@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Play, ChevronRight, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,11 +7,12 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 interface VoiceRecorderProps {
-  onRecordingComplete?: (data: { transcription: string, refinedText: string }) => void;
+  onRecordingComplete?: (audioData: Blob) => void;
+  onCancel?: () => void;
   className?: string;
 }
 
-export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderProps) {
+export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -40,7 +40,6 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
-        // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
       };
       
@@ -49,17 +48,14 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
       setAudioBlob(null);
       mediaRecorder.start();
       
-      // Start timer
       timerRef.current = window.setInterval(() => {
         setRecordingTime((prev) => prev + 1);
         
-        // Add a new ripple every 2 seconds
         if ((recordingTime % 2) === 0) {
           setRipples(prev => [...prev, Date.now()]);
         }
       }, 1000);
       
-      // Initial ripple
       setRipples([Date.now()]);
     } catch (error) {
       console.error('Error accessing microphone:', error);
@@ -72,13 +68,11 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       
-      // Clear timer
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
       
-      // Clear ripples
       setRipples([]);
       
       toast.success('Recording saved!');
@@ -102,45 +96,15 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
     
     try {
       setIsProcessing(true);
-      toast.loading('Processing your recording...');
       
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
+      if (onRecordingComplete) {
+        onRecordingComplete(audioBlob);
+      }
       
-      reader.onloadend = async () => {
-        // Extract base64 data
-        const base64Audio = reader.result as string;
-        const base64Data = base64Audio.split(',')[1];
-        
-        // Send to our Supabase Edge Function
-        const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-          body: { audio: base64Data }
-        });
-        
-        if (error) {
-          console.error('Error processing audio:', error);
-          toast.dismiss();
-          toast.error('Error processing recording. Please try again.');
-          setIsProcessing(false);
-          return;
-        }
-        
-        // Success!
-        toast.dismiss();
-        toast.success('Entry saved!');
-        
-        if (onRecordingComplete) {
-          onRecordingComplete(data);
-        }
-        
-        // Reset state
-        setAudioBlob(null);
-        setIsProcessing(false);
-      };
+      setAudioBlob(null);
+      setIsProcessing(false);
     } catch (error) {
       console.error('Error processing recording:', error);
-      toast.dismiss();
       toast.error('Error processing recording. Please try again.');
       setIsProcessing(false);
     }
@@ -153,7 +117,6 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
   };
 
   useEffect(() => {
-    // Cleanup on unmount
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -164,7 +127,6 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
     };
   }, [isRecording]);
 
-  // Clean up old ripples
   useEffect(() => {
     if (ripples.length > 0) {
       const timer = setTimeout(() => {
@@ -175,7 +137,6 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
     }
   }, [ripples]);
 
-  // Handle audio playback ended
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.onended = () => setIsPlaying(false);
@@ -193,7 +154,6 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
       )}
       
       <div className="relative flex items-center justify-center my-8">
-        {/* Recording button and ripple effects */}
         <AnimatePresence>
           {ripples.map((id) => (
             <motion.div
@@ -229,7 +189,6 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
         </motion.button>
       </div>
       
-      {/* Recording timer or playback controls */}
       <AnimatePresence mode="wait">
         {isRecording ? (
           <motion.div

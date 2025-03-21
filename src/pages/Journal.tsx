@@ -81,6 +81,13 @@ export default function Journal() {
     try {
       // Convert blob to base64
       const reader = new FileReader();
+      
+      // Make sure we have actual audio data
+      if (!audioData || !(audioData instanceof Blob)) {
+        toast.error('Invalid audio data received');
+        return;
+      }
+      
       reader.readAsDataURL(audioData);
       reader.onloadend = async () => {
         const base64Audio = reader.result?.toString().split(',')[1];
@@ -240,7 +247,10 @@ export default function Journal() {
             transition={{ duration: 0.3 }}
             className="mb-8"
           >
-            <VoiceRecorder onRecordingComplete={handleNewEntry} onCancel={() => setIsRecording(false)} />
+            <VoiceRecorder 
+              onRecordingComplete={handleNewEntry} 
+              onCancel={() => setIsRecording(false)} 
+            />
           </motion.div>
         )}
         
