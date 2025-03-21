@@ -1,0 +1,140 @@
+
+import { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Home, MessageCircle, BarChart2, Settings, Menu, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+
+export function Navbar() {
+  const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+  const isMobile = useIsMobile();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 20) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const navItems = [
+    { path: '/', label: 'Home', icon: Home },
+    { path: '/journal', label: 'Journal', icon: Home },
+    { path: '/insights', label: 'Insights', icon: BarChart2 },
+    { path: '/chat', label: 'AI Assistant', icon: MessageCircle },
+    { path: '/settings', label: 'Settings', icon: Settings },
+  ];
+
+  const closeMenu = () => setIsOpen(false);
+
+  return (
+    <nav 
+      className={cn(
+        "fixed top-0 w-full z-50 transition-all duration-300 px-4 md:px-8",
+        scrolled || isOpen ? "backdrop-blur-xl bg-white/70 shadow-md py-3" : "py-5"
+      )}
+    >
+      <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <Link to="/" className="flex items-center gap-2">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center"
+          >
+            <span className="text-white font-bold text-lg">F</span>
+          </motion.div>
+          <motion.span 
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="font-semibold text-xl"
+          >
+            Feelosophy
+          </motion.span>
+        </Link>
+
+        {/* Desktop navigation */}
+        <div className="hidden md:flex items-center gap-1">
+          {navItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={cn(
+                "relative px-4 py-2 rounded-full flex items-center gap-2 transition-all duration-300",
+                location.pathname === item.path
+                  ? "text-primary font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {location.pathname === item.path && (
+                <motion.div
+                  layoutId="nav-pill"
+                  className="absolute inset-0 bg-primary/10 rounded-full"
+                  transition={{ type: "spring", duration: 0.6 }}
+                />
+              )}
+              <item.icon className="h-4 w-4" />
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </div>
+
+        {/* Mobile menu button */}
+        <button 
+          onClick={() => setIsOpen(!isOpen)}
+          className="md:hidden p-2"
+          aria-label={isOpen ? "Close menu" : "Open menu"}
+        >
+          {isOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
+        </button>
+      </div>
+
+      {/* Mobile menu */}
+      {isMobile && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ 
+            height: isOpen ? 'auto' : 0,
+            opacity: isOpen ? 1 : 0
+          }}
+          transition={{ duration: 0.3 }}
+          className="md:hidden overflow-hidden"
+        >
+          <div className="py-4 flex flex-col gap-2">
+            {navItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={closeMenu}
+                className={cn(
+                  "p-3 rounded-lg flex items-center gap-3 transition-all",
+                  location.pathname === item.path
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:bg-secondary"
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                <span>{item.label}</span>
+              </Link>
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </nav>
+  );
+}
+
+export default Navbar;
