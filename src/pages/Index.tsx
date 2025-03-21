@@ -1,10 +1,10 @@
-
 import { useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Mic, BarChart2, Bot, HeartPulse, Volume1 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
+import ParticleBackground from '@/components/ParticleBackground';
 
 const fadeInUpVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -91,17 +91,14 @@ export default function Index() {
   return (
     <div ref={ref} className="min-h-screen">
       <Navbar />
+      <ParticleBackground />
       
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center py-20 px-4 overflow-hidden">
         <motion.div
           style={{ y, opacity }}
           className="absolute inset-0 -z-10"
-        >
-          <div className="absolute top-1/4 left-1/4 w-72 h-72 rounded-full bg-blue-200 opacity-30 blur-3xl" />
-          <div className="absolute top-1/3 right-1/4 w-96 h-96 rounded-full bg-feelosophy-lavender opacity-20 blur-3xl" />
-          <div className="absolute bottom-1/4 left-1/3 w-80 h-80 rounded-full bg-feelosophy-peach opacity-30 blur-3xl" />
-        </motion.div>
+        />
         
         <div className="max-w-5xl mx-auto text-center relative z-10 pt-16">
           <motion.div
@@ -149,21 +146,6 @@ export default function Index() {
                 Try AI Assistant
               </Link>
             </Button>
-          </motion.div>
-          
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.2 }}
-            className="mt-16 mb-8"
-          >
-            <div className="overflow-hidden glass rounded-2xl max-w-2xl mx-auto shadow-xl">
-              <img 
-                src="https://images.unsplash.com/photo-1600210492493-0946911123ea?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.0.3"
-                alt="Feelosophy App Preview" 
-                className="w-full object-cover"
-              />
-            </div>
           </motion.div>
         </div>
       </section>

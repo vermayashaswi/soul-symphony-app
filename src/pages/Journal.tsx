@@ -10,6 +10,7 @@ import VoiceRecorder from '@/components/VoiceRecorder';
 import Navbar from '@/components/Navbar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import ParticleBackground from '@/components/ParticleBackground';
 
 // Update the type definition to match the actual database structure
 type JournalEntry = {
@@ -19,6 +20,7 @@ type JournalEntry = {
   "refined text"?: string | null;
   emotions?: string[];
   duration?: string;
+  audio_url?: string | null;
 };
 
 export default function Journal() {
@@ -73,10 +75,6 @@ export default function Journal() {
     (entry.emotions && entry.emotions.some(emotion => emotion.toLowerCase().includes(searchQuery.toLowerCase())))
   );
   
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-  };
-  
   const handleNewEntry = async (audioData: Blob) => {
     try {
       // Convert blob to base64
@@ -87,6 +85,30 @@ export default function Journal() {
         toast.error('Invalid audio data received');
         return;
       }
+      
+      // Save the audio file to Supabase Storage
+      const timestamp = Date.now();
+      const filename = `journal-entry-${timestamp}.webm`;
+      
+      // Upload to storage
+      const { data: storageData, error: storageError } = await supabase
+        .storage
+        .from('audio-recordings')
+        .upload(filename, audioData);
+        
+      if (storageError) {
+        console.error('Error uploading audio:', storageError);
+        toast.error('Failed to save audio recording');
+        // Continue with transcription even if storage fails
+      }
+      
+      // Get the public URL for the audio
+      const { data: urlData } = await supabase
+        .storage
+        .from('audio-recordings')
+        .getPublicUrl(filename);
+        
+      const audioUrl = urlData?.publicUrl;
       
       reader.readAsDataURL(audioData);
       reader.onloadend = async () => {
@@ -115,22 +137,26 @@ export default function Journal() {
           toast.dismiss();
           toast.success('Journal entry saved!');
           
-          // Fetch the updated entries
-          const { data: newEntries, error: fetchError } = await supabase
+          // Create the entry with the audioUrl included
+          const { data: entryData, error: insertError } = await supabase
             .from('Journal Entries')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(1)
+            .insert([{ 
+              "transcription text": transcriptionData?.transcription || '',
+              "refined text": transcriptionData?.refinedText || '',
+              "audio_url": audioUrl
+            }])
+            .select()
             .single();
-          
-          if (fetchError) {
-            console.error('Error fetching new entry:', fetchError);
+            
+          if (insertError) {
+            console.error('Error creating entry:', insertError);
+            toast.error('Failed to save entry details');
             return;
           }
           
           // Add the new entry to the state with placeholder emotions and duration
           const newEntryWithMetadata: JournalEntry = {
-            ...newEntries,
+            ...entryData,
             emotions: ['Reflective', 'Thoughtful', 'Calm'],
             duration: '2:45'
           };
@@ -141,17 +167,34 @@ export default function Journal() {
           console.error('Error processing audio:', err);
           toast.dismiss();
           toast.error('An error occurred while processing your journal entry.');
+        } finally {
+          setIsRecording(false);
         }
       };
     } catch (err) {
       console.error('Error preparing audio data:', err);
       toast.error('Failed to prepare audio data.');
+      setIsRecording(false);
     }
   };
   
   const deleteEntry = async (id: number) => {
     try {
       toast.loading('Deleting entry...');
+      
+      // Find the entry to get its audio URL
+      const entryToDelete = entries.find(entry => entry.id === id);
+      
+      // Delete the audio file from storage if it exists
+      if (entryToDelete?.audio_url) {
+        const filename = entryToDelete.audio_url.split('/').pop();
+        if (filename) {
+          await supabase
+            .storage
+            .from('audio-recordings')
+            .remove([filename]);
+        }
+      }
       
       const { error } = await supabase
         .from('Journal Entries')
@@ -177,12 +220,27 @@ export default function Journal() {
       toast.error('An unexpected error occurred.');
     }
   };
+  
+  const playAudio = (audioUrl: string | null | undefined) => {
+    if (!audioUrl) {
+      toast.error('No audio recording available for this entry.');
+      return;
+    }
+    
+    // Create audio element and play
+    const audio = new Audio(audioUrl);
+    audio.play().catch(err => {
+      console.error('Error playing audio:', err);
+      toast.error('Failed to play the recording.');
+    });
+  };
 
   // Render a helpful message if there's an error or if data is loading
   if (error) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
+        <ParticleBackground />
         <div className="max-w-5xl mx-auto pt-24 px-4">
           <div className="text-center py-12">
             <h2 className="text-2xl font-semibold mb-2">Error Loading Journal</h2>
@@ -202,6 +260,7 @@ export default function Journal() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <ParticleBackground />
       
       <div className="max-w-5xl mx-auto pt-24 px-4">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
@@ -219,7 +278,7 @@ export default function Journal() {
             </div>
             
             <Button 
-              onClick={toggleRecording} 
+              onClick={() => setIsRecording(!isRecording)} 
               className={isRecording ? "bg-red-500 hover:bg-red-600" : ""}
             >
               {isRecording ? (
@@ -287,14 +346,28 @@ export default function Journal() {
                         ))}
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => deleteEntry(entry.id)}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-2">
+                      {entry.audio_url && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => playAudio(entry.audio_url)}
+                          className="text-muted-foreground hover:text-primary"
+                          title="Play recording"
+                        >
+                          <Play className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => deleteEntry(entry.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                        title="Delete entry"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="flex items-center justify-between text-sm text-muted-foreground pt-2 border-t border-border mt-2">
@@ -315,7 +388,7 @@ export default function Journal() {
           <div className="text-center py-12">
             <h2 className="text-2xl font-semibold mb-2">No journal entries yet</h2>
             <p className="text-muted-foreground mb-8">Record your first voice journal to get started</p>
-            <Button onClick={toggleRecording}>
+            <Button onClick={() => setIsRecording(true)}>
               <Mic className="mr-2 h-4 w-4" />
               Start Recording
             </Button>

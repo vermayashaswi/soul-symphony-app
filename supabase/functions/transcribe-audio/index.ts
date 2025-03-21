@@ -122,29 +122,6 @@ serve(async (req) => {
     
     console.log("Refinement successful:", refinedText);
 
-    // Store in Supabase - match the DB column names exactly
-    if (supabaseServiceKey) {
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-      
-      console.log("Storing in Supabase...");
-      const { data, error } = await supabase
-        .from('Journal Entries')
-        .insert([
-          { 
-            "transcription text": transcribedText,
-            "refined text": refinedText 
-          }
-        ]);
-      
-      if (error) {
-        console.error("Supabase storage error:", error);
-      } else {
-        console.log("Successfully stored in Supabase:", data);
-      }
-    } else {
-      console.warn("Supabase service key not available, skipping database storage");
-    }
-
     return new Response(
       JSON.stringify({
         transcription: transcribedText,

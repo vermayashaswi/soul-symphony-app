@@ -1,10 +1,10 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Play, ChevronRight, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioData: Blob) => void;
@@ -21,7 +21,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<number | null>(null);
+  const timerIntervalRef = useRef<number | null>(null);
   const [ripples, setRipples] = useState<number[]>([]);
   
   const startRecording = async () => {
@@ -48,14 +48,26 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       setAudioBlob(null);
       mediaRecorder.start();
       
-      timerRef.current = window.setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-        
-        if ((recordingTime % 2) === 0) {
-          setRipples(prev => [...prev, Date.now()]);
-        }
+      // Important: Clear any existing interval before setting a new one
+      if (timerIntervalRef.current) {
+        window.clearInterval(timerIntervalRef.current);
+      }
+      
+      // Set up the interval for the timer and ripples
+      timerIntervalRef.current = window.setInterval(() => {
+        setRecordingTime(prev => {
+          const newTime = prev + 1;
+          
+          // Add ripple effect on even seconds
+          if (newTime % 2 === 0) {
+            setRipples(prev => [...prev, Date.now()]);
+          }
+          
+          return newTime;
+        });
       }, 1000);
       
+      // Initial ripple
       setRipples([Date.now()]);
     } catch (error) {
       console.error('Error accessing microphone:', error);
@@ -68,9 +80,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
       
       setRipples([]);
@@ -118,8 +130,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
       }
       if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop();
