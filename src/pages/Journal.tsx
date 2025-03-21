@@ -11,11 +11,12 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Update the type definition to match the actual database structure
 type JournalEntry = {
   id: number;
   created_at: string;
-  transcription: string;
-  "refined text": string;
+  "transcription text"?: string | null;
+  "refined text"?: string | null;
   emotions?: string[];
   duration?: string;
 };
@@ -63,7 +64,7 @@ export default function Journal() {
   
   // Filter entries based on search query
   const filteredEntries = entries.filter(entry => 
-    (entry.transcription && entry.transcription.toLowerCase().includes(searchQuery.toLowerCase())) || 
+    (entry["transcription text"] && entry["transcription text"].toLowerCase().includes(searchQuery.toLowerCase())) || 
     (entry["refined text"] && entry["refined text"].toLowerCase().includes(searchQuery.toLowerCase())) ||
     (entry.emotions && entry.emotions.some(emotion => emotion.toLowerCase().includes(searchQuery.toLowerCase())))
   );
@@ -85,7 +86,7 @@ export default function Journal() {
       }
       
       // Add the new entry to the state with placeholder emotions and duration
-      const newEntryWithMetadata = {
+      const newEntryWithMetadata: JournalEntry = {
         ...newEntries,
         emotions: ['Reflective', 'Thoughtful', 'Calm'],
         duration: '2:45'
@@ -182,7 +183,7 @@ export default function Journal() {
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="font-semibold text-lg mb-2">{format(new Date(entry.created_at), 'MMMM d, yyyy')}</h3>
-                        <p className="text-muted-foreground mb-3">{entry["refined text"] || entry.transcription}</p>
+                        <p className="text-muted-foreground mb-3">{entry["refined text"] || entry["transcription text"]}</p>
                         <div className="flex flex-wrap gap-2">
                           {entry.emotions?.map((emotion) => (
                             <span 

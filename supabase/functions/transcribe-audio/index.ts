@@ -122,7 +122,7 @@ serve(async (req) => {
     
     console.log("Refinement successful:", refinedText);
 
-    // Store in Supabase
+    // Store in Supabase - match the DB column names exactly
     if (supabaseServiceKey) {
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
       
@@ -131,7 +131,7 @@ serve(async (req) => {
         .from('Journal Entries')
         .insert([
           { 
-            transcription: transcribedText,
+            "transcription text": transcribedText,
             "refined text": refinedText 
           }
         ]);
