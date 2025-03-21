@@ -1,13 +1,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Play, ChevronRight } from 'lucide-react';
+import { Mic, Square, Play, ChevronRight, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VoiceRecorderProps {
-  onRecordingComplete?: (blob: Blob) => void;
+  onRecordingComplete?: (data: { transcription: string, refinedText: string }) => void;
   className?: string;
 }
 
@@ -16,12 +17,13 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const [ripples, setRipples] = useState<number[]>([]);
-
+  
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -38,9 +40,6 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
-        if (onRecordingComplete) {
-          onRecordingComplete(blob);
-        }
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
       };
@@ -95,6 +94,55 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
     } else {
       audioRef.current.play();
       setIsPlaying(true);
+    }
+  };
+  
+  const processRecording = async () => {
+    if (!audioBlob) return;
+    
+    try {
+      setIsProcessing(true);
+      toast.loading('Processing your recording...');
+      
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      
+      reader.onloadend = async () => {
+        // Extract base64 data
+        const base64Audio = reader.result as string;
+        const base64Data = base64Audio.split(',')[1];
+        
+        // Send to our Supabase Edge Function
+        const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+          body: { audio: base64Data }
+        });
+        
+        if (error) {
+          console.error('Error processing audio:', error);
+          toast.dismiss();
+          toast.error('Error processing recording. Please try again.');
+          setIsProcessing(false);
+          return;
+        }
+        
+        // Success!
+        toast.dismiss();
+        toast.success('Entry saved!');
+        
+        if (onRecordingComplete) {
+          onRecordingComplete(data);
+        }
+        
+        // Reset state
+        setAudioBlob(null);
+        setIsProcessing(false);
+      };
+    } catch (error) {
+      console.error('Error processing recording:', error);
+      toast.dismiss();
+      toast.error('Error processing recording. Please try again.');
+      setIsProcessing(false);
     }
   };
 
@@ -162,11 +210,13 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
         
         <motion.button
           onClick={isRecording ? stopRecording : startRecording}
+          disabled={isProcessing}
           className={cn(
             "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
             isRecording 
               ? "bg-red-500 border-red-600 w-16 h-16" 
-              : "bg-primary hover:bg-primary/90 border-primary/20 w-20 h-20"
+              : "bg-primary hover:bg-primary/90 border-primary/20 w-20 h-20",
+            isProcessing && "opacity-50 cursor-not-allowed"
           )}
           whileTap={{ scale: 0.95 }}
           animate={isRecording ? { scale: [1, 1.05, 1], transition: { repeat: Infinity, duration: 1.5 } } : {}}
@@ -206,6 +256,7 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
             <Button 
               onClick={togglePlayback} 
               variant="outline"
+              disabled={isProcessing}
               className="rounded-full h-10 px-4 flex items-center gap-2"
             >
               {isPlaying ? (
@@ -222,18 +273,21 @@ export function VoiceRecorder({ onRecordingComplete, className }: VoiceRecorderP
             </Button>
             
             <Button 
-              onClick={() => {
-                // Process the recording (in a real app, this would send to Whisper API)
-                toast.success('Processing your recording...');
-                setTimeout(() => {
-                  toast.success('Entry saved!');
-                  setAudioBlob(null);
-                }, 2000);
-              }}
+              onClick={processRecording}
+              disabled={isProcessing}
               className="w-full mt-2 rounded-lg flex items-center justify-center gap-2"
             >
-              <span>Save Entry</span>
-              <ChevronRight className="w-4 h-4" />
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <span>Save Entry</span>
+                  <ChevronRight className="w-4 h-4" />
+                </>
+              )}
             </Button>
           </motion.div>
         ) : (

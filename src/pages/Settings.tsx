@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, Volume2, HelpCircle, Shield, Edit, Check } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, Volume2, HelpCircle, Shield, Edit, Check as CheckIcon } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -39,7 +39,6 @@ export default function Settings() {
   const [aiVoiceFeedback, setAiVoiceFeedback] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(false);
   
-  // Color theme options
   const colorThemes = [
     { name: 'Default', color: 'bg-primary' },
     { name: 'Calm', color: 'bg-blue-400' },
@@ -185,7 +184,7 @@ export default function Settings() {
                         )}
                       >
                         {selectedTheme === themeOption.name && (
-                          <Check className="h-5 w-5 text-white" />
+                          <CheckIcon className="h-5 w-5 text-white" />
                         )}
                       </div>
                       <span className="text-xs">{themeOption.name}</span>
@@ -290,19 +289,6 @@ export default function Settings() {
 
 function Check(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
+    <CheckIcon {...props} />
   );
 }

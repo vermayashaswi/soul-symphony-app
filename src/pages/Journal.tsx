@@ -1,60 +1,103 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { Calendar, Search, Filter, Plus, CheckCircle2, Clock, Tag } from 'lucide-react';
+import { Calendar, Search, Filter, Plus, CheckCircle2, Clock, Tag, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import Navbar from '@/components/Navbar';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-// Sample journal entries (in a real app, these would come from a backend)
-const sampleEntries = [
-  {
-    id: 1,
-    date: new Date('2023-05-10'),
-    summary: 'Had a productive day at work, felt accomplished',
-    emotions: ['Joy', 'Productive', 'Calm'],
-    duration: '2:45',
-  },
-  {
-    id: 2,
-    date: new Date('2023-05-08'),
-    summary: 'Feeling anxious about the upcoming presentation',
-    emotions: ['Anxiety', 'Stress', 'Worry'],
-    duration: '3:21',
-  },
-  {
-    id: 3,
-    date: new Date('2023-05-05'),
-    summary: 'Great dinner with friends, laughed a lot',
-    emotions: ['Happy', 'Social', 'Relaxed'],
-    duration: '4:12',
-  },
-  {
-    id: 4,
-    date: new Date('2023-05-02'),
-    summary: 'Feeling tired after a long week, need rest',
-    emotions: ['Tired', 'Drained', 'Reflective'],
-    duration: '1:50',
-  },
-];
+type JournalEntry = {
+  id: number;
+  created_at: string;
+  transcription: string;
+  "refined text": string;
+  emotions?: string[];
+  duration?: string;
+};
 
 export default function Journal() {
   const [isRecording, setIsRecording] = useState(false);
-  const [entries, setEntries] = useState(sampleEntries);
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Fetch journal entries from Supabase
+  useEffect(() => {
+    async function fetchEntries() {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('Journal Entries')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('Error fetching journal entries:', error);
+          toast.error('Failed to load journal entries');
+          return;
+        }
+        
+        // Add placeholder emotions and duration if they don't exist yet
+        const entriesWithMetadata = data.map(entry => ({
+          ...entry,
+          emotions: ['Reflective', 'Thoughtful', 'Calm'],
+          duration: '2:45'
+        }));
+        
+        setEntries(entriesWithMetadata);
+      } catch (error) {
+        console.error('Error in fetchEntries:', error);
+        toast.error('Something went wrong while loading entries');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    fetchEntries();
+  }, []);
   
   // Filter entries based on search query
   const filteredEntries = entries.filter(entry => 
-    entry.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    entry.emotions.some(emotion => emotion.toLowerCase().includes(searchQuery.toLowerCase()))
+    (entry.transcription && entry.transcription.toLowerCase().includes(searchQuery.toLowerCase())) || 
+    (entry["refined text"] && entry["refined text"].toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (entry.emotions && entry.emotions.some(emotion => emotion.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
-  const handleRecordingComplete = (blob: Blob) => {
-    console.log('Recording completed:', blob);
-    // In a real app, this would send the audio to Whisper API for transcription
+  const handleRecordingComplete = async (data: { transcription: string, refinedText: string }) => {
+    // The data is already stored in Supabase by the edge function,
+    // so we just need to refresh our entries
+    try {
+      const { data: newEntries, error } = await supabase
+        .from('Journal Entries')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching new entry:', error);
+        return;
+      }
+      
+      // Add the new entry to the state with placeholder emotions and duration
+      const newEntryWithMetadata = {
+        ...newEntries,
+        emotions: ['Reflective', 'Thoughtful', 'Calm'],
+        duration: '2:45'
+      };
+      
+      setEntries(prev => [newEntryWithMetadata, ...prev]);
+    } catch (error) {
+      console.error('Error in handleRecordingComplete:', error);
+    }
+    
+    // Hide the recorder
+    setIsRecording(false);
   };
 
   const toggleRecording = () => {
@@ -120,7 +163,14 @@ export default function Journal() {
             </div>
             
             <div className="space-y-4">
-              {filteredEntries.length > 0 ? (
+              {isLoading ? (
+                <div className="flex justify-center py-12">
+                  <div className="flex flex-col items-center">
+                    <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
+                    <p className="text-muted-foreground">Loading journal entries...</p>
+                  </div>
+                </div>
+              ) : filteredEntries.length > 0 ? (
                 filteredEntries.map((entry) => (
                   <motion.div
                     key={entry.id}
@@ -131,10 +181,10 @@ export default function Journal() {
                   >
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-semibold text-lg mb-2">{format(entry.date, 'MMMM d, yyyy')}</h3>
-                        <p className="text-muted-foreground mb-3">{entry.summary}</p>
+                        <h3 className="font-semibold text-lg mb-2">{format(new Date(entry.created_at), 'MMMM d, yyyy')}</h3>
+                        <p className="text-muted-foreground mb-3">{entry["refined text"] || entry.transcription}</p>
                         <div className="flex flex-wrap gap-2">
-                          {entry.emotions.map((emotion) => (
+                          {entry.emotions?.map((emotion) => (
                             <span 
                               key={emotion} 
                               className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium"
@@ -147,7 +197,7 @@ export default function Journal() {
                       <div className="flex flex-col items-end">
                         <div className="flex items-center text-muted-foreground text-xs mb-2">
                           <Clock className="h-3 w-3 mr-1" />
-                          <span>{entry.duration}</span>
+                          <span>{entry.duration || "2:45"}</span>
                         </div>
                         <div className="mt-2">
                           <CheckCircle2 className="h-5 w-5 text-green-500" />

@@ -2,12 +2,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { Send, Mic, MicOff, Bot, User, Image, Calendar, PlusCircle, SmilePlus } from 'lucide-react';
+import { Send, Mic, MicOff, Bot, User, Image, Calendar, PlusCircle, SmilePlus, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 type Message = {
   id: string;
@@ -29,6 +30,7 @@ export default function Chat() {
   ]);
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -47,8 +49,8 @@ export default function Chat() {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
     
     // Add user message
     const userMessage: Message = {
@@ -60,8 +62,9 @@ export default function Chat() {
     
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setIsLoading(true);
     
-    // Simulate AI thinking
+    // Add thinking message
     const thinkingId = (Date.now() + 1).toString();
     setMessages(prev => [
       ...prev, 
@@ -74,19 +77,53 @@ export default function Chat() {
       }
     ]);
     
-    // Simulate AI response after a short delay
-    setTimeout(() => {
+    try {
+      // Call RAG-enhanced chat function
+      const { data, error } = await supabase.functions.invoke('chat-rag', {
+        body: { message: input }
+      });
+      
+      // Remove thinking message
       setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
       
-      const aiResponse: Message = {
+      if (error) {
+        console.error('Error calling chat function:', error);
+        toast.error('Sorry, I had trouble responding. Please try again.');
+        
+        // Add error message
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 2).toString(),
+          sender: 'ai',
+          text: "I'm sorry, I encountered an error while processing your message. Could you try again?",
+          timestamp: new Date(),
+        }]);
+      } else {
+        // Add AI response
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 2).toString(),
+          sender: 'ai',
+          text: data.response,
+          timestamp: new Date(),
+        }]);
+      }
+    } catch (error) {
+      console.error('Error in handleSend:', error);
+      
+      // Remove thinking message
+      setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
+      
+      // Add error message
+      setMessages(prev => [...prev, {
         id: (Date.now() + 2).toString(),
         sender: 'ai',
-        text: getAIResponse(input),
+        text: "I'm sorry, I encountered an error while processing your message. Could you try again?",
         timestamp: new Date(),
-      };
+      }]);
       
-      setMessages(prev => [...prev, aiResponse]);
-    }, 1500);
+      toast.error('Sorry, I had trouble responding. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const startRecording = async () => {
@@ -102,10 +139,9 @@ export default function Chat() {
         }
       };
       
-      mediaRecorder.onstop = () => {
-        // In a real app, this would send audio to Whisper API
-        // Here we just simulate a text response
-        processVoiceToText();
+      mediaRecorder.onstop = async () => {
+        // Process voice to text using Supabase Edge Function
+        await processVoiceToText();
         
         // Stop audio tracks
         stream.getTracks().forEach(track => track.stop());
@@ -128,75 +164,118 @@ export default function Chat() {
     }
   };
 
-  const processVoiceToText = () => {
-    // This would normally send audio to Whisper API and get a transcript
-    // Here we just simulate it with a fixed response
-    const simulatedText = "I've been feeling a bit anxious about work lately.";
-    
-    // Add user message with the transcribed text
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      sender: 'user',
-      text: simulatedText,
-      timestamp: new Date(),
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    
-    // Simulate AI thinking
-    const thinkingId = (Date.now() + 1).toString();
-    setMessages(prev => [
-      ...prev, 
-      { 
-        id: thinkingId, 
-        sender: 'ai', 
-        text: '...', 
-        timestamp: new Date(),
-        isThinking: true,
-      }
-    ]);
-    
-    // Simulate AI response
-    setTimeout(() => {
-      setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
+  const processVoiceToText = async () => {
+    try {
+      if (audioChunksRef.current.length === 0) return;
       
-      const aiResponse: Message = {
-        id: (Date.now() + 2).toString(),
-        sender: 'ai',
-        text: "I've noticed that work-related anxiety has been a recurring theme in your entries. Would you like to explore some coping strategies that have helped others in similar situations?",
-        timestamp: new Date(),
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      
+      reader.onloadend = async () => {
+        // Show loading toast
+        toast.loading('Processing your voice message...');
+        
+        // Extract base64 data
+        const base64Audio = reader.result as string;
+        const base64Data = base64Audio.split(',')[1];
+        
+        // Send to our Supabase Edge Function
+        const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+          body: { audio: base64Data }
+        });
+        
+        toast.dismiss();
+        
+        if (error) {
+          console.error('Error processing voice:', error);
+          toast.error('Error processing voice message. Please try again.');
+          return;
+        }
+        
+        // Success! Add the transcribed message to chat
+        toast.success('Voice processed successfully!');
+        
+        // Add user message with the transcribed text
+        const userMessage: Message = {
+          id: Date.now().toString(),
+          sender: 'user',
+          text: data.transcription,
+          timestamp: new Date(),
+        };
+        
+        setMessages(prev => [...prev, userMessage]);
+        
+        // Now trigger AI response using the transcribed text
+        setIsLoading(true);
+        
+        // Add thinking message
+        const thinkingId = (Date.now() + 1).toString();
+        setMessages(prev => [
+          ...prev, 
+          { 
+            id: thinkingId, 
+            sender: 'ai', 
+            text: '...', 
+            timestamp: new Date(),
+            isThinking: true,
+          }
+        ]);
+        
+        try {
+          // Call RAG-enhanced chat function
+          const { data: ragData, error: ragError } = await supabase.functions.invoke('chat-rag', {
+            body: { message: data.transcription }
+          });
+          
+          // Remove thinking message
+          setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
+          
+          if (ragError) {
+            console.error('Error calling chat function:', ragError);
+            toast.error('Sorry, I had trouble responding. Please try again.');
+            
+            // Add error message
+            setMessages(prev => [...prev, {
+              id: (Date.now() + 2).toString(),
+              sender: 'ai',
+              text: "I'm sorry, I encountered an error while processing your message. Could you try again?",
+              timestamp: new Date(),
+            }]);
+          } else {
+            // Add AI response
+            setMessages(prev => [...prev, {
+              id: (Date.now() + 2).toString(),
+              sender: 'ai',
+              text: ragData.response,
+              timestamp: new Date(),
+            }]);
+          }
+        } catch (error) {
+          console.error('Error in voice processing chat response:', error);
+          
+          // Remove thinking message
+          setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
+          
+          // Add error message
+          setMessages(prev => [...prev, {
+            id: (Date.now() + 2).toString(),
+            sender: 'ai',
+            text: "I'm sorry, I encountered an error while processing your message. Could you try again?",
+            timestamp: new Date(),
+          }]);
+          
+          toast.error('Sorry, I had trouble responding. Please try again.');
+        } finally {
+          setIsLoading(false);
+        }
       };
-      
-      setMessages(prev => [...prev, aiResponse]);
-    }, 1500);
-  };
-
-  // Simple function to simulate AI responses
-  const getAIResponse = (userMessage: string) => {
-    const lowerCaseMsg = userMessage.toLowerCase();
-    
-    if (lowerCaseMsg.includes('how') && lowerCaseMsg.includes('feeling')) {
-      return "Based on your recent journal entries, you've been experiencing more joy in the past week, with a 20% decrease in anxiety compared to the previous week. Your energy levels have been relatively stable.";
+    } catch (error) {
+      console.error('Error processing voice to text:', error);
+      toast.error('Error processing voice message. Please try again.');
     }
-    
-    if (lowerCaseMsg.includes('pattern') || lowerCaseMsg.includes('trend')) {
-      return "I've noticed that you tend to feel more anxious on Mondays and Tuesdays, but your mood typically improves toward the end of the week. Your sleep quality seems to significantly impact your daily mood - days after good sleep show more positive emotions.";
-    }
-    
-    if (lowerCaseMsg.includes('mindful') || lowerCaseMsg.includes('exercise')) {
-      return "Here's a simple mindfulness exercise: Close your eyes and take five deep, slow breaths. Focus on the sensation of breathing in and out. Notice any thoughts that come up without judgment, and gently return your attention to your breath. How does that feel?";
-    }
-    
-    if (lowerCaseMsg.includes('anxiety') || lowerCaseMsg.includes('stress')) {
-      return "I'm sorry to hear you're experiencing anxiety. Your journal entries suggest that taking a short walk outside tends to help you when you're feeling anxious. Would you like me to suggest some other anxiety-reduction techniques that might work for you?";
-    }
-    
-    if (lowerCaseMsg.includes('progress')) {
-      return "You've made significant progress in the past month! Your anxiety levels have decreased by 15%, and you've had 8 consecutive days of journaling - your longest streak yet. Your emotional vocabulary has also expanded, allowing you to express your feelings with more nuance.";
-    }
-    
-    // Default response
-    return "Thank you for sharing that with me. Would you like to explore this topic further, or would you prefer to talk about something else? I'm here to support you however I can.";
   };
 
   return (
@@ -300,6 +379,7 @@ export default function Chat() {
                 variant="outline"
                 className="rounded-full flex-shrink-0"
                 onClick={isRecording ? stopRecording : startRecording}
+                disabled={isLoading}
               >
                 {isRecording ? (
                   <MicOff className="h-5 w-5 text-red-500" />
@@ -320,6 +400,7 @@ export default function Chat() {
                       handleSend();
                     }
                   }}
+                  disabled={isLoading}
                   className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent flex-1"
                 />
                 <div className="flex items-center">
@@ -353,11 +434,15 @@ export default function Chat() {
               <Button
                 type="button"
                 size="icon"
-                disabled={!input.trim()}
+                disabled={!input.trim() || isLoading}
                 onClick={handleSend}
                 className="rounded-full flex-shrink-0"
               >
-                <Send className="h-5 w-5" />
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
               </Button>
             </div>
           </div>
