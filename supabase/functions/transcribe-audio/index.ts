@@ -48,6 +48,14 @@ function processBase64Chunks(base64String: string, chunkSize = 32768) {
 // Generate embeddings using OpenAI
 async function generateEmbedding(text: string) {
   try {
+    // Log that we're trying to generate an embedding
+    console.log('Generating embedding for text:', text.slice(0, 100) + '...');
+    
+    if (!openAIApiKey) {
+      console.error('OpenAI API key is missing or empty');
+      throw new Error('OpenAI API key is not configured');
+    }
+    
     const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -87,7 +95,16 @@ serve(async (req) => {
       throw new Error('No audio data provided');
     }
 
+    // Verify API keys are available
+    if (!openAIApiKey) {
+      console.error('OpenAI API key is missing or empty in environment variables');
+      throw new Error('OpenAI API key is not configured. Please set the OPENAI_API_KEY secret in the Supabase dashboard.');
+    }
+
     console.log("Received audio data, processing...");
+    console.log("OpenAI API Key available:", !!openAIApiKey);
+    console.log("Supabase URL available:", !!supabaseUrl);
+    console.log("Supabase Service Key available:", !!supabaseServiceKey);
     
     // Process audio in chunks
     const binaryAudio = processBase64Chunks(audio);
