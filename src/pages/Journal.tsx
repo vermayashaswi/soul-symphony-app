@@ -30,12 +30,15 @@ export default function Journal() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showRecorder, setShowRecorder] = useState(true);
+  const [fetchTrigger, setFetchTrigger] = useState(0); // Add a trigger to force refetch
   
   useEffect(() => {
     async function fetchJournalEntries() {
       try {
         setIsLoading(true);
         setError(null);
+        
+        console.log('Fetching journal entries...');
         
         const { data, error } = await supabase
           .from('Journal Entries')
@@ -45,9 +48,11 @@ export default function Journal() {
         if (error) {
           console.error('Error fetching journal entries:', error);
           setError('Failed to load journal entries.');
-          toast.error('Failed to load journal entries');
+          toast.error('Failed to load journal entries: ' + error.message);
           return;
         }
+
+        console.log('Fetched journal entries:', data);
 
         // Transform data to match JournalEntry type
         const formattedEntries: JournalEntry[] = data.map(entry => ({
@@ -67,7 +72,7 @@ export default function Journal() {
     }
     
     fetchJournalEntries();
-  }, []);
+  }, [fetchTrigger]); // Re-fetch when trigger changes
   
   // Filter entries based on search query
   const filteredEntries = entries.filter(entry => 
@@ -110,39 +115,25 @@ export default function Journal() {
           if (functionError) {
             console.error('Error calling transcribe-audio function:', functionError);
             toast.dismiss('process-entry');
-            toast.error('Failed to transcribe audio.');
+            toast.error('Failed to transcribe audio: ' + functionError.message);
             return;
           }
           
-          if (!transcriptionData.success) {
+          if (!transcriptionData || !transcriptionData.success) {
             toast.dismiss('process-entry');
-            toast.error('Failed to process audio: ' + (transcriptionData.error || 'Unknown error'));
+            const errorMessage = transcriptionData?.error || 'Unknown error';
+            console.error('Transcription failed:', errorMessage);
+            toast.error('Failed to process audio: ' + errorMessage);
             return;
           }
           
+          console.log('Transcription successful:', transcriptionData);
           toast.dismiss('process-entry');
           toast.success('Journal entry saved!');
           
-          // Entry is now created directly in the edge function
-          // Refresh the entries list
-          const { data: newEntries, error: fetchError } = await supabase
-            .from('Journal Entries')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(20);
-            
-          if (fetchError) {
-            console.error('Error fetching updated entries:', fetchError);
-          } else if (newEntries) {
-            // Transform data to match JournalEntry type
-            const formattedEntries: JournalEntry[] = newEntries.map(entry => ({
-              ...entry,
-              emotions: ['Reflective', 'Thoughtful', 'Calm'], // Default emotions for now
-              duration: entry["audio_url"] ? '2:45' : '0:00', // Default duration for now
-            }));
-            
-            setEntries(formattedEntries);
-          }
+          // Trigger a refetch to show the new entry
+          setFetchTrigger(prev => prev + 1);
+          
         } catch (err) {
           console.error('Error processing audio:', err);
           toast.dismiss('process-entry');
@@ -212,6 +203,12 @@ export default function Journal() {
     });
   };
 
+  // Add a refresh button to manually refetch entries
+  const handleRefresh = () => {
+    toast.info('Refreshing journal entries...');
+    setFetchTrigger(prev => prev + 1);
+  };
+
   // Render a helpful message if there's an error or if data is loading
   if (error) {
     return (
@@ -224,7 +221,7 @@ export default function Journal() {
             <p className="text-muted-foreground">{error}</p>
             <Button 
               className="mt-4" 
-              onClick={() => window.location.reload()}
+              onClick={handleRefresh}
             >
               Try Again
             </Button>
@@ -243,14 +240,25 @@ export default function Journal() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
           <h1 className="text-3xl font-bold">My Journal</h1>
           
-          <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input 
-              placeholder="Search entries..." 
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input 
+                placeholder="Search entries..." 
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            
+            <Button 
+              variant="outline"
+              onClick={handleRefresh}
+              className="flex-shrink-0"
+              title="Refresh entries"
+            >
+              Refresh
+            </Button>
           </div>
         </div>
         
