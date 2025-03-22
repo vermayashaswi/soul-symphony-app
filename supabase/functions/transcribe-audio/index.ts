@@ -45,6 +45,35 @@ function processBase64Chunks(base64String: string, chunkSize = 32768) {
   return result;
 }
 
+// Generate embeddings using OpenAI
+async function generateEmbedding(text: string) {
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: text
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error generating embedding:', error);
+      throw new Error('Failed to generate embedding');
+    }
+
+    const result = await response.json();
+    return result.data[0].embedding;
+  } catch (error) {
+    console.error('Error in generateEmbedding:', error);
+    throw error;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -155,8 +184,10 @@ serve(async (req) => {
     console.log("Refinement successful:", refinedText);
 
     // Store in database if we have valid transcription
+    let entryId = null;
     if (transcribedText) {
       try {
+        // Insert the journal entry
         const { data: entryData, error: insertError } = await supabase
           .from('Journal Entries')
           .insert([{ 
@@ -169,8 +200,31 @@ serve(async (req) => {
             
         if (insertError) {
           console.error('Error creating entry in database:', insertError);
-        } else {
+        } else if (entryData && entryData.length > 0) {
           console.log("Journal entry saved to database:", entryData);
+          entryId = entryData[0].id;
+          
+          // Generate embedding for the refined text
+          try {
+            const embedding = await generateEmbedding(refinedText);
+            
+            // Store the embedding in the journal_embeddings table
+            const { error: embeddingError } = await supabase
+              .from('journal_embeddings')
+              .insert([{ 
+                journal_entry_id: entryId,
+                content: refinedText,
+                embedding: embedding
+              }]);
+              
+            if (embeddingError) {
+              console.error('Error storing embedding:', embeddingError);
+            } else {
+              console.log("Embedding stored successfully for entry:", entryId);
+            }
+          } catch (embErr) {
+            console.error("Error generating embedding:", embErr);
+          }
         }
       } catch (dbErr) {
         console.error("Database error:", dbErr);
@@ -182,6 +236,7 @@ serve(async (req) => {
         transcription: transcribedText,
         refinedText: refinedText,
         audioUrl: audioUrl,
+        entryId: entryId,
         success: true
       }),
       { 

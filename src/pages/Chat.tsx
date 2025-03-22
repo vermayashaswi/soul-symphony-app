@@ -1,451 +1,222 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { format } from 'date-fns';
-import { Send, Mic, MicOff, Bot, User, Image, Calendar, PlusCircle, SmilePlus, Loader2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
+import ParticleBackground from '@/components/ParticleBackground';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Card } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Send, Bot, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 type Message = {
   id: string;
-  sender: 'user' | 'ai';
-  text: string;
+  content: string;
+  sender: 'user' | 'assistant';
   timestamp: Date;
-  isThinking?: boolean;
-  imageUrl?: string;
 };
 
-export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      sender: 'ai',
-      text: "Hello! I'm your AI mental health assistant. How are you feeling today?",
-      timestamp: new Date(),
-    },
-  ]);
-  const [input, setInput] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const endOfMessagesRef = useRef<HTMLDivElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  
-  // Sample suggestions for quick responses
-  const suggestions = [
-    'How have I been feeling lately?',
-    'What patterns do you see in my emotions?',
-    'Give me a mindfulness exercise',
-    'Help me process my anxiety',
-    'Tell me about my progress',
-  ];
+// Demo questions to show to new users
+const demoQuestions = [
+  "How can I manage my anxiety better?",
+  "What are some good journaling prompts for self-reflection?",
+  "I've been feeling down lately. Any suggestions?",
+  "How can I improve my mindfulness practice?",
+  "What are some techniques to help with overthinking?"
+];
 
+export default function Chat() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showWelcome, setShowWelcome] = useState(true);
+  
+  // Add initial assistant message
   useEffect(() => {
-    // Scroll to the bottom of messages when messages change
-    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length === 0) {
+      setMessages([
+        {
+          id: '1',
+          content: "Hi, I'm Feelosophy, your AI assistant. I'm here to help you reflect on your thoughts and feelings. How are you doing today?",
+          sender: 'assistant',
+          timestamp: new Date()
+        }
+      ]);
+    }
+  }, []);
+
+  // Scroll to bottom when messages update
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSendMessage = async (content: string = inputValue) => {
+    if (!content.trim()) return;
     
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
+      content: content.trim(),
       sender: 'user',
-      text: input,
-      timestamp: new Date(),
+      timestamp: new Date()
     };
     
     setMessages(prev => [...prev, userMessage]);
-    setInput('');
+    setInputValue('');
     setIsLoading(true);
-    
-    // Add thinking message
-    const thinkingId = (Date.now() + 1).toString();
-    setMessages(prev => [
-      ...prev, 
-      { 
-        id: thinkingId, 
-        sender: 'ai', 
-        text: '...', 
-        timestamp: new Date(),
-        isThinking: true,
-      }
-    ]);
+    setShowWelcome(false);
     
     try {
-      // Call RAG-enhanced chat function
+      // Call the chat-rag edge function
       const { data, error } = await supabase.functions.invoke('chat-rag', {
-        body: { message: input }
+        body: { message: content.trim() }
       });
-      
-      // Remove thinking message
-      setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
       
       if (error) {
         console.error('Error calling chat function:', error);
-        toast.error('Sorry, I had trouble responding. Please try again.');
-        
-        // Add error message
-        setMessages(prev => [...prev, {
-          id: (Date.now() + 2).toString(),
-          sender: 'ai',
-          text: "I'm sorry, I encountered an error while processing your message. Could you try again?",
-          timestamp: new Date(),
-        }]);
-      } else {
-        // Add AI response
-        setMessages(prev => [...prev, {
-          id: (Date.now() + 2).toString(),
-          sender: 'ai',
-          text: data.response,
-          timestamp: new Date(),
-        }]);
+        toast.error('Failed to get a response. Please try again.');
+        setIsLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error in handleSend:', error);
       
-      // Remove thinking message
-      setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
+      // Add assistant response
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: data.response || "I'm sorry, I couldn't process your request at the moment.",
+        sender: 'assistant',
+        timestamp: new Date()
+      };
       
-      // Add error message
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 2).toString(),
-        sender: 'ai',
-        text: "I'm sorry, I encountered an error while processing your message. Could you try again?",
-        timestamp: new Date(),
-      }]);
-      
-      toast.error('Sorry, I had trouble responding. Please try again.');
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (err) {
+      console.error('Error in chat:', err);
+      toast.error('Something went wrong. Please try again later.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-      
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-      
-      mediaRecorder.onstop = async () => {
-        // Process voice to text using Supabase Edge Function
-        await processVoiceToText();
-        
-        // Stop audio tracks
-        stream.getTracks().forEach(track => track.stop());
-      };
-      
-      mediaRecorder.start();
-      setIsRecording(true);
-      
-      toast.success('Recording started');
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
-      toast.error('Could not access microphone. Please check permissions.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  const processVoiceToText = async () => {
-    try {
-      if (audioChunksRef.current.length === 0) return;
-      
-      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-      
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
-      
-      reader.onloadend = async () => {
-        // Show loading toast
-        toast.loading('Processing your voice message...');
-        
-        // Extract base64 data
-        const base64Audio = reader.result as string;
-        const base64Data = base64Audio.split(',')[1];
-        
-        // Send to our Supabase Edge Function
-        const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-          body: { audio: base64Data }
-        });
-        
-        toast.dismiss();
-        
-        if (error) {
-          console.error('Error processing voice:', error);
-          toast.error('Error processing voice message. Please try again.');
-          return;
-        }
-        
-        // Success! Add the transcribed message to chat
-        toast.success('Voice processed successfully!');
-        
-        // Add user message with the transcribed text
-        const userMessage: Message = {
-          id: Date.now().toString(),
-          sender: 'user',
-          text: data.transcription,
-          timestamp: new Date(),
-        };
-        
-        setMessages(prev => [...prev, userMessage]);
-        
-        // Now trigger AI response using the transcribed text
-        setIsLoading(true);
-        
-        // Add thinking message
-        const thinkingId = (Date.now() + 1).toString();
-        setMessages(prev => [
-          ...prev, 
-          { 
-            id: thinkingId, 
-            sender: 'ai', 
-            text: '...', 
-            timestamp: new Date(),
-            isThinking: true,
-          }
-        ]);
-        
-        try {
-          // Call RAG-enhanced chat function
-          const { data: ragData, error: ragError } = await supabase.functions.invoke('chat-rag', {
-            body: { message: data.transcription }
-          });
-          
-          // Remove thinking message
-          setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
-          
-          if (ragError) {
-            console.error('Error calling chat function:', ragError);
-            toast.error('Sorry, I had trouble responding. Please try again.');
-            
-            // Add error message
-            setMessages(prev => [...prev, {
-              id: (Date.now() + 2).toString(),
-              sender: 'ai',
-              text: "I'm sorry, I encountered an error while processing your message. Could you try again?",
-              timestamp: new Date(),
-            }]);
-          } else {
-            // Add AI response
-            setMessages(prev => [...prev, {
-              id: (Date.now() + 2).toString(),
-              sender: 'ai',
-              text: ragData.response,
-              timestamp: new Date(),
-            }]);
-          }
-        } catch (error) {
-          console.error('Error in voice processing chat response:', error);
-          
-          // Remove thinking message
-          setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
-          
-          // Add error message
-          setMessages(prev => [...prev, {
-            id: (Date.now() + 2).toString(),
-            sender: 'ai',
-            text: "I'm sorry, I encountered an error while processing your message. Could you try again?",
-            timestamp: new Date(),
-          }]);
-          
-          toast.error('Sorry, I had trouble responding. Please try again.');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-    } catch (error) {
-      console.error('Error processing voice to text:', error);
-      toast.error('Error processing voice message. Please try again.');
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
+      <ParticleBackground />
       
-      <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full px-4 pt-28 pb-20">
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold mb-2">AI Assistant</h1>
-          <p className="text-muted-foreground">Chat with your personal mental health companion</p>
+      <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full px-4 pt-24 pb-6">
+        <div className="flex flex-col space-y-4 mb-4 flex-1 overflow-y-auto">
+          
+          {/* Chat messages */}
+          {messages.map((message) => (
+            <motion.div
+              key={message.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={cn(
+                "flex",
+                message.sender === 'user' ? "justify-end" : "justify-start"
+              )}
+            >
+              <div className={cn(
+                "flex gap-3 max-w-[85%]",
+                message.sender === 'user' ? "flex-row-reverse" : "flex-row"
+              )}>
+                <Avatar className={cn(
+                  "h-8 w-8",
+                  message.sender === 'assistant' && "bg-primary text-primary-foreground"
+                )}>
+                  {message.sender === 'assistant' ? (
+                    <AvatarFallback><Bot className="h-4 w-4" /></AvatarFallback>
+                  ) : (
+                    <AvatarFallback>U</AvatarFallback>
+                  )}
+                </Avatar>
+                
+                <Card className={cn(
+                  "p-3 text-sm",
+                  message.sender === 'user' 
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted"
+                )}>
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+                </Card>
+              </div>
+            </motion.div>
+          ))}
+          
+          {/* Loading indicator */}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="flex gap-3 max-w-[85%]">
+                <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+                  <AvatarFallback><Bot className="h-4 w-4" /></AvatarFallback>
+                </Avatar>
+                <Card className="p-3 bg-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </Card>
+              </div>
+            </div>
+          )}
+          
+          <div ref={messagesEndRef} />
         </div>
         
-        <div className="flex-1 flex flex-col bg-secondary/50 rounded-xl overflow-hidden border border-border">
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-4">
-              {messages.map((message) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={cn(
-                    "flex",
-                    message.sender === 'user' ? "justify-end" : "justify-start"
-                  )}
-                >
-                  <div 
-                    className={cn(
-                      "max-w-[80%] rounded-2xl px-4 py-3",
-                      message.sender === 'user' 
-                        ? "bg-primary text-primary-foreground rounded-tr-none" 
-                        : "bg-white text-foreground rounded-tl-none"
-                    )}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      {message.sender === 'ai' ? (
-                        <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Bot className="h-3.5 w-3.5 text-primary" />
-                        </div>
-                      ) : (
-                        <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center">
-                          <User className="h-3.5 w-3.5 text-white" />
-                        </div>
-                      )}
-                      <span className={cn(
-                        "text-xs",
-                        message.sender === 'user' ? "text-white/70" : "text-muted-foreground"
-                      )}>
-                        {message.sender === 'ai' ? 'Feelosophy' : 'You'} • {format(message.timestamp, 'h:mm a')}
-                      </span>
-                    </div>
-                    
-                    {message.isThinking ? (
-                      <div className="flex gap-1 py-1">
-                        <div className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-pulse"></div>
-                        <div className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                        <div className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                      </div>
-                    ) : (
-                      <p className={cn(
-                        message.sender === 'user' ? "text-white" : "text-foreground"
-                      )}>
-                        {message.text}
-                      </p>
-                    )}
-                    
-                    {message.imageUrl && (
-                      <img 
-                        src={message.imageUrl} 
-                        alt="Shared content" 
-                        className="mt-2 rounded-lg max-w-full" 
-                      />
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-              <div ref={endOfMessagesRef} />
-            </div>
-          </div>
-          
-          <div className="p-4 bg-white border-t border-border">
-            <div className="mb-3 overflow-x-auto flex gap-2 pb-2">
-              {suggestions.map((suggestion, index) => (
-                <motion.button
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                  onClick={() => setInput(suggestion)}
-                  className="whitespace-nowrap px-3 py-1.5 bg-secondary text-muted-foreground rounded-full text-sm hover:text-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  {suggestion}
-                </motion.button>
-              ))}
-            </div>
-            
-            <div className="flex items-center gap-2 relative">
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                className="rounded-full flex-shrink-0"
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isLoading}
-              >
-                {isRecording ? (
-                  <MicOff className="h-5 w-5 text-red-500" />
-                ) : (
-                  <Mic className="h-5 w-5" />
-                )}
-              </Button>
-              
-              <div className="flex-1 flex items-center bg-secondary rounded-full pr-1">
-                <Input
-                  type="text"
-                  placeholder="Type a message..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  disabled={isLoading}
-                  className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent flex-1"
-                />
-                <div className="flex items-center">
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 rounded-full"
-                  >
-                    <SmilePlus className="h-5 w-5 text-muted-foreground" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 rounded-full"
-                  >
-                    <Image className="h-5 w-5 text-muted-foreground" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 rounded-full"
-                  >
-                    <Calendar className="h-5 w-5 text-muted-foreground" />
-                  </Button>
-                </div>
+        {/* Sample questions */}
+        <AnimatePresence>
+          {showWelcome && messages.length <= 2 && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-6"
+            >
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-medium">Try asking about:</h3>
               </div>
-              
-              <Button
-                type="button"
-                size="icon"
-                disabled={!input.trim() || isLoading}
-                onClick={handleSend}
-                className="rounded-full flex-shrink-0"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <Send className="h-5 w-5" />
-                )}
-              </Button>
-            </div>
-          </div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {demoQuestions.map((question, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    className="text-sm"
+                    onClick={() => handleSendMessage(question)}
+                  >
+                    {question}
+                  </Button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {/* Input area */}
+        <div className="flex gap-2 items-end">
+          <Textarea
+            placeholder="Type your message..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="resize-none min-h-[60px]"
+            rows={1}
+          />
+          <Button 
+            onClick={() => handleSendMessage()} 
+            size="icon"
+            disabled={isLoading || !inputValue.trim()}
+          >
+            <Send className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>

@@ -18,23 +18,66 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [ripples, setRipples] = useState<number[]>([]);
+  
+  // Check for microphone permission on component mount
+  useEffect(() => {
+    const checkMicPermission = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Stop the stream immediately after checking permission
+        stream.getTracks().forEach(track => track.stop());
+        setHasPermission(true);
+      } catch (error) {
+        console.error('Microphone permission error:', error);
+        setHasPermission(false);
+      }
+    };
+    
+    checkMicPermission();
+    
+    // Cleanup function
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
   
   const startRecording = async () => {
     try {
       // Reset state
       setAudioBlob(null);
       setRecordingTime(0);
+      chunksRef.current = [];
       
-      // Get user media
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Request microphone permission with user interaction
+      toast.loading('Accessing microphone...');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      toast.dismiss();
+      toast.success('Microphone accessed. Recording started!');
+      
+      // Save stream reference for cleanup
+      streamRef.current = stream;
+      
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
       
       // Set up data handling
       mediaRecorder.ondataavailable = (e) => {
@@ -45,17 +88,29 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       
       // Set up stop handler
       mediaRecorder.onstop = () => {
+        if (chunksRef.current.length === 0) {
+          toast.error('No audio data recorded. Please try again.');
+          setAudioBlob(null);
+          return;
+        }
+        
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        console.log('Recording stopped, blob size:', blob.size);
         setAudioBlob(blob);
         
         // Stop all tracks to release the microphone
-        stream.getTracks().forEach(track => track.stop());
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
         
         // Clear timer
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
+        
+        toast.success('Recording saved!');
       };
       
       // Start recording
@@ -79,10 +134,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       // Initial ripple
       setRipples([Date.now()]);
       
-      toast.success('Recording started! Speak clearly into your microphone.');
     } catch (error) {
       console.error('Error accessing microphone:', error);
+      toast.dismiss();
       toast.error('Could not access microphone. Please check permissions and try again.');
+      setHasPermission(false);
     }
   };
 
@@ -93,8 +149,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       
       // Clear ripples
       setRipples([]);
-      
-      toast.success('Recording saved!');
     }
   };
 
@@ -105,13 +159,31 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play();
-      setIsPlaying(true);
+      // Create a new audio element each time to ensure fresh playback
+      const audioUrl = URL.createObjectURL(audioBlob);
+      audioRef.current.src = audioUrl;
+      
+      audioRef.current.play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch(err => {
+          console.error('Error playing audio:', err);
+          toast.error('Failed to play the recording.');
+        });
     }
   };
   
   const processRecording = async () => {
-    if (!audioBlob) return;
+    if (!audioBlob) {
+      toast.error('No recording to process.');
+      return;
+    }
+    
+    if (audioBlob.size < 100) {
+      toast.error('Recording is too short. Please try again.');
+      return;
+    }
     
     try {
       setIsProcessing(true);
@@ -135,17 +207,28 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Cleanup function
+  // Set up audio ended handler
   useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
-      }
-    };
-  }, [isRecording]);
+    if (audioRef.current) {
+      audioRef.current.onended = () => setIsPlaying(false);
+    }
+  }, [audioBlob]);
+  
+  // Request permissions if they were denied
+  const requestPermissions = async () => {
+    try {
+      toast.loading('Requesting microphone permission...');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      setHasPermission(true);
+      toast.dismiss();
+      toast.success('Microphone permission granted!');
+    } catch (error) {
+      console.error('Failed to get permission:', error);
+      toast.dismiss();
+      toast.error('Microphone permission denied. Please adjust your browser settings.');
+    }
+  };
 
   // Manage ripples lifecycle
   useEffect(() => {
@@ -158,22 +241,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     }
   }, [ripples]);
 
-  // Set up audio ended handler
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.onended = () => setIsPlaying(false);
-    }
-  }, [audioBlob]);
-
   return (
     <div className={cn("flex flex-col items-center", className)}>
-      {audioBlob && (
-        <audio 
-          ref={audioRef} 
-          src={URL.createObjectURL(audioBlob)} 
-          className="hidden"
-        />
-      )}
+      <audio 
+        ref={audioRef} 
+        className="hidden"
+      />
       
       <div className="relative flex items-center justify-center my-8">
         <AnimatePresence>
@@ -190,25 +263,35 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           ))}
         </AnimatePresence>
         
-        <motion.button
-          onClick={isRecording ? stopRecording : startRecording}
-          disabled={isProcessing}
-          className={cn(
-            "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
-            isRecording 
-              ? "bg-red-500 border-red-600 w-16 h-16" 
-              : "bg-primary hover:bg-primary/90 border-primary/20 w-20 h-20",
-            isProcessing && "opacity-50 cursor-not-allowed"
-          )}
-          whileTap={{ scale: 0.95 }}
-          animate={isRecording ? { scale: [1, 1.05, 1], transition: { repeat: Infinity, duration: 1.5 } } : {}}
-        >
-          {isRecording ? (
-            <Square className="w-6 h-6 text-white" />
-          ) : (
+        {hasPermission === false ? (
+          <motion.button
+            onClick={requestPermissions}
+            className="relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg bg-red-500 border-red-600 w-20 h-20"
+            whileTap={{ scale: 0.95 }}
+          >
             <Mic className="w-8 h-8 text-white" />
-          )}
-        </motion.button>
+          </motion.button>
+        ) : (
+          <motion.button
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={isProcessing}
+            className={cn(
+              "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
+              isRecording 
+                ? "bg-red-500 border-red-600 w-16 h-16" 
+                : "bg-primary hover:bg-primary/90 border-primary/20 w-20 h-20",
+              isProcessing && "opacity-50 cursor-not-allowed"
+            )}
+            whileTap={{ scale: 0.95 }}
+            animate={isRecording ? { scale: [1, 1.05, 1], transition: { repeat: Infinity, duration: 1.5 } } : {}}
+          >
+            {isRecording ? (
+              <Square className="w-6 h-6 text-white" />
+            ) : (
+              <Mic className="w-8 h-8 text-white" />
+            )}
+          </motion.button>
+        )}
       </div>
       
       <AnimatePresence mode="wait">
@@ -271,6 +354,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               )}
             </Button>
           </motion.div>
+        ) : hasPermission === false ? (
+          <motion.p
+            key="permission"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="text-center text-muted-foreground"
+          >
+            Microphone access is required for recording
+          </motion.p>
         ) : (
           <motion.p
             key="instruction"

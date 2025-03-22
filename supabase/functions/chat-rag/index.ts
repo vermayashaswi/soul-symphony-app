@@ -3,14 +3,46 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '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';
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://kwnwhgucnzqxndzjayyq.supabase.co';
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+// Initialize Supabase client with service role key
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Generate embeddings using OpenAI
+async function generateEmbedding(text: string) {
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: text
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error generating embedding:', error);
+      throw new Error('Failed to generate embedding');
+    }
+
+    const result = await response.json();
+    return result.data[0].embedding;
+  } catch (error) {
+    console.error('Error in generateEmbedding:', error);
+    throw error;
+  }
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -27,38 +59,69 @@ serve(async (req) => {
 
     console.log("Processing chat request:", message);
     
-    // Create Supabase client
-    const supabase = createClient(supabaseUrl, supabaseServiceKey || 'anon-key');
+    // Generate embedding for the user query
+    console.log("Generating embedding for user query...");
+    const queryEmbedding = await generateEmbedding(message);
     
-    // Retrieve relevant journal entries for context
+    // Search for relevant journal entries using vector similarity
+    console.log("Searching for relevant context...");
+    const { data: similarEntries, error: searchError } = await supabase.rpc(
+      'match_journal_entries',
+      {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.5,
+        match_count: 5
+      }
+    );
+    
+    if (searchError) {
+      console.error("Error searching for similar entries:", searchError);
+    }
+    
+    // Create RAG context from relevant entries
     let journalContext = "";
-    if (supabaseServiceKey) {
-      console.log("Retrieving journal entries for context...");
+    if (similarEntries && similarEntries.length > 0) {
+      console.log("Found similar entries:", similarEntries.length);
       
-      // Get the most recent journal entries
-      const { data: entries, error } = await supabase
+      // Fetch full entries for context
+      const entryIds = similarEntries.map(entry => entry.id);
+      const { data: entries, error: entriesError } = await supabase
         .from('Journal Entries')
-        .select('refined text, transcription, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .select('refined text, created_at')
+        .in('id', entryIds);
       
-      if (error) {
-        console.error("Error retrieving journal entries:", error);
+      if (entriesError) {
+        console.error("Error retrieving journal entries:", entriesError);
       } else if (entries && entries.length > 0) {
         // Format entries as context
-        journalContext = "Here are some recent journal entries for context:\n\n" + 
+        journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
           entries.map((entry, index) => {
             const date = new Date(entry.created_at).toLocaleDateString();
-            const text = entry["refined text"] || entry.transcription || "No content";
-            return `Entry ${index+1} (${date}): ${text}`;
+            return `Entry ${index+1} (${date}): ${entry["refined text"]}`;
+          }).join('\n\n') + "\n\n";
+      }
+    } else {
+      // Fallback to recent entries if no similar ones found
+      const { data: recentEntries, error: recentError } = await supabase
+        .from('Journal Entries')
+        .select('refined text, created_at')
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
+      if (recentError) {
+        console.error("Error retrieving recent entries:", recentError);
+      } else if (recentEntries && recentEntries.length > 0) {
+        journalContext = "Here are some of your recent journal entries:\n\n" + 
+          recentEntries.map((entry, index) => {
+            const date = new Date(entry.created_at).toLocaleDateString();
+            return `Entry ${index+1} (${date}): ${entry["refined text"]}`;
           }).join('\n\n') + "\n\n";
       }
     }
     
     // Prepare system prompt with RAG context
-    const systemPrompt = `You are an empathetic AI mental health assistant named Feelosophy. 
-You help users understand their emotions, detect patterns in their mood, and provide supportive advice.
-${journalContext}
+    const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling. 
+${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
 Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
 mention them, but do so gently and constructively. Focus on being helpful rather than diagnostic.`;

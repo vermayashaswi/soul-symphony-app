@@ -25,11 +25,11 @@ type JournalEntry = {
 };
 
 export default function Journal() {
-  const [isRecording, setIsRecording] = useState(false);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showRecorder, setShowRecorder] = useState(true);
   
   useEffect(() => {
     async function fetchJournalEntries() {
@@ -96,7 +96,7 @@ export default function Journal() {
           return;
         }
         
-        toast.loading('Processing your journal entry...');
+        toast.loading('Processing your journal entry...', { id: 'process-entry' });
         
         try {
           // Call the transcribe-audio edge function
@@ -109,18 +109,18 @@ export default function Journal() {
           
           if (functionError) {
             console.error('Error calling transcribe-audio function:', functionError);
-            toast.dismiss();
+            toast.dismiss('process-entry');
             toast.error('Failed to transcribe audio.');
             return;
           }
           
           if (!transcriptionData.success) {
-            toast.dismiss();
+            toast.dismiss('process-entry');
             toast.error('Failed to process audio: ' + (transcriptionData.error || 'Unknown error'));
             return;
           }
           
-          toast.dismiss();
+          toast.dismiss('process-entry');
           toast.success('Journal entry saved!');
           
           // Entry is now created directly in the edge function
@@ -138,30 +138,26 @@ export default function Journal() {
             const formattedEntries: JournalEntry[] = newEntries.map(entry => ({
               ...entry,
               emotions: ['Reflective', 'Thoughtful', 'Calm'], // Default emotions for now
-              duration: '2:45', // Default duration for now
+              duration: entry["audio_url"] ? '2:45' : '0:00', // Default duration for now
             }));
             
             setEntries(formattedEntries);
           }
-          
-          setIsRecording(false);
         } catch (err) {
           console.error('Error processing audio:', err);
-          toast.dismiss();
+          toast.dismiss('process-entry');
           toast.error('An error occurred while processing your journal entry.');
-          setIsRecording(false);
         }
       };
     } catch (err) {
       console.error('Error preparing audio data:', err);
       toast.error('Failed to prepare audio data.');
-      setIsRecording(false);
     }
   };
   
   const deleteEntry = async (id: number) => {
     try {
-      toast.loading('Deleting entry...');
+      toast.loading('Deleting entry...', { id: 'delete-entry' });
       
       // Find the entry to get its audio URL
       const entryToDelete = entries.find(entry => entry.id === id);
@@ -184,12 +180,12 @@ export default function Journal() {
       
       if (error) {
         console.error('Error deleting entry:', error);
-        toast.dismiss();
+        toast.dismiss('delete-entry');
         toast.error('Failed to delete entry.');
         return;
       }
       
-      toast.dismiss();
+      toast.dismiss('delete-entry');
       toast.success('Entry deleted.');
       
       // Update state to remove the deleted entry
@@ -197,7 +193,7 @@ export default function Journal() {
       
     } catch (err) {
       console.error('Unexpected error deleting entry:', err);
-      toast.dismiss();
+      toast.dismiss('delete-entry');
       toast.error('An unexpected error occurred.');
     }
   };
@@ -260,7 +256,7 @@ export default function Journal() {
         
         <Separator className="mb-8" />
         
-        {isRecording && (
+        {showRecorder && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -270,7 +266,7 @@ export default function Journal() {
           >
             <VoiceRecorder 
               onRecordingComplete={handleNewEntry} 
-              onCancel={() => setIsRecording(false)} 
+              onCancel={() => setShowRecorder(false)} 
             />
           </motion.div>
         )}
@@ -350,10 +346,12 @@ export default function Journal() {
           <div className="text-center py-12">
             <h2 className="text-2xl font-semibold mb-2">No journal entries yet</h2>
             <p className="text-muted-foreground mb-8">Record your first voice journal to get started</p>
-            <Button onClick={() => setIsRecording(true)}>
-              <Mic className="mr-2 h-4 w-4" />
-              Start Recording
-            </Button>
+            {!showRecorder && (
+              <Button onClick={() => setShowRecorder(true)}>
+                <Mic className="mr-2 h-4 w-4" />
+                Start Recording
+              </Button>
+            )}
           </div>
         )}
       </div>
