@@ -3,7 +3,8 @@
 CREATE OR REPLACE FUNCTION match_journal_entries(
   query_embedding vector(1536),
   match_threshold float,
-  match_count int
+  match_count int,
+  user_id_filter uuid
 )
 RETURNS TABLE (
   id bigint,
@@ -20,7 +21,11 @@ BEGIN
     1 - (je.embedding <=> query_embedding) AS similarity
   FROM
     journal_embeddings je
-  WHERE 1 - (je.embedding <=> query_embedding) > match_threshold
+  JOIN
+    "Journal Entries" entries ON je.journal_entry_id = entries.id
+  WHERE 
+    1 - (je.embedding <=> query_embedding) > match_threshold
+    AND (user_id_filter IS NULL OR entries.user_id = user_id_filter::text)
   ORDER BY
     je.embedding <=> query_embedding
   LIMIT match_count;

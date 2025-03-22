@@ -102,6 +102,7 @@ serve(async (req) => {
     }
 
     console.log("Received audio data, processing...");
+    console.log("User ID:", userId);
     console.log("OpenAI API Key available:", !!openAIApiKey);
     console.log("Supabase URL available:", !!supabaseUrl);
     console.log("Supabase Service Key available:", !!supabaseServiceKey);
@@ -111,7 +112,7 @@ serve(async (req) => {
     
     // Save to storage
     const timestamp = Date.now();
-    const filename = `journal-entry-${timestamp}.webm`;
+    const filename = `journal-entry-${userId ? userId + '-' : ''}${timestamp}.webm`;
     
     // Upload to storage
     let audioUrl = null;

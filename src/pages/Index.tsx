@@ -1,10 +1,12 @@
+
 import { useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Mic, BarChart2, Bot, HeartPulse, Volume1 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
+import { useAuth } from '@/contexts/AuthContext';
 
 const fadeInUpVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -55,6 +57,8 @@ export default function Index() {
   
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "40%"]);
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   const features = [
     {
@@ -87,6 +91,14 @@ export default function Index() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  const handleStartJournaling = () => {
+    if (user) {
+      navigate('/journal');
+    } else {
+      navigate('/auth');
+    }
+  };
 
   return (
     <div ref={ref} className="min-h-screen">
@@ -135,16 +147,21 @@ export default function Index() {
             transition={{ duration: 0.6, delay: 0.8 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Button asChild size="lg" className="rounded-full px-6">
-              <Link to="/journal">
-                Start Journaling
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Link>
+            <Button
+              size="lg"
+              className="rounded-full px-6"
+              onClick={handleStartJournaling}
+            >
+              Start Journaling
+              <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
-            <Button asChild variant="outline" size="lg" className="rounded-full px-6">
-              <Link to="/chat">
-                Try AI Assistant
-              </Link>
+            <Button
+              variant="outline"
+              size="lg"
+              className="rounded-full px-6"
+              onClick={() => navigate('/chat')}
+            >
+              Try AI Assistant
             </Button>
           </motion.div>
         </div>
@@ -193,11 +210,13 @@ export default function Index() {
           <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
             Begin tracking your emotions, understanding your patterns, and improving your mental wellness with Feelosophy.
           </p>
-          <Button asChild size="lg" className="rounded-full px-8">
-            <Link to="/journal">
-              Get Started
-              <ArrowRight className="ml-2 w-4 h-4" />
-            </Link>
+          <Button 
+            size="lg" 
+            className="rounded-full px-8"
+            onClick={handleStartJournaling}
+          >
+            Get Started
+            <ArrowRight className="ml-2 w-4 h-4" />
           </Button>
         </motion.div>
       </section>

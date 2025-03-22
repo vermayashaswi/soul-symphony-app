@@ -11,6 +11,8 @@ import Navbar from '@/components/Navbar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import ParticleBackground from '@/components/ParticleBackground';
+import { useAuth } from '@/contexts/AuthContext';
+import { Navigate } from 'react-router-dom';
 
 // Update the type definition to match the actual database structure
 type JournalEntry = {
@@ -31,18 +33,22 @@ export default function Journal() {
   const [error, setError] = useState<string | null>(null);
   const [showRecorder, setShowRecorder] = useState(true);
   const [fetchTrigger, setFetchTrigger] = useState(0); // Add a trigger to force refetch
+  const { user, isLoading: authLoading } = useAuth();
   
   useEffect(() => {
     async function fetchJournalEntries() {
+      if (!user) return;
+      
       try {
         setIsLoading(true);
         setError(null);
         
-        console.log('Fetching journal entries...');
+        console.log('Fetching journal entries for user:', user.id);
         
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('*')
+          .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         
         if (error) {
@@ -71,8 +77,10 @@ export default function Journal() {
       }
     }
     
-    fetchJournalEntries();
-  }, [fetchTrigger]); // Re-fetch when trigger changes
+    if (user) {
+      fetchJournalEntries();
+    }
+  }, [fetchTrigger, user]); // Re-fetch when trigger changes or user changes
   
   // Filter entries based on search query
   const filteredEntries = entries.filter(entry => 
@@ -82,6 +90,11 @@ export default function Journal() {
   );
   
   const handleNewEntry = async (audioData: Blob) => {
+    if (!user) {
+      toast.error('You must be signed in to create journal entries');
+      return;
+    }
+    
     try {
       // Make sure we have actual audio data
       if (!audioData || !(audioData instanceof Blob)) {
@@ -108,7 +121,7 @@ export default function Journal() {
           const { data: transcriptionData, error: functionError } = await supabase.functions.invoke('transcribe-audio', {
             body: { 
               audio: base64Audio,
-              userId: null // Update with actual user ID when auth is implemented
+              userId: user.id // Pass the user's ID to associate the entry with them
             }
           });
           
@@ -208,6 +221,20 @@ export default function Journal() {
     toast.info('Refreshing journal entries...');
     setFetchTrigger(prev => prev + 1);
   };
+
+  // Handle authentication state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Redirect to auth page if not authenticated
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
   // Render a helpful message if there's an error or if data is loading
   if (error) {
