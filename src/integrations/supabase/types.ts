@@ -11,22 +11,31 @@ export type Database = {
     Tables: {
       "Journal Entries": {
         Row: {
+          audio_url: string | null
           created_at: string
+          "foreign key": string | null
           id: number
           "refined text": string | null
           "transcription text": string | null
+          user_id: string | null
         }
         Insert: {
+          audio_url?: string | null
           created_at?: string
+          "foreign key"?: string | null
           id?: number
           "refined text"?: string | null
           "transcription text"?: string | null
+          user_id?: string | null
         }
         Update: {
+          audio_url?: string | null
           created_at?: string
+          "foreign key"?: string | null
           id?: number
           "refined text"?: string | null
           "transcription text"?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -49,7 +58,15 @@ export type Database = {
           id?: number
           "subscription date"?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "Subscription Status_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "User Information"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       "User Information": {
         Row: {
@@ -76,7 +93,15 @@ export type Database = {
           Name?: string | null
           "Phone number"?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "User Information_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "Journal Entries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

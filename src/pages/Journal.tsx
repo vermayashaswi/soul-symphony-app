@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { Search, Plus, Mic, Play, Clock, Calendar, Tag, Trash } from 'lucide-react';
+import { Search, Mic, Play, Clock, Calendar, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -21,6 +21,7 @@ type JournalEntry = {
   emotions?: string[];
   duration?: string;
   audio_url?: string | null;
+  user_id?: string | null;
 };
 
 export default function Journal() {
@@ -77,40 +78,16 @@ export default function Journal() {
   
   const handleNewEntry = async (audioData: Blob) => {
     try {
-      // Convert blob to base64
-      const reader = new FileReader();
-      
       // Make sure we have actual audio data
       if (!audioData || !(audioData instanceof Blob)) {
         toast.error('Invalid audio data received');
         return;
       }
       
-      // Save the audio file to Supabase Storage
-      const timestamp = Date.now();
-      const filename = `journal-entry-${timestamp}.webm`;
-      
-      // Upload to storage
-      const { data: storageData, error: storageError } = await supabase
-        .storage
-        .from('audio-recordings')
-        .upload(filename, audioData);
-        
-      if (storageError) {
-        console.error('Error uploading audio:', storageError);
-        toast.error('Failed to save audio recording');
-        // Continue with transcription even if storage fails
-      }
-      
-      // Get the public URL for the audio
-      const { data: urlData } = await supabase
-        .storage
-        .from('audio-recordings')
-        .getPublicUrl(filename);
-        
-      const audioUrl = urlData?.publicUrl;
-      
+      // Convert blob to base64
+      const reader = new FileReader();
       reader.readAsDataURL(audioData);
+      
       reader.onloadend = async () => {
         const base64Audio = reader.result?.toString().split(',')[1];
         
@@ -124,7 +101,10 @@ export default function Journal() {
         try {
           // Call the transcribe-audio edge function
           const { data: transcriptionData, error: functionError } = await supabase.functions.invoke('transcribe-audio', {
-            body: { audio: base64Audio }
+            body: { 
+              audio: base64Audio,
+              userId: null // Update with actual user ID when auth is implemented
+            }
           });
           
           if (functionError) {
@@ -134,40 +114,41 @@ export default function Journal() {
             return;
           }
           
-          toast.dismiss();
-          toast.success('Journal entry saved!');
-          
-          // Create the entry with the audioUrl included
-          const { data: entryData, error: insertError } = await supabase
-            .from('Journal Entries')
-            .insert([{ 
-              "transcription text": transcriptionData?.transcription || '',
-              "refined text": transcriptionData?.refinedText || '',
-              "audio_url": audioUrl
-            }])
-            .select()
-            .single();
-            
-          if (insertError) {
-            console.error('Error creating entry:', insertError);
-            toast.error('Failed to save entry details');
+          if (!transcriptionData.success) {
+            toast.dismiss();
+            toast.error('Failed to process audio: ' + (transcriptionData.error || 'Unknown error'));
             return;
           }
           
-          // Add the new entry to the state with placeholder emotions and duration
-          const newEntryWithMetadata: JournalEntry = {
-            ...entryData,
-            emotions: ['Reflective', 'Thoughtful', 'Calm'],
-            duration: '2:45'
-          };
+          toast.dismiss();
+          toast.success('Journal entry saved!');
           
-          setEntries(prevEntries => [newEntryWithMetadata, ...prevEntries]);
+          // Entry is now created directly in the edge function
+          // Refresh the entries list
+          const { data: newEntries, error: fetchError } = await supabase
+            .from('Journal Entries')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(20);
+            
+          if (fetchError) {
+            console.error('Error fetching updated entries:', fetchError);
+          } else if (newEntries) {
+            // Transform data to match JournalEntry type
+            const formattedEntries: JournalEntry[] = newEntries.map(entry => ({
+              ...entry,
+              emotions: ['Reflective', 'Thoughtful', 'Calm'], // Default emotions for now
+              duration: '2:45', // Default duration for now
+            }));
+            
+            setEntries(formattedEntries);
+          }
           
+          setIsRecording(false);
         } catch (err) {
           console.error('Error processing audio:', err);
           toast.dismiss();
           toast.error('An error occurred while processing your journal entry.');
-        } finally {
           setIsRecording(false);
         }
       };
@@ -191,7 +172,7 @@ export default function Journal() {
         if (filename) {
           await supabase
             .storage
-            .from('audio-recordings')
+            .from('journal-audio-entries')
             .remove([filename]);
         }
       }
@@ -266,33 +247,14 @@ export default function Journal() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
           <h1 className="text-3xl font-bold">My Journal</h1>
           
-          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input 
-                placeholder="Search entries..." 
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            
-            <Button 
-              onClick={() => setIsRecording(!isRecording)} 
-              className={isRecording ? "bg-red-500 hover:bg-red-600" : ""}
-            >
-              {isRecording ? (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Stop Recording
-                </>
-              ) : (
-                <>
-                  <Mic className="mr-2 h-4 w-4" />
-                  Start Recording
-                </>
-              )}
-            </Button>
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input 
+              placeholder="Search entries..." 
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         </div>
         

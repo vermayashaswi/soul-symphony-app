@@ -11,6 +11,7 @@ import Insights from "./pages/Insights";
 import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import ParticleBackground from "./components/ParticleBackground";
 
 const queryClient = new QueryClient();
 
@@ -19,6 +20,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner position="top-center" />
+      <ParticleBackground />
       <BrowserRouter>
         <AnimatePresence mode="wait">
           <Routes>

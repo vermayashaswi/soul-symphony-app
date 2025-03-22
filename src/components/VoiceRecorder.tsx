@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 interface VoiceRecorderProps {
-  onRecordingComplete?: (audioData: Blob) => void;
+  onRecordingComplete?: (audioBlob: Blob) => void;
   onCancel?: () => void;
   className?: string;
 }
@@ -21,44 +21,53 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const timerIntervalRef = useRef<number | null>(null);
+  const timerRef = useRef<number | null>(null);
   const [ripples, setRipples] = useState<number[]>([]);
   
   const startRecording = async () => {
     try {
+      // Reset state
+      setAudioBlob(null);
+      setRecordingTime(0);
+      
+      // Get user media
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
       
+      // Set up data handling
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           chunksRef.current.push(e.data);
         }
       };
       
+      // Set up stop handler
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
+        
+        // Stop all tracks to release the microphone
         stream.getTracks().forEach(track => track.stop());
+        
+        // Clear timer
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
       };
       
+      // Start recording
       setIsRecording(true);
-      setRecordingTime(0);
-      setAudioBlob(null);
       mediaRecorder.start();
       
-      // Important: Clear any existing interval before setting a new one
-      if (timerIntervalRef.current) {
-        window.clearInterval(timerIntervalRef.current);
-      }
-      
-      // Set up the interval for the timer and ripples
-      timerIntervalRef.current = window.setInterval(() => {
+      // Start timer
+      timerRef.current = window.setInterval(() => {
         setRecordingTime(prev => {
           const newTime = prev + 1;
           
-          // Add ripple effect on even seconds
+          // Add a new ripple every 2 seconds
           if (newTime % 2 === 0) {
             setRipples(prev => [...prev, Date.now()]);
           }
@@ -69,9 +78,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       
       // Initial ripple
       setRipples([Date.now()]);
+      
+      toast.success('Recording started! Speak clearly into your microphone.');
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      toast.error('Could not access microphone. Please check permissions.');
+      toast.error('Could not access microphone. Please check permissions and try again.');
     }
   };
 
@@ -80,11 +91,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-      
+      // Clear ripples
       setRipples([]);
       
       toast.success('Recording saved!');
@@ -114,10 +121,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       }
       
       setAudioBlob(null);
-      setIsProcessing(false);
     } catch (error) {
       console.error('Error processing recording:', error);
       toast.error('Error processing recording. Please try again.');
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -128,10 +135,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Cleanup function
   useEffect(() => {
     return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
       }
       if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop();
@@ -139,6 +147,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     };
   }, [isRecording]);
 
+  // Manage ripples lifecycle
   useEffect(() => {
     if (ripples.length > 0) {
       const timer = setTimeout(() => {
@@ -149,6 +158,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     }
   }, [ripples]);
 
+  // Set up audio ended handler
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.onended = () => setIsPlaying(false);

@@ -3,9 +3,12 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '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';
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://kwnwhgucnzqxndzjayyq.supabase.co';
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+// Initialize Supabase client with service role key
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,7 +52,7 @@ serve(async (req) => {
   }
 
   try {
-    const { audio } = await req.json();
+    const { audio, userId } = await req.json();
     
     if (!audio) {
       throw new Error('No audio data provided');
@@ -59,6 +62,35 @@ serve(async (req) => {
     
     // Process audio in chunks
     const binaryAudio = processBase64Chunks(audio);
+    
+    // Save to storage
+    const timestamp = Date.now();
+    const filename = `journal-entry-${timestamp}.webm`;
+    
+    // Upload to storage
+    let audioUrl = null;
+    try {
+      const { data: storageData, error: storageError } = await supabase
+        .storage
+        .from('journal-audio-entries')
+        .upload(filename, binaryAudio);
+        
+      if (storageError) {
+        console.error('Error uploading audio to storage:', storageError);
+      } else {
+        // Get the public URL for the audio
+        const { data: urlData } = await supabase
+          .storage
+          .from('journal-audio-entries')
+          .getPublicUrl(filename);
+          
+        audioUrl = urlData?.publicUrl;
+        console.log("Audio stored successfully:", audioUrl);
+      }
+    } catch (err) {
+      console.error("Storage error:", err);
+      // Continue with transcription even if storage fails
+    }
     
     // Prepare form data for Whisper API
     const formData = new FormData();
@@ -122,20 +154,44 @@ serve(async (req) => {
     
     console.log("Refinement successful:", refinedText);
 
+    // Store in database if we have valid transcription
+    if (transcribedText) {
+      try {
+        const { data: entryData, error: insertError } = await supabase
+          .from('Journal Entries')
+          .insert([{ 
+            "transcription text": transcribedText,
+            "refined text": refinedText,
+            "audio_url": audioUrl,
+            "user_id": userId || null
+          }])
+          .select();
+            
+        if (insertError) {
+          console.error('Error creating entry in database:', insertError);
+        } else {
+          console.log("Journal entry saved to database:", entryData);
+        }
+      } catch (dbErr) {
+        console.error("Database error:", dbErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         transcription: transcribedText,
-        refinedText: refinedText
+        refinedText: refinedText,
+        audioUrl: audioUrl,
+        success: true
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
-
   } catch (error) {
     console.error("Error in transcribe-audio function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message, success: false }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
