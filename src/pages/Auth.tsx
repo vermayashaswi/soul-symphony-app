@@ -34,12 +34,14 @@ export default function Auth() {
   // Handle cases where user has just completed authentication via redirect
   useEffect(() => {
     const handleHashRedirect = async () => {
+      // Check if we're coming back from an OAuth redirect
       const hasHashParams = window.location.hash.includes('access_token') || 
-                             window.location.hash.includes('error');
-                             
+                           window.location.hash.includes('error');
+                           
       if (hasHashParams) {
         console.log('Detected auth redirect with hash params:', window.location.hash);
         try {
+          // This will automatically exchange the auth code for a session
           const { data, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -47,6 +49,8 @@ export default function Auth() {
             toast.error('Authentication error. Please try again.');
           } else if (data.session) {
             console.log('Successfully retrieved session after redirect:', data.session.user.email);
+            // Log the current domain so we can verify
+            console.log('Current domain:', window.location.origin);
             // Session will be picked up by the other useEffect
           }
         } catch (e) {
@@ -61,7 +65,12 @@ export default function Auth() {
 
   const handleSignIn = async () => {
     console.log('Initiating Google sign-in from', window.location.origin);
-    await signInWithGoogle();
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      console.error('Failed to initiate Google sign-in:', error);
+      toast.error('Failed to initiate sign-in process. Please try again.');
+    }
   };
 
   if (isLoading) {
