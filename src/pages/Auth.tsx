@@ -34,23 +34,35 @@ export default function Auth() {
   // Handle cases where user has just completed authentication via redirect
   useEffect(() => {
     const handleHashRedirect = async () => {
-      if (window.location.hash.includes('access_token') || 
-          window.location.hash.includes('error')) {
-        console.log('Detected auth redirect with hash params');
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error getting session after redirect:', error);
-          toast.error('Authentication error. Please try again.');
-        } else if (data.session) {
-          console.log('Successfully retrieved session after redirect');
-          // Session will be picked up by the other useEffect
+      const hasHashParams = window.location.hash.includes('access_token') || 
+                             window.location.hash.includes('error');
+                             
+      if (hasHashParams) {
+        console.log('Detected auth redirect with hash params:', window.location.hash);
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('Error getting session after redirect:', error);
+            toast.error('Authentication error. Please try again.');
+          } else if (data.session) {
+            console.log('Successfully retrieved session after redirect:', data.session.user.email);
+            // Session will be picked up by the other useEffect
+          }
+        } catch (e) {
+          console.error('Exception during auth redirect handling:', e);
+          toast.error('Unexpected error during authentication');
         }
       }
     };
     
     handleHashRedirect();
   }, []);
+
+  const handleSignIn = async () => {
+    console.log('Initiating Google sign-in from', window.location.origin);
+    await signInWithGoogle();
+  };
 
   if (isLoading) {
     return (
@@ -89,7 +101,7 @@ export default function Auth() {
           <Button 
             size="lg" 
             className="w-full flex items-center justify-center gap-2"
-            onClick={signInWithGoogle}
+            onClick={handleSignIn}
           >
             <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
               <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">

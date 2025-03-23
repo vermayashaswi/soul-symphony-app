@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import Index from "./pages/Index";
 import Journal from "./pages/Journal";
@@ -26,9 +26,18 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected route component
+// Protected route component with location preservation
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
+  
+  useEffect(() => {
+    if (!isLoading && !user) {
+      console.log("Protected route: No user, should redirect to /auth", {
+        path: location.pathname
+      });
+    }
+  }, [user, isLoading, location]);
   
   if (isLoading) {
     return (
@@ -39,7 +48,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) {
-    return <Navigate to="/auth" state={{ from: { pathname: window.location.pathname } }} />;
+    console.log("Redirecting to auth from protected route:", location.pathname);
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
   return <>{children}</>;
