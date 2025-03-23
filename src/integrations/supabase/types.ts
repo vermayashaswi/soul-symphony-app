@@ -117,50 +117,7 @@ export type Database = {
           id?: number
           "subscription date"?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "Subscription Status_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "User Information"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      "User Information": {
-        Row: {
-          created_at: string
-          email: string | null
-          id: number
-          "last logged in": string | null
-          Name: string | null
-          "Phone number": string | null
-        }
-        Insert: {
-          created_at?: string
-          email?: string | null
-          id?: number
-          "last logged in"?: string | null
-          Name?: string | null
-          "Phone number"?: string | null
-        }
-        Update: {
-          created_at?: string
-          email?: string | null
-          id?: number
-          "last logged in"?: string | null
-          Name?: string | null
-          "Phone number"?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "User Information_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "Journal Entries"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {

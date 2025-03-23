@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 type AuthContextType = {
   session: Session | null;
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
+        console.log('Auth state changed:', event, currentSession?.user?.email);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         setIsLoading(false);
@@ -37,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log('Initial session check:', currentSession?.user?.email);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       setIsLoading(false);
@@ -53,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: `${window.location.origin}/journal`,
         },
       });
 
@@ -61,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     } catch (error: any) {
+      console.error('Error signing in with Google:', error);
       toast.error(`Error signing in with Google: ${error.message}`);
       setIsLoading(false);
     }
@@ -73,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     } catch (error: any) {
+      console.error('Error signing out:', error);
       toast.error(`Error signing out: ${error.message}`);
     }
   };

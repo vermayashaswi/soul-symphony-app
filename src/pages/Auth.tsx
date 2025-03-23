@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,18 +9,46 @@ import ParticleBackground from '@/components/ParticleBackground';
 export default function Auth() {
   const { user, isLoading, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [redirecting, setRedirecting] = useState(false);
+  
+  // Get the return path from the location state or default to /journal
+  const from = location.state?.from?.pathname || '/journal';
 
   useEffect(() => {
     if (user && !redirecting) {
+      console.log('Auth page: User detected, redirecting to:', from);
       setRedirecting(true);
+      
+      // Add a brief delay to ensure state changes have processed
       const timer = setTimeout(() => {
-        navigate('/journal');
-      }, 1000);
+        navigate(from, { replace: true });
+      }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [user, navigate, redirecting]);
+  }, [user, navigate, redirecting, from]);
+
+  // Handle cases where user has just completed authentication via redirect
+  useEffect(() => {
+    const handleHashRedirect = async () => {
+      if (window.location.hash.includes('access_token') || 
+          window.location.hash.includes('error')) {
+        console.log('Detected auth redirect with hash params');
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session after redirect:', error);
+          toast.error('Authentication error. Please try again.');
+        } else if (data.session) {
+          console.log('Successfully retrieved session after redirect');
+          // Session will be picked up by the other useEffect
+        }
+      }
+    };
+    
+    handleHashRedirect();
+  }, []);
 
   if (isLoading) {
     return (
@@ -31,7 +59,8 @@ export default function Auth() {
   }
 
   if (user) {
-    return <Navigate to="/journal" replace />;
+    console.log('Auth page: User exists in render, redirecting to', from);
+    return <Navigate to={from} replace />;
   }
 
   return (

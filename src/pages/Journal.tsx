@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { Search, Mic, Play, Clock, Calendar, Trash } from 'lucide-react';
+import { Search, Mic, Play, Clock, Calendar, Trash, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -37,7 +37,10 @@ export default function Journal() {
   
   useEffect(() => {
     async function fetchJournalEntries() {
-      if (!user) return;
+      if (!user) {
+        console.log("No user found, skipping journal entries fetch");
+        return;
+      }
       
       try {
         setIsLoading(true);
@@ -60,18 +63,22 @@ export default function Journal() {
 
         console.log('Fetched journal entries:', data);
 
+        if (data.length === 0) {
+          console.log('No journal entries found for user');
+        }
+
         // Transform data to match JournalEntry type
         const formattedEntries: JournalEntry[] = data.map(entry => ({
           ...entry,
-          emotions: ['Reflective', 'Thoughtful', 'Calm'], // Default emotions for now
-          duration: '2:45', // Default duration for now
+          emotions: entry.emotions || ['Reflective', 'Thoughtful', 'Calm'], // Default emotions for now
+          duration: entry.duration || '2:45', // Default duration for now
         }));
         
         setEntries(formattedEntries);
       } catch (err) {
         console.error('Unexpected error fetching entries:', err);
         setError('An unexpected error occurred.');
-        toast.error('An unexpected error occurred');
+        toast.error('An unexpected error occurred while fetching entries');
       } finally {
         setIsLoading(false);
       }
@@ -79,6 +86,8 @@ export default function Journal() {
     
     if (user) {
       fetchJournalEntries();
+    } else {
+      setIsLoading(false);
     }
   }, [fetchTrigger, user]); // Re-fetch when trigger changes or user changes
   
@@ -222,20 +231,6 @@ export default function Journal() {
     setFetchTrigger(prev => prev + 1);
   };
 
-  // Handle authentication state
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  // Redirect to auth page if not authenticated
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
   // Render a helpful message if there's an error or if data is loading
   if (error) {
     return (
@@ -281,9 +276,10 @@ export default function Journal() {
             <Button 
               variant="outline"
               onClick={handleRefresh}
-              className="flex-shrink-0"
+              className="flex-shrink-0 flex items-center gap-1"
               title="Refresh entries"
             >
+              <RefreshCw className="h-4 w-4" />
               Refresh
             </Button>
           </div>
