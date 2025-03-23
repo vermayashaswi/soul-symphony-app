@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -11,15 +12,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// Update JournalEntry type to include emotions and duration
+// Update JournalEntry type to match Supabase table schema exactly with optional properties
 type JournalEntry = {
   id: number;
   "transcription text": string;
   "refined text": string;
   created_at: string;
-  audio_url: string;
-  user_id: string;
-  "foreign key": string;
+  audio_url: string | null;
+  user_id: string | null;
+  "foreign key": string | null;
   emotions?: { [key: string]: number };
   duration?: number;
 };
@@ -41,8 +42,9 @@ const Journal = () => {
       setLoading(true);
       console.log('Fetching entries for user ID:', user?.id);
       
+      // Fix: Use the correct table name "Journal Entries" instead of "journal_entries"
       const { data, error } = await supabase
-        .from('journal_entries')
+        .from('Journal Entries')
         .select('*')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
@@ -52,7 +54,9 @@ const Journal = () => {
       }
       
       console.log('Fetched entries:', data);
-      setEntries(data || []);
+      // We need to ensure data matches our JournalEntry type
+      const typedEntries = (data || []) as JournalEntry[];
+      setEntries(typedEntries);
     } catch (error) {
       console.error('Error fetching entries:', error);
       toast.error('Failed to load journal entries');
@@ -87,7 +91,7 @@ const Journal = () => {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col items-center">
-                <VoiceRecorder onEntryRecorded={onEntryRecorded} />
+                <VoiceRecorder onRecordingComplete={onEntryRecorded} />
               </div>
             </CardContent>
           </Card>
@@ -143,7 +147,7 @@ const Journal = () => {
                       <div>
                         <h3 className="font-medium mb-4">Emotion Analysis</h3>
                         {entry.emotions ? (
-                          <EmotionChart emotions={entry.emotions} />
+                          <EmotionChart data={entry.emotions} />
                         ) : (
                           <p className="text-muted-foreground">No emotion data available</p>
                         )}

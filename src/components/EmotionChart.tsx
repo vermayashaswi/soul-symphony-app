@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { 
   LineChart, 
@@ -40,16 +39,44 @@ type ChartType = 'line' | 'area' | 'bubble';
 interface EmotionChartProps {
   className?: string;
   timeframe?: 'week' | 'month' | 'year';
+  data?: { [key: string]: number }; // Add this prop to accept emotion data
 }
 
-export function EmotionChart({ className, timeframe = 'week' }: EmotionChartProps) {
-  const [chartType, setChartType] = useState<ChartType>('line');
+export function EmotionChart({ className, timeframe = 'week', data }: EmotionChartProps) {
+  const [chartType, setChartType] = useState<ChartType>('bubble');
 
   const chartTypes = [
     { id: 'line', label: 'Line' },
     { id: 'area', label: 'Area' },
     { id: 'bubble', label: 'Emotion Bubbles' },
   ];
+
+  // Transform data for bubble chart if provided
+  const getBubbleData = () => {
+    if (!data) return bubbleData;
+    
+    return Object.entries(data).map(([name, value]) => {
+      // Map emotion names to colors
+      const getColor = () => {
+        const colorMap: Record<string, string> = {
+          joy: '#4299E1',
+          gratitude: '#48BB78',
+          calm: '#9F7AEA',
+          anxiety: '#F56565',
+          sadness: '#718096',
+          anger: '#ED8936',
+          excitement: '#ECC94B',
+        };
+        return colorMap[name.toLowerCase()] || '#A3A3A3';
+      };
+      
+      return {
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: value * 10, // Scale value for visualization
+        color: getColor()
+      };
+    }).sort((a, b) => b.value - a.value); // Sort by value
+  };
 
   const renderLineChart = () => (
     <ResponsiveContainer width="100%" height={300}>
@@ -138,55 +165,59 @@ export function EmotionChart({ className, timeframe = 'week' }: EmotionChartProp
     </ResponsiveContainer>
   );
 
-  const renderBubbleChart = () => (
-    <div className="w-full h-[300px] flex items-center justify-center relative">
-      {bubbleData.map((item, index) => {
-        // Calculate position based on index
-        const angle = (index / bubbleData.length) * Math.PI * 2;
-        const radius = 100;
-        const x = Math.cos(angle) * radius + 150; // center x
-        const y = Math.sin(angle) * radius + 120; // center y
-        
-        return (
-          <motion.div
-            key={item.name}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ 
-              scale: 1, 
-              opacity: 1,
-              x: [x - 5, x + 5, x],
-              y: [y - 5, y + 5, y]
-            }}
-            transition={{ 
-              duration: 0.5, 
-              delay: index * 0.1,
-              x: { repeat: Infinity, duration: 3 + index, repeatType: 'reverse' },
-              y: { repeat: Infinity, duration: 4 + index, repeatType: 'reverse' }
-            }}
-            style={{
-              width: `${item.value * 1.5}px`,
-              height: `${item.value * 1.5}px`,
-              backgroundColor: item.color,
-              position: 'absolute',
-              left: x,
-              top: y,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: item.value > 15 ? '14px' : '12px',
-              fontWeight: 'bold',
-              boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-              zIndex: Math.floor(item.value)
-            }}
-          >
-            {item.name}
-          </motion.div>
-        );
-      })}
-    </div>
-  );
+  const renderBubbleChart = () => {
+    const dataToRender = getBubbleData();
+    
+    return (
+      <div className="w-full h-[300px] flex items-center justify-center relative">
+        {dataToRender.map((item, index) => {
+          // Calculate position based on index
+          const angle = (index / dataToRender.length) * Math.PI * 2;
+          const radius = 100;
+          const x = Math.cos(angle) * radius + 150; // center x
+          const y = Math.sin(angle) * radius + 120; // center y
+          
+          return (
+            <motion.div
+              key={item.name}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ 
+                scale: 1, 
+                opacity: 1,
+                x: [x - 5, x + 5, x],
+                y: [y - 5, y + 5, y]
+              }}
+              transition={{ 
+                duration: 0.5, 
+                delay: index * 0.1,
+                x: { repeat: Infinity, duration: 3 + index, repeatType: 'reverse' },
+                y: { repeat: Infinity, duration: 4 + index, repeatType: 'reverse' }
+              }}
+              style={{
+                width: `${item.value * 1.5}px`,
+                height: `${item.value * 1.5}px`,
+                backgroundColor: item.color,
+                position: 'absolute',
+                left: x,
+                top: y,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: item.value > 15 ? '14px' : '12px',
+                fontWeight: 'bold',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                zIndex: Math.floor(item.value)
+              }}
+            >
+              {item.name}
+            </motion.div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className={cn("w-full", className)}>
