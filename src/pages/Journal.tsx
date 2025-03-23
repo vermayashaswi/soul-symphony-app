@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -14,16 +13,16 @@ import ParticleBackground from '@/components/ParticleBackground';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 
-// Update the type definition to match the actual database structure
 type JournalEntry = {
   id: number;
   created_at: string;
   "transcription text"?: string | null;
   "refined text"?: string | null;
-  emotions?: string[];
-  duration?: string;
+  "foreign key"?: string | null;
   audio_url?: string | null;
   user_id?: string | null;
+  emotions?: string[];
+  duration?: string;
 };
 
 export default function Journal() {
@@ -32,9 +31,10 @@ export default function Journal() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showRecorder, setShowRecorder] = useState(true);
-  const [fetchTrigger, setFetchTrigger] = useState(0); // Add a trigger to force refetch
+  const [fetchTrigger, setFetchTrigger] = useState(0);
+
   const { user, isLoading: authLoading } = useAuth();
-  
+
   useEffect(() => {
     async function fetchJournalEntries() {
       if (!user) {
@@ -67,11 +67,10 @@ export default function Journal() {
           console.log('No journal entries found for user');
         }
 
-        // Transform data to match JournalEntry type
         const formattedEntries: JournalEntry[] = data.map(entry => ({
           ...entry,
-          emotions: entry.emotions || ['Reflective', 'Thoughtful', 'Calm'], // Default emotions for now
-          duration: entry.duration || '2:45', // Default duration for now
+          emotions: ['Reflective', 'Thoughtful', 'Calm'],
+          duration: '2:45',
         }));
         
         setEntries(formattedEntries);
@@ -89,15 +88,14 @@ export default function Journal() {
     } else {
       setIsLoading(false);
     }
-  }, [fetchTrigger, user]); // Re-fetch when trigger changes or user changes
-  
-  // Filter entries based on search query
+  }, [fetchTrigger, user]);
+
   const filteredEntries = entries.filter(entry => 
     (entry["transcription text"] && entry["transcription text"].toLowerCase().includes(searchQuery.toLowerCase())) || 
     (entry["refined text"] && entry["refined text"].toLowerCase().includes(searchQuery.toLowerCase())) ||
     (entry.emotions && entry.emotions.some(emotion => emotion.toLowerCase().includes(searchQuery.toLowerCase())))
   );
-  
+
   const handleNewEntry = async (audioData: Blob) => {
     if (!user) {
       toast.error('You must be signed in to create journal entries');
@@ -105,13 +103,11 @@ export default function Journal() {
     }
     
     try {
-      // Make sure we have actual audio data
       if (!audioData || !(audioData instanceof Blob)) {
         toast.error('Invalid audio data received');
         return;
       }
       
-      // Convert blob to base64
       const reader = new FileReader();
       reader.readAsDataURL(audioData);
       
@@ -126,11 +122,10 @@ export default function Journal() {
         toast.loading('Processing your journal entry...', { id: 'process-entry' });
         
         try {
-          // Call the transcribe-audio edge function
           const { data: transcriptionData, error: functionError } = await supabase.functions.invoke('transcribe-audio', {
             body: { 
               audio: base64Audio,
-              userId: user.id // Pass the user's ID to associate the entry with them
+              userId: user.id
             }
           });
           
@@ -153,9 +148,7 @@ export default function Journal() {
           toast.dismiss('process-entry');
           toast.success('Journal entry saved!');
           
-          // Trigger a refetch to show the new entry
           setFetchTrigger(prev => prev + 1);
-          
         } catch (err) {
           console.error('Error processing audio:', err);
           toast.dismiss('process-entry');
@@ -167,15 +160,13 @@ export default function Journal() {
       toast.error('Failed to prepare audio data.');
     }
   };
-  
+
   const deleteEntry = async (id: number) => {
     try {
       toast.loading('Deleting entry...', { id: 'delete-entry' });
       
-      // Find the entry to get its audio URL
       const entryToDelete = entries.find(entry => entry.id === id);
       
-      // Delete the audio file from storage if it exists
       if (entryToDelete?.audio_url) {
         const filename = entryToDelete.audio_url.split('/').pop();
         if (filename) {
@@ -201,7 +192,6 @@ export default function Journal() {
       toast.dismiss('delete-entry');
       toast.success('Entry deleted.');
       
-      // Update state to remove the deleted entry
       setEntries(prevEntries => prevEntries.filter(entry => entry.id !== id));
       
     } catch (err) {
@@ -210,14 +200,13 @@ export default function Journal() {
       toast.error('An unexpected error occurred.');
     }
   };
-  
+
   const playAudio = (audioUrl: string | null | undefined) => {
     if (!audioUrl) {
       toast.error('No audio recording available for this entry.');
       return;
     }
     
-    // Create audio element and play
     const audio = new Audio(audioUrl);
     audio.play().catch(err => {
       console.error('Error playing audio:', err);
@@ -225,13 +214,11 @@ export default function Journal() {
     });
   };
 
-  // Add a refresh button to manually refetch entries
   const handleRefresh = () => {
     toast.info('Refreshing journal entries...');
     setFetchTrigger(prev => prev + 1);
   };
 
-  // Render a helpful message if there's an error or if data is loading
   if (error) {
     return (
       <div className="min-h-screen bg-background">
@@ -252,7 +239,7 @@ export default function Journal() {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
