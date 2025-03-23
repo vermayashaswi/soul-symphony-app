@@ -18,6 +18,9 @@ export default function Auth() {
   const from = location.state?.from?.pathname || '/journal';
 
   useEffect(() => {
+    // Log the current origin/domain for debugging
+    console.log('Current origin for Auth page:', window.location.origin);
+    
     if (user && !redirecting) {
       console.log('Auth page: User detected, redirecting to:', from);
       setRedirecting(true);
@@ -36,10 +39,22 @@ export default function Auth() {
     const handleHashRedirect = async () => {
       // Check if we're coming back from an OAuth redirect
       const hasHashParams = window.location.hash.includes('access_token') || 
-                           window.location.hash.includes('error');
+                           window.location.hash.includes('error') ||
+                           window.location.search.includes('error');
                            
       if (hasHashParams) {
-        console.log('Detected auth redirect with hash params:', window.location.hash);
+        console.log('Detected auth redirect with hash/search params:', { 
+          hash: window.location.hash,
+          search: window.location.search 
+        });
+        
+        // Check for error in the URL
+        if (window.location.hash.includes('error') || window.location.search.includes('error')) {
+          console.error('Error detected in redirect URL');
+          toast.error('Authentication failed. Please try again.');
+          return;
+        }
+        
         try {
           // This will automatically exchange the auth code for a session
           const { data, error } = await supabase.auth.getSession();
@@ -49,7 +64,6 @@ export default function Auth() {
             toast.error('Authentication error. Please try again.');
           } else if (data.session) {
             console.log('Successfully retrieved session after redirect:', data.session.user.email);
-            // Log the current domain so we can verify
             console.log('Current domain:', window.location.origin);
             // Session will be picked up by the other useEffect
           }

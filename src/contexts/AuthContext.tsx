@@ -51,15 +51,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Get the current domain - will be the production URL when deployed
-  const getCurrentDomain = () => {
-    return window.location.origin;
+  // Get the current domain for redirect - uses the actual domain in production
+  const getRedirectUrl = () => {
+    // Get the current origin (will be the production URL when deployed)
+    const origin = window.location.origin;
+    return `${origin}/journal`;
   };
 
   const signInWithGoogle = async () => {
     setIsLoading(true);
     try {
-      const redirectUrl = `${getCurrentDomain()}/journal`;
+      const redirectUrl = getRedirectUrl();
       console.log('Using redirect URL for Google auth:', redirectUrl);
       
       const { error } = await supabase.auth.signInWithOAuth({
