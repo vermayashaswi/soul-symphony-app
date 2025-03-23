@@ -51,11 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Get the current domain for redirect - uses the actual domain in production
+  // Get the correct redirect URL based on environment
   const getRedirectUrl = () => {
-    // Get the current origin (will be the production URL when deployed)
     const origin = window.location.origin;
-    return `${origin}/journal`;
+    // Format the redirect URL correctly for Supabase auth
+    return `${origin}/auth`;
   };
 
   const signInWithGoogle = async () => {
