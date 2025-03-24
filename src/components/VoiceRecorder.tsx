@@ -116,7 +116,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       
       // Start recording
       setIsRecording(true);
-      mediaRecorder.start();
+      mediaRecorder.start(1000); // Collect data every second for more reliable recording
       
       // Start timer
       timerRef.current = window.setInterval(() => {
@@ -181,7 +181,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       return;
     }
     
-    if (audioBlob.size < 100) {
+    if (audioBlob.size < 1000) { // 1KB minimum
       toast.error('Recording is too short. Please try again.');
       return;
     }
@@ -193,9 +193,26 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       // Convert blob to base64
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
+      reader.onerror = function() {
+        console.error('Error reading audio file:', reader.error);
+        toast.dismiss();
+        toast.error('Error reading audio file. Please try again.');
+        setIsProcessing(false);
+      };
+      
       reader.onloadend = async function() {
         try {
           const base64Audio = reader.result as string;
+          
+          // Validate base64 data
+          if (!base64Audio || base64Audio.length < 100) {
+            console.error('Invalid base64 audio data');
+            toast.dismiss();
+            toast.error('Invalid audio data. Please try again.');
+            setIsProcessing(false);
+            return;
+          }
+          
           // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
           const base64String = base64Audio.split(',')[1]; 
           
@@ -221,14 +238,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           if (error) {
             console.error('Transcription error:', error);
             toast.dismiss();
-            toast.error('Failed to transcribe audio. Please try again.');
+            toast.error(`Failed to transcribe audio: ${error.message || 'Unknown error'}`);
             setIsProcessing(false);
             return;
           }
 
           console.log("Transcription response:", data);
           
-          if (data.success) {
+          if (data && data.success) {
             toast.dismiss();
             toast.success('Journal entry saved successfully!');
             
@@ -239,12 +256,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             setAudioBlob(null);
           } else {
             toast.dismiss();
-            toast.error(data.error || 'Failed to process recording');
+            toast.error(data?.error || 'Failed to process recording');
           }
         } catch (err) {
           console.error('Error processing audio:', err);
           toast.dismiss();
-          toast.error('Failed to process audio. Please try again.');
+          toast.error(`Failed to process audio: ${err.message || 'Unknown error'}`);
         } finally {
           setIsProcessing(false);
         }
@@ -252,7 +269,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     } catch (error) {
       console.error('Error processing recording:', error);
       toast.dismiss();
-      toast.error('Error processing recording. Please try again.');
+      toast.error(`Error processing recording: ${error.message || 'Unknown error'}`);
       setIsProcessing(false);
     }
   };

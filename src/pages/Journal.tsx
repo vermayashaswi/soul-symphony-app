@@ -53,6 +53,7 @@ const Journal = () => {
         
       if (error) {
         console.error('Error fetching entries:', error);
+        toast.error('Failed to load journal entries');
         throw error;
       }
       

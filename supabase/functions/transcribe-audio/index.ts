@@ -17,32 +17,42 @@ const corsHeaders = {
 
 // Process base64 in chunks to prevent memory issues
 function processBase64Chunks(base64String: string, chunkSize = 32768) {
-  const chunks: Uint8Array[] = [];
-  let position = 0;
-  
-  while (position < base64String.length) {
-    const chunk = base64String.slice(position, position + chunkSize);
-    const binaryChunk = atob(chunk);
-    const bytes = new Uint8Array(binaryChunk.length);
+  if (!base64String || base64String.length === 0) {
+    console.error('Empty base64 string provided');
+    return new Uint8Array(0);
+  }
+
+  try {
+    const chunks: Uint8Array[] = [];
+    let position = 0;
     
-    for (let i = 0; i < binaryChunk.length; i++) {
-      bytes[i] = binaryChunk.charCodeAt(i);
+    while (position < base64String.length) {
+      const chunk = base64String.slice(position, position + chunkSize);
+      const binaryChunk = atob(chunk);
+      const bytes = new Uint8Array(binaryChunk.length);
+      
+      for (let i = 0; i < binaryChunk.length; i++) {
+        bytes[i] = binaryChunk.charCodeAt(i);
+      }
+      
+      chunks.push(bytes);
+      position += chunkSize;
     }
-    
-    chunks.push(bytes);
-    position += chunkSize;
+
+    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error processing base64 chunks:', error);
+    throw new Error('Failed to process audio data');
   }
-
-  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-  const result = new Uint8Array(totalLength);
-  let offset = 0;
-
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return result;
 }
 
 // Generate embeddings using OpenAI
@@ -139,9 +149,33 @@ serve(async (req) => {
   }
 
   try {
-    const { audio, userId } = await req.json();
+    // Verify content-type to ensure we're getting JSON data
+    const contentType = req.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      console.error('Invalid content type:', contentType);
+      throw new Error('Request must be JSON format');
+    }
+
+    // Parse the request body
+    const requestBody = await req.text();
+    if (!requestBody || requestBody.trim() === '') {
+      console.error('Empty request body');
+      throw new Error('Empty request body');
+    }
+
+    // Parse the JSON payload
+    let payload;
+    try {
+      payload = JSON.parse(requestBody);
+    } catch (error) {
+      console.error('Error parsing JSON:', error, 'Body:', requestBody.slice(0, 100));
+      throw new Error('Invalid JSON payload');
+    }
+
+    const { audio, userId } = payload;
     
     if (!audio) {
+      console.error('No audio data provided in payload');
       throw new Error('No audio data provided');
     }
 
@@ -161,6 +195,10 @@ serve(async (req) => {
     // Process audio in chunks
     const binaryAudio = processBase64Chunks(audio);
     console.log("Processed binary audio size:", binaryAudio.length);
+
+    if (binaryAudio.length === 0) {
+      throw new Error('Failed to process audio data - empty result');
+    }
     
     // Save to storage
     const timestamp = Date.now();
@@ -298,6 +336,7 @@ serve(async (req) => {
         if (insertError) {
           console.error('Error creating entry in database:', insertError);
           console.error('Error details:', JSON.stringify(insertError));
+          throw new Error(`Database insert error: ${insertError.message}`);
         } else if (entryData && entryData.length > 0) {
           console.log("Journal entry saved to database:", entryData[0].id);
           entryId = entryData[0].id;
@@ -318,16 +357,24 @@ serve(async (req) => {
             if (embeddingError) {
               console.error('Error storing embedding:', embeddingError);
               console.error('Embedding error details:', JSON.stringify(embeddingError));
+              // Continue despite embedding error
             } else {
               console.log("Embedding stored successfully for entry:", entryId);
             }
           } catch (embErr) {
             console.error("Error generating embedding:", embErr);
+            // Continue despite embedding error
           }
+        } else {
+          console.error("No data returned from insert operation");
+          throw new Error("Failed to create journal entry in database");
         }
       } catch (dbErr) {
         console.error("Database error:", dbErr);
+        throw new Error(`Database error: ${dbErr.message}`);
       }
+    } else {
+      throw new Error("Transcription failed - no text generated");
     }
 
     return new Response(
