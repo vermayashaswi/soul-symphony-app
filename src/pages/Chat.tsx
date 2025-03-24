@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { ChatLayout } from '@/components/chat/ChatLayout';
 import { ChatContainer } from '@/components/chat/ChatContainer';
@@ -57,58 +56,39 @@ export default function Chat() {
         if (validEntries.length > 0) {
           setHasEntries(true);
           
-          // Check for existing embeddings
-          console.log('Checking for existing embeddings...');
-          const { data: embeddings, error: embError } = await supabase
-            .from('journal_embeddings')
-            .select('journal_entry_id')
-            .in('journal_entry_id', validEntries.map(e => e.id));
+          // Generate embeddings for all entries
+          console.log('Making sure all journal entries have embeddings...');
+          toast.info('Preparing your journal entries for chat...');
+          
+          // Try up to 3 times to generate embeddings
+          let embeddingsResult = false;
+          let attempts = 0;
+          
+          while (!embeddingsResult && attempts < 3) {
+            attempts++;
+            console.log(`Embedding generation attempt ${attempts}...`);
             
-          if (embError) {
-            console.error('Error checking for embeddings:', embError);
-          } else {
-            const entriesWithEmbeddings = embeddings?.length || 0;
-            console.log(`Found ${entriesWithEmbeddings} entries with embeddings out of ${validEntries.length} entries`);
-            
-            // Check if any entries are missing embeddings
-            if (entriesWithEmbeddings < validEntries.length) {
-              console.log('Some journal entries are missing embeddings, generating...');
-              toast.info('Preparing your journal entries for chat...');
-              
-              // Try up to 3 times to generate embeddings
-              let embeddingsResult = false;
-              let attempts = 0;
-              
-              while (!embeddingsResult && attempts < 3) {
-                attempts++;
-                console.log(`Embedding generation attempt ${attempts}...`);
-                
-                try {
-                  embeddingsResult = await ensureJournalEntriesHaveEmbeddings(currentUserId);
-                } catch (error) {
-                  console.error(`Error in embedding generation attempt ${attempts}:`, error);
-                }
-                
-                if (!embeddingsResult) {
-                  console.warn(`Embedding generation attempt ${attempts} failed`);
-                  if (attempts < 3) {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                  }
-                }
-              }
-              
-              if (!embeddingsResult) {
-                console.error('Failed to generate embeddings after multiple attempts');
-                toast.warning('Could not prepare all journal entries for chat. Some entries may not be accessible.');
-              } else {
-                console.log('Successfully ensured journal entries have embeddings');
-                setEmbeddingsReady(true);
-                toast.success('Journal entries prepared for chat');
-              }
-            } else {
-              console.log('All journal entries already have embeddings');
-              setEmbeddingsReady(true);
+            try {
+              embeddingsResult = await ensureJournalEntriesHaveEmbeddings(currentUserId);
+            } catch (error) {
+              console.error(`Error in embedding generation attempt ${attempts}:`, error);
             }
+            
+            if (!embeddingsResult) {
+              console.warn(`Embedding generation attempt ${attempts} failed`);
+              if (attempts < 3) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            }
+          }
+          
+          if (!embeddingsResult) {
+            console.error('Failed to generate embeddings after multiple attempts');
+            toast.warning('Could not prepare all journal entries for chat. Some entries may not be accessible.');
+          } else {
+            console.log('Successfully ensured journal entries have embeddings');
+            setEmbeddingsReady(true);
+            toast.success('Journal entries prepared for chat');
           }
         } else {
           setHasEntries(false);

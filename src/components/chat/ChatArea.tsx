@@ -201,7 +201,12 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       return;
     }
     
-    await ensureJournalEntriesHaveEmbeddings(currentUserId);
+    const embeddingsResult = await ensureJournalEntriesHaveEmbeddings(currentUserId);
+    console.log('Embeddings generation result:', embeddingsResult);
+    
+    if (!embeddingsResult) {
+      console.warn('Failed to ensure all journal entries have embeddings');
+    }
     
     const isNewThread = !threadId;
     

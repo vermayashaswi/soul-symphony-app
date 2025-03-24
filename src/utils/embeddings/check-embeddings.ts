@@ -31,6 +31,7 @@ export async function fetchJournalEntriesWithText(userId: string): Promise<Journ
     
     console.log(`Found ${entriesData.length} journal entries for embedding check`);
     
+    // Safely cast and filter entries with valid text
     // Cast to any[] first and then filter out entries without valid refined text
     const entries = entriesData as any[];
     const validEntries = entries.filter(entry => 
@@ -73,7 +74,10 @@ export async function checkExistingEmbeddings(entryIds: number[]): Promise<numbe
     }
     
     // Extract entry IDs from the results
-    const existingEmbeddingIds = (existingEmbeddings as EmbeddingReference[] || []).map(e => e.journal_entry_id);
+    const existingEmbeddingIds = (existingEmbeddings as EmbeddingReference[] || [])
+      .filter(e => e !== null && typeof e === 'object' && 'journal_entry_id' in e)
+      .map(e => e.journal_entry_id);
+      
     return existingEmbeddingIds;
   } catch (error) {
     console.error('Error checking existing embeddings:', error);
