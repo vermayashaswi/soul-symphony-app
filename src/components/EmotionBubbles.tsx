@@ -1,7 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, Sparkles, Star, Flame, Smile } from 'lucide-react';
 
 interface EmotionBubblesProps {
   themes: string[];
@@ -15,13 +14,46 @@ interface BubbleProps {
   children: React.ReactNode;
 }
 
-const ICONS = [
-  Heart, 
-  Sparkles, 
-  Star, 
-  Flame, 
-  Smile
-];
+// More accurate emotion to emoji mapping
+const EMOTION_EMOJIS: Record<string, string> = {
+  // Positive emotions
+  joy: '😄',
+  happiness: '😊',
+  love: '❤️',
+  gratitude: '🙏',
+  excitement: '🤩',
+  contentment: '😌',
+  calm: '😌',
+  peaceful: '😇',
+  hope: '🌱',
+  relief: '😮‍💨',
+  pride: '🦚',
+  satisfaction: '👍',
+  
+  // Negative emotions
+  sadness: '😢',
+  anger: '😠',
+  fear: '😨',
+  anxiety: '😰',
+  stress: '😖',
+  disappointment: '😞',
+  frustration: '😤',
+  grief: '😭',
+  shame: '😳',
+  guilt: '😔',
+  jealousy: '😒',
+  regret: '😕',
+  
+  // Neutral or mixed emotions
+  surprise: '😲',
+  confusion: '🤔',
+  curiosity: '🧐',
+  nostalgia: '🕰️',
+  boredom: '😴',
+  anticipation: '👀',
+  awe: '😮',
+  ambivalence: '😐'
+};
 
 const getRandomValue = (min: number, max: number) => {
   return Math.random() * (max - min) + min;
@@ -63,13 +95,15 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
     y: number;
     size: number;
     delay: number;
-    Icon: React.ElementType;
+    emoji: string;
   }>>([]);
   
   useEffect(() => {
     // Generate bubbles with better distribution to avoid overlapping
     const newBubbles = themes.slice(0, 5).map((theme, index) => {
-      const Icon = ICONS[index % ICONS.length];
+      // Get the appropriate emoji based on the theme
+      const normalizedTheme = theme.toLowerCase().trim();
+      const emoji = EMOTION_EMOJIS[normalizedTheme] || '';
       
       // Calculate positions using a more distributed approach
       // Divide the container into sections for better distribution
@@ -94,7 +128,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
         y,
         size,
         delay: index * 0.2, // Stagger animations
-        Icon
+        emoji
       };
     });
     
@@ -112,7 +146,11 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
           delay={bubble.delay}
         >
           <div className="flex flex-col items-center text-center">
-            <bubble.Icon className="h-5 w-5 text-primary mb-1" />
+            {bubble.emoji ? (
+              <span className="text-lg mb-1">{bubble.emoji}</span>
+            ) : (
+              <div className="h-5 w-5 bg-primary/30 rounded-full mb-1"></div>
+            )}
             <span className="text-xs font-medium text-primary/90 max-w-[60px] line-clamp-2">{bubble.theme}</span>
           </div>
         </Bubble>

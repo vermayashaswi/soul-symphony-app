@@ -240,48 +240,66 @@ export function EmotionChart({
     const bubblePositions = calculateBubblePositions(bubbleData);
     
     return (
-      <div className="w-full h-[300px] flex items-center justify-center relative">
-        {bubbleData.map((item, index) => {
-          const position = bubblePositions[index];
-          
-          return (
-            <motion.div
-              key={item.name}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ 
-                scale: 1, 
-                opacity: 1,
-                x: [position.x - 5, position.x + 5, position.x],
-                y: [position.y - 5, position.y + 5, position.y]
-              }}
-              transition={{ 
-                duration: 0.5, 
-                delay: index * 0.1,
-                x: { repeat: Infinity, duration: 3 + index, repeatType: 'reverse' },
-                y: { repeat: Infinity, duration: 4 + index, repeatType: 'reverse' }
-              }}
-              style={{
-                width: `${position.size}px`,
-                height: `${position.size}px`,
-                backgroundColor: item.color,
-                position: 'absolute',
-                left: position.x - (position.size / 2),
-                top: position.y - (position.size / 2),
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: position.size > 70 ? '14px' : '12px',
-                fontWeight: 'bold',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                zIndex: Math.floor(item.value)
-              }}
-            >
-              {item.name}
-            </motion.div>
-          );
-        })}
+      <div className="w-full h-[300px] flex flex-col items-center justify-center relative">
+        <div className="absolute top-0 right-0 text-xs text-muted-foreground">
+          * Size of bubble represents intensity
+        </div>
+        
+        {/* Container with boundary constraints */}
+        <div className="relative w-[320px] h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden">
+          {bubbleData.map((item, index) => {
+            const position = bubblePositions[index];
+            // Calculate constrained positions
+            const constrainedX = Math.max(position.size/2, Math.min(320 - position.size/2, position.x));
+            const constrainedY = Math.max(position.size/2, Math.min(250 - position.size/2, position.y));
+            
+            return (
+              <motion.div
+                key={item.name}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ 
+                  scale: 1, 
+                  opacity: 1,
+                  x: [
+                    constrainedX - 5, 
+                    constrainedX + 5, 
+                    constrainedX
+                  ].map(x => Math.max(position.size/2, Math.min(320 - position.size/2, x))),
+                  y: [
+                    constrainedY - 5, 
+                    constrainedY + 5, 
+                    constrainedY
+                  ].map(y => Math.max(position.size/2, Math.min(250 - position.size/2, y)))
+                }}
+                transition={{ 
+                  duration: 0.5, 
+                  delay: index * 0.1,
+                  x: { repeat: Infinity, duration: 3 + index, repeatType: "reverse" },
+                  y: { repeat: Infinity, duration: 4 + index, repeatType: "reverse" }
+                }}
+                style={{
+                  width: `${position.size}px`,
+                  height: `${position.size}px`,
+                  backgroundColor: item.color,
+                  position: 'absolute',
+                  left: constrainedX - (position.size / 2),
+                  top: constrainedY - (position.size / 2),
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: position.size > 70 ? '14px' : '12px',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                  zIndex: Math.floor(item.value)
+                }}
+              >
+                {item.name}
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -289,7 +307,7 @@ export function EmotionChart({
   return (
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap justify-between items-center mb-6">
-        <h3 className="text-xl font-semibold">Emotions</h3>
+        <h3 className="text-xl font-semibold">Soul-ubles</h3>
         <div className="flex gap-2 mt-2 sm:mt-0">
           {chartTypes.map((type) => (
             <button
