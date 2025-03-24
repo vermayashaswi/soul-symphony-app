@@ -33,8 +33,10 @@ export default function ChatThreadList({
   useEffect(() => {
     if (userId) {
       fetchThreads();
+    } else {
+      setThreads([]);
     }
-  }, [userId]);
+  }, [userId, currentThreadId]);
 
   const fetchThreads = async () => {
     try {
@@ -63,12 +65,26 @@ export default function ChatThreadList({
   const deleteThread = async (threadId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
+      // First delete all messages in the thread
+      const { error: messagesError } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('thread_id', threadId);
+
+      if (messagesError) {
+        console.error('Error deleting messages:', messagesError);
+        toast.error('Failed to delete chat messages');
+        return;
+      }
+      
+      // Then delete the thread
       const { error } = await supabase
         .from('chat_threads')
         .delete()
         .eq('id', threadId);
 
       if (error) {
+        console.error('Error deleting thread:', error);
         toast.error('Failed to delete thread');
         return;
       }

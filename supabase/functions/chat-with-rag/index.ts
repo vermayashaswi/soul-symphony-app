@@ -84,6 +84,48 @@ async function getThreadHistory(threadId: string) {
   }));
 }
 
+// Generate a summarized title for a new chat thread
+async function generateThreadTitle(message: string, userId: string) {
+  try {
+    console.log("Generating title for thread based on message:", message.substring(0, 30) + "...");
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that generates concise, descriptive titles for chat conversations. The title should be no longer than 5-6 words and should capture the essence of the user\'s message.'
+          },
+          {
+            role: 'user',
+            content: `Generate a short, descriptive title for a chat that starts with this message: "${message}"`
+          }
+        ],
+        max_tokens: 20,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate thread title');
+    }
+
+    const result = await response.json();
+    const generatedTitle = result.choices[0].message.content.trim().replace(/^"|"$/g, '');
+    console.log("Generated title:", generatedTitle);
+    
+    return generatedTitle || message.substring(0, 30) + (message.length > 30 ? "..." : "");
+  } catch (error) {
+    console.error("Error generating thread title:", error);
+    return message.substring(0, 30) + (message.length > 30 ? "..." : "");
+  }
+}
+
 // Store user query with its embedding
 async function storeUserQuery(userId: string, queryText: string, embedding: any) {
   const { error } = await supabase
@@ -136,7 +178,13 @@ serve(async (req) => {
     
     // Create a new thread if needed
     if (isNewThread) {
-      const title = threadTitle || message.substring(0, 30) + (message.length > 30 ? "..." : "");
+      let title = threadTitle;
+      
+      // Generate a better title using AI if not provided or just a simple truncation
+      if (!title || title === message.substring(0, 30) + (message.length > 30 ? "..." : "")) {
+        title = await generateThreadTitle(message, userId);
+      }
+      
       const { data: newThread, error } = await supabase
         .from('chat_threads')
         .insert({
@@ -153,6 +201,16 @@ serve(async (req) => {
       
       currentThreadId = newThread.id;
       console.log("Created new thread with ID:", currentThreadId);
+    } else {
+      // Update the thread's updated_at timestamp
+      const { error: updateError } = await supabase
+        .from('chat_threads')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', currentThreadId);
+        
+      if (updateError) {
+        console.error("Error updating thread timestamp:", updateError);
+      }
     }
     
     // Store user message
@@ -167,6 +225,8 @@ serve(async (req) => {
     
     // Search for relevant journal entries using vector similarity
     console.log("Searching for relevant context using match_journal_entries function...");
+    console.log("User ID for journal entries search:", userId);
+    
     const { data: similarEntries, error: searchError } = await supabase.rpc(
       'match_journal_entries',
       {
@@ -188,16 +248,19 @@ serve(async (req) => {
     
     if (similarEntries && similarEntries.length > 0) {
       console.log("Found similar entries:", similarEntries.length);
+      console.log("Similar entries:", JSON.stringify(similarEntries));
       
       // Fetch full entries for context
       const entryIds = similarEntries.map(entry => entry.id);
       const { data: entries, error: entriesError } = await supabase
         .from('Journal Entries')
         .select('id, refined text, created_at, emotions')
-        .in('id', entryIds);
+        .in('id', entryIds)
+        .eq('user_id', userId);
       
       if (entriesError) {
         console.error("Error retrieving journal entries:", entriesError);
+        console.error("Entries error details:", JSON.stringify(entriesError));
       } else if (entries && entries.length > 0) {
         console.log("Retrieved full entries:", entries.length);
         
@@ -229,6 +292,7 @@ serve(async (req) => {
       
       if (recentError) {
         console.error("Error retrieving recent entries:", recentError);
+        console.error("Recent entries error details:", JSON.stringify(recentError));
       } else if (recentEntries && recentEntries.length > 0) {
         console.log("Retrieved recent entries:", recentEntries.length);
         

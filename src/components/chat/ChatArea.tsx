@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { verifyUserAuthentication } from '@/utils/audio/auth-utils';
 
 export interface MessageReference {
   id: number;
@@ -137,7 +139,23 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   };
 
   const handleSendMessage = async (content: string = inputValue) => {
-    if (!content.trim() || !userId) return;
+    if (!content.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+    
+    // Check user authentication
+    const authCheck = await verifyUserAuthentication();
+    if (!authCheck.isAuthenticated) {
+      toast.error(authCheck.error || 'You must be signed in to use the chat');
+      return;
+    }
+    
+    const userId = authCheck.userId;
+    if (!userId) {
+      toast.error('User ID not found');
+      return;
+    }
     
     const isNewThread = !threadId;
     
@@ -154,7 +172,10 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     setShowWelcome(false);
     
     try {
-      console.log("Sending message to chat-with-rag function");
+      console.log("Sending message to chat-with-rag function with userId:", userId);
+      
+      const threadTitle = isNewThread ? content.substring(0, 30) + (content.length > 30 ? "..." : "") : undefined;
+      console.log("Thread title for new thread:", threadTitle);
       
       const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: { 
@@ -162,7 +183,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
           userId: userId,
           threadId: threadId,
           isNewThread: isNewThread,
-          threadTitle: content.substring(0, 30) + (content.length > 30 ? "..." : "")
+          threadTitle: threadTitle
         }
       });
       
@@ -176,6 +197,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       console.log("Received response from chat-with-rag function:", data);
       
       if (isNewThread && data.threadId) {
+        console.log("New thread created with ID:", data.threadId);
         onNewThreadCreated(data.threadId);
       }
       
