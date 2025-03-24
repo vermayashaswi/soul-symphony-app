@@ -12,28 +12,37 @@ export type Database = {
       "Journal Entries": {
         Row: {
           audio_url: string | null
+          categories: string[] | null
           created_at: string
+          duration: number | null
           "foreign key": string | null
           id: number
           "refined text": string | null
+          sentiment: string | null
           "transcription text": string | null
           user_id: string | null
         }
         Insert: {
           audio_url?: string | null
+          categories?: string[] | null
           created_at?: string
+          duration?: number | null
           "foreign key"?: string | null
           id?: number
           "refined text"?: string | null
+          sentiment?: string | null
           "transcription text"?: string | null
           user_id?: string | null
         }
         Update: {
           audio_url?: string | null
+          categories?: string[] | null
           created_at?: string
+          duration?: number | null
           "foreign key"?: string | null
           id?: number
           "refined text"?: string | null
+          sentiment?: string | null
           "transcription text"?: string | null
           user_id?: string | null
         }
@@ -116,6 +125,30 @@ export type Database = {
           created_at?: string
           id?: number
           "subscription date"?: string | null
+        }
+        Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_subscribed: boolean | null
+          trial_start_date: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_subscribed?: boolean | null
+          trial_start_date?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_subscribed?: boolean | null
+          trial_start_date?: string | null
+          user_id?: string
         }
         Relationships: []
       }

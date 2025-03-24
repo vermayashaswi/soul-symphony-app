@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Message = {
   id: string;
@@ -34,6 +35,7 @@ export default function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showWelcome, setShowWelcome] = useState(true);
+  const { user } = useAuth();
   
   // Add initial assistant message
   useEffect(() => {
@@ -73,9 +75,14 @@ export default function Chat() {
     setShowWelcome(false);
     
     try {
-      // Call the chat-rag edge function
+      console.log("Sending message to chat-rag function with user ID:", user?.id);
+      
+      // Call the chat-rag edge function with user ID
       const { data, error } = await supabase.functions.invoke('chat-rag', {
-        body: { message: content.trim() }
+        body: { 
+          message: content.trim(),
+          userId: user?.id 
+        }
       });
       
       if (error) {
@@ -84,6 +91,8 @@ export default function Chat() {
         setIsLoading(false);
         return;
       }
+      
+      console.log("Received response from chat-rag function:", data);
       
       // Add assistant response
       const assistantMessage: Message = {

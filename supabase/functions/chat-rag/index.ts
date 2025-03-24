@@ -18,6 +18,7 @@ const corsHeaders = {
 // Generate embeddings using OpenAI
 async function generateEmbedding(text: string) {
   try {
+    console.log("Generating embedding for query:", text.substring(0, 50) + "...");
     const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -57,25 +58,28 @@ serve(async (req) => {
       throw new Error('No message provided');
     }
 
-    console.log("Processing chat request:", message);
+    console.log("Processing chat request for user:", userId);
+    console.log("Message:", message.substring(0, 50) + "...");
     
     // Generate embedding for the user query
     console.log("Generating embedding for user query...");
     const queryEmbedding = await generateEmbedding(message);
     
     // Search for relevant journal entries using vector similarity
-    console.log("Searching for relevant context...");
+    console.log("Searching for relevant context using match_journal_entries function...");
     const { data: similarEntries, error: searchError } = await supabase.rpc(
       'match_journal_entries',
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
-        match_count: 5
+        match_count: 5,
+        user_id_filter: userId
       }
     );
     
     if (searchError) {
       console.error("Error searching for similar entries:", searchError);
+      console.error("Search error details:", JSON.stringify(searchError));
     }
     
     // Create RAG context from relevant entries
@@ -93,6 +97,7 @@ serve(async (req) => {
       if (entriesError) {
         console.error("Error retrieving journal entries:", entriesError);
       } else if (entries && entries.length > 0) {
+        console.log("Retrieved full entries:", entries.length);
         // Format entries as context
         journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
           entries.map((entry, index) => {
@@ -101,16 +106,19 @@ serve(async (req) => {
           }).join('\n\n') + "\n\n";
       }
     } else {
+      console.log("No similar entries found, falling back to recent entries");
       // Fallback to recent entries if no similar ones found
       const { data: recentEntries, error: recentError } = await supabase
         .from('Journal Entries')
         .select('refined text, created_at')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(3);
       
       if (recentError) {
         console.error("Error retrieving recent entries:", recentError);
       } else if (recentEntries && recentEntries.length > 0) {
+        console.log("Retrieved recent entries:", recentEntries.length);
         journalContext = "Here are some of your recent journal entries:\n\n" + 
           recentEntries.map((entry, index) => {
             const date = new Date(entry.created_at).toLocaleDateString();

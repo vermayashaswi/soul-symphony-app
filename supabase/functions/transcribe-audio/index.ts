@@ -117,6 +117,17 @@ serve(async (req) => {
     // Upload to storage
     let audioUrl = null;
     try {
+      // Ensure the storage bucket exists
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const journalBucket = buckets?.find(b => b.name === 'journal-audio-entries');
+      
+      if (!journalBucket) {
+        console.log('Creating journal-audio-entries bucket');
+        await supabase.storage.createBucket('journal-audio-entries', {
+          public: true
+        });
+      }
+      
       const { data: storageData, error: storageError } = await supabase
         .storage
         .from('journal-audio-entries')
@@ -212,14 +223,16 @@ serve(async (req) => {
             "transcription text": transcribedText,
             "refined text": refinedText,
             "audio_url": audioUrl,
-            "user_id": userId || null
+            "user_id": userId || null,
+            "duration": Math.floor(Math.random() * 120) + 60  // Temporary placeholder for duration
           }])
           .select();
             
         if (insertError) {
           console.error('Error creating entry in database:', insertError);
+          console.error('Error details:', JSON.stringify(insertError));
         } else if (entryData && entryData.length > 0) {
-          console.log("Journal entry saved to database:", entryData);
+          console.log("Journal entry saved to database:", entryData[0].id);
           entryId = entryData[0].id;
           
           // Generate embedding for the refined text
@@ -237,6 +250,7 @@ serve(async (req) => {
               
             if (embeddingError) {
               console.error('Error storing embedding:', embeddingError);
+              console.error('Embedding error details:', JSON.stringify(embeddingError));
             } else {
               console.log("Embedding stored successfully for entry:", entryId);
             }
