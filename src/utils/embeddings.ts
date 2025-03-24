@@ -33,26 +33,24 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     // Safely type and filter entries with text content
     const validEntries: {id: number; "refined text": string}[] = [];
     
+    // Filter out null entries first
+    const nonNullEntries = entriesData.filter(entry => entry !== null);
+    
     // Validate each entry before using it
-    for (let i = 0; i < entriesData.length; i++) {
-      const currentEntry = entriesData[i];
-      
-      // Skip null entries
-      if (currentEntry === null) continue;
-      
+    for (const entry of nonNullEntries) {
       // Type guard to ensure entry is a valid object with required properties
-      if (typeof currentEntry === 'object' && 
-          'id' in currentEntry && 
-          currentEntry.id !== undefined && 
-          typeof currentEntry.id === 'number' && 
-          'refined text' in currentEntry &&
-          currentEntry["refined text"] !== null && 
-          currentEntry["refined text"] !== undefined && 
-          typeof currentEntry["refined text"] === 'string') {
+      if (typeof entry === 'object' && 
+          'id' in entry && 
+          entry.id !== undefined && 
+          typeof entry.id === 'number' && 
+          'refined text' in entry &&
+          entry["refined text"] !== null && 
+          entry["refined text"] !== undefined && 
+          typeof entry["refined text"] === 'string') {
         
         validEntries.push({
-          id: currentEntry.id,
-          "refined text": currentEntry["refined text"]
+          id: entry.id,
+          "refined text": entry["refined text"]
         });
       }
     }
@@ -86,20 +84,18 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     // Extract entry IDs from the results and ensure they're all valid
     const entriesWithEmbeddings = new Set<number>();
     
-    // Use indexed loop instead of for...of to avoid null reference issues
-    for (let i = 0; i < embeddingsData.length; i++) {
-      const currentItem = embeddingsData[i];
-      
-      // Skip null items
-      if (currentItem === null) continue;
-      
+    // Filter null items first
+    const nonNullEmbeddingsData = embeddingsData.filter(item => item !== null);
+    
+    // Use for...of loop with filtered data
+    for (const item of nonNullEmbeddingsData) {
       // Type guard to ensure item is a valid object with required property
-      if (typeof currentItem === 'object' && 
-          'journal_entry_id' in currentItem &&
-          currentItem.journal_entry_id !== undefined && 
-          typeof currentItem.journal_entry_id === 'number') {
+      if (typeof item === 'object' && 
+          'journal_entry_id' in item &&
+          item.journal_entry_id !== undefined && 
+          typeof item.journal_entry_id === 'number') {
         
-        entriesWithEmbeddings.add(currentItem.journal_entry_id);
+        entriesWithEmbeddings.add(item.journal_entry_id);
       }
     }
     
