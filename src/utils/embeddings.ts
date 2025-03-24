@@ -30,32 +30,26 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     console.log(`Found ${entriesData.length} journal entries`);
     
-    // Safely type and filter entries with text content
-    const validEntries: {id: number; "refined text": string}[] = [];
+    // Create an array to store valid entries
+    const validEntries: Array<{id: number; "refined text": string}> = [];
     
-    // We use a type guard to ensure TypeScript knows we're filtering out nulls and undefined
-    const nonNullEntries = entriesData.filter((entry): entry is NonNullable<typeof entry> => 
-      entry !== null && entry !== undefined
-    );
-    
-    // Validate each entry before using it
-    for (const entryData of nonNullEntries) {
-      // First check if entryData is not null to satisfy TypeScript
-      if (!entryData) continue;
+    // Process each entry to filter out invalid ones
+    for (let i = 0; i < entriesData.length; i++) {
+      const entry = entriesData[i];
       
-      // Then do the rest of the type guard checks
-      if (typeof entryData === 'object' && 
-          'id' in entryData && 
-          entryData.id !== undefined && 
-          typeof entryData.id === 'number' && 
-          'refined text' in entryData &&
-          entryData["refined text"] !== null && 
-          entryData["refined text"] !== undefined && 
-          typeof entryData["refined text"] === 'string') {
+      // Skip null/undefined entries
+      if (!entry) continue;
+      
+      // Ensure the entry has the required structure and values
+      if (typeof entry === 'object' && 
+          'id' in entry && 
+          typeof entry.id === 'number' &&
+          'refined text' in entry &&
+          typeof entry["refined text"] === 'string') {
         
         validEntries.push({
-          id: entryData.id,
-          "refined text": entryData["refined text"]
+          id: entry.id,
+          "refined text": entry["refined text"]
         });
       }
     }
@@ -86,26 +80,22 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
       return false;
     }
     
-    // Extract entry IDs from the results and ensure they're all valid
+    // Build a set of entries that already have embeddings
     const entriesWithEmbeddings = new Set<number>();
     
-    // Filter null items first with a proper type guard
-    const nonNullEmbeddingsData = embeddingsData.filter((item): item is NonNullable<typeof item> => 
-      item !== null && item !== undefined
-    );
-    
-    // Process non-null items
-    for (const itemData of nonNullEmbeddingsData) {
-      // First check if itemData is not null to satisfy TypeScript
-      if (!itemData) continue;
+    // Process each embedding record
+    for (let i = 0; i < embeddingsData.length; i++) {
+      const item = embeddingsData[i];
       
-      // Then do the rest of the type guard checks
-      if (typeof itemData === 'object' && 
-          'journal_entry_id' in itemData &&
-          itemData.journal_entry_id !== undefined && 
-          typeof itemData.journal_entry_id === 'number') {
+      // Skip null/undefined items
+      if (!item) continue;
+      
+      // Ensure the item has the required structure
+      if (typeof item === 'object' && 
+          'journal_entry_id' in item &&
+          typeof item.journal_entry_id === 'number') {
         
-        entriesWithEmbeddings.add(itemData.journal_entry_id);
+        entriesWithEmbeddings.add(item.journal_entry_id);
       }
     }
     
