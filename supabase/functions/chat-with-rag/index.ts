@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -154,11 +153,10 @@ async function storeMessage(threadId: string, content: string, sender: 'user' | 
   return data.id;
 }
 
-// Fetch relevant journal entries using vector search only
+// Fetch relevant journal entries using vector search
 async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) {
-  console.log(`Fetching relevant journal entries for user ${userId} using vector similarity only`);
+  console.log(`Fetching relevant journal entries for user ${userId} using vector similarity`);
   
-  // Use the match_journal_entries function
   const { data: similarEntries, error: matchError } = await supabase.rpc(
     'match_journal_entries',
     {
@@ -276,7 +274,7 @@ serve(async (req) => {
     // Store user query with embedding and connection to thread/message
     await storeUserQuery(userId, message, queryEmbedding, currentThreadId, userMessageId);
     
-    // Get relevant journal entries using vector similarity only
+    // Get relevant journal entries using vector similarity
     const journalEntries = await fetchRelevantJournalEntries(userId, queryEmbedding);
     
     console.log(`Retrieved ${journalEntries?.length || 0} relevant journal entries for RAG context`);
