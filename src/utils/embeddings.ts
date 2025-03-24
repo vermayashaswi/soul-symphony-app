@@ -35,25 +35,25 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     // Validate each entry before using it
     for (let i = 0; i < entriesData.length; i++) {
-      const entry = entriesData[i];
+      const currentEntry = entriesData[i];
       
       // Skip null entries
-      if (entry === null) continue;
+      if (currentEntry === null) continue;
       
-      // Type guard to ensure entry is a valid object
-      if (typeof entry === 'object') {
-        if ('id' in entry && 
-            entry.id !== undefined && 
-            typeof entry.id === 'number' && 
-            'refined text' in entry &&
-            entry["refined text"] !== null && 
-            entry["refined text"] !== undefined && 
-            typeof entry["refined text"] === 'string') {
-          validEntries.push({
-            id: entry.id,
-            "refined text": entry["refined text"]
-          });
-        }
+      // Type guard to ensure entry is a valid object with required properties
+      if (typeof currentEntry === 'object' && 
+          'id' in currentEntry && 
+          currentEntry.id !== undefined && 
+          typeof currentEntry.id === 'number' && 
+          'refined text' in currentEntry &&
+          currentEntry["refined text"] !== null && 
+          currentEntry["refined text"] !== undefined && 
+          typeof currentEntry["refined text"] === 'string') {
+        
+        validEntries.push({
+          id: currentEntry.id,
+          "refined text": currentEntry["refined text"]
+        });
       }
     }
     
@@ -88,18 +88,18 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     // Use indexed loop instead of for...of to avoid null reference issues
     for (let i = 0; i < embeddingsData.length; i++) {
-      const item = embeddingsData[i];
+      const currentItem = embeddingsData[i];
       
       // Skip null items
-      if (item === null) continue;
+      if (currentItem === null) continue;
       
-      // Type guard to ensure item is a valid object
-      if (typeof item === 'object') {
-        if ('journal_entry_id' in item &&
-            item.journal_entry_id !== undefined && 
-            typeof item.journal_entry_id === 'number') {
-          entriesWithEmbeddings.add(item.journal_entry_id);
-        }
+      // Type guard to ensure item is a valid object with required property
+      if (typeof currentItem === 'object' && 
+          'journal_entry_id' in currentItem &&
+          currentItem.journal_entry_id !== undefined && 
+          typeof currentItem.journal_entry_id === 'number') {
+        
+        entriesWithEmbeddings.add(currentItem.journal_entry_id);
       }
     }
     
