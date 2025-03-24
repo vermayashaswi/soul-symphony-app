@@ -25,7 +25,7 @@ BEGIN
     "Journal Entries" entries ON je.journal_entry_id = entries.id
   WHERE 
     1 - (je.embedding <=> query_embedding) > match_threshold
-    AND (user_id_filter IS NULL OR entries.user_id = user_id_filter::text)
+    AND entries.user_id = user_id_filter::text
   ORDER BY
     je.embedding <=> query_embedding
   LIMIT match_count;

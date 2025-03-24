@@ -17,32 +17,27 @@ const corsHeaders = {
 
 // Generate embeddings using OpenAI
 async function generateEmbedding(text: string) {
-  try {
-    console.log("Generating embedding for query:", text.substring(0, 50) + "...");
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-ada-002',
-        input: text
-      }),
-    });
+  console.log("Generating embedding for query:", text.substring(0, 50) + "...");
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openAIApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'text-embedding-ada-002',
+      input: text
+    }),
+  });
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Error generating embedding:', error);
-      throw new Error('Failed to generate embedding');
-    }
-
-    const result = await response.json();
-    return result.data[0].embedding;
-  } catch (error) {
-    console.error('Error in generateEmbedding:', error);
-    throw error;
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Error generating embedding:', error);
+    throw new Error('Failed to generate embedding');
   }
+
+  const result = await response.json();
+  return result.data[0].embedding;
 }
 
 // Format emotions data into a readable string
@@ -85,45 +80,40 @@ async function getThreadHistory(threadId: string) {
 }
 
 // Generate a summarized title for a new chat thread
-async function generateThreadTitle(message: string, userId: string) {
-  try {
-    console.log("Generating title for thread based on message:", message.substring(0, 30) + "...");
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant that generates concise, descriptive titles for chat conversations. The title should be no longer than 5-6 words and should capture the essence of the user\'s message.'
-          },
-          {
-            role: 'user',
-            content: `Generate a short, descriptive title for a chat that starts with this message: "${message}"`
-          }
-        ],
-        max_tokens: 20,
-      }),
-    });
+async function generateThreadTitle(message: string) {
+  console.log("Generating title for thread based on message:", message.substring(0, 30) + "...");
+  
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openAIApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant that generates concise, descriptive titles for chat conversations. The title should be no longer than 5-6 words and should capture the essence of the user\'s message.'
+        },
+        {
+          role: 'user',
+          content: `Generate a short, descriptive title for a chat that starts with this message: "${message}"`
+        }
+      ],
+      max_tokens: 20,
+    }),
+  });
 
-    if (!response.ok) {
-      throw new Error('Failed to generate thread title');
-    }
-
-    const result = await response.json();
-    const generatedTitle = result.choices[0].message.content.trim().replace(/^"|"$/g, '');
-    console.log("Generated title:", generatedTitle);
-    
-    return generatedTitle || message.substring(0, 30) + (message.length > 30 ? "..." : "");
-  } catch (error) {
-    console.error("Error generating thread title:", error);
-    return message.substring(0, 30) + (message.length > 30 ? "..." : "");
+  if (!response.ok) {
+    throw new Error('Failed to generate thread title');
   }
+
+  const result = await response.json();
+  const generatedTitle = result.choices[0].message.content.trim().replace(/^"|"$/g, '');
+  console.log("Generated title:", generatedTitle);
+  
+  return generatedTitle || message.substring(0, 30) + (message.length > 30 ? "..." : "");
 }
 
 // Store user query with its embedding
@@ -157,128 +147,60 @@ async function storeMessage(threadId: string, content: string, sender: 'user' | 
   }
 }
 
-// Improved function to fetch relevant journal entries
-async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any, threadId: string | null) {
-  console.log(`Attempting to fetch relevant journal entries for user ${userId}`);
+// Fetch relevant journal entries using vector search only
+async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) {
+  console.log(`Fetching relevant journal entries for user ${userId} using vector similarity only`);
   
-  // First, try using the match_journal_entries function if available
-  try {
-    const { data: similarEntries, error: matchError } = await supabase.rpc(
-      'match_journal_entries',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 5,
-        user_id_filter: userId
-      }
-    );
-    
-    if (!matchError && similarEntries && similarEntries.length > 0) {
-      console.log(`Found ${similarEntries.length} similar journal entries using vector similarity`);
-      
-      // Fetch the full details of these journal entries
-      const entryIds = similarEntries.map(entry => entry.id);
-      const { data: entries, error: fetchError } = await supabase
-        .from('Journal Entries')
-        .select('id, refined text, created_at, emotions, master_themes')
-        .in('id', entryIds);
-      
-      if (!fetchError && entries && entries.length > 0) {
-        console.log(`Retrieved full details for ${entries.length} journal entries`);
-        
-        // Tag them with their similarity score from the match
-        const entriesWithSimilarity = entries.map(entry => {
-          const matchEntry = similarEntries.find(se => se.id === entry.id);
-          return {
-            ...entry,
-            similarity: matchEntry ? matchEntry.similarity : 0,
-            type: 'semantic_match'
-          };
-        });
-        
-        return entriesWithSimilarity;
-      }
+  // Use the match_journal_entries function
+  const { data: similarEntries, error: matchError } = await supabase.rpc(
+    'match_journal_entries',
+    {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.5,
+      match_count: 5,
+      user_id_filter: userId
     }
-    
-    // If vector search didn't work, fall back to other methods
-    console.log("Vector similarity search didn't yield results, trying alternative methods");
-  } catch (error) {
-    console.error("Error in vector similarity search:", error);
+  );
+  
+  if (matchError) {
+    console.error("Error in vector similarity search:", matchError);
+    return [];
   }
   
-  // Fall back 1: Try to fetch the most recent entries for this user specifically
-  try {
-    const { data: recentEntries, error: recentError } = await supabase
-      .from('Journal Entries')
-      .select('id, refined text, created_at, emotions, master_themes')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-    
-    if (!recentError && recentEntries && recentEntries.length > 0) {
-      console.log(`Found ${recentEntries.length} recent journal entries`);
-      
-      // Tag them as recent entries
-      return recentEntries.map(entry => ({
-        ...entry,
-        type: 'recent_entry'
-      }));
-    }
-  } catch (error) {
-    console.error("Error fetching recent entries:", error);
+  if (!similarEntries || similarEntries.length === 0) {
+    console.log("No relevant journal entries found for this user/query");
+    return [];
   }
   
-  // Fall back 2: Try to fetch entries that might be related to the current thread
-  if (threadId) {
-    try {
-      // First get messages from this thread to understand the conversation
-      const { data: messages, error: msgError } = await supabase
-        .from('chat_messages')
-        .select('content')
-        .eq('thread_id', threadId)
-        .eq('sender', 'user')
-        .order('created_at', { ascending: false })
-        .limit(3);
-      
-      if (!msgError && messages && messages.length > 0) {
-        // Create a search term based on common words in the messages
-        const searchTerms = messages
-          .map(msg => msg.content)
-          .join(' ')
-          .toLowerCase()
-          .split(/\s+/)
-          .filter(word => word.length > 4) // Only use meaningful words
-          .slice(0, 5) // Take top 5 words
-          .join(' | '); // OR search
-        
-        if (searchTerms) {
-          // Perform a text search on journal entries
-          const { data: textMatchEntries, error: textError } = await supabase
-            .from('Journal Entries')
-            .select('id, refined text, created_at, emotions, master_themes')
-            .eq('user_id', userId)
-            .textSearch('refined text', searchTerms)
-            .limit(3);
-          
-          if (!textError && textMatchEntries && textMatchEntries.length > 0) {
-            console.log(`Found ${textMatchEntries.length} text-matched journal entries`);
-            
-            // Tag them as text matches
-            return textMatchEntries.map(entry => ({
-              ...entry,
-              type: 'text_match'
-            }));
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error in text search fallback:", error);
-    }
+  console.log(`Found ${similarEntries.length} similar journal entries using vector similarity`);
+  
+  // Fetch the full details of these journal entries
+  const entryIds = similarEntries.map(entry => entry.id);
+  const { data: entries, error: fetchError } = await supabase
+    .from('Journal Entries')
+    .select('id, refined text, created_at, emotions, master_themes')
+    .in('id', entryIds);
+  
+  if (fetchError) {
+    console.error("Error fetching full entry details:", fetchError);
+    return [];
   }
   
-  // No entries found
-  console.log("No relevant journal entries found for this user/query");
-  return [];
+  if (!entries || entries.length === 0) {
+    console.log("Could not retrieve full details for journal entries");
+    return [];
+  }
+  
+  console.log(`Retrieved full details for ${entries.length} journal entries`);
+  
+  // Tag them with their similarity score
+  return entries.map(entry => {
+    const matchEntry = similarEntries.find(se => se.id === entry.id);
+    return {
+      ...entry,
+      similarity: matchEntry ? matchEntry.similarity : 0
+    };
+  });
 }
 
 serve(async (req) => {
@@ -305,9 +227,8 @@ serve(async (req) => {
     if (isNewThread) {
       let title = threadTitle;
       
-      // Generate a better title using AI if not provided or just a simple truncation
       if (!title || title === message.substring(0, 30) + (message.length > 30 ? "..." : "")) {
-        title = await generateThreadTitle(message, userId);
+        title = await generateThreadTitle(message);
       }
       
       const { data: newThread, error } = await supabase
@@ -348,8 +269,8 @@ serve(async (req) => {
     // Store user query with embedding for future use
     await storeUserQuery(userId, message, queryEmbedding);
     
-    // Get relevant journal entries using our improved function
-    const journalEntries = await fetchRelevantJournalEntries(userId, queryEmbedding, currentThreadId);
+    // Get relevant journal entries using vector similarity only
+    const journalEntries = await fetchRelevantJournalEntries(userId, queryEmbedding);
     
     console.log(`Retrieved ${journalEntries?.length || 0} relevant journal entries for RAG context`);
     
@@ -371,8 +292,7 @@ serve(async (req) => {
             id: entry.id,
             date: entry.created_at,
             snippet: entry["refined text"]?.substring(0, 100) + "...",
-            similarity: entry.similarity || 0,
-            type: entry.type || "unknown"
+            similarity: entry.similarity || 0
           });
           
           return `Journal Entry ${index+1} (${date}):\n"${entry["refined text"]}"\n\nEmotional state: ${emotionsText}\n${themesText}`;
@@ -385,7 +305,7 @@ serve(async (req) => {
     // Get conversation history for this thread
     const previousMessages = await getThreadHistory(currentThreadId);
     
-    // Prepare system prompt with RAG context and more specific instructions
+    // Prepare system prompt with RAG context and specific instructions
     const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling.
 
 IMPORTANT CONTEXT FROM USER'S JOURNAL:
@@ -404,76 +324,58 @@ Remember, your primary value is connecting their question to their personal jour
     console.log("System prompt first 200 chars:", systemPrompt.substring(0, 200) + "...");
     console.log("Number of previous messages in context:", previousMessages.length);
     
-    try {
-      // Send to GPT with RAG context and conversation history
-      const messagesForGPT = [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        ...previousMessages,
-        {
-          role: 'user',
-          content: message
-        }
-      ];
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: messagesForGPT,
-          temperature: 0.7,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("GPT API error:", errorText);
-        throw new Error(`GPT API error: ${errorText}`);
+    // Send to GPT with RAG context and conversation history
+    const messagesForGPT = [
+      {
+        role: 'system',
+        content: systemPrompt
+      },
+      ...previousMessages,
+      {
+        role: 'user',
+        content: message
       }
+    ];
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: messagesForGPT,
+        temperature: 0.7,
+      }),
+    });
 
-      const result = await response.json();
-      const aiResponse = result.choices[0].message.content;
-      
-      console.log("AI response generated successfully");
-      console.log("AI response first 100 chars:", aiResponse.substring(0, 100) + "...");
-      
-      // Store assistant response with references to journal entries
-      await storeMessage(currentThreadId, aiResponse, 'assistant', referenceEntries.length > 0 ? referenceEntries : null);
-      
-      return new Response(
-        JSON.stringify({ 
-          response: aiResponse, 
-          threadId: currentThreadId, 
-          references: referenceEntries,
-          journal_entries_count: journalEntries.length
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    } catch (apiError) {
-      console.error("API error:", apiError);
-      
-      // Return a 200 status even for errors to avoid CORS issues
-      return new Response(
-        JSON.stringify({ 
-          error: apiError.message, 
-          response: "I'm having trouble connecting right now. Please try again later.",
-          success: false,
-          threadId: currentThreadId
-        }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("GPT API error:", errorText);
+      throw new Error(`GPT API error: ${errorText}`);
     }
+
+    const result = await response.json();
+    const aiResponse = result.choices[0].message.content;
+    
+    console.log("AI response generated successfully");
+    console.log("AI response first 100 chars:", aiResponse.substring(0, 100) + "...");
+    
+    // Store assistant response with references to journal entries
+    await storeMessage(currentThreadId, aiResponse, 'assistant', referenceEntries.length > 0 ? referenceEntries : null);
+    
+    return new Response(
+      JSON.stringify({ 
+        response: aiResponse, 
+        threadId: currentThreadId, 
+        references: referenceEntries,
+        journal_entries_count: journalEntries.length
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
   } catch (error) {
     console.error("Error in chat-with-rag function:", error);
     
