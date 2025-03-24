@@ -70,7 +70,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
             <div>
               <h3 className="font-medium mb-4 flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-amber-500" />
-                Emotions
+                Soul-ubles
               </h3>
               
               <div className="h-48 mb-4 flex items-center justify-center">
