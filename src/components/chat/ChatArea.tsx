@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { verifyUserAuthentication } from '@/utils/audio/auth-utils';
+import { verifyUserAuthentication, getCurrentUserId } from '@/utils/audio/auth-utils';
 
 export interface MessageReference {
   id: number;
@@ -56,6 +55,12 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   useEffect(() => {
     if (userId) {
       checkForJournalEntries(userId);
+    } else {
+      getCurrentUserId().then(id => {
+        if (id) {
+          checkForJournalEntries(id);
+        }
+      });
     }
   }, [userId]);
 
@@ -71,7 +76,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
 
   useEffect(() => {
     if (messages.length === 0 && threadId === null) {
-      // Initial welcome message
       const welcomeMessage = hasJournalEntries === false
         ? "Hi, I'm Feelosophy, your AI assistant. I noticed you don't have any journal entries yet. To get personalized insights, try creating some journal entries first. How can I help you today?"
         : "Hi, I'm Feelosophy, your AI assistant. I'm here to help you reflect on your thoughts and feelings. How are you doing today?";
@@ -95,6 +99,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
 
   const checkForJournalEntries = async (userId: string) => {
     try {
+      console.log('Checking for journal entries for user ID:', userId);
+      
       const { count, error } = await supabase
         .from('Journal Entries')
         .select('*', { count: 'exact', head: true })
@@ -107,6 +113,10 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       setHasJournalEntries(count > 0);
       console.log(`User has ${count} journal entries`);
+      
+      if (count > 0 && !hasJournalEntries) {
+        console.log('Journal entries exist but not being found. May need to refresh embeddings.');
+      }
     } catch (error) {
       console.error('Error:', error);
     }
@@ -175,15 +185,17 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       return;
     }
     
-    // Check user authentication
-    const authCheck = await verifyUserAuthentication();
-    if (!authCheck.isAuthenticated) {
-      toast.error(authCheck.error || 'You must be signed in to use the chat');
-      return;
+    let currentUserId = userId;
+    if (!currentUserId) {
+      const authCheck = await verifyUserAuthentication();
+      if (!authCheck.isAuthenticated) {
+        toast.error(authCheck.error || 'You must be signed in to use the chat');
+        return;
+      }
+      currentUserId = authCheck.userId;
     }
     
-    const userId = authCheck.userId;
-    if (!userId) {
+    if (!currentUserId) {
       toast.error('User ID not found');
       return;
     }
@@ -203,15 +215,22 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     setShowWelcome(false);
     
     try {
-      console.log("Sending message to chat-with-rag function with userId:", userId);
+      console.log("Sending message to chat-with-rag function with userId:", currentUserId);
       
       const threadTitle = isNewThread ? content.substring(0, 30) + (content.length > 30 ? "..." : "") : undefined;
       console.log("Thread title for new thread:", threadTitle);
       
+      const { count } = await supabase
+        .from('Journal Entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', currentUserId);
+      
+      console.log(`Found ${count} journal entries before sending message`);
+      
       const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: { 
           message: content.trim(),
-          userId: userId,
+          userId: currentUserId,
           threadId: threadId,
           isNewThread: isNewThread,
           threadTitle: threadTitle
@@ -227,15 +246,12 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       console.log("Received response from chat-with-rag function:", data);
       
-      if (data.journal_entries_count === 0 && hasJournalEntries !== false) {
-        // Update the state if we just learned the user has no journal entries
-        setHasJournalEntries(false);
-        toast.info('No journal entries found. Add some journals for personalized responses.');
-      } else if (data.journal_entries_count > 0 && hasJournalEntries !== true) {
-        // Update the state if we just learned the user has journal entries
-        setHasJournalEntries(true);
-        console.log(`Response included context from ${data.journal_entries_count} journal entries`);
+      if (data.journal_entries_count === 0 && count > 0) {
+        console.warn('Journal entries exist but RAG function could not access them.');
+        toast.warning('Your entries exist but could not be accessed. Please try refreshing the page.');
       }
+      
+      setHasJournalEntries(count > 0);
       
       if (isNewThread && data.threadId) {
         console.log("New thread created with ID:", data.threadId);
