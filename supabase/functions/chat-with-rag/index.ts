@@ -176,6 +176,43 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
     return [];
   }
   
+  // Check for existing embeddings for this user's entries
+  const { count: embeddingCount, error: embCountError } = await supabase
+    .from('journal_embeddings')
+    .select('*', { count: 'exact', head: true })
+    .in('journal_entry_id', 
+      supabase.from('Journal Entries')
+        .select('id')
+        .eq('user_id', userId)
+    );
+    
+  if (embCountError) {
+    console.error("Error checking for embeddings:", embCountError);
+  } else {
+    console.log(`User has ${embeddingCount || 0} journal entry embeddings`);
+    
+    if (embeddingCount === 0 && entryCount > 0) {
+      console.log("WARNING: User has journal entries but no embeddings. RAG will not work correctly.");
+      // We continue anyway to show the issue in logs
+    }
+  }
+  
+  // Debug: Check the actual embedding vector content and dimensions
+  const { data: sampleEmb, error: sampleError } = await supabase
+    .from('journal_embeddings')
+    .select('embedding')
+    .limit(1);
+    
+  if (!sampleError && sampleEmb && sampleEmb.length > 0) {
+    console.log("Sample embedding exists, dimensions check:", 
+      Array.isArray(sampleEmb[0].embedding) ? sampleEmb[0].embedding.length : "Not an array");
+  } else {
+    console.log("No sample embedding found to check dimensions");
+  }
+  
+  // Debug: Check query embedding dimensions
+  console.log("Query embedding dimensions:", Array.isArray(queryEmbedding) ? queryEmbedding.length : "Not an array");
+  
   // Proceed with vector similarity search
   const { data: similarEntries, error: matchError } = await supabase.rpc(
     'match_journal_entries',
@@ -189,6 +226,7 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
   
   if (matchError) {
     console.error("Error in vector similarity search:", matchError);
+    console.error("Full error object:", JSON.stringify(matchError));
     return [];
   }
   
@@ -229,6 +267,65 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
   });
 }
 
+// Debug function to check embedding dimensions for troubleshooting
+async function debugEmbeddingDimensions(userId: string) {
+  console.log(`Running embedding dimension debug check for user ${userId}`);
+  
+  try {
+    // Check a random journal entry and its embedding
+    const { data: entry, error: entryError } = await supabase
+      .from('Journal Entries')
+      .select('id, refined text')
+      .eq('user_id', userId)
+      .limit(1)
+      .single();
+      
+    if (entryError) {
+      console.log("Error fetching sample journal entry:", entryError);
+      return;
+    }
+    
+    if (!entry) {
+      console.log("No journal entries found for user");
+      return;
+    }
+    
+    console.log(`Found sample journal entry ${entry.id}`);
+    
+    // Check if it has an embedding
+    const { data: embedding, error: embError } = await supabase
+      .from('journal_embeddings')
+      .select('embedding')
+      .eq('journal_entry_id', entry.id)
+      .limit(1)
+      .single();
+      
+    if (embError) {
+      console.log(`Error fetching embedding for entry ${entry.id}:`, embError);
+      
+      // If no embedding exists, try to generate one for debugging
+      if (entry["refined text"]) {
+        console.log("Attempting to generate test embedding for debugging...");
+        const testVector = await generateEmbedding(entry["refined text"]);
+        console.log("Generated test vector with dimensions:", testVector.length);
+      }
+      
+      return;
+    }
+    
+    if (!embedding) {
+      console.log(`No embedding found for entry ${entry.id}`);
+      return;
+    }
+    
+    console.log(`Found embedding for entry ${entry.id}, dimensions:`, 
+      Array.isArray(embedding.embedding) ? embedding.embedding.length : "Not an array");
+      
+  } catch (error) {
+    console.log("Error in debug function:", error);
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -249,6 +346,9 @@ serve(async (req) => {
     console.log("Is new thread:", isNewThread);
     console.log("Message preview:", message.substring(0, 50) + (message.length > 50 ? "..." : ""));
     
+    // Run debug function to check embedding dimensions
+    await debugEmbeddingDimensions(userId);
+    
     // Check if this user has any journal entries
     const { count, error: countError } = await supabase
       .from('Journal Entries')
@@ -259,6 +359,29 @@ serve(async (req) => {
       console.error("Error checking journal entries count:", countError);
     } else {
       console.log(`User has ${count} total journal entries`);
+    }
+    
+    // Check if embeddings exist for these entries
+    if (count && count > 0) {
+      const { count: embCount, error: embCountError } = await supabase
+        .from('journal_embeddings')
+        .select('*', { count: 'exact', head: true })
+        .in('journal_entry_id', 
+          supabase.from('Journal Entries')
+            .select('id')
+            .eq('user_id', userId)
+        );
+        
+      if (embCountError) {
+        console.error("Error checking embeddings count:", embCountError);
+      } else {
+        console.log(`User has ${embCount || 0} entries with embeddings out of ${count} total entries`);
+        
+        // If there are missing embeddings, we should warn but continue
+        if (embCount < count) {
+          console.warn("Some journal entries are missing embeddings. RAG may not work correctly.");
+        }
+      }
     }
     
     // Create a new thread if needed

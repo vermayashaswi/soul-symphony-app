@@ -11,6 +11,7 @@ export default function Chat() {
   const [hasEntries, setHasEntries] = useState<boolean | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [embeddingsReady, setEmbeddingsReady] = useState(false);
   const { sidebar, content } = ChatContainer();
   
   useEffect(() => {
@@ -45,19 +46,36 @@ export default function Chat() {
         console.log(`User has ${count} journal entries`);
         
         if (count > 0) {
-          // Ensure journal entries have embeddings
-          console.log('Ensuring journal entries have embeddings...');
-          const result = await ensureJournalEntriesHaveEmbeddings(currentUserId);
+          setHasEntries(true);
           
-          if (!result) {
-            console.warn('Error generating embeddings for journal entries. Chat may not work properly.');
+          // Ensure journal entries have embeddings with multiple attempts if needed
+          console.log('Ensuring journal entries have embeddings...');
+          let embeddingsResult = false;
+          let attempts = 0;
+          
+          while (!embeddingsResult && attempts < 3) {
+            attempts++;
+            console.log(`Embedding generation attempt ${attempts}...`);
+            embeddingsResult = await ensureJournalEntriesHaveEmbeddings(currentUserId);
+            
+            if (!embeddingsResult) {
+              console.warn(`Embedding generation attempt ${attempts} failed`);
+              if (attempts < 3) {
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+              }
+            }
+          }
+          
+          if (!embeddingsResult) {
+            console.error('Failed to generate embeddings after multiple attempts');
             toast.warning('Error generating embeddings for journal entries. Chat may not work properly.');
           } else {
             console.log('Successfully ensured journal entries have embeddings');
+            setEmbeddingsReady(true);
           }
+        } else {
+          setHasEntries(false);
         }
-        
-        setHasEntries(count > 0);
         
       } catch (error) {
         console.error('Error checking journal entries:', error);
