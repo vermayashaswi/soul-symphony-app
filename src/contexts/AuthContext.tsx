@@ -10,8 +10,9 @@ type AuthContextType = {
   isLoading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
-  isDevMode: boolean;  // New flag for development mode
-  toggleDevMode: () => void;  // New function to toggle dev mode
+  isDevMode: boolean;  // Flag for development mode
+  toggleDevMode: () => void;  // Function to toggle dev mode
+  signInWithCredentials: (email: string, password: string) => Promise<void>; // New function for direct signin
 };
 
 // Export the AuthContext so it can be imported directly
@@ -85,6 +86,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // New function to sign in with email and password
+  const signInWithCredentials = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      console.log('Attempting to sign in with email/password');
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      console.error('Error signing in with credentials:', error);
+      toast.error(`Sign in failed: ${error.message}`);
+      setIsLoading(false);
+    }
+  };
+
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -97,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // New function to toggle development mode
+  // Function to toggle development mode
   const toggleDevMode = () => {
     setIsDevMode(prev => {
       const newValue = !prev;
@@ -120,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         isDevMode,
         toggleDevMode,
+        signInWithCredentials,
       }}
     >
       {children}

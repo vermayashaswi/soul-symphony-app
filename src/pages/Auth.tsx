@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
 export default function Auth() {
-  const { user, isLoading, signInWithGoogle, isDevMode, toggleDevMode } = useAuth();
+  const { user, isLoading, signInWithGoogle, isDevMode, toggleDevMode, signInWithCredentials } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [redirecting, setRedirecting] = useState(false);
@@ -97,6 +97,20 @@ export default function Auth() {
     }
   };
 
+  // Function to handle the direct login with the user's account
+  const handleDirectLogin = async () => {
+    // Replace with the user's actual credentials
+    const email = "demo@feelosophy.app"; // Replace with your actual email
+    const password = "demo123"; // Replace with your actual password
+
+    try {
+      await signInWithCredentials(email, password);
+      // The redirect will happen in the useEffect hook
+    } catch (error) {
+      console.error('Failed direct login:', error);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -145,6 +159,16 @@ export default function Auth() {
               </g>
             </svg>
             Sign in with Google
+          </Button>
+          
+          {/* Demo Account Login Button */}
+          <Button 
+            variant="outline"
+            size="lg" 
+            className="w-full flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 border-green-200"
+            onClick={handleDirectLogin}
+          >
+            <span className="font-medium">Login with Demo Account</span>
           </Button>
           
           {/* Development Mode Toggle */}
