@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import EmotionChart from '@/components/EmotionChart';
 import EmotionBubbles from '@/components/EmotionBubbles';
 import { JournalEntry } from '@/types/journal';
 
