@@ -105,7 +105,11 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         content: msg.content,
         sender: msg.sender as 'user' | 'assistant',
         created_at: msg.created_at,
-        reference_entries: msg.reference_entries,
+        reference_entries: msg.reference_entries ? 
+          (Array.isArray(msg.reference_entries) ? 
+            msg.reference_entries as MessageReference[] : 
+            null) : 
+          null,
         thread_id: msg.thread_id
       }));
 
