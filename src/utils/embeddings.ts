@@ -31,7 +31,9 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     // Filter to entries with text content
     const validEntries = entriesData.filter(entry => 
-      entry && typeof entry.id === 'number' && entry["refined text"] && 
+      entry && 
+      typeof entry.id === 'number' && 
+      entry["refined text"] && 
       typeof entry["refined text"] === 'string'
     );
     
@@ -42,18 +44,27 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     console.log(`Found ${validEntries.length} valid journal entries with text`);
     
+    // Get valid entry IDs for checking
+    const validEntryIds = validEntries.map(entry => entry.id);
+    
     // Check which entries already have embeddings
     const { data: embeddingsData, error: embeddingsError } = await supabase
       .from('journal_embeddings')
       .select('journal_entry_id')
-      .in('journal_entry_id', validEntries.map(e => e.id));
+      .in('journal_entry_id', validEntryIds);
       
     if (embeddingsError) {
       console.error('Error checking existing embeddings:', embeddingsError);
       return false;
     }
     
-    const entriesWithEmbeddings = new Set(embeddingsData?.map(e => e.journal_entry_id) || []);
+    if (!embeddingsData) {
+      console.error('No embedding data returned from query');
+      return false;
+    }
+    
+    // Extract entry IDs from the results
+    const entriesWithEmbeddings = new Set(embeddingsData.map(e => e.journal_entry_id));
     console.log(`Found ${entriesWithEmbeddings.size} entries that already have embeddings`);
     
     // Filter to entries without embeddings
