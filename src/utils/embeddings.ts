@@ -39,20 +39,21 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     );
     
     // Validate each entry before using it
-    for (const entry of nonNullEntries) {
+    for (const entryData of nonNullEntries) {
       // Type guard to ensure entry is a valid object with required properties
-      if (typeof entry === 'object' && 
-          'id' in entry && 
-          entry.id !== undefined && 
-          typeof entry.id === 'number' && 
-          'refined text' in entry &&
-          entry["refined text"] !== null && 
-          entry["refined text"] !== undefined && 
-          typeof entry["refined text"] === 'string') {
+      if (entryData && 
+          typeof entryData === 'object' && 
+          'id' in entryData && 
+          entryData.id !== undefined && 
+          typeof entryData.id === 'number' && 
+          'refined text' in entryData &&
+          entryData["refined text"] !== null && 
+          entryData["refined text"] !== undefined && 
+          typeof entryData["refined text"] === 'string') {
         
         validEntries.push({
-          id: entry.id,
-          "refined text": entry["refined text"]
+          id: entryData.id,
+          "refined text": entryData["refined text"]
         });
       }
     }
@@ -92,14 +93,15 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     );
     
     // Process non-null items
-    for (const item of nonNullEmbeddingsData) {
+    for (const itemData of nonNullEmbeddingsData) {
       // Type guard to ensure item is a valid object with required property
-      if (typeof item === 'object' && 
-          'journal_entry_id' in item &&
-          item.journal_entry_id !== undefined && 
-          typeof item.journal_entry_id === 'number') {
+      if (itemData && 
+          typeof itemData === 'object' && 
+          'journal_entry_id' in itemData &&
+          itemData.journal_entry_id !== undefined && 
+          typeof itemData.journal_entry_id === 'number') {
         
-        entriesWithEmbeddings.add(item.journal_entry_id);
+        entriesWithEmbeddings.add(itemData.journal_entry_id);
       }
     }
     
