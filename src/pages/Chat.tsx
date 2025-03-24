@@ -44,7 +44,13 @@ export default function Chat() {
           return;
         }
         
-        const validEntries = entries?.filter(entry => entry && entry["refined text"]) || [];
+        const validEntries = entries?.filter(entry => 
+          entry && 
+          typeof entry.id === 'number' && 
+          entry["refined text"] && 
+          typeof entry["refined text"] === 'string'
+        ) || [];
+        
         console.log(`User has ${validEntries.length} valid journal entries with text`);
         
         if (validEntries.length > 0) {

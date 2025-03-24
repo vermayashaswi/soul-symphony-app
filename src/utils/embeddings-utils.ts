@@ -39,7 +39,7 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     // Filter out entries without valid refined text
     const validEntries = entries.filter(entry => 
       entry && 
-      entry.id && 
+      typeof entry.id === 'number' && 
       entry["refined text"] && 
       typeof entry["refined text"] === 'string' &&
       entry["refined text"].trim().length > 0
@@ -94,7 +94,7 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
       console.log(`Processing batch ${i+1}/${batches} with ${batch.length} entries`);
       
       // Process each entry in the batch with Promise.all for parallel processing
-      const results = await Promise.all(batch.map(async entry => {
+      const results = await Promise.all(batch.map(async (entry) => {
         try {
           if (!entry["refined text"]) {
             console.log(`Entry ${entry.id} has no refined text, skipping embedding generation`);
