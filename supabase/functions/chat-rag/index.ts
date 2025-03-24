@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -135,52 +136,74 @@ mention them, but do so gently and constructively. Focus on being helpful rather
 
     console.log("Sending to GPT with RAG context...");
     
-    // Send to GPT with RAG context
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: message
-          }
-        ],
-      }),
-    });
+    try {
+      // Send to GPT with RAG context
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: message
+            }
+          ],
+        }),
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("GPT API error:", errorText);
-      throw new Error(`GPT API error: ${errorText}`);
-    }
-
-    const result = await response.json();
-    const aiResponse = result.choices[0].message.content;
-    
-    console.log("AI response generated successfully");
-    
-    return new Response(
-      JSON.stringify({ response: aiResponse }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("GPT API error:", errorText);
+        throw new Error(`GPT API error: ${errorText}`);
       }
-    );
 
+      const result = await response.json();
+      const aiResponse = result.choices[0].message.content;
+      
+      console.log("AI response generated successfully");
+      
+      return new Response(
+        JSON.stringify({ response: aiResponse }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    } catch (apiError) {
+      console.error("API error:", apiError);
+      
+      // Return a 200 status even for errors to avoid CORS issues
+      return new Response(
+        JSON.stringify({ 
+          error: apiError.message, 
+          response: "I'm having trouble connecting right now. Please try again later.",
+          success: false 
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
   } catch (error) {
     console.error("Error in chat-rag function:", error);
+    
+    // Return 200 status even for errors to avoid CORS issues
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message, 
+        response: "I'm having trouble processing your request. Please try again later.",
+        success: false 
+      }),
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
