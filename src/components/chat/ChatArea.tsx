@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,7 +12,6 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { verifyUserAuthentication, getCurrentUserId } from '@/utils/audio/auth-utils';
-import { JournalEntriesDebug } from './JournalEntriesDebug';
 
 export interface MessageReference {
   id: number;
@@ -114,10 +114,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       setHasJournalEntries(count > 0);
       console.log(`User has ${count} journal entries`);
-      
-      if (count > 0 && !hasJournalEntries) {
-        console.log('Journal entries exist but not being found. May need to refresh embeddings.');
-      }
     } catch (error) {
       console.error('Error:', error);
     }
@@ -429,10 +425,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         >
           <Send className="h-4 w-4" />
         </Button>
-      </div>
-      
-      <div className="px-4 mb-2">
-        <JournalEntriesDebug />
       </div>
     </div>
   );

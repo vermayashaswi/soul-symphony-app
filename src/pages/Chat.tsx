@@ -27,8 +27,6 @@ export default function Chat() {
         return;
       }
       
-      console.log('Checking for journal entries for user ID:', currentUserId);
-      
       // Directly query the database for journal entries
       try {
         const { count, error } = await supabase
@@ -38,14 +36,11 @@ export default function Chat() {
           
         if (error) {
           console.error('Error checking journal entries:', error);
-          toast.error('Failed to check for journal entries');
           setIsLoading(false);
           return;
         }
         
-        console.log(`User has ${count} journal entries in database query`);
-        
-        // Also check if embeddings exist for those entries
+        // Check if embeddings exist for those entries
         // First, get the journal entry IDs for this user
         const { data: journalEntryIds, error: idsError } = await supabase
           .from('Journal Entries')
@@ -64,29 +59,13 @@ export default function Chat() {
             
           if (embeddingError) {
             console.error('Error checking journal embeddings:', embeddingError);
-          } else {
-            console.log(`Found ${embeddingCount} embeddings for journal entries`);
-            
-            if (count > 0 && embeddingCount === 0) {
-              toast.warning('Your journal entries exist but have no embeddings. The chatbot may not work properly.');
-            }
           }
         }
         
-        // Also check with our utility function for comparison
-        const hasEntriesResult = await checkUserHasJournalEntries(currentUserId);
-        console.log('Check user has journal entries result:', hasEntriesResult);
-        
         setHasEntries(count > 0);
         
-        if (count === 0) {
-          toast.info('No journal entries found. Add some journals for personalized responses.');
-        } else {
-          toast.success(`Found ${count} journal entries for personalized chat experience`);
-        }
       } catch (error) {
         console.error('Error checking journal entries:', error);
-        toast.error('Failed to check for journal entries');
       } finally {
         setIsLoading(false);
       }
