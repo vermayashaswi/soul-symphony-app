@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -251,13 +250,11 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: 'audio/webm' });
     formData.append('file', blob, 'audio.webm');
     formData.append('model', 'whisper-1');
-    // Updating to the latest Whisper model
     formData.append('response_format', 'json');
 
     console.log("Sending to Whisper API for high-quality transcription using the latest model...");
     
     try {
-      // Step 1: Use Whisper for high-quality transcription with the latest model
       const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
@@ -277,7 +274,6 @@ serve(async (req) => {
       
       console.log("Transcription successful:", transcribedText);
 
-      // Step 2: Use GPT to refine and translate the transcription
       const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -293,7 +289,7 @@ serve(async (req) => {
             },
             {
               role: 'user',
-              content: `Translate this text to English if needed and improve its clarity while preserving the emotional tone: "${transcribedText}"`
+              content: `Here is a multilingual voice journal data of a user in their local language. Please translate it to English logically "${transcribedText}"`
             }
           ],
         }),
@@ -310,7 +306,6 @@ serve(async (req) => {
       
       console.log("Refinement successful:", refinedText);
 
-      // Step 3: Analyze emotions using our database of emotions
       const emotions = await analyzeEmotions(refinedText);
       console.log("Emotion analysis:", emotions);
 
