@@ -82,6 +82,56 @@ async function generateEmbedding(text: string) {
   }
 }
 
+// Function to analyze emotions in text
+async function analyzeEmotions(text: string) {
+  try {
+    console.log('Analyzing emotions for text:', text.slice(0, 100) + '...');
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an emotion analysis expert. Extract the emotions present in the text and assign intensity values from 0 to 1. Return ONLY a JSON object with emotion names as keys and intensity values as values. Include at least: joy, sadness, anger, fear, surprise, and any other relevant emotions.'
+          },
+          {
+            role: 'user',
+            content: `Analyze the emotions in this text: "${text}"`
+          }
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error analyzing emotions:', error);
+      throw new Error('Failed to analyze emotions');
+    }
+
+    const result = await response.json();
+    const emotionsText = result.choices[0].message.content;
+    try {
+      // Parse the JSON response
+      const emotions = JSON.parse(emotionsText);
+      return emotions;
+    } catch (err) {
+      console.error('Error parsing emotions JSON:', err);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error in analyzeEmotions:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -131,7 +181,10 @@ serve(async (req) => {
       const { data: storageData, error: storageError } = await supabase
         .storage
         .from('journal-audio-entries')
-        .upload(filename, binaryAudio);
+        .upload(filename, binaryAudio, {
+          contentType: 'audio/webm',
+          cacheControl: '3600'
+        });
         
       if (storageError) {
         console.error('Error uploading audio to storage:', storageError);
@@ -212,6 +265,13 @@ serve(async (req) => {
     
     console.log("Refinement successful:", refinedText);
 
+    // Analyze emotions in the refined text
+    const emotions = await analyzeEmotions(refinedText);
+    console.log("Emotion analysis:", emotions);
+
+    // Calculate audio duration (in seconds)
+    const audioDuration = Math.floor(binaryAudio.length / 16000); // Rough estimate based on typical audio bitrate
+
     // Store in database if we have valid transcription
     let entryId = null;
     if (transcribedText) {
@@ -224,7 +284,8 @@ serve(async (req) => {
             "refined text": refinedText,
             "audio_url": audioUrl,
             "user_id": userId || null,
-            "duration": Math.floor(Math.random() * 120) + 60  // Temporary placeholder for duration
+            "duration": audioDuration,
+            "emotions": emotions
           }])
           .select();
             
@@ -269,6 +330,7 @@ serve(async (req) => {
         refinedText: refinedText,
         audioUrl: audioUrl,
         entryId: entryId,
+        emotions: emotions,
         success: true
       }),
       { 

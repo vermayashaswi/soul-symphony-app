@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob) => void;
@@ -188,15 +189,61 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     try {
       setIsProcessing(true);
       
-      if (onRecordingComplete) {
-        onRecordingComplete(audioBlob);
-      }
-      
-      setAudioBlob(null);
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = async function() {
+        try {
+          const base64Audio = reader.result as string;
+          const base64String = base64Audio.split(',')[1]; // Remove the data URL prefix
+          
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            toast.error('You must be signed in to save journal entries.');
+            setIsProcessing(false);
+            return;
+          }
+
+          console.log("Sending audio to transcribe function...");
+          
+          // Send to the Edge Function
+          const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+            body: {
+              audio: base64String,
+              userId: user.id
+            }
+          });
+
+          if (error) {
+            console.error('Transcription error:', error);
+            toast.error('Failed to transcribe audio. Please try again.');
+            setIsProcessing(false);
+            return;
+          }
+
+          console.log("Transcription response:", data);
+          
+          if (data.success) {
+            toast.success('Journal entry saved successfully!');
+            
+            if (onRecordingComplete) {
+              onRecordingComplete(audioBlob);
+            }
+            
+            setAudioBlob(null);
+          } else {
+            toast.error(data.error || 'Failed to process recording');
+          }
+        } catch (err) {
+          console.error('Error processing audio:', err);
+          toast.error('Failed to process audio. Please try again.');
+        } finally {
+          setIsProcessing(false);
+        }
+      };
     } catch (error) {
       console.error('Error processing recording:', error);
       toast.error('Error processing recording. Please try again.');
-    } finally {
       setIsProcessing(false);
     }
   };

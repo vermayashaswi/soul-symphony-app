@@ -31,20 +31,20 @@ const Journal = () => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const [refreshKey, setRefreshKey] = useState(0); // Add a refresh key to force re-fetch
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (user) {
       fetchEntries();
     }
-  }, [user, refreshKey]); // Add refreshKey as dependency
+  }, [user, refreshKey]);
 
   const fetchEntries = async () => {
     try {
       setLoading(true);
       console.log('Fetching entries for user ID:', user?.id);
       
-      // Fix: Use the correct table name "Journal Entries" instead of "journal_entries"
+      // Fetch entries from the Journal Entries table
       const { data, error } = await supabase
         .from('Journal Entries')
         .select('*')
@@ -57,6 +57,7 @@ const Journal = () => {
       }
       
       console.log('Fetched entries:', data);
+      
       // We need to ensure data matches our JournalEntry type
       const typedEntries = (data || []) as JournalEntry[];
       setEntries(typedEntries);
