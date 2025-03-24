@@ -9,9 +9,6 @@ interface JournalEntry {
   [key: string]: any;
 }
 
-// Define a type for possible database entries
-type PossibleEntry = null | undefined | JournalEntry | object;
-
 /**
  * Checks if embeddings exist for journal entries and requests generation if missing
  */
@@ -34,18 +31,14 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     }
     
     console.log(`Found ${entries.length} journal entries for embedding check`);
+    console.log('Sample entry:', entries[0]); // Debug log to see entry structure
     
-    // Type guard function to check if an entry is a valid journal entry
-    function isValidJournalEntry(entry: PossibleEntry): entry is JournalEntry {
-      return entry !== null && 
-             entry !== undefined && 
-             typeof entry === 'object' &&
-             'id' in entry && 
-             typeof entry.id === 'number';
-    }
-    
-    // Filter out any invalid entries
-    const validEntries = entries.filter(isValidJournalEntry);
+    // Filter out any null entries and ensure they have an ID
+    const validEntries = entries.filter((entry): entry is JournalEntry => {
+      if (!entry || typeof entry !== 'object') return false;
+      if (!('id' in entry) || typeof entry.id !== 'number') return false;
+      return true;
+    });
     
     if (validEntries.length === 0) {
       console.error('No valid journal entry IDs found');
@@ -65,6 +58,8 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
       console.error('Error checking existing embeddings:', embeddingsError);
       return false;
     }
+    
+    console.log('Existing embeddings:', existingEmbeddings); // Debug log
     
     // Find entries without embeddings
     const existingEmbeddingIds = existingEmbeddings?.map(e => e.journal_entry_id) || [];
