@@ -35,21 +35,28 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     // Process each entry to filter out invalid ones
     for (let i = 0; i < entriesData.length; i++) {
-      const currentEntry = entriesData[i];
+      const entry = entriesData[i];
       
-      // Skip null/undefined entries
-      if (currentEntry === null || currentEntry === undefined) continue;
+      // Skip null/undefined entries with an explicit type check
+      if (entry === null || entry === undefined) continue;
       
-      // Ensure the entry has the required structure and values
-      if (typeof currentEntry === 'object' && 
-          'id' in currentEntry && 
-          typeof currentEntry.id === 'number' &&
-          'refined text' in currentEntry &&
-          typeof currentEntry["refined text"] === 'string') {
-        
+      // Define a type guard function to ensure the entry has the required structure
+      const isValidEntry = (obj: any): obj is {id: number; "refined text": string} => {
+        return (
+          typeof obj === 'object' && 
+          obj !== null &&
+          'id' in obj && 
+          typeof obj.id === 'number' &&
+          'refined text' in obj &&
+          typeof obj["refined text"] === 'string'
+        );
+      };
+      
+      // Use the type guard
+      if (isValidEntry(entry)) {
         validEntries.push({
-          id: currentEntry.id,
-          "refined text": currentEntry["refined text"]
+          id: entry.id,
+          "refined text": entry["refined text"]
         });
       }
     }
@@ -85,17 +92,24 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     // Process each embedding record
     for (let i = 0; i < embeddingsData.length; i++) {
-      const currentItem = embeddingsData[i];
+      const item = embeddingsData[i];
       
-      // Skip null/undefined items
-      if (currentItem === null || currentItem === undefined) continue;
+      // Skip null/undefined items with an explicit type check
+      if (item === null || item === undefined) continue;
       
-      // Ensure the item has the required structure
-      if (typeof currentItem === 'object' && 
-          'journal_entry_id' in currentItem &&
-          typeof currentItem.journal_entry_id === 'number') {
-        
-        entriesWithEmbeddings.add(currentItem.journal_entry_id);
+      // Define a type guard function
+      const isValidEmbedding = (obj: any): obj is {journal_entry_id: number} => {
+        return (
+          typeof obj === 'object' && 
+          obj !== null &&
+          'journal_entry_id' in obj &&
+          typeof obj.journal_entry_id === 'number'
+        );
+      };
+      
+      // Use the type guard
+      if (isValidEmbedding(item)) {
+        entriesWithEmbeddings.add(item.journal_entry_id);
       }
     }
     
