@@ -35,9 +35,11 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     // Validate each entry before using it
     for (const entry of entriesData) {
+      // Skip null entries
+      if (entry === null) continue;
+      
       // Ensure entry exists and has the expected properties
-      if (entry && 
-          typeof entry === 'object' &&
+      if (typeof entry === 'object' &&
           'id' in entry && 
           entry.id !== undefined && 
           typeof entry.id === 'number' && 
@@ -81,9 +83,11 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     const entriesWithEmbeddings = new Set<number>();
     
     for (const item of embeddingsData) {
+      // Skip null items
+      if (item === null) continue;
+      
       // Ensure item exists and has the expected journal_entry_id property
-      if (item && 
-          typeof item === 'object' &&
+      if (typeof item === 'object' &&
           'journal_entry_id' in item &&
           item.journal_entry_id !== undefined && 
           typeof item.journal_entry_id === 'number') {
