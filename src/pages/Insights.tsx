@@ -1,7 +1,6 @@
 
-import { useState, useContext } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AuthContext } from '@/contexts/AuthContext';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import Navbar from '@/components/Navbar';
@@ -9,9 +8,10 @@ import EmotionChart from '@/components/EmotionChart';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Insights() {
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
