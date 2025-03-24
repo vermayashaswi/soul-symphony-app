@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -14,18 +13,15 @@ export default function Auth() {
   const location = useLocation();
   const [redirecting, setRedirecting] = useState(false);
   
-  // Get the return path from the location state or default to /journal
   const from = location.state?.from?.pathname || '/journal';
 
   useEffect(() => {
-    // Log the current origin/domain for debugging
     console.log('Current origin for Auth page:', window.location.origin);
     
     if (user && !redirecting) {
       console.log('Auth page: User detected, redirecting to:', from);
       setRedirecting(true);
       
-      // Add a brief delay to ensure state changes have processed
       const timer = setTimeout(() => {
         navigate(from, { replace: true });
       }, 500);
@@ -34,10 +30,8 @@ export default function Auth() {
     }
   }, [user, navigate, redirecting, from]);
 
-  // Handle cases where user has just completed authentication via redirect
   useEffect(() => {
     const handleHashRedirect = async () => {
-      // Check if we're coming back from an OAuth redirect
       const hasHashParams = window.location.hash.includes('access_token') || 
                            window.location.hash.includes('error') ||
                            window.location.search.includes('error');
@@ -48,7 +42,6 @@ export default function Auth() {
           search: window.location.search 
         });
         
-        // Check for error in the URL
         if (window.location.hash.includes('error') || window.location.search.includes('error')) {
           console.error('Error detected in redirect URL');
           toast.error('Authentication failed. Please try again.');
@@ -56,7 +49,6 @@ export default function Auth() {
         }
         
         try {
-          // This will automatically exchange the auth code for a session
           const { data, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -65,7 +57,6 @@ export default function Auth() {
           } else if (data.session) {
             console.log('Successfully retrieved session after redirect:', data.session.user.email);
             console.log('Current domain:', window.location.origin);
-            // Session will be picked up by the other useEffect
           }
         } catch (e) {
           console.error('Exception during auth redirect handling:', e);

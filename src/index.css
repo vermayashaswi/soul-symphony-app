@@ -93,6 +93,7 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";
+    overflow-x: hidden;
   }
   
   html {
@@ -119,5 +120,9 @@
   
   .text-balance {
     text-wrap: balance;
+  }
+  
+  .particle-background {
+    @apply fixed inset-0 w-full h-full -z-10 pointer-events-none;
   }
 }

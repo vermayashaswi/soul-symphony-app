@@ -1,7 +1,6 @@
 
 import { ReactNode } from 'react';
 import Navbar from '@/components/Navbar';
-import ParticleBackground from '@/components/ParticleBackground';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useState, useEffect } from 'react';
@@ -23,7 +22,6 @@ export function ChatLayout({ sidebar, content }: ChatLayoutProps) {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
-      <ParticleBackground />
       
       <div className="flex-1 pt-16 flex">
         <ResizablePanelGroup direction="horizontal" className="w-full h-full">

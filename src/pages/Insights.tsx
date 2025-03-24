@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import Navbar from '@/components/Navbar';
+import ParticleBackground from '@/components/ParticleBackground';
 import EmotionChart from '@/components/EmotionChart';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -84,6 +85,7 @@ export default function Insights() {
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
+      <ParticleBackground />
       
       {/* Sticky time toggle that appears when scrolling */}
       {isSticky && (
