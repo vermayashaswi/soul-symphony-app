@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { ChatLayout } from '@/components/chat/ChatLayout';
 import { ChatContainer } from '@/components/chat/ChatContainer';
@@ -30,7 +31,7 @@ export default function Chat() {
       
       try {
         console.log('Checking journal entries for user:', currentUserId);
-        const { data: entries, error } = await supabase
+        const { data: entriesData, error } = await supabase
           .from('Journal Entries')
           .select('id, refined text')
           .eq('user_id', currentUserId)
@@ -42,12 +43,14 @@ export default function Chat() {
           return;
         }
         
-        const validEntries = (entries as JournalEntry[] || []).filter(entry => 
+        // Properly type and filter the entries
+        const entries = entriesData as any[] || [];
+        const validEntries = entries.filter(entry => 
           entry && 
           typeof entry.id === 'number' && 
           entry["refined text"] && 
           typeof entry["refined text"] === 'string'
-        );
+        ) as JournalEntry[];
         
         console.log(`User has ${validEntries.length} valid journal entries with text`);
         

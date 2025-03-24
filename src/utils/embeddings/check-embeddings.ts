@@ -12,7 +12,7 @@ export async function fetchJournalEntriesWithText(userId: string): Promise<Journ
     console.log('Fetching journal entries for user:', userId);
     
     // Get all journal entries for this user that have refined text
-    const { data: entries, error: entriesError } = await supabase
+    const { data: entriesData, error: entriesError } = await supabase
       .from('Journal Entries')
       .select('id, refined text')
       .eq('user_id', userId)
@@ -24,21 +24,22 @@ export async function fetchJournalEntriesWithText(userId: string): Promise<Journ
       return null;
     }
     
-    if (!entries || entries.length === 0) {
+    if (!entriesData || entriesData.length === 0) {
       console.log('No journal entries with text found for user');
       return null;
     }
     
-    console.log(`Found ${entries.length} journal entries for embedding check`);
+    console.log(`Found ${entriesData.length} journal entries for embedding check`);
     
-    // Cast to JournalEntry[] and filter out entries without valid refined text
-    const validEntries = (entries as JournalEntry[]).filter(entry => 
+    // Cast to any[] first and then filter out entries without valid refined text
+    const entries = entriesData as any[];
+    const validEntries = entries.filter(entry => 
       entry && 
       typeof entry.id === 'number' && 
       entry["refined text"] && 
       typeof entry["refined text"] === 'string' &&
       entry["refined text"].trim().length > 0
-    );
+    ) as JournalEntry[];
     
     if (validEntries.length === 0) {
       console.error('No valid journal entries with text found');
