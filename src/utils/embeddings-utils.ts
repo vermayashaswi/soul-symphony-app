@@ -2,6 +2,13 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Define a type for journal entries
+interface JournalEntry {
+  id: number | string;
+  "refined text"?: string;
+  [key: string]: any;
+}
+
 /**
  * Checks if embeddings exist for journal entries and requests generation if missing
  */
@@ -27,8 +34,10 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     
     // Get entry IDs - filter out any null entries and ensure they have an ID
     const entryIds = entries
-      .filter((entry): entry is {id: number | string, "refined text"?: string} => 
-        entry !== null && typeof entry === 'object' && 'id' in entry
+      .filter((entry): entry is JournalEntry => 
+        entry !== null && 
+        typeof entry === 'object' && 
+        'id' in entry
       )
       .map(entry => entry.id);
     
@@ -55,7 +64,7 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
       typeof entry === 'object' && 
       'id' in entry && 
       !existingEmbeddingIds.includes(entry.id)
-    );
+    ) as JournalEntry[];
     
     if (entriesWithoutEmbeddings.length === 0) {
       console.log('All journal entries have embeddings');
@@ -67,11 +76,8 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     
     // Generate embeddings for entries that don't have them
     for (const entry of entriesWithoutEmbeddings) {
-      // Skip null entries or entries without refined text
-      if (entry === null || 
-          typeof entry !== 'object' || 
-          !('id' in entry) || 
-          !entry["refined text"]) {
+      // Skip entries without refined text
+      if (!entry || !entry["refined text"]) {
         console.log(`Entry is invalid or has no refined text, skipping embedding generation`);
         continue;
       }
