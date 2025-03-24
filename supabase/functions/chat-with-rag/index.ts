@@ -157,6 +157,71 @@ async function storeMessage(threadId: string, content: string, sender: 'user' | 
   }
 }
 
+// Fetch journal entries directly by user ID
+async function fetchJournalEntriesByUserId(userId: string, limit: number = 5) {
+  console.log(`Directly fetching up to ${limit} journal entries for user ID: ${userId}`);
+  
+  const { data, error } = await supabase
+    .from('Journal Entries')
+    .select('id, refined text, created_at, emotions, master_themes')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  
+  if (error) {
+    console.error("Error fetching journal entries:", error);
+    return [];
+  }
+  
+  console.log(`Successfully retrieved ${data.length} journal entries`);
+  return data;
+}
+
+// Try to fetch journal entries using vector similarity
+async function fetchSimilarJournalEntries(embedding: any, userId: string, limit: number = 5) {
+  try {
+    console.log(`Attempting to fetch similar journal entries for user ${userId} using vector similarity`);
+    
+    // First try the match_journal_entries function
+    const { data, error } = await supabase
+      .rpc('match_journal_entries', {
+        query_embedding: embedding,
+        match_threshold: 0.5,
+        match_count: limit,
+        user_id_filter: userId
+      });
+    
+    if (error) {
+      console.error("Error with match_journal_entries function:", error);
+      throw error;
+    }
+    
+    console.log(`Vector similarity search returned ${data?.length || 0} results`);
+    
+    // If we got results, fetch the full entries
+    if (data && data.length > 0) {
+      const entryIds = data.map(item => item.id);
+      const { data: fullEntries, error: entriesError } = await supabase
+        .from('Journal Entries')
+        .select('id, refined text, created_at, emotions, master_themes')
+        .in('id', entryIds);
+      
+      if (entriesError) {
+        console.error("Error fetching full journal entries:", entriesError);
+        throw entriesError;
+      }
+      
+      return fullEntries;
+    }
+    
+    return [];
+  } catch (error) {
+    console.error("Error in fetchSimilarJournalEntries:", error);
+    // Fall back to direct fetch if there's any error
+    return await fetchJournalEntriesByUserId(userId, limit);
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -223,64 +288,39 @@ serve(async (req) => {
     // Store user query with embedding for future use
     await storeUserQuery(userId, message, queryEmbedding);
     
-    // Search for relevant journal entries using vector similarity
-    console.log("Searching for relevant context using match_journal_entries function...");
-    
-    // Debug for user ID
     console.log("User ID for journal entries search:", userId);
     
-    // First check if the match_journal_entries function exists
+    // Try to find journal entries using vector similarity first, then fall back to direct fetch
+    let journalEntries = [];
     try {
-      const { data: funcCheck, error: funcError } = await supabase
-        .rpc('match_journal_entries', {
-          query_embedding: queryEmbedding,
-          match_threshold: 0.5,
-          match_count: 5,
-          user_id_filter: userId
-        });
-      
-      if (funcError) {
-        console.error("Error with match_journal_entries function:", funcError);
-        
-        // Alternative approach: direct query to journal embeddings
-        console.log("Trying direct query to journal_embeddings table...");
-      }
-    } catch (funcCheckError) {
-      console.error("Exception checking match_journal_entries function:", funcCheckError);
+      journalEntries = await fetchSimilarJournalEntries(queryEmbedding, userId);
+    } catch (error) {
+      console.error("Error fetching similar journal entries:", error);
+      journalEntries = await fetchJournalEntriesByUserId(userId);
     }
     
-    // Direct query to journal entries as a fallback
-    console.log("Querying Journal Entries directly...");
-    const { data: directEntries, error: directError } = await supabase
-      .from('Journal Entries')
-      .select('id, refined text, created_at, emotions, master_themes')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-    
-    if (directError) {
-      console.error("Error directly fetching journal entries:", directError);
+    // If we still don't have entries, log this information
+    if (!journalEntries || journalEntries.length === 0) {
+      console.log("No journal entries found for user ID:", userId);
     } else {
-      console.log(`Found ${directEntries?.length || 0} entries via direct query`);
+      console.log(`Found ${journalEntries.length} journal entries for context`);
     }
     
     // Create RAG context from relevant entries
     let journalContext = "";
     let referenceEntries = [];
     
-    if (directEntries && directEntries.length > 0) {
-      console.log("Using directly fetched entries for context");
-      
+    if (journalEntries && journalEntries.length > 0) {
       // Store reference information
-      referenceEntries = directEntries.map(entry => ({
+      referenceEntries = journalEntries.map(entry => ({
         id: entry.id,
         date: entry.created_at,
         snippet: entry["refined text"]?.substring(0, 100) + "...",
-        type: "recent"
+        type: "semantic_match"
       }));
       
-      journalContext = "Here are some of your journal entries:\n\n" + 
-        directEntries.map((entry, index) => {
+      journalContext = "Here are some of your relevant journal entries:\n\n" + 
+        journalEntries.map((entry, index) => {
           const date = new Date(entry.created_at).toLocaleDateString();
           const emotionsText = formatEmotions(entry.emotions);
           const themesText = entry.master_themes ? 
@@ -301,7 +341,7 @@ ${journalContext}
 Based on the above context (if available) and the conversation history, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
-Focus on being helpful rather than diagnostic.`;
+Focus on being helpful rather than diagnostic. Reference specific themes, emotions, or content from their journal when relevant.`;
 
     console.log("Sending to GPT with RAG context and conversation history...");
     
