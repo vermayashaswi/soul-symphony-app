@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -157,6 +158,25 @@ async function storeMessage(threadId: string, content: string, sender: 'user' | 
 async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) {
   console.log(`Fetching relevant journal entries for user ${userId} using vector similarity`);
   
+  // First, check if the user has any journal entries at all
+  const { count: entryCount, error: countError } = await supabase
+    .from('Journal Entries')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId);
+    
+  if (countError) {
+    console.error("Error checking for journal entries:", countError);
+    return [];
+  }
+  
+  console.log(`User has ${entryCount} journal entries in total`);
+  
+  if (entryCount === 0) {
+    console.log("User has no journal entries, skipping vector search");
+    return [];
+  }
+  
+  // Proceed with vector similarity search
   const { data: similarEntries, error: matchError } = await supabase.rpc(
     'match_journal_entries',
     {
@@ -178,6 +198,7 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
   }
   
   console.log(`Found ${similarEntries.length} similar journal entries using vector similarity`);
+  console.log("First entry similarity score:", similarEntries[0].similarity);
   
   // Fetch the full details of these journal entries
   const entryIds = similarEntries.map(entry => entry.id);
@@ -227,6 +248,18 @@ serve(async (req) => {
     console.log("Thread ID:", currentThreadId);
     console.log("Is new thread:", isNewThread);
     console.log("Message preview:", message.substring(0, 50) + (message.length > 50 ? "..." : ""));
+    
+    // Check if this user has any journal entries
+    const { count, error: countError } = await supabase
+      .from('Journal Entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+      
+    if (countError) {
+      console.error("Error checking journal entries count:", countError);
+    } else {
+      console.log(`User has ${count} total journal entries`);
+    }
     
     // Create a new thread if needed
     if (isNewThread) {

@@ -10,15 +10,25 @@ export async function verifyUserAuthentication(): Promise<{
   error?: string;
 }> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (!user) {
+    if (authError) {
+      console.error('Authentication error:', authError);
       return { 
         isAuthenticated: false, 
-        error: 'You must be signed in to save journal entries.' 
+        error: `Authentication error: ${authError.message}` 
       };
     }
     
+    if (!user) {
+      console.log('No authenticated user found');
+      return { 
+        isAuthenticated: false, 
+        error: 'You must be signed in to use this feature.' 
+      };
+    }
+    
+    console.log('Authenticated user found with ID:', user.id);
     return { isAuthenticated: true, userId: user.id };
   } catch (error: any) {
     console.error('Auth verification error:', error);

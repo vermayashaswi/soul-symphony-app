@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -42,6 +43,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [hasJournalEntries, setHasJournalEntries] = useState<boolean | null>(null);
   
   const demoQuestions = [
     "How can I manage my anxiety better?",
@@ -50,6 +52,12 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     "How can I improve my mindfulness practice?",
     "What are some techniques to help with overthinking?"
   ];
+
+  useEffect(() => {
+    if (userId) {
+      checkForJournalEntries(userId);
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (threadId) {
@@ -63,22 +71,46 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
 
   useEffect(() => {
     if (messages.length === 0 && threadId === null) {
+      // Initial welcome message
+      const welcomeMessage = hasJournalEntries === false
+        ? "Hi, I'm Feelosophy, your AI assistant. I noticed you don't have any journal entries yet. To get personalized insights, try creating some journal entries first. How can I help you today?"
+        : "Hi, I'm Feelosophy, your AI assistant. I'm here to help you reflect on your thoughts and feelings. How are you doing today?";
+        
       setMessages([
         {
           id: '1',
-          content: "Hi, I'm Feelosophy, your AI assistant. I'm here to help you reflect on your thoughts and feelings. How are you doing today?",
+          content: welcomeMessage,
           sender: 'assistant',
           created_at: new Date().toISOString(),
         }
       ]);
     }
-  }, [messages.length, threadId]);
+  }, [messages.length, threadId, hasJournalEntries]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  const checkForJournalEntries = async (userId: string) => {
+    try {
+      const { count, error } = await supabase
+        .from('Journal Entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+        
+      if (error) {
+        console.error('Error checking journal entries:', error);
+        return;
+      }
+      
+      setHasJournalEntries(count > 0);
+      console.log(`User has ${count} journal entries`);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
 
   const fetchMessages = async (threadId: string) => {
     try {
@@ -195,9 +227,13 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       console.log("Received response from chat-with-rag function:", data);
       
-      if (data.journal_entries_count === 0) {
+      if (data.journal_entries_count === 0 && hasJournalEntries !== false) {
+        // Update the state if we just learned the user has no journal entries
+        setHasJournalEntries(false);
         toast.info('No journal entries found. Add some journals for personalized responses.');
-      } else if (data.journal_entries_count > 0) {
+      } else if (data.journal_entries_count > 0 && hasJournalEntries !== true) {
+        // Update the state if we just learned the user has journal entries
+        setHasJournalEntries(true);
         console.log(`Response included context from ${data.journal_entries_count} journal entries`);
       }
       
@@ -321,6 +357,17 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         
         <div ref={messagesEndRef} />
       </div>
+      
+      {hasJournalEntries === false && !isLoadingMessages && (
+        <div className="mb-4 mx-4">
+          <Card className="bg-amber-50 border-amber-200">
+            <div className="p-3 text-sm text-amber-800">
+              <p className="font-medium">No Journal Entries Found</p>
+              <p className="mt-1">To get personalized insights, please add some journal entries first. This will help me provide more relevant advice based on your experiences.</p>
+            </div>
+          </Card>
+        </div>
+      )}
       
       <AnimatePresence>
         {showWelcome && messages.length <= 2 && (
