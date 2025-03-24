@@ -103,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error signing in with credentials:', error);
       toast.error(`Sign in failed: ${error.message}`);
       setIsLoading(false);
+      throw error; // Re-throw to allow handling in the component
     }
   };
 

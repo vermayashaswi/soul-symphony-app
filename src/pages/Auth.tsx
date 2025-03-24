@@ -99,15 +99,16 @@ export default function Auth() {
 
   // Function to handle the direct login with the user's account
   const handleDirectLogin = async () => {
-    // Use a valid account that exists in your Supabase project
-    const email = "admin@feelosophy.app"; // Updated email
-    const password = "feelosophy123"; // Updated password
+    // Use the specified user account
+    const email = "verma.yashaswi@gmail.com"; // Updated to requested email
+    const password = "feelosophy123"; // Keep the same password unless specified otherwise
 
     try {
       await signInWithCredentials(email, password);
       // The redirect will happen in the useEffect hook
     } catch (error) {
       console.error('Failed direct login:', error);
+      toast.error('Login failed. Please check console for details.');
     }
   };
 
