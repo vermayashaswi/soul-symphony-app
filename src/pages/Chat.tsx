@@ -7,6 +7,13 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { ensureJournalEntriesHaveEmbeddings } from '@/utils/embeddings-utils';
 
+// Define the JournalEntry type to match what we get from Supabase
+interface JournalEntry {
+  id: number;
+  "refined text"?: string | null;
+  [key: string]: any;
+}
+
 export default function Chat() {
   const [hasEntries, setHasEntries] = useState<boolean | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -44,12 +51,13 @@ export default function Chat() {
           return;
         }
         
-        const validEntries = entries?.filter(entry => 
+        // Cast the entries to our JournalEntry type and filter invalid entries
+        const validEntries = (entries as JournalEntry[] || []).filter(entry => 
           entry && 
           typeof entry.id === 'number' && 
           entry["refined text"] && 
           typeof entry["refined text"] === 'string'
-        ) || [];
+        );
         
         console.log(`User has ${validEntries.length} valid journal entries with text`);
         

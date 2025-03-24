@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 // Define a type for journal entries
 interface JournalEntry {
   id: number;
-  "refined text"?: string;
+  "refined text"?: string | null;
   [key: string]: any;
 }
 
@@ -36,8 +36,8 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     
     console.log(`Found ${entries.length} journal entries for embedding check`);
     
-    // Filter out entries without valid refined text
-    const validEntries = entries.filter(entry => 
+    // Cast to JournalEntry[] and filter out entries without valid refined text
+    const validEntries = (entries as JournalEntry[]).filter(entry => 
       entry && 
       typeof entry.id === 'number' && 
       entry["refined text"] && 
