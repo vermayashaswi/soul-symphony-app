@@ -225,92 +225,71 @@ serve(async (req) => {
     
     // Search for relevant journal entries using vector similarity
     console.log("Searching for relevant context using match_journal_entries function...");
+    
+    // Debug for user ID
     console.log("User ID for journal entries search:", userId);
     
-    const { data: similarEntries, error: searchError } = await supabase.rpc(
-      'match_journal_entries',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 5,
-        user_id_filter: userId
+    // First check if the match_journal_entries function exists
+    try {
+      const { data: funcCheck, error: funcError } = await supabase
+        .rpc('match_journal_entries', {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.5,
+          match_count: 5,
+          user_id_filter: userId
+        });
+      
+      if (funcError) {
+        console.error("Error with match_journal_entries function:", funcError);
+        
+        // Alternative approach: direct query to journal embeddings
+        console.log("Trying direct query to journal_embeddings table...");
       }
-    );
+    } catch (funcCheckError) {
+      console.error("Exception checking match_journal_entries function:", funcCheckError);
+    }
     
-    if (searchError) {
-      console.error("Error searching for similar entries:", searchError);
-      console.error("Search error details:", JSON.stringify(searchError));
+    // Direct query to journal entries as a fallback
+    console.log("Querying Journal Entries directly...");
+    const { data: directEntries, error: directError } = await supabase
+      .from('Journal Entries')
+      .select('id, refined text, created_at, emotions, master_themes')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    
+    if (directError) {
+      console.error("Error directly fetching journal entries:", directError);
+    } else {
+      console.log(`Found ${directEntries?.length || 0} entries via direct query`);
     }
     
     // Create RAG context from relevant entries
     let journalContext = "";
     let referenceEntries = [];
     
-    if (similarEntries && similarEntries.length > 0) {
-      console.log("Found similar entries:", similarEntries.length);
-      console.log("Similar entries:", JSON.stringify(similarEntries));
+    if (directEntries && directEntries.length > 0) {
+      console.log("Using directly fetched entries for context");
       
-      // Fetch full entries for context
-      const entryIds = similarEntries.map(entry => entry.id);
-      const { data: entries, error: entriesError } = await supabase
-        .from('Journal Entries')
-        .select('id, refined text, created_at, emotions')
-        .in('id', entryIds)
-        .eq('user_id', userId);
+      // Store reference information
+      referenceEntries = directEntries.map(entry => ({
+        id: entry.id,
+        date: entry.created_at,
+        snippet: entry["refined text"]?.substring(0, 100) + "...",
+        type: "recent"
+      }));
       
-      if (entriesError) {
-        console.error("Error retrieving journal entries:", entriesError);
-        console.error("Entries error details:", JSON.stringify(entriesError));
-      } else if (entries && entries.length > 0) {
-        console.log("Retrieved full entries:", entries.length);
-        
-        // Store reference information
-        referenceEntries = entries.map(entry => ({
-          id: entry.id,
-          date: entry.created_at,
-          snippet: entry["refined text"]?.substring(0, 100) + "...",
-          similarity: similarEntries.find(se => se.id === entry.id)?.similarity || 0
-        }));
-        
-        // Format entries as context with emotions data
-        journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
-          entries.map((entry, index) => {
-            const date = new Date(entry.created_at).toLocaleDateString();
-            const emotionsText = formatEmotions(entry.emotions);
-            return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
-          }).join('\n\n') + "\n\n";
-      }
+      journalContext = "Here are some of your journal entries:\n\n" + 
+        directEntries.map((entry, index) => {
+          const date = new Date(entry.created_at).toLocaleDateString();
+          const emotionsText = formatEmotions(entry.emotions);
+          const themesText = entry.master_themes ? 
+            `Key themes: ${entry.master_themes.slice(0, 5).join(', ')}` : '';
+          return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}\n${themesText}`;
+        }).join('\n\n') + "\n\n";
     } else {
-      console.log("No similar entries found, falling back to recent entries");
-      // Fallback to recent entries if no similar ones found
-      const { data: recentEntries, error: recentError } = await supabase
-        .from('Journal Entries')
-        .select('id, refined text, created_at, emotions')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(3);
-      
-      if (recentError) {
-        console.error("Error retrieving recent entries:", recentError);
-        console.error("Recent entries error details:", JSON.stringify(recentError));
-      } else if (recentEntries && recentEntries.length > 0) {
-        console.log("Retrieved recent entries:", recentEntries.length);
-        
-        // Store reference information
-        referenceEntries = recentEntries.map(entry => ({
-          id: entry.id,
-          date: entry.created_at,
-          snippet: entry["refined text"]?.substring(0, 100) + "...",
-          type: "recent"
-        }));
-        
-        journalContext = "Here are some of your recent journal entries:\n\n" + 
-          recentEntries.map((entry, index) => {
-            const date = new Date(entry.created_at).toLocaleDateString();
-            const emotionsText = formatEmotions(entry.emotions);
-            return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
-          }).join('\n\n') + "\n\n";
-      }
+      console.log("No journal entries found for user");
+      journalContext = "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings.";
     }
     
     // Get conversation history for this thread
@@ -318,7 +297,7 @@ serve(async (req) => {
     
     // Prepare system prompt with RAG context
     const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling. 
-${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
+${journalContext}
 Based on the above context (if available) and the conversation history, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.

@@ -35,12 +35,15 @@ export default function ChatThreadList({
       fetchThreads();
     } else {
       setThreads([]);
+      setIsLoading(false);
     }
   }, [userId, currentThreadId]);
 
   const fetchThreads = async () => {
     try {
       setIsLoading(true);
+      console.log("Fetching threads for user:", userId);
+      
       const { data, error } = await supabase
         .from('chat_threads')
         .select('*')
@@ -53,6 +56,7 @@ export default function ChatThreadList({
         return;
       }
 
+      console.log("Threads fetched:", data?.length || 0);
       setThreads(data || []);
     } catch (error) {
       console.error('Error:', error);

@@ -95,7 +95,8 @@ export function EmotionChart({
         value: value,
         color: getEmotionColor(name)
       }))
-      .sort((a, b) => b.value - a.value);
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10); // Get top 10 emotions by value
   };
   
   // Process aggregated data for line chart
@@ -104,7 +105,8 @@ export function EmotionChart({
       return [];
     }
     
-    // Get top 3 emotions based on frequency and average score
+    // Get top 5 emotions based on frequency and average score for the line chart
+    // (5 is a good number for line chart readability)
     const emotionTotals: Record<string, number> = {};
     const dateMap: Map<string, Record<string, number>> = new Map();
     
@@ -122,10 +124,10 @@ export function EmotionChart({
       });
     });
     
-    // Get top 3 emotions by total score
+    // Get top 5 emotions by total score for the line chart
     const topEmotions = Object.entries(emotionTotals)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
+      .slice(0, 5)
       .map(([emotion]) => emotion);
     
     // Convert the dateMap to an array of data points for the chart
@@ -199,7 +201,7 @@ export function EmotionChart({
         </ResponsiveContainer>
         
         <div className="mt-4 text-center text-xs text-muted-foreground">
-          * Only primary emotions are shown
+          * Only top 5 emotions are shown in line chart for readability
         </div>
       </div>
     );
@@ -219,21 +221,21 @@ export function EmotionChart({
       // Canvas dimensions
       const canvasWidth = 400;
       const canvasHeight = 300;
-      const minDistance = 80; // Minimum distance between bubble centers
+      const minDistance = 60; // Reduced minimum distance to fit more bubbles
       
-      // Calculate initial positions in a circular layout
+      // Calculate initial positions in a spiral layout for better distribution of more bubbles
       const positions: {x: number, y: number, size: number}[] = [];
       
       bubbles.forEach((bubble, index) => {
-        // Scale bubble size proportionally to value - now more directly proportional
-        const maxSize = 120;
-        const minSize = 40;
+        // Scale bubble size proportionally to value
+        const maxSize = 100; // Reduced max size to fit more bubbles
+        const minSize = 30;  // Reduced min size too
         const maxValue = Math.max(...bubbles.map(b => b.value));
         const size = minSize + ((bubble.value / maxValue) * (maxSize - minSize));
         
-        // Initial position in a circle
-        const angle = (index / bubbles.length) * 2 * Math.PI;
-        const radius = Math.min(canvasWidth, canvasHeight) * 0.35;
+        // Position in a spiral to better accommodate 10 bubbles
+        const angle = 0.5 * index;
+        const radius = 25 + (15 * index);
         const x = (canvasWidth / 2) + Math.cos(angle) * radius;
         const y = (canvasHeight / 2) + Math.sin(angle) * radius;
         

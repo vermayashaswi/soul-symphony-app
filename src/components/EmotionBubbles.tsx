@@ -100,14 +100,14 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
   
   useEffect(() => {
     // Generate bubbles with better distribution to avoid overlapping
-    const newBubbles = themes.slice(0, 5).map((theme, index) => {
+    const newBubbles = themes.slice(0, 10).map((theme, index) => {
       // Get the appropriate emoji based on the theme
       const normalizedTheme = theme.toLowerCase().trim();
       const emoji = EMOTION_EMOJIS[normalizedTheme] || '';
       
       // Calculate positions using a more distributed approach
       // Divide the container into sections for better distribution
-      const sectionWidth = 360 / Math.min(themes.length, 5);
+      const sectionWidth = 360 / Math.min(themes.length, 10);
       const sectionCenter = index * sectionWidth + (sectionWidth / 2);
       
       // Use angle-based positioning for a circular arrangement
@@ -119,7 +119,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
       const y = Math.sin(angle) * radius + 80 + getRandomValue(-10, 10);
       
       // Vary size based on index (first themes are more important)
-      const size = 70 - (index * 6);
+      const size = 70 - (index * 4); // Less dramatic size decrease to accommodate more bubbles
       
       return {
         id: index,
@@ -127,7 +127,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
         x,
         y,
         size,
-        delay: index * 0.2, // Stagger animations
+        delay: index * 0.15, // Shorter delay between animations to fit 10 bubbles
         emoji
       };
     });
@@ -146,7 +146,6 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
           delay={bubble.delay}
         >
           <div className="flex flex-col items-center text-center">
-            {/* Removed emoji/icon display from bubbles as requested */}
             <span className="text-xs font-medium text-primary/90 max-w-[60px] line-clamp-2">{bubble.theme}</span>
           </div>
         </Bubble>

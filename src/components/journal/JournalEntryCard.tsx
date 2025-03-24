@@ -75,7 +75,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
               
               <div className="h-48 mb-4 flex items-center justify-center">
                 {entry.master_themes && entry.master_themes.length > 0 ? (
-                  <EmotionBubbles themes={entry.master_themes.slice(0, 5)} />
+                  <EmotionBubbles themes={entry.master_themes.slice(0, 10)} />
                 ) : entry.emotions ? (
                   <EmotionChart 
                     aggregatedData={{ 
