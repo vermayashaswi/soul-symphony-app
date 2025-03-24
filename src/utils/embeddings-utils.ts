@@ -21,6 +21,8 @@ interface SupabaseEntry {
  */
 export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promise<boolean> {
   try {
+    console.log('Starting embeddings check for user:', userId);
+    
     // Get all journal entries for this user
     const { data: entries, error: entriesError } = await supabase
       .from('Journal Entries')
@@ -96,25 +98,37 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     toast.info(`Preparing your journal entries for chat (${entriesWithoutEmbeddings.length} entries)...`);
     
     // Generate embeddings for entries that don't have them
-    for (const entry of entriesWithoutEmbeddings) {
+    const generationPromises = entriesWithoutEmbeddings.map(async entry => {
       // Skip entries without refined text
       if (!entry["refined text"]) {
         console.log(`Entry ${entry.id} has no refined text, skipping embedding generation`);
-        continue;
+        return null;
       }
       
-      // Call the generate-embeddings function
-      const { error: genError } = await supabase.functions.invoke('generate-embeddings', {
-        body: { 
-          entryId: entry.id,
-          text: entry["refined text"]
+      try {
+        // Call the generate-embeddings function
+        console.log(`Generating embedding for entry ${entry.id} with text length: ${entry["refined text"]?.length}`);
+        const { error: genError } = await supabase.functions.invoke('generate-embeddings', {
+          body: { 
+            entryId: entry.id,
+            text: entry["refined text"]
+          }
+        });
+        
+        if (genError) {
+          console.error(`Error generating embedding for entry ${entry.id}:`, genError);
+          return null;
         }
-      });
-      
-      if (genError) {
-        console.error(`Error generating embedding for entry ${entry.id}:`, genError);
+        
+        return entry.id;
+      } catch (error) {
+        console.error(`Exception generating embedding for entry ${entry.id}:`, error);
+        return null;
       }
-    }
+    });
+    
+    // Wait for all embedding generation to complete
+    await Promise.all(generationPromises);
     
     toast.success('Journal entries prepared for chat');
     return true;

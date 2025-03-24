@@ -30,6 +30,7 @@ export default function Chat() {
       
       // Directly query the database for journal entries
       try {
+        console.log('Checking journal entries for user:', currentUserId);
         const { count, error } = await supabase
           .from('Journal Entries')
           .select('*', { count: 'exact', head: true })
@@ -41,12 +42,18 @@ export default function Chat() {
           return;
         }
         
+        console.log(`User has ${count} journal entries`);
+        
         if (count > 0) {
           // Ensure journal entries have embeddings
+          console.log('Ensuring journal entries have embeddings...');
           const result = await ensureJournalEntriesHaveEmbeddings(currentUserId);
           
           if (!result) {
+            console.warn('Error generating embeddings for journal entries. Chat may not work properly.');
             toast.warning('Error generating embeddings for journal entries. Chat may not work properly.');
+          } else {
+            console.log('Successfully ensured journal entries have embeddings');
           }
         }
         
