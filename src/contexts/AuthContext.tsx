@@ -10,9 +10,6 @@ type AuthContextType = {
   isLoading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
-  isDevMode: boolean;  // Flag for development mode
-  toggleDevMode: () => void;  // Function to toggle dev mode
-  signInWithCredentials: (email: string, password: string) => Promise<void>; // New function for direct signin
 };
 
 // Export the AuthContext so it can be imported directly
@@ -22,7 +19,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDevMode, setIsDevMode] = useState(false);  // Initialize dev mode as false
 
   useEffect(() => {
     console.log("AuthProvider: Setting up auth state listener");
@@ -86,27 +82,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // New function to sign in with email and password
-  const signInWithCredentials = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      console.log('Attempting to sign in with email/password');
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) {
-        throw error;
-      }
-    } catch (error: any) {
-      console.error('Error signing in with credentials:', error);
-      toast.error(`Sign in failed: ${error.message}`);
-      setIsLoading(false);
-      throw error; // Re-throw to allow handling in the component
-    }
-  };
-
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -119,19 +94,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Function to toggle development mode
-  const toggleDevMode = () => {
-    setIsDevMode(prev => {
-      const newValue = !prev;
-      if (newValue) {
-        toast.success('Development mode enabled - Auth bypass active');
-      } else {
-        toast.info('Development mode disabled - Auth checks restored');
-      }
-      return newValue;
-    });
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -140,9 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         signInWithGoogle,
         signOut,
-        isDevMode,
-        toggleDevMode,
-        signInWithCredentials,
       }}
     >
       {children}

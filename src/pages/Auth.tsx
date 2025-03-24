@@ -7,11 +7,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import ParticleBackground from '@/components/ParticleBackground';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 
 export default function Auth() {
-  const { user, isLoading, signInWithGoogle, isDevMode, toggleDevMode, signInWithCredentials } = useAuth();
+  const { user, isLoading, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [redirecting, setRedirecting] = useState(false);
@@ -89,29 +87,6 @@ export default function Auth() {
     }
   };
 
-  const handleDevModeToggle = () => {
-    toggleDevMode();
-    if (!isDevMode) {
-      // If we're enabling dev mode, navigate to the requested page
-      navigate(from, { replace: true });
-    }
-  };
-
-  // Function to handle the direct login with the user's account
-  const handleDirectLogin = async () => {
-    // Use the specified user account
-    const email = "verma.yashaswi@gmail.com"; // Updated to requested email
-    const password = "feelosophy123"; // Keep the same password unless specified otherwise
-
-    try {
-      await signInWithCredentials(email, password);
-      // The redirect will happen in the useEffect hook
-    } catch (error) {
-      console.error('Failed direct login:', error);
-      toast.error('Login failed. Please check console for details.');
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -161,29 +136,6 @@ export default function Auth() {
             </svg>
             Sign in with Google
           </Button>
-          
-          {/* Demo Account Login Button */}
-          <Button 
-            variant="outline"
-            size="lg" 
-            className="w-full flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 border-green-200"
-            onClick={handleDirectLogin}
-          >
-            <span className="font-medium">Login with Demo Account</span>
-          </Button>
-          
-          {/* Development Mode Toggle */}
-          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-            <div>
-              <Label htmlFor="dev-mode" className="font-medium">Development Mode</Label>
-              <p className="text-sm text-muted-foreground">Bypass authentication for testing</p>
-            </div>
-            <Switch 
-              id="dev-mode" 
-              checked={isDevMode} 
-              onCheckedChange={handleDevModeToggle} 
-            />
-          </div>
           
           <div className="text-center text-sm text-muted-foreground">
             <p>By signing in, you agree to our Terms of Service and Privacy Policy</p>
