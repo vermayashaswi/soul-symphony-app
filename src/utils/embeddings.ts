@@ -44,7 +44,8 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
           entry.id !== undefined && 
           typeof entry.id === 'number' && 
           'refined text' in entry &&
-          entry["refined text"] && 
+          entry["refined text"] !== null && 
+          entry["refined text"] !== undefined && 
           typeof entry["refined text"] === 'string') {
         validEntries.push({
           id: entry.id,
