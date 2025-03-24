@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { verifyUserAuthentication, getCurrentUserId } from '@/utils/audio/auth-utils';
+import { JournalEntriesDebug } from './JournalEntriesDebug';
 
 export interface MessageReference {
   id: number;
@@ -283,7 +284,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex-1 overflow-hidden flex flex-col h-full">
       <div className="flex flex-col space-y-4 mb-4 flex-1 overflow-y-auto px-4 py-4">
         {isLoadingMessages ? (
           <div className="flex-1 flex items-center justify-center">
@@ -428,6 +429,10 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         >
           <Send className="h-4 w-4" />
         </Button>
+      </div>
+      
+      <div className="px-4 mb-2">
+        <JournalEntriesDebug />
       </div>
     </div>
   );
