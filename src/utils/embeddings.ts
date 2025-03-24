@@ -33,16 +33,18 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     // Safely type and filter entries with text content
     const validEntries: {id: number; "refined text": string}[] = [];
     
-    // Filter out null entries first
-    const nonNullEntries = entriesData.filter((entry): entry is (typeof entriesData)[number] => 
+    // We use a type guard to ensure TypeScript knows we're filtering out nulls and undefined
+    const nonNullEntries = entriesData.filter((entry): entry is NonNullable<typeof entry> => 
       entry !== null && entry !== undefined
     );
     
     // Validate each entry before using it
     for (const entryData of nonNullEntries) {
-      // Type guard to ensure entry is a valid object with required properties
-      if (entryData && 
-          typeof entryData === 'object' && 
+      // First check if entryData is not null to satisfy TypeScript
+      if (!entryData) continue;
+      
+      // Then do the rest of the type guard checks
+      if (typeof entryData === 'object' && 
           'id' in entryData && 
           entryData.id !== undefined && 
           typeof entryData.id === 'number' && 
@@ -87,16 +89,18 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     // Extract entry IDs from the results and ensure they're all valid
     const entriesWithEmbeddings = new Set<number>();
     
-    // Filter null items first
-    const nonNullEmbeddingsData = embeddingsData.filter((item): item is (typeof embeddingsData)[number] => 
+    // Filter null items first with a proper type guard
+    const nonNullEmbeddingsData = embeddingsData.filter((item): item is NonNullable<typeof item> => 
       item !== null && item !== undefined
     );
     
     // Process non-null items
     for (const itemData of nonNullEmbeddingsData) {
-      // Type guard to ensure item is a valid object with required property
-      if (itemData && 
-          typeof itemData === 'object' && 
+      // First check if itemData is not null to satisfy TypeScript
+      if (!itemData) continue;
+      
+      // Then do the rest of the type guard checks
+      if (typeof itemData === 'object' && 
           'journal_entry_id' in itemData &&
           itemData.journal_entry_id !== undefined && 
           typeof itemData.journal_entry_id === 'number') {
