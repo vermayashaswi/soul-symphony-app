@@ -33,29 +33,29 @@ interface EmotionChartProps {
   aggregatedData?: AggregatedEmotionData;
 }
 
-// Color mapping for emotions
+// Vibrant color mapping for emotions
 const EMOTION_COLORS: Record<string, string> = {
-  joy: '#4299E1',
-  happiness: '#48BB78',
-  gratitude: '#38B2AC',
-  calm: '#9F7AEA',
-  anxiety: '#F56565',
-  sadness: '#718096',
-  anger: '#ED8936',
-  fear: '#E53E3E',
-  excitement: '#ECC94B',
-  love: '#F687B3',
-  stress: '#DD6B20',
-  surprise: '#D69E2E',
-  confusion: '#805AD5',
-  disappointment: '#A0AEC0',
-  pride: '#3182CE',
-  shame: '#822727',
-  guilt: '#744210',
-  hope: '#2B6CB0',
-  boredom: '#A0AEC0',
-  disgust: '#62783E',
-  contentment: '#319795'
+  joy: '#4299E1',           // Bright Blue
+  happiness: '#48BB78',     // Bright Green
+  gratitude: '#0EA5E9',     // Ocean Blue
+  calm: '#8B5CF6',          // Vivid Purple
+  anxiety: '#F56565',       // Bright Red
+  sadness: '#3B82F6',       // Bright Blue
+  anger: '#F97316',         // Bright Orange
+  fear: '#EF4444',          // Bright Red
+  excitement: '#FBBF24',    // Vibrant Yellow
+  love: '#EC4899',          // Magenta Pink
+  stress: '#F97316',        // Bright Orange
+  surprise: '#F59E0B',      // Amber
+  confusion: '#8B5CF6',     // Vivid Purple
+  disappointment: '#6366F1', // Indigo
+  pride: '#3B82F6',         // Blue
+  shame: '#DC2626',         // Red
+  guilt: '#B45309',         // Amber
+  hope: '#2563EB',          // Blue
+  boredom: '#4B5563',       // Gray
+  disgust: '#65A30D',       // Lime
+  contentment: '#0D9488'    // Teal
 };
 
 // Get color for an emotion, with fallback
@@ -166,36 +166,42 @@ export function EmotionChart({
     const emotions = Object.keys(lineData[0]).filter(key => key !== 'day');
     
     return (
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart
-          data={lineData}
-          margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-          <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
-          <YAxis stroke="#888" fontSize={12} tickMargin={10} domain={[0, 10]} />
-          <Tooltip 
-            contentStyle={{ 
-              backgroundColor: 'rgba(255, 255, 255, 0.8)', 
-              borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
-              border: 'none' 
-            }} 
-          />
-          {emotions.map((emotion, index) => (
-            <Line
-              key={emotion}
-              type="monotone"
-              dataKey={emotion}
-              stroke={getEmotionColor(emotion)}
-              strokeWidth={3}
-              dot={{ r: 4 }}
-              activeDot={{ r: 6 }}
-              name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+      <div className="flex flex-col h-full">
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart
+            data={lineData}
+            margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+            <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
+            <YAxis stroke="#888" fontSize={12} tickMargin={10} domain={[0, 10]} />
+            <Tooltip 
+              contentStyle={{ 
+                backgroundColor: 'rgba(255, 255, 255, 0.8)', 
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
+                border: 'none' 
+              }} 
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+            {emotions.map((emotion, index) => (
+              <Line
+                key={emotion}
+                type="monotone"
+                dataKey={emotion}
+                stroke={getEmotionColor(emotion)}
+                strokeWidth={3}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
+                name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+        
+        <div className="mt-4 text-center text-xs text-muted-foreground">
+          * Only primary emotions are shown
+        </div>
+      </div>
     );
   };
 
@@ -219,9 +225,9 @@ export function EmotionChart({
       const positions: {x: number, y: number, size: number}[] = [];
       
       bubbles.forEach((bubble, index) => {
-        // Scale bubble size proportionally to value
-        const maxSize = 100;
-        const minSize = 50;
+        // Scale bubble size proportionally to value - now more directly proportional
+        const maxSize = 120;
+        const minSize = 40;
         const maxValue = Math.max(...bubbles.map(b => b.value));
         const size = minSize + ((bubble.value / maxValue) * (maxSize - minSize));
         
@@ -306,9 +312,9 @@ export function EmotionChart({
 
   return (
     <div className={cn("w-full", className)}>
-      <div className="flex flex-wrap justify-between items-center mb-6">
-        <h3 className="text-xl font-semibold">Soul-ubles</h3>
-        <div className="flex gap-2 mt-2 sm:mt-0">
+      <div className="flex flex-wrap justify-between items-center mb-4">
+        <h3 className="text-xl font-semibold mb-2">Soul-ubles</h3>
+        <div className="flex gap-2">
           {chartTypes.map((type) => (
             <button
               key={type.id}
@@ -332,7 +338,7 @@ export function EmotionChart({
       </div>
       
       {chartType === 'line' && lineData.length > 0 && (
-        <div className="flex flex-wrap justify-start gap-4 mt-4 text-sm text-muted-foreground">
+        <div className="flex flex-wrap justify-start gap-4 mt-4 text-sm">
           {Object.keys(lineData[0])
             .filter(key => key !== 'day')
             .map(emotion => (
@@ -341,7 +347,7 @@ export function EmotionChart({
                   className="w-3 h-3 rounded-full" 
                   style={{ backgroundColor: getEmotionColor(emotion) }}
                 ></div>
-                <span>{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
+                <span className="font-medium">{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
               </div>
             ))}
         </div>

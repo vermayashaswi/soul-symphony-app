@@ -51,7 +51,15 @@ export default function Insights() {
       <ToggleGroup 
         type="single" 
         value={timeRange}
-        onValueChange={(value) => value && setTimeRange(value as TimeRange)}
+        onValueChange={(value) => {
+          if (value) {
+            // Preserve scroll position when changing time range
+            const currentScrollPosition = window.scrollY;
+            setTimeRange(value as TimeRange);
+            // Use setTimeout to ensure the scroll is set after the state update renders
+            setTimeout(() => window.scrollTo(0, currentScrollPosition), 0);
+          }
+        }}
         variant="outline"
         className="bg-secondary rounded-full p-1"
       >
@@ -243,16 +251,6 @@ export default function Insights() {
               transition={{ duration: 0.4, delay: 0.3 }}
               className="bg-white p-6 md:p-8 rounded-xl shadow-sm mb-8"
             >
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                <h2 className="text-xl font-semibold">Emotional Trends</h2>
-                <div className="flex items-center mt-2 sm:mt-0">
-                  <Button variant="outline" size="sm" className="text-xs flex items-center gap-1.5 rounded-full">
-                    <Filter className="h-3 w-3" />
-                    <span>Customize</span>
-                  </Button>
-                </div>
-              </div>
-              
               <EmotionChart 
                 timeframe={timeRange}
                 aggregatedData={insightsData.aggregatedEmotionData}
