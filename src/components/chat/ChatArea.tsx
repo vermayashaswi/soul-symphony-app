@@ -26,6 +26,7 @@ export interface Message {
   sender: 'user' | 'assistant';
   created_at: string;
   reference_entries?: MessageReference[] | null;
+  thread_id?: string;
 }
 
 interface ChatAreaProps {
@@ -98,7 +99,17 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
 
-      setMessages(data || []);
+      // Convert the data to the Message type to ensure type safety
+      const formattedMessages: Message[] = data.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        sender: msg.sender as 'user' | 'assistant',
+        created_at: msg.created_at,
+        reference_entries: msg.reference_entries,
+        thread_id: msg.thread_id
+      }));
+
+      setMessages(formattedMessages);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Something went wrong');
