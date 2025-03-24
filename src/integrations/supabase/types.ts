@@ -15,6 +15,7 @@ export type Database = {
           categories: string[] | null
           created_at: string
           duration: number | null
+          emotions: Json | null
           "foreign key": string | null
           id: number
           "refined text": string | null
@@ -27,6 +28,7 @@ export type Database = {
           categories?: string[] | null
           created_at?: string
           duration?: number | null
+          emotions?: Json | null
           "foreign key"?: string | null
           id?: number
           "refined text"?: string | null
@@ -39,6 +41,7 @@ export type Database = {
           categories?: string[] | null
           created_at?: string
           duration?: number | null
+          emotions?: Json | null
           "foreign key"?: string | null
           id?: number
           "refined text"?: string | null

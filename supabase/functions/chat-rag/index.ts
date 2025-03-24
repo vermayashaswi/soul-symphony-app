@@ -45,6 +45,25 @@ async function generateEmbedding(text: string) {
   }
 }
 
+// Format emotions data into a readable string
+function formatEmotions(emotions: Record<string, number> | null | undefined): string {
+  if (!emotions) return "No emotion data available";
+  
+  // Sort emotions by intensity (highest first)
+  const sortedEmotions = Object.entries(emotions)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3); // Take top 3 emotions for brevity
+    
+  return sortedEmotions
+    .map(([emotion, intensity]) => {
+      // Convert intensity to percentage and format emotion name
+      const percentage = Math.round(intensity * 100);
+      const formattedEmotion = emotion.charAt(0).toUpperCase() + emotion.slice(1);
+      return `${formattedEmotion} (${percentage}%)`;
+    })
+    .join(", ");
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -91,18 +110,19 @@ serve(async (req) => {
       const entryIds = similarEntries.map(entry => entry.id);
       const { data: entries, error: entriesError } = await supabase
         .from('Journal Entries')
-        .select('refined text, created_at')
+        .select('refined text, created_at, emotions')
         .in('id', entryIds);
       
       if (entriesError) {
         console.error("Error retrieving journal entries:", entriesError);
       } else if (entries && entries.length > 0) {
         console.log("Retrieved full entries:", entries.length);
-        // Format entries as context
+        // Format entries as context with emotions data
         journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
           entries.map((entry, index) => {
             const date = new Date(entry.created_at).toLocaleDateString();
-            return `Entry ${index+1} (${date}): ${entry["refined text"]}`;
+            const emotionsText = formatEmotions(entry.emotions);
+            return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
           }).join('\n\n') + "\n\n";
       }
     } else {
@@ -110,7 +130,7 @@ serve(async (req) => {
       // Fallback to recent entries if no similar ones found
       const { data: recentEntries, error: recentError } = await supabase
         .from('Journal Entries')
-        .select('refined text, created_at')
+        .select('refined text, created_at, emotions')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(3);
@@ -122,7 +142,8 @@ serve(async (req) => {
         journalContext = "Here are some of your recent journal entries:\n\n" + 
           recentEntries.map((entry, index) => {
             const date = new Date(entry.created_at).toLocaleDateString();
-            return `Entry ${index+1} (${date}): ${entry["refined text"]}`;
+            const emotionsText = formatEmotions(entry.emotions);
+            return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
           }).join('\n\n') + "\n\n";
       }
     }
@@ -132,7 +153,8 @@ serve(async (req) => {
 ${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
 Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
-mention them, but do so gently and constructively. Focus on being helpful rather than diagnostic.`;
+mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
+Focus on being helpful rather than diagnostic.`;
 
     console.log("Sending to GPT with RAG context...");
     

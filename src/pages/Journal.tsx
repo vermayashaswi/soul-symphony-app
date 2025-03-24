@@ -22,7 +22,7 @@ type JournalEntry = {
   audio_url: string | null;
   user_id: string | null;
   "foreign key": string | null;
-  emotions?: { [key: string]: number };
+  emotions?: Record<string, number>;
   duration?: number;
 };
 
