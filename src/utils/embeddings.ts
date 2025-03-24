@@ -23,7 +23,7 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
       return false;
     }
     
-    if (!entriesData || entriesData.length === 0) {
+    if (!entriesData || !Array.isArray(entriesData) || entriesData.length === 0) {
       console.log('No journal entries found for user');
       return false;
     }
@@ -35,9 +35,13 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     // Validate each entry before using it
     for (const entry of entriesData) {
+      // Ensure entry exists and has the expected properties
       if (entry && 
+          typeof entry === 'object' &&
+          'id' in entry && 
           entry.id !== undefined && 
           typeof entry.id === 'number' && 
+          'refined text' in entry &&
           entry["refined text"] && 
           typeof entry["refined text"] === 'string') {
         validEntries.push({
@@ -68,7 +72,7 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
       return false;
     }
     
-    if (!embeddingsData) {
+    if (!embeddingsData || !Array.isArray(embeddingsData)) {
       console.error('No embedding data returned from query');
       return false;
     }
@@ -77,7 +81,12 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     const entriesWithEmbeddings = new Set<number>();
     
     for (const item of embeddingsData) {
-      if (item && item.journal_entry_id !== undefined && typeof item.journal_entry_id === 'number') {
+      // Ensure item exists and has the expected journal_entry_id property
+      if (item && 
+          typeof item === 'object' &&
+          'journal_entry_id' in item &&
+          item.journal_entry_id !== undefined && 
+          typeof item.journal_entry_id === 'number') {
         entriesWithEmbeddings.add(item.journal_entry_id);
       }
     }
