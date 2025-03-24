@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
@@ -23,7 +22,7 @@ export function ParticleBackground() {
   
   const colors = [
     '#9b87f5', '#7E69AB', '#FDE1D3', '#D3E4FD', '#E5DEFF', 
-    '#FFDEE2', '#D6BCFA', '#33C3F0'
+    '#FFDEE2', '#D6BCFA', '#33C3F0', '#FF6B6B', '#FFD166'
   ];
   
   const getRandomColor = () => colors[Math.floor(Math.random() * colors.length)];
@@ -31,16 +30,16 @@ export function ParticleBackground() {
   const createRipple = (x: number, y: number, count = 15) => {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 0.5 + Math.random() * 2;
+      const speed = 0.8 + Math.random() * 2.5;
       
       particles.current.push({
         x,
         y,
-        size: 1 + Math.random() * 4,
+        size: 2 + Math.random() * 5,
         speedX: Math.cos(angle) * speed,
         speedY: Math.sin(angle) * speed,
         color: getRandomColor(),
-        opacity: 0.7,
+        opacity: 0.8,
         life: 0,
         maxLife: 50 + Math.random() * 100
       });
@@ -54,11 +53,11 @@ export function ParticleBackground() {
       particles.current.push({
         x: Math.random() * width,
         y: Math.random() * height,
-        size: 1 + Math.random() * 2,
-        speedX: (Math.random() - 0.5) * 0.5,
-        speedY: (Math.random() - 0.5) * 0.5,
+        size: 1.5 + Math.random() * 3,
+        speedX: (Math.random() - 0.5) * 0.8,
+        speedY: (Math.random() - 0.5) * 0.8,
         color: getRandomColor(),
-        opacity: 0.3 + Math.random() * 0.3,
+        opacity: 0.4 + Math.random() * 0.4,
         life: 0,
         maxLife: 200 + Math.random() * 200
       });
@@ -69,13 +68,13 @@ export function ParticleBackground() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     const now = Date.now();
-    if (mousePos.current && now - lastTouchTime.current > 50) {
-      createRipple(mousePos.current.x, mousePos.current.y, 5);
+    if (mousePos.current && now - lastTouchTime.current > 40) {
+      createRipple(mousePos.current.x, mousePos.current.y, 6);
       lastTouchTime.current = now;
     }
     
-    if (particles.current.length < 100) {
-      createFloatingParticles(canvas, 5);
+    if (particles.current.length < 120) {
+      createFloatingParticles(canvas, 8);
     }
     
     const liveParticles: Particle[] = [];
@@ -83,22 +82,17 @@ export function ParticleBackground() {
     particles.current.forEach(particle => {
       particle.life += 1;
       
-      // Check if particle is still alive
       if (particle.life < particle.maxLife) {
-        // Calculate fade based on life
         const fadeInPhase = Math.min(1, particle.life / 20);
         const fadeOutPhase = Math.max(0, 1 - (particle.life - (particle.maxLife * 0.7)) / (particle.maxLife * 0.3));
-        particle.opacity = 0.8 * fadeInPhase * fadeOutPhase;
+        particle.opacity = 0.9 * fadeInPhase * fadeOutPhase;
         
-        // Move the particle
         particle.x += particle.speedX;
         particle.y += particle.speedY;
         
-        // Slow down over time
-        particle.speedX *= 0.99;
-        particle.speedY *= 0.99;
+        particle.speedX *= 0.991;
+        particle.speedY *= 0.991;
         
-        // Draw the particle
         ctx.globalAlpha = particle.opacity;
         ctx.fillStyle = particle.color;
         ctx.beginPath();
@@ -121,7 +115,6 @@ export function ParticleBackground() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Set canvas size
     const updateCanvasSize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -130,10 +123,8 @@ export function ParticleBackground() {
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
     
-    // Create initial floating particles
-    createFloatingParticles(canvas, 100);
+    createFloatingParticles(canvas, 150);
     
-    // Track mouse/touch position
     const handleMouseMove = (e: MouseEvent) => {
       mousePos.current = {
         x: e.clientX,
@@ -151,12 +142,12 @@ export function ParticleBackground() {
     };
     
     const handleClick = (e: MouseEvent) => {
-      createRipple(e.clientX, e.clientY, 30);
+      createRipple(e.clientX, e.clientY, 40);
     };
     
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length > 0) {
-        createRipple(e.touches[0].clientX, e.touches[0].clientY, 30);
+        createRipple(e.touches[0].clientX, e.touches[0].clientY, 40);
       }
     };
     
@@ -165,10 +156,8 @@ export function ParticleBackground() {
     window.addEventListener('click', handleClick);
     window.addEventListener('touchstart', handleTouchStart);
     
-    // Start animation loop
     animationRef.current = requestAnimationFrame(() => drawParticles(ctx, canvas));
     
-    // Cleanup
     return () => {
       window.removeEventListener('resize', updateCanvasSize);
       window.removeEventListener('mousemove', handleMouseMove);
