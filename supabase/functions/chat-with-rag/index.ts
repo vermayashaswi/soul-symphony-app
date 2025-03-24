@@ -157,109 +157,128 @@ async function storeMessage(threadId: string, content: string, sender: 'user' | 
   }
 }
 
-// Fetch journal entries directly by user ID
-async function fetchJournalEntriesByUserId(userId: string, limit: number = 10) {
-  console.log(`Directly fetching up to ${limit} journal entries for user ID: ${userId}`);
+// Improved function to fetch relevant journal entries
+async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any, threadId: string | null) {
+  console.log(`Attempting to fetch relevant journal entries for user ${userId}`);
   
-  const { data, error } = await supabase
-    .from('Journal Entries')
-    .select('id, refined text, created_at, emotions, master_themes')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  
-  if (error) {
-    console.error("Error fetching journal entries:", error);
-    return [];
-  }
-  
-  console.log(`Successfully retrieved ${data.length} journal entries directly`);
-  return data;
-}
-
-// Try to fetch journal entries using vector similarity
-async function fetchSimilarJournalEntries(embedding: any, userId: string, limit: number = 7) {
+  // First, try using the match_journal_entries function if available
   try {
-    console.log(`Attempting to fetch similar journal entries for user ${userId} using vector similarity`);
-    
-    // First try the match_journal_entries function
-    const { data, error } = await supabase
-      .rpc('match_journal_entries', {
-        query_embedding: embedding,
+    const { data: similarEntries, error: matchError } = await supabase.rpc(
+      'match_journal_entries',
+      {
+        query_embedding: queryEmbedding,
         match_threshold: 0.5,
-        match_count: limit,
+        match_count: 5,
         user_id_filter: userId
-      });
+      }
+    );
     
-    if (error) {
-      console.error("Error with match_journal_entries function:", error);
-      throw error;
-    }
-    
-    console.log(`Vector similarity search returned ${data?.length || 0} results`);
-    
-    // If we got results, fetch the full entries
-    if (data && data.length > 0) {
-      const entryIds = data.map(item => item.id);
-      const { data: fullEntries, error: entriesError } = await supabase
+    if (!matchError && similarEntries && similarEntries.length > 0) {
+      console.log(`Found ${similarEntries.length} similar journal entries using vector similarity`);
+      
+      // Fetch the full details of these journal entries
+      const entryIds = similarEntries.map(entry => entry.id);
+      const { data: entries, error: fetchError } = await supabase
         .from('Journal Entries')
         .select('id, refined text, created_at, emotions, master_themes')
         .in('id', entryIds);
       
-      if (entriesError) {
-        console.error("Error fetching full journal entries:", entriesError);
-        throw entriesError;
+      if (!fetchError && entries && entries.length > 0) {
+        console.log(`Retrieved full details for ${entries.length} journal entries`);
+        
+        // Tag them with their similarity score from the match
+        const entriesWithSimilarity = entries.map(entry => {
+          const matchEntry = similarEntries.find(se => se.id === entry.id);
+          return {
+            ...entry,
+            similarity: matchEntry ? matchEntry.similarity : 0,
+            type: 'semantic_match'
+          };
+        });
+        
+        return entriesWithSimilarity;
       }
-      
-      console.log(`Retrieved ${fullEntries?.length || 0} full journal entries`);
-      return fullEntries || [];
     }
     
-    // If no results from vector search, try direct fetch
-    console.log("No vector search results, falling back to direct fetch");
-    return await fetchJournalEntriesByUserId(userId, limit);
+    // If vector search didn't work, fall back to other methods
+    console.log("Vector similarity search didn't yield results, trying alternative methods");
   } catch (error) {
-    console.error("Error in fetchSimilarJournalEntries:", error);
-    // Fall back to direct fetch if there's any error
-    console.log("Error in vector search, falling back to direct fetch");
-    return await fetchJournalEntriesByUserId(userId, limit);
+    console.error("Error in vector similarity search:", error);
   }
-}
-
-// Check if journal embeddings exist for a user
-async function checkJournalEmbeddingsExist(userId: string) {
+  
+  // Fall back 1: Try to fetch the most recent entries for this user specifically
   try {
-    // Check if we have any journal entries for this user
-    const { data: entries, error: entriesError } = await supabase
+    const { data: recentEntries, error: recentError } = await supabase
       .from('Journal Entries')
-      .select('id')
+      .select('id, refined text, created_at, emotions, master_themes')
       .eq('user_id', userId)
-      .limit(1);
+      .order('created_at', { ascending: false })
+      .limit(5);
     
-    if (entriesError || !entries || entries.length === 0) {
-      console.log(`No journal entries found for user ${userId}`);
-      return false;
+    if (!recentError && recentEntries && recentEntries.length > 0) {
+      console.log(`Found ${recentEntries.length} recent journal entries`);
+      
+      // Tag them as recent entries
+      return recentEntries.map(entry => ({
+        ...entry,
+        type: 'recent_entry'
+      }));
     }
-    
-    // Check if we have any embeddings for this user's journal entries
-    const entryId = entries[0].id;
-    const { data: embeddings, error: embeddingsError } = await supabase
-      .from('journal_embeddings')
-      .select('id')
-      .eq('journal_entry_id', entryId)
-      .limit(1);
-    
-    if (embeddingsError || !embeddings || embeddings.length === 0) {
-      console.log(`No embeddings found for user ${userId}'s journal entries`);
-      return false;
-    }
-    
-    console.log(`Found embeddings for user ${userId}`);
-    return true;
   } catch (error) {
-    console.error("Error checking for journal embeddings:", error);
-    return false;
+    console.error("Error fetching recent entries:", error);
   }
+  
+  // Fall back 2: Try to fetch entries that might be related to the current thread
+  if (threadId) {
+    try {
+      // First get messages from this thread to understand the conversation
+      const { data: messages, error: msgError } = await supabase
+        .from('chat_messages')
+        .select('content')
+        .eq('thread_id', threadId)
+        .eq('sender', 'user')
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
+      if (!msgError && messages && messages.length > 0) {
+        // Create a search term based on common words in the messages
+        const searchTerms = messages
+          .map(msg => msg.content)
+          .join(' ')
+          .toLowerCase()
+          .split(/\s+/)
+          .filter(word => word.length > 4) // Only use meaningful words
+          .slice(0, 5) // Take top 5 words
+          .join(' | '); // OR search
+        
+        if (searchTerms) {
+          // Perform a text search on journal entries
+          const { data: textMatchEntries, error: textError } = await supabase
+            .from('Journal Entries')
+            .select('id, refined text, created_at, emotions, master_themes')
+            .eq('user_id', userId)
+            .textSearch('refined text', searchTerms)
+            .limit(3);
+          
+          if (!textError && textMatchEntries && textMatchEntries.length > 0) {
+            console.log(`Found ${textMatchEntries.length} text-matched journal entries`);
+            
+            // Tag them as text matches
+            return textMatchEntries.map(entry => ({
+              ...entry,
+              type: 'text_match'
+            }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error in text search fallback:", error);
+    }
+  }
+  
+  // No entries found
+  console.log("No relevant journal entries found for this user/query");
+  return [];
 }
 
 serve(async (req) => {
@@ -276,10 +295,11 @@ serve(async (req) => {
     }
 
     let currentThreadId = threadId;
-    console.log("Processing chat request for user:", userId);
+    console.log("=== RAG CHAT REQUEST ===");
+    console.log("User ID:", userId);
     console.log("Thread ID:", currentThreadId);
     console.log("Is new thread:", isNewThread);
-    console.log("Message:", message.substring(0, 50) + "...");
+    console.log("Message preview:", message.substring(0, 50) + (message.length > 50 ? "..." : ""));
     
     // Create a new thread if needed
     if (isNewThread) {
@@ -328,78 +348,61 @@ serve(async (req) => {
     // Store user query with embedding for future use
     await storeUserQuery(userId, message, queryEmbedding);
     
-    console.log("User ID for journal entries search:", userId);
+    // Get relevant journal entries using our improved function
+    const journalEntries = await fetchRelevantJournalEntries(userId, queryEmbedding, currentThreadId);
     
-    // Check if journal embeddings exist
-    const hasEmbeddings = await checkJournalEmbeddingsExist(userId);
-    console.log("Journal embeddings exist:", hasEmbeddings);
-    
-    // Get journal entries - try different methods depending on whether embeddings exist
-    let journalEntries = [];
-    if (hasEmbeddings) {
-      journalEntries = await fetchSimilarJournalEntries(queryEmbedding, userId);
-    } else {
-      journalEntries = await fetchJournalEntriesByUserId(userId);
-    }
-    
-    // Log what we got
-    console.log(`Retrieved ${journalEntries?.length || 0} journal entries for RAG context`);
-    
-    // If we still don't have entries, log this information
-    if (!journalEntries || journalEntries.length === 0) {
-      console.log("No journal entries found for user ID:", userId);
-    } else {
-      console.log(`Found ${journalEntries.length} journal entries for context`);
-      
-      // Log snippets of the first few entries to confirm content
-      journalEntries.slice(0, 3).forEach((entry, i) => {
-        console.log(`Entry ${i+1} snippet: ${entry["refined text"]?.substring(0, 50) || "No text"}...`);
-        console.log(`Entry ${i+1} themes: ${entry.master_themes ? entry.master_themes.join(', ') : "None"}`);
-      });
-    }
+    console.log(`Retrieved ${journalEntries?.length || 0} relevant journal entries for RAG context`);
     
     // Create RAG context from relevant entries
     let journalContext = "";
     let referenceEntries = [];
     
     if (journalEntries && journalEntries.length > 0) {
-      // Store reference information
-      referenceEntries = journalEntries.map(entry => ({
-        id: entry.id,
-        date: entry.created_at,
-        snippet: entry["refined text"]?.substring(0, 100) + "...",
-        type: hasEmbeddings ? "semantic_match" : "recent_entry"
-      }));
-      
-      journalContext = "Here are some of your relevant journal entries:\n\n" + 
+      // Format journal entries for the chat prompt
+      journalContext = "I have analyzed your journal entries and found these relevant ones that might relate to your question:\n\n" + 
         journalEntries.map((entry, index) => {
           const date = new Date(entry.created_at).toLocaleDateString();
           const emotionsText = formatEmotions(entry.emotions);
           const themesText = entry.master_themes ? 
             `Key themes: ${entry.master_themes.slice(0, 5).join(', ')}` : '';
-          return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}\n${themesText}`;
-        }).join('\n\n') + "\n\n";
+          
+          // Store reference info for later use in the response
+          referenceEntries.push({
+            id: entry.id,
+            date: entry.created_at,
+            snippet: entry["refined text"]?.substring(0, 100) + "...",
+            similarity: entry.similarity || 0,
+            type: entry.type || "unknown"
+          });
+          
+          return `Journal Entry ${index+1} (${date}):\n"${entry["refined text"]}"\n\nEmotional state: ${emotionsText}\n${themesText}`;
+        }).join('\n\n---\n\n') + "\n\n";
     } else {
       console.log("No journal entries found for user");
-      journalContext = "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings.";
+      journalContext = "I don't have access to any of your journal entries that seem relevant to this question. If you'd like more personalized responses, consider using the journal feature to record your thoughts and feelings.";
     }
     
     // Get conversation history for this thread
     const previousMessages = await getThreadHistory(currentThreadId);
     
-    // Prepare system prompt with RAG context
-    const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling. 
-${journalContext}
-Based on the above context (if available) and the conversation history, provide a thoughtful, personalized response.
-Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
-mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
-Focus on being helpful rather than diagnostic. Reference specific themes, emotions, or content from their journal when relevant.
-IMPORTANT: If you're given journal entries to work with, you MUST refer to specific content from those entries in your response.
-Don't just give generic advice - show that you've analyzed their journal entries by mentioning specific emotions, themes, or content.`;
+    // Prepare system prompt with RAG context and more specific instructions
+    const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling.
 
-    console.log("Sending to GPT with RAG context and conversation history...");
-    console.log("System prompt first 100 chars:", systemPrompt.substring(0, 100) + "...");
-    console.log("Number of previous messages:", previousMessages.length);
+IMPORTANT CONTEXT FROM USER'S JOURNAL:
+${journalContext}
+
+INSTRUCTIONS:
+1. Directly reference specific insights, themes, emotions, or patterns from the journal entries provided above.
+2. Do not just give generic advice - show that you've analyzed their journal by mentioning specific emotional states, dates, or content.
+3. When the user's question connects to themes in their journals, explicitly point this out.
+4. If their journal reveals recurring patterns, gently highlight these connections.
+5. Maintain a warm, supportive tone while providing personalized insights based on their journal.
+6. Be genuinely helpful rather than diagnostic or clinical.
+
+Remember, your primary value is connecting their question to their personal journal insights. Do not respond as if you're just answering a general question.`;
+
+    console.log("System prompt first 200 chars:", systemPrompt.substring(0, 200) + "...");
+    console.log("Number of previous messages in context:", previousMessages.length);
     
     try {
       // Send to GPT with RAG context and conversation history
@@ -440,7 +443,7 @@ Don't just give generic advice - show that you've analyzed their journal entries
       console.log("AI response generated successfully");
       console.log("AI response first 100 chars:", aiResponse.substring(0, 100) + "...");
       
-      // Store assistant response
+      // Store assistant response with references to journal entries
       await storeMessage(currentThreadId, aiResponse, 'assistant', referenceEntries.length > 0 ? referenceEntries : null);
       
       return new Response(
