@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
@@ -22,7 +23,6 @@ export default function Insights() {
     { value: 'year', label: 'Year' },
   ];
 
-  
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
@@ -77,7 +77,6 @@ export default function Insights() {
           </div>
         ) : (
           <>
-            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -221,3 +220,9 @@ export default function Insights() {
                 aggregatedData={insightsData.aggregatedEmotionData}
               />
             </motion.div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
