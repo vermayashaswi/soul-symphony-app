@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Play, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { Mic, Square, Play, ChevronRight, Loader2, AlertCircle, Pause } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -22,6 +23,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
   const [noiseReduction, setNoiseReduction] = useState(true);
+  const [playbackProgress, setPlaybackProgress] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyzerRef = useRef<AnalyserNode | null>(null);
@@ -30,6 +34,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const timerRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioLevelTimerRef = useRef<number | null>(null);
+  const playbackTimerRef = useRef<number | null>(null);
   const [ripples, setRipples] = useState<number[]>([]);
   
   // Check for microphone permission on component mount
@@ -50,93 +55,109 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     
     // Cleanup function
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (audioLevelTimerRef.current) {
-        clearInterval(audioLevelTimerRef.current);
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
+      cleanupResources();
     };
   }, []);
+  
+  const cleanupResources = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (audioLevelTimerRef.current) {
+      clearInterval(audioLevelTimerRef.current);
+      audioLevelTimerRef.current = null;
+    }
+    if (playbackTimerRef.current) {
+      clearInterval(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(console.error);
+      audioContextRef.current = null;
+    }
+  };
 
   // Function to create audio processing setup for visualizations and noise reduction
   const setupAudioProcessing = (stream: MediaStream) => {
-    // Create audio context
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    audioContextRef.current = audioContext;
-    
-    // Create analyzer node for visualization
-    const analyzerNode = audioContext.createAnalyser();
-    analyzerNode.fftSize = 256;
-    analyzerRef.current = analyzerNode;
-    
-    // Create source from stream
-    const source = audioContext.createMediaStreamSource(stream);
-    
-    // If noise reduction is enabled, add filtering
-    if (noiseReduction) {
-      // High-pass filter to remove low-frequency noise
-      const highpassFilter = audioContext.createBiquadFilter();
-      highpassFilter.type = 'highpass';
-      highpassFilter.frequency.value = 80;
-      highpassFilter.Q.value = 0.7;
+    try {
+      // Create audio context
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = audioContext;
       
-      // Low-pass filter to remove high-frequency noise
-      const lowpassFilter = audioContext.createBiquadFilter();
-      lowpassFilter.type = 'lowpass';
-      lowpassFilter.frequency.value = 8000;
-      lowpassFilter.Q.value = 0.7;
+      // Create analyzer node for visualization
+      const analyzerNode = audioContext.createAnalyser();
+      analyzerNode.fftSize = 256;
+      analyzerRef.current = analyzerNode;
       
-      // Compressor to normalize volume
-      const compressor = audioContext.createDynamicsCompressor();
-      compressor.threshold.value = -24;
-      compressor.knee.value = 30;
-      compressor.ratio.value = 12;
-      compressor.attack.value = 0.003;
-      compressor.release.value = 0.25;
+      // Create source from stream
+      const source = audioContext.createMediaStreamSource(stream);
       
-      // Connect the nodes
-      source.connect(highpassFilter);
-      highpassFilter.connect(lowpassFilter);
-      lowpassFilter.connect(compressor);
-      compressor.connect(analyzerNode);
+      // If noise reduction is enabled, add filtering
+      if (noiseReduction) {
+        // High-pass filter to remove low-frequency noise
+        const highpassFilter = audioContext.createBiquadFilter();
+        highpassFilter.type = 'highpass';
+        highpassFilter.frequency.value = 80;
+        highpassFilter.Q.value = 0.7;
+        
+        // Low-pass filter to remove high-frequency noise
+        const lowpassFilter = audioContext.createBiquadFilter();
+        lowpassFilter.type = 'lowpass';
+        lowpassFilter.frequency.value = 8000;
+        lowpassFilter.Q.value = 0.7;
+        
+        // Compressor to normalize volume
+        const compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.value = -24;
+        compressor.knee.value = 30;
+        compressor.ratio.value = 12;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.25;
+        
+        // Connect the nodes
+        source.connect(highpassFilter);
+        highpassFilter.connect(lowpassFilter);
+        lowpassFilter.connect(compressor);
+        compressor.connect(analyzerNode);
+      } else {
+        // Simple connection without filtering
+        source.connect(analyzerNode);
+      }
       
-      // For monitoring purposes only (uncomment for testing)
-      // analyzerNode.connect(audioContext.destination);
-    } else {
-      // Simple connection without filtering
-      source.connect(analyzerNode);
+      // Start monitoring audio levels
+      const dataArray = new Uint8Array(analyzerNode.frequencyBinCount);
+      
+      audioLevelTimerRef.current = window.setInterval(() => {
+        if (analyzerRef.current) {
+          analyzerRef.current.getByteFrequencyData(dataArray);
+          
+          // Calculate average volume level
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+          const scaledLevel = Math.min(100, Math.max(0, avg * 1.5)); // Scale 0-255 to 0-100
+          
+          setAudioLevel(scaledLevel);
+          
+          // Add ripple based on audio level
+          if (isRecording && avg > 50 && Math.random() > 0.7) {
+            setRipples(prev => [...prev, Date.now()]);
+          }
+        }
+      }, 100);
+      
+      return audioContext;
+    } catch (error) {
+      console.error('Error setting up audio processing:', error);
+      return null;
     }
-    
-    // Start monitoring audio levels
-    const dataArray = new Uint8Array(analyzerNode.frequencyBinCount);
-    
-    audioLevelTimerRef.current = window.setInterval(() => {
-      analyzerNode.getByteFrequencyData(dataArray);
-      
-      // Calculate average volume level
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        sum += dataArray[i];
-      }
-      const avg = sum / dataArray.length;
-      const scaledLevel = Math.min(100, Math.max(0, avg * 1.5)); // Scale 0-255 to 0-100
-      
-      setAudioLevel(scaledLevel);
-      
-      // Add ripple based on audio level
-      if (isRecording && avg > 50 && Math.random() > 0.7) {
-        setRipples(prev => [...prev, Date.now()]);
-      }
-    }, 100);
-    
-    return audioContext;
   };
   
   const startRecording = async () => {
@@ -148,15 +169,19 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       
       // Request microphone permission with user interaction
       toast.loading('Accessing microphone...');
+      
+      // Enhanced media constraints for better recording quality
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
-          // Enhanced audio constraints for better quality
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          channelCount: 1,
+          // Use higher sample rate for better quality
           sampleRate: 48000,
-          sampleSize: 16
+          // Try to use higher bit depth
+          sampleSize: 16,
+          // Use stereo if available
+          channelCount: 2
         } 
       });
       
@@ -169,12 +194,36 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       // Set up audio processing
       setupAudioProcessing(stream);
       
+      // Try to use the best available codec
+      let options: MediaRecorderOptions = {};
+      
+      // Check what MIME types are supported to get the best quality
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/wav'
+      ];
+      
+      for (const type of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          options.mimeType = type;
+          console.log(`Using media recorder MIME type: ${type}`);
+          break;
+        }
+      }
+      
       // Create MediaRecorder with best available options
-      const options = { mimeType: 'audio/webm' };
-      const mediaRecorder = new MediaRecorder(stream, options);
+      // Add higher bitrate for better quality, when supported
+      const mediaRecorder = new MediaRecorder(stream, {
+        ...options,
+        bitsPerSecond: 128000 // 128 kbps for better audio quality
+      });
+      
       mediaRecorderRef.current = mediaRecorder;
       
-      // Set up data handling
+      // Set up data handling with more frequent data collection
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           chunksRef.current.push(e.data);
@@ -189,39 +238,19 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           return;
         }
         
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(chunksRef.current, { type: options.mimeType || 'audio/webm' });
         console.log('Recording stopped, blob size:', blob.size);
         setAudioBlob(blob);
         
-        // Stop all tracks to release the microphone
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-          streamRef.current = null;
-        }
-        
-        // Clear timers
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        
-        if (audioLevelTimerRef.current) {
-          clearInterval(audioLevelTimerRef.current);
-          audioLevelTimerRef.current = null;
-        }
-        
-        // Close audio context
-        if (audioContextRef.current) {
-          audioContextRef.current.close();
-          audioContextRef.current = null;
-        }
+        // Clean up resources
+        cleanupResources();
         
         toast.success('Recording saved!');
       };
       
-      // Start recording
+      // Start recording with more frequent data collection (every 500ms)
       setIsRecording(true);
-      mediaRecorder.start(1000); // Collect data every second for more reliable recording
+      mediaRecorder.start(500);
       
       // Start timer
       timerRef.current = window.setInterval(() => {
@@ -255,14 +284,35 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
+      
+      if (playbackTimerRef.current) {
+        clearInterval(playbackTimerRef.current);
+        playbackTimerRef.current = null;
+      }
     } else {
       // Create a new audio element each time to ensure fresh playback
       const audioUrl = URL.createObjectURL(audioBlob);
       audioRef.current.src = audioUrl;
       
+      // Setup audio duration and progress tracking
+      audioRef.current.onloadedmetadata = () => {
+        if (audioRef.current) {
+          setAudioDuration(audioRef.current.duration);
+        }
+      };
+      
       audioRef.current.play()
         .then(() => {
           setIsPlaying(true);
+          
+          // Setup progress tracking timer
+          playbackTimerRef.current = window.setInterval(() => {
+            if (audioRef.current) {
+              const currentTime = audioRef.current.currentTime;
+              const duration = audioRef.current.duration;
+              setPlaybackProgress(Math.floor((currentTime / duration) * 100));
+            }
+          }, 100); // Update progress more frequently (every 100ms)
         })
         .catch(err => {
           console.error('Error playing audio:', err);
@@ -379,8 +429,21 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   // Set up audio ended handler
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.onended = () => setIsPlaying(false);
+      audioRef.current.onended = () => {
+        setIsPlaying(false);
+        setPlaybackProgress(0);
+        if (playbackTimerRef.current) {
+          clearInterval(playbackTimerRef.current);
+          playbackTimerRef.current = null;
+        }
+      };
     }
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.onended = null;
+      }
+    };
   }, [audioBlob]);
   
   // Request permissions if they were denied
@@ -522,26 +585,41 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="flex flex-col items-center gap-3"
+            className="flex flex-col items-center gap-3 w-full max-w-xs"
           >
-            <Button 
-              onClick={togglePlayback} 
-              variant="outline"
-              disabled={isProcessing}
-              className="rounded-full h-10 px-4 flex items-center gap-2"
-            >
-              {isPlaying ? (
-                <>
-                  <Square className="w-4 h-4" />
-                  <span>Pause</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4" />
-                  <span>Play Recording</span>
-                </>
+            <div className="w-full">
+              <Button 
+                onClick={togglePlayback} 
+                variant="outline"
+                disabled={isProcessing}
+                className="rounded-full h-10 px-4 flex items-center gap-2 w-full mb-2"
+              >
+                {isPlaying ? (
+                  <>
+                    <Pause className="w-4 h-4" />
+                    <span>Pause</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4" />
+                    <span>Play Recording</span>
+                  </>
+                )}
+              </Button>
+              
+              {/* Playback progress indicator */}
+              {audioBlob && (
+                <div className="w-full space-y-1">
+                  <Progress value={playbackProgress} className="h-2" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>
+                      {formatTime(Math.floor((playbackProgress / 100) * (audioDuration || 0)))}
+                    </span>
+                    <span>{formatTime(Math.floor(audioDuration || 0))}</span>
+                  </div>
+                </div>
               )}
-            </Button>
+            </div>
             
             <Button 
               onClick={processRecording}
