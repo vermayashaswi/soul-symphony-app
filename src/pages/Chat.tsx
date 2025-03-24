@@ -45,6 +45,27 @@ export default function Chat() {
         
         console.log(`User has ${count} journal entries in database query`);
         
+        // Also check if embeddings exist for those entries
+        const { count: embeddingCount, error: embeddingError } = await supabase
+          .from('journal_embeddings')
+          .select('*', { count: 'exact', head: true })
+          .in('journal_entry_id', 
+            supabase
+              .from('Journal Entries')
+              .select('id')
+              .eq('user_id', currentUserId)
+          );
+          
+        if (embeddingError) {
+          console.error('Error checking journal embeddings:', embeddingError);
+        } else {
+          console.log(`Found ${embeddingCount} embeddings for journal entries`);
+          
+          if (count > 0 && embeddingCount === 0) {
+            toast.warning('Your journal entries exist but have no embeddings. The chatbot may not work properly.');
+          }
+        }
+        
         // Also check with our utility function for comparison
         const hasEntriesResult = await checkUserHasJournalEntries(currentUserId);
         console.log('Check user has journal entries result:', hasEntriesResult);

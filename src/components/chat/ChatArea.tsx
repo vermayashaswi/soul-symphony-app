@@ -216,7 +216,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     setShowWelcome(false);
     
     try {
-      console.log("Sending message to chat-with-rag function with userId:", currentUserId);
+      console.log("Sending message to chat-rag function with userId:", currentUserId);
       
       const threadTitle = isNewThread ? content.substring(0, 30) + (content.length > 30 ? "..." : "") : undefined;
       console.log("Thread title for new thread:", threadTitle);
@@ -228,7 +228,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       console.log(`Found ${count} journal entries before sending message`);
       
-      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+      const { data, error } = await supabase.functions.invoke('chat-rag', {
         body: { 
           message: content.trim(),
           userId: currentUserId,
@@ -245,7 +245,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
       
-      console.log("Received response from chat-with-rag function:", data);
+      console.log("Received response from chat-rag function:", data);
       
       if (data.journal_entries_count === 0 && count > 0) {
         console.warn('Journal entries exist but RAG function could not access them.');
