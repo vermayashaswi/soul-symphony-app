@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -91,6 +92,20 @@ async function analyzeEmotions(text: string) {
   try {
     console.log('Analyzing emotions for text:', text.slice(0, 100) + '...');
     
+    // First, fetch all emotions from our database
+    const { data: emotions, error: emotionsError } = await supabase
+      .from('emotions')
+      .select('name, description')
+      .order('id', { ascending: true });
+      
+    if (emotionsError) {
+      console.error('Error fetching emotions from database:', emotionsError);
+      throw new Error('Failed to fetch emotions data');
+    }
+    
+    // Create a prompt with all emotions
+    const emotionsPrompt = emotions.map(e => `- ${e.name}: ${e.description}`).join('\n');
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -102,14 +117,21 @@ async function analyzeEmotions(text: string) {
         messages: [
           {
             role: 'system',
-            content: 'You are an emotion analysis expert. Extract the emotions present in the text and assign intensity values from 0 to 1. Return ONLY a JSON object with emotion names as keys and intensity values as values. Include at least: joy, sadness, anger, fear, surprise, and any other relevant emotions.'
+            content: `You are an emotional analysis expert. You will be given a journal entry text and a list of emotions. 
+            Analyze the text and identify which emotions from the provided list are present in the text. 
+            Rate each identified emotion with an intensity value from 0 to 1, where 0 means not present and 1 means strongly present.
+            Only include emotions that are actually expressed in the text with a score above 0.
+            Return ONLY a JSON object with emotion names as keys and intensity values as numbers.
+            
+            Here is the list of emotions to choose from:
+            ${emotionsPrompt}`
           },
           {
             role: 'user',
-            content: `Analyze the emotions in this text: "${text}"`
+            content: `Analyze the emotions in this journal entry: "${text}"`
           }
         ],
-        temperature: 0.7,
+        temperature: 0.5,
         response_format: { type: "json_object" }
       }),
     });
@@ -127,6 +149,7 @@ async function analyzeEmotions(text: string) {
       return emotions;
     } catch (err) {
       console.error('Error parsing emotions JSON:', err);
+      console.error('Raw emotions text:', emotionsText);
       return null;
     }
   } catch (error) {
@@ -177,9 +200,6 @@ serve(async (req) => {
     console.log("User ID:", userId);
     console.log("Audio data length:", audio.length);
     console.log("OpenAI API Key available:", !!openAIApiKey);
-    console.log("OpenAI API Key starts with:", openAIApiKey.substring(0, 10));
-    console.log("Supabase URL available:", !!supabaseUrl);
-    console.log("Supabase Service Key available:", !!supabaseServiceKey);
     
     const binaryAudio = processBase64Chunks(audio);
     console.log("Processed binary audio size:", binaryAudio.length);
@@ -232,9 +252,10 @@ serve(async (req) => {
     formData.append('file', blob, 'audio.webm');
     formData.append('model', 'whisper-1');
 
-    console.log("Sending to Whisper API...");
+    console.log("Sending to Whisper API for high-quality transcription...");
     
     try {
+      // Step 1: Use Whisper for high-quality transcription
       const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
@@ -254,6 +275,7 @@ serve(async (req) => {
       
       console.log("Transcription successful:", transcribedText);
 
+      // Step 2: Use GPT to refine and translate the transcription
       const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -265,11 +287,11 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning.'
+              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. Preserve the emotional tone and personal nature of the content.'
             },
             {
               role: 'user',
-              content: `Translate this multilingual feedback to English and improve its clarity: "${transcribedText}"`
+              content: `Translate this text to English if needed and improve its clarity while preserving the emotional tone: "${transcribedText}"`
             }
           ],
         }),
@@ -286,6 +308,7 @@ serve(async (req) => {
       
       console.log("Refinement successful:", refinedText);
 
+      // Step 3: Analyze emotions using our database of emotions
       const emotions = await analyzeEmotions(refinedText);
       console.log("Emotion analysis:", emotions);
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Play, ChevronRight, Loader2 } from 'lucide-react';
+import { Mic, Square, Play, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -20,11 +20,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [isPlaying, setIsPlaying] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [noiseReduction, setNoiseReduction] = useState(true);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyzerRef = useRef<AnalyserNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioLevelTimerRef = useRef<number | null>(null);
   const [ripples, setRipples] = useState<number[]>([]);
   
   // Check for microphone permission on component mount
@@ -51,8 +56,88 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (audioLevelTimerRef.current) {
+        clearInterval(audioLevelTimerRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
     };
   }, []);
+
+  // Function to create audio processing setup for visualizations and noise reduction
+  const setupAudioProcessing = (stream: MediaStream) => {
+    // Create audio context
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    audioContextRef.current = audioContext;
+    
+    // Create analyzer node for visualization
+    const analyzerNode = audioContext.createAnalyser();
+    analyzerNode.fftSize = 256;
+    analyzerRef.current = analyzerNode;
+    
+    // Create source from stream
+    const source = audioContext.createMediaStreamSource(stream);
+    
+    // If noise reduction is enabled, add filtering
+    if (noiseReduction) {
+      // High-pass filter to remove low-frequency noise
+      const highpassFilter = audioContext.createBiquadFilter();
+      highpassFilter.type = 'highpass';
+      highpassFilter.frequency.value = 80;
+      highpassFilter.Q.value = 0.7;
+      
+      // Low-pass filter to remove high-frequency noise
+      const lowpassFilter = audioContext.createBiquadFilter();
+      lowpassFilter.type = 'lowpass';
+      lowpassFilter.frequency.value = 8000;
+      lowpassFilter.Q.value = 0.7;
+      
+      // Compressor to normalize volume
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -24;
+      compressor.knee.value = 30;
+      compressor.ratio.value = 12;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+      
+      // Connect the nodes
+      source.connect(highpassFilter);
+      highpassFilter.connect(lowpassFilter);
+      lowpassFilter.connect(compressor);
+      compressor.connect(analyzerNode);
+      
+      // For monitoring purposes only (uncomment for testing)
+      // analyzerNode.connect(audioContext.destination);
+    } else {
+      // Simple connection without filtering
+      source.connect(analyzerNode);
+    }
+    
+    // Start monitoring audio levels
+    const dataArray = new Uint8Array(analyzerNode.frequencyBinCount);
+    
+    audioLevelTimerRef.current = window.setInterval(() => {
+      analyzerNode.getByteFrequencyData(dataArray);
+      
+      // Calculate average volume level
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+      }
+      const avg = sum / dataArray.length;
+      const scaledLevel = Math.min(100, Math.max(0, avg * 1.5)); // Scale 0-255 to 0-100
+      
+      setAudioLevel(scaledLevel);
+      
+      // Add ripple based on audio level
+      if (isRecording && avg > 50 && Math.random() > 0.7) {
+        setRipples(prev => [...prev, Date.now()]);
+      }
+    }, 100);
+    
+    return audioContext;
+  };
   
   const startRecording = async () => {
     try {
@@ -65,9 +150,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       toast.loading('Accessing microphone...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
+          // Enhanced audio constraints for better quality
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          channelCount: 1,
+          sampleRate: 48000,
+          sampleSize: 16
         } 
       });
       
@@ -77,7 +166,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       // Save stream reference for cleanup
       streamRef.current = stream;
       
-      const mediaRecorder = new MediaRecorder(stream);
+      // Set up audio processing
+      setupAudioProcessing(stream);
+      
+      // Create MediaRecorder with best available options
+      const options = { mimeType: 'audio/webm' };
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       
       // Set up data handling
@@ -105,10 +199,21 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           streamRef.current = null;
         }
         
-        // Clear timer
+        // Clear timers
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
+        }
+        
+        if (audioLevelTimerRef.current) {
+          clearInterval(audioLevelTimerRef.current);
+          audioLevelTimerRef.current = null;
+        }
+        
+        // Close audio context
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+          audioContextRef.current = null;
         }
         
         toast.success('Recording saved!');
@@ -120,16 +225,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       
       // Start timer
       timerRef.current = window.setInterval(() => {
-        setRecordingTime(prev => {
-          const newTime = prev + 1;
-          
-          // Add a new ripple every 2 seconds
-          if (newTime % 2 === 0) {
-            setRipples(prev => [...prev, Date.now()]);
-          }
-          
-          return newTime;
-        });
+        setRecordingTime(prev => prev + 1);
       }, 1000);
       
       // Initial ripple
@@ -188,7 +284,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     
     try {
       setIsProcessing(true);
-      toast.loading('Processing your journal entry...');
+      toast.loading('Processing your journal entry with advanced AI...');
       
       // Convert blob to base64
       const reader = new FileReader();
@@ -321,6 +417,22 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         className="hidden"
       />
       
+      <div className="flex items-center justify-center mb-4">
+        <label className="flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            className="sr-only"
+            checked={noiseReduction}
+            onChange={() => setNoiseReduction(!noiseReduction)}
+            disabled={isRecording}
+          />
+          <div className={`h-5 w-10 rounded-full transition-colors ${noiseReduction ? 'bg-primary' : 'bg-gray-300'} relative`}>
+            <div className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${noiseReduction ? 'translate-x-5' : ''}`} />
+          </div>
+          <span className="ml-2 text-sm">Noise Reduction</span>
+        </label>
+      </div>
+      
       <div className="relative flex items-center justify-center my-8">
         <AnimatePresence>
           {ripples.map((id) => (
@@ -335,6 +447,24 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             />
           ))}
         </AnimatePresence>
+        
+        {isRecording && (
+          <motion.div 
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <div className="h-full w-full rounded-full border-4 border-transparent relative">
+              <div className="absolute inset-0 rounded-full"
+                style={{
+                  background: `conic-gradient(rgba(147, 51, 234, ${Math.min(0.8, audioLevel / 100 + 0.1)}) ${audioLevel}%, transparent ${audioLevel}%)`,
+                  transform: 'rotate(-90deg)',
+                  transition: 'all 0.2s ease'
+                }}
+              />
+            </div>
+          </motion.div>
+        )}
         
         {hasPermission === false ? (
           <motion.button
@@ -381,6 +511,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               <span>Recording</span>
             </div>
             <p className="text-lg font-mono mt-1">{formatTime(recordingTime)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              <AlertCircle className="h-3 w-3 inline-block mr-1" />
+              Speak clearly for best results
+            </p>
           </motion.div>
         ) : audioBlob ? (
           <motion.div 
@@ -417,7 +551,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               {isProcessing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Processing...</span>
+                  <span>Processing with AI...</span>
                 </>
               ) : (
                 <>
