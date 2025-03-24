@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { JournalEntry } from '@/types/journal';
 
 export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefined): Promise<boolean> {
   if (!userId) {
@@ -29,13 +30,21 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     console.log(`Found ${entriesData.length} journal entries`);
     
-    // Filter to entries with text content
-    const validEntries = entriesData.filter(entry => 
-      entry && 
-      typeof entry.id === 'number' && 
-      entry["refined text"] && 
-      typeof entry["refined text"] === 'string'
-    );
+    // Safely type and filter entries with text content
+    const validEntries: {id: number; "refined text": string}[] = [];
+    
+    // Validate each entry before using it
+    for (const entry of entriesData) {
+      if (entry && 
+          typeof entry.id === 'number' && 
+          entry["refined text"] && 
+          typeof entry["refined text"] === 'string') {
+        validEntries.push({
+          id: entry.id,
+          "refined text": entry["refined text"]
+        });
+      }
+    }
     
     if (validEntries.length === 0) {
       console.log('No valid journal entries with text found');
@@ -63,8 +72,15 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
       return false;
     }
     
-    // Extract entry IDs from the results
-    const entriesWithEmbeddings = new Set(embeddingsData.map(e => e.journal_entry_id));
+    // Extract entry IDs from the results and ensure they're all valid
+    const entriesWithEmbeddings = new Set<number>();
+    
+    for (const item of embeddingsData) {
+      if (item && typeof item.journal_entry_id === 'number') {
+        entriesWithEmbeddings.add(item.journal_entry_id);
+      }
+    }
+    
     console.log(`Found ${entriesWithEmbeddings.size} entries that already have embeddings`);
     
     // Filter to entries without embeddings
@@ -77,8 +93,11 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     console.log(`Need to generate embeddings for ${entriesToEmbed.length} entries`);
     
-    // Generate embeddings for entries without them
-    for (const entry of entriesToEmbed.slice(0, 5)) { // Limit to 5 at a time to avoid overload
+    // Generate embeddings for entries without them (limit to 5 at a time)
+    const batchSize = 5;
+    const entriesToProcess = entriesToEmbed.slice(0, batchSize);
+    
+    for (const entry of entriesToProcess) {
       try {
         console.log(`Generating embedding for entry ${entry.id}`);
         
