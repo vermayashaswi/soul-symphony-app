@@ -18,26 +18,32 @@ const corsHeaders = {
 // Generate embeddings using OpenAI
 async function generateEmbedding(text: string) {
   console.log("Generating embedding for query:", text.substring(0, 50) + "...");
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'text-embedding-ada-002',
-      input: text
-    }),
-  });
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: text
+      }),
+    });
 
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Error generating embedding:', error);
-    throw new Error('Failed to generate embedding');
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error generating embedding:', error);
+      throw new Error('Failed to generate embedding');
+    }
+
+    const result = await response.json();
+    console.log(`Successfully generated embedding with ${result.data[0].embedding.length} dimensions`);
+    return result.data[0].embedding;
+  } catch (error) {
+    console.error('Error in generateEmbedding:', error);
+    throw error;
   }
-
-  const result = await response.json();
-  return result.data[0].embedding;
 }
 
 // Format emotions data into a readable string
@@ -159,41 +165,75 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
   console.log(`Fetching relevant journal entries for user ${userId} using vector similarity`);
   
   // First, check if the user has any journal entries at all
-  const { count: entryCount, error: countError } = await supabase
+  const { data: allEntries, error: entriesError } = await supabase
+    .from('Journal Entries')
+    .select('id, refined text, created_at')
+    .eq('user_id', userId)
+    .limit(10);
+    
+  if (entriesError) {
+    console.error("Error checking for journal entries:", entriesError);
+    return [];
+  }
+  
+  console.log(`User has ${allEntries?.length || 0} recent journal entries`);
+  
+  // Get total count
+  const { count, error: countError } = await supabase
     .from('Journal Entries')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId);
     
   if (countError) {
-    console.error("Error checking for journal entries:", countError);
-    return [];
-  }
-  
-  console.log(`User has ${entryCount} journal entries in total`);
-  
-  if (entryCount === 0) {
-    console.log("User has no journal entries, skipping vector search");
-    return [];
+    console.error("Error checking for journal entries count:", countError);
+  } else {
+    console.log(`User has ${count || 0} total journal entries`);
+    
+    if (count === 0) {
+      console.log("User has no journal entries, skipping vector search");
+      return [];
+    }
   }
   
   // Check for existing embeddings for this user's entries
-  const { count: embeddingCount, error: embCountError } = await supabase
+  const { data: entriesWithEmbeddings, error: embError } = await supabase
     .from('journal_embeddings')
-    .select('*', { count: 'exact', head: true })
-    .in('journal_entry_id', 
-      supabase.from('Journal Entries')
-        .select('id')
-        .eq('user_id', userId)
-    );
+    .select('journal_entry_id')
+    .in('journal_entry_id', allEntries?.map(e => e.id) || []);
     
-  if (embCountError) {
-    console.error("Error checking for embeddings:", embCountError);
+  if (embError) {
+    console.error("Error checking for embeddings:", embError);
   } else {
-    console.log(`User has ${embeddingCount || 0} journal entry embeddings`);
+    console.log(`Found ${entriesWithEmbeddings?.length || 0} entries with embeddings out of ${allEntries?.length || 0} recent entries`);
     
-    if (embeddingCount === 0 && entryCount > 0) {
-      console.log("WARNING: User has journal entries but no embeddings. RAG will not work correctly.");
-      // We continue anyway to show the issue in logs
+    if (entriesWithEmbeddings?.length === 0 && allEntries?.length > 0) {
+      console.log("WARNING: User has journal entries but no embeddings. Will attempt to generate embeddings on the fly.");
+      
+      // Attempt to generate embeddings for a few entries to enable RAG
+      for (const entry of allEntries.slice(0, 3)) {
+        if (entry["refined text"]) {
+          try {
+            console.log(`Generating embedding for entry ${entry.id}`);
+            const embedding = await generateEmbedding(entry["refined text"]);
+            
+            const { error: insertError } = await supabase
+              .from('journal_embeddings')
+              .insert({
+                journal_entry_id: entry.id,
+                embedding: embedding,
+                content: entry["refined text"]
+              });
+              
+            if (insertError) {
+              console.error(`Error storing embedding for entry ${entry.id}:`, insertError);
+            } else {
+              console.log(`Successfully generated embedding for entry ${entry.id}`);
+            }
+          } catch (error) {
+            console.error(`Error generating embedding for entry ${entry.id}:`, error);
+          }
+        }
+      }
     }
   }
   
@@ -213,12 +253,16 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
   // Debug: Check query embedding dimensions
   console.log("Query embedding dimensions:", Array.isArray(queryEmbedding) ? queryEmbedding.length : "Not an array");
   
+  // Try with a lower threshold first
+  let matchThreshold = 0.3; // Start with a lower threshold
+  
   // Proceed with vector similarity search
+  console.log(`Attempting vector search with threshold ${matchThreshold}`);
   const { data: similarEntries, error: matchError } = await supabase.rpc(
     'match_journal_entries',
     {
       query_embedding: queryEmbedding,
-      match_threshold: 0.5,
+      match_threshold: matchThreshold,
       match_count: 5,
       user_id_filter: userId
     }
@@ -227,16 +271,96 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
   if (matchError) {
     console.error("Error in vector similarity search:", matchError);
     console.error("Full error object:", JSON.stringify(matchError));
+    
+    // If there's an error, try to debug by checking embeddings more directly
+    try {
+      console.log("Checking journal_embeddings table directly...");
+      const { data: embeddingsCount, error: embCountError } = await supabase
+        .from('journal_embeddings')
+        .select('id', { count: 'exact', head: true });
+        
+      if (embCountError) {
+        console.error("Error checking embeddings count:", embCountError);
+      } else {
+        console.log(`There are ${embeddingsCount?.length || 0} total entries in journal_embeddings table`);
+      }
+      
+      // Check if user's entries have embeddings by direct join
+      const { data: userEmbeddings, error: userEmbError } = await supabase
+        .from('journal_embeddings')
+        .select('journal_embeddings.id, journal_entry_id')
+        .join('"Journal Entries" as je', 'journal_embeddings.journal_entry_id = je.id')
+        .eq('je.user_id', userId)
+        .limit(5);
+        
+      if (userEmbError) {
+        console.error("Error checking user's embeddings by join:", userEmbError);
+      } else {
+        console.log(`Found ${userEmbeddings?.length || 0} embeddings for user's entries by direct join`);
+      }
+    } catch (error) {
+      console.error("Error during embedding debugging:", error);
+    }
+    
     return [];
   }
   
   if (!similarEntries || similarEntries.length === 0) {
-    console.log("No relevant journal entries found for this user/query");
-    return [];
+    console.log(`No relevant journal entries found with threshold ${matchThreshold}`);
+    
+    // Try again with an even lower threshold as a fallback
+    if (matchThreshold > 0.1) {
+      matchThreshold = 0.1;
+      console.log(`Retrying with lower threshold ${matchThreshold}`);
+      
+      const { data: moreEntries, error: retryError } = await supabase.rpc(
+        'match_journal_entries',
+        {
+          query_embedding: queryEmbedding,
+          match_threshold: matchThreshold,
+          match_count: 5,
+          user_id_filter: userId
+        }
+      );
+      
+      if (retryError) {
+        console.error("Error in second vector search attempt:", retryError);
+        return [];
+      }
+      
+      if (!moreEntries || moreEntries.length === 0) {
+        console.log("Still no results with lower threshold, falling back to recent entries");
+        
+        // As a last resort, just return a few recent entries
+        const { data: recentEntries, error: recentError } = await supabase
+          .from('Journal Entries')
+          .select('id, refined text, created_at, emotions, master_themes')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(3);
+          
+        if (recentError) {
+          console.error("Error fetching recent entries as fallback:", recentError);
+          return [];
+        }
+        
+        console.log(`Returning ${recentEntries?.length || 0} recent entries as fallback`);
+        
+        // Add a placeholder similarity score
+        return (recentEntries || []).map(entry => ({
+          ...entry,
+          similarity: 0.1 // Just a placeholder value
+        }));
+      }
+      
+      similarEntries.push(...moreEntries);
+    }
   }
   
-  console.log(`Found ${similarEntries.length} similar journal entries using vector similarity`);
-  console.log("First entry similarity score:", similarEntries[0].similarity);
+  console.log(`Found ${similarEntries?.length || 0} similar journal entries using vector similarity`);
+  if (similarEntries && similarEntries.length > 0) {
+    console.log("First entry similarity score:", similarEntries[0].similarity);
+  }
   
   // Fetch the full details of these journal entries
   const entryIds = similarEntries.map(entry => entry.id);
@@ -308,6 +432,21 @@ async function debugEmbeddingDimensions(userId: string) {
         console.log("Attempting to generate test embedding for debugging...");
         const testVector = await generateEmbedding(entry["refined text"]);
         console.log("Generated test vector with dimensions:", testVector.length);
+        
+        // Store this test embedding
+        const { error: insertError } = await supabase
+          .from('journal_embeddings')
+          .insert({
+            journal_entry_id: entry.id,
+            embedding: testVector,
+            content: entry["refined text"]
+          });
+          
+        if (insertError) {
+          console.error("Error storing test embedding:", insertError);
+        } else {
+          console.log("Successfully stored test embedding");
+        }
       }
       
       return;
@@ -358,27 +497,24 @@ serve(async (req) => {
     if (countError) {
       console.error("Error checking journal entries count:", countError);
     } else {
-      console.log(`User has ${count} total journal entries`);
+      console.log(`User has ${count || 0} total journal entries`);
     }
     
     // Check if embeddings exist for these entries
     if (count && count > 0) {
-      const { count: embCount, error: embCountError } = await supabase
+      const { data: entriesWithEmbeddings, error: embCountError } = await supabase
         .from('journal_embeddings')
-        .select('*', { count: 'exact', head: true })
-        .in('journal_entry_id', 
-          supabase.from('Journal Entries')
-            .select('id')
-            .eq('user_id', userId)
-        );
+        .select('journal_entry_id')
+        .join('"Journal Entries" as je', 'journal_embeddings.journal_entry_id = je.id')
+        .eq('je.user_id', userId);
         
       if (embCountError) {
         console.error("Error checking embeddings count:", embCountError);
       } else {
-        console.log(`User has ${embCount || 0} entries with embeddings out of ${count} total entries`);
+        console.log(`User has ${entriesWithEmbeddings?.length || 0} entries with embeddings out of ${count} total entries`);
         
         // If there are missing embeddings, we should warn but continue
-        if (embCount < count) {
+        if (entriesWithEmbeddings?.length < count) {
           console.warn("Some journal entries are missing embeddings. RAG may not work correctly.");
         }
       }

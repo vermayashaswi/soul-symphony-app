@@ -9,13 +9,6 @@ interface JournalEntry {
   [key: string]: any;
 }
 
-// Define a type for what Supabase might return (which could include error objects)
-interface SupabaseEntry {
-  id?: number;
-  "refined text"?: string;
-  [key: string]: any;
-}
-
 /**
  * Checks if embeddings exist for journal entries and requests generation if missing
  */
@@ -23,11 +16,13 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
   try {
     console.log('Starting embeddings check for user:', userId);
     
-    // Get all journal entries for this user
+    // Get all journal entries for this user that have refined text
     const { data: entries, error: entriesError } = await supabase
       .from('Journal Entries')
       .select('id, refined text')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .not('refined text', 'is', null)
+      .order('created_at', { ascending: false });
       
     if (entriesError) {
       console.error('Error fetching journal entries:', entriesError);
@@ -35,36 +30,27 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     }
     
     if (!entries || entries.length === 0) {
-      console.log('No journal entries found for user');
+      console.log('No journal entries with text found for user');
       return false;
     }
     
     console.log(`Found ${entries.length} journal entries for embedding check`);
-    console.log('Sample entry:', entries[0]); // Debug log to see entry structure
     
-    // Type guard function to verify entry structure
-    function isValidJournalEntry(entry: any): entry is JournalEntry {
-      return entry !== null && 
-             entry !== undefined && 
-             typeof entry === 'object' &&
-             'id' in entry && 
-             typeof entry.id === 'number';
-    }
-    
-    // Filter out any entries that don't match our expected structure
-    const validEntries: JournalEntry[] = [];
-    for (const entry of entries) {
-      if (isValidJournalEntry(entry)) {
-        validEntries.push(entry);
-      } else {
-        console.warn('Invalid entry format:', entry);
-      }
-    }
+    // Filter out entries without valid refined text
+    const validEntries = entries.filter(entry => 
+      entry && 
+      entry.id && 
+      entry["refined text"] && 
+      typeof entry["refined text"] === 'string' &&
+      entry["refined text"].trim().length > 0
+    );
     
     if (validEntries.length === 0) {
-      console.error('No valid journal entry IDs found');
+      console.error('No valid journal entries with text found');
       return false;
     }
+    
+    console.log(`Found ${validEntries.length} entries with valid text content`);
     
     // Get entry IDs
     const entryIds = validEntries.map(entry => entry.id);
@@ -79,8 +65,6 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
       console.error('Error checking existing embeddings:', embeddingsError);
       return false;
     }
-    
-    console.log('Existing embeddings:', existingEmbeddings); // Debug log
     
     // Find entries without embeddings
     const existingEmbeddingIds = existingEmbeddings?.map(e => e.journal_entry_id) || [];
@@ -97,42 +81,60 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     console.log(`Found ${entriesWithoutEmbeddings.length} entries without embeddings, generating...`);
     toast.info(`Preparing your journal entries for chat (${entriesWithoutEmbeddings.length} entries)...`);
     
-    // Generate embeddings for entries that don't have them
-    const generationPromises = entriesWithoutEmbeddings.map(async entry => {
-      // Skip entries without refined text
-      if (!entry["refined text"]) {
-        console.log(`Entry ${entry.id} has no refined text, skipping embedding generation`);
-        return null;
-      }
+    // Generate embeddings for entries that don't have them, but limit to 5 at a time to avoid timeouts
+    const batchSize = 5;
+    const batches = Math.ceil(entriesWithoutEmbeddings.length / batchSize);
+    let successCount = 0;
+    
+    for (let i = 0; i < batches; i++) {
+      const start = i * batchSize;
+      const end = Math.min(start + batchSize, entriesWithoutEmbeddings.length);
+      const batch = entriesWithoutEmbeddings.slice(start, end);
       
-      try {
-        // Call the generate-embeddings function
-        console.log(`Generating embedding for entry ${entry.id} with text length: ${entry["refined text"]?.length}`);
-        const { data, error: genError } = await supabase.functions.invoke('generate-embeddings', {
-          body: { 
-            entryId: entry.id,
-            text: entry["refined text"]
+      console.log(`Processing batch ${i+1}/${batches} with ${batch.length} entries`);
+      
+      // Process each entry in the batch with Promise.all for parallel processing
+      const results = await Promise.all(batch.map(async entry => {
+        try {
+          if (!entry["refined text"]) {
+            console.log(`Entry ${entry.id} has no refined text, skipping embedding generation`);
+            return null;
           }
-        });
-        
-        if (genError) {
-          console.error(`Error generating embedding for entry ${entry.id}:`, genError);
+          
+          // Call the generate-embeddings function
+          console.log(`Generating embedding for entry ${entry.id} with text length: ${entry["refined text"]?.length}`);
+          const { data, error: genError } = await supabase.functions.invoke('generate-embeddings', {
+            body: { 
+              entryId: entry.id,
+              text: entry["refined text"]
+            }
+          });
+          
+          if (genError) {
+            console.error(`Error generating embedding for entry ${entry.id}:`, genError);
+            return null;
+          }
+          
+          // Verify the result
+          console.log(`Embedding generation result for entry ${entry.id}:`, data?.success ? 'Success' : 'Failed');
+          
+          return data?.success ? entry.id : null;
+        } catch (error) {
+          console.error(`Exception generating embedding for entry ${entry.id}:`, error);
           return null;
         }
-        
-        // Verify the result
-        console.log(`Embedding generation result for entry ${entry.id}:`, data?.success ? 'Success' : 'Failed');
-        
-        return entry.id;
-      } catch (error) {
-        console.error(`Exception generating embedding for entry ${entry.id}:`, error);
-        return null;
+      }));
+      
+      const batchSuccessCount = results.filter(id => id !== null).length;
+      successCount += batchSuccessCount;
+      
+      console.log(`Batch ${i+1} complete: ${batchSuccessCount} successful out of ${batch.length}`);
+      
+      // Short delay between batches to avoid rate limiting
+      if (i < batches - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
-    });
-    
-    // Wait for all embedding generation to complete
-    const results = await Promise.all(generationPromises);
-    const successCount = results.filter(id => id !== null).length;
+    }
     
     console.log(`Successfully generated ${successCount} embeddings out of ${entriesWithoutEmbeddings.length} entries`);
     
