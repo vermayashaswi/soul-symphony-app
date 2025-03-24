@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Mic } from 'lucide-react';
+import { Mic, Sparkles } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import VoiceRecorder from '@/components/VoiceRecorder';
@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
+import EmotionBubbles from '@/components/EmotionBubbles';
 
 // Update JournalEntry type to match Supabase table schema exactly
 type JournalEntry = {
@@ -24,6 +25,7 @@ type JournalEntry = {
   "foreign key": string | null;
   emotions?: Record<string, number>;
   duration?: number;
+  master_themes?: string[];
 };
 
 const Journal = () => {
@@ -61,12 +63,41 @@ const Journal = () => {
       
       // We need to ensure data matches our JournalEntry type
       const typedEntries = (data || []) as JournalEntry[];
+      
+      // For any entry without master_themes, generate them
+      for (const entry of typedEntries) {
+        if (!entry.master_themes && entry["refined text"]) {
+          await generateThemesForEntry(entry);
+        }
+      }
+      
       setEntries(typedEntries);
     } catch (error) {
       console.error('Error fetching entries:', error);
       toast.error('Failed to load journal entries');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateThemesForEntry = async (entry: JournalEntry) => {
+    try {
+      // Call the Supabase Edge Function to generate themes
+      const { data, error } = await supabase.functions.invoke('generate-themes', {
+        body: { text: entry["refined text"], entryId: entry.id }
+      });
+      
+      if (error) {
+        console.error('Error generating themes:', error);
+        return;
+      }
+      
+      if (data?.themes) {
+        // Update the entry with the new themes
+        entry.master_themes = data.themes;
+      }
+    } catch (error) {
+      console.error('Error invoking generate-themes function:', error);
     }
   };
 
@@ -156,25 +187,26 @@ const Journal = () => {
                               </div>
                               
                               <div>
-                                <h3 className="font-medium mb-2">Transcription</h3>
-                                <p className="text-muted-foreground whitespace-pre-line">
-                                  {entry["transcription text"] || "No transcription available"}
-                                </p>
-                              </div>
-                              
-                              <div>
-                                <h3 className="font-medium mb-2">Refined Entry</h3>
+                                <h3 className="font-medium mb-2">Journal Entry</h3>
                                 <p className="whitespace-pre-line">{entry["refined text"] || "No refined text available"}</p>
                               </div>
                             </div>
                             
                             <div>
-                              <h3 className="font-medium mb-4">Emotion Analysis</h3>
-                              {entry.emotions ? (
-                                <EmotionChart data={entry.emotions} />
-                              ) : (
-                                <p className="text-muted-foreground">No emotion data available</p>
-                              )}
+                              <h3 className="font-medium mb-4 flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-amber-500" />
+                                Emotions
+                              </h3>
+                              
+                              <div className="h-48 mb-4 flex items-center justify-center">
+                                {entry.master_themes && entry.master_themes.length > 0 ? (
+                                  <EmotionBubbles themes={entry.master_themes.slice(0, 5)} />
+                                ) : entry.emotions ? (
+                                  <EmotionChart data={entry.emotions} />
+                                ) : (
+                                  <p className="text-muted-foreground text-center">Analyzing emotions...</p>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </CardContent>
