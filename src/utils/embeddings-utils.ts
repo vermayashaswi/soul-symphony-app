@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 // Define a type for journal entries
 interface JournalEntry {
-  id: number | string;
+  id: number;
   "refined text"?: string;
   [key: string]: any;
 }
@@ -32,19 +32,22 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     
     console.log(`Found ${entries.length} journal entries for embedding check`);
     
-    // Get entry IDs - filter out any null entries and ensure they have an ID
-    const entryIds = entries
+    // Filter out any null entries and ensure they have an ID
+    const validEntries = entries
       .filter((entry): entry is JournalEntry => 
         entry !== null && 
         typeof entry === 'object' && 
-        'id' in entry
-      )
-      .map(entry => entry.id);
+        'id' in entry &&
+        typeof entry.id === 'number'
+      );
     
-    if (entryIds.length === 0) {
+    if (validEntries.length === 0) {
       console.error('No valid journal entry IDs found');
       return false;
     }
+    
+    // Get entry IDs
+    const entryIds = validEntries.map(entry => entry.id);
     
     // Check which entries already have embeddings
     const { data: existingEmbeddings, error: embeddingsError } = await supabase
@@ -57,15 +60,8 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
       return false;
     }
     
-    // Find entries without embeddings - ensure entries aren't null before checking
+    // Find entries without embeddings
     const existingEmbeddingIds = existingEmbeddings?.map(e => e.journal_entry_id) || [];
-    
-    // Use type assertion after filtering to ensure the correct type
-    const validEntries = entries.filter(entry => 
-      entry !== null && 
-      typeof entry === 'object' && 
-      'id' in entry
-    ) as JournalEntry[];
     
     const entriesWithoutEmbeddings = validEntries.filter(entry => 
       !existingEmbeddingIds.includes(entry.id)
