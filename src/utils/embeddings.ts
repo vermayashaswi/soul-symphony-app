@@ -33,8 +33,10 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     // Safely type and filter entries with text content
     const validEntries: {id: number; "refined text": string}[] = [];
     
-    // Filter out null entries first and make a new array with non-null entries
-    const nonNullEntries = entriesData.filter((entry): entry is (typeof entriesData)[number] => entry !== null);
+    // Filter out null entries first
+    const nonNullEntries = entriesData.filter((entry): entry is (typeof entriesData)[number] => 
+      entry !== null && entry !== undefined
+    );
     
     // Validate each entry before using it
     for (const entry of nonNullEntries) {
@@ -84,10 +86,12 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     // Extract entry IDs from the results and ensure they're all valid
     const entriesWithEmbeddings = new Set<number>();
     
-    // Filter null items first and make a new array with non-null items
-    const nonNullEmbeddingsData = embeddingsData.filter((item): item is (typeof embeddingsData)[number] => item !== null);
+    // Filter null items first
+    const nonNullEmbeddingsData = embeddingsData.filter((item): item is (typeof embeddingsData)[number] => 
+      item !== null && item !== undefined
+    );
     
-    // Use for...of loop with filtered data
+    // Process non-null items
     for (const item of nonNullEmbeddingsData) {
       // Type guard to ensure item is a valid object with required property
       if (typeof item === 'object' && 
