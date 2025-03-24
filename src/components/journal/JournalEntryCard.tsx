@@ -6,20 +6,7 @@ import { Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EmotionChart from '@/components/EmotionChart';
 import EmotionBubbles from '@/components/EmotionBubbles';
-
-// Type for JournalEntry matching Supabase table schema
-export type JournalEntry = {
-  id: number;
-  "transcription text": string;
-  "refined text": string;
-  created_at: string;
-  audio_url: string | null;
-  user_id: string | null;
-  "foreign key": string | null;
-  emotions?: Record<string, number>;
-  duration?: number;
-  master_themes?: string[];
-};
+import { JournalEntry } from '@/types/journal';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;

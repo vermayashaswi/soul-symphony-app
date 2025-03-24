@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Pause, Play, Trash2, Save, X, Check, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { EmotionBadge } from '@/components/EmotionBadge';
-import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 
 export default function Journal() {
   const { toast } = useToast();
@@ -94,8 +94,8 @@ export default function Journal() {
       await saveJournalEntry({
         user_id: user.id,
         audio_url: audioUrl,
-        transcription: transcription || '',
-        refined_text: refinedText || transcription || '',
+        "transcription text": transcription || '',
+        "refined text": refinedText || transcription || '',
         emotions: emotions || [],
         created_at: new Date().toISOString()
       });
@@ -120,7 +120,7 @@ export default function Journal() {
   
   const handleEditEntry = (entry: JournalEntry) => {
     setEditingEntry(entry);
-    setEditedText(entry["refined text"] || entry.transcription || '');
+    setEditedText(entry["refined text"] || entry["transcription text"] || '');
     setIsEditing(true);
   };
   
@@ -131,10 +131,10 @@ export default function Journal() {
       await saveJournalEntry({
         id: editingEntry.id,
         user_id: user.id,
-        audio_url: editingEntry.audio_url,
-        transcription: editingEntry.transcription,
-        refined_text: editedText,
-        emotions: editingEntry.emotions,
+        audio_url: editingEntry.audio_url || null,
+        "transcription text": editingEntry["transcription text"] || '',
+        "refined text": editedText,
+        emotions: editingEntry.emotions || [],
         created_at: editingEntry.created_at
       });
       
@@ -549,7 +549,7 @@ export default function Journal() {
                                 ) : (
                                   <div className="space-y-4">
                                     <p className="text-sm">
-                                      {entry["refined text"] || entry.transcription}
+                                      {entry["refined text"] || entry["transcription text"]}
                                     </p>
                                     
                                     {entry.emotions && entry.emotions.length > 0 && (

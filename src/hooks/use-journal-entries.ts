@@ -2,14 +2,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 
 interface JournalEntryInput {
   id?: number;
   user_id: string;
   audio_url: string | null;
-  transcription: string;
-  refined_text: string;
+  "transcription text"?: string;
+  "refined text"?: string;
   emotions?: string[] | null;
   created_at: string;
 }
@@ -91,8 +91,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         ...entryData.id ? { id: entryData.id } : {},
         user_id: userId,
         audio_url: entryData.audio_url,
-        "transcription text": entryData.transcription,
-        "refined text": entryData.refined_text,
+        "transcription text": entryData["transcription text"] || '',
+        "refined text": entryData["refined text"] || '',
         created_at: entryData.created_at,
         emotions: entryData.emotions
       };
