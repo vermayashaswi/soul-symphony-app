@@ -1,9 +1,8 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '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';
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -71,22 +70,108 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId } = await req.json();
+    const { message, userId, threadId, isNewThread, threadTitle } = await req.json();
     
-    if (!message) {
-      throw new Error('No message provided');
+    if (!message || !userId) {
+      throw new Error('Message and userId are required');
     }
 
-    console.log("Processing chat request for user:", userId);
-    console.log("Message:", message.substring(0, 50) + "...");
+    let currentThreadId = threadId;
+    console.log("=== RAG CHAT REQUEST ===");
+    console.log("User ID:", userId);
+    console.log("Thread ID:", currentThreadId);
+    console.log("Is new thread:", isNewThread);
+    console.log("Message preview:", message.substring(0, 50) + (message.length > 50 ? "..." : ""));
+    
+    // Check if this user has any journal entries and generate embeddings if needed
+    const { data: entries, error: entriesError } = await supabase
+      .from('Journal Entries')
+      .select('id, refined text')
+      .eq('user_id', userId);
+      
+    if (entriesError) {
+      console.error("Error fetching journal entries:", entriesError);
+    } else if (entries && entries.length > 0) {
+      console.log(`User has ${entries.length} journal entries`);
+      
+      // Check which entries have embeddings
+      const entryIds = entries.map(entry => entry.id);
+      const { data: existingEmbeddings, error: embeddingsError } = await supabase
+        .from('journal_embeddings')
+        .select('journal_entry_id')
+        .in('journal_entry_id', entryIds);
+        
+      if (embeddingsError) {
+        console.error("Error checking existing embeddings:", embeddingsError);
+      } else {
+        const existingEmbeddingIds = existingEmbeddings?.map(e => e.journal_entry_id) || [];
+        const entriesWithoutEmbeddings = entries.filter(entry => 
+          !existingEmbeddingIds.includes(entry.id) && entry["refined text"]
+        );
+        
+        console.log(`Found ${entriesWithoutEmbeddings.length} entries without embeddings`);
+        
+        // Generate embeddings for entries that don't have them
+        for (const entry of entriesWithoutEmbeddings.slice(0, 5)) { // Limit to 5 to avoid timeout
+          if (!entry["refined text"]) continue;
+          
+          try {
+            // Generate embedding
+            const embedding = await generateEmbedding(entry["refined text"]);
+            
+            // Store embedding in database
+            await supabase
+              .from('journal_embeddings')
+              .insert({
+                journal_entry_id: entry.id,
+                embedding: embedding,
+                content: entry["refined text"]
+              });
+              
+            console.log(`Generated embedding for entry ${entry.id}`);
+          } catch (error) {
+            console.error(`Error generating embedding for entry ${entry.id}:`, error);
+          }
+        }
+      }
+    }
+    
+    // Store user message and get its ID
+    const { data: messageData, error: messageError } = await supabase
+      .from('chat_messages')
+      .insert({
+        thread_id: currentThreadId || 'temp',
+        content: message,
+        sender: 'user'
+      })
+      .select('id')
+      .single();
+      
+    if (messageError) {
+      console.error("Error storing user message:", messageError);
+    }
+    
+    const userMessageId = messageData?.id;
     
     // Generate embedding for the user query
     console.log("Generating embedding for user query...");
     const queryEmbedding = await generateEmbedding(message);
     
-    // Search for relevant journal entries using vector similarity
-    console.log("Searching for relevant context using match_journal_entries function...");
-    const { data: similarEntries, error: searchError } = await supabase.rpc(
+    // Store user query with embedding
+    if (userMessageId) {
+      await supabase
+        .from('user_queries')
+        .insert({
+          user_id: userId,
+          query_text: message,
+          embedding: queryEmbedding,
+          thread_id: currentThreadId,
+          message_id: userMessageId
+        });
+    }
+    
+    // Search for journal entries using the embedding
+    const { data: matchingEntries, error: matchError } = await supabase.rpc(
       'match_journal_entries',
       {
         query_embedding: queryEmbedding,
@@ -96,18 +181,19 @@ serve(async (req) => {
       }
     );
     
-    if (searchError) {
-      console.error("Error searching for similar entries:", searchError);
-      console.error("Search error details:", JSON.stringify(searchError));
+    if (matchError) {
+      console.error("Error in match_journal_entries function:", matchError);
     }
+    
+    console.log(`Found ${matchingEntries?.length || 0} matching journal entries`);
     
     // Create RAG context from relevant entries
     let journalContext = "";
-    if (similarEntries && similarEntries.length > 0) {
-      console.log("Found similar entries:", similarEntries.length);
+    if (matchingEntries && matchingEntries.length > 0) {
+      console.log("Found similar entries:", matchingEntries.length);
       
       // Fetch full entries for context
-      const entryIds = similarEntries.map(entry => entry.id);
+      const entryIds = matchingEntries.map(entry => entry.id);
       const { data: entries, error: entriesError } = await supabase
         .from('Journal Entries')
         .select('refined text, created_at, emotions')

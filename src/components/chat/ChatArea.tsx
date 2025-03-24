@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +11,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { verifyUserAuthentication, getCurrentUserId } from '@/utils/audio/auth-utils';
+import { ensureJournalEntriesHaveEmbeddings } from '@/utils/embeddings-utils';
 
 export interface MessageReference {
   id: number;
@@ -112,6 +112,10 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
       
+      if (count > 0) {
+        await ensureJournalEntriesHaveEmbeddings(userId);
+      }
+      
       setHasJournalEntries(count > 0);
       console.log(`User has ${count} journal entries`);
     } catch (error) {
@@ -197,6 +201,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       return;
     }
     
+    await ensureJournalEntriesHaveEmbeddings(currentUserId);
+    
     const isNewThread = !threadId;
     
     const tempUserMessage: Message = {
@@ -215,14 +221,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       console.log("Sending message to chat-rag function with userId:", currentUserId);
       
       const threadTitle = isNewThread ? content.substring(0, 30) + (content.length > 30 ? "..." : "") : undefined;
-      console.log("Thread title for new thread:", threadTitle);
-      
-      const { count } = await supabase
-        .from('Journal Entries')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', currentUserId);
-      
-      console.log(`Found ${count} journal entries before sending message`);
       
       const { data, error } = await supabase.functions.invoke('chat-rag', {
         body: { 
@@ -243,12 +241,18 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       console.log("Received response from chat-rag function:", data);
       
-      if (data.journal_entries_count === 0 && count > 0) {
-        console.warn('Journal entries exist but RAG function could not access them.');
-        toast.warning('Your entries exist but could not be accessed. Please try refreshing the page.');
+      if (data.journal_entries_count === 0) {
+        const { count } = await supabase
+          .from('Journal Entries')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', currentUserId);
+          
+        if (count > 0) {
+          console.warn('Journal entries exist but RAG function could not access them.');
+          toast.warning('Your entries exist but could not be accessed. Trying to fix the issue...');
+          await ensureJournalEntriesHaveEmbeddings(currentUserId);
+        }
       }
-      
-      setHasJournalEntries(count > 0);
       
       if (isNewThread && data.threadId) {
         console.log("New thread created with ID:", data.threadId);
