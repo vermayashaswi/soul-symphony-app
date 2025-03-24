@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -13,6 +13,9 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function Insights() {
   const { user } = useAuth();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
+  const [isSticky, setIsSticky] = useState(false);
+  const timeToggleRef = useRef<HTMLDivElement>(null);
+  const stickyThreshold = useRef<number>(0);
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
@@ -23,9 +26,65 @@ export default function Insights() {
     { value: 'year', label: 'Year' },
   ];
 
+  // Handle scroll event to make time toggle sticky
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!timeToggleRef.current) return;
+      
+      if (!stickyThreshold.current) {
+        // Calculate position once
+        const rect = timeToggleRef.current.getBoundingClientRect();
+        stickyThreshold.current = rect.top + window.scrollY - 16; // 16px buffer
+      }
+      
+      setIsSticky(window.scrollY > stickyThreshold.current);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Render time toggle component
+  const renderTimeToggle = () => (
+    <div className="flex items-center gap-3">
+      <span className="text-sm text-muted-foreground">View:</span>
+      <ToggleGroup 
+        type="single" 
+        value={timeRange}
+        onValueChange={(value) => value && setTimeRange(value as TimeRange)}
+        variant="outline"
+        className="bg-secondary rounded-full p-1"
+      >
+        {timeRanges.map((range) => (
+          <ToggleGroupItem
+            key={range.value}
+            value={range.value}
+            className={cn(
+              "px-4 py-1.5 rounded-full text-sm font-medium transition-all",
+              timeRange === range.value
+                ? "bg-white text-primary shadow-sm"
+                : "text-muted-foreground hover:text-foreground bg-transparent"
+            )}
+          >
+            {range.label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
+  );
+
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
+      
+      {/* Sticky time toggle that appears when scrolling */}
+      {isSticky && (
+        <div className="fixed top-16 left-0 right-0 z-10 py-3 px-4 bg-background border-b shadow-sm flex justify-center">
+          <div className="max-w-5xl w-full flex justify-end">
+            {renderTimeToggle()}
+          </div>
+        </div>
+      )}
       
       <div className="max-w-5xl mx-auto px-4 pt-28">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
@@ -34,30 +93,9 @@ export default function Insights() {
             <p className="text-muted-foreground">Discover patterns in your emotional journey</p>
           </div>
           
-          <div className="flex items-center gap-3 mt-4 md:mt-0">
-            <span className="text-sm text-muted-foreground">View:</span>
-            <ToggleGroup 
-              type="single" 
-              value={timeRange}
-              onValueChange={(value) => value && setTimeRange(value as TimeRange)}
-              variant="outline"
-              className="bg-secondary rounded-full p-1"
-            >
-              {timeRanges.map((range) => (
-                <ToggleGroupItem
-                  key={range.value}
-                  value={range.value}
-                  className={cn(
-                    "px-4 py-1.5 rounded-full text-sm font-medium transition-all",
-                    timeRange === range.value
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-foreground bg-transparent"
-                  )}
-                >
-                  {range.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+          {/* Original non-sticky time toggle */}
+          <div className="mt-4 md:mt-0" ref={timeToggleRef}>
+            {renderTimeToggle()}
           </div>
         </div>
         
