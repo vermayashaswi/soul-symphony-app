@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Mic } from 'lucide-react';
@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 
-// Update JournalEntry type to match Supabase table schema exactly with optional properties
+// Update JournalEntry type to match Supabase table schema exactly
 type JournalEntry = {
   id: number;
   "transcription text": string;
@@ -31,12 +31,13 @@ const Journal = () => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const [refreshKey, setRefreshKey] = useState(0); // Add a refresh key to force re-fetch
 
   useEffect(() => {
     if (user) {
       fetchEntries();
     }
-  }, [user]);
+  }, [user, refreshKey]); // Add refreshKey as dependency
 
   const fetchEntries = async () => {
     try {
@@ -51,6 +52,7 @@ const Journal = () => {
         .order('created_at', { ascending: false });
         
       if (error) {
+        console.error('Error fetching entries:', error);
         throw error;
       }
       
@@ -68,7 +70,7 @@ const Journal = () => {
 
   const onEntryRecorded = () => {
     console.log('Entry recorded, refreshing entries');
-    fetchEntries();
+    setRefreshKey(prev => prev + 1); // Force refresh by updating the key
     setActiveTab('entries');
   };
 
@@ -108,73 +110,95 @@ const Journal = () => {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
               </div>
             ) : entries.length > 0 ? (
-              <div className="grid grid-cols-1 gap-6">
-                {entries.map((entry) => (
-                  <Card key={entry.id} className="overflow-hidden">
-                    <CardHeader className="bg-muted/50">
-                      <div className="flex justify-between items-center">
-                        <CardTitle className="text-xl">
-                          {format(new Date(entry.created_at), 'MMMM d, yyyy - h:mm a')}
-                        </CardTitle>
-                        {entry.duration && (
-                          <span className="text-sm text-muted-foreground">
-                            {Math.floor(entry.duration / 60)}:{(entry.duration % 60).toString().padStart(2, '0')}
-                          </span>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="md:col-span-2 space-y-4">
-                          <div>
-                            <h3 className="font-medium mb-2">Your Recording</h3>
-                            {entry.audio_url && (
-                              <audio controls className="w-full">
-                                <source src={entry.audio_url} type="audio/webm" />
-                                Your browser does not support the audio element.
-                              </audio>
+              <motion.div 
+                className="grid grid-cols-1 gap-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ staggerChildren: 0.1 }}
+              >
+                <AnimatePresence>
+                  {entries.map((entry) => (
+                    <motion.div
+                      key={entry.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Card className="overflow-hidden">
+                        <CardHeader className="bg-muted/50">
+                          <div className="flex justify-between items-center">
+                            <CardTitle className="text-xl">
+                              {format(new Date(entry.created_at), 'MMMM d, yyyy - h:mm a')}
+                            </CardTitle>
+                            {entry.duration && (
+                              <span className="text-sm text-muted-foreground">
+                                {Math.floor(entry.duration / 60)}:{(entry.duration % 60).toString().padStart(2, '0')}
+                              </span>
                             )}
                           </div>
-                          
-                          <div>
-                            <h3 className="font-medium mb-2">Transcription</h3>
-                            <p className="text-muted-foreground whitespace-pre-line">
-                              {entry["transcription text"]}
-                            </p>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="md:col-span-2 space-y-4">
+                              <div>
+                                <h3 className="font-medium mb-2">Your Recording</h3>
+                                {entry.audio_url ? (
+                                  <audio controls className="w-full">
+                                    <source src={entry.audio_url} type="audio/webm" />
+                                    Your browser does not support the audio element.
+                                  </audio>
+                                ) : (
+                                  <p className="text-muted-foreground">No audio recording available</p>
+                                )}
+                              </div>
+                              
+                              <div>
+                                <h3 className="font-medium mb-2">Transcription</h3>
+                                <p className="text-muted-foreground whitespace-pre-line">
+                                  {entry["transcription text"] || "No transcription available"}
+                                </p>
+                              </div>
+                              
+                              <div>
+                                <h3 className="font-medium mb-2">Refined Entry</h3>
+                                <p className="whitespace-pre-line">{entry["refined text"] || "No refined text available"}</p>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <h3 className="font-medium mb-4">Emotion Analysis</h3>
+                              {entry.emotions ? (
+                                <EmotionChart data={entry.emotions} />
+                              ) : (
+                                <p className="text-muted-foreground">No emotion data available</p>
+                              )}
+                            </div>
                           </div>
-                          
-                          <div>
-                            <h3 className="font-medium mb-2">Refined Entry</h3>
-                            <p className="whitespace-pre-line">{entry["refined text"]}</p>
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <h3 className="font-medium mb-4">Emotion Analysis</h3>
-                          {entry.emotions ? (
-                            <EmotionChart data={entry.emotions} />
-                          ) : (
-                            <p className="text-muted-foreground">No emotion data available</p>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </motion.div>
             ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center py-12">
-                  <Mic className="h-16 w-16 text-muted-foreground mb-4" />
-                  <h3 className="text-xl font-medium mb-2">No Journal Entries Yet</h3>
-                  <p className="text-muted-foreground text-center mb-6">
-                    Start recording your thoughts to begin your journaling journey
-                  </p>
-                  <Button onClick={() => setActiveTab('record')}>
-                    Record Your First Entry
-                  </Button>
-                </CardContent>
-              </Card>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <Card>
+                  <CardContent className="flex flex-col items-center py-12">
+                    <Mic className="h-16 w-16 text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-medium mb-2">No Journal Entries Yet</h3>
+                    <p className="text-muted-foreground text-center mb-6">
+                      Start recording your thoughts to begin your journaling journey
+                    </p>
+                    <Button onClick={() => setActiveTab('record')}>
+                      Record Your First Entry
+                    </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
             )}
           </TabsContent>
         </Tabs>
