@@ -188,6 +188,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     
     try {
       setIsProcessing(true);
+      toast.loading('Processing your journal entry...');
       
       // Convert blob to base64
       const reader = new FileReader();
@@ -195,16 +196,19 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       reader.onloadend = async function() {
         try {
           const base64Audio = reader.result as string;
-          const base64String = base64Audio.split(',')[1]; // Remove the data URL prefix
+          // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
+          const base64String = base64Audio.split(',')[1]; 
           
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) {
+            toast.dismiss();
             toast.error('You must be signed in to save journal entries.');
             setIsProcessing(false);
             return;
           }
 
           console.log("Sending audio to transcribe function...");
+          console.log("Audio base64 length:", base64String.length);
           
           // Send to the Edge Function
           const { data, error } = await supabase.functions.invoke('transcribe-audio', {
@@ -216,6 +220,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
 
           if (error) {
             console.error('Transcription error:', error);
+            toast.dismiss();
             toast.error('Failed to transcribe audio. Please try again.');
             setIsProcessing(false);
             return;
@@ -224,6 +229,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           console.log("Transcription response:", data);
           
           if (data.success) {
+            toast.dismiss();
             toast.success('Journal entry saved successfully!');
             
             if (onRecordingComplete) {
@@ -232,10 +238,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             
             setAudioBlob(null);
           } else {
+            toast.dismiss();
             toast.error(data.error || 'Failed to process recording');
           }
         } catch (err) {
           console.error('Error processing audio:', err);
+          toast.dismiss();
           toast.error('Failed to process audio. Please try again.');
         } finally {
           setIsProcessing(false);
@@ -243,6 +251,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       };
     } catch (error) {
       console.error('Error processing recording:', error);
+      toast.dismiss();
       toast.error('Error processing recording. Please try again.');
       setIsProcessing(false);
     }

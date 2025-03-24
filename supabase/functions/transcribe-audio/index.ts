@@ -153,12 +153,14 @@ serve(async (req) => {
 
     console.log("Received audio data, processing...");
     console.log("User ID:", userId);
+    console.log("Audio data length:", audio.length);
     console.log("OpenAI API Key available:", !!openAIApiKey);
     console.log("Supabase URL available:", !!supabaseUrl);
     console.log("Supabase Service Key available:", !!supabaseServiceKey);
     
     // Process audio in chunks
     const binaryAudio = processBase64Chunks(audio);
+    console.log("Processed binary audio size:", binaryAudio.length);
     
     // Save to storage
     const timestamp = Date.now();
@@ -188,6 +190,7 @@ serve(async (req) => {
         
       if (storageError) {
         console.error('Error uploading audio to storage:', storageError);
+        console.error('Storage error details:', JSON.stringify(storageError));
       } else {
         // Get the public URL for the audio
         const { data: urlData } = await supabase
@@ -277,6 +280,9 @@ serve(async (req) => {
     if (transcribedText) {
       try {
         // Insert the journal entry
+        console.log("Inserting journal entry with transcription:", transcribedText.substring(0, 50));
+        console.log("Refined text:", refinedText.substring(0, 50));
+        
         const { data: entryData, error: insertError } = await supabase
           .from('Journal Entries')
           .insert([{ 
