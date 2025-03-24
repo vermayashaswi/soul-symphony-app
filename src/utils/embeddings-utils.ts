@@ -9,6 +9,13 @@ interface JournalEntry {
   [key: string]: any;
 }
 
+// Define a type for what Supabase might return (which could include error objects)
+interface SupabaseEntry {
+  id?: number;
+  "refined text"?: string;
+  [key: string]: any;
+}
+
 /**
  * Checks if embeddings exist for journal entries and requests generation if missing
  */
@@ -33,12 +40,24 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     console.log(`Found ${entries.length} journal entries for embedding check`);
     console.log('Sample entry:', entries[0]); // Debug log to see entry structure
     
-    // Filter out any null entries and ensure they have an ID
-    const validEntries = entries.filter((entry): entry is JournalEntry => {
-      if (!entry || typeof entry !== 'object') return false;
-      if (!('id' in entry) || typeof entry.id !== 'number') return false;
-      return true;
-    });
+    // Type guard function to verify entry structure
+    function isValidJournalEntry(entry: any): entry is JournalEntry {
+      return entry !== null && 
+             entry !== undefined && 
+             typeof entry === 'object' &&
+             'id' in entry && 
+             typeof entry.id === 'number';
+    }
+    
+    // Filter out any entries that don't match our expected structure
+    const validEntries: JournalEntry[] = [];
+    for (const entry of entries) {
+      if (isValidJournalEntry(entry)) {
+        validEntries.push(entry);
+      } else {
+        console.warn('Invalid entry format:', entry);
+      }
+    }
     
     if (validEntries.length === 0) {
       console.error('No valid journal entry IDs found');
