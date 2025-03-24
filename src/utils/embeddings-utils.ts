@@ -59,12 +59,17 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     
     // Find entries without embeddings - ensure entries aren't null before checking
     const existingEmbeddingIds = existingEmbeddings?.map(e => e.journal_entry_id) || [];
-    const entriesWithoutEmbeddings = entries.filter(entry => 
+    
+    // Use type assertion after filtering to ensure the correct type
+    const validEntries = entries.filter(entry => 
       entry !== null && 
       typeof entry === 'object' && 
-      'id' in entry && 
-      !existingEmbeddingIds.includes(entry.id)
+      'id' in entry
     ) as JournalEntry[];
+    
+    const entriesWithoutEmbeddings = validEntries.filter(entry => 
+      !existingEmbeddingIds.includes(entry.id)
+    );
     
     if (entriesWithoutEmbeddings.length === 0) {
       console.log('All journal entries have embeddings');
@@ -77,7 +82,7 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     // Generate embeddings for entries that don't have them
     for (const entry of entriesWithoutEmbeddings) {
       // Skip entries without refined text
-      if (!entry || !entry["refined text"]) {
+      if (!entry["refined text"]) {
         console.log(`Entry is invalid or has no refined text, skipping embedding generation`);
         continue;
       }
