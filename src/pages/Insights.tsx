@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
@@ -23,6 +22,7 @@ export default function Insights() {
     { value: 'year', label: 'Year' },
   ];
 
+  
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
@@ -77,6 +77,7 @@ export default function Insights() {
           </div>
         ) : (
           <>
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -220,55 +221,3 @@ export default function Insights() {
                 aggregatedData={insightsData.aggregatedEmotionData}
               />
             </motion.div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">AI-Generated Insights</h2>
-                <Button variant="outline" size="sm" className="text-xs flex items-center gap-1.5 rounded-full">
-                  <Calendar className="h-3 w-3" />
-                  <span>Date Range</span>
-                </Button>
-              </div>
-              
-              {insightsData.entries.length > 0 ? (
-                <div className="space-y-4">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4 }}
-                    className="bg-white p-6 rounded-xl shadow-sm flex items-start gap-4"
-                  >
-                    <div className="h-12 w-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <TrendingUp className="h-6 w-6 text-amber-600" />
-                    </div>
-                    
-                    <div className="flex-1">
-                      <div className="flex flex-wrap justify-between items-start gap-2">
-                        <h3 className="font-semibold">
-                          {insightsData.dominantMood 
-                            ? `You've been feeling more ${insightsData.dominantMood.emotion} lately` 
-                            : "Your emotional patterns are developing"}
-                        </h3>
-                      </div>
-                      <p className="text-muted-foreground text-sm mt-1">
-                        {insightsData.dominantMood 
-                          ? `Your journal entries show ${insightsData.dominantMood.emotion} as your primary emotion this ${timeRange}.` 
-                          : `Keep journaling to reveal deeper emotional patterns.`}
-                      </p>
-                    </div>
-                  </motion.div>
-                </div>
-              ) : (
-                <div className="bg-white p-6 rounded-xl shadow-sm text-center">
-                  <p className="text-muted-foreground">
-                    Add more journal entries to generate insights
-                  </p>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}

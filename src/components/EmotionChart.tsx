@@ -7,12 +7,11 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer,
-  AreaChart,
-  Area
+  ResponsiveContainer
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 
 // Type definitions for emotion data
 type EmotionData = {
@@ -30,9 +29,8 @@ type ChartType = 'line' | 'bubble';
 
 interface EmotionChartProps {
   className?: string;
-  timeframe?: 'today' | 'week' | 'month' | 'year';
-  data?: { [key: string]: number }; // For single entry emotion data
-  aggregatedData?: Array<{ date: string, emotions: { [key: string]: number } }>; // For multiple entries
+  timeframe?: TimeRange;
+  aggregatedData?: AggregatedEmotionData;
 }
 
 // Color mapping for emotions
@@ -68,8 +66,7 @@ const getEmotionColor = (emotion: string): string => {
 
 export function EmotionChart({ 
   className, 
-  timeframe = 'week', 
-  data, 
+  timeframe = 'week',
   aggregatedData 
 }: EmotionChartProps) {
   const [chartType, setChartType] = useState<ChartType>('bubble');
@@ -79,99 +76,81 @@ export function EmotionChart({
     { id: 'bubble', label: 'Emotion Bubbles' },
   ];
   
-  // Process single entry emotion data for bubble chart
+  // Process emotion data for bubble chart
   const getBubbleData = (): EmotionBubbleData[] => {
-    if (!data && !aggregatedData) return [];
+    if (!aggregatedData) return [];
     
-    if (data) {
-      // For a single entry
-      return Object.entries(data)
-        .map(([name, value]) => ({
-          name: name.charAt(0).toUpperCase() + name.slice(1),
-          value: value * 10, // Scale value for visualization
-          color: getEmotionColor(name)
-        }))
-        .sort((a, b) => b.value - a.value);
-    } else if (aggregatedData && aggregatedData.length > 0) {
-      // For aggregated data, combine emotions across entries
-      const combinedEmotions: Record<string, number> = {};
-      
-      aggregatedData.forEach(entry => {
-        if (entry.emotions) {
-          Object.entries(entry.emotions).forEach(([emotion, score]) => {
-            combinedEmotions[emotion] = (combinedEmotions[emotion] || 0) + score;
-          });
-        }
-      });
-      
-      return Object.entries(combinedEmotions)
-        .map(([name, value]) => ({
-          name: name.charAt(0).toUpperCase() + name.slice(1),
-          value: (value / aggregatedData.length) * 10, // Average and scale
-          color: getEmotionColor(name)
-        }))
-        .sort((a, b) => b.value - a.value);
-    }
+    // Combine all emotions from aggregatedData
+    const emotionScores: Record<string, number> = {};
     
-    return [];
+    Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
+      // Sum up all values for this emotion
+      const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
+      emotionScores[emotion] = totalScore;
+    });
+    
+    return Object.entries(emotionScores)
+      .map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: value,
+        color: getEmotionColor(name)
+      }))
+      .sort((a, b) => b.value - a.value);
   };
   
   // Process aggregated data for line chart
   const getLineChartData = (): EmotionData[] => {
-    if (!aggregatedData || aggregatedData.length === 0) {
+    if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
       return [];
     }
     
     // Get top 3 emotions based on frequency and average score
-    const emotionCounts: Record<string, { count: number, total: number }> = {};
+    const emotionTotals: Record<string, number> = {};
+    const dateMap: Map<string, Record<string, number>> = new Map();
     
-    aggregatedData.forEach(entry => {
-      if (entry.emotions) {
-        Object.entries(entry.emotions).forEach(([emotion, score]) => {
-          if (!emotionCounts[emotion]) {
-            emotionCounts[emotion] = { count: 0, total: 0 };
-          }
-          emotionCounts[emotion].count += 1;
-          emotionCounts[emotion].total += score;
-        });
-      }
+    // Calculate totals for each emotion to find top emotions
+    Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
+      emotionTotals[emotion] = dataPoints.reduce((sum, point) => sum + point.value, 0);
+      
+      // Also populate the dateMap for creating the chart data
+      dataPoints.forEach(point => {
+        if (!dateMap.has(point.date)) {
+          dateMap.set(point.date, {});
+        }
+        const dateEntry = dateMap.get(point.date)!;
+        dateEntry[emotion] = point.value;
+      });
     });
     
-    const topEmotions = Object.entries(emotionCounts)
-      .map(([emotion, data]) => ({
-        emotion,
-        count: data.count,
-        average: data.total / data.count
-      }))
-      .sort((a, b) => {
-        // Sort by count first, then by average score
-        if (b.count !== a.count) return b.count - a.count;
-        return b.average - a.average;
-      })
+    // Get top 3 emotions by total score
+    const topEmotions = Object.entries(emotionTotals)
+      .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(item => item.emotion);
+      .map(([emotion]) => emotion);
     
-    // Create line chart data points
-    return aggregatedData
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .map(entry => {
-        const dataPoint: EmotionData = { day: new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+    // Convert the dateMap to an array of data points for the chart
+    return Array.from(dateMap.entries())
+      .map(([date, emotions]) => {
+        const dataPoint: EmotionData = { 
+          day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+        };
         
         // Add the top emotions to the data point
         topEmotions.forEach(emotion => {
-          if (entry.emotions && entry.emotions[emotion] !== undefined) {
-            dataPoint[emotion] = entry.emotions[emotion];
-          } else {
-            dataPoint[emotion] = 0;
-          }
+          dataPoint[emotion] = emotions[emotion] || 0;
         });
         
         return dataPoint;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.day);
+        const dateB = new Date(b.day);
+        return dateA.getTime() - dateB.getTime();
       });
   };
 
   // Memoize chart data
-  const bubbleData = useMemo(() => getBubbleData(), [data, aggregatedData]);
+  const bubbleData = useMemo(() => getBubbleData(), [aggregatedData]);
   const lineData = useMemo(() => getLineChartData(), [aggregatedData]);
   
   const renderLineChart = () => {
@@ -229,25 +208,41 @@ export function EmotionChart({
       );
     }
     
-    // Filter to top 5 emotions for display
-    const topBubbles = bubbleData.slice(0, 5);
+    // Calculate bubble positions to avoid overlap
+    const calculateBubblePositions = (bubbles: EmotionBubbleData[]) => {
+      // Canvas dimensions
+      const canvasWidth = 400;
+      const canvasHeight = 300;
+      const minDistance = 80; // Minimum distance between bubble centers
+      
+      // Calculate initial positions in a circular layout
+      const positions: {x: number, y: number, size: number}[] = [];
+      
+      bubbles.forEach((bubble, index) => {
+        // Scale bubble size proportionally to value
+        const maxSize = 100;
+        const minSize = 50;
+        const maxValue = Math.max(...bubbles.map(b => b.value));
+        const size = minSize + ((bubble.value / maxValue) * (maxSize - minSize));
+        
+        // Initial position in a circle
+        const angle = (index / bubbles.length) * 2 * Math.PI;
+        const radius = Math.min(canvasWidth, canvasHeight) * 0.35;
+        const x = (canvasWidth / 2) + Math.cos(angle) * radius;
+        const y = (canvasHeight / 2) + Math.sin(angle) * radius;
+        
+        positions.push({ x, y, size });
+      });
+      
+      return positions;
+    };
+    
+    const bubblePositions = calculateBubblePositions(bubbleData);
     
     return (
       <div className="w-full h-[300px] flex items-center justify-center relative">
-        {topBubbles.map((item, index) => {
-          // Calculate position using a more distributed approach
-          const sectionWidth = 360 / topBubbles.length;
-          const sectionCenter = index * sectionWidth + (sectionWidth / 2);
-          const angle = (sectionCenter / 180) * Math.PI;
-          const radius = 100;
-          const x = Math.cos(angle) * radius + 150;
-          const y = Math.sin(angle) * radius + 120;
-          
-          // Scale bubble size proportionally to value
-          const maxSize = 100;
-          const minSize = 50;
-          const maxValue = Math.max(...topBubbles.map(b => b.value));
-          const size = minSize + ((item.value / maxValue) * (maxSize - minSize));
+        {bubbleData.map((item, index) => {
+          const position = bubblePositions[index];
           
           return (
             <motion.div
@@ -256,8 +251,8 @@ export function EmotionChart({
               animate={{ 
                 scale: 1, 
                 opacity: 1,
-                x: [x - 5, x + 5, x],
-                y: [y - 5, y + 5, y]
+                x: [position.x - 5, position.x + 5, position.x],
+                y: [position.y - 5, position.y + 5, position.y]
               }}
               transition={{ 
                 duration: 0.5, 
@@ -266,18 +261,18 @@ export function EmotionChart({
                 y: { repeat: Infinity, duration: 4 + index, repeatType: 'reverse' }
               }}
               style={{
-                width: `${size}px`,
-                height: `${size}px`,
+                width: `${position.size}px`,
+                height: `${position.size}px`,
                 backgroundColor: item.color,
                 position: 'absolute',
-                left: x,
-                top: y,
+                left: position.x - (position.size / 2),
+                top: position.y - (position.size / 2),
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white',
-                fontSize: item.value > 15 ? '14px' : '12px',
+                fontSize: position.size > 70 ? '14px' : '12px',
                 fontWeight: 'bold',
                 boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
                 zIndex: Math.floor(item.value)
