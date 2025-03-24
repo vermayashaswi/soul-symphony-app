@@ -158,7 +158,7 @@ async function storeMessage(threadId: string, content: string, sender: 'user' | 
 }
 
 // Fetch journal entries directly by user ID
-async function fetchJournalEntriesByUserId(userId: string, limit: number = 5) {
+async function fetchJournalEntriesByUserId(userId: string, limit: number = 10) {
   console.log(`Directly fetching up to ${limit} journal entries for user ID: ${userId}`);
   
   const { data, error } = await supabase
@@ -173,12 +173,12 @@ async function fetchJournalEntriesByUserId(userId: string, limit: number = 5) {
     return [];
   }
   
-  console.log(`Successfully retrieved ${data.length} journal entries`);
+  console.log(`Successfully retrieved ${data.length} journal entries directly`);
   return data;
 }
 
 // Try to fetch journal entries using vector similarity
-async function fetchSimilarJournalEntries(embedding: any, userId: string, limit: number = 5) {
+async function fetchSimilarJournalEntries(embedding: any, userId: string, limit: number = 7) {
   try {
     console.log(`Attempting to fetch similar journal entries for user ${userId} using vector similarity`);
     
@@ -211,14 +211,54 @@ async function fetchSimilarJournalEntries(embedding: any, userId: string, limit:
         throw entriesError;
       }
       
-      return fullEntries;
+      console.log(`Retrieved ${fullEntries?.length || 0} full journal entries`);
+      return fullEntries || [];
     }
     
-    return [];
+    // If no results from vector search, try direct fetch
+    console.log("No vector search results, falling back to direct fetch");
+    return await fetchJournalEntriesByUserId(userId, limit);
   } catch (error) {
     console.error("Error in fetchSimilarJournalEntries:", error);
     // Fall back to direct fetch if there's any error
+    console.log("Error in vector search, falling back to direct fetch");
     return await fetchJournalEntriesByUserId(userId, limit);
+  }
+}
+
+// Check if journal embeddings exist for a user
+async function checkJournalEmbeddingsExist(userId: string) {
+  try {
+    // Check if we have any journal entries for this user
+    const { data: entries, error: entriesError } = await supabase
+      .from('Journal Entries')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1);
+    
+    if (entriesError || !entries || entries.length === 0) {
+      console.log(`No journal entries found for user ${userId}`);
+      return false;
+    }
+    
+    // Check if we have any embeddings for this user's journal entries
+    const entryId = entries[0].id;
+    const { data: embeddings, error: embeddingsError } = await supabase
+      .from('journal_embeddings')
+      .select('id')
+      .eq('journal_entry_id', entryId)
+      .limit(1);
+    
+    if (embeddingsError || !embeddings || embeddings.length === 0) {
+      console.log(`No embeddings found for user ${userId}'s journal entries`);
+      return false;
+    }
+    
+    console.log(`Found embeddings for user ${userId}`);
+    return true;
+  } catch (error) {
+    console.error("Error checking for journal embeddings:", error);
+    return false;
   }
 }
 
@@ -290,20 +330,32 @@ serve(async (req) => {
     
     console.log("User ID for journal entries search:", userId);
     
-    // Try to find journal entries using vector similarity first, then fall back to direct fetch
+    // Check if journal embeddings exist
+    const hasEmbeddings = await checkJournalEmbeddingsExist(userId);
+    console.log("Journal embeddings exist:", hasEmbeddings);
+    
+    // Get journal entries - try different methods depending on whether embeddings exist
     let journalEntries = [];
-    try {
+    if (hasEmbeddings) {
       journalEntries = await fetchSimilarJournalEntries(queryEmbedding, userId);
-    } catch (error) {
-      console.error("Error fetching similar journal entries:", error);
+    } else {
       journalEntries = await fetchJournalEntriesByUserId(userId);
     }
+    
+    // Log what we got
+    console.log(`Retrieved ${journalEntries?.length || 0} journal entries for RAG context`);
     
     // If we still don't have entries, log this information
     if (!journalEntries || journalEntries.length === 0) {
       console.log("No journal entries found for user ID:", userId);
     } else {
       console.log(`Found ${journalEntries.length} journal entries for context`);
+      
+      // Log snippets of the first few entries to confirm content
+      journalEntries.slice(0, 3).forEach((entry, i) => {
+        console.log(`Entry ${i+1} snippet: ${entry["refined text"]?.substring(0, 50) || "No text"}...`);
+        console.log(`Entry ${i+1} themes: ${entry.master_themes ? entry.master_themes.join(', ') : "None"}`);
+      });
     }
     
     // Create RAG context from relevant entries
@@ -316,7 +368,7 @@ serve(async (req) => {
         id: entry.id,
         date: entry.created_at,
         snippet: entry["refined text"]?.substring(0, 100) + "...",
-        type: "semantic_match"
+        type: hasEmbeddings ? "semantic_match" : "recent_entry"
       }));
       
       journalContext = "Here are some of your relevant journal entries:\n\n" + 
@@ -341,9 +393,13 @@ ${journalContext}
 Based on the above context (if available) and the conversation history, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
-Focus on being helpful rather than diagnostic. Reference specific themes, emotions, or content from their journal when relevant.`;
+Focus on being helpful rather than diagnostic. Reference specific themes, emotions, or content from their journal when relevant.
+IMPORTANT: If you're given journal entries to work with, you MUST refer to specific content from those entries in your response.
+Don't just give generic advice - show that you've analyzed their journal entries by mentioning specific emotions, themes, or content.`;
 
     console.log("Sending to GPT with RAG context and conversation history...");
+    console.log("System prompt first 100 chars:", systemPrompt.substring(0, 100) + "...");
+    console.log("Number of previous messages:", previousMessages.length);
     
     try {
       // Send to GPT with RAG context and conversation history
@@ -366,8 +422,9 @@ Focus on being helpful rather than diagnostic. Reference specific themes, emotio
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4o',
           messages: messagesForGPT,
+          temperature: 0.7,
         }),
       });
 
@@ -381,6 +438,7 @@ Focus on being helpful rather than diagnostic. Reference specific themes, emotio
       const aiResponse = result.choices[0].message.content;
       
       console.log("AI response generated successfully");
+      console.log("AI response first 100 chars:", aiResponse.substring(0, 100) + "...");
       
       // Store assistant response
       await storeMessage(currentThreadId, aiResponse, 'assistant', referenceEntries.length > 0 ? referenceEntries : null);
@@ -389,7 +447,8 @@ Focus on being helpful rather than diagnostic. Reference specific themes, emotio
         JSON.stringify({ 
           response: aiResponse, 
           threadId: currentThreadId, 
-          references: referenceEntries 
+          references: referenceEntries,
+          journal_entries_count: journalEntries.length
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

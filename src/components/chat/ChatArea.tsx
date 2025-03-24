@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -195,6 +194,12 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       }
       
       console.log("Received response from chat-with-rag function:", data);
+      
+      if (data.journal_entries_count === 0) {
+        toast.info('No journal entries found. Add some journals for personalized responses.');
+      } else if (data.journal_entries_count > 0) {
+        console.log(`Response included context from ${data.journal_entries_count} journal entries`);
+      }
       
       if (isNewThread && data.threadId) {
         console.log("New thread created with ID:", data.threadId);
