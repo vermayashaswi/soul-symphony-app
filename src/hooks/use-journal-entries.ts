@@ -1,20 +1,27 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
-export function useJournalEntries(userId: string | undefined, refreshKey: number) {
+interface JournalEntryInput {
+  id?: number;
+  user_id: string;
+  audio_url: string | null;
+  transcription: string;
+  refined_text: string;
+  emotions?: string[] | null;
+  created_at: string;
+}
+
+export function useJournalEntries(userId: string | undefined, refreshKey: number = 0) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (userId) {
-      fetchEntries();
-    }
-  }, [userId, refreshKey]);
-
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
+    if (!userId) return;
+    
     try {
       setLoading(true);
       console.log('Fetching entries for user ID:', userId);
@@ -51,7 +58,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   const generateThemesForEntry = async (entry: JournalEntry) => {
     try {
@@ -74,5 +81,102 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  return { entries, loading };
+  const saveJournalEntry = async (entryData: JournalEntryInput) => {
+    if (!userId) throw new Error('User ID is required to save journal entries');
+    
+    setIsSaving(true);
+    try {
+      // Map the input data to match the database schema
+      const dbEntry = {
+        ...entryData.id ? { id: entryData.id } : {},
+        user_id: userId,
+        audio_url: entryData.audio_url,
+        "transcription text": entryData.transcription,
+        "refined text": entryData.refined_text,
+        created_at: entryData.created_at,
+        emotions: entryData.emotions
+      };
+      
+      let result;
+      
+      if (entryData.id) {
+        // Update existing entry
+        result = await supabase
+          .from('Journal Entries')
+          .update(dbEntry)
+          .eq('id', entryData.id)
+          .select()
+          .single();
+      } else {
+        // Insert new entry
+        result = await supabase
+          .from('Journal Entries')
+          .insert(dbEntry)
+          .select()
+          .single();
+      }
+      
+      const { data, error } = result;
+      
+      if (error) {
+        console.error('Error saving journal entry:', error);
+        toast.error('Failed to save journal entry');
+        throw error;
+      }
+      
+      // Re-fetch entries to update the list
+      await fetchEntries();
+      
+      return data;
+    } catch (error) {
+      console.error('Error in saveJournalEntry:', error);
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteJournalEntry = async (id: number) => {
+    try {
+      const { error } = await supabase
+        .from('Journal Entries')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error deleting journal entry:', error);
+        toast.error('Failed to delete journal entry');
+        throw error;
+      }
+      
+      // Update local state
+      setEntries(prev => prev.filter(entry => entry.id !== id));
+      
+    } catch (error) {
+      console.error('Error in deleteJournalEntry:', error);
+      throw error;
+    }
+  };
+
+  const refreshEntries = () => {
+    fetchEntries();
+  };
+
+  // Fetch entries on mount and when dependencies change
+  useEffect(() => {
+    if (userId) {
+      fetchEntries();
+    }
+  }, [userId, refreshKey, fetchEntries]);
+
+  return { 
+    entries, 
+    loading, 
+    saveJournalEntry,
+    isSaving,
+    deleteJournalEntry,
+    refreshEntries,
+    journalEntries: entries, // Alias for backward compatibility
+    isLoading: loading // Alias for backward compatibility
+  };
 }

@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRecording } from '@/hooks/use-recording';
 import { useTranscription } from '@/hooks/use-transcription';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
-import { formatDate, formatTime } from '@/lib/utils';
+import { formatDate, formatTime, cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,8 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { EmotionBadge } from '@/components/EmotionBadge';
-import { JournalEntry } from '@/types/journal';
-import { cn } from '@/lib/utils';
+import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
 export default function Journal() {
   const { toast } = useToast();
@@ -63,7 +62,6 @@ export default function Journal() {
     refreshEntries
   } = useJournalEntries(user?.id);
   
-  // Reset recording state when switching to record tab
   useEffect(() => {
     if (activeTab === 'record') {
       resetRecording();
@@ -73,7 +71,6 @@ export default function Journal() {
     }
   }, [activeTab, resetRecording, resetTranscription]);
   
-  // Handle save journal entry
   const handleSaveEntry = async () => {
     if (!user) {
       toast({
@@ -121,14 +118,12 @@ export default function Journal() {
     }
   };
   
-  // Handle edit journal entry
   const handleEditEntry = (entry: JournalEntry) => {
     setEditingEntry(entry);
     setEditedText(entry["refined text"] || entry.transcription || '');
     setIsEditing(true);
   };
   
-  // Handle save edited entry
   const handleSaveEdit = async () => {
     if (!editingEntry || !user) return;
     
@@ -160,13 +155,11 @@ export default function Journal() {
     }
   };
   
-  // Handle cancel edit
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditingEntry(null);
   };
   
-  // Handle delete journal entry
   const handleDeleteEntry = async (id: number) => {
     setIsDeleting(id);
     try {
@@ -188,7 +181,6 @@ export default function Journal() {
     }
   };
   
-  // Handle refine transcription
   const handleRefineTranscription = async () => {
     if (!transcription) {
       toast({
@@ -214,7 +206,6 @@ export default function Journal() {
     }
   };
   
-  // Format recording time
   const formatRecordingTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
