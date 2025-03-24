@@ -1,7 +1,8 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import JournalEntryCard, { JournalEntry } from './JournalEntryCard';
+import JournalEntryCard from './JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 import EmptyJournalState from './EmptyJournalState';
 import { Skeleton } from '@/components/ui/skeleton';
 
