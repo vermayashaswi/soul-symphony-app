@@ -525,7 +525,13 @@ serve(async (req) => {
       let title = threadTitle;
       
       if (!title || title === message.substring(0, 30) + (message.length > 30 ? "..." : "")) {
-        title = await generateThreadTitle(message);
+        try {
+          title = await generateThreadTitle(message);
+        } catch (error) {
+          console.error("Error generating thread title:", error);
+          // Fall back to default title if generation fails
+          title = message.substring(0, 30) + (message.length > 30 ? "..." : "");
+        }
       }
       
       const { data: newThread, error } = await supabase
@@ -558,16 +564,37 @@ serve(async (req) => {
     
     // Store user message and get its ID
     const userMessageId = await storeMessage(currentThreadId, message, 'user');
+    if (!userMessageId) {
+      console.warn("Failed to store user message, but continuing");
+    }
     
     // Generate embedding for the user query
     console.log("Generating embedding for user query...");
-    const queryEmbedding = await generateEmbedding(message);
+    let queryEmbedding;
+    try {
+      queryEmbedding = await generateEmbedding(message);
+    } catch (embError) {
+      console.error("Error generating query embedding:", embError);
+      // Continue without embeddings if there's an error
+      queryEmbedding = [];
+    }
     
     // Store user query with embedding and connection to thread/message
-    await storeUserQuery(userId, message, queryEmbedding, currentThreadId, userMessageId);
+    try {
+      await storeUserQuery(userId, message, queryEmbedding, currentThreadId, userMessageId);
+    } catch (storeError) {
+      console.error("Error storing user query:", storeError);
+      // Non-critical, continue
+    }
     
     // Get relevant journal entries using vector similarity
-    const journalEntries = await fetchRelevantJournalEntries(userId, queryEmbedding);
+    let journalEntries = [];
+    try {
+      journalEntries = await fetchRelevantJournalEntries(userId, queryEmbedding);
+    } catch (fetchError) {
+      console.error("Error fetching relevant journal entries:", fetchError);
+      // Continue without journal entries if there's an error
+    }
     
     console.log(`Retrieved ${journalEntries?.length || 0} relevant journal entries for RAG context`);
     
@@ -600,7 +627,13 @@ serve(async (req) => {
     }
     
     // Get conversation history for this thread
-    const previousMessages = await getThreadHistory(currentThreadId);
+    let previousMessages = [];
+    try {
+      previousMessages = await getThreadHistory(currentThreadId);
+    } catch (historyError) {
+      console.error("Error getting thread history:", historyError);
+      // Continue without history if there's an error
+    }
     
     // Prepare system prompt with RAG context and specific instructions
     const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling.
@@ -634,33 +667,46 @@ Remember, your primary value is connecting their question to their personal jour
       }
     ];
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: messagesForGPT,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("GPT API error:", errorText);
-      throw new Error(`GPT API error: ${errorText}`);
+    let aiResponse = "";
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: messagesForGPT,
+          temperature: 0.7,
+        }),
+      });
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("GPT API error:", errorText);
+        throw new Error(`GPT API error: ${errorText}`);
+      }
+  
+      const result = await response.json();
+      aiResponse = result.choices[0].message.content;
+      
+      console.log("AI response generated successfully");
+      console.log("AI response first 100 chars:", aiResponse.substring(0, 100) + "...");
+    } catch (gptError) {
+      console.error("Error calling OpenAI API:", gptError);
+      
+      // Provide a fallback response if OpenAI call fails
+      aiResponse = "I'm currently having trouble accessing your journal insights. Could you please try again in a moment? In the meantime, feel free to continue journaling to help me better understand your thoughts and feelings.";
     }
-
-    const result = await response.json();
-    const aiResponse = result.choices[0].message.content;
-    
-    console.log("AI response generated successfully");
-    console.log("AI response first 100 chars:", aiResponse.substring(0, 100) + "...");
     
     // Store assistant response with references to journal entries
-    const assistantMessageId = await storeMessage(currentThreadId, aiResponse, 'assistant', referenceEntries.length > 0 ? referenceEntries : null);
+    try {
+      const assistantMessageId = await storeMessage(currentThreadId, aiResponse, 'assistant', referenceEntries.length > 0 ? referenceEntries : null);
+    } catch (storeError) {
+      console.error("Error storing assistant message:", storeError);
+      // Non-critical, continue
+    }
     
     return new Response(
       JSON.stringify({ 
@@ -676,11 +722,11 @@ Remember, your primary value is connecting their question to their personal jour
   } catch (error) {
     console.error("Error in chat-with-rag function:", error);
     
-    // Return 200 status even for errors to avoid CORS issues
+    // Return 200 status with a more helpful error message
     return new Response(
       JSON.stringify({ 
         error: error.message, 
-        response: "I'm having trouble processing your request. Please try again later.",
+        response: "I'm sorry, I couldn't process your request at the moment. This could be because I'm still learning about your journal entries or there's a temporary technical issue. Please try again in a moment.",
         success: false 
       }),
       {

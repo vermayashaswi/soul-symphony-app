@@ -63,19 +63,12 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
               <div className="h-48 mb-4 flex items-center justify-center">
                 {entry.master_themes && entry.master_themes.length > 0 ? (
                   <EmotionBubbles themes={entry.master_themes.slice(0, 10)} />
-                ) : entry.emotions && entry.emotions.length > 0 ? (
-                  <EmotionChart 
-                    aggregatedData={{ 
-                      ...Object.fromEntries(
-                        entry.emotions.map(emotion => [
-                          emotion, 
-                          [{ date: entry.created_at, value: 1, emotion }]
-                        ])
-                      )
-                    }} 
-                  />
                 ) : (
-                  <p className="text-muted-foreground text-center">Analyzing emotions...</p>
+                  entry.emotions && entry.emotions.length > 0 ? (
+                    <EmotionBubbles themes={entry.emotions.slice(0, 10)} />
+                  ) : (
+                    <p className="text-muted-foreground text-center">Analyzing emotions...</p>
+                  )
                 )}
               </div>
             </div>
