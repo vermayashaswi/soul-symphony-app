@@ -65,10 +65,10 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
       className="absolute flex items-center justify-center"
       initial={{ x, y, opacity: 0, scale: 0 }}
       animate={{ 
-        x: [x, x + getRandomValue(-10, 10)], 
-        y: [y, y - getRandomValue(5, 10)],
-        opacity: [0, 1, 0.8],
-        scale: [0, 1, 0.9]
+        x: [x, x + getRandomValue(-5, 5)], 
+        y: [y, y - getRandomValue(3, 7)],
+        opacity: [0, 1, 0.9],
+        scale: [0, 1, 0.95]
       }}
       transition={{
         duration: 4,
@@ -78,7 +78,7 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
       }}
     >
       <div 
-        className="rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center p-2"
+        className="rounded-full bg-gradient-to-br from-primary/70 to-primary/20 flex items-center justify-center p-1 shadow-sm"
         style={{ width: `${size}px`, height: `${size}px` }}
       >
         {children}
@@ -99,35 +99,42 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
   }>>([]);
   
   useEffect(() => {
-    // Generate bubbles with better distribution to avoid overlapping
+    // Generate bubbles with a wider and more organized distribution
     const newBubbles = themes.slice(0, 10).map((theme, index) => {
       // Get the appropriate emoji based on the theme
       const normalizedTheme = theme.toLowerCase().trim();
       const emoji = EMOTION_EMOJIS[normalizedTheme] || '';
       
-      // Calculate positions using a more distributed approach
-      // Divide the container into sections for better distribution
-      const sectionWidth = 360 / Math.min(themes.length, 10);
-      const sectionCenter = index * sectionWidth + (sectionWidth / 2);
+      // Use a circular arrangement with full 360 degree coverage
+      // This gives better separation between bubbles
+      const angle = (index / Math.min(themes.length, 10)) * 2 * Math.PI;
       
-      // Use angle-based positioning for a circular arrangement
-      const angle = (sectionCenter / 180) * Math.PI;
-      const radius = 80; // Smaller radius to ensure bubbles stay within container
+      // Use variable radius based on index to create layered effect
+      // Inner and outer rings to maximize space usage
+      const isOuterRing = index % 2 === 0;
+      const radius = isOuterRing ? 140 : 80;  // Larger radius for better spread
       
-      // Calculate x,y based on the angle and add some minor randomness
-      const x = Math.cos(angle) * radius + 120 + getRandomValue(-10, 10); 
-      const y = Math.sin(angle) * radius + 80 + getRandomValue(-10, 10);
+      // Calculate x,y based on the angle with container center as origin
+      const containerWidth = 400;  // Increase container width
+      const containerHeight = 300; // Use more vertical space
+      const centerX = containerWidth / 2;
+      const centerY = containerHeight / 2;
       
-      // Vary size based on index (first themes are more important)
-      const size = 70 - (index * 4); // Less dramatic size decrease to accommodate more bubbles
+      const x = Math.cos(angle) * radius + centerX; 
+      const y = Math.sin(angle) * radius + centerY;
+      
+      // Randomize size less dramatically (bigger bubbles overall)
+      const baseSize = 65;
+      const variableSize = 15;
+      const size = baseSize - (index * (variableSize / themes.length));
       
       return {
         id: index,
         theme,
         x,
         y,
-        size,
-        delay: index * 0.15, // Shorter delay between animations to fit 10 bubbles
+        size: Math.max(size, 40), // Ensure minimum bubble size
+        delay: index * 0.1, // Quicker appearance for all bubbles
         emoji
       };
     });
@@ -136,7 +143,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
   }, [themes]);
   
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full overflow-visible">
       {bubbles.map((bubble) => (
         <Bubble
           key={bubble.id}
@@ -145,8 +152,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
           size={bubble.size}
           delay={bubble.delay}
         >
-          <div className="flex flex-col items-center text-center">
-            <span className="text-xs font-medium text-primary/90 max-w-[60px] line-clamp-2">{bubble.theme}</span>
+          <div className="flex flex-col items-center justify-center text-center">
+            <span className="text-sm font-semibold text-primary-foreground">{bubble.theme}</span>
           </div>
         </Bubble>
       ))}

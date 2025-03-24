@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { 
   LineChart, 
@@ -13,7 +12,6 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 
-// Type definitions for emotion data
 type EmotionData = {
   day: string;
   [key: string]: number | string;
@@ -33,32 +31,30 @@ interface EmotionChartProps {
   aggregatedData?: AggregatedEmotionData;
 }
 
-// Vibrant color mapping for emotions
 const EMOTION_COLORS: Record<string, string> = {
-  joy: '#4299E1',           // Bright Blue
-  happiness: '#48BB78',     // Bright Green
-  gratitude: '#0EA5E9',     // Ocean Blue
-  calm: '#8B5CF6',          // Vivid Purple
-  anxiety: '#F56565',       // Bright Red
-  sadness: '#3B82F6',       // Bright Blue
-  anger: '#F97316',         // Bright Orange
-  fear: '#EF4444',          // Bright Red
-  excitement: '#FBBF24',    // Vibrant Yellow
-  love: '#EC4899',          // Magenta Pink
-  stress: '#F97316',        // Bright Orange
-  surprise: '#F59E0B',      // Amber
-  confusion: '#8B5CF6',     // Vivid Purple
-  disappointment: '#6366F1', // Indigo
-  pride: '#3B82F6',         // Blue
-  shame: '#DC2626',         // Red
-  guilt: '#B45309',         // Amber
-  hope: '#2563EB',          // Blue
-  boredom: '#4B5563',       // Gray
-  disgust: '#65A30D',       // Lime
-  contentment: '#0D9488'    // Teal
+  joy: '#4299E1',
+  happiness: '#48BB78',
+  gratitude: '#0EA5E9',
+  calm: '#8B5CF6',
+  anxiety: '#F56565',
+  sadness: '#3B82F6',
+  anger: '#F97316',
+  fear: '#EF4444',
+  excitement: '#FBBF24',
+  love: '#EC4899',
+  stress: '#F97316',
+  surprise: '#F59E0B',
+  confusion: '#8B5CF6',
+  disappointment: '#6366F1',
+  pride: '#3B82F6',
+  shame: '#DC2626',
+  guilt: '#B45309',
+  hope: '#2563EB',
+  boredom: '#4B5563',
+  disgust: '#65A30D',
+  contentment: '#0D9488'
 };
 
-// Get color for an emotion, with fallback
 const getEmotionColor = (emotion: string): string => {
   const normalized = emotion.toLowerCase();
   return EMOTION_COLORS[normalized] || '#A3A3A3';
@@ -76,15 +72,12 @@ export function EmotionChart({
     { id: 'bubble', label: 'Emotion Bubbles' },
   ];
   
-  // Process emotion data for bubble chart
   const getBubbleData = (): EmotionBubbleData[] => {
     if (!aggregatedData) return [];
     
-    // Combine all emotions from aggregatedData
     const emotionScores: Record<string, number> = {};
     
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
-      // Sum up all values for this emotion
       const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
       emotionScores[emotion] = totalScore;
     });
@@ -96,25 +89,20 @@ export function EmotionChart({
         color: getEmotionColor(name)
       }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 10); // Get top 10 emotions by value
+      .slice(0, 10);
   };
   
-  // Process aggregated data for line chart
   const getLineChartData = (): EmotionData[] => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
       return [];
     }
     
-    // Get top 5 emotions based on frequency and average score for the line chart
-    // (5 is a good number for line chart readability)
     const emotionTotals: Record<string, number> = {};
     const dateMap: Map<string, Record<string, number>> = new Map();
     
-    // Calculate totals for each emotion to find top emotions
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       emotionTotals[emotion] = dataPoints.reduce((sum, point) => sum + point.value, 0);
       
-      // Also populate the dateMap for creating the chart data
       dataPoints.forEach(point => {
         if (!dateMap.has(point.date)) {
           dateMap.set(point.date, {});
@@ -124,20 +112,17 @@ export function EmotionChart({
       });
     });
     
-    // Get top 5 emotions by total score for the line chart
     const topEmotions = Object.entries(emotionTotals)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
-    // Convert the dateMap to an array of data points for the chart
     return Array.from(dateMap.entries())
       .map(([date, emotions]) => {
         const dataPoint: EmotionData = { 
           day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
         };
         
-        // Add the top emotions to the data point
         topEmotions.forEach(emotion => {
           dataPoint[emotion] = emotions[emotion] || 0;
         });
@@ -151,7 +136,6 @@ export function EmotionChart({
       });
   };
 
-  // Memoize chart data
   const bubbleData = useMemo(() => getBubbleData(), [aggregatedData]);
   const lineData = useMemo(() => getLineChartData(), [aggregatedData]);
   
@@ -164,7 +148,6 @@ export function EmotionChart({
       );
     }
     
-    // Get the emotion names that are present in the data
     const emotions = Object.keys(lineData[0]).filter(key => key !== 'day');
     
     return (
@@ -216,28 +199,26 @@ export function EmotionChart({
       );
     }
     
-    // Calculate bubble positions to avoid overlap
     const calculateBubblePositions = (bubbles: EmotionBubbleData[]) => {
-      // Canvas dimensions
-      const canvasWidth = 400;
+      const canvasWidth = 600;
       const canvasHeight = 300;
-      const minDistance = 60; // Reduced minimum distance to fit more bubbles
       
-      // Calculate initial positions in a spiral layout for better distribution of more bubbles
       const positions: {x: number, y: number, size: number}[] = [];
       
       bubbles.forEach((bubble, index) => {
-        // Scale bubble size proportionally to value
-        const maxSize = 100; // Reduced max size to fit more bubbles
-        const minSize = 30;  // Reduced min size too
+        const maxSize = 100;
+        const minSize = 40;
         const maxValue = Math.max(...bubbles.map(b => b.value));
         const size = minSize + ((bubble.value / maxValue) * (maxSize - minSize));
         
-        // Position in a spiral to better accommodate 10 bubbles
-        const angle = 0.5 * index;
-        const radius = 25 + (15 * index);
-        const x = (canvasWidth / 2) + Math.cos(angle) * radius;
-        const y = (canvasHeight / 2) + Math.sin(angle) * radius;
+        const angle = (index / bubbles.length) * 2 * Math.PI;
+        const radius = 100;
+        const centerX = canvasWidth / 2;
+        const centerY = canvasHeight / 2;
+        
+        const offsetRadius = radius + (index % 3 * 30);
+        const x = centerX + Math.cos(angle) * offsetRadius;
+        const y = centerY + Math.sin(angle) * offsetRadius;
         
         positions.push({ x, y, size });
       });
@@ -248,18 +229,14 @@ export function EmotionChart({
     const bubblePositions = calculateBubblePositions(bubbleData);
     
     return (
-      <div className="w-full h-[300px] flex flex-col items-center justify-center relative">
+      <div className="w-full h-[340px] flex flex-col items-center justify-center relative">
         <div className="absolute top-0 right-0 text-xs text-muted-foreground">
           * Size of bubble represents intensity
         </div>
         
-        {/* Container with boundary constraints */}
-        <div className="relative w-[320px] h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden">
+        <div className="relative w-full h-[300px] border-2 border-dashed border-muted/20 rounded-lg overflow-visible">
           {bubbleData.map((item, index) => {
             const position = bubblePositions[index];
-            // Calculate constrained positions
-            const constrainedX = Math.max(position.size/2, Math.min(320 - position.size/2, position.x));
-            const constrainedY = Math.max(position.size/2, Math.min(250 - position.size/2, position.y));
             
             return (
               <motion.div
@@ -269,15 +246,15 @@ export function EmotionChart({
                   scale: 1, 
                   opacity: 1,
                   x: [
-                    constrainedX - 5, 
-                    constrainedX + 5, 
-                    constrainedX
-                  ].map(x => Math.max(position.size/2, Math.min(320 - position.size/2, x))),
+                    position.x - 5, 
+                    position.x + 5, 
+                    position.x
+                  ],
                   y: [
-                    constrainedY - 5, 
-                    constrainedY + 5, 
-                    constrainedY
-                  ].map(y => Math.max(position.size/2, Math.min(250 - position.size/2, y)))
+                    position.y - 5, 
+                    position.y + 5, 
+                    position.y
+                  ]
                 }}
                 transition={{ 
                   duration: 0.5, 
@@ -290,14 +267,14 @@ export function EmotionChart({
                   height: `${position.size}px`,
                   backgroundColor: item.color,
                   position: 'absolute',
-                  left: constrainedX - (position.size / 2),
-                  top: constrainedY - (position.size / 2),
+                  left: position.x - (position.size / 2),
+                  top: position.y - (position.size / 2),
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'white',
-                  fontSize: position.size > 70 ? '14px' : '12px',
+                  fontSize: position.size > 70 ? '16px' : '14px',
                   fontWeight: 'bold',
                   boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
                   zIndex: Math.floor(item.value)
