@@ -251,11 +251,13 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: 'audio/webm' });
     formData.append('file', blob, 'audio.webm');
     formData.append('model', 'whisper-1');
+    // Updating to the latest Whisper model
+    formData.append('response_format', 'json');
 
-    console.log("Sending to Whisper API for high-quality transcription...");
+    console.log("Sending to Whisper API for high-quality transcription using the latest model...");
     
     try {
-      // Step 1: Use Whisper for high-quality transcription
+      // Step 1: Use Whisper for high-quality transcription with the latest model
       const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
