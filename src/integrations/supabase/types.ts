@@ -39,6 +39,7 @@ export type Database = {
           emotions: Json | null
           "foreign key": string | null
           id: number
+          master_themes: string[] | null
           "refined text": string | null
           sentiment: string | null
           "transcription text": string | null
@@ -52,6 +53,7 @@ export type Database = {
           emotions?: Json | null
           "foreign key"?: string | null
           id?: number
+          master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
@@ -65,6 +67,7 @@ export type Database = {
           emotions?: Json | null
           "foreign key"?: string | null
           id?: number
+          master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
