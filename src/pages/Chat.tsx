@@ -43,26 +43,10 @@ export default function Chat() {
         
         if (count > 0) {
           // Ensure journal entries have embeddings
-          await ensureJournalEntriesHaveEmbeddings(currentUserId);
+          const result = await ensureJournalEntriesHaveEmbeddings(currentUserId);
           
-          // Double-check that embeddings were created
-          const { data: journalEntryIds } = await supabase
-            .from('Journal Entries')
-            .select('id')
-            .eq('user_id', currentUserId);
-            
-          if (journalEntryIds && journalEntryIds.length > 0) {
-            const ids = journalEntryIds.map(entry => entry.id);
-            const { count: embeddingCount } = await supabase
-              .from('journal_embeddings')
-              .select('*', { count: 'exact', head: true })
-              .in('journal_entry_id', ids);
-              
-            console.log(`Found ${embeddingCount} embeddings for ${ids.length} journal entries`);
-            
-            if (embeddingCount === 0) {
-              toast.warning('Could not generate embeddings for your journal entries. Chat may not work properly.');
-            }
+          if (!result) {
+            toast.warning('Error generating embeddings for journal entries. Chat may not work properly.');
           }
         }
         

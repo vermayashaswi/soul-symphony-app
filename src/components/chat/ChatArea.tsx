@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -201,11 +202,12 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       return;
     }
     
+    // Ensure embeddings exist before chatting
     await ensureJournalEntriesHaveEmbeddings(currentUserId);
     
     const isNewThread = !threadId;
     
-    const tempUserMessage: Message = {
+    const tempUserMessage = {
       id: Date.now().toString(),
       content: content.trim(),
       sender: 'user',
@@ -218,11 +220,12 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     setShowWelcome(false);
     
     try {
-      console.log("Sending message to chat-rag function with userId:", currentUserId);
+      console.log("Sending message to chat-with-rag function with userId:", currentUserId);
       
       const threadTitle = isNewThread ? content.substring(0, 30) + (content.length > 30 ? "..." : "") : undefined;
       
-      const { data, error } = await supabase.functions.invoke('chat-rag', {
+      // Use chat-with-rag function which is more complete
+      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: { 
           message: content.trim(),
           userId: currentUserId,
@@ -239,7 +242,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
       
-      console.log("Received response from chat-rag function:", data);
+      console.log("Received response from chat-with-rag function:", data);
       
       if (data.journal_entries_count === 0) {
         const { count } = await supabase
@@ -259,7 +262,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         onNewThreadCreated(data.threadId);
       }
       
-      const assistantMessage: Message = {
+      const assistantMessage = {
         id: (Date.now() + 1).toString(),
         content: data.response || "I'm sorry, I couldn't process your request at the moment.",
         sender: 'assistant',
