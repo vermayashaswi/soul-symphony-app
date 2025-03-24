@@ -12,7 +12,7 @@ import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 
 interface VoiceRecorderProps {
-  onRecordingComplete?: (audioBlob: Blob) => void;
+  onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
   onCancel?: () => void;
   className?: string;
 }
@@ -45,10 +45,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     if (!audioBlob) return;
     
     setIsProcessing(true);
-    const success = await processRecording(audioBlob, "user_id");
+    const result = await processRecording(audioBlob, "user_id");
     
-    if (success && onRecordingComplete) {
-      onRecordingComplete(audioBlob);
+    if (result.success && onRecordingComplete) {
+      onRecordingComplete(audioBlob, result.tempId);
     }
     
     setIsProcessing(false);
