@@ -117,13 +117,15 @@ async function generateThreadTitle(message: string) {
 }
 
 // Store user query with its embedding
-async function storeUserQuery(userId: string, queryText: string, embedding: any) {
+async function storeUserQuery(userId: string, queryText: string, embedding: any, threadId: string, messageId: string | null = null) {
   const { error } = await supabase
     .from('user_queries')
     .insert({
       user_id: userId,
       query_text: queryText,
-      embedding: embedding
+      embedding: embedding,
+      thread_id: threadId,
+      message_id: messageId
     });
 
   if (error) {
@@ -133,18 +135,23 @@ async function storeUserQuery(userId: string, queryText: string, embedding: any)
 
 // Store assistant response in chat messages
 async function storeMessage(threadId: string, content: string, sender: 'user' | 'assistant', references = null) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('chat_messages')
     .insert({
       thread_id: threadId,
       content: content,
       sender: sender,
       reference_entries: references
-    });
+    })
+    .select('id')
+    .single();
 
   if (error) {
     console.error("Error storing message:", error);
+    return null;
   }
+  
+  return data.id;
 }
 
 // Fetch relevant journal entries using vector search only
@@ -259,15 +266,15 @@ serve(async (req) => {
       }
     }
     
-    // Store user message
-    await storeMessage(currentThreadId, message, 'user');
+    // Store user message and get its ID
+    const userMessageId = await storeMessage(currentThreadId, message, 'user');
     
     // Generate embedding for the user query
     console.log("Generating embedding for user query...");
     const queryEmbedding = await generateEmbedding(message);
     
-    // Store user query with embedding for future use
-    await storeUserQuery(userId, message, queryEmbedding);
+    // Store user query with embedding and connection to thread/message
+    await storeUserQuery(userId, message, queryEmbedding, currentThreadId, userMessageId);
     
     // Get relevant journal entries using vector similarity only
     const journalEntries = await fetchRelevantJournalEntries(userId, queryEmbedding);
@@ -363,7 +370,7 @@ Remember, your primary value is connecting their question to their personal jour
     console.log("AI response first 100 chars:", aiResponse.substring(0, 100) + "...");
     
     // Store assistant response with references to journal entries
-    await storeMessage(currentThreadId, aiResponse, 'assistant', referenceEntries.length > 0 ? referenceEntries : null);
+    const assistantMessageId = await storeMessage(currentThreadId, aiResponse, 'assistant', referenceEntries.length > 0 ? referenceEntries : null);
     
     return new Response(
       JSON.stringify({ 

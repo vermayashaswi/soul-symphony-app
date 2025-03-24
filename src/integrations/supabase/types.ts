@@ -219,24 +219,45 @@ export type Database = {
           created_at: string
           embedding: string | null
           id: string
+          message_id: string | null
           query_text: string
+          thread_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           embedding?: string | null
           id?: string
+          message_id?: string | null
           query_text: string
+          thread_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           embedding?: string | null
           id?: string
+          message_id?: string | null
           query_text?: string
+          thread_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_queries_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_queries_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_subscriptions: {
         Row: {
@@ -378,6 +399,19 @@ export type Database = {
             }
             Returns: unknown
           }
+      match_journal_entries: {
+        Args: {
+          query_embedding: string
+          match_threshold: number
+          match_count: number
+          user_id_filter: string
+        }
+        Returns: {
+          id: number
+          content: string
+          similarity: number
+        }[]
+      }
       sparsevec_out: {
         Args: {
           "": unknown
