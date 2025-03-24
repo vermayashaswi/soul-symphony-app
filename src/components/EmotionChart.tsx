@@ -1,4 +1,5 @@
-import { useState } from 'react';
+
+import { useState, useMemo } from 'react';
 import { 
   LineChart, 
   Line, 
@@ -13,169 +14,240 @@ import {
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
-// Sample data - in a real app this would come from user entries
-const emotionData = [
-  { day: 'Mon', joy: 7, anxiety: 4, energy: 6 },
-  { day: 'Tue', joy: 5, anxiety: 6, energy: 4 },
-  { day: 'Wed', joy: 6, anxiety: 3, energy: 7 },
-  { day: 'Thu', joy: 8, anxiety: 2, energy: 8 },
-  { day: 'Fri', joy: 7, anxiety: 5, energy: 6 },
-  { day: 'Sat', joy: 9, anxiety: 1, energy: 9 },
-  { day: 'Sun', joy: 8, anxiety: 2, energy: 7 },
-];
+// Type definitions for emotion data
+type EmotionData = {
+  day: string;
+  [key: string]: number | string;
+};
 
-const bubbleData = [
-  { name: 'Joy', value: 35, color: '#4299E1' },
-  { name: 'Gratitude', value: 20, color: '#48BB78' },
-  { name: 'Calm', value: 15, color: '#9F7AEA' },
-  { name: 'Anxiety', value: 10, color: '#F56565' },
-  { name: 'Sadness', value: 8, color: '#718096' },
-  { name: 'Anger', value: 7, color: '#ED8936' },
-  { name: 'Excitement', value: 5, color: '#ECC94B' },
-];
+type EmotionBubbleData = {
+  name: string;
+  value: number;
+  color: string;
+};
 
-type ChartType = 'line' | 'area' | 'bubble';
+type ChartType = 'line' | 'bubble';
 
 interface EmotionChartProps {
   className?: string;
-  timeframe?: 'week' | 'month' | 'year';
-  data?: { [key: string]: number }; // Add this prop to accept emotion data
+  timeframe?: 'today' | 'week' | 'month' | 'year';
+  data?: { [key: string]: number }; // For single entry emotion data
+  aggregatedData?: Array<{ date: string, emotions: { [key: string]: number } }>; // For multiple entries
 }
 
-export function EmotionChart({ className, timeframe = 'week', data }: EmotionChartProps) {
+// Color mapping for emotions
+const EMOTION_COLORS: Record<string, string> = {
+  joy: '#4299E1',
+  happiness: '#48BB78',
+  gratitude: '#38B2AC',
+  calm: '#9F7AEA',
+  anxiety: '#F56565',
+  sadness: '#718096',
+  anger: '#ED8936',
+  fear: '#E53E3E',
+  excitement: '#ECC94B',
+  love: '#F687B3',
+  stress: '#DD6B20',
+  surprise: '#D69E2E',
+  confusion: '#805AD5',
+  disappointment: '#A0AEC0',
+  pride: '#3182CE',
+  shame: '#822727',
+  guilt: '#744210',
+  hope: '#2B6CB0',
+  boredom: '#A0AEC0',
+  disgust: '#62783E',
+  contentment: '#319795'
+};
+
+// Get color for an emotion, with fallback
+const getEmotionColor = (emotion: string): string => {
+  const normalized = emotion.toLowerCase();
+  return EMOTION_COLORS[normalized] || '#A3A3A3';
+};
+
+export function EmotionChart({ 
+  className, 
+  timeframe = 'week', 
+  data, 
+  aggregatedData 
+}: EmotionChartProps) {
   const [chartType, setChartType] = useState<ChartType>('bubble');
 
   const chartTypes = [
     { id: 'line', label: 'Line' },
-    { id: 'area', label: 'Area' },
     { id: 'bubble', label: 'Emotion Bubbles' },
   ];
-
-  // Transform data for bubble chart if provided
-  const getBubbleData = () => {
-    if (!data) return bubbleData;
+  
+  // Process single entry emotion data for bubble chart
+  const getBubbleData = (): EmotionBubbleData[] => {
+    if (!data && !aggregatedData) return [];
     
-    return Object.entries(data).map(([name, value]) => {
-      // Map emotion names to colors
-      const getColor = () => {
-        const colorMap: Record<string, string> = {
-          joy: '#4299E1',
-          gratitude: '#48BB78',
-          calm: '#9F7AEA',
-          anxiety: '#F56565',
-          sadness: '#718096',
-          anger: '#ED8936',
-          excitement: '#ECC94B',
-        };
-        return colorMap[name.toLowerCase()] || '#A3A3A3';
-      };
+    if (data) {
+      // For a single entry
+      return Object.entries(data)
+        .map(([name, value]) => ({
+          name: name.charAt(0).toUpperCase() + name.slice(1),
+          value: value * 10, // Scale value for visualization
+          color: getEmotionColor(name)
+        }))
+        .sort((a, b) => b.value - a.value);
+    } else if (aggregatedData && aggregatedData.length > 0) {
+      // For aggregated data, combine emotions across entries
+      const combinedEmotions: Record<string, number> = {};
       
-      return {
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        value: value * 10, // Scale value for visualization
-        color: getColor()
-      };
-    }).sort((a, b) => b.value - a.value); // Sort by value
+      aggregatedData.forEach(entry => {
+        if (entry.emotions) {
+          Object.entries(entry.emotions).forEach(([emotion, score]) => {
+            combinedEmotions[emotion] = (combinedEmotions[emotion] || 0) + score;
+          });
+        }
+      });
+      
+      return Object.entries(combinedEmotions)
+        .map(([name, value]) => ({
+          name: name.charAt(0).toUpperCase() + name.slice(1),
+          value: (value / aggregatedData.length) * 10, // Average and scale
+          color: getEmotionColor(name)
+        }))
+        .sort((a, b) => b.value - a.value);
+    }
+    
+    return [];
+  };
+  
+  // Process aggregated data for line chart
+  const getLineChartData = (): EmotionData[] => {
+    if (!aggregatedData || aggregatedData.length === 0) {
+      return [];
+    }
+    
+    // Get top 3 emotions based on frequency and average score
+    const emotionCounts: Record<string, { count: number, total: number }> = {};
+    
+    aggregatedData.forEach(entry => {
+      if (entry.emotions) {
+        Object.entries(entry.emotions).forEach(([emotion, score]) => {
+          if (!emotionCounts[emotion]) {
+            emotionCounts[emotion] = { count: 0, total: 0 };
+          }
+          emotionCounts[emotion].count += 1;
+          emotionCounts[emotion].total += score;
+        });
+      }
+    });
+    
+    const topEmotions = Object.entries(emotionCounts)
+      .map(([emotion, data]) => ({
+        emotion,
+        count: data.count,
+        average: data.total / data.count
+      }))
+      .sort((a, b) => {
+        // Sort by count first, then by average score
+        if (b.count !== a.count) return b.count - a.count;
+        return b.average - a.average;
+      })
+      .slice(0, 3)
+      .map(item => item.emotion);
+    
+    // Create line chart data points
+    return aggregatedData
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(entry => {
+        const dataPoint: EmotionData = { day: new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+        
+        // Add the top emotions to the data point
+        topEmotions.forEach(emotion => {
+          if (entry.emotions && entry.emotions[emotion] !== undefined) {
+            dataPoint[emotion] = entry.emotions[emotion];
+          } else {
+            dataPoint[emotion] = 0;
+          }
+        });
+        
+        return dataPoint;
+      });
   };
 
-  const renderLineChart = () => (
-    <ResponsiveContainer width="100%" height={300}>
-      <LineChart
-        data={emotionData}
-        margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
-      >
-        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-        <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
-        <YAxis stroke="#888" fontSize={12} tickMargin={10} />
-        <Tooltip 
-          contentStyle={{ 
-            backgroundColor: 'rgba(255, 255, 255, 0.8)', 
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
-            border: 'none' 
-          }} 
-        />
-        <Line
-          type="monotone"
-          dataKey="joy"
-          stroke="#4299E1"
-          strokeWidth={3}
-          dot={{ r: 4 }}
-          activeDot={{ r: 6 }}
-        />
-        <Line
-          type="monotone"
-          dataKey="anxiety"
-          stroke="#F56565"
-          strokeWidth={3}
-          dot={{ r: 4 }}
-          activeDot={{ r: 6 }}
-        />
-        <Line
-          type="monotone"
-          dataKey="energy"
-          stroke="#48BB78"
-          strokeWidth={3}
-          dot={{ r: 4 }}
-          activeDot={{ r: 6 }}
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-
-  const renderAreaChart = () => (
-    <ResponsiveContainer width="100%" height={300}>
-      <AreaChart
-        data={emotionData}
-        margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
-      >
-        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-        <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
-        <YAxis stroke="#888" fontSize={12} tickMargin={10} />
-        <Tooltip 
-          contentStyle={{ 
-            backgroundColor: 'rgba(255, 255, 255, 0.8)', 
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
-            border: 'none' 
-          }} 
-        />
-        <Area
-          type="monotone"
-          dataKey="joy"
-          stroke="#4299E1"
-          fill="#4299E1"
-          fillOpacity={0.2}
-        />
-        <Area
-          type="monotone"
-          dataKey="anxiety"
-          stroke="#F56565"
-          fill="#F56565"
-          fillOpacity={0.2}
-        />
-        <Area
-          type="monotone"
-          dataKey="energy"
-          stroke="#48BB78"
-          fill="#48BB78"
-          fillOpacity={0.2}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
-  );
+  // Memoize chart data
+  const bubbleData = useMemo(() => getBubbleData(), [data, aggregatedData]);
+  const lineData = useMemo(() => getLineChartData(), [aggregatedData]);
+  
+  const renderLineChart = () => {
+    if (lineData.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">No data available for this timeframe</p>
+        </div>
+      );
+    }
+    
+    // Get the emotion names that are present in the data
+    const emotions = Object.keys(lineData[0]).filter(key => key !== 'day');
+    
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart
+          data={lineData}
+          margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+          <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
+          <YAxis stroke="#888" fontSize={12} tickMargin={10} domain={[0, 10]} />
+          <Tooltip 
+            contentStyle={{ 
+              backgroundColor: 'rgba(255, 255, 255, 0.8)', 
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
+              border: 'none' 
+            }} 
+          />
+          {emotions.map((emotion, index) => (
+            <Line
+              key={emotion}
+              type="monotone"
+              dataKey={emotion}
+              stroke={getEmotionColor(emotion)}
+              strokeWidth={3}
+              dot={{ r: 4 }}
+              activeDot={{ r: 6 }}
+              name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  };
 
   const renderBubbleChart = () => {
-    const dataToRender = getBubbleData();
+    if (bubbleData.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">No emotion data available</p>
+        </div>
+      );
+    }
+    
+    // Filter to top 5 emotions for display
+    const topBubbles = bubbleData.slice(0, 5);
     
     return (
       <div className="w-full h-[300px] flex items-center justify-center relative">
-        {dataToRender.map((item, index) => {
-          // Calculate position based on index
-          const angle = (index / dataToRender.length) * Math.PI * 2;
+        {topBubbles.map((item, index) => {
+          // Calculate position using a more distributed approach
+          const sectionWidth = 360 / topBubbles.length;
+          const sectionCenter = index * sectionWidth + (sectionWidth / 2);
+          const angle = (sectionCenter / 180) * Math.PI;
           const radius = 100;
-          const x = Math.cos(angle) * radius + 150; // center x
-          const y = Math.sin(angle) * radius + 120; // center y
+          const x = Math.cos(angle) * radius + 150;
+          const y = Math.sin(angle) * radius + 120;
+          
+          // Scale bubble size proportionally to value
+          const maxSize = 100;
+          const minSize = 50;
+          const maxValue = Math.max(...topBubbles.map(b => b.value));
+          const size = minSize + ((item.value / maxValue) * (maxSize - minSize));
           
           return (
             <motion.div
@@ -194,8 +266,8 @@ export function EmotionChart({ className, timeframe = 'week', data }: EmotionCha
                 y: { repeat: Infinity, duration: 4 + index, repeatType: 'reverse' }
               }}
               style={{
-                width: `${item.value * 1.5}px`,
-                height: `${item.value * 1.5}px`,
+                width: `${size}px`,
+                height: `${size}px`,
                 backgroundColor: item.color,
                 position: 'absolute',
                 left: x,
@@ -222,7 +294,7 @@ export function EmotionChart({ className, timeframe = 'week', data }: EmotionCha
   return (
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap justify-between items-center mb-6">
-        <h3 className="text-xl font-semibold">Emotion Trends</h3>
+        <h3 className="text-xl font-semibold">Emotions</h3>
         <div className="flex gap-2 mt-2 sm:mt-0">
           {chartTypes.map((type) => (
             <button
@@ -243,24 +315,24 @@ export function EmotionChart({ className, timeframe = 'week', data }: EmotionCha
       
       <div className="bg-white p-4 rounded-xl shadow-sm">
         {chartType === 'line' && renderLineChart()}
-        {chartType === 'area' && renderAreaChart()}
         {chartType === 'bubble' && renderBubbleChart()}
       </div>
       
-      <div className="flex justify-between mt-4 text-sm text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-          <span>Joy</span>
+      {chartType === 'line' && lineData.length > 0 && (
+        <div className="flex flex-wrap justify-start gap-4 mt-4 text-sm text-muted-foreground">
+          {Object.keys(lineData[0])
+            .filter(key => key !== 'day')
+            .map(emotion => (
+              <div key={emotion} className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: getEmotionColor(emotion) }}
+                ></div>
+                <span>{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
+              </div>
+            ))}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-400"></div>
-          <span>Anxiety</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-green-400"></div>
-          <span>Energy</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

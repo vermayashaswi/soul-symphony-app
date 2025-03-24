@@ -1,63 +1,23 @@
 
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { motion } from 'framer-motion';
-import { format, subDays } from 'date-fns';
-import { Calendar, ArrowRight, Filter, TrendingUp, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
+import { AuthContext } from '@/contexts/AuthContext';
+import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import Navbar from '@/components/Navbar';
 import EmotionChart from '@/components/EmotionChart';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-type TimeRange = 'week' | 'month' | 'year';
-
-// Sample insights data
-const insights = [
-  {
-    id: 1,
-    title: "You've been feeling more energetic",
-    description: "Your energy levels have increased by 20% compared to last week.",
-    date: subDays(new Date(), 2),
-    trend: "up",
-    category: "energy",
-  },
-  {
-    id: 2,
-    title: "Anxiety levels are decreasing",
-    description: "Your anxiety has decreased by 15% over the past month.",
-    date: subDays(new Date(), 4),
-    trend: "down",
-    category: "anxiety",
-  },
-  {
-    id: 3,
-    title: "Social connection pattern detected",
-    description: "You tend to feel happier on days when you socialize.",
-    date: subDays(new Date(), 7),
-    trend: "up",
-    category: "social",
-  },
-  {
-    id: 4,
-    title: "Sleep quality affecting mood",
-    description: "Days with better sleep show improved mood in your entries.",
-    date: subDays(new Date(), 12),
-    trend: "neutral",
-    category: "sleep",
-  },
-];
-
-// Mood summary data
-const moodSummary = {
-  dominant: "Joy",
-  improvement: "Anxiety",
-  entries: 12,
-  streak: 8,
-};
+import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
 
 export default function Insights() {
+  const { user } = useContext(AuthContext);
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   
+  const { insightsData, loading } = useInsightsData(user?.id, timeRange);
+  
   const timeRanges = [
+    { value: 'today', label: 'Today' },
     { value: 'week', label: 'Week' },
     { value: 'month', label: 'Month' },
     { value: 'year', label: 'Year' },
@@ -76,175 +36,238 @@ export default function Insights() {
           
           <div className="flex items-center gap-3 mt-4 md:mt-0">
             <span className="text-sm text-muted-foreground">View:</span>
-            <div className="flex p-1 bg-secondary rounded-full">
+            <ToggleGroup 
+              type="single" 
+              value={timeRange}
+              onValueChange={(value) => value && setTimeRange(value as TimeRange)}
+              variant="outline"
+              className="bg-secondary rounded-full p-1"
+            >
               {timeRanges.map((range) => (
-                <button
+                <ToggleGroupItem
                   key={range.value}
-                  onClick={() => setTimeRange(range.value as TimeRange)}
+                  value={range.value}
                   className={cn(
                     "px-4 py-1.5 rounded-full text-sm font-medium transition-all",
                     timeRange === range.value
                       ? "bg-white text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground bg-transparent"
                   )}
                 >
                   {range.label}
-                </button>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="bg-white p-6 rounded-xl shadow-sm"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="font-semibold text-lg">Dominant Mood</h2>
-              <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                This {timeRange}
-              </span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">😊</span>
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold">{moodSummary.dominant}</h3>
-                <p className="text-muted-foreground text-sm">Appeared in most entries</p>
-              </div>
-            </div>
-          </motion.div>
-          
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="bg-white p-6 rounded-xl shadow-sm"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="font-semibold text-lg">Biggest Improvement</h2>
-              <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                -15%
-              </span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center">
-                <ArrowDownRight className="h-8 w-8 text-green-600" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold">{moodSummary.improvement}</h3>
-                <p className="text-muted-foreground text-sm">Decreased significantly</p>
-              </div>
-            </div>
-          </motion.div>
-          
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
-            className="bg-white p-6 rounded-xl shadow-sm"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="font-semibold text-lg">Journal Activity</h2>
-              <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-                {moodSummary.streak} day streak
-              </span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center">
-                <Activity className="h-8 w-8 text-purple-600" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold">{moodSummary.entries} entries</h3>
-                <p className="text-muted-foreground text-sm">This {timeRange}</p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-        
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
-          className="bg-white p-6 md:p-8 rounded-xl shadow-sm mb-8"
-        >
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-            <h2 className="text-xl font-semibold">Emotional Trends</h2>
-            <div className="flex items-center mt-2 sm:mt-0">
-              <Button variant="outline" size="sm" className="text-xs flex items-center gap-1.5 rounded-full">
-                <Filter className="h-3 w-3" />
-                <span>Customize</span>
-              </Button>
-            </div>
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
-          
-          <EmotionChart timeframe={timeRange} />
-        </motion.div>
-        
-        <div>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold">AI-Generated Insights</h2>
-            <Button variant="outline" size="sm" className="text-xs flex items-center gap-1.5 rounded-full">
-              <Calendar className="h-3 w-3" />
-              <span>Date Range</span>
+        ) : insightsData.entries.length === 0 ? (
+          <div className="bg-white rounded-xl p-8 text-center">
+            <h2 className="text-xl font-semibold mb-4">No journal data available</h2>
+            <p className="text-muted-foreground mb-6">
+              Start recording journal entries to see your emotional insights.
+            </p>
+            <Button onClick={() => window.location.href = '/journal'}>
+              Go to Journal
             </Button>
           </div>
-          
-          <div className="space-y-4">
-            {insights.map((insight, index) => (
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <motion.div
-                key={insight.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 * index }}
-                className="bg-white p-6 rounded-xl shadow-sm flex items-start gap-4"
+                transition={{ duration: 0.4 }}
+                className="bg-white p-6 rounded-xl shadow-sm"
               >
-                <div 
-                  className={cn(
-                    "h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0",
-                    insight.trend === "up" 
-                      ? "bg-green-100" 
-                      : insight.trend === "down" 
-                        ? "bg-blue-100" 
-                        : "bg-amber-100"
-                  )}
-                >
-                  {insight.trend === "up" ? (
-                    <ArrowUpRight className="h-6 w-6 text-green-600" />
-                  ) : insight.trend === "down" ? (
-                    <ArrowDownRight className="h-6 w-6 text-blue-600" />
-                  ) : (
-                    <TrendingUp className="h-6 w-6 text-amber-600" />
+                <div className="flex justify-between items-start mb-4">
+                  <h2 className="font-semibold text-lg">Dominant Mood</h2>
+                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                    This {timeRange}
+                  </span>
+                </div>
+                {insightsData.dominantMood ? (
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-2xl">{insightsData.dominantMood.emoji}</span>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold capitalize">{insightsData.dominantMood.emotion}</h3>
+                      <p className="text-muted-foreground text-sm">Appeared in most entries</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-2xl">🤔</span>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold">Not enough data</h3>
+                      <p className="text-muted-foreground text-sm">Add more journal entries</p>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+              
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+                className="bg-white p-6 rounded-xl shadow-sm"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <h2 className="font-semibold text-lg">Biggest Improvement</h2>
+                  {insightsData.biggestImprovement && (
+                    <span 
+                      className={cn(
+                        "px-2 py-1 rounded-full text-xs font-medium",
+                        insightsData.biggestImprovement.percentage >= 0 
+                          ? "bg-green-100 text-green-700" 
+                          : "bg-red-100 text-red-700"
+                      )}
+                    >
+                      {insightsData.biggestImprovement.percentage >= 0 ? '+' : ''}
+                      {insightsData.biggestImprovement.percentage}%
+                    </span>
                   )}
                 </div>
-                
-                <div className="flex-1">
-                  <div className="flex flex-wrap justify-between items-start gap-2">
-                    <h3 className="font-semibold">{insight.title}</h3>
-                    <span className="text-xs text-muted-foreground">
-                      {format(insight.date, 'MMM d')}
-                    </span>
-                  </div>
-                  <p className="text-muted-foreground text-sm mt-1">{insight.description}</p>
-                  <div className="mt-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-xs h-7 px-2 text-primary flex items-center gap-1"
+                {insightsData.biggestImprovement ? (
+                  <div className="flex items-center gap-4">
+                    <div 
+                      className={cn(
+                        "h-16 w-16 rounded-full flex items-center justify-center",
+                        insightsData.biggestImprovement.percentage >= 0 
+                          ? "bg-green-100" 
+                          : "bg-blue-100"
+                      )}
                     >
-                      View details
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
+                      {insightsData.biggestImprovement.percentage >= 0 ? (
+                        <ArrowUp className="h-8 w-8 text-green-600" />
+                      ) : (
+                        <ArrowDown className="h-8 w-8 text-blue-600" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold capitalize">{insightsData.biggestImprovement.emotion}</h3>
+                      <p className="text-muted-foreground text-sm">
+                        {insightsData.biggestImprovement.percentage >= 0 
+                          ? "Increased significantly" 
+                          : "Decreased significantly"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center">
+                      <TrendingUp className="h-8 w-8 text-gray-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold">Not enough data</h3>
+                      <p className="text-muted-foreground text-sm">Need more entries to compare</p>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+              
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+                className="bg-white p-6 rounded-xl shadow-sm"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <h2 className="font-semibold text-lg">Journal Activity</h2>
+                  {insightsData.journalActivity.streak > 0 && (
+                    <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                      {insightsData.journalActivity.streak} day streak
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center">
+                    <Activity className="h-8 w-8 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold">{insightsData.journalActivity.entryCount} entries</h3>
+                    <p className="text-muted-foreground text-sm capitalize">This {timeRange}</p>
                   </div>
                 </div>
               </motion.div>
-            ))}
-          </div>
-        </div>
+            </div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+              className="bg-white p-6 md:p-8 rounded-xl shadow-sm mb-8"
+            >
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                <h2 className="text-xl font-semibold">Emotional Trends</h2>
+                <div className="flex items-center mt-2 sm:mt-0">
+                  <Button variant="outline" size="sm" className="text-xs flex items-center gap-1.5 rounded-full">
+                    <Filter className="h-3 w-3" />
+                    <span>Customize</span>
+                  </Button>
+                </div>
+              </div>
+              
+              <EmotionChart 
+                timeframe={timeRange}
+                aggregatedData={insightsData.aggregatedEmotionData}
+              />
+            </motion.div>
+            
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold">AI-Generated Insights</h2>
+                <Button variant="outline" size="sm" className="text-xs flex items-center gap-1.5 rounded-full">
+                  <Calendar className="h-3 w-3" />
+                  <span>Date Range</span>
+                </Button>
+              </div>
+              
+              {insightsData.entries.length > 0 ? (
+                <div className="space-y-4">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="bg-white p-6 rounded-xl shadow-sm flex items-start gap-4"
+                  >
+                    <div className="h-12 w-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <TrendingUp className="h-6 w-6 text-amber-600" />
+                    </div>
+                    
+                    <div className="flex-1">
+                      <div className="flex flex-wrap justify-between items-start gap-2">
+                        <h3 className="font-semibold">
+                          {insightsData.dominantMood 
+                            ? `You've been feeling more ${insightsData.dominantMood.emotion} lately` 
+                            : "Your emotional patterns are developing"}
+                        </h3>
+                      </div>
+                      <p className="text-muted-foreground text-sm mt-1">
+                        {insightsData.dominantMood 
+                          ? `Your journal entries show ${insightsData.dominantMood.emotion} as your primary emotion this ${timeRange}.` 
+                          : `Keep journaling to reveal deeper emotional patterns.`}
+                      </p>
+                    </div>
+                  </motion.div>
+                </div>
+              ) : (
+                <div className="bg-white p-6 rounded-xl shadow-sm text-center">
+                  <p className="text-muted-foreground">
+                    Add more journal entries to generate insights
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

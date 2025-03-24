@@ -33,8 +33,8 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
       className="absolute flex items-center justify-center"
       initial={{ x, y, opacity: 0, scale: 0 }}
       animate={{ 
-        x: [x, x + getRandomValue(-15, 15)], 
-        y: [y, y - getRandomValue(5, 15)],
+        x: [x, x + getRandomValue(-10, 10)], 
+        y: [y, y - getRandomValue(5, 10)],
         opacity: [0, 1, 0.8],
         scale: [0, 1, 0.9]
       }}
@@ -67,17 +67,33 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
   }>>([]);
   
   useEffect(() => {
-    // Generate bubbles when themes change
-    const newBubbles = themes.map((theme, index) => {
+    // Generate bubbles with better distribution to avoid overlapping
+    const newBubbles = themes.slice(0, 5).map((theme, index) => {
       const Icon = ICONS[index % ICONS.length];
+      
+      // Calculate positions using a more distributed approach
+      // Divide the container into sections for better distribution
+      const sectionWidth = 360 / Math.min(themes.length, 5);
+      const sectionCenter = index * sectionWidth + (sectionWidth / 2);
+      
+      // Use angle-based positioning for a circular arrangement
+      const angle = (sectionCenter / 180) * Math.PI;
+      const radius = 80; // Smaller radius to ensure bubbles stay within container
+      
+      // Calculate x,y based on the angle and add some minor randomness
+      const x = Math.cos(angle) * radius + 120 + getRandomValue(-10, 10); 
+      const y = Math.sin(angle) * radius + 80 + getRandomValue(-10, 10);
+      
+      // Vary size based on index (first themes are more important)
+      const size = 70 - (index * 6);
       
       return {
         id: index,
         theme,
-        x: getRandomValue(20, 160),
-        y: getRandomValue(20, 120),
-        size: getRandomValue(50, 80),
-        delay: getRandomValue(0, 1),
+        x,
+        y,
+        size,
+        delay: index * 0.2, // Stagger animations
         Icon
       };
     });
