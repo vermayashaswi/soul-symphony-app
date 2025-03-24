@@ -26,7 +26,19 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     console.log(`Found ${entries.length} journal entries for embedding check`);
     
     // Get entry IDs
-    const entryIds = entries.map(entry => entry.id);
+    const entryIds = entries.map(entry => {
+      // Make sure entry is valid and has an id property
+      if (!entry || typeof entry !== 'object' || !('id' in entry)) {
+        console.error('Invalid journal entry without ID:', entry);
+        return null;
+      }
+      return entry.id;
+    }).filter(id => id !== null) as string[];
+    
+    if (entryIds.length === 0) {
+      console.error('No valid journal entry IDs found');
+      return false;
+    }
     
     // Check which entries already have embeddings
     const { data: existingEmbeddings, error: embeddingsError } = await supabase
@@ -42,7 +54,7 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     // Find entries without embeddings
     const existingEmbeddingIds = existingEmbeddings?.map(e => e.journal_entry_id) || [];
     const entriesWithoutEmbeddings = entries.filter(entry => 
-      !existingEmbeddingIds.includes(entry.id)
+      entry && typeof entry === 'object' && 'id' in entry && !existingEmbeddingIds.includes(entry.id)
     );
     
     if (entriesWithoutEmbeddings.length === 0) {
@@ -55,8 +67,8 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
     
     // Generate embeddings for entries that don't have them
     for (const entry of entriesWithoutEmbeddings) {
-      if (!entry["refined text"]) {
-        console.log(`Entry ${entry.id} has no refined text, skipping embedding generation`);
+      if (!entry || typeof entry !== 'object' || !('id' in entry) || !entry["refined text"]) {
+        console.log(`Entry is invalid or has no refined text, skipping embedding generation`);
         continue;
       }
       

@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -202,15 +201,14 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       return;
     }
     
-    // Ensure embeddings exist before chatting
     await ensureJournalEntriesHaveEmbeddings(currentUserId);
     
     const isNewThread = !threadId;
     
-    const tempUserMessage = {
+    const tempUserMessage: Message = {
       id: Date.now().toString(),
       content: content.trim(),
-      sender: 'user',
+      sender: 'user' as const,
       created_at: new Date().toISOString()
     };
     
@@ -224,7 +222,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       const threadTitle = isNewThread ? content.substring(0, 30) + (content.length > 30 ? "..." : "") : undefined;
       
-      // Use chat-with-rag function which is more complete
       const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: { 
           message: content.trim(),
@@ -262,10 +259,10 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         onNewThreadCreated(data.threadId);
       }
       
-      const assistantMessage = {
+      const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: data.response || "I'm sorry, I couldn't process your request at the moment.",
-        sender: 'assistant',
+        sender: 'assistant' as const,
         created_at: new Date().toISOString(),
         reference_entries: data.references
       };
