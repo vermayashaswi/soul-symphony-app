@@ -262,18 +262,13 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
     // Debug: Check query embedding dimensions
     console.log("Query embedding dimensions:", Array.isArray(queryEmbedding) ? queryEmbedding.length : "Not an array");
     
-    // Try with a lower threshold first
-    let matchThreshold = 0.3; // Start with a lower threshold
-    let similarEntries = [];
-    
-    // Proceed with vector similarity search
-    console.log(`Attempting vector search with threshold ${matchThreshold}`);
+    // Use the match_journal_entries RPC function for vector similarity search
     try {
       const { data: matchEntries, error: matchError } = await supabase.rpc(
         'match_journal_entries',
         {
           query_embedding: queryEmbedding,
-          match_threshold: matchThreshold,
+          match_threshold: 0.3,  // Starting with a reasonable threshold
           match_count: 5,
           user_id_filter: userId
         }
@@ -282,21 +277,13 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
       if (matchError) {
         console.error("Error in vector similarity search:", matchError);
         console.error("Full error object:", JSON.stringify(matchError));
-      } else if (matchEntries && matchEntries.length > 0) {
-        console.log(`Found ${matchEntries.length} similar journal entries with threshold ${matchThreshold}`);
-        similarEntries = matchEntries;
-      } else {
-        console.log(`No relevant journal entries found with threshold ${matchThreshold}`);
         
-        // Try again with an even lower threshold as a fallback
-        matchThreshold = 0.1;
-        console.log(`Retrying with lower threshold ${matchThreshold}`);
-        
-        const { data: moreEntries, error: retryError } = await supabase.rpc(
+        // Try again with a lower threshold as fallback
+        const { data: lowerThresholdEntries, error: retryError } = await supabase.rpc(
           'match_journal_entries',
           {
             query_embedding: queryEmbedding,
-            match_threshold: matchThreshold,
+            match_threshold: 0.1,  // Lower threshold for better recall
             match_count: 5,
             user_id_filter: userId
           }
@@ -304,100 +291,114 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
         
         if (retryError) {
           console.error("Error in second vector search attempt:", retryError);
-        } else if (moreEntries && moreEntries.length > 0) {
-          console.log(`Found ${moreEntries.length} entries with lower threshold ${matchThreshold}`);
-          similarEntries = moreEntries;
+          // Fall back to recent entries
+          return await getFallbackRecentEntries(userId);
         }
+        
+        if (lowerThresholdEntries && lowerThresholdEntries.length > 0) {
+          console.log(`Found ${lowerThresholdEntries.length} entries with lower threshold 0.1`);
+          return await getFullEntryDetails(lowerThresholdEntries);
+        }
+        
+        // No matches found even with lower threshold
+        return await getFallbackRecentEntries(userId);
       }
       
-      // As a last resort, if still no results, just return a few recent entries
-      if (similarEntries.length === 0) {
-        console.log("No results from vector search, falling back to recent entries");
-        
-        const { data: recentEntries, error: recentError } = await supabase
-          .from('Journal Entries')
-          .select('id, refined text, created_at, emotions, master_themes')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(3);
-          
-        if (recentError) {
-          console.error("Error fetching recent entries as fallback:", recentError);
-        } else if (recentEntries && recentEntries.length > 0) {
-          console.log(`Returning ${recentEntries.length} recent entries as fallback`);
-          
-          // Add a placeholder similarity score
-          return (recentEntries || []).map(entry => ({
-            ...entry,
-            similarity: 0.1 // Just a placeholder value
-          }));
-        }
+      if (matchEntries && matchEntries.length > 0) {
+        console.log(`Found ${matchEntries.length} similar journal entries with threshold 0.3`);
+        return await getFullEntryDetails(matchEntries);
       }
       
-      if (similarEntries && similarEntries.length > 0) {
-        console.log("First entry similarity score:", similarEntries[0].similarity);
-        
-        // Fetch the full details of these journal entries
-        const entryIds = similarEntries.map(entry => entry.id);
-        const { data: entries, error: fetchError } = await supabase
-          .from('Journal Entries')
-          .select('id, refined text, created_at, emotions, master_themes')
-          .in('id', entryIds);
-        
-        if (fetchError) {
-          console.error("Error fetching full entry details:", fetchError);
-        } else if (entries && entries.length > 0) {
-          console.log(`Retrieved full details for ${entries.length} journal entries`);
-          
-          // Tag them with their similarity score
-          return entries.map(entry => {
-            const matchEntry = similarEntries.find(se => se.id === entry.id);
-            return {
-              ...entry,
-              similarity: matchEntry ? matchEntry.similarity : 0
-            };
-          });
+      // No matches found with initial threshold, try lower
+      const { data: lowerEntries, error: lowerError } = await supabase.rpc(
+        'match_journal_entries',
+        {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.1,  // Lower threshold as fallback
+          match_count: 5,
+          user_id_filter: userId
         }
+      );
+      
+      if (!lowerError && lowerEntries && lowerEntries.length > 0) {
+        console.log(`Found ${lowerEntries.length} entries with lower threshold 0.1`);
+        return await getFullEntryDetails(lowerEntries);
       }
       
-      // If we've reached here, no entries were found
-      console.log("Could not find any relevant journal entries");
-      return [];
+      // No matches found with any threshold
+      return await getFallbackRecentEntries(userId);
       
     } catch (error) {
       console.error("Exception in vector similarity search:", error);
-      
-      // If vector search completely fails, try a direct query as last resort
-      console.log("Falling back to direct query for recent entries");
-      try {
-        const { data: recentEntries, error: recentError } = await supabase
-          .from('Journal Entries')
-          .select('id, refined text, created_at, emotions, master_themes')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(3);
-          
-        if (recentError) {
-          console.error("Error in fallback direct query:", recentError);
-          return [];
-        }
-        
-        console.log(`Retrieved ${recentEntries?.length || 0} entries via direct query fallback`);
-        return (recentEntries || []).map(entry => ({
-          ...entry,
-          similarity: 0.1 // Placeholder
-        }));
-      } catch (fallbackError) {
-        console.error("Error in fallback query:", fallbackError);
-        return [];
-      }
+      return await getFallbackRecentEntries(userId);
     }
   } catch (outerError) {
     console.error("Outer exception in fetchRelevantJournalEntries:", outerError);
     return [];
   }
+}
+
+// Helper to get full entry details after finding matches
+async function getFullEntryDetails(matchEntries: any[]) {
+  try {
+    const entryIds = matchEntries.map(entry => entry.id);
+    
+    const { data: entries, error: fetchError } = await supabase
+      .from('Journal Entries')
+      .select('id, refined text, created_at, emotions, master_themes')
+      .in('id', entryIds);
+    
+    if (fetchError) {
+      console.error("Error fetching full entry details:", fetchError);
+      return [];
+    }
+    
+    if (entries && entries.length > 0) {
+      console.log(`Retrieved full details for ${entries.length} journal entries`);
+      
+      // Tag them with their similarity score from the match results
+      return entries.map(entry => {
+        const matchEntry = matchEntries.find(se => se.id === entry.id);
+        return {
+          ...entry,
+          similarity: matchEntry ? matchEntry.similarity : 0
+        };
+      });
+    }
+    
+    return [];
+  } catch (error) {
+    console.error("Error getting full entry details:", error);
+    return [];
+  }
+}
+
+// Fallback to get recent entries when vector search fails
+async function getFallbackRecentEntries(userId: string) {
+  console.log("Falling back to recent entries");
   
-  return []; // Return empty array if all attempts fail
+  try {
+    const { data: recentEntries, error: recentError } = await supabase
+      .from('Journal Entries')
+      .select('id, refined text, created_at, emotions, master_themes')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(3);
+      
+    if (recentError) {
+      console.error("Error fetching recent entries as fallback:", recentError);
+      return [];
+    }
+    
+    console.log(`Retrieved ${recentEntries?.length || 0} entries via direct query fallback`);
+    return (recentEntries || []).map(entry => ({
+      ...entry,
+      similarity: 0.1 // Placeholder
+    }));
+  } catch (fallbackError) {
+    console.error("Error in fallback query:", fallbackError);
+    return [];
+  }
 }
 
 serve(async (req) => {
