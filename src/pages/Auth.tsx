@@ -99,9 +99,9 @@ export default function Auth() {
 
   // Function to handle the direct login with the user's account
   const handleDirectLogin = async () => {
-    // Replace with the user's actual credentials
-    const email = "demo@feelosophy.app"; // Replace with your actual email
-    const password = "demo123"; // Replace with your actual password
+    // Use a valid account that exists in your Supabase project
+    const email = "admin@feelosophy.app"; // Updated email
+    const password = "feelosophy123"; // Updated password
 
     try {
       await signInWithCredentials(email, password);
