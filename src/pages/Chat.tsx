@@ -1,18 +1,11 @@
-
 import { useEffect, useState } from 'react';
 import { ChatLayout } from '@/components/chat/ChatLayout';
 import { ChatContainer } from '@/components/chat/ChatContainer';
 import { getCurrentUserId } from '@/utils/audio/auth-utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { ensureJournalEntriesHaveEmbeddings } from '@/utils/embeddings-utils';
-
-// Define the JournalEntry type to match what we get from Supabase
-interface JournalEntry {
-  id: number;
-  "refined text"?: string | null;
-  [key: string]: any;
-}
+import { ensureJournalEntriesHaveEmbeddings } from '@/utils/embeddings';
+import { JournalEntry } from '@/types/journal';
 
 export default function Chat() {
   const [hasEntries, setHasEntries] = useState<boolean | null>(null);
@@ -25,7 +18,6 @@ export default function Chat() {
     async function initialize() {
       setIsLoading(true);
       
-      // Get current user ID
       const currentUserId = await getCurrentUserId();
       setUserId(currentUserId);
       
@@ -36,7 +28,6 @@ export default function Chat() {
         return;
       }
       
-      // Directly query the database for journal entries
       try {
         console.log('Checking journal entries for user:', currentUserId);
         const { data: entries, error } = await supabase
@@ -51,7 +42,6 @@ export default function Chat() {
           return;
         }
         
-        // Cast the entries to our JournalEntry type and filter invalid entries
         const validEntries = (entries as JournalEntry[] || []).filter(entry => 
           entry && 
           typeof entry.id === 'number' && 
@@ -64,7 +54,6 @@ export default function Chat() {
         if (validEntries.length > 0) {
           setHasEntries(true);
           
-          // Check if these entries have embeddings
           const { data: embeddings, error: embError } = await supabase
             .from('journal_embeddings')
             .select('journal_entry_id')
@@ -82,7 +71,6 @@ export default function Chat() {
               console.log('Some journal entries are missing embeddings, generating...');
               toast.info('Preparing your journal entries for chat...');
               
-              // Ensure journal entries have embeddings with multiple attempts if needed
               let embeddingsResult = false;
               let attempts = 0;
               
@@ -94,7 +82,7 @@ export default function Chat() {
                 if (!embeddingsResult) {
                   console.warn(`Embedding generation attempt ${attempts} failed`);
                   if (attempts < 3) {
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                   }
                 }
               }
@@ -115,7 +103,6 @@ export default function Chat() {
         } else {
           setHasEntries(false);
         }
-        
       } catch (error) {
         console.error('Error checking journal entries:', error);
       } finally {
