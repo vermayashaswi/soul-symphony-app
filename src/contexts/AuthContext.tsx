@@ -10,6 +10,8 @@ type AuthContextType = {
   isLoading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  isDevMode: boolean;  // New flag for development mode
+  toggleDevMode: () => void;  // New function to toggle dev mode
 };
 
 // Export the AuthContext so it can be imported directly
@@ -19,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDevMode, setIsDevMode] = useState(false);  // Initialize dev mode as false
 
   useEffect(() => {
     console.log("AuthProvider: Setting up auth state listener");
@@ -94,6 +97,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // New function to toggle development mode
+  const toggleDevMode = () => {
+    setIsDevMode(prev => {
+      const newValue = !prev;
+      if (newValue) {
+        toast.success('Development mode enabled - Auth bypass active');
+      } else {
+        toast.info('Development mode disabled - Auth checks restored');
+      }
+      return newValue;
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -102,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         signInWithGoogle,
         signOut,
+        isDevMode,
+        toggleDevMode,
       }}
     >
       {children}

@@ -28,16 +28,16 @@ const queryClient = new QueryClient({
 
 // Protected route component with location preservation
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isDevMode } = useAuth();
   const location = useLocation();
   
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (!isLoading && !user && !isDevMode) {
       console.log("Protected route: No user, should redirect to /auth", {
         path: location.pathname
       });
     }
-  }, [user, isLoading, location]);
+  }, [user, isLoading, location, isDevMode]);
   
   if (isLoading) {
     return (
@@ -47,7 +47,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  if (!user) {
+  // If in dev mode, allow access even without authentication
+  if (!user && !isDevMode) {
     console.log("Redirecting to auth from protected route:", location.pathname);
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }

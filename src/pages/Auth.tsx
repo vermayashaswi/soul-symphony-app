@@ -7,9 +7,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import ParticleBackground from '@/components/ParticleBackground';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 export default function Auth() {
-  const { user, isLoading, signInWithGoogle } = useAuth();
+  const { user, isLoading, signInWithGoogle, isDevMode, toggleDevMode } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [redirecting, setRedirecting] = useState(false);
@@ -87,6 +89,14 @@ export default function Auth() {
     }
   };
 
+  const handleDevModeToggle = () => {
+    toggleDevMode();
+    if (!isDevMode) {
+      // If we're enabling dev mode, navigate to the requested page
+      navigate(from, { replace: true });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -136,6 +146,19 @@ export default function Auth() {
             </svg>
             Sign in with Google
           </Button>
+          
+          {/* Development Mode Toggle */}
+          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+            <div>
+              <Label htmlFor="dev-mode" className="font-medium">Development Mode</Label>
+              <p className="text-sm text-muted-foreground">Bypass authentication for testing</p>
+            </div>
+            <Switch 
+              id="dev-mode" 
+              checked={isDevMode} 
+              onCheckedChange={handleDevModeToggle} 
+            />
+          </div>
           
           <div className="text-center text-sm text-muted-foreground">
             <p>By signing in, you agree to our Terms of Service and Privacy Policy</p>
