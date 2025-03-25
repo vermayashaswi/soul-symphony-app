@@ -173,6 +173,42 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
+  const processAllEmbeddings = async () => {
+    if (!userId) {
+      toast.error('User ID is required to process embeddings');
+      return;
+    }
+    
+    try {
+      toast.info('Processing journal embeddings...');
+      
+      // Call the Supabase Edge Function to process all embeddings
+      const { data, error } = await supabase.functions.invoke('embed-all-entries', {
+        body: { userId }
+      });
+      
+      if (error) {
+        console.error('Error processing embeddings:', error);
+        toast.error('Failed to process journal embeddings');
+        throw error;
+      }
+      
+      if (data?.success) {
+        console.log('Embeddings processed successfully:', data);
+        toast.success(`Processed ${data.successCount || 0} entries successfully`);
+        return data;
+      } else {
+        toast.error('Failed to process journal embeddings');
+        return { success: false };
+      }
+      
+    } catch (error) {
+      console.error('Error in processAllEmbeddings:', error);
+      toast.error('Failed to process journal embeddings');
+      throw error;
+    }
+  };
+
   const refreshEntries = () => {
     fetchEntries();
   };
@@ -191,6 +227,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     isSaving,
     deleteJournalEntry,
     refreshEntries,
+    processAllEmbeddings,
     journalEntries: entries, // Alias for backward compatibility
     isLoading: loading // Alias for backward compatibility
   };
