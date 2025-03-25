@@ -1,58 +1,74 @@
 
-import { Button } from "@/components/ui/button"
-import { Database, Mic, PieChart, Loader2 } from "lucide-react"
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Plus, ChartBar, RefreshCw, Database } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface JournalHeaderProps {
   onCreateJournal: () => void;
   onViewInsights: () => void;
-  onProcessAllEmbeddings?: () => void;
-  isProcessingEmbeddings?: boolean;
+  onProcessAllEmbeddings: () => void;
+  isProcessingEmbeddings: boolean;
 }
 
 export function JournalHeader({ 
   onCreateJournal, 
   onViewInsights, 
   onProcessAllEmbeddings,
-  isProcessingEmbeddings
+  isProcessingEmbeddings 
 }: JournalHeaderProps) {
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Journal</h1>
-        <p className="text-muted-foreground">
-          Record your thoughts and feelings through voice or text
-        </p>
-      </div>
-      <div className="flex gap-2 self-end">
-        {onProcessAllEmbeddings && (
-          <Button 
-            variant="outline" 
-            size="sm"
-            disabled={isProcessingEmbeddings}
-            onClick={onProcessAllEmbeddings}
-          >
-            {isProcessingEmbeddings ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Database className="h-4 w-4 mr-2" />
-                Index All Entries
-              </>
-            )}
-          </Button>
-        )}
-        <Button variant="outline" size="sm" onClick={onViewInsights}>
-          <PieChart className="h-4 w-4 mr-2" />
-          Insights
-        </Button>
-        <Button onClick={onCreateJournal}>
-          <Mic className="h-4 w-4 mr-2" />
-          New Entry
-        </Button>
-      </div>
-    </div>
+    <Card>
+      <CardHeader className="pb-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle className="text-2xl">Journal</CardTitle>
+            <CardDescription>
+              Record your thoughts and feelings to track your emotional wellbeing
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              onClick={onProcessAllEmbeddings} 
+              variant="outline" 
+              size="sm"
+              disabled={isProcessingEmbeddings}
+            >
+              {isProcessingEmbeddings ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Database className="h-4 w-4 mr-2" />
+                  Index Entries
+                </>
+              )}
+            </Button>
+            
+            <Button
+              onClick={onViewInsights}
+              variant="outline"
+              size="sm"
+            >
+              <ChartBar className="h-4 w-4 mr-2" />
+              Insights
+            </Button>
+            
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Button onClick={onCreateJournal}>
+                <Plus className="h-4 w-4 mr-2" />
+                New Journal
+              </Button>
+            </motion.div>
+          </div>
+        </div>
+      </CardHeader>
+    </Card>
   );
 }
