@@ -10,49 +10,13 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Create a simple BackendTester component since the original file is empty
-const BackendTester = ({ onTest }: { onTest: () => Promise<any> }) => {
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleTest = async () => {
-    setIsLoading(true);
-    try {
-      await onTest();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="border border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
-      <h3 className="font-medium mb-2 text-sm">Backend Testing Tools</h3>
-      <Button 
-        variant="outline" 
-        size="sm" 
-        onClick={handleTest}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <>
-            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            Testing...
-          </>
-        ) : (
-          'Test Journal Retrieval'
-        )}
-      </Button>
-    </div>
-  );
-};
-
 export default function Journal() {
   const { user } = useAuth();
   const { journalEntries, isLoading, refreshEntries } = useJournalEntries(user?.id);
   const { 
     handleCreateJournal, 
     handleViewInsights,
-    processUnprocessedEntries,
-    testJournalRetrieval 
+    processUnprocessedEntries
   } = useJournalHandler(user?.id);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -123,10 +87,6 @@ export default function Journal() {
       ) : (
         <EmptyJournalState onStartRecording={handleCreateJournal} />
       )}
-      
-      <div className="mt-8">
-        <BackendTester onTest={testJournalRetrieval} />
-      </div>
     </div>
   );
 }
