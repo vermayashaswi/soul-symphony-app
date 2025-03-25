@@ -1,19 +1,43 @@
 
 import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { createOrUpdateSession, endUserSession } from "@/utils/audio/auth-utils";
 import { useJournalHandler } from "@/hooks/use-journal-handler";
+import { toast } from "sonner";
 
 const AuthStateListener = () => {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const { processUnprocessedEntries } = useJournalHandler(user?.id);
   
   useEffect(() => {
     console.log("Setting up Supabase auth debugging listener");
     console.log("Current route:", location.pathname);
+    
+    // Check if we're on a callback URL from OAuth
+    const isOAuthRedirect = 
+      location.hash.includes('access_token') || 
+      location.search.includes('error') ||
+      location.hash.includes('type=recovery');
+    
+    if (isOAuthRedirect) {
+      console.log("Detected OAuth redirect URL", {
+        hash: location.hash,
+        search: location.search
+      });
+      
+      // Let the auth system handle it, then redirect
+      setTimeout(async () => {
+        await refreshSession();
+        if (location.pathname === '/404' || location.pathname.includes('callback')) {
+          console.log("Redirecting from 404/callback to /journal");
+          navigate('/journal', { replace: true });
+        }
+      }, 1000);
+    }
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth event:", event, "User:", session?.user?.email);
@@ -24,6 +48,12 @@ const AuthStateListener = () => {
         try {
           const result = await createOrUpdateSession(session.user.id, window.location.pathname);
           console.log("Session creation result:", result);
+          
+          // Redirect if on 404 page or OAuth callback page
+          if (location.pathname === '/404' || location.pathname.includes('callback')) {
+            console.log("Redirecting from 404/callback to /journal after sign in");
+            navigate('/journal', { replace: true });
+          }
           
           // Process unprocessed journal entries after sign in
           setTimeout(async () => {
@@ -60,6 +90,12 @@ const AuthStateListener = () => {
           expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
         });
         
+        // Check if we need to redirect from a 404 page or callback page
+        if (location.pathname === '/404' || location.pathname.includes('callback')) {
+          console.log("Redirecting from 404/callback to /journal with initial session");
+          navigate('/journal', { replace: true });
+        }
+        
         createOrUpdateSession(data.session.user.id, window.location.pathname)
           .catch(err => {
             console.error("Error tracking initial session:", err);
@@ -82,7 +118,7 @@ const AuthStateListener = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [user, location.pathname, processUnprocessedEntries]);
+  }, [user, location.pathname, processUnprocessedEntries, location.hash, location.search, navigate, refreshSession]);
   
   return null;
 };
