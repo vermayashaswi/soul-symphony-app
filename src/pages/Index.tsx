@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
+import { createOrUpdateSession } from '@/utils/audio/auth-utils';
 
 export default function Index() {
   const navigate = useNavigate();
@@ -26,6 +27,20 @@ export default function Index() {
       setAuthChecked(true);
     }
   }, [isLoading]);
+
+  // Track session when user visits index page
+  useEffect(() => {
+    if (user && !isLoading) {
+      console.log("Index page: Tracking session for user", user.id);
+      createOrUpdateSession(user.id, '/')
+        .then(result => {
+          console.log("Session tracking result:", result);
+        })
+        .catch(error => {
+          console.error("Error tracking session on index page:", error);
+        });
+    }
+  }, [user, isLoading]);
 
   const handleGetStarted = () => {
     if (user) {

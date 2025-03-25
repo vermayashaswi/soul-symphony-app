@@ -80,7 +80,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     
     // Track session when user accesses a protected route - but don't block rendering on this
     if (user && !isLoading) {
+      // Add debug logging
+      console.log("Protected route: Tracking session for user", user.id, "on path", location.pathname);
+      
       createOrUpdateSession(user.id, location.pathname)
+        .then(result => {
+          console.log("Session tracking result:", result);
+        })
         .catch(err => {
           console.error("Error tracking session:", err);
           // Don't block the app flow on session tracking errors
@@ -140,12 +146,19 @@ const AppRoutes = () => {
       
       // Track session events - but don't block rendering on this
       if (event === 'SIGNED_IN' && session?.user) {
+        console.log("SIGNED_IN event detected - creating new session for user", session.user.id);
+        
         createOrUpdateSession(session.user.id, window.location.pathname)
+          .then(result => {
+            console.log("Session creation result:", result);
+          })
           .catch(err => {
             console.error("Error creating session on sign in:", err);
             // Don't block the app flow on session tracking errors
           });
       } else if (event === 'SIGNED_OUT' && user) {
+        console.log("SIGNED_OUT event detected - ending session for user", user.id);
+        
         endUserSession(user.id)
           .catch(err => {
             console.error("Error ending session on sign out:", err);
@@ -168,7 +181,12 @@ const AppRoutes = () => {
         
         // Create or update session for initial session - but don't block rendering on this
         if (data.session.user.id) {
+          console.log("Creating/updating session for initial session user", data.session.user.id);
+          
           createOrUpdateSession(data.session.user.id, window.location.pathname)
+            .then(result => {
+              console.log("Initial session tracking result:", result);
+            })
             .catch(err => {
               console.error("Error tracking session on initial load:", err);
               // Don't block the app flow on session tracking errors

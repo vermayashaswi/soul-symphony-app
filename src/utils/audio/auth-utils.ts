@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export const refreshAuthSession = async (showToasts = true) => {
@@ -128,6 +129,7 @@ export const createOrUpdateSession = async (userId: string, entryPage = '/') => 
         return { success: false, error: updateError.message };
       }
       
+      console.log('Updated existing session:', existingSession.id);
       return { success: true, sessionId: existingSession.id, isNew: false };
     } else {
       // Create new session
@@ -150,12 +152,18 @@ export const createOrUpdateSession = async (userId: string, entryPage = '/') => 
         // Check if it's a permissions error - this could be an auth state mismatch
         if (insertError.message.includes('permission') || insertError.message.includes('JWTClaimsSetVerificationException')) {
           console.warn('Permission error on session creation - possibly auth state mismatch');
+          // Try to refresh the session and try again
+          const refreshed = await refreshAuthSession(false);
+          if (refreshed) {
+            return createOrUpdateSession(userId, entryPage);
+          }
           // Return success to avoid blocking the app
           return { success: true, isNew: false };
         }
         return { success: false, error: insertError.message };
       }
       
+      console.log('Created new session:', newSession.id);
       return { success: true, sessionId: newSession.id, isNew: true };
     }
   } catch (error: any) {
