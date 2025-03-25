@@ -27,10 +27,32 @@ export default function Journal() {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [mode, setMode] = useState<'record' | 'past'>('past');
 
+  // Extract processing entries from URL if present
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const tempId = queryParams.get('processing');
+    
+    if (tempId && !processingEntries.includes(tempId)) {
+      setProcessingEntries(prev => [...prev, tempId]);
+      
+      // Clean URL without reloading page
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+      
+      // Set a timeout to remove the processing entry after some time
+      // This is just in case it doesn't get refreshed by the normal refresh mechanism
+      setTimeout(() => {
+        setProcessingEntries(prev => prev.filter(id => id !== tempId));
+      }, 30000);
+    }
+  }, []);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       await refreshEntries();
+      // After refresh, clear any processing entries that might have been completed
+      setProcessingEntries([]);
       toast.success('Journal entries refreshed');
     } catch (error) {
       console.error('Error refreshing entries:', error);
@@ -55,6 +77,8 @@ export default function Journal() {
       processUnprocessedEntries().then(result => {
         if (result?.success) {
           console.log('Successfully processed unprocessed entries');
+          // Refresh entries to show the newly processed ones
+          refreshEntries();
         }
       });
     }

@@ -12,6 +12,12 @@ interface JournalEntryCardProps {
 }
 
 const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
+  // For debugging purposes
+  console.log("Rendering entry:", entry);
+  console.log("Entry refined text:", entry["refined text"]);
+  console.log("Entry emotions:", entry.emotions);
+  console.log("Entry master_themes:", entry.master_themes);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -49,7 +55,13 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
               
               <div>
                 <h3 className="font-medium mb-2">Journal Entry</h3>
-                <p className="whitespace-pre-line">{entry["refined text"] || "No refined text available"}</p>
+                {entry["refined text"] ? (
+                  <p className="whitespace-pre-line">{entry["refined text"]}</p>
+                ) : entry["transcription text"] ? (
+                  <p className="whitespace-pre-line">{entry["transcription text"]}</p>
+                ) : (
+                  <p className="text-muted-foreground">Your entry is being processed...</p>
+                )}
               </div>
             </div>
             
@@ -62,12 +74,10 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
               <div className="h-60 mb-4 flex items-center justify-center">
                 {entry.master_themes && entry.master_themes.length > 0 ? (
                   <EmotionBubbles themes={entry.master_themes.slice(0, 10)} />
+                ) : entry.emotions && entry.emotions.length > 0 ? (
+                  <EmotionBubbles themes={entry.emotions.slice(0, 10)} />
                 ) : (
-                  entry.emotions && entry.emotions.length > 0 ? (
-                    <EmotionBubbles themes={entry.emotions.slice(0, 10)} />
-                  ) : (
-                    <p className="text-muted-foreground text-center">Analyzing emotions...</p>
-                  )
+                  <p className="text-muted-foreground text-center">Analyzing emotions...</p>
                 )}
               </div>
             </div>

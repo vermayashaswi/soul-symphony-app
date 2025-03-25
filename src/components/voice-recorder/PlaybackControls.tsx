@@ -32,7 +32,7 @@ export function PlaybackControls({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="flex flex-col items-center gap-3 w-full max-w-xs"
+      className="flex flex-col items-center gap-3 w-full max-w-xs mt-4"
     >
       <div className="w-full">
         <Button 
@@ -54,16 +54,18 @@ export function PlaybackControls({
           )}
         </Button>
         
-        {/* Playback progress indicator */}
-        <div className="w-full space-y-1">
-          <Progress value={playbackProgress} className="h-2" />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>
-              {formatTime(Math.floor((playbackProgress / 100) * (audioDuration || 0)))}
-            </span>
-            <span>{formatTime(Math.floor(audioDuration || 0))}</span>
+        {/* Only show playback progress when playing */}
+        {isPlaying && (
+          <div className="w-full space-y-1">
+            <Progress value={playbackProgress} className="h-2" />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>
+                {formatTime(Math.floor((playbackProgress / 100) * (audioDuration || 0)))}
+              </span>
+              <span>{formatTime(Math.floor(audioDuration || 0))}</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
       
       <Button 

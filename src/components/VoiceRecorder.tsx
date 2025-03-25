@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, ChevronRight } from 'lucide-react';
+import { Loader2, ChevronRight, RefreshCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
@@ -12,6 +12,7 @@ import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -33,7 +34,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     ripples,
     startRecording,
     stopRecording,
-    requestPermissions
+    requestPermissions,
+    resetRecording
   } = useVoiceRecorder({ noiseReduction });
   
   const {
@@ -76,6 +78,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     }
   };
 
+  // Handle recording restart
+  const handleRestartRecording = () => {
+    resetRecording();
+  };
+
   // Automatically request permissions on component mount
   useEffect(() => {
     if (hasPermission === null) {
@@ -109,14 +116,27 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         ripples={ripples}
       />
       
-      <RecordingButton
-        isRecording={isRecording}
-        isProcessing={isProcessing}
-        hasPermission={hasPermission}
-        onRecordingStart={startRecording}
-        onRecordingStop={stopRecording}
-        onPermissionRequest={requestPermissions}
-      />
+      <div className="flex items-center gap-3">
+        <RecordingButton
+          isRecording={isRecording}
+          isProcessing={isProcessing}
+          hasPermission={hasPermission}
+          onRecordingStart={startRecording}
+          onRecordingStop={stopRecording}
+          onPermissionRequest={requestPermissions}
+        />
+        
+        {!isRecording && audioBlob && (
+          <Button 
+            onClick={handleRestartRecording}
+            variant="outline"
+            size="icon"
+            className="rounded-full h-10 w-10"
+          >
+            <RefreshCcw className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
       
       <AnimatePresence mode="wait">
         {isRecording ? (
@@ -161,7 +181,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
           <span>Processing with AI...</span>
-          <ChevronRight className="w-4 h-4" />
         </div>
       )}
     </div>

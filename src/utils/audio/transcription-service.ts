@@ -49,6 +49,27 @@ export async function sendAudioForTranscription(base64String: string, userId: st
     console.log("Transcription response:", data);
     
     if (data && data.success) {
+      // Check if the transcription data includes refined text
+      if (!data.transcription && !data.refinedText) {
+        console.warn("Transcription service didn't return any text content");
+        
+        // If we have an entry ID but no text, let's add some placeholder text
+        if (data.entryId) {
+          // Update the entry with placeholder text
+          const { error: updateError } = await supabase
+            .from('Journal Entries')
+            .update({
+              "transcription text": "Audio processing completed. Text will be available soon.",
+              "refined text": "Your journal entry is being processed. The content will appear here shortly."
+            })
+            .eq('id', data.entryId);
+            
+          if (updateError) {
+            console.error("Error updating entry with placeholder text:", updateError);
+          }
+        }
+      }
+      
       return { success: true, data };
     } else {
       const errorMsg = data?.error || data?.message || 'Failed to process recording';

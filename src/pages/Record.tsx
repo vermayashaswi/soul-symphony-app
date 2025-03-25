@@ -15,7 +15,10 @@ export default function Record() {
 
   const handleRecordingComplete = (audioBlob: Blob, tempId?: string) => {
     console.log('Recording completed, tempId:', tempId);
-    navigate('/journal');
+    toast.success('Journal entry saved successfully! Redirecting to journal page...');
+    setTimeout(() => {
+      navigate('/journal');
+    }, 1500);
   };
 
   const handleToggleMode = (value: string) => {

@@ -93,6 +93,20 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     
     if (result.success) {
       toast.success('Journal entry saved successfully!');
+      
+      // Add the processing entry to the URL to show it in the journal list
+      if (window.location.pathname === '/journal') {
+        // Already on journal page, just update the URL
+        const url = new URL(window.location.href);
+        url.searchParams.set('processing', toastId);
+        window.history.replaceState({}, document.title, url.toString());
+        
+        // Force a reload to show the processing entry
+        window.location.reload();
+      } else {
+        // Redirect to journal page with processing parameter
+        window.location.href = `/journal?processing=${toastId}`;
+      }
     } else {
       toast.error(result.error || 'Failed to process recording');
     }
