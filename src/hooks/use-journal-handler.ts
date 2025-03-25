@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 export function useJournalHandler(userId: string | undefined) {
   const navigate = useNavigate();
   const [isTestingBackend, setIsTestingBackend] = useState(false);
+  const [isProcessingUnprocessedEntries, setIsProcessingUnprocessedEntries] = useState(false);
   const { processAllEmbeddings, isProcessingEmbeddings } = useJournalEntries(userId);
 
   const handleCreateJournal = () => {
@@ -31,6 +32,48 @@ export function useJournalHandler(userId: string | undefined) {
     } catch (error) {
       console.error('Error processing embeddings:', error);
       toast.error('Failed to process embeddings');
+    }
+  };
+
+  // New function to handle specifically unprocessed entries (NULL embeddings)
+  const processUnprocessedEntries = async () => {
+    if (!userId) {
+      toast.error("Authentication required. Please sign in");
+      return { success: false, message: "Authentication required" };
+    }
+
+    setIsProcessingUnprocessedEntries(true);
+    try {
+      toast.info('Processing unprocessed journal entries...');
+      
+      // Call the Supabase Edge Function to process only unprocessed entries
+      const { data, error } = await supabase.functions.invoke('embed-all-entries', {
+        body: { 
+          userId,
+          processAll: false  // Flag to only process entries without embeddings
+        }
+      });
+      
+      if (error) {
+        console.error('Error processing unprocessed entries:', error);
+        toast.error('Failed to process unprocessed journal entries');
+        throw error;
+      }
+      
+      if (data?.success) {
+        console.log('Unprocessed entries processed successfully:', data);
+        toast.success(`Processed ${data.successCount} unprocessed entries`);
+        return data;
+      } else {
+        toast.error('Failed to process unprocessed journal entries');
+        return { success: false };
+      }
+    } catch (error) {
+      console.error('Error in processUnprocessedEntries:', error);
+      toast.error(`Failed to process entries: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return { success: false, error };
+    } finally {
+      setIsProcessingUnprocessedEntries(false);
     }
   };
 
@@ -109,6 +152,8 @@ export function useJournalHandler(userId: string | undefined) {
     handleViewInsights,
     handleProcessAllEmbeddings,
     isProcessingEmbeddings,
+    processUnprocessedEntries,
+    isProcessingUnprocessedEntries,
     testJournalRetrieval,
     isTestingBackend
   };

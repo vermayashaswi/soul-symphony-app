@@ -45,7 +45,7 @@ serve(async (req) => {
       
       if (data) entries = [data];
     } else {
-      // Process all entries for a user
+      // Process entries for a user
       const query = supabase
         .from('Journal Entries')
         .select('id, "refined text", "transcription text"')
@@ -53,13 +53,23 @@ serve(async (req) => {
       
       // If not processing all, only get entries without embeddings
       if (!processAll) {
-        const entriesWithEmbeddings = await supabase
+        console.log('Querying only entries without embeddings');
+        // First, get the entries that already have embeddings
+        const { data: embeddingsData } = await supabase
           .from('journal_embeddings')
-          .select('journal_entry_id');
+          .select('journal_entry_id')
+          .is('embedding', 'not null');
           
-        if (entriesWithEmbeddings.data && entriesWithEmbeddings.data.length > 0) {
-          const entriesWithEmbeddingsIds = entriesWithEmbeddings.data.map(e => e.journal_entry_id);
-          query.not('id', 'in', `(${entriesWithEmbeddingsIds.join(',')})`);
+        if (embeddingsData && embeddingsData.length > 0) {
+          // Get list of entry IDs that already have non-null embeddings
+          const entriesWithEmbeddingsIds = embeddingsData.map(e => e.journal_entry_id);
+          
+          if (entriesWithEmbeddingsIds.length > 0) {
+            console.log(`Found ${entriesWithEmbeddingsIds.length} entries with existing embeddings`);
+            query.not('id', 'in', `(${entriesWithEmbeddingsIds.join(',')})`);
+          }
+        } else {
+          console.log('No entries found with existing embeddings, processing all entries for user');
         }
       }
       
@@ -115,7 +125,7 @@ serve(async (req) => {
         const embeddingData = await embeddingResponse.json();
         const embedding = embeddingData.data[0].embedding;
         
-        // Check if entry already has an embedding
+        // Check if entry already has an embedding record
         const { data: existingEmbedding } = await supabase
           .from('journal_embeddings')
           .select('id')
@@ -126,6 +136,7 @@ serve(async (req) => {
         let upsertResult;
         if (existingEmbedding) {
           // Update existing embedding
+          console.log(`Updating existing embedding for entry ${entry.id}`);
           upsertResult = await supabase
             .from('journal_embeddings')
             .update({ 
@@ -135,6 +146,7 @@ serve(async (req) => {
             .eq('journal_entry_id', entry.id);
         } else {
           // Insert new embedding
+          console.log(`Creating new embedding for entry ${entry.id}`);
           upsertResult = await supabase
             .from('journal_embeddings')
             .insert({ 
