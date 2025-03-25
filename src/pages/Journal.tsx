@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import JournalHeader from '@/components/journal/JournalHeader';
+import { JournalHeader } from '@/components/journal/JournalHeader';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import EmptyJournalState from '@/components/journal/EmptyJournalState';
 import { useAuth } from '@/contexts/AuthContext';

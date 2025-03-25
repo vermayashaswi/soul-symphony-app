@@ -16,27 +16,65 @@ const AuthStateListener = () => {
   useEffect(() => {
     console.log("Setting up Supabase auth debugging listener");
     console.log("Current route:", location.pathname);
+    console.log("Current hash:", location.hash ? "Present (contains tokens)" : "None");
     
-    // Check if we're on a callback URL from OAuth
+    // Improved OAuth redirect detection
     const isOAuthRedirect = 
       location.hash.includes('access_token') || 
       location.search.includes('error') ||
-      location.hash.includes('type=recovery');
+      location.hash.includes('type=recovery') ||
+      location.pathname.includes('callback');
     
     if (isOAuthRedirect) {
-      console.log("Detected OAuth redirect URL", {
-        hash: location.hash,
-        search: location.search
+      console.log("Detected OAuth redirect", {
+        hash: location.hash ? "Present (contains tokens)" : "None",
+        search: location.search,
+        pathname: location.pathname
       });
       
-      // Let the auth system handle it, then redirect
-      setTimeout(async () => {
-        await refreshSession();
-        if (location.pathname === '/404' || location.pathname.includes('callback')) {
-          console.log("Redirecting from 404/callback to /journal");
-          navigate('/journal', { replace: true });
+      // Handle the OAuth callback immediately
+      if (location.hash.includes('access_token')) {
+        // The hash contains tokens we need to process
+        const params = new URLSearchParams(location.hash.substring(1));
+        const accessToken = params.get('access_token');
+        
+        if (accessToken) {
+          console.log("Processing access token from hash");
+          
+          // Let Supabase process the token
+          supabase.auth.getSession().then(async ({ data, error }) => {
+            if (error) {
+              console.error("Error getting session from hash:", error);
+              toast.error("Authentication error");
+            } else if (data.session) {
+              console.log("Successfully retrieved session from hash");
+              
+              // Force refresh our context state
+              await refreshSession();
+              
+              // Redirect to journal page
+              console.log("Redirecting to journal page after successful auth");
+              navigate('/journal', { replace: true });
+              
+              toast.success("Successfully signed in!");
+            }
+          });
         }
-      }, 1000);
+      } else {
+        // Add a small delay to allow auth state to process
+        setTimeout(async () => {
+          await refreshSession();
+          
+          // Check if we're authenticated now
+          if (user) {
+            console.log("User authenticated, redirecting to journal");
+            navigate('/journal', { replace: true });
+          } else {
+            console.log("Not authenticated after OAuth callback, redirecting to auth");
+            navigate('/auth', { replace: true });
+          }
+        }, 1000);
+      }
     }
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -49,9 +87,11 @@ const AuthStateListener = () => {
           const result = await createOrUpdateSession(session.user.id, window.location.pathname);
           console.log("Session creation result:", result);
           
-          // Redirect if on 404 page or OAuth callback page
-          if (location.pathname === '/404' || location.pathname.includes('callback')) {
-            console.log("Redirecting from 404/callback to /journal after sign in");
+          // Redirect if on 404 page or OAuth callback page or at the hash URL
+          if (location.pathname === '/404' || 
+              location.pathname.includes('callback') || 
+              location.hash.includes('access_token')) {
+            console.log("Redirecting to journal after sign in");
             navigate('/journal', { replace: true });
           }
           
@@ -64,7 +104,7 @@ const AuthStateListener = () => {
             } catch (err) {
               console.error("Error processing entries after sign in:", err);
             }
-          }, 5000); // Wait 5 seconds to allow for auth state to fully settle
+          }, 3000); // Reduced wait time slightly
           
         } catch (err) {
           console.error("Error creating session on sign in:", err);
@@ -80,7 +120,7 @@ const AuthStateListener = () => {
       }
     });
     
-    // Check initial session
+    // Check initial session - especially important for hash callbacks
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) {
         console.error("Initial session check error:", error);
@@ -91,9 +131,11 @@ const AuthStateListener = () => {
           expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
         });
         
-        // Check if we need to redirect from a 404 page or callback page
-        if (location.pathname === '/404' || location.pathname.includes('callback')) {
-          console.log("Redirecting from 404/callback to /journal with initial session");
+        // First, make sure the user is in the correct page, especially from auth callbacks
+        if (location.pathname === '/404' || 
+            location.pathname.includes('callback') || 
+            location.hash.includes('access_token')) {
+          console.log("Redirecting to journal with initial session");
           navigate('/journal', { replace: true });
         }
         
@@ -111,7 +153,7 @@ const AuthStateListener = () => {
           } catch (err) {
             console.error("Error processing entries on initial load:", err);
           }
-        }, 5000); // Wait 5 seconds to allow for component mounting
+        }, 3000);
       } else {
         console.log("No initial session found");
       }
