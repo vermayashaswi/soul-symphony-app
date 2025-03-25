@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import VoiceRecorder from '@/components/VoiceRecorder';
@@ -15,6 +16,12 @@ export default function Record() {
 
   const handleRecordingComplete = async (audioBlob: Blob, tempId?: string) => {
     console.log('Recording completed, tempId:', tempId);
+    
+    if (isNavigating) {
+      console.log('Already navigating, ignoring duplicate completion event');
+      return;
+    }
+    
     setIsNavigating(true);
     
     try {
@@ -22,8 +29,10 @@ export default function Record() {
       
       // Navigate to the journal page with the temp ID as a query param
       if (tempId) {
+        console.log('Navigating to journal with processing ID:', tempId);
         navigate(`/journal?processing=${tempId}`, { replace: true });
       } else {
+        console.log('Navigating to journal (no processing ID)');
         navigate('/journal', { replace: true });
       }
     } catch (error) {
@@ -35,6 +44,15 @@ export default function Record() {
 
   const handleToggleMode = (value: string) => {
     if (value === 'past' && !isNavigating) {
+      console.log('Switching to past entries view, navigating to journal');
+      setIsNavigating(true);
+      navigate('/journal');
+    }
+  };
+
+  const handleCancel = () => {
+    console.log('Recording cancelled, navigating to journal');
+    if (!isNavigating) {
       setIsNavigating(true);
       navigate('/journal');
     }
@@ -63,7 +81,7 @@ export default function Record() {
             <h3 className="text-lg font-medium mb-4">Record a New Journal Entry</h3>
             <VoiceRecorder 
               onRecordingComplete={handleRecordingComplete}
-              onCancel={() => navigate('/journal')}
+              onCancel={handleCancel}
             />
           </div>
         </CardContent>
