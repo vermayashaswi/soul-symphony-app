@@ -75,7 +75,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                 {entry.master_themes && entry.master_themes.length > 0 ? (
                   <EmotionBubbles themes={entry.master_themes.slice(0, 10)} />
                 ) : entry.emotions && entry.emotions.length > 0 ? (
-                  <EmotionBubbles themes={entry.emotions.slice(0, 10)} />
+                  <EmotionBubbles themes={Array.isArray(entry.emotions) ? entry.emotions.slice(0, 10) : []} />
                 ) : (
                   <p className="text-muted-foreground text-center">Analyzing emotions...</p>
                 )}

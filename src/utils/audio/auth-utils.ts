@@ -70,7 +70,8 @@ export async function getCurrentUserId(): Promise<string | undefined> {
  */
 export async function refreshAuthSession(showToasts: boolean = false): Promise<boolean> {
   let retryCount = 0;
-  const maxRetries = 2;
+  const maxRetries = 3;
+  let lastError = null;
   
   async function attemptRefresh(): Promise<boolean> {
     try {
@@ -79,6 +80,7 @@ export async function refreshAuthSession(showToasts: boolean = false): Promise<b
       const { data, error } = await supabase.auth.refreshSession();
       
       if (error) {
+        lastError = error;
         console.error('Error refreshing session:', error);
         
         // Only show toast on explicit refresh requests, not background ones
@@ -90,7 +92,8 @@ export async function refreshAuthSession(showToasts: boolean = false): Promise<b
         if (retryCount < maxRetries && 
             (error.message.includes('network') || 
              error.message.includes('timeout') ||
-             error.message.includes('rate limit'))) {
+             error.message.includes('rate limit') ||
+             error.message.includes('auth'))) {
           retryCount++;
           // Wait with exponential backoff before retrying
           const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
@@ -118,6 +121,7 @@ export async function refreshAuthSession(showToasts: boolean = false): Promise<b
       
       return !!data.session;
     } catch (error: any) {
+      lastError = error;
       console.error('Unexpected error refreshing session:', error);
       
       // Only show toast on explicit refresh requests
@@ -125,9 +129,26 @@ export async function refreshAuthSession(showToasts: boolean = false): Promise<b
         toast.error(`Unexpected error refreshing session: ${error.message}`);
       }
       
+      // Try retrying on unexpected errors too
+      if (retryCount < maxRetries) {
+        retryCount++;
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
+        console.log(`Retrying after error in ${delay}ms...`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return attemptRefresh();
+      }
+      
       return false;
     }
   }
   
-  return attemptRefresh();
+  const result = await attemptRefresh();
+  
+  // If all retries failed and we're in silent mode, log a summary but don't toast
+  if (!result && !showToasts && lastError) {
+    console.warn(`Session refresh failed after ${retryCount + 1} attempts. Last error: ${lastError.message}`);
+  }
+  
+  return result;
 }

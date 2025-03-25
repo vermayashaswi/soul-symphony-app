@@ -152,13 +152,6 @@ export default function Auth() {
             Sign in with Google
           </Button>
           
-          <div className="text-center text-sm text-muted-foreground mt-6">
-            <p className="mb-2">Debug Information:</p>
-            <p className="font-mono text-xs break-all bg-muted p-2 rounded">
-              Current URL: {window.location.href}
-            </p>
-          </div>
-          
           <div className="text-center text-sm text-muted-foreground">
             <p>By signing in, you agree to our Terms of Service and Privacy Policy</p>
           </div>

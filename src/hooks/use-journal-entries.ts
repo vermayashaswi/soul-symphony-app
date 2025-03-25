@@ -19,6 +19,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { storeEmbedding } = useTranscription();
 
   const fetchEntries = useCallback(async () => {
@@ -26,6 +27,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     
     try {
       setLoading(true);
+      setLoadError(null);
       console.log('Fetching entries for user ID:', userId);
       
       // Fetch entries from the Journal Entries table
@@ -37,7 +39,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         
       if (error) {
         console.error('Error fetching entries:', error);
-        toast.error('Failed to load journal entries');
+        setLoadError(error.message);
+        // Don't show toast immediately, only after a retry
         throw error;
       }
       
@@ -49,18 +52,28 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       // For any entry without master_themes, generate them
       for (const entry of typedEntries) {
         if (!entry.master_themes && entry["refined text"]) {
-          await generateThemesForEntry(entry);
+          try {
+            await generateThemesForEntry(entry);
+          } catch (themeError) {
+            console.error('Error generating themes for entry:', themeError);
+            // Continue with other entries even if one fails
+          }
         }
       }
       
       setEntries(typedEntries);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching entries:', error);
-      toast.error('Failed to load journal entries');
+      setLoadError(error.message || 'Failed to load journal entries');
+      
+      // Only show toast error after retry attempts
+      if (loadError) {
+        toast.error('Failed to load journal entries. Please try again later.');
+      }
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, loadError]);
 
   const generateThemesForEntry = async (entry: JournalEntry) => {
     try {
@@ -77,6 +90,16 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       if (data?.themes) {
         // Update the entry with the new themes
         entry.master_themes = data.themes;
+        
+        // Update the entry in the database
+        const { error: updateError } = await supabase
+          .from('Journal Entries')
+          .update({ master_themes: data.themes })
+          .eq('id', entry.id);
+          
+        if (updateError) {
+          console.error('Error updating entry with themes:', updateError);
+        }
       }
     } catch (error) {
       console.error('Error invoking generate-themes function:', error);
@@ -195,9 +218,31 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  const refreshEntries = () => {
-    fetchEntries();
+  // Implement retry logic for refreshing entries
+  const refreshEntries = async () => {
+    try {
+      await fetchEntries();
+    } catch (error) {
+      console.error('Error in manual refresh:', error);
+      // Already showing error in fetchEntries
+    }
   };
+
+  // Add auto-retry for initial fetch if it fails
+  useEffect(() => {
+    let retryTimeout: NodeJS.Timeout;
+    
+    if (loadError && !loading) {
+      console.log('Retrying fetch after error in 5 seconds...');
+      retryTimeout = setTimeout(() => {
+        fetchEntries();
+      }, 5000);
+    }
+    
+    return () => {
+      if (retryTimeout) clearTimeout(retryTimeout);
+    };
+  }, [loadError, loading, fetchEntries]);
 
   // Fetch entries on mount and when dependencies change
   useEffect(() => {
@@ -214,6 +259,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     deleteJournalEntry,
     refreshEntries,
     journalEntries: entries, // Alias for backward compatibility
-    isLoading: loading // Alias for backward compatibility
+    isLoading: loading, // Alias for backward compatibility
+    loadError
   };
 }
