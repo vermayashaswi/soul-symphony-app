@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Navbar from "@/components/Navbar";
 
 const NotFound = () => {
   const location = useLocation();
@@ -17,8 +16,6 @@ const NotFound = () => {
 
   return (
     <div className="min-h-screen">
-      <Navbar />
-      
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center max-w-md px-4">
           <div className="mb-6 flex justify-center">

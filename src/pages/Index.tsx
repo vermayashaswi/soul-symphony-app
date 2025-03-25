@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
-import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -57,11 +56,8 @@ export default function Index() {
         <ParticleBackground />
       </div>
       
-      {/* Navbar with proper spacing */}
-      <Navbar />
-      
       {/* Main content with padding to avoid navbar overlap */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 pt-24 pb-12">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 py-12">
         <div className="max-w-3xl w-full text-center mb-10">
           <h1 className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500 mb-4">
             Welcome to Feelosophy

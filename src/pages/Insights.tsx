@@ -1,9 +1,7 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
 import EmotionChart from '@/components/EmotionChart';
 import { Button } from '@/components/ui/button';
@@ -27,13 +25,11 @@ export default function Insights() {
     { value: 'year', label: 'Year' },
   ];
 
-  // Handle scroll event to make time toggle sticky
   useEffect(() => {
     const handleScroll = () => {
       if (!timeToggleRef.current) return;
       
       if (!stickyThreshold.current) {
-        // Calculate position once
         const rect = timeToggleRef.current.getBoundingClientRect();
         stickyThreshold.current = rect.top + window.scrollY - 16; // 16px buffer
       }
@@ -45,7 +41,6 @@ export default function Insights() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Render time toggle component
   const renderTimeToggle = () => (
     <div className="flex items-center gap-3">
       <span className="text-sm text-muted-foreground">View:</span>
@@ -54,10 +49,8 @@ export default function Insights() {
         value={timeRange}
         onValueChange={(value) => {
           if (value) {
-            // Preserve scroll position when changing time range
             const currentScrollPosition = window.scrollY;
             setTimeRange(value as TimeRange);
-            // Use setTimeout to ensure the scroll is set after the state update renders
             setTimeout(() => window.scrollTo(0, currentScrollPosition), 0);
           }
         }}
@@ -84,10 +77,8 @@ export default function Insights() {
 
   return (
     <div className="min-h-screen pb-20">
-      <Navbar />
       <ParticleBackground />
       
-      {/* Sticky time toggle that appears when scrolling */}
       {isSticky && (
         <div className="fixed top-16 left-0 right-0 z-10 py-3 px-4 bg-background border-b shadow-sm flex justify-center">
           <div className="max-w-5xl w-full flex justify-end">
@@ -96,14 +87,13 @@ export default function Insights() {
         </div>
       )}
       
-      <div className="max-w-5xl mx-auto px-4 pt-28">
+      <div className="max-w-5xl mx-auto px-4 pt-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Insights</h1>
             <p className="text-muted-foreground">Discover patterns in your emotional journey</p>
           </div>
           
-          {/* Original non-sticky time toggle */}
           <div className="mt-4 md:mt-0" ref={timeToggleRef}>
             {renderTimeToggle()}
           </div>

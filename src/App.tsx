@@ -16,6 +16,7 @@ import ParticleBackground from "./components/ParticleBackground";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
+import Navbar from "./components/Navbar";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +56,22 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Layout component to wrap all routes with common elements like Navbar
+const AppLayout = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
+  const isAuthPage = location.pathname === "/auth";
+  
+  return (
+    <>
+      {/* Don't show navbar on auth page */}
+      {!isAuthPage && <Navbar />}
+      <div className={!isAuthPage ? "pt-16" : ""}>
+        {children}
+      </div>
+    </>
+  );
+};
+
 const AppRoutes = () => {
   // Listen for auth changes outside the React context
   useEffect(() => {
@@ -69,31 +86,33 @@ const AppRoutes = () => {
   }, []);
   
   return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/journal" element={
-        <ProtectedRoute>
-          <Journal />
-        </ProtectedRoute>
-      } />
-      <Route path="/insights" element={
-        <ProtectedRoute>
-          <Insights />
-        </ProtectedRoute>
-      } />
-      <Route path="/chat" element={
-        <ProtectedRoute>
-          <Chat />
-        </ProtectedRoute>
-      } />
-      <Route path="/settings" element={
-        <ProtectedRoute>
-          <Settings />
-        </ProtectedRoute>
-      } />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <AppLayout>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/journal" element={
+          <ProtectedRoute>
+            <Journal />
+          </ProtectedRoute>
+        } />
+        <Route path="/insights" element={
+          <ProtectedRoute>
+            <Insights />
+          </ProtectedRoute>
+        } />
+        <Route path="/chat" element={
+          <ProtectedRoute>
+            <Chat />
+          </ProtectedRoute>
+        } />
+        <Route path="/settings" element={
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        } />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </AppLayout>
   );
 };
 
