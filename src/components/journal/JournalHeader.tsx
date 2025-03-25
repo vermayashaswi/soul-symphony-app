@@ -14,7 +14,7 @@ interface JournalHeaderProps {
   isProcessingUnprocessedEntries?: boolean;
 }
 
-export function JournalHeader({ 
+export default function JournalHeader({ 
   onCreateJournal, 
   onViewInsights, 
   onProcessAllEmbeddings,

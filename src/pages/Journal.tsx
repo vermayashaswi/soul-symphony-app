@@ -1,15 +1,49 @@
 
 import React, { useState } from 'react';
-import { JournalHeader } from '@/components/journal/JournalHeader';
-import { JournalEntriesList } from '@/components/journal/JournalEntriesList';
-import { EmptyJournalState } from '@/components/journal/EmptyJournalState';
+import JournalHeader from '@/components/journal/JournalHeader';
+import JournalEntriesList from '@/components/journal/JournalEntriesList';
+import EmptyJournalState from '@/components/journal/EmptyJournalState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useJournalHandler } from '@/hooks/use-journal-handler';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
-import { BackendTester } from '@/components/BackendTester';
 import { toast } from 'sonner';
+
+// Create a simple BackendTester component since the original file is empty
+const BackendTester = ({ onTest }: { onTest: () => Promise<any> }) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleTest = async () => {
+    setIsLoading(true);
+    try {
+      await onTest();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="border border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
+      <h3 className="font-medium mb-2 text-sm">Backend Testing Tools</h3>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        onClick={handleTest}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <>
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            Testing...
+          </>
+        ) : (
+          'Test Journal Retrieval'
+        )}
+      </Button>
+    </div>
+  );
+};
 
 export default function Journal() {
   const { user } = useAuth();
@@ -48,7 +82,7 @@ export default function Journal() {
         }
       });
     }
-  }, [user?.id]);
+  }, [user?.id, processUnprocessedEntries]);
 
   return (
     <div className="container px-4 md:px-6 max-w-6xl space-y-6 py-6">
@@ -88,9 +122,13 @@ export default function Journal() {
           <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
         </div>
       ) : journalEntries.length > 0 ? (
-        <JournalEntriesList entries={journalEntries} />
+        <JournalEntriesList 
+          entries={journalEntries} 
+          loading={false} 
+          onStartRecording={handleCreateJournal}
+        />
       ) : (
-        <EmptyJournalState onCreate={handleCreateJournal} />
+        <EmptyJournalState onStartRecording={handleCreateJournal} />
       )}
       
       <div className="mt-8">
