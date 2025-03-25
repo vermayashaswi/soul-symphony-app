@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Processes an audio recording for transcription and analysis
@@ -35,6 +36,37 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       duration: 120000, // Toast remains for 2 minutes or until explicitly dismissed
     });
     
+    // Check if the user exists in the profiles table
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+      
+    if (profileError || !profileData) {
+      console.error('Profile check error:', profileError);
+      
+      // If profile doesn't exist, create one
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({ 
+          id: userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      if (insertError) {
+        console.error('Failed to create profile:', insertError);
+        toast.error('Failed to create user profile. Please try again later.');
+        toast.dismiss(tempId);
+        return { success: false, error: 'Failed to create user profile' };
+      }
+      
+      console.log('Successfully created profile for user:', userId);
+    } else {
+      console.log('User profile exists:', profileData);
+    }
+    
     // Launch the processing without awaiting it
     processRecordingInBackground(audioBlob, userId, tempId);
     
@@ -61,6 +93,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     console.log("Processing blob in background:", audioBlob);
     console.log("Blob type:", audioBlob.type);
     console.log("Blob size:", audioBlob.size);
+    console.log("User ID:", userId);
     
     // 1. Convert blob to base64
     const base64Audio = await blobToBase64(audioBlob);

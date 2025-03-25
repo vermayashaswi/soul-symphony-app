@@ -23,7 +23,7 @@ interface VoiceRecorderProps {
 export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
   const [noiseReduction, setNoiseReduction] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   
   const {
     isRecording,
@@ -62,8 +62,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     try {
       console.log("Processing recording with blob size:", audioBlob.size);
       console.log("Audio blob type:", audioBlob.type);
+      console.log("User ID:", user.id);
       
-      const result = await processRecording(audioBlob, user?.id);
+      const result = await processRecording(audioBlob, user.id);
       
       if (result.success && onRecordingComplete) {
         onRecordingComplete(audioBlob, result.tempId);
@@ -176,6 +177,18 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           </motion.p>
         )}
       </AnimatePresence>
+      
+      {authLoading && (
+        <div className="text-sm text-muted-foreground mt-4">
+          Checking authentication status...
+        </div>
+      )}
+      
+      {!user && !authLoading && (
+        <div className="text-sm text-red-500 mt-4">
+          You need to be signed in to save recordings
+        </div>
+      )}
       
       {isProcessing && (
         <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">

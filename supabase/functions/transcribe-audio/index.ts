@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -409,6 +410,30 @@ serve(async (req) => {
       themes = ["Theme 1", "Theme 2", "Theme 3", "Theme 4", "Theme 5"];
     }
     
+    // Check if a profile exists for this user, if not create one
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+      
+    if (profileError) {
+      console.log('Profile not found, creating one...');
+      const { error: insertProfileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      if (insertProfileError) {
+        console.error('Error creating profile:', insertProfileError);
+      } else {
+        console.log('Profile created successfully');
+      }
+    }
+    
     // Store entry with processed data
     const audioDuration = Math.floor(binaryAudio.length / 16000);
     let entryId = null;
@@ -420,9 +445,9 @@ serve(async (req) => {
           "transcription text": transcriptionText,
           "refined text": refinedText,
           "audio_url": audioUrl,
-          "user_id": userId || null,
+          "user_id": userId,
           "duration": audioDuration,
-          "emotions": emotionScores, // Store emotion scores directly
+          "emotions": emotionScores,
           "master_themes": themes
         }])
         .select();
