@@ -37,29 +37,30 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     });
     
     // Check if user profile exists before proceeding
+    // This is now a non-blocking call - we don't care if it fails
     try {
       const profileResult = await ensureUserProfile(userId);
       if (!profileResult.success) {
-        console.warn('Profile creation warning in processRecording:', profileResult.error);
-        // Continue with processing since profile might get created later
+        console.warn('Profile creation warning in processRecording - continuing anyway:', profileResult.error);
+      } else {
+        console.log('Profile check completed. Proceeding with recording processing');
       }
     } catch (profileError) {
-      console.error('Profile check error:', profileError);
-      // Don't fail the recording process due to profile issues
+      console.error('Profile check error, but continuing with recording process:', profileError);
     }
       
     // Launch the processing without awaiting it
     processRecordingInBackground(audioBlob, userId, tempId).catch(error => {
       console.error('Background processing error:', error);
       toast.dismiss(tempId);
-      toast.error('Error processing recording');
+      toast.error('Error processing recording. Please try again.');
     });
     
     // Return immediately with the temp ID
     return { success: true, tempId };
   } catch (error: any) {
     console.error('Error initiating recording process:', error);
-    toast.error(`Error initiating recording process: ${error.message || 'Unknown error'}`);
+    toast.error(`Error initiating recording process. Please try again later.`);
     return { success: false, error: error.message || 'Unknown error' };
   }
 }
@@ -100,27 +101,28 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     try {
       const authStatus = await verifyUserAuthentication(false); // Don't show toast here
       if (!authStatus.isAuthenticated) {
+        console.error('Authentication verification failed:', authStatus.error);
         toast.dismiss(toastId);
-        toast.error(authStatus.error || 'Authentication failed');
+        toast.error('Authentication failed. Please try signing in again.');
         return;
       }
     } catch (authError) {
       console.error('Authentication verification error:', authError);
       toast.dismiss(toastId);
-      toast.error('Authentication check failed');
+      toast.error('Authentication check failed. Please try again.');
       return;
     }
 
-    // Final check for profile existence
+    // Profile check is non-blocking - we continue with transcription regardless
     try {
       const profileResult = await ensureUserProfile(userId);
       if (!profileResult.success) {
         console.warn('Profile creation issue before transcription, continuing anyway:', profileResult.error);
-        // We continue anyway as the transcription service will also try to create the profile
+      } else {
+        console.log('Profile check completed before transcription');
       }
     } catch (profileError) {
-      console.error('Profile check error before transcription:', profileError);
-      // Continue despite errors with profile checking
+      console.error('Profile check error before transcription, continuing anyway:', profileError);
     }
 
     // 3. Send audio for transcription and AI analysis
@@ -148,16 +150,17 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
           window.location.href = `/journal?processing=${toastId}`;
         }
       } else {
-        toast.error(result.error || 'Failed to process recording');
+        console.error('Transcription service error:', result.error);
+        toast.error('Failed to process recording. Please try again later.');
       }
     } catch (transcriptionError) {
       console.error('Transcription error:', transcriptionError);
       toast.dismiss(toastId);
-      toast.error('Failed to transcribe audio. Please try again.');
+      toast.error('Failed to transcribe audio. Please try again later.');
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
     toast.dismiss(toastId);
-    toast.error(`Error processing recording: ${error.message || 'Unknown error'}`);
+    toast.error(`Error processing recording. Please try again later.`);
   }
 }

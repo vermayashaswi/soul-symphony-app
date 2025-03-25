@@ -35,13 +35,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await ensureUserProfile(userId);
       
       if (!result.success) {
-        console.error('Profile creation failed:', result.error);
+        console.warn('Profile creation attempted but had issues:', result.error);
         // Don't show toast here to prevent multiple errors
+        // The error is not fatal - the database trigger might have created the profile
       } else {
         console.log('Profile check/creation completed successfully');
       }
     } catch (error) {
-      console.error('Error in createUserProfile:', error);
+      console.error('Error in createUserProfile, but continuing:', error);
+      // Don't throw the error as it's not fatal
     }
   }, [profileCreationAttempted]);
   
@@ -63,7 +65,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (newSession?.user) {
           // Reset profile creation flag on new sign-in
           setProfileCreationAttempted(false);
-          createUserProfile(newSession.user.id);
+          createUserProfile(newSession.user.id).catch(err => {
+            console.error('Profile creation error on auth state change, but continuing:', err);
+          });
         }
       } else if (event === 'SIGNED_OUT') {
         toast.info('Signed out successfully');
@@ -79,10 +83,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Ensure user profile exists for existing session
       if (initialSession?.user) {
-        createUserProfile(initialSession.user.id);
+        createUserProfile(initialSession.user.id).catch(err => {
+          console.error('Profile creation error on initial session, but continuing:', err);
+        });
       }
     }).catch(error => {
-      console.error('Error checking session:', error);
+      console.error('Error checking session, but continuing:', error);
       setIsLoading(false);
     });
     
