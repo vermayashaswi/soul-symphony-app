@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { FeelsophyLogo } from '@/components/FeelsophyLogo';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -81,9 +82,8 @@ export function Navbar() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
-            className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center"
           >
-            <span className="text-white font-bold text-lg">F</span>
+            <FeelsophyLogo size="md" withText={false} />
           </motion.div>
           <motion.span 
             initial={{ opacity: 0, x: -10 }}

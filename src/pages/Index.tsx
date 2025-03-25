@@ -57,7 +57,7 @@ export default function Index() {
             Welcome to Feelosophy
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground mb-8">
-            Explore your thoughts, track your emotions, and gain valuable insights with AI-powered journaling
+            Explore your thoughts, track your emotions, and gain valuable insights with AI-powered VOICE journaling
           </p>
           
           {isLoading ? (
