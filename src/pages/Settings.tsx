@@ -1,4 +1,5 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, Volume2, HelpCircle, Shield, Edit, Check as CheckIcon } from 'lucide-react';
 import Navbar from '@/components/Navbar';
@@ -8,6 +9,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -38,6 +41,19 @@ export default function Settings() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [aiVoiceFeedback, setAiVoiceFeedback] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(false);
+  const [profileData, setProfileData] = useState<{
+    fullName: string;
+    email: string;
+    avatarUrl: string;
+  }>({
+    fullName: '',
+    email: '',
+    avatarUrl: '',
+  });
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+  const [journalCount, setJournalCount] = useState(0);
+  
+  const { user } = useAuth();
   
   const colorThemes = [
     { name: 'Default', color: 'bg-primary' },
@@ -48,6 +64,99 @@ export default function Settings() {
   ];
   
   const [selectedTheme, setSelectedTheme] = useState(colorThemes[0].name);
+  
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user) return;
+      
+      try {
+        // Get journal count
+        const { data: journalData, error: journalError } = await supabase
+          .from('Journal Entries')
+          .select('id')
+          .eq('user_id', user.id);
+          
+        if (journalError) {
+          console.error('Error fetching journal count:', journalError);
+        } else {
+          setJournalCount(journalData?.length || 0);
+        }
+        
+        // Get user profile data
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('full_name, email, avatar_url')
+          .eq('id', user.id)
+          .maybeSingle();
+          
+        if (profileError) {
+          console.error('Error fetching profile data:', profileError);
+          return;
+        }
+        
+        // Use data from profile if available, otherwise fallback to user object
+        setProfileData({
+          fullName: profileData?.full_name || user.user_metadata?.full_name || 'User',
+          email: profileData?.email || user.email || '',
+          avatarUrl: profileData?.avatar_url || user.user_metadata?.avatar_url || '',
+        });
+      } catch (error) {
+        console.error('Error in fetchUserProfile:', error);
+      }
+    };
+    
+    fetchUserProfile();
+  }, [user]);
+  
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user || !e.target.files || e.target.files.length === 0) return;
+    
+    try {
+      setIsUpdatingAvatar(true);
+      const file = e.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      // Upload the file to storage
+      const { error: uploadError } = await supabase.storage
+        .from('profile_pictures')
+        .upload(filePath, file);
+        
+      if (uploadError) {
+        toast.error('Failed to upload profile picture');
+        console.error('Error uploading avatar:', uploadError);
+        return;
+      }
+      
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('profile_pictures')
+        .getPublicUrl(filePath);
+        
+      const avatarUrl = urlData.publicUrl;
+      
+      // Update the profile with the new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', user.id);
+        
+      if (updateError) {
+        toast.error('Failed to update profile');
+        console.error('Error updating profile:', updateError);
+        return;
+      }
+      
+      // Update local state
+      setProfileData(prev => ({ ...prev, avatarUrl }));
+      toast.success('Profile picture updated successfully');
+    } catch (error) {
+      console.error('Error in handleAvatarChange:', error);
+      toast.error('An error occurred while updating profile picture');
+    } finally {
+      setIsUpdatingAvatar(false);
+    }
+  };
   
   return (
     <div className="min-h-screen pb-20">
@@ -78,28 +187,39 @@ export default function Settings() {
             <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
               <div className="relative">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&auto=format&fit=crop" />
-                  <AvatarFallback>JD</AvatarFallback>
+                  <AvatarImage src={profileData.avatarUrl} />
+                  <AvatarFallback>{profileData.fullName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
                 </Avatar>
-                <button className="absolute bottom-0 right-0 h-8 w-8 bg-primary text-white rounded-full flex items-center justify-center border-2 border-background">
-                  <Edit className="h-4 w-4" />
-                </button>
+                <label className="absolute bottom-0 right-0 h-8 w-8 bg-primary text-white rounded-full flex items-center justify-center border-2 border-background cursor-pointer">
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    disabled={isUpdatingAvatar}
+                  />
+                  {isUpdatingAvatar ? (
+                    <span className="animate-spin h-3 w-3 border-2 border-white rounded-full border-t-transparent" />
+                  ) : (
+                    <Edit className="h-4 w-4" />
+                  )}
+                </label>
               </div>
               
               <div className="flex-1 space-y-4 text-center sm:text-left">
                 <div>
-                  <h3 className="text-xl font-semibold">Alex Johnson</h3>
-                  <p className="text-muted-foreground">alex.johnson@example.com</p>
+                  <h3 className="text-xl font-semibold">{profileData.fullName}</h3>
+                  <p className="text-muted-foreground">{profileData.email}</p>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-secondary rounded-lg p-3">
                     <p className="text-muted-foreground text-sm">Journal Entries</p>
-                    <p className="text-xl font-medium">48</p>
+                    <p className="text-xl font-medium">{journalCount}</p>
                   </div>
                   <div className="bg-secondary rounded-lg p-3">
                     <p className="text-muted-foreground text-sm">Current Streak</p>
-                    <p className="text-xl font-medium">8 days</p>
+                    <p className="text-xl font-medium">0 days</p>
                   </div>
                 </div>
               </div>

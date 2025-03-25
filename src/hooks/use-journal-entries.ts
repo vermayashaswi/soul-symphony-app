@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,7 +31,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const RETRY_DELAY = 5000; // 5 seconds between retries
 
   const fetchEntries = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('No userId provided to useJournalEntries');
+      setLoading(false);
+      return;
+    }
     
     // Prevent multiple simultaneous fetch attempts
     if (isRetrying) return;
@@ -38,6 +43,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     try {
       setLoading(true);
       setLoadError(null);
+      
+      console.log(`Fetching entries for user ${userId}`);
       
       const { data, error } = await supabase
         .from('Journal Entries')
@@ -47,6 +54,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         
       if (error) {
         console.error('Error fetching entries:', error);
+        console.error('Error details:', JSON.stringify(error));
         setLoadError(error.message);
         
         if (retryAttempt >= MAX_RETRY_ATTEMPTS) {
@@ -68,6 +76,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       // Reset retry counter on success
       setRetryAttempt(0);
       
+      console.log(`Fetched ${data?.length || 0} entries successfully`);
+      
       const typedEntries = (data || []) as JournalEntry[];
       
       // Process any entries without master_themes (would happen if using old transcription function)
@@ -87,13 +97,18 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         
         // Re-fetch entries if we updated any
         if (entriesNeedingThemes.length > 0) {
-          const { data: refreshedData } = await supabase
+          const { data: refreshedData, error: refreshError } = await supabase
             .from('Journal Entries')
             .select('*')
             .eq('user_id', userId)
             .order('created_at', { ascending: false });
             
+          if (refreshError) {
+            console.error('Error re-fetching entries after theme generation:', refreshError);
+          }
+            
           if (refreshedData) {
+            console.log(`Re-fetched ${refreshedData.length} entries after theme generation`);
             setEntries(refreshedData as JournalEntry[]);
             return;
           }
@@ -313,7 +328,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setEntries([]);
       setRetryAttempt(0);
       setLoadError(null);
+      console.log(`Initial fetch triggered for user ${userId} with refreshKey ${refreshKey}`);
       fetchEntries();
+    } else {
+      console.log('No user ID available for fetching journal entries');
     }
   }, [userId, refreshKey, fetchEntries]);
 

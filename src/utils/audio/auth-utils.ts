@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -71,11 +70,24 @@ export async function ensureUserProfile(userId: string): Promise<{
   error?: string;
 }> {
   if (!userId) {
+    console.error('No user ID provided to ensureUserProfile');
     return { success: false, error: 'No user ID provided' };
   }
   
   try {
-    // Check if profile exists first
+    // Get user details from auth first to have the data ready if we need to create a profile
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) {
+      console.error('Error getting user data:', userError);
+      return { success: false, error: `Unable to get user information: ${userError.message}` };
+    }
+    
+    if (!userData.user) {
+      return { success: false, error: 'User not found' };
+    }
+    
+    // Check if profile exists
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('id')
@@ -97,71 +109,53 @@ export async function ensureUserProfile(userId: string): Promise<{
     // Profile doesn't exist, try to create one
     console.log('No profile found, attempting to create profile for user:', userId);
     
+    // Extract user information
+    const email = userData.user.email;
+    const fullName = userData.user.user_metadata?.full_name || null;
+    const avatarUrl = userData.user.user_metadata?.avatar_url || null;
+    
+    console.log('Creating profile with user data:', { email, fullName, avatarUrl });
+    
+    // Insert profile with retry logic for concurrent creation
     try {
-      // Get user details from auth
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        console.error('Error getting user data:', userError);
-        // If we can't get user data, we'll still return success
-        // The profile might be created by the database trigger
-        return { success: true, error: `Unable to get user information: ${userError.message}` };
-      }
-      
-      if (!userData.user) {
-        // Return success anyway as the profile might be created by the database trigger
-        return { success: true, error: 'User not found, but continuing' };
-      }
-      
-      // Extract user information
-      const email = userData.user.email;
-      const fullName = userData.user.user_metadata?.full_name || null;
-      const avatarUrl = userData.user.user_metadata?.avatar_url || null;
-      
-      // Insert profile with retry logic for concurrent creation
-      try {
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({ 
-            id: userId,
-            email: email,
-            full_name: fullName,
-            avatar_url: avatarUrl,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-          
-        if (insertError) {
-          // If duplicate key error, profile was created in another process
-          if (insertError.code === '23505') {
-            console.log('Profile already exists (created by another process)');
-            return { success: true };
-          }
-          
-          // If RLS error, the profile will likely be created by the database trigger
-          if (insertError.message.includes('row-level security') || 
-              insertError.message.includes('violates row-level security policy')) {
-            console.log('Row-level security prevented profile creation from client.');
-            console.log('This is expected - the database trigger should create the profile instead');
-            // Don't treat this as an error - the database trigger should create the profile
-            return { success: true };
-          }
-          
-          console.error('Failed to create profile:', insertError);
-          // Return success anyway as the profile might be created by the database trigger
-          return { success: true, error: `Client-side profile creation failed: ${insertError.message}` };
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({ 
+          id: userId,
+          email: email,
+          full_name: fullName,
+          avatar_url: avatarUrl,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      if (insertError) {
+        // If duplicate key error, profile was created in another process
+        if (insertError.code === '23505') {
+          console.log('Profile already exists (created by another process)');
+          return { success: true };
         }
         
-        console.log('Successfully created profile for user:', userId);
-        return { success: true };
-      } catch (insertErr: any) {
-        console.error('Profile insertion error:', insertErr);
+        // If RLS error, the profile will likely be created by the database trigger
+        if (insertError.message.includes('row-level security') || 
+            insertError.message.includes('violates row-level security policy')) {
+          console.log('Row-level security prevented profile creation from client.');
+          console.log('This is expected - the database trigger should create the profile instead');
+          // Don't treat this as an error - the database trigger should create the profile
+          return { success: true };
+        }
+        
+        console.error('Failed to create profile:', insertError);
         // Return success anyway as the profile might be created by the database trigger
-        return { success: true, error: `Profile insertion error, but continuing: ${insertErr.message}` };
+        return { success: true, error: `Client-side profile creation failed: ${insertError.message}` };
       }
-    } catch (userDataErr: any) {
-      console.error('Error getting user data:', userDataErr);
+      
+      console.log('Successfully created profile for user:', userId);
+      return { success: true };
+    } catch (insertErr: any) {
+      console.error('Profile insertion error:', insertErr);
       // Return success anyway as the profile might be created by the database trigger
-      return { success: true, error: `Error getting user data, but continuing: ${userDataErr.message}` };
+      return { success: true, error: `Profile insertion error, but continuing: ${insertErr.message}` };
     }
   } catch (error: any) {
     console.error('Error in ensureUserProfile:', error);

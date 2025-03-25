@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('AuthProvider: Setting up auth state listener');
     
     // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log('Auth state changed:', event);
       
       setSession(newSession);
@@ -65,9 +65,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (newSession?.user) {
           // Reset profile creation flag on new sign-in
           setProfileCreationAttempted(false);
-          createUserProfile(newSession.user.id).catch(err => {
-            console.error('Profile creation error on auth state change, but continuing:', err);
+          
+          // Log user data for debugging
+          console.log('User data after sign-in:', {
+            id: newSession.user.id,
+            email: newSession.user.email,
+            name: newSession.user.user_metadata?.full_name,
+            avatar: newSession.user.user_metadata?.avatar_url
           });
+          
+          try {
+            await createUserProfile(newSession.user.id);
+          } catch (err) {
+            console.error('Profile creation error on auth state change, but continuing:', err);
+          }
         }
       } else if (event === 'SIGNED_OUT') {
         toast.info('Signed out successfully');
@@ -83,9 +94,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Ensure user profile exists for existing session
       if (initialSession?.user) {
-        createUserProfile(initialSession.user.id).catch(err => {
-          console.error('Profile creation error on initial session, but continuing:', err);
+        // Log user data for debugging
+        console.log('User data from existing session:', {
+          id: initialSession.user.id,
+          email: initialSession.user.email,
+          name: initialSession.user.user_metadata?.full_name,
+          avatar: initialSession.user.user_metadata?.avatar_url
         });
+        
+        try {
+          createUserProfile(initialSession.user.id);
+        } catch (err) {
+          console.error('Profile creation error on initial session, but continuing:', err);
+        }
       }
     }).catch(error => {
       console.error('Error checking session, but continuing:', error);
