@@ -166,14 +166,18 @@ export default function Chat() {
       // For each entry, check if it has an embedding and generate one if missing
       let diagnosticInfo = "Embedding Debug Results:\n\n";
       
-      for (const entry of entriesData) {
+      // Explicitly type entriesData as an array that might contain journal entries
+      const typedEntries = entriesData as Array<Partial<JournalEntry> | null>;
+      
+      for (const entry of typedEntries) {
         // Make sure entry is valid before accessing properties
         if (!entry || typeof entry !== 'object') {
           diagnosticInfo += `Entry is null or not an object\n\n`;
           continue;
         }
         
-        const entryId = entry && typeof entry.id === 'number' ? entry.id : null;
+        // Safely access properties with proper type checking
+        const entryId = entry && 'id' in entry && typeof entry.id === 'number' ? entry.id : null;
         if (entryId === null) {
           diagnosticInfo += `Entry has invalid ID: ${JSON.stringify(entry)}\n\n`;
           continue;
@@ -186,15 +190,26 @@ export default function Chat() {
           .eq('journal_entry_id', entryId)
           .maybeSingle();
         
-        const date = entry && entry.created_at ? new Date(entry.created_at).toLocaleString() : 'unknown date';
+        // Safely access properties with optional chaining
+        const date = entry && 'created_at' in entry && entry.created_at 
+          ? new Date(entry.created_at.toString()).toLocaleString() 
+          : 'unknown date';
+          
         const hasEmbedding = !embeddingError && embeddingData;
         
         diagnosticInfo += `Entry ${entryId} (${date}):\n`;
-        diagnosticInfo += `- Has text: ${entry && entry["refined text"] ? "Yes" : "No"}\n`;
-        diagnosticInfo += `- Text length: ${entry && entry["refined text"] ? entry["refined text"].length : 0} characters\n`;
+        
+        // Type-safe property access
+        const hasText = entry && 'refined text' in entry && entry["refined text"] ? true : false;
+        const textLength = entry && 'refined text' in entry && entry["refined text"] 
+          ? entry["refined text"].length 
+          : 0;
+          
+        diagnosticInfo += `- Has text: ${hasText ? "Yes" : "No"}\n`;
+        diagnosticInfo += `- Text length: ${textLength} characters\n`;
         diagnosticInfo += `- Has embedding: ${hasEmbedding ? "Yes" : "No"}\n`;
         
-        if (!hasEmbedding && entry && entry["refined text"]) {
+        if (!hasEmbedding && hasText) {
           diagnosticInfo += "- Attempting to generate embedding...\n";
           try {
             const success = await checkEmbeddingForEntry(entryId);

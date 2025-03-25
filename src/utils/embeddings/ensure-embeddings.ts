@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { JournalEntry } from '@/types/journal';
 import { fetchJournalEntriesWithText, checkExistingEmbeddings, countEmbeddings } from './check-embeddings';
