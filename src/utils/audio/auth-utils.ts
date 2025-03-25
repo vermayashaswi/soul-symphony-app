@@ -7,6 +7,7 @@ import { toast } from "sonner";
  */
 export async function verifyUserAuthentication() {
   try {
+    console.log("Verifying user authentication...");
     const { data, error } = await supabase.auth.getSession();
     
     if (error) {
@@ -18,9 +19,11 @@ export async function verifyUserAuthentication() {
     }
     
     if (!data.session) {
+      console.error('No session found');
       return { isAuthenticated: false, error: 'User is not authenticated' };
     }
     
+    console.log("User authenticated:", data.session.user.id);
     return { isAuthenticated: true, userId: data.session.user.id };
   } catch (error: any) {
     console.error('Unexpected authentication error:', error);

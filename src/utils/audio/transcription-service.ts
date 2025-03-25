@@ -30,6 +30,7 @@ export async function sendAudioForTranscription(base64String: string, userId: st
     }
     
     // Call the Supabase function
+    console.log("Calling transcribe-audio edge function...");
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64String,
@@ -50,9 +51,11 @@ export async function sendAudioForTranscription(base64String: string, userId: st
     if (data && data.success) {
       return { success: true, data };
     } else {
+      const errorMsg = data?.error || data?.message || 'Failed to process recording';
+      console.error("Transcription failed:", errorMsg);
       return { 
         success: false, 
-        error: data?.error || data?.message || 'Failed to process recording' 
+        error: errorMsg 
       };
     }
   } catch (error: any) {

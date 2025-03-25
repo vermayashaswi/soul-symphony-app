@@ -59,6 +59,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     
     try {
       console.log("Processing recording with blob size:", audioBlob.size);
+      console.log("Audio blob type:", audioBlob.type);
+      
       const result = await processRecording(audioBlob, user?.id);
       
       if (result.success && onRecordingComplete) {

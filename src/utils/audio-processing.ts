@@ -58,6 +58,10 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       return;
     }
     
+    console.log("Processing blob in background:", audioBlob);
+    console.log("Blob type:", audioBlob.type);
+    console.log("Blob size:", audioBlob.size);
+    
     // 1. Convert blob to base64
     const base64Audio = await blobToBase64(audioBlob);
     
@@ -71,6 +75,8 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     
     // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
     const base64String = base64Audio.split(',')[1]; 
+    
+    console.log("Base64 audio length:", base64String.length);
     
     // 2. Verify user authentication
     const authStatus = await verifyUserAuthentication();

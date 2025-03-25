@@ -13,15 +13,24 @@ export function blobToBase64(blob: Blob): Promise<string> {
       return;
     }
 
+    console.log("Converting blob to base64, size:", blob.size, "type:", blob.type);
     const reader = new FileReader();
+    
     reader.onloadend = () => {
       if (typeof reader.result === 'string') {
+        console.log("Base64 conversion successful, length:", reader.result.length);
         resolve(reader.result);
       } else {
+        console.error("FileReader did not return a string, result type:", typeof reader.result);
         reject(new Error('FileReader did not return a string'));
       }
     };
-    reader.onerror = () => reject(new Error('Error reading audio file'));
+    
+    reader.onerror = (e) => {
+      console.error("FileReader error:", e);
+      reject(new Error('Error reading audio file'));
+    };
+    
     reader.readAsDataURL(blob);
   });
 }
@@ -31,10 +40,14 @@ export function blobToBase64(blob: Blob): Promise<string> {
  */
 export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; errorMessage?: string } {
   if (!audioBlob) {
+    console.error("Audio blob is null or undefined");
     return { isValid: false, errorMessage: 'No recording to process.' };
   }
   
+  console.log("Validating audio blob, size:", audioBlob.size, "type:", audioBlob.type);
+  
   if (audioBlob.size < 1000) { // 1KB minimum
+    console.error("Audio blob is too small:", audioBlob.size);
     return { isValid: false, errorMessage: 'Recording is too short. Please try again.' };
   }
   

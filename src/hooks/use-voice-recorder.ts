@@ -1,5 +1,5 @@
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 
 interface UseVoiceRecorderOptions {
@@ -56,7 +56,7 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
     };
   }, []);
   
-  const cleanupResources = () => {
+  const cleanupResources = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
@@ -73,10 +73,10 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       audioContextRef.current.close().catch(console.error);
       audioContextRef.current = null;
     }
-  };
+  }, []);
 
   // Function to create audio processing setup for visualizations and noise reduction
-  const setupAudioProcessing = (stream: MediaStream) => {
+  const setupAudioProcessing = useCallback((stream: MediaStream) => {
     try {
       // Create audio context
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -151,7 +151,7 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       console.error('Error setting up audio processing:', error);
       return null;
     }
-  };
+  }, [noiseReduction, isRecording]);
   
   const startRecording = async () => {
     try {
@@ -168,13 +168,7 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true,
-          // Use higher sample rate for better quality
-          sampleRate: 48000,
-          // Try to use higher bit depth
-          sampleSize: 16,
-          // Use stereo if available
-          channelCount: 2
+          autoGainControl: true
         } 
       });
       
@@ -208,16 +202,14 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       }
       
       // Create MediaRecorder with best available options
-      // Add higher bitrate for better quality, when supported
-      const mediaRecorder = new MediaRecorder(stream, {
-        ...options,
-        bitsPerSecond: 128000 // 128 kbps for better audio quality
-      });
+      console.log("Creating media recorder with options:", options);
+      const mediaRecorder = new MediaRecorder(stream, options);
       
       mediaRecorderRef.current = mediaRecorder;
       
       // Set up data handling with more frequent data collection
       mediaRecorder.ondataavailable = (e) => {
+        console.log("Data available event:", e.data.size, "bytes");
         if (e.data.size > 0) {
           chunksRef.current.push(e.data);
         }
@@ -225,6 +217,9 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       
       // Set up stop handler
       mediaRecorder.onstop = () => {
+        console.log("Media recorder stopped");
+        console.log("Chunks collected:", chunksRef.current.length);
+        
         if (chunksRef.current.length === 0) {
           toast.error('No audio data recorded. Please try again.');
           setAudioBlob(null);
@@ -232,7 +227,7 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
         }
         
         const blob = new Blob(chunksRef.current, { type: options.mimeType || 'audio/webm' });
-        console.log('Recording stopped, blob size:', blob.size);
+        console.log('Recording stopped, blob size:', blob.size, 'type:', blob.type);
         setAudioBlob(blob);
         
         // Clean up resources
@@ -242,8 +237,8 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       };
       
       // Start recording with more frequent data collection (every 500ms)
-      setIsRecording(true);
       mediaRecorder.start(500);
+      setIsRecording(true);
       
       // Start timer
       timerRef.current = window.setInterval(() => {
@@ -261,7 +256,9 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
     }
   };
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
+    console.log("Stopping recording, mediaRecorder state:", mediaRecorderRef.current?.state);
+    
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -269,7 +266,7 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       // Clear ripples
       setRipples([]);
     }
-  };
+  }, [isRecording]);
   
   const requestPermissions = async () => {
     try {
@@ -283,6 +280,7 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       console.error('Failed to get permission:', error);
       toast.dismiss();
       toast.error('Microphone permission denied. Please adjust your browser settings.');
+      setHasPermission(false);
     }
   };
 

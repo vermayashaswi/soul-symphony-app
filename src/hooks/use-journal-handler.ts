@@ -10,7 +10,7 @@ export function useJournalHandler(userId: string | undefined) {
 
   const handleCreateJournal = () => {
     // Navigate to the record tab or show the journal creation dialog
-    console.log('Create journal entry');
+    navigate('/record');
   };
 
   const handleViewInsights = () => {

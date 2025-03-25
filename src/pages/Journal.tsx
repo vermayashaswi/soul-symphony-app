@@ -16,9 +16,11 @@ export default function Journal() {
   const { 
     handleCreateJournal, 
     handleViewInsights,
-    processUnprocessedEntries
+    processUnprocessedEntries,
+    isProcessingUnprocessedEntries
   } = useJournalHandler(user?.id);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [processingEntries, setProcessingEntries] = useState<string[]>([]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -58,7 +60,7 @@ export default function Journal() {
           variant="outline" 
           size="sm" 
           onClick={handleRefresh}
-          disabled={isRefreshing}
+          disabled={isRefreshing || isProcessingUnprocessedEntries}
         >
           {isRefreshing ? (
             <>
@@ -78,10 +80,11 @@ export default function Journal() {
         <div className="flex justify-center items-center min-h-[300px]">
           <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
         </div>
-      ) : journalEntries.length > 0 ? (
+      ) : journalEntries.length > 0 || processingEntries.length > 0 ? (
         <JournalEntriesList 
           entries={journalEntries} 
-          loading={false} 
+          loading={isLoading}
+          processingEntries={processingEntries}
           onStartRecording={handleCreateJournal}
         />
       ) : (
