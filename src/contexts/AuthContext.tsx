@@ -36,6 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           toast.success('Signed in successfully');
         } else if (event === 'SIGNED_OUT') {
           toast.info('Signed out');
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log('Token refreshed successfully');
         }
       }
     );
@@ -66,16 +68,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const redirectUrl = getRedirectUrl();
       console.log('Using redirect URL for Google auth:', redirectUrl);
       
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         },
       });
 
       if (error) {
+        console.error('Error initiating Google OAuth:', error);
         throw error;
       }
+      
+      console.log('OAuth sign-in initiated, URL:', data?.url);
     } catch (error: any) {
       console.error('Error signing in with Google:', error);
       toast.error(`Error signing in with Google: ${error.message}`);
@@ -98,14 +107,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Add a function to manually refresh the session
   const refreshSession = async () => {
     try {
-      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.refreshSession();
       if (error) {
+        console.error('Error refreshing session:', error);
         throw error;
       }
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
+      
+      console.log('Session refreshed:', data.session?.user?.email);
+      setSession(data.session);
+      setUser(data.session?.user ?? null);
     } catch (error: any) {
       console.error('Error refreshing session:', error);
+      toast.error(`Session refresh failed: ${error.message}`);
     }
   };
 

@@ -13,11 +13,14 @@ export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
   const [redirecting, setRedirecting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   
   const from = location.state?.from?.pathname || '/journal';
 
   useEffect(() => {
-    console.log('Current origin for Auth page:', window.location.origin);
+    const currentUrl = window.location.href;
+    console.log('Auth page loaded at URL:', currentUrl);
+    console.log('Current origin:', window.location.origin);
     
     if (user && !redirecting) {
       console.log('Auth page: User detected, redirecting to:', from);
@@ -45,7 +48,12 @@ export default function Auth() {
         
         if (window.location.hash.includes('error') || window.location.search.includes('error')) {
           console.error('Error detected in redirect URL');
-          toast.error('Authentication failed. Please try again.');
+          const errorMessage = window.location.search.includes('error_description') 
+            ? decodeURIComponent(window.location.search.split('error_description=')[1].split('&')[0])
+            : 'Authentication failed. Please try again.';
+          
+          setAuthError(errorMessage);
+          toast.error(errorMessage);
           return;
         }
         
@@ -54,27 +62,36 @@ export default function Auth() {
           
           if (error) {
             console.error('Error getting session after redirect:', error);
+            setAuthError(error.message);
             toast.error('Authentication error. Please try again.');
           } else if (data.session) {
-            console.log('Successfully retrieved session after redirect:', data.session.user.email);
+            console.log('Successfully retrieved session after redirect');
+            console.log('User:', data.session.user.email);
             console.log('Current domain:', window.location.origin);
           }
         } catch (e) {
           console.error('Exception during auth redirect handling:', e);
+          setAuthError(e instanceof Error ? e.message : 'Unexpected error');
           toast.error('Unexpected error during authentication');
         }
       }
     };
     
+    // Run hash redirect handler immediately
     handleHashRedirect();
   }, []);
 
   const handleSignIn = async () => {
+    setAuthError(null);
+    const callbackUrl = `${window.location.origin}/auth`;
     console.log('Initiating Google sign-in from', window.location.origin);
+    console.log('Using callback URL:', callbackUrl);
+    
     try {
       await signInWithGoogle();
     } catch (error) {
       console.error('Failed to initiate Google sign-in:', error);
+      setAuthError(error instanceof Error ? error.message : 'Unknown error');
       toast.error('Failed to initiate sign-in process. Please try again.');
     }
   };
@@ -113,6 +130,12 @@ export default function Auth() {
         </div>
         
         <div className="space-y-4">
+          {authError && (
+            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm mb-4">
+              {authError}
+            </div>
+          )}
+          
           <Button 
             size="lg" 
             className="w-full flex items-center justify-center gap-2"
@@ -128,6 +151,13 @@ export default function Auth() {
             </svg>
             Sign in with Google
           </Button>
+          
+          <div className="text-center text-sm text-muted-foreground mt-6">
+            <p className="mb-2">Debug Information:</p>
+            <p className="font-mono text-xs break-all bg-muted p-2 rounded">
+              Current URL: {window.location.href}
+            </p>
+          </div>
           
           <div className="text-center text-sm text-muted-foreground">
             <p>By signing in, you agree to our Terms of Service and Privacy Policy</p>
