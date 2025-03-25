@@ -78,7 +78,8 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
       console.log(`After generation: ${finalCount} embeddings exist for ${entryIds.length} journal entries`);
     }
     
-    return successCount > 0 || existingEmbeddingIds.size > 0;
+    // Fix here - use existingEmbeddingIds.length instead of existingEmbeddingIds.size
+    return successCount > 0 || existingEmbeddingIds.length > 0;
   } catch (error) {
     console.error('Error ensuring journal entries have embeddings:', error);
     return false;

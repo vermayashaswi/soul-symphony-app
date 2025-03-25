@@ -167,19 +167,26 @@ export default function Chat() {
       let diagnosticInfo = "Embedding Debug Results:\n\n";
       
       for (const entry of entriesData) {
-        if (!entry.id) continue;
+        // Make sure entry is valid before accessing properties
+        if (!entry || typeof entry !== 'object') continue;
+        
+        const entryId = typeof entry.id === 'number' ? entry.id : null;
+        if (entryId === null) {
+          diagnosticInfo += `Entry has invalid ID: ${JSON.stringify(entry)}\n\n`;
+          continue;
+        }
         
         // Check individual entry embedding
         const { data: embeddingData, error: embeddingError } = await supabase
           .from('journal_embeddings')
           .select('id')
-          .eq('journal_entry_id', entry.id)
+          .eq('journal_entry_id', entryId)
           .maybeSingle();
         
-        const date = new Date(entry.created_at).toLocaleString();
+        const date = entry.created_at ? new Date(entry.created_at).toLocaleString() : 'unknown date';
         const hasEmbedding = !embeddingError && embeddingData;
         
-        diagnosticInfo += `Entry ${entry.id} (${date}):\n`;
+        diagnosticInfo += `Entry ${entryId} (${date}):\n`;
         diagnosticInfo += `- Has text: ${entry["refined text"] ? "Yes" : "No"}\n`;
         diagnosticInfo += `- Text length: ${entry["refined text"]?.length || 0} characters\n`;
         diagnosticInfo += `- Has embedding: ${hasEmbedding ? "Yes" : "No"}\n`;
@@ -187,7 +194,7 @@ export default function Chat() {
         if (!hasEmbedding && entry["refined text"]) {
           diagnosticInfo += "- Attempting to generate embedding...\n";
           try {
-            const success = await checkEmbeddingForEntry(entry.id);
+            const success = await checkEmbeddingForEntry(entryId);
             diagnosticInfo += `- Generation ${success ? "succeeded" : "failed"}\n`;
           } catch (e) {
             diagnosticInfo += `- Generation failed with error: ${e}\n`;

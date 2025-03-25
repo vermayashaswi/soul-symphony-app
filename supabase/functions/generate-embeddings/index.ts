@@ -64,7 +64,25 @@ serve(async (req) => {
 
   try {
     // Parse the request body
-    const { entryId, text, forceRegenerate, isTestQuery } = await req.json();
+    let requestData;
+    try {
+      requestData = await req.json();
+      console.log("Request data received:", JSON.stringify(requestData).substring(0, 500) + "...");
+    } catch (parseError) {
+      console.error("Error parsing request JSON:", parseError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Invalid JSON in request body" 
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
+    const { entryId, text, forceRegenerate, isTestQuery } = requestData;
     
     // If this is just a test query to generate an embedding without storing it
     if (isTestQuery && text) {
@@ -89,29 +107,37 @@ serve(async (req) => {
       throw new Error("Entry ID is required");
     }
     
+    // Parse entry ID to ensure it's a number
+    const numericEntryId = typeof entryId === 'number' ? entryId : 
+                          typeof entryId === 'string' ? parseInt(entryId, 10) : null;
+                          
+    if (!numericEntryId && !isTestQuery) {
+      throw new Error(`Invalid entry ID: ${entryId}. Must be a valid number.`);
+    }
+    
     // If force regenerate is requested, delete existing embedding first
-    if (forceRegenerate) {
-      console.log(`Force regenerate requested for entry ${entryId}, deleting existing embedding`);
+    if (forceRegenerate && numericEntryId) {
+      console.log(`Force regenerate requested for entry ${numericEntryId}, deleting existing embedding`);
       const { error: deleteError } = await supabase
         .from('journal_embeddings')
         .delete()
-        .eq('journal_entry_id', entryId);
+        .eq('journal_entry_id', numericEntryId);
         
       if (deleteError) {
-        console.log(`No existing embedding found to delete for entry ${entryId}`);
+        console.log(`No existing embedding found to delete for entry ${numericEntryId}`);
       } else {
-        console.log(`Successfully deleted existing embedding for entry ${entryId}`);
+        console.log(`Successfully deleted existing embedding for entry ${numericEntryId}`);
       }
-    } else {
+    } else if (!isTestQuery) {
       // Check if embedding already exists for this entry
       const { data: existingEmbedding, error: checkError } = await supabase
         .from('journal_embeddings')
         .select('id')
-        .eq('journal_entry_id', entryId)
+        .eq('journal_entry_id', numericEntryId)
         .maybeSingle();
         
       if (!checkError && existingEmbedding) {
-        console.log(`Embedding already exists for entry ${entryId}, skipping generation`);
+        console.log(`Embedding already exists for entry ${numericEntryId}, skipping generation`);
         return new Response(
           JSON.stringify({ 
             success: true, 
@@ -124,14 +150,26 @@ serve(async (req) => {
     }
     
     // Generate the embedding
-    console.log(`Generating embedding for entry ${entryId}`);
+    console.log(`Generating embedding for entry ${numericEntryId || 'test query'}`);
     const embedding = await generateEmbedding(text);
+    
+    // For test queries, we're done here
+    if (isTestQuery) {
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Test embedding generated successfully",
+          embedding
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     // Store the embedding in the database
     const { data: insertedEmbedding, error: insertError } = await supabase
       .from('journal_embeddings')
       .insert({
-        journal_entry_id: entryId,
+        journal_entry_id: numericEntryId,
         embedding: embedding,
         content: text.trim()
       })
@@ -139,11 +177,11 @@ serve(async (req) => {
       .single();
       
     if (insertError) {
-      console.error(`Error storing embedding for entry ${entryId}:`, insertError);
+      console.error(`Error storing embedding for entry ${numericEntryId}:`, insertError);
       throw new Error(`Failed to store embedding: ${insertError.message}`);
     }
     
-    console.log(`Successfully stored embedding for entry ${entryId} with ID ${insertedEmbedding.id}`);
+    console.log(`Successfully stored embedding for entry ${numericEntryId} with ID ${insertedEmbedding.id}`);
     
     // Return success response
     return new Response(
