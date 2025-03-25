@@ -78,12 +78,12 @@ export function useTranscription(): UseTranscriptionReturnType {
     }
   };
 
-  // New function to store embeddings in the journal_embeddings table
+  // Function to store embeddings in the journal_embeddings table
   const storeEmbedding = async (journalEntryId: number, text: string) => {
     try {
       setIsStoringEmbedding(true);
       
-      // Call the OpenAI embeddings API through a Supabase Edge Function
+      // Call the create-embedding Edge Function
       const { data, error } = await supabase.functions.invoke('create-embedding', {
         body: { text, journalEntryId },
       });
@@ -96,7 +96,6 @@ export function useTranscription(): UseTranscriptionReturnType {
       
       if (data?.success) {
         console.log('Embedding stored successfully for journal entry:', journalEntryId);
-        toast.success('Journal entry indexed for search');
       } else {
         console.error('No success response from embedding function');
         toast.error('Failed to index journal entry for search');

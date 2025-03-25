@@ -60,18 +60,42 @@ serve(async (req) => {
       throw new Error('No embedding returned from OpenAI');
     }
     
-    // Store embedding in journal_embeddings table
-    const { data: storageData, error: storageError } = await supabase
+    // Check if entry already has an embedding
+    const { data: existingEmbedding, error: checkError } = await supabase
       .from('journal_embeddings')
-      .insert([{ 
-        journal_entry_id: journalEntryId,
-        content: text,
-        embedding,
-      }]);
+      .select('id')
+      .eq('journal_entry_id', journalEntryId)
+      .single();
       
-    if (storageError) {
-      console.error('Error storing embedding:', storageError);
-      throw new Error(`Database error: ${storageError.message}`);
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" which is expected
+      console.error('Error checking for existing embedding:', checkError);
+      throw new Error(`Database error: ${checkError.message}`);
+    }
+    
+    let result;
+    if (existingEmbedding) {
+      // Update existing embedding
+      result = await supabase
+        .from('journal_embeddings')
+        .update({ 
+          content: text,
+          embedding 
+        })
+        .eq('journal_entry_id', journalEntryId);
+    } else {
+      // Insert new embedding
+      result = await supabase
+        .from('journal_embeddings')
+        .insert([{ 
+          journal_entry_id: journalEntryId,
+          content: text,
+          embedding,
+        }]);
+    }
+    
+    if (result.error) {
+      console.error('Error storing embedding:', result.error);
+      throw new Error(`Database error: ${result.error.message}`);
     }
     
     console.log(`Successfully stored embedding for journal entry ${journalEntryId}`);

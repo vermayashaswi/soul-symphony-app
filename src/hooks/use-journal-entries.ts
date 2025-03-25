@@ -175,6 +175,33 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     fetchEntries();
   };
 
+  // Function to batch process embeddings for all entries
+  const processAllEmbeddings = async () => {
+    if (!userId) return;
+    
+    try {
+      toast.info('Starting to process embeddings for all journal entries...');
+      
+      const { data, error } = await supabase.functions.invoke('embed-all-entries', {
+        body: { userId }
+      });
+      
+      if (error) {
+        console.error('Error processing embeddings:', error);
+        toast.error('Failed to process embeddings');
+        return;
+      }
+      
+      toast.success(`Successfully processed embeddings for ${data.successCount} entries.`);
+      if (data.errorCount > 0) {
+        toast.warning(`Failed to process ${data.errorCount} entries.`);
+      }
+    } catch (error) {
+      console.error('Error invoking embed-all-entries function:', error);
+      toast.error('Failed to process embeddings');
+    }
+  };
+
   // Fetch entries on mount and when dependencies change
   useEffect(() => {
     if (userId) {
@@ -189,6 +216,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     isSaving,
     deleteJournalEntry,
     refreshEntries,
+    processAllEmbeddings,
     journalEntries: entries, // Alias for backward compatibility
     isLoading: loading // Alias for backward compatibility
   };

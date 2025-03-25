@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Pause, Play, Trash2, Save, X, Check, Loader2, RefreshCw } from 'lucide-react';
+import { Mic, Pause, Play, Trash2, Save, X, Check, Loader2, RefreshCw, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,6 +30,7 @@ export default function Journal() {
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [isRefining, setIsRefining] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState<number | null>(null);
+  const [isProcessingEmbeddings, setIsProcessingEmbeddings] = useState(false);
   
   const { 
     isRecording, 
@@ -59,7 +60,8 @@ export default function Journal() {
     saveJournalEntry,
     isSaving,
     deleteJournalEntry,
-    refreshEntries
+    refreshEntries,
+    processAllEmbeddings
   } = useJournalEntries(user?.id);
   
   useEffect(() => {
@@ -203,6 +205,17 @@ export default function Journal() {
       });
     } finally {
       setIsRefining(false);
+    }
+  };
+  
+  const handleProcessAllEmbeddings = async () => {
+    setIsProcessingEmbeddings(true);
+    try {
+      await processAllEmbeddings();
+    } catch (error) {
+      console.error('Error processing embeddings:', error);
+    } finally {
+      setIsProcessingEmbeddings(false);
     }
   };
   
@@ -412,17 +425,38 @@ export default function Journal() {
             
             <TabsContent value="entries">
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center flex-wrap gap-2">
                   <h2 className="text-xl font-semibold">Your Journal Entries</h2>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={refreshEntries}
-                    className="flex items-center gap-2"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleProcessAllEmbeddings}
+                      className="flex items-center gap-2"
+                      disabled={isProcessingEmbeddings}
+                    >
+                      {isProcessingEmbeddings ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Database className="h-4 w-4" />
+                          Index All Entries
+                        </>
+                      )}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={refreshEntries}
+                      className="flex items-center gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
                 
                 {isLoadingEntries ? (
@@ -584,3 +618,4 @@ export default function Journal() {
     </div>
   );
 }
+
