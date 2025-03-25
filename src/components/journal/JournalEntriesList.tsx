@@ -19,7 +19,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   processingEntries = [],
   onStartRecording
 }) => {
-  if (loading && entries.length === 0) {
+  if (loading && entries.length === 0 && processingEntries.length === 0) {
     return (
       <div className="flex justify-center my-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -42,7 +42,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         {/* Processing entry placeholders */}
         {processingEntries.map((tempId) => (
           <motion.div 
-            key={tempId}
+            key={`processing-${tempId}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="border rounded-lg p-6 shadow-sm relative overflow-hidden"
@@ -64,13 +64,13 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           </motion.div>
         ))}
 
-        {/* Actual entries */}
+        {/* Actual entries - don't hide these while loading more entries */}
         {entries.map((entry) => (
-          <JournalEntryCard key={entry.id} entry={entry} />
+          <JournalEntryCard key={`entry-${entry.id}`} entry={entry} />
         ))}
       </AnimatePresence>
     </motion.div>
   );
-};
+}
 
 export default JournalEntriesList;

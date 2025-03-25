@@ -15,10 +15,15 @@ export default function Record() {
 
   const handleRecordingComplete = (audioBlob: Blob, tempId?: string) => {
     console.log('Recording completed, tempId:', tempId);
-    toast.success('Journal entry saved successfully! Redirecting to journal page...');
-    setTimeout(() => {
-      navigate('/journal');
-    }, 1500);
+    toast.success('Journal entry saved successfully!');
+    
+    // Navigate to the journal page with the temp ID as a query param
+    // This will allow us to show a loading state for just this entry
+    if (tempId) {
+      navigate(`/journal?processing=${tempId}`, { replace: true });
+    } else {
+      navigate('/journal', { replace: true });
+    }
   };
 
   const handleToggleMode = (value: string) => {

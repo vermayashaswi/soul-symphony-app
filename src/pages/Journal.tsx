@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import JournalHeader from '@/components/journal/JournalHeader';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import EmptyJournalState from '@/components/journal/EmptyJournalState';
@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function Journal() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { 
     journalEntries, 
@@ -36,7 +37,7 @@ export default function Journal() {
 
   // Extract processing entries from URL if present
   useEffect(() => {
-    const queryParams = new URLSearchParams(window.location.search);
+    const queryParams = new URLSearchParams(location.search);
     const tempId = queryParams.get('processing');
     
     if (tempId && !processingEntries.includes(tempId)) {
@@ -50,9 +51,25 @@ export default function Journal() {
       // This is just in case it doesn't get refreshed by the normal refresh mechanism
       setTimeout(() => {
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
+        // Trigger a refresh to attempt to load the completed entry
+        refreshEntries(false);
       }, 30000);
+      
+      // Schedule periodic refreshes while processing
+      const refreshInterval = setInterval(() => {
+        console.log("Auto-refreshing entries to check for processed entry");
+        refreshEntries(false).then(() => {
+          // Check if we should clear the interval
+          if (processingEntries.length === 0) {
+            clearInterval(refreshInterval);
+          }
+        });
+      }, 5000); // Check every 5 seconds
+      
+      // Clean up interval
+      return () => clearInterval(refreshInterval);
     }
-  }, []);
+  }, [location.search, processingEntries]);
 
   const handleRefresh = async () => {
     if (isRefreshing) return;
@@ -134,7 +151,7 @@ export default function Journal() {
           variant="outline" 
           size="sm" 
           onClick={handleRefresh}
-          disabled={isRefreshing || isProcessingUnprocessedEntries || isLoading}
+          disabled={isRefreshing || isProcessingUnprocessedEntries}
         >
           {isRefreshing ? (
             <>
@@ -166,20 +183,13 @@ export default function Journal() {
         </Alert>
       )}
       
-      {isLoading && journalEntries.length === 0 ? (
-        <div className="flex justify-center items-center min-h-[300px]">
-          <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
-        </div>
-      ) : journalEntries.length > 0 || processingEntries.length > 0 ? (
-        <JournalEntriesList 
-          entries={journalEntries} 
-          loading={isLoading}
-          processingEntries={processingEntries}
-          onStartRecording={() => navigate('/record')}
-        />
-      ) : (
-        <EmptyJournalState onStartRecording={() => navigate('/record')} />
-      )}
+      {/* We don't want the whole page to show a loading state if we have entries */}
+      <JournalEntriesList 
+        entries={journalEntries} 
+        loading={isLoading}
+        processingEntries={processingEntries}
+        onStartRecording={() => navigate('/record')}
+      />
     </div>
   );
 }

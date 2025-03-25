@@ -67,15 +67,20 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       const result = await processRecording(audioBlob, user.id);
       
       if (result.success && onRecordingComplete) {
+        // Call the completion handler with the temp ID
         onRecordingComplete(audioBlob, result.tempId);
       } else if (!result.success) {
+        setIsProcessing(false);
         toast.error(result.error || "Failed to process recording");
       }
+      
+      // Note: We don't reset processing state here because the component will unmount
+      // when navigating away
+      
     } catch (error) {
       console.error("Error in handleSaveEntry:", error);
-      toast.error("Failed to save entry. Please try again.");
-    } finally {
       setIsProcessing(false);
+      toast.error("Failed to save entry. Please try again.");
     }
   };
 
