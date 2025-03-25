@@ -19,6 +19,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isProcessingEmbeddings, setIsProcessingEmbeddings] = useState(false);
   const { storeEmbedding } = useTranscription();
 
   const fetchEntries = useCallback(async () => {
@@ -176,15 +177,19 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const processAllEmbeddings = async () => {
     if (!userId) {
       toast.error('User ID is required to process embeddings');
-      return;
+      return { success: false };
     }
     
+    setIsProcessingEmbeddings(true);
     try {
       toast.info('Processing journal embeddings...');
       
       // Call the Supabase Edge Function to process all embeddings
       const { data, error } = await supabase.functions.invoke('embed-all-entries', {
-        body: { userId }
+        body: { 
+          userId,
+          processAll: true  // Flag to process all entries regardless of existing embeddings
+        }
       });
       
       if (error) {
@@ -195,7 +200,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       if (data?.success) {
         console.log('Embeddings processed successfully:', data);
-        toast.success(`Processed ${data.successCount || 0} entries successfully`);
+        toast.success(`Processed ${data.totalProcessed} entries: ${data.successCount} successful, ${data.errorCount} errors`);
         return data;
       } else {
         toast.error('Failed to process journal embeddings');
@@ -204,8 +209,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
     } catch (error) {
       console.error('Error in processAllEmbeddings:', error);
-      toast.error('Failed to process journal embeddings');
-      throw error;
+      toast.error(`Failed to process journal embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return { success: false, error };
+    } finally {
+      setIsProcessingEmbeddings(false);
     }
   };
 
@@ -228,6 +235,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     deleteJournalEntry,
     refreshEntries,
     processAllEmbeddings,
+    isProcessingEmbeddings,
     journalEntries: entries, // Alias for backward compatibility
     isLoading: loading // Alias for backward compatibility
   };

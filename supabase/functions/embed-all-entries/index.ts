@@ -16,6 +16,8 @@ const corsHeaders = {
 
 async function createEmbedding(text: string) {
   try {
+    console.log('Creating embedding for text (first 50 chars):', text.substring(0, 50));
+    
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -42,6 +44,60 @@ async function createEmbedding(text: string) {
   }
 }
 
+async function processEntry(entry) {
+  try {
+    // Skip if no text content
+    const textContent = entry["refined text"] || entry["transcription text"];
+    if (!textContent) {
+      return { id: entry.id, status: 'skipped', reason: 'No text content' };
+    }
+    
+    // Check if entry already has embedding
+    const { data: existingEmbedding } = await supabase
+      .from('journal_embeddings')
+      .select('id')
+      .eq('journal_entry_id', entry.id)
+      .single();
+      
+    // Create embedding
+    const embedding = await createEmbedding(textContent);
+    
+    let result;
+    if (existingEmbedding) {
+      // Update existing
+      result = await supabase
+        .from('journal_embeddings')
+        .update({ 
+          content: textContent,
+          embedding 
+        })
+        .eq('journal_entry_id', entry.id);
+      
+      console.log(`Updated embedding for entry ${entry.id}`);
+    } else {
+      // Insert new
+      result = await supabase
+        .from('journal_embeddings')
+        .insert([{ 
+          journal_entry_id: entry.id,
+          content: textContent,
+          embedding,
+        }]);
+      
+      console.log(`Created new embedding for entry ${entry.id}`);
+    }
+    
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+    
+    return { id: entry.id, status: 'success' };
+  } catch (error) {
+    console.error(`Error processing entry ${entry.id}:`, error);
+    return { id: entry.id, status: 'error', error: error.message };
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -49,7 +105,9 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, entryId } = await req.json();
+    const { userId, entryId, processAll = false } = await req.json();
+    
+    console.log(`Processing request: userId=${userId}, entryId=${entryId}, processAll=${processAll}`);
     
     let query = supabase
       .from('Journal Entries')
@@ -61,8 +119,8 @@ serve(async (req) => {
       query = query.eq('user_id', userId);
     }
     
-    // Filter by entry if provided
-    if (entryId) {
+    // Filter by entry if provided and not processing all
+    if (entryId && !processAll) {
       query = query.eq('id', entryId);
     }
     
@@ -75,10 +133,26 @@ serve(async (req) => {
     
     console.log(`Found ${entries.length} entries to process`);
     
-    // Process each entry
-    const results = [];
+    if (entries.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          message: "No entries found to process",
+          totalProcessed: 0,
+          successCount: 0,
+          errorCount: 0,
+          results: []
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
+    // Process entries
     let successCount = 0;
     let errorCount = 0;
+    const results = [];
     
     // Process in smaller batches to avoid rate limits
     const batchSize = 5;
@@ -88,60 +162,19 @@ serve(async (req) => {
       console.log(`Processing batch ${i/batchSize + 1} of ${Math.ceil(entries.length/batchSize)}`);
       
       // Process this batch concurrently
-      const batchPromises = batch.map(async (entry) => {
-        try {
-          // Skip if no text content
-          const textContent = entry["refined text"] || entry["transcription text"];
-          if (!textContent) {
-            return { id: entry.id, status: 'skipped', reason: 'No text content' };
-          }
-          
-          // Check if entry already has embedding
-          const { data: existingEmbedding } = await supabase
-            .from('journal_embeddings')
-            .select('id')
-            .eq('journal_entry_id', entry.id)
-            .single();
-            
-          // Create embedding
-          const embedding = await createEmbedding(textContent);
-          
-          let result;
-          if (existingEmbedding) {
-            // Update existing
-            result = await supabase
-              .from('journal_embeddings')
-              .update({ 
-                content: textContent,
-                embedding 
-              })
-              .eq('journal_entry_id', entry.id);
-          } else {
-            // Insert new
-            result = await supabase
-              .from('journal_embeddings')
-              .insert([{ 
-                journal_entry_id: entry.id,
-                content: textContent,
-                embedding,
-              }]);
-          }
-          
-          if (result.error) {
-            throw new Error(result.error.message);
-          }
-          
-          successCount++;
-          return { id: entry.id, status: 'success' };
-        } catch (error) {
-          errorCount++;
-          console.error(`Error processing entry ${entry.id}:`, error);
-          return { id: entry.id, status: 'error', error: error.message };
-        }
-      });
+      const batchPromises = batch.map(entry => processEntry(entry));
       
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
+      
+      // Count successes and errors
+      for (const result of batchResults) {
+        if (result.status === 'success') {
+          successCount++;
+        } else if (result.status === 'error') {
+          errorCount++;
+        }
+      }
       
       // Add a short delay between batches to avoid rate limits
       if (i + batchSize < entries.length) {

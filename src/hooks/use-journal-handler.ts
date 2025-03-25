@@ -1,20 +1,17 @@
-
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useJournalEntries } from './use-journal-entries';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 export function useJournalHandler(userId: string | undefined) {
   const navigate = useNavigate();
-  const [isProcessingEmbeddings, setIsProcessingEmbeddings] = useState(false);
   const [isTestingBackend, setIsTestingBackend] = useState(false);
-  const { processAllEmbeddings } = useJournalEntries(userId);
+  const { processAllEmbeddings, isProcessingEmbeddings } = useJournalEntries(userId);
 
   const handleCreateJournal = () => {
     // Navigate to the record tab or show the journal creation dialog
     // This is a placeholder - implement as needed
-    // Could set an active tab state or show a modal
     console.log('Create journal entry');
   };
 
@@ -24,13 +21,15 @@ export function useJournalHandler(userId: string | undefined) {
   };
 
   const handleProcessAllEmbeddings = async () => {
-    setIsProcessingEmbeddings(true);
     try {
-      await processAllEmbeddings();
+      const result = await processAllEmbeddings();
+      
+      if (result?.success) {
+        toast.success('Journal entries have been indexed successfully');
+      }
     } catch (error) {
       console.error('Error processing embeddings:', error);
-    } finally {
-      setIsProcessingEmbeddings(false);
+      toast.error('Failed to process embeddings');
     }
   };
 
