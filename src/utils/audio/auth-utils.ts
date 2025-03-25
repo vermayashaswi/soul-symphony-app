@@ -15,6 +15,11 @@ export const refreshAuthSession = async (showToasts = true) => {
       return false;
     }
     
+    if (data.session) {
+      // Update the session's last activity
+      await updateSessionActivity(data.session.user.id);
+    }
+    
     return !!data.session;
   } catch (error: any) {
     console.error("Exception in refreshAuthSession:", error?.message || error);
@@ -34,6 +39,9 @@ export const checkAuth = async () => {
     if (!session) {
       return { isAuthenticated: false };
     }
+    
+    // Update the session's last activity if authenticated
+    await updateSessionActivity(session.user.id);
     
     return {
       isAuthenticated: true,
@@ -70,6 +78,9 @@ export const verifyUserAuthentication = async (showToasts = true) => {
       return { isAuthenticated: false };
     }
     
+    // Update the session's last activity if authenticated
+    await updateSessionActivity(session.user.id);
+    
     return {
       isAuthenticated: true,
       user: session.user
@@ -77,6 +88,136 @@ export const verifyUserAuthentication = async (showToasts = true) => {
   } catch (error: any) {
     console.error("Exception in verifyUserAuthentication:", error?.message || error);
     return { isAuthenticated: false, error: error?.message || 'Unknown error' };
+  }
+};
+
+// Create a new session or update an existing one's activity
+export const createOrUpdateSession = async (userId: string, entryPage = '/') => {
+  try {
+    if (!userId) return { success: false, error: 'No user ID provided' };
+
+    // Get user agent and other client info
+    const userAgent = navigator.userAgent;
+    const deviceType = getDeviceType(userAgent);
+    
+    // Check for existing active session for this user
+    const { data: existingSession, error: fetchError } = await supabase
+      .from('user_sessions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (fetchError) {
+      console.error('Error checking for existing session:', fetchError);
+      return { success: false, error: fetchError.message };
+    }
+    
+    if (existingSession) {
+      // Update existing session
+      const { error: updateError } = await supabase
+        .from('user_sessions')
+        .update({ 
+          last_activity: new Date().toISOString(),
+          last_active_page: window.location.pathname
+        })
+        .eq('id', existingSession.id);
+      
+      if (updateError) {
+        console.error('Error updating session:', updateError);
+        return { success: false, error: updateError.message };
+      }
+      
+      return { success: true, sessionId: existingSession.id, isNew: false };
+    } else {
+      // Create new session
+      const { data: newSession, error: insertError } = await supabase
+        .from('user_sessions')
+        .insert({
+          user_id: userId,
+          ip_address: '', // Can't reliably get client IP from browser
+          user_agent: userAgent,
+          device_type: deviceType,
+          entry_page: entryPage,
+          last_active_page: entryPage,
+          referrer: document.referrer || ''
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error('Error creating session:', insertError);
+        return { success: false, error: insertError.message };
+      }
+      
+      return { success: true, sessionId: newSession.id, isNew: true };
+    }
+  } catch (error: any) {
+    console.error('Exception in createOrUpdateSession:', error?.message || error);
+    return { success: false, error: error?.message || 'Unknown error' };
+  }
+};
+
+// Update session activity timestamp and current page
+export const updateSessionActivity = async (userId: string) => {
+  try {
+    if (!userId) return false;
+    
+    const { data, error } = await supabase
+      .from('user_sessions')
+      .update({ 
+        last_activity: new Date().toISOString(),
+        last_active_page: window.location.pathname
+      })
+      .eq('user_id', userId)
+      .eq('is_active', true);
+    
+    if (error) {
+      console.error('Error updating session activity:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Exception in updateSessionActivity:', error);
+    return false;
+  }
+};
+
+// End user session
+export const endUserSession = async (userId: string) => {
+  try {
+    if (!userId) return false;
+    
+    const { error } = await supabase
+      .from('user_sessions')
+      .update({ 
+        is_active: false,
+        session_end: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+      .eq('is_active', true);
+    
+    if (error) {
+      console.error('Error ending session:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Exception in endUserSession:', error);
+    return false;
+  }
+};
+
+// Helper function to determine device type from user agent
+const getDeviceType = (userAgent: string): string => {
+  if (/mobile|android|iphone|ipad|ipod/i.test(userAgent.toLowerCase())) {
+    return 'mobile';
+  } else if (/tablet|ipad/i.test(userAgent.toLowerCase())) {
+    return 'tablet';
+  } else {
+    return 'desktop';
   }
 };
 

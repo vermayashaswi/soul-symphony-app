@@ -267,6 +267,57 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          created_at: string
+          device_type: string | null
+          entry_page: string | null
+          id: string
+          ip_address: string | null
+          is_active: boolean | null
+          last_active_page: string | null
+          last_activity: string | null
+          location: string | null
+          referrer: string | null
+          session_end: string | null
+          session_start: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_type?: string | null
+          entry_page?: string | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean | null
+          last_active_page?: string | null
+          last_activity?: string | null
+          location?: string | null
+          referrer?: string | null
+          session_end?: string | null
+          session_start?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_type?: string | null
+          entry_page?: string | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean | null
+          last_active_page?: string | null
+          last_activity?: string | null
+          location?: string | null
+          referrer?: string | null
+          session_end?: string | null
+          session_start?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_subscriptions: {
         Row: {
           created_at: string | null
@@ -407,6 +458,10 @@ export type Database = {
             }
             Returns: unknown
           }
+      mark_inactive_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       match_journal_entries: {
         Args: {
           query_embedding: string
