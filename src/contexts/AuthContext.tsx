@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_IN') {
           toast.success('Signed in successfully');
+          console.log('Full user data on sign in:', currentSession?.user);
         } else if (event === 'SIGNED_OUT') {
           toast.info('Signed out');
         } else if (event === 'TOKEN_REFRESHED') {
@@ -45,6 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       console.log('Initial session check:', currentSession?.user?.email);
+      if (currentSession) {
+        console.log('Initial user data:', currentSession.user);
+      }
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       setIsLoading(false);
@@ -94,10 +98,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      console.log('Signing out user...');
       const { error } = await supabase.auth.signOut();
       if (error) {
         throw error;
       }
+      console.log('Sign out successful');
     } catch (error: any) {
       console.error('Error signing out:', error);
       toast.error(`Error signing out: ${error.message}`);
@@ -107,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Add a function to manually refresh the session
   const refreshSession = async () => {
     try {
+      console.log('Manually refreshing session from AuthContext...');
       const { data, error } = await supabase.auth.refreshSession();
       if (error) {
         console.error('Error refreshing session:', error);

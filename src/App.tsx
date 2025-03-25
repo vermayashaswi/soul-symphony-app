@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 import Navbar from "./components/Navbar";
+import { refreshAuthSession } from "./utils/audio/auth-utils";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,7 +30,7 @@ const queryClient = new QueryClient({
 
 // Protected route component with location preservation
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refreshSession } = useAuth();
   const location = useLocation();
   
   useEffect(() => {
@@ -38,7 +39,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         path: location.pathname
       });
     }
-  }, [user, isLoading, location]);
+
+    // Try refreshing the session if we don't have a user
+    if (!isLoading && !user) {
+      refreshSession();
+    }
+  }, [user, isLoading, location, refreshSession]);
   
   if (isLoading) {
     return (
@@ -73,11 +79,41 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
-  // Listen for auth changes outside the React context
+  // Ensure supabase client is properly configured and refreshing tokens
   useEffect(() => {
     console.log("Setting up Supabase auth debugging listener");
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth event outside React context:", event, session?.user?.email);
+      
+      // Extra debug for production auth issues
+      if (session) {
+        console.log("User authentication details:", {
+          id: session.user?.id,
+          email: session.user?.email,
+          hasAccessToken: !!session.access_token,
+          hasRefreshToken: !!session.refresh_token,
+          expiresAt: session.expires_at
+        });
+      }
+    });
+    
+    // Check the session on mount to debug production issues
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.error("Initial session check error:", error);
+      } else if (data.session) {
+        console.log("Initial session present:", {
+          userId: data.session.user.id,
+          email: data.session.user.email
+        });
+      } else {
+        console.log("No initial session found");
+        
+        // Try to refresh auth session when app loads if no session is found
+        refreshAuthSession().then(success => {
+          console.log("Auto-refresh session result:", success ? "Success" : "Failed");
+        });
+      }
     });
     
     return () => {

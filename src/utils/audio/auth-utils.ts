@@ -19,11 +19,11 @@ export async function verifyUserAuthentication() {
     }
     
     if (!data.session) {
-      console.error('No session found');
+      console.log('No session found in auth-utils verification');
       return { isAuthenticated: false, error: 'User is not authenticated' };
     }
     
-    console.log("User authenticated:", data.session.user.id);
+    console.log("User authenticated successfully:", data.session.user.id);
     return { isAuthenticated: true, userId: data.session.user.id };
   } catch (error: any) {
     console.error('Unexpected authentication error:', error);
@@ -40,16 +40,45 @@ export async function verifyUserAuthentication() {
  */
 export async function getCurrentUserId(): Promise<string | undefined> {
   try {
+    console.log("Getting current user ID...");
     const { data, error } = await supabase.auth.getSession();
     
-    if (error || !data.session) {
+    if (error) {
       console.error('Error getting user ID:', error);
       return undefined;
     }
     
+    if (!data.session) {
+      console.log('No session found when getting user ID');
+      return undefined;
+    }
+    
+    console.log("Retrieved user ID:", data.session.user.id);
     return data.session.user.id;
   } catch (error: any) {
     console.error('Unexpected error getting user ID:', error);
     return undefined;
+  }
+}
+
+/**
+ * Force refreshes the current session
+ * Useful for cases where the session state might be outdated
+ */
+export async function refreshAuthSession() {
+  try {
+    console.log("Manually refreshing auth session...");
+    const { data, error } = await supabase.auth.refreshSession();
+    
+    if (error) {
+      console.error('Error refreshing session:', error);
+      return false;
+    }
+    
+    console.log("Session refreshed successfully:", !!data.session);
+    return !!data.session;
+  } catch (error: any) {
+    console.error('Unexpected error refreshing session:', error);
+    return false;
   }
 }
