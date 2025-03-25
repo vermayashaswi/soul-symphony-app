@@ -1,8 +1,8 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/types/journal';
-import { useTranscription } from './use-transcription';
 
 interface JournalEntryInput {
   id?: number;
@@ -24,7 +24,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [isRetrying, setIsRetrying] = useState(false);
   const [lastRetryTime, setLastRetryTime] = useState<number>(0);
   const [lastRefreshToastId, setLastRefreshToastId] = useState<string | null>(null);
-  const { storeEmbedding } = useTranscription();
 
   const MAX_RETRY_ATTEMPTS = 3;
   const RETRY_DELAY = 5000; // 5 seconds between retries
@@ -195,15 +194,30 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       await fetchEntries();
       
-      const textToEmbed = data["refined text"] || data["transcription text"] || '';
-      if (textToEmbed.trim().length > 0) {
-        try {
+      // Automatically generate embedding after saving the entry
+      try {
+        const textToEmbed = data["refined text"] || data["transcription text"] || '';
+        if (textToEmbed.trim().length > 0) {
           console.log('Automatically generating embedding for entry:', data.id);
-          await createEmbeddingForEntry(data.id, textToEmbed);
-          console.log('Embedding generated successfully');
-        } catch (embeddingError) {
-          console.error('Error generating embedding:', embeddingError);
+          
+          // Call the Edge Function to create the embedding
+          const { error: embeddingError } = await supabase.functions.invoke('create-embedding', {
+            body: { 
+              text: textToEmbed, 
+              journalEntryId: data.id 
+            }
+          });
+          
+          if (embeddingError) {
+            console.error('Error automatically generating embedding:', embeddingError);
+            // Don't show an error toast to the user, as this happens in the background
+          } else {
+            console.log('Embedding generated successfully');
+          }
         }
+      } catch (embeddingError) {
+        console.error('Error in automatic embedding generation:', embeddingError);
+        // Don't surface this error to the user
       }
       
       return data;
@@ -212,27 +226,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       throw error;
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const createEmbeddingForEntry = async (journalEntryId: number, text: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('create-embedding', {
-        body: { 
-          text, 
-          journalEntryId 
-        }
-      });
-      
-      if (error) {
-        console.error('Error creating embedding:', error);
-        return { success: false, error };
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Error in createEmbeddingForEntry:', error);
-      return { success: false, error };
     }
   };
 

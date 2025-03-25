@@ -12,8 +12,6 @@ interface UseTranscriptionReturnType {
   emotions: string[] | null;
   refineTranscription: (text: string) => Promise<void>;
   isRefiningTranscription: boolean;
-  storeEmbedding: (journalEntryId: number, text: string) => Promise<void>;
-  isStoringEmbedding: boolean;
 }
 
 export function useTranscription(): UseTranscriptionReturnType {
@@ -22,7 +20,6 @@ export function useTranscription(): UseTranscriptionReturnType {
   const [refinedText, setRefinedText] = useState<string | null>(null);
   const [emotions, setEmotions] = useState<string[] | null>(null);
   const [isRefiningTranscription, setIsRefiningTranscription] = useState(false);
-  const [isStoringEmbedding, setIsStoringEmbedding] = useState(false);
 
   const transcribeAudio = async (audioBlob: Blob) => {
     try {
@@ -78,40 +75,6 @@ export function useTranscription(): UseTranscriptionReturnType {
     }
   };
 
-  // Function to store embeddings in the journal_embeddings table
-  const storeEmbedding = async (journalEntryId: number, text: string) => {
-    try {
-      setIsStoringEmbedding(true);
-      console.log(`Storing embedding for journal entry ${journalEntryId}`);
-      
-      // Call the create-embedding Edge Function directly
-      const { data, error } = await supabase.functions.invoke('create-embedding', {
-        body: { 
-          text, 
-          journalEntryId 
-        },
-      });
-      
-      if (error) {
-        console.error('Error creating embedding:', error);
-        throw error;
-      }
-      
-      if (data?.success) {
-        console.log('Embedding stored successfully:', data);
-      } else {
-        console.error('No success response from embedding function:', data);
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Error storing embedding:', error);
-      // We don't show an error toast here since this happens in the background
-    } finally {
-      setIsStoringEmbedding(false);
-    }
-  };
-
   const resetTranscription = () => {
     setTranscription(null);
     setRefinedText(null);
@@ -126,8 +89,6 @@ export function useTranscription(): UseTranscriptionReturnType {
     refinedText,
     emotions,
     refineTranscription,
-    isRefiningTranscription,
-    storeEmbedding,
-    isStoringEmbedding
+    isRefiningTranscription
   };
 }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { JournalHeader } from '@/components/journal/JournalHeader';
@@ -7,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useJournalHandler } from '@/hooks/use-journal-handler';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Mic, BookOpen, Database } from 'lucide-react';
+import { RefreshCw, Mic, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -26,9 +27,6 @@ export default function Journal() {
   const { 
     handleCreateJournal, 
     handleViewInsights,
-    processUnprocessedEntries,
-    processAllEntries,
-    isProcessingUnprocessedEntries
   } = useJournalHandler(user?.id);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
@@ -38,7 +36,7 @@ export default function Journal() {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      if (isLoading || isProcessingUnprocessedEntries) {
+      if (isLoading) {
         console.log('Force completing loading state due to timeout');
         setIsRefreshing(false);
         setProcessingEntries([]);
@@ -52,7 +50,7 @@ export default function Journal() {
         clearTimeout(loadTimeout);
       }
     };
-  }, [isLoading, isProcessingUnprocessedEntries]);
+  }, [isLoading]);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -113,30 +111,6 @@ export default function Journal() {
     }
   };
 
-  const handleProcessAllEntries = async () => {
-    const result = await processAllEntries();
-    if (result?.success) {
-      // Refresh entries after processing
-      setTimeout(() => {
-        refreshEntries(false);
-      }, 2000);
-    }
-  };
-
-  useEffect(() => {
-    if (user?.id) {
-      // Process unprocessed entries automatically on page load
-      // Don't show a toast for this automatic process
-      processUnprocessedEntries().then(result => {
-        if (result?.success) {
-          console.log('Successfully processed unprocessed entries');
-          // Refresh entries without showing toast
-          refreshEntries(false);
-        }
-      });
-    }
-  }, [user?.id, processUnprocessedEntries]);
-
   return (
     <div className="container px-4 md:px-6 max-w-6xl space-y-6 py-6">
       <Card>
@@ -176,8 +150,6 @@ export default function Journal() {
         onViewInsights={handleViewInsights}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
-        onProcessAllEmbeddings={handleProcessAllEntries}
-        isProcessingEmbeddings={isProcessingUnprocessedEntries}
       />
       
       {loadError && !isLoading && (
