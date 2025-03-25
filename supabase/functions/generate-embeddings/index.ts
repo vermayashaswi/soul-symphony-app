@@ -52,7 +52,18 @@ serve(async (req) => {
   }
 
   try {
-    const { entryId, text } = await req.json();
+    const requestData = await req.json();
+    const { entryId, text, isTestQuery, forceRegenerate } = requestData;
+    
+    // Special case for test queries - just return the embedding without storing
+    if (isTestQuery && text) {
+      console.log("Generating test embedding without storing");
+      const embedding = await generateEmbedding(text);
+      return new Response(
+        JSON.stringify({ success: true, embedding: embedding }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     if (!entryId || !text) {
       throw new Error('Entry ID and text are required');
@@ -61,22 +72,37 @@ serve(async (req) => {
     console.log(`Processing embedding generation for entry ID: ${entryId}`);
     
     // Check if embedding already exists for this entry
-    const { count, error: checkError } = await supabase
-      .from('journal_embeddings')
-      .select('*', { count: 'exact', head: true })
-      .eq('journal_entry_id', entryId);
+    if (!forceRegenerate) {
+      const { count, error: checkError } = await supabase
+        .from('journal_embeddings')
+        .select('*', { count: 'exact', head: true })
+        .eq('journal_entry_id', entryId);
+        
+      if (checkError) {
+        console.error('Error checking existing embedding:', checkError);
+        throw checkError;
+      }
       
-    if (checkError) {
-      console.error('Error checking existing embedding:', checkError);
-      throw checkError;
-    }
-    
-    if (count && count > 0) {
-      console.log(`Embedding already exists for entry ${entryId}, skipping generation`);
-      return new Response(
-        JSON.stringify({ success: true, message: 'Embedding already exists' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (count && count > 0) {
+        console.log(`Embedding already exists for entry ${entryId}, skipping generation`);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Embedding already exists' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else if (forceRegenerate) {
+      // Delete any existing embedding if force regenerate is true
+      const { error: deleteError } = await supabase
+        .from('journal_embeddings')
+        .delete()
+        .eq('journal_entry_id', entryId);
+        
+      if (deleteError) {
+        console.error('Error deleting existing embedding:', deleteError);
+        // Continue anyway to try generating a new one
+      } else {
+        console.log(`Deleted existing embedding for entry ${entryId} to regenerate`);
+      }
     }
     
     // Generate embedding

@@ -1,8 +1,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 /**
  * For troubleshooting RAG issues - checks if an embedding exists for a specific entry
+ * and creates one if missing
  * @param entryId Journal entry ID to check
  * @returns Promise resolving to true if successful, false otherwise
  */
@@ -38,27 +40,32 @@ export async function checkEmbeddingForEntry(entryId: number): Promise<boolean> 
       console.log(`No embedding found for entry ${entryId}, generating...`);
       
       // Generate embedding
-      const { error: genError } = await supabase.functions.invoke('generate-embeddings', {
+      const { data, error: genError } = await supabase.functions.invoke('generate-embeddings', {
         body: { 
           entryId: entryId,
-          text: entry["refined text"]
+          text: entry["refined text"],
+          forceRegenerate: true
         }
       });
       
       if (genError) {
         console.error(`Error generating embedding for entry ${entryId}:`, genError);
+        toast.error(`Failed to generate embedding for entry ${entryId}`);
         return false;
       }
       
       console.log(`Successfully generated embedding for entry ${entryId}`);
+      toast.success(`Generated embedding for entry ${entryId}`);
       return true;
     }
     
     console.log(`Embedding already exists for entry ${entryId}`);
+    toast.success(`Embedding already exists for entry ${entryId}`);
     return true;
     
   } catch (error) {
     console.error(`Error checking embedding for entry ${entryId}:`, error);
+    toast.error(`Error checking embedding for entry ${entryId}`);
     return false;
   }
 }
