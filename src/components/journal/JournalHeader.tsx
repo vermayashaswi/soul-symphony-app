@@ -1,20 +1,57 @@
+import { Button } from "@/components/ui/button"
+import { Database, Mic, PieChart, Loader2 } from "lucide-react"
 
-import React from 'react';
-import { motion } from 'framer-motion';
+interface JournalHeaderProps {
+  onCreateJournal: () => void;
+  onViewInsights: () => void;
+  onProcessAllEmbeddings?: () => void;
+  isProcessingEmbeddings?: boolean;
+}
 
-const JournalHeader = () => {
+export function JournalHeader({ 
+  onCreateJournal, 
+  onViewInsights, 
+  onProcessAllEmbeddings,
+  isProcessingEmbeddings
+}: JournalHeaderProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="container mx-auto px-4 py-8 max-w-5xl pt-24"
-    >
-      <h1 className="text-4xl font-bold text-center mb-2">Your Journal</h1>
-      <p className="text-center text-muted-foreground mb-8">
-        Record your thoughts and track your emotional journey
-      </p>
-    </motion.div>
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Journal</h1>
+        <p className="text-muted-foreground">
+          Record your thoughts and feelings through voice or text
+        </p>
+      </div>
+      <div className="flex gap-2 self-end">
+        {onProcessAllEmbeddings && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            disabled={isProcessingEmbeddings}
+            onClick={onProcessAllEmbeddings}
+          >
+            {isProcessingEmbeddings ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Database className="h-4 w-4 mr-2" />
+                Index All Entries
+              </>
+            )}
+          </Button>
+        )}
+        <Button variant="outline" size="sm" onClick={onViewInsights}>
+          <PieChart className="h-4 w-4 mr-2" />
+          Insights
+        </Button>
+        <Button onClick={onCreateJournal}>
+          <Mic className="h-4 w-4 mr-2" />
+          New Entry
+        </Button>
+      </div>
+    </div>
   );
-};
-
-export default JournalHeader;
+}

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Bot, Loader2 } from 'lucide-react';
+import { Send, Bot, Loader2, Scroll } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
@@ -18,6 +18,14 @@ export interface Message {
   sender: 'user' | 'assistant';
   created_at: string;
   thread_id?: string;
+  reference_entries?: Array<{id: number, similarity: number}> | null;
+}
+
+interface JournalReference {
+  id: number;
+  content: string;
+  created_at: string;
+  similarity: number;
 }
 
 interface ChatAreaProps {
@@ -31,6 +39,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [relevantEntries, setRelevantEntries] = useState<JournalReference[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showWelcome, setShowWelcome] = useState(true);
   
@@ -91,7 +100,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         content: msg.content,
         sender: msg.sender as 'user' | 'assistant',
         created_at: msg.created_at,
-        thread_id: msg.thread_id
+        thread_id: msg.thread_id,
+        reference_entries: msg.reference_entries
       }));
 
       setMessages(formattedMessages);
@@ -139,71 +149,58 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     setShowWelcome(false);
     
     try {
-      // Simple placeholder response without RAG functionality
-      const placeholderResponse = "I'm a basic assistant without access to your journal entries yet. The RAG functionality has been removed and will be reimplemented. In the meantime, I can still chat with you about general wellness topics.";
-      
-      // Simulate a delay for the response
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Determine thread ID for new threads
-      let currentThreadId = threadId;
-      if (isNewThread) {
-        // Create a basic thread title from the message
-        const title = content.substring(0, 30) + (content.length > 30 ? "..." : "");
-        
-        // Create a new thread
-        const { data: newThread, error } = await supabase
-          .from('chat_threads')
-          .insert({
-            user_id: currentUserId,
-            title: title
-          })
-          .select('id')
-          .single();
-          
-        if (error) {
-          console.error("Error creating new thread:", error);
-          throw error;
+      // Use the chat-rag endpoint to get a response with relevant journal entries
+      const response = await supabase.functions.invoke('chat-rag', {
+        body: {
+          message: content.trim(),
+          userId: currentUserId,
+          threadId,
+          isNewThread
         }
-        
-        currentThreadId = newThread.id;
-        onNewThreadCreated(currentThreadId);
+      });
+      
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to get response');
       }
       
-      // Store user message
-      if (currentThreadId) {
-        await supabase
-          .from('chat_messages')
-          .insert({
-            thread_id: currentThreadId,
-            content: content.trim(),
-            sender: 'user'
-          });
+      const { threadId: newThreadId, response: aiResponse, relevantEntries: foundEntries } = response.data;
+      
+      if (isNewThread && newThreadId) {
+        onNewThreadCreated(newThreadId);
       }
       
-      // Store assistant response
-      if (currentThreadId) {
-        await supabase
-          .from('chat_messages')
-          .insert({
-            thread_id: currentThreadId,
-            content: placeholderResponse,
-            sender: 'assistant'
-          });
+      // Update relevant entries if any were found
+      if (foundEntries && foundEntries.length > 0) {
+        setRelevantEntries(foundEntries);
       }
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: placeholderResponse,
+        content: aiResponse,
         sender: 'assistant' as const,
         created_at: new Date().toISOString(),
-        thread_id: currentThreadId
+        thread_id: newThreadId || threadId,
+        reference_entries: foundEntries ? foundEntries.map(entry => ({ 
+          id: entry.id, 
+          similarity: entry.similarity 
+        })) : null
       };
       
       setMessages(prev => [...prev, assistantMessage]);
     } catch (err) {
       console.error('Error in chat:', err);
       toast.error('Something went wrong. Please try again later.');
+      
+      // Add a fallback message
+      const fallbackMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I'm sorry, I'm having trouble processing your request. Please try again later.",
+        sender: 'assistant' as const,
+        created_at: new Date().toISOString(),
+        thread_id: threadId || undefined
+      };
+      
+      setMessages(prev => [...prev, fallbackMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -214,6 +211,10 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    return format(new Date(dateString), 'MMM d, yyyy');
   };
 
   return (
@@ -258,6 +259,13 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
                         : "bg-muted"
                     )}>
                       <p className="whitespace-pre-wrap">{message.content}</p>
+                      
+                      {message.reference_entries && message.reference_entries.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-muted-foreground flex items-center">
+                          <Scroll className="h-3 w-3 mr-1" />
+                          <span>Referencing {message.reference_entries.length} journal entries</span>
+                        </div>
+                      )}
                     </Card>
                   </div>
                 </div>
@@ -281,6 +289,28 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         
         <div ref={messagesEndRef} />
       </div>
+      
+      {relevantEntries.length > 0 && (
+        <div className="px-4 mb-2">
+          <div className="bg-muted/50 rounded-lg p-3">
+            <div className="flex items-center text-sm font-medium mb-2">
+              <Scroll className="h-4 w-4 mr-2" />
+              <span>Related Journal Entries</span>
+            </div>
+            <div className="space-y-2 text-sm">
+              {relevantEntries.slice(0, 2).map((entry) => (
+                <div key={entry.id} className="bg-background rounded p-2">
+                  <div className="flex justify-between mb-1">
+                    <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>
+                    <span className="text-xs font-medium">{(entry.similarity * 100).toFixed(0)}% match</span>
+                  </div>
+                  <p className="text-xs line-clamp-2">{entry.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       
       <AnimatePresence>
         {showWelcome && messages.length <= 2 && (

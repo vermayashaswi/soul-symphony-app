@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,6 +18,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isProcessingEmbeddings, setIsProcessingEmbeddings] = useState(false);
   const { storeEmbedding } = useTranscription();
 
   const fetchEntries = useCallback(async () => {
@@ -181,6 +181,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     
     try {
       toast.info('Starting to process embeddings for all journal entries...');
+      setIsProcessingEmbeddings(true);
       
       const { data, error } = await supabase.functions.invoke('embed-all-entries', {
         body: { userId }
@@ -199,6 +200,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     } catch (error) {
       console.error('Error invoking embed-all-entries function:', error);
       toast.error('Failed to process embeddings');
+    } finally {
+      setIsProcessingEmbeddings(false);
     }
   };
 
@@ -217,6 +220,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     deleteJournalEntry,
     refreshEntries,
     processAllEmbeddings,
+    isProcessingEmbeddings,
     journalEntries: entries, // Alias for backward compatibility
     isLoading: loading // Alias for backward compatibility
   };
