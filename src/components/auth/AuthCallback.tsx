@@ -42,9 +42,9 @@ const AuthCallback = () => {
           if (location.hash && location.hash.includes('access_token')) {
             console.log("Attempting to exchange hash for session...");
             
-            // Using the correct method to process the URL hash
-            // Replaced getSessionFromUrl with setSession to process the hash
-            const { data: hashData, error: hashError } = await supabase.auth.setSession(location.hash);
+            // Use the correct method to process the hash
+            // The hash includes the token info Supabase needs
+            const { data: hashData, error: hashError } = await supabase.auth.exchangeCodeForSession(location.hash);
             
             if (hashError) {
               console.error("Error processing hash:", hashError);
