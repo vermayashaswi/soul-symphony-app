@@ -52,7 +52,7 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
       const batchSuccessCount = await generateEmbeddingsForBatch(batch);
       successCount += batchSuccessCount;
       
-      // Short delay between batches to avoid rate limiting
+      // Short delay between batches to avoid rate limits
       if (i < batches - 1) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
@@ -78,7 +78,7 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string): Promis
       console.log(`After generation: ${finalCount} embeddings exist for ${entryIds.length} journal entries`);
     }
     
-    return successCount > 0;
+    return successCount > 0 || existingEmbeddingIds.size > 0;
   } catch (error) {
     console.error('Error ensuring journal entries have embeddings:', error);
     return false;

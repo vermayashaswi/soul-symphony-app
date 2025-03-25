@@ -5,7 +5,8 @@ import { ChatContainer } from '@/components/chat/ChatContainer';
 import { getCurrentUserId } from '@/utils/audio/auth-utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { ensureJournalEntriesHaveEmbeddings, debugEmbeddingIssues, checkEmbeddingForEntry } from '@/utils/embeddings';
+import { ensureJournalEntriesHaveEmbeddings } from '@/utils/embeddings';
+import { checkEmbeddingForEntry } from '@/utils/embeddings/troubleshoot';
 import { JournalEntry } from '@/types/journal';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -143,8 +144,99 @@ export default function Chat() {
     if (!userId) return;
     
     try {
-      const debugData = await debugEmbeddingIssues(userId);
-      setDebugInfo(debugData);
+      // First, try to fetch entries to debug
+      const { data: entriesData, error } = await supabase
+        .from('Journal Entries')
+        .select('id, refined text, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+        
+      if (error) {
+        console.error('Error fetching entries for debug:', error);
+        toast.error('Failed to fetch journal entries for debugging');
+        return;
+      }
+      
+      if (!entriesData || entriesData.length === 0) {
+        toast.info('No journal entries found to debug');
+        return;
+      }
+      
+      // For each entry, check if it has an embedding and generate one if missing
+      let diagnosticInfo = "Embedding Debug Results:\n\n";
+      
+      for (const entry of entriesData) {
+        if (!entry.id) continue;
+        
+        // Check individual entry embedding
+        const { data: embeddingData, error: embeddingError } = await supabase
+          .from('journal_embeddings')
+          .select('id')
+          .eq('journal_entry_id', entry.id)
+          .maybeSingle();
+        
+        const date = new Date(entry.created_at).toLocaleString();
+        const hasEmbedding = !embeddingError && embeddingData;
+        
+        diagnosticInfo += `Entry ${entry.id} (${date}):\n`;
+        diagnosticInfo += `- Has text: ${entry["refined text"] ? "Yes" : "No"}\n`;
+        diagnosticInfo += `- Text length: ${entry["refined text"]?.length || 0} characters\n`;
+        diagnosticInfo += `- Has embedding: ${hasEmbedding ? "Yes" : "No"}\n`;
+        
+        if (!hasEmbedding && entry["refined text"]) {
+          diagnosticInfo += "- Attempting to generate embedding...\n";
+          try {
+            const success = await checkEmbeddingForEntry(entry.id);
+            diagnosticInfo += `- Generation ${success ? "succeeded" : "failed"}\n`;
+          } catch (e) {
+            diagnosticInfo += `- Generation failed with error: ${e}\n`;
+          }
+        }
+        diagnosticInfo += "\n";
+      }
+      
+      // Test the match_journal_entries function
+      diagnosticInfo += "Testing match_journal_entries function:\n";
+      try {
+        const { data: testEmbedding } = await supabase.functions.invoke('generate-embeddings', {
+          body: { 
+            text: "How am I feeling today?", 
+            isTestQuery: true 
+          }
+        });
+        
+        if (testEmbedding?.embedding) {
+          const { data: matches, error: matchError } = await supabase.rpc(
+            'match_journal_entries',
+            {
+              query_embedding: testEmbedding.embedding,
+              match_threshold: 0.0, // Very low threshold to get any matches
+              match_count: 10,
+              user_id_filter: userId
+            }
+          );
+          
+          if (matchError) {
+            diagnosticInfo += `- Error with match function: ${matchError.message}\n`;
+          } else {
+            diagnosticInfo += `- Match function returned ${matches?.length || 0} results\n`;
+            
+            if (matches && matches.length > 0) {
+              diagnosticInfo += "- Matched entries:\n";
+              matches.forEach((match, i) => {
+                diagnosticInfo += `  ${i+1}. Entry ID: ${match.id}, Similarity: ${match.similarity.toFixed(4)}\n`;
+              });
+            }
+          }
+        } else {
+          diagnosticInfo += "- Could not generate test embedding\n";
+        }
+      } catch (error) {
+        diagnosticInfo += `- Error testing match function: ${error}\n`;
+      }
+      
+      setDebugInfo(diagnosticInfo);
       setShowDebug(true);
     } catch (error) {
       console.error('Error debugging embeddings:', error);
@@ -177,7 +269,7 @@ export default function Chat() {
           )}
           
           {hasEntries === true && !embeddingsReady && !isLoading && (
-            <Alert className="m-4">
+            <Alert className="m-4" variant="default">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Embeddings Not Ready</AlertTitle>
               <AlertDescription className="flex flex-col gap-2">

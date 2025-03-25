@@ -201,11 +201,16 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       return;
     }
     
-    const embeddingsResult = await ensureJournalEntriesHaveEmbeddings(currentUserId);
-    console.log('Embeddings generation result:', embeddingsResult);
-    
-    if (!embeddingsResult) {
-      console.warn('Failed to ensure all journal entries have embeddings');
+    try {
+      const embeddingsResult = await ensureJournalEntriesHaveEmbeddings(currentUserId);
+      console.log('Embeddings generation result before chat:', embeddingsResult);
+      
+      if (!embeddingsResult) {
+        toast.warning('Some journal entries might not be available to the chat. Your question will still be processed.');
+      }
+    } catch (error) {
+      console.error('Error ensuring embeddings before chat:', error);
+      toast.warning('There was an issue preparing your journal entries. Your question will still be processed.');
     }
     
     const isNewThread = !threadId;
@@ -254,8 +259,20 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
           
         if (count > 0) {
           console.warn('Journal entries exist but RAG function could not access them.');
-          toast.warning('Your entries exist but could not be accessed. Trying to fix the issue...');
-          await ensureJournalEntriesHaveEmbeddings(currentUserId);
+          toast.warning('Your entries exist but could not be accessed. Trying to fix the issue...', {
+            action: {
+              label: 'Fix Now',
+              onClick: async () => {
+                toast.info('Attempting to fix journal entry access...');
+                const fixed = await ensureJournalEntriesHaveEmbeddings(currentUserId);
+                if (fixed) {
+                  toast.success('Journal entries are now ready for chat');
+                } else {
+                  toast.error('Could not fix journal entry access. Please try again later or contact support.');
+                }
+              }
+            }
+          });
         }
       }
       
