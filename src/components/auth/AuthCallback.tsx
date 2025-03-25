@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,12 +8,14 @@ import { useAuth } from "@/contexts/AuthContext";
 const AuthCallback = () => {
   const [isProcessing, setIsProcessing] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
   const { refreshSession } = useAuth();
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
         console.log("Auth callback page: Processing authentication...");
+        console.log("Hash present:", location.hash ? "Yes" : "No");
         
         // Get session from hash and handle the redirect internally
         const { data, error } = await supabase.auth.getSession();
@@ -35,6 +37,34 @@ const AuthCallback = () => {
           navigate("/journal", { replace: true });
         } else {
           console.log("No session found after processing hash");
+          
+          // If we have a hash but no session, we need to process the hash
+          if (location.hash && location.hash.includes('access_token')) {
+            console.log("Attempting to exchange hash for session...");
+            
+            // This will process the hash and exchange it for a session
+            const { data: hashData, error: hashError } = await supabase.auth.getSessionFromUrl();
+            
+            if (hashError) {
+              console.error("Error processing hash:", hashError);
+              toast.error("Authentication error: " + hashError.message);
+              navigate("/auth", { replace: true });
+              return;
+            }
+            
+            if (hashData.session) {
+              console.log("Successfully processed hash and created session");
+              
+              // Force refresh our auth context
+              await refreshSession();
+              
+              toast.success("Successfully signed in!");
+              navigate("/journal", { replace: true });
+              return;
+            }
+          }
+          
+          // If we still don't have a session, redirect to auth
           navigate("/auth", { replace: true });
         }
       } catch (error) {
@@ -47,7 +77,7 @@ const AuthCallback = () => {
     };
 
     handleAuthCallback();
-  }, [navigate, refreshSession]);
+  }, [navigate, refreshSession, location.hash]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

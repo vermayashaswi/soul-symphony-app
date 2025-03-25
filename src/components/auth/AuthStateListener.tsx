@@ -11,15 +11,18 @@ const AuthStateListener = () => {
   const navigate = useNavigate();
   const { processUnprocessedEntries } = useJournalHandler(user?.id);
   
+  // Handle OAuth redirects that come with tokens in the URL
   useEffect(() => {
-    console.log("Setting up Supabase auth debugging listener");
-    console.log("Current route:", location.pathname);
+    console.log("Setting up authentication listener");
+    console.log("Current path:", location.pathname);
     console.log("Current hash:", location.hash ? "Present (contains tokens)" : "None");
     
-    // Check if we have an access token in the hash at the root path
-    if ((location.pathname === '/' || location.pathname === '') && location.hash.includes('access_token')) {
-      console.log("Detected OAuth token in URL hash at root path, redirecting to callback");
-      // Instead of processing here, redirect to the callback route with the hash intact
+    // Check if we have an auth token at any path (not just root)
+    if (location.hash && 
+        (location.hash.includes('access_token') || 
+         location.hash.includes('type=recovery'))) {
+      console.log("Detected OAuth token in URL hash, redirecting to callback");
+      // Redirect to the callback route with the hash intact
       navigate('/callback' + location.hash, { replace: true });
       return;
     }
@@ -94,8 +97,8 @@ const AuthStateListener = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [user, location.pathname, processUnprocessedEntries, location.hash, navigate, refreshSession]);
-  
+  }, [location.pathname, location.hash, navigate, user, processUnprocessedEntries, refreshSession]);
+
   return null;
 };
 
