@@ -180,7 +180,7 @@ async function fetchRelevantJournalEntries(userId: string, queryEmbedding: any) 
       .eq('user_id', userId);
       
     if (countError) {
-      console.error("Error checking for journal entries:", countError);
+      console.error("Error checking journal entries count:", countError);
       return [];
     }
     

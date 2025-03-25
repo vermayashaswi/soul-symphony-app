@@ -438,6 +438,16 @@ export type Database = {
         }
         Returns: number
       }
+      store_user_query: {
+        Args: {
+          user_id: string
+          query_text: string
+          query_embedding: string
+          thread_id: string
+          message_id?: string
+        }
+        Returns: string
+      }
       vector_avg: {
         Args: {
           "": number[]
