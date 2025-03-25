@@ -1,124 +1,132 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.22.0";
+import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
+import { createJournalEmbeddingsTable } from "../_shared/sql-helpers.ts";
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
+// Setup CORS headers for browser requests
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const contentType = req.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-      throw new Error('Request must be JSON format');
+    // Create a Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseServiceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const openaiKey = Deno.env.get("OPENAI_API_KEY") || "";
+
+    if (!supabaseUrl || !supabaseServiceRole || !openaiKey) {
+      throw new Error("Missing environment variables");
     }
 
+    const supabase = createClient(supabaseUrl, supabaseServiceRole);
+
+    // Get the request body
     const { text, journalEntryId } = await req.json();
-    
+
     if (!text || !journalEntryId) {
-      throw new Error('Text and journalEntryId are required');
+      throw new Error("Missing required fields: text and journalEntryId");
     }
 
     console.log(`Creating embedding for journal entry ${journalEntryId}`);
-    
-    // Generate embeddings using OpenAI API
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        input: text,
-        model: 'text-embedding-ada-002',
-      }),
-    });
+    console.log(`Text length: ${text.length} characters`);
 
-    if (!embeddingResponse.ok) {
-      const errorData = await embeddingResponse.json();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${JSON.stringify(errorData)}`);
+    // Initialize OpenAI
+    const configuration = new Configuration({ apiKey: openaiKey });
+    const openai = new OpenAIApi(configuration);
+
+    // First, make sure the journal_embeddings table exists
+    try {
+      const { error: tableError } = await supabase.query(createJournalEmbeddingsTable);
+      
+      if (tableError) {
+        console.error("Error creating table:", tableError);
+        // Continue anyway as the table might already exist
+      } else {
+        console.log("Journal embeddings table created or already exists");
+      }
+    } catch (tableErr) {
+      console.error("Error running table creation SQL:", tableErr);
+      // Continue anyway as the table might already exist
     }
 
-    const embeddingData = await embeddingResponse.json();
-    const embedding = embeddingData.data[0].embedding;
-
-    if (!embedding) {
-      throw new Error('No embedding returned from OpenAI');
-    }
-    
-    // Check if entry already has an embedding
-    const { data: existingEmbedding, error: checkError } = await supabase
+    // Check if an embedding already exists for this journal entry
+    const { data: existingEmbeddings, error: checkError } = await supabase
       .from('journal_embeddings')
       .select('id')
       .eq('journal_entry_id', journalEntryId)
-      .single();
+      .limit(1);
+
+    if (checkError) {
+      console.error("Error checking for existing embeddings:", checkError);
+    } else if (existingEmbeddings && existingEmbeddings.length > 0) {
+      console.log(`Embedding already exists for journal entry ${journalEntryId}. Deleting it first.`);
       
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" which is expected
-      console.error('Error checking for existing embedding:', checkError);
-      throw new Error(`Database error: ${checkError.message}`);
-    }
-    
-    let result;
-    if (existingEmbedding) {
-      // Update existing embedding
-      result = await supabase
+      // Delete existing embedding
+      const { error: deleteError } = await supabase
         .from('journal_embeddings')
-        .update({ 
-          content: text,
-          embedding 
-        })
+        .delete()
         .eq('journal_entry_id', journalEntryId);
-    } else {
-      // Insert new embedding
-      result = await supabase
-        .from('journal_embeddings')
-        .insert([{ 
-          journal_entry_id: journalEntryId,
-          content: text,
-          embedding,
-        }]);
+        
+      if (deleteError) {
+        console.error("Error deleting existing embedding:", deleteError);
+      }
     }
-    
-    if (result.error) {
-      console.error('Error storing embedding:', result.error);
-      throw new Error(`Database error: ${result.error.message}`);
+
+    // Generate embedding with OpenAI
+    const embeddingResponse = await openai.createEmbedding({
+      model: "text-embedding-ada-002",
+      input: text.trim(),
+    });
+
+    const [{ embedding }] = embeddingResponse.data.data;
+
+    // Store the embedding in the database
+    const { data, error } = await supabase
+      .from('journal_embeddings')
+      .insert({
+        journal_entry_id: journalEntryId,
+        embedding,
+        content: text
+      })
+      .select();
+
+    if (error) {
+      console.error("Error storing embedding:", error);
+      throw new Error(`Failed to store embedding: ${error.message}`);
     }
-    
+
     console.log(`Successfully stored embedding for journal entry ${journalEntryId}`);
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ 
+        success: true, 
+        message: "Embedding created successfully", 
+        embeddingId: data?.[0]?.id
+      }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200 
       }
     );
-    
   } catch (error) {
     console.error("Error in create-embedding function:", error);
     
     return new Response(
       JSON.stringify({ 
-        error: error.message, 
-        success: false,
-        message: "Error occurred during embedding creation"
+        success: false, 
+        error: error.message 
       }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500 
       }
     );
   }

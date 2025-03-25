@@ -75,6 +75,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
           
           try {
+            // Update the profile with Google info if available
+            if (newSession.user.app_metadata.provider === 'google' && 
+                newSession.user.user_metadata?.full_name) {
+              const { data: existingProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', newSession.user.id)
+                .maybeSingle();
+                
+              // Only update if it doesn't have data already
+              if (!existingProfile?.full_name || !existingProfile?.avatar_url) {
+                await supabase
+                  .from('profiles')
+                  .update({
+                    full_name: newSession.user.user_metadata.full_name,
+                    avatar_url: newSession.user.user_metadata.avatar_url,
+                    email: newSession.user.email
+                  })
+                  .eq('id', newSession.user.id);
+              }
+            }
+            
             await createUserProfile(newSession.user.id);
           } catch (err) {
             console.error('Profile creation error on auth state change, but continuing:', err);

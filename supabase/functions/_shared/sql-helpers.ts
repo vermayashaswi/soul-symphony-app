@@ -14,6 +14,18 @@ export interface UserQuery {
   message_id?: string;
 }
 
+export const createJournalEmbeddingsTable = `
+CREATE TABLE IF NOT EXISTS public.journal_embeddings (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  journal_entry_id BIGINT REFERENCES "Journal Entries"(id) ON DELETE CASCADE NOT NULL,
+  embedding VECTOR(1536) NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS journal_embeddings_journal_entry_id_idx ON public.journal_embeddings (journal_entry_id);
+`;
+
 export const matchJournalEntries = `
 CREATE OR REPLACE FUNCTION public.match_journal_entries(
   query_embedding VECTOR(1536),

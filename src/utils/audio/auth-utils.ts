@@ -1,221 +1,122 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
-let refreshInProgress = false;
-
-/**
- * Gets the current authenticated user's ID
- * @returns The user ID if authenticated, or null if not
- */
-export async function getCurrentUserId(): Promise<string | null> {
+export const refreshAuthSession = async (showToasts = true) => {
   try {
-    const { data, error } = await supabase.auth.getUser();
-    
-    if (error || !data.user) {
-      return null;
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) {
+      console.error("Error refreshing session:", error.message);
+      return false;
     }
     
-    return data.user.id;
+    return !!data.session;
   } catch (error) {
-    console.error('Error getting current user ID:', error);
-    return null;
+    console.error("Exception in refreshAuthSession:", error);
+    return false;
   }
-}
+};
 
-/**
- * Checks if the current user is authenticated
- * @param showToast Whether to show a toast message if not authenticated
- * @returns Object with authentication status and user information
- */
-export async function verifyUserAuthentication(showToast = true): Promise<{
-  isAuthenticated: boolean;
-  user?: any;
-  error?: string;
-}> {
+// Function to get the current auth state
+export const checkAuth = async () => {
   try {
-    const { data, error } = await supabase.auth.getUser();
+    const { data: { session }, error } = await supabase.auth.getSession();
     
     if (error) {
-      console.error('Auth error:', error);
-      if (showToast) {
-        toast.error('Authentication error. Please sign in again.');
-      }
       return { isAuthenticated: false, error: error.message };
     }
     
-    if (!data.user) {
-      if (showToast) {
-        toast.error('Authentication required. Please sign in.');
-      }
-      return { isAuthenticated: false, error: 'No authenticated user found' };
+    if (!session) {
+      return { isAuthenticated: false };
     }
     
-    return { isAuthenticated: true, user: data.user };
-  } catch (error: any) {
-    console.error('Error verifying authentication:', error);
-    if (showToast) {
-      toast.error('Authentication error. Please try again.');
-    }
-    return { isAuthenticated: false, error: error.message || 'Authentication check failed' };
+    return {
+      isAuthenticated: true,
+      user: session.user
+    };
+  } catch (error) {
+    console.error("Error checking auth:", error);
+    return { isAuthenticated: false, error: error.message };
   }
-}
+};
 
-/**
- * Ensures that the current user has a profile
- * @param userId The ID of the user to check
- * @returns Success status and error message if applicable
- */
-export async function ensureUserProfile(userId: string): Promise<{
-  success: boolean;
-  error?: string;
-}> {
-  if (!userId) {
-    console.error('No user ID provided to ensureUserProfile');
-    return { success: false, error: 'No user ID provided' };
-  }
-  
+// Function to get the current user ID
+export const getCurrentUserId = async () => {
   try {
-    // Get user details from auth first to have the data ready if we need to create a profile
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    
-    if (userError) {
-      console.error('Error getting user data:', userError);
-      return { success: false, error: `Unable to get user information: ${userError.message}` };
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id;
+  } catch (error) {
+    console.error("Error getting current user ID:", error);
+    return null;
+  }
+};
+
+// Ensure a profile exists for the user
+export const ensureUserProfile = async (userId: string) => {
+  try {
+    if (!userId) {
+      return { success: false, error: 'No user ID provided' };
     }
     
-    if (!userData.user) {
-      return { success: false, error: 'User not found' };
-    }
-    
-    // Check if profile exists
-    const { data: profileData, error: profileError } = await supabase
+    // Check if a profile already exists for this user
+    const { data: existingProfile, error: profileError } = await supabase
       .from('profiles')
       .select('id')
       .eq('id', userId)
       .maybeSingle();
-      
-    if (profileError) {
-      console.error('Profile check error:', profileError);
-      // Don't treat this as a fatal error, since we'll try to create the profile anyway
-      console.log('Continuing despite profile check error');
+    
+    // If there's a query error that isn't just "no rows returned", report it
+    if (profileError && !profileError.message.includes('no rows')) {
+      console.error('Error checking for existing profile:', profileError);
+      return { success: false, error: profileError.message };
     }
     
-    // If profile exists, return success
-    if (profileData) {
-      console.log('User profile exists:', profileData.id);
-      return { success: true };
+    // If profile exists, we're done!
+    if (existingProfile) {
+      console.log('Profile already exists for user:', userId);
+      return { success: true, message: 'Profile already exists', isNew: false };
     }
     
-    // Profile doesn't exist, try to create one
-    console.log('No profile found, attempting to create profile for user:', userId);
+    // Get the user data to populate the profile
+    const { data: userData, error: userError } = await supabase.auth.getUser();
     
-    // Extract user information
-    const email = userData.user.email;
-    const fullName = userData.user.user_metadata?.full_name || null;
-    const avatarUrl = userData.user.user_metadata?.avatar_url || null;
+    if (userError) {
+      console.error('Error getting user data:', userError);
+      return { success: false, error: userError.message };
+    }
     
-    console.log('Creating profile with user data:', { email, fullName, avatarUrl });
+    const user = userData?.user;
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
     
-    // Insert profile with retry logic for concurrent creation
-    try {
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert({ 
-          id: userId,
-          email: email,
-          full_name: fullName,
-          avatar_url: avatarUrl,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-        
-      if (insertError) {
-        // If duplicate key error, profile was created in another process
-        if (insertError.code === '23505') {
-          console.log('Profile already exists (created by another process)');
-          return { success: true };
-        }
-        
-        // If RLS error, the profile will likely be created by the database trigger
-        if (insertError.message.includes('row-level security') || 
-            insertError.message.includes('violates row-level security policy')) {
-          console.log('Row-level security prevented profile creation from client.');
-          console.log('This is expected - the database trigger should create the profile instead');
-          // Don't treat this as an error - the database trigger should create the profile
-          return { success: true };
-        }
-        
-        console.error('Failed to create profile:', insertError);
-        // Return success anyway as the profile might be created by the database trigger
-        return { success: true, error: `Client-side profile creation failed: ${insertError.message}` };
+    // Create a new profile - we have a database trigger too, but this is a failsafe
+    const { data: newProfile, error: insertError } = await supabase
+      .from('profiles')
+      .insert({
+        id: userId,
+        email: user.email,
+        full_name: user.user_metadata?.full_name,
+        avatar_url: user.user_metadata?.avatar_url
+      })
+      .select()
+      .single();
+    
+    if (insertError) {
+      // If the error is about unique violation, the profile might have been 
+      // created by the database trigger, so we can consider this a success
+      if (insertError.message.includes('unique constraint')) {
+        console.log('Profile likely created by database trigger for user:', userId);
+        return { success: true, message: 'Profile created by database trigger', isNew: true };
       }
       
-      console.log('Successfully created profile for user:', userId);
-      return { success: true };
-    } catch (insertErr: any) {
-      console.error('Profile insertion error:', insertErr);
-      // Return success anyway as the profile might be created by the database trigger
-      return { success: true, error: `Profile insertion error, but continuing: ${insertErr.message}` };
-    }
-  } catch (error: any) {
-    console.error('Error in ensureUserProfile:', error);
-    // Return success anyway as the profile might be created by the database trigger
-    return { success: true, error: `Profile check error, but continuing: ${error.message}` };
-  }
-}
-
-/**
- * Refreshes the auth session and updates the session state
- * @param showToast Whether to show toast messages
- * @returns Whether the refresh was successful
- */
-export async function refreshAuthSession(showToast = true): Promise<boolean> {
-  if (refreshInProgress) {
-    console.log('Session refresh already in progress, skipping...');
-    return false;
-  }
-  
-  refreshInProgress = true;
-  
-  try {
-    console.log('Refreshing auth session...');
-    
-    const { data, error } = await supabase.auth.refreshSession();
-    
-    if (error) {
-      console.error('Session refresh error:', error);
-      refreshInProgress = false;
-      return false;
+      console.error('Error creating profile:', insertError);
+      return { success: false, error: insertError.message };
     }
     
-    if (!data.session) {
-      console.log('No session after refresh attempt');
-      refreshInProgress = false;
-      return false;
-    }
-    
-    console.log('Session refreshed successfully, expires:', 
-                new Date(data.session.expires_at * 1000).toISOString());
-    
-    // Ensure user profile exists
-    if (data.user) {
-      try {
-        // This is now a non-blocking call - we don't care if it fails
-        const profileResult = await ensureUserProfile(data.user.id);
-        if (!profileResult.success) {
-          console.log('Profile check after refresh had issues, but continuing:', profileResult.error);
-        }
-      } catch (profileError) {
-        console.error('Error ensuring profile after refresh:', profileError);
-        // Continue despite profile error
-      }
-    }
-    
-    refreshInProgress = false;
-    return true;
+    console.log('New profile created successfully for user:', userId);
+    return { success: true, profile: newProfile, isNew: true };
   } catch (error) {
-    console.error('Error in refreshAuthSession:', error);
-    refreshInProgress = false;
-    return false;
+    console.error('Exception in ensureUserProfile:', error);
+    return { success: false, error: error.message };
   }
-}
+};
