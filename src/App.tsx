@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -21,9 +20,7 @@ import { supabase } from "./integrations/supabase/client";
 import Navbar from "./components/Navbar";
 import { refreshAuthSession } from "./utils/audio/auth-utils";
 
-// Create queryClient inside the component to ensure it's created in React context
 const App = () => {
-  // Create a new QueryClient instance inside the component
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -54,7 +51,6 @@ const App = () => {
   );
 };
 
-// Protected route component with location preservation
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, refreshSession } = useAuth();
   const location = useLocation();
@@ -62,7 +58,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const [refreshAttempted, setRefreshAttempted] = useState(false);
   
   useEffect(() => {
-    // Only attempt a refresh once to avoid redirect loop or multiple refresh attempts
     if (!isLoading && !user && !isRefreshing && !refreshAttempted) {
       console.log("Protected route: No user found, attempting to refresh session", {
         path: location.pathname
@@ -70,7 +65,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       
       setIsRefreshing(true);
       
-      // Try refreshing the session if we don't have a user
       refreshAuthSession(false).then(success => {
         console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
         setIsRefreshing(false);
@@ -82,7 +76,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user, isLoading, location, refreshSession, isRefreshing, refreshAttempted]);
   
-  // Show loading spinner while authentication is being checked
   if (isLoading || isRefreshing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -91,7 +84,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  // Redirect to auth page if user is not authenticated
   if (!user) {
     console.log("Redirecting to auth from protected route:", location.pathname);
     return <Navigate to="/auth" state={{ from: location }} replace />;
@@ -100,14 +92,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Layout component to wrap all routes with common elements like Navbar
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const isAuthPage = location.pathname === "/auth";
   
   return (
     <>
-      {/* Don't show navbar on auth page */}
       {!isAuthPage && <Navbar />}
       <div className={!isAuthPage ? "pt-16" : ""}>
         {children}
@@ -117,15 +107,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
-  // Ensure supabase client is properly configured and refreshing tokens
   useEffect(() => {
     console.log("Setting up Supabase auth debugging listener");
     
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth event outside React context:", event, session?.user?.email);
       
-      // Extra debug for auth issues
       if (session) {
         console.log("User authentication details:", {
           id: session.user?.id,
@@ -137,7 +124,6 @@ const AppRoutes = () => {
       }
     });
     
-    // Check the session on mount for debugging
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) {
         console.error("Initial session check error:", error);
@@ -149,9 +135,8 @@ const AppRoutes = () => {
           expiresIn: Math.round((data.session.expires_at * 1000 - Date.now()) / 1000 / 60) + " minutes"
         });
         
-        // Try to refresh auth session when app loads if expiry is close
         const timeToExpiry = data.session.expires_at * 1000 - Date.now();
-        const shouldRefresh = timeToExpiry < 30 * 60 * 1000; // Less than 30 minutes remaining
+        const shouldRefresh = timeToExpiry < 30 * 60 * 1000;
         
         if (shouldRefresh) {
           console.log("Session expiring soon, refreshing...");
