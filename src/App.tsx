@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -146,6 +147,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
 const AppRoutes = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  
+  // Log the current route for debugging
+  console.log("Current route:", location.pathname);
   
   useEffect(() => {
     console.log("Setting up Supabase auth debugging listener");
