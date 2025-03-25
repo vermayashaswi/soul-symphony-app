@@ -5,6 +5,25 @@ import { toast } from 'sonner';
 let refreshInProgress = false;
 
 /**
+ * Gets the current authenticated user's ID
+ * @returns The user ID if authenticated, or null if not
+ */
+export async function getCurrentUserId(): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    
+    if (error || !data.user) {
+      return null;
+    }
+    
+    return data.user.id;
+  } catch (error) {
+    console.error('Error getting current user ID:', error);
+    return null;
+  }
+}
+
+/**
  * Checks if the current user is authenticated
  * @param showToast Whether to show a toast message if not authenticated
  * @returns Object with authentication status and user information

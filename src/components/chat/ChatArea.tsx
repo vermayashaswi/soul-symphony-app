@@ -132,12 +132,12 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         toast.error(authCheck.error || 'You must be signed in to use the chat');
         return;
       }
-      currentUserId = authCheck.userId;
-    }
-    
-    if (!currentUserId) {
-      toast.error('User ID not found');
-      return;
+      currentUserId = authCheck.user?.id;
+      
+      if (!currentUserId) {
+        toast.error('User ID not found');
+        return;
+      }
     }
     
     const isNewThread = !threadId;
