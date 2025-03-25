@@ -20,6 +20,11 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     return { success: false, error: validation.errorMessage };
   }
   
+  if (!userId) {
+    toast.error("You must be signed in to save journal entries");
+    return { success: false, error: "Authentication required" };
+  }
+  
   try {
     // Generate a temporary ID for this recording
     const tempId = `temp-${Date.now()}`;
@@ -45,7 +50,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
 /**
  * Processes a recording in the background without blocking the UI
  */
-async function processRecordingInBackground(audioBlob: Blob | null, userId: string | undefined, toastId: string): Promise<void> {
+async function processRecordingInBackground(audioBlob: Blob | null, userId: string, toastId: string): Promise<void> {
   try {
     // 1. Convert blob to base64
     const base64Audio = await blobToBase64(audioBlob!);
@@ -70,7 +75,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     }
 
     // 3. Send audio for transcription
-    const result = await sendAudioForTranscription(base64String, authStatus.userId!);
+    const result = await sendAudioForTranscription(base64String, userId);
     
     toast.dismiss(toastId);
     

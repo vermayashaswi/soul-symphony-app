@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingVisualizer } from '@/components/voice-recorder/RecordingVisualizer';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -20,6 +21,7 @@ interface VoiceRecorderProps {
 export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
   const [noiseReduction, setNoiseReduction] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { user } = useAuth();
   
   const {
     isRecording,
@@ -45,7 +47,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     if (!audioBlob) return;
     
     setIsProcessing(true);
-    const result = await processRecording(audioBlob, "user_id");
+    const result = await processRecording(audioBlob, user?.id);
     
     if (result.success && onRecordingComplete) {
       onRecordingComplete(audioBlob, result.tempId);
@@ -53,6 +55,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     
     setIsProcessing(false);
   };
+
+  // Automatically request permissions on component mount
+  useEffect(() => {
+    if (hasPermission === null) {
+      requestPermissions();
+    }
+  }, [hasPermission, requestPermissions]);
 
   return (
     <div className={cn("flex flex-col items-center", className)}>

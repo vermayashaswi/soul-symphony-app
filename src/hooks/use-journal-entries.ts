@@ -19,7 +19,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isProcessingEmbeddings, setIsProcessingEmbeddings] = useState(false);
   const { storeEmbedding } = useTranscription();
 
   const fetchEntries = useCallback(async () => {
@@ -152,7 +151,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  // New function to directly create embeddings using the updated edge function
+  // Function to directly create embeddings using the edge function
   const createEmbeddingForEntry = async (journalEntryId: number, text: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('create-embedding', {
@@ -196,48 +195,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  const processAllEmbeddings = async () => {
-    if (!userId) {
-      toast.error('User ID is required to process embeddings');
-      return { success: false };
-    }
-    
-    setIsProcessingEmbeddings(true);
-    try {
-      toast.info('Processing journal embeddings...');
-      
-      // Call the Supabase Edge Function to process all embeddings
-      const { data, error } = await supabase.functions.invoke('embed-all-entries', {
-        body: { 
-          userId,
-          processAll: true  // Flag to process all entries regardless of existing embeddings
-        }
-      });
-      
-      if (error) {
-        console.error('Error processing embeddings:', error);
-        toast.error('Failed to process journal embeddings');
-        throw error;
-      }
-      
-      if (data?.success) {
-        console.log('Embeddings processed successfully:', data);
-        toast.success(`Processed ${data.totalProcessed} entries: ${data.successCount} successful, ${data.errorCount} errors`);
-        return data;
-      } else {
-        toast.error('Failed to process journal embeddings');
-        return { success: false };
-      }
-      
-    } catch (error) {
-      console.error('Error in processAllEmbeddings:', error);
-      toast.error(`Failed to process journal embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      return { success: false, error };
-    } finally {
-      setIsProcessingEmbeddings(false);
-    }
-  };
-
   const refreshEntries = () => {
     fetchEntries();
   };
@@ -256,8 +213,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     isSaving,
     deleteJournalEntry,
     refreshEntries,
-    processAllEmbeddings,
-    isProcessingEmbeddings,
     journalEntries: entries, // Alias for backward compatibility
     isLoading: loading // Alias for backward compatibility
   };

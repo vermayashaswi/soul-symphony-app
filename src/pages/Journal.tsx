@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import JournalHeader from '@/components/journal/JournalHeader';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import EmptyJournalState from '@/components/journal/EmptyJournalState';
@@ -50,11 +50,8 @@ export default function Journal() {
   const { journalEntries, isLoading, refreshEntries } = useJournalEntries(user?.id);
   const { 
     handleCreateJournal, 
-    handleViewInsights, 
-    handleProcessAllEmbeddings, 
-    isProcessingEmbeddings,
+    handleViewInsights,
     processUnprocessedEntries,
-    isProcessingUnprocessedEntries,
     testJournalRetrieval 
   } = useJournalHandler(user?.id);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -73,7 +70,7 @@ export default function Journal() {
   };
 
   // Run the processUnprocessedEntries function when the component mounts
-  React.useEffect(() => {
+  useEffect(() => {
     if (user?.id) {
       // Process unprocessed entries automatically on page load
       processUnprocessedEntries().then(result => {
@@ -88,11 +85,7 @@ export default function Journal() {
     <div className="container px-4 md:px-6 max-w-6xl space-y-6 py-6">
       <JournalHeader 
         onCreateJournal={handleCreateJournal} 
-        onViewInsights={handleViewInsights} 
-        onProcessAllEmbeddings={handleProcessAllEmbeddings}
-        isProcessingEmbeddings={isProcessingEmbeddings}
-        onProcessUnprocessedEntries={processUnprocessedEntries}
-        isProcessingUnprocessedEntries={isProcessingUnprocessedEntries}
+        onViewInsights={handleViewInsights}
       />
       
       <div className="flex justify-between items-center">

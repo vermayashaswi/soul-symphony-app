@@ -2,6 +2,8 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +19,37 @@ export default function Index() {
       navigate('/auth');
     }
   };
+
+  const featureCards = [
+    {
+      title: "Voice Journaling",
+      description: "Simply speak your thoughts and let AI transcribe them into meaningful journal entries",
+      icon: <Mic className="h-12 w-12 text-primary" />,
+      action: "Start Recording",
+      onClick: () => navigate('/journal')
+    },
+    {
+      title: "AI Chat Companion",
+      description: "Have meaningful conversations about your journal entries with your AI companion",
+      icon: <MessageSquare className="h-12 w-12 text-indigo-500" />,
+      action: "Chat Now",
+      onClick: () => navigate('/chat')
+    },
+    {
+      title: "Emotional Insights",
+      description: "Gain valuable insights into your emotional patterns and wellbeing over time",
+      icon: <ChartBar className="h-12 w-12 text-green-500" />,
+      action: "View Insights",
+      onClick: () => navigate('/insights')
+    },
+    {
+      title: "Guided Reflection",
+      description: "Follow AI-generated prompts to reflect on your experiences more deeply",
+      icon: <BookOpen className="h-12 w-12 text-amber-500" />,
+      action: "Start Reflecting",
+      onClick: () => navigate('/journal')
+    }
+  ];
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
@@ -34,6 +67,27 @@ export default function Index() {
           <Button size="lg" onClick={handleGetStarted} className="text-lg px-8 py-6">
             {user ? 'Go to Journal' : 'Get Started'}
           </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl w-full mt-16">
+          {featureCards.map((card, index) => (
+            <Card key={index} className="border shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <CardHeader>
+                <div className="flex justify-center mb-4">
+                  {card.icon}
+                </div>
+                <CardTitle className="text-center">{card.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-center">{card.description}</CardDescription>
+              </CardContent>
+              <CardFooter className="flex justify-center">
+                <Button variant="outline" onClick={card.onClick}>
+                  {card.action}
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
         </div>
       </div>
     </div>

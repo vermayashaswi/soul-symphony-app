@@ -9,11 +9,9 @@ export function useJournalHandler(userId: string | undefined) {
   const navigate = useNavigate();
   const [isTestingBackend, setIsTestingBackend] = useState(false);
   const [isProcessingUnprocessedEntries, setIsProcessingUnprocessedEntries] = useState(false);
-  const { processAllEmbeddings, isProcessingEmbeddings } = useJournalEntries(userId);
 
   const handleCreateJournal = () => {
     // Navigate to the record tab or show the journal creation dialog
-    // This is a placeholder - implement as needed
     console.log('Create journal entry');
   };
 
@@ -22,29 +20,16 @@ export function useJournalHandler(userId: string | undefined) {
     navigate('/insights');
   };
 
-  const handleProcessAllEmbeddings = async () => {
-    try {
-      const result = await processAllEmbeddings();
-      
-      if (result?.success) {
-        toast.success('Journal entries have been indexed successfully');
-      }
-    } catch (error) {
-      console.error('Error processing embeddings:', error);
-      toast.error('Failed to process embeddings');
-    }
-  };
-
-  // New function to handle specifically unprocessed entries (NULL embeddings)
+  // Function to handle specifically unprocessed entries (NULL embeddings)
   const processUnprocessedEntries = async () => {
     if (!userId) {
-      toast.error("Authentication required. Please sign in");
+      console.log("No user ID available for processing entries");
       return { success: false, message: "Authentication required" };
     }
 
     setIsProcessingUnprocessedEntries(true);
     try {
-      toast.info('Processing unprocessed journal entries...');
+      console.log('Processing unprocessed journal entries...');
       
       // Call the Supabase Edge Function to process only unprocessed entries
       const { data, error } = await supabase.functions.invoke('embed-all-entries', {
@@ -56,21 +41,18 @@ export function useJournalHandler(userId: string | undefined) {
       
       if (error) {
         console.error('Error processing unprocessed entries:', error);
-        toast.error('Failed to process unprocessed journal entries');
-        throw error;
+        return { success: false, error };
       }
       
       if (data?.success) {
         console.log('Unprocessed entries processed successfully:', data);
-        toast.success(`Processed ${data.successCount} unprocessed entries`);
         return data;
       } else {
-        toast.error('Failed to process unprocessed journal entries');
+        console.error('Failed to process unprocessed journal entries:', data);
         return { success: false };
       }
     } catch (error) {
       console.error('Error in processUnprocessedEntries:', error);
-      toast.error(`Failed to process entries: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return { success: false, error };
     } finally {
       setIsProcessingUnprocessedEntries(false);
@@ -150,8 +132,6 @@ export function useJournalHandler(userId: string | undefined) {
   return {
     handleCreateJournal,
     handleViewInsights,
-    handleProcessAllEmbeddings,
-    isProcessingEmbeddings,
     processUnprocessedEntries,
     isProcessingUnprocessedEntries,
     testJournalRetrieval,
