@@ -1,9 +1,9 @@
-
 import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const NotFound = () => {
   const location = useLocation();
@@ -11,23 +11,24 @@ const NotFound = () => {
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
+    console.log("NotFound: Current path:", location.pathname);
+    console.log("NotFound: Auth state:", { user: !!user, isLoading });
     
-    // If the user came from an OAuth redirect and got lost
-    // This helps with Google auth redirects that might lose the path
-    const isFromRedirect = location.pathname.includes('callback') || 
-                          location.search.includes('error') || 
-                          location.hash.includes('access_token');
+    // Check for OAuth redirect signatures
+    const isFromRedirect = 
+      location.pathname.includes('callback') || 
+      location.search.includes('error') || 
+      location.hash.includes('access_token') ||
+      location.hash.includes('type=recovery');
                           
     if (isFromRedirect && !isLoading) {
       console.log("Detected redirect to 404 page, attempting recovery");
-      // Slight delay to ensure auth state is processed
+      
+      // Add slight delay to ensure auth state is processed
       const timer = setTimeout(() => {
         if (user) {
           console.log("User is authenticated, redirecting to journal");
+          toast.success("Successfully logged in!");
           navigate("/journal", { replace: true });
         } else {
           console.log("User is not authenticated, redirecting to auth");

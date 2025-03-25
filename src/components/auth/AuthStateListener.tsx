@@ -9,35 +9,34 @@ const AuthStateListener = () => {
   const { user } = useAuth();
   const location = useLocation();
   
-  // Log the current route for debugging
-  console.log("Current route:", location.pathname);
-  
   useEffect(() => {
     console.log("Setting up Supabase auth debugging listener");
+    console.log("Current route:", location.pathname);
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth event outside React context:", event, session?.user?.email);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth event:", event, "User:", session?.user?.email);
       
       if (event === 'SIGNED_IN' && session?.user) {
-        console.log("SIGNED_IN event detected - creating new session for user", session.user.id);
+        console.log("SIGNED_IN event detected - creating session for", session.user.id);
         
-        createOrUpdateSession(session.user.id, window.location.pathname)
-          .then(result => {
-            console.log("Session creation result:", result);
-          })
-          .catch(err => {
-            console.error("Error creating session on sign in:", err);
-          });
+        try {
+          const result = await createOrUpdateSession(session.user.id, window.location.pathname);
+          console.log("Session creation result:", result);
+        } catch (err) {
+          console.error("Error creating session on sign in:", err);
+        }
       } else if (event === 'SIGNED_OUT' && user) {
-        console.log("SIGNED_OUT event detected - ending session for user", user.id);
+        console.log("SIGNED_OUT event detected - ending session for", user.id);
         
-        endUserSession(user.id)
-          .catch(err => {
-            console.error("Error ending session on sign out:", err);
-          });
+        try {
+          await endUserSession(user.id);
+        } catch (err) {
+          console.error("Error ending session on sign out:", err);
+        }
       }
     });
     
+    // Check initial session
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) {
         console.error("Initial session check error:", error);
@@ -46,20 +45,12 @@ const AuthStateListener = () => {
           userId: data.session.user.id,
           email: data.session.user.email,
           expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
-          expiresIn: Math.round((data.session.expires_at * 1000 - Date.now()) / 1000 / 60) + " minutes"
         });
         
-        if (data.session.user.id) {
-          console.log("Creating/updating session for initial session user", data.session.user.id);
-          
-          createOrUpdateSession(data.session.user.id, window.location.pathname)
-            .then(result => {
-              console.log("Initial session tracking result:", result);
-            })
-            .catch(err => {
-              console.error("Error tracking session on initial load:", err);
-            });
-        }
+        createOrUpdateSession(data.session.user.id, window.location.pathname)
+          .catch(err => {
+            console.error("Error tracking initial session:", err);
+          });
       } else {
         console.log("No initial session found");
       }
