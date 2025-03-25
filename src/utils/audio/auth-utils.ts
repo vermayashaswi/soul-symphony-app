@@ -77,47 +77,57 @@ export async function ensureUserProfile(userId: string): Promise<{
     // Profile doesn't exist, create one
     console.log('No profile found, creating profile for user:', userId);
     
-    // Get user details from auth
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError) {
-      console.error('Error getting user data:', userError);
-      return { success: false, error: `Failed to get user information: ${userError.message}` };
-    }
-    
-    if (!userData.user) {
-      return { success: false, error: 'User not found' };
-    }
-    
-    // Extract user information
-    const email = userData.user.email;
-    const fullName = userData.user.user_metadata?.full_name || null;
-    const avatarUrl = userData.user.user_metadata?.avatar_url || null;
-    
-    // Insert profile with retry logic for concurrent creation
-    const { error: insertError } = await supabase
-      .from('profiles')
-      .insert({ 
-        id: userId,
-        email: email,
-        full_name: fullName,
-        avatar_url: avatarUrl,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-      
-    if (insertError) {
-      // If duplicate key error, profile was created in another process
-      if (insertError.code === '23505') {
-        console.log('Profile already exists (created by another process)');
-        return { success: true };
+    try {
+      // Get user details from auth
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('Error getting user data:', userError);
+        return { success: false, error: `Failed to get user information: ${userError.message}` };
       }
       
-      console.error('Failed to create profile:', insertError);
-      return { success: false, error: `Failed to create profile: ${insertError.message}` };
+      if (!userData.user) {
+        return { success: false, error: 'User not found' };
+      }
+      
+      // Extract user information
+      const email = userData.user.email;
+      const fullName = userData.user.user_metadata?.full_name || null;
+      const avatarUrl = userData.user.user_metadata?.avatar_url || null;
+      
+      // Insert profile with retry logic for concurrent creation
+      try {
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({ 
+            id: userId,
+            email: email,
+            full_name: fullName,
+            avatar_url: avatarUrl,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+          
+        if (insertError) {
+          // If duplicate key error, profile was created in another process
+          if (insertError.code === '23505') {
+            console.log('Profile already exists (created by another process)');
+            return { success: true };
+          }
+          
+          console.error('Failed to create profile:', insertError);
+          return { success: false, error: `Failed to create profile: ${insertError.message}` };
+        }
+        
+        console.log('Successfully created profile for user:', userId);
+        return { success: true };
+      } catch (insertErr: any) {
+        console.error('Profile insertion error:', insertErr);
+        return { success: false, error: `Profile insertion error: ${insertErr.message}` };
+      }
+    } catch (userDataErr: any) {
+      console.error('Error getting user data:', userDataErr);
+      return { success: false, error: `Error getting user data: ${userDataErr.message}` };
     }
-    
-    console.log('Successfully created profile for user:', userId);
-    return { success: true };
   } catch (error: any) {
     console.error('Error in ensureUserProfile:', error);
     return { success: false, error: error.message || 'Unknown error ensuring user profile' };
@@ -159,7 +169,12 @@ export async function refreshAuthSession(showToast = true): Promise<boolean> {
     
     // Ensure user profile exists
     if (data.user) {
-      await ensureUserProfile(data.user.id);
+      try {
+        await ensureUserProfile(data.user.id);
+      } catch (profileError) {
+        console.error('Error ensuring profile after refresh:', profileError);
+        // Continue despite profile error
+      }
     }
     
     refreshInProgress = false;

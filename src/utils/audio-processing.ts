@@ -36,15 +36,24 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       duration: 120000, // Toast remains for 2 minutes or until explicitly dismissed
     });
     
-    // Ensure the user profile exists before proceeding
-    const profileResult = await ensureUserProfile(userId);
-    if (!profileResult.success) {
-      console.error('Profile creation error in processRecording:', profileResult.error);
-      // Continue with processing since profile might get created by the transcription function
+    // Check if user profile exists before proceeding
+    try {
+      const profileResult = await ensureUserProfile(userId);
+      if (!profileResult.success) {
+        console.warn('Profile creation warning in processRecording:', profileResult.error);
+        // Continue with processing since profile might get created later
+      }
+    } catch (profileError) {
+      console.error('Profile check error:', profileError);
+      // Don't fail the recording process due to profile issues
     }
       
     // Launch the processing without awaiting it
-    processRecordingInBackground(audioBlob, userId, tempId);
+    processRecordingInBackground(audioBlob, userId, tempId).catch(error => {
+      console.error('Background processing error:', error);
+      toast.dismiss(tempId);
+      toast.error('Error processing recording');
+    });
     
     // Return immediately with the temp ID
     return { success: true, tempId };
@@ -88,45 +97,63 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     console.log("Base64 audio length:", base64String.length);
     
     // 2. Verify user authentication
-    const authStatus = await verifyUserAuthentication(false); // Don't show toast here
-    if (!authStatus.isAuthenticated) {
+    try {
+      const authStatus = await verifyUserAuthentication(false); // Don't show toast here
+      if (!authStatus.isAuthenticated) {
+        toast.dismiss(toastId);
+        toast.error(authStatus.error || 'Authentication failed');
+        return;
+      }
+    } catch (authError) {
+      console.error('Authentication verification error:', authError);
       toast.dismiss(toastId);
-      toast.error(authStatus.error || 'Authentication failed');
+      toast.error('Authentication check failed');
       return;
     }
 
     // Final check for profile existence
-    const profileResult = await ensureUserProfile(userId);
-    if (!profileResult.success) {
-      console.warn('Profile creation issue before transcription, but continuing:', profileResult.error);
-      // We continue anyway as the transcription service will also try to create the profile
+    try {
+      const profileResult = await ensureUserProfile(userId);
+      if (!profileResult.success) {
+        console.warn('Profile creation issue before transcription, continuing anyway:', profileResult.error);
+        // We continue anyway as the transcription service will also try to create the profile
+      }
+    } catch (profileError) {
+      console.error('Profile check error before transcription:', profileError);
+      // Continue despite errors with profile checking
     }
 
     // 3. Send audio for transcription and AI analysis
-    const result = await sendAudioForTranscription(base64String, userId);
-    
-    toast.dismiss(toastId);
-    
-    if (result.success) {
-      toast.success('Journal entry processed and saved successfully!', {
-        description: "Your entry has been analyzed for themes and emotions."
-      });
+    try {
+      const result = await sendAudioForTranscription(base64String, userId);
       
-      // Add the processing entry to the URL to show it in the journal list
-      if (window.location.pathname === '/journal') {
-        // Already on journal page, just update the URL
-        const url = new URL(window.location.href);
-        url.searchParams.set('processing', toastId);
-        window.history.replaceState({}, document.title, url.toString());
+      toast.dismiss(toastId);
+      
+      if (result.success) {
+        toast.success('Journal entry processed and saved successfully!', {
+          description: "Your entry has been analyzed for themes and emotions."
+        });
         
-        // Force a reload to show the new entry
-        window.location.reload();
+        // Add the processing entry to the URL to show it in the journal list
+        if (window.location.pathname === '/journal') {
+          // Already on journal page, just update the URL
+          const url = new URL(window.location.href);
+          url.searchParams.set('processing', toastId);
+          window.history.replaceState({}, document.title, url.toString());
+          
+          // Force a reload to show the new entry
+          window.location.reload();
+        } else {
+          // Redirect to journal page with processing parameter
+          window.location.href = `/journal?processing=${toastId}`;
+        }
       } else {
-        // Redirect to journal page with processing parameter
-        window.location.href = `/journal?processing=${toastId}`;
+        toast.error(result.error || 'Failed to process recording');
       }
-    } else {
-      toast.error(result.error || 'Failed to process recording');
+    } catch (transcriptionError) {
+      console.error('Transcription error:', transcriptionError);
+      toast.dismiss(toastId);
+      toast.error('Failed to transcribe audio. Please try again.');
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
