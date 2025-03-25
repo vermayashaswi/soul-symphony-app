@@ -16,9 +16,15 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
   // Get themes to display - first try master_themes, then fall back to emotions
   const themesToDisplay = React.useMemo(() => {
     if (entry.master_themes && Array.isArray(entry.master_themes) && entry.master_themes.length > 0) {
-      return entry.master_themes.slice(0, 10);
+      // Trim long theme names to prevent overflow
+      return entry.master_themes.slice(0, 10).map(theme => 
+        typeof theme === 'string' && theme.length > 12 ? theme.slice(0, 12) + '...' : theme
+      );
     } else if (entry.emotions && Array.isArray(entry.emotions) && entry.emotions.length > 0) {
-      return entry.emotions.slice(0, 10);
+      // Trim long emotion names to prevent overflow
+      return entry.emotions.slice(0, 10).map(emotion => 
+        typeof emotion === 'string' && emotion.length > 12 ? emotion.slice(0, 12) + '...' : emotion
+      );
     }
     return [];
   }, [entry.master_themes, entry.emotions]);
@@ -81,7 +87,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                 Soul-ubles
               </h3>
               
-              <div className="h-60 mb-4 flex items-center justify-center">
+              <div className="h-60 mb-4 flex items-center justify-center relative bg-white/50 rounded-lg p-2 border border-border/30 overflow-hidden">
                 {themesToDisplay.length > 0 ? (
                   <EmotionBubbles themes={themesToDisplay} />
                 ) : (
