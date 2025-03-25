@@ -150,14 +150,16 @@ export async function generateEmbeddingsForAllEntries() {
       return { success: true, message: 'No entries need embeddings', processed: 0 };
     }
     
-    // Type guard to ensure we're working with valid entries
-    const validEntries: EntryWithoutEmbedding[] = [];
-    
-    for (const entry of entriesData) {
-      if (entry && typeof entry === 'object' && 'id' in entry && typeof entry.id === 'number') {
-        validEntries.push(entry as EntryWithoutEmbedding);
-      }
+    // Define a type guard to ensure we're working with valid entries
+    function isValidEntry(entry: unknown): entry is EntryWithoutEmbedding {
+      return entry !== null && 
+             typeof entry === 'object' && 
+             'id' in entry && 
+             typeof entry.id === 'number';
     }
+    
+    // Filter out invalid entries
+    const validEntries: EntryWithoutEmbedding[] = entriesData.filter(isValidEntry);
     
     if (validEntries.length === 0) {
       return { success: true, message: 'No valid entries found', processed: 0 };
@@ -191,6 +193,7 @@ export async function generateEmbeddingsForAllEntries() {
     let errorCount = 0;
     
     for (const entry of entriesToProcess) {
+      // Since we've validated entries with the filter above, we know entry is not null here
       const text = entry["refined text"] || entry["transcription text"] || '';
       
       if (!text.trim()) {
