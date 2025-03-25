@@ -15,7 +15,7 @@ interface JournalEntryCardProps {
 const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
   // Get themes to display - first try master_themes, then fall back to emotions
   const themesToDisplay = React.useMemo(() => {
-    if (entry.master_themes && entry.master_themes.length > 0) {
+    if (entry.master_themes && Array.isArray(entry.master_themes) && entry.master_themes.length > 0) {
       return entry.master_themes.slice(0, 10);
     } else if (entry.emotions && Array.isArray(entry.emotions) && entry.emotions.length > 0) {
       return entry.emotions.slice(0, 10);

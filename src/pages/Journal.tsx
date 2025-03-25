@@ -32,6 +32,7 @@ export default function Journal() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [mode, setMode] = useState<'record' | 'past'>('past');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Extract processing entries from URL if present
   useEffect(() => {
@@ -54,11 +55,14 @@ export default function Journal() {
   }, []);
 
   const handleRefresh = async () => {
+    if (isRefreshing) return;
+    
     setIsRefreshing(true);
     try {
       await refreshEntries();
       // After refresh, clear any processing entries that might have been completed
       setProcessingEntries([]);
+      setRefreshKey(prev => prev + 1); // Force a fresh fetch
     } catch (error) {
       console.error('Error refreshing entries:', error);
     } finally {
@@ -128,7 +132,7 @@ export default function Journal() {
           variant="outline" 
           size="sm" 
           onClick={handleRefresh}
-          disabled={isRefreshing || isProcessingUnprocessedEntries}
+          disabled={isRefreshing || isProcessingUnprocessedEntries || isLoading}
         >
           {isRefreshing ? (
             <>
@@ -150,8 +154,9 @@ export default function Journal() {
             Failed to load journal entries. 
             <Button 
               variant="link" 
-              className="p-0 h-auto text-destructive-foreground underline ml-2" 
+              className="p-0 h-auto text-destructive-foreground underline ml-2"
               onClick={handleRefresh}
+              disabled={isRefreshing}
             >
               Click to retry
             </Button>
@@ -159,7 +164,7 @@ export default function Journal() {
         </Alert>
       )}
       
-      {isLoading ? (
+      {isLoading && journalEntries.length === 0 ? (
         <div className="flex justify-center items-center min-h-[300px]">
           <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
         </div>

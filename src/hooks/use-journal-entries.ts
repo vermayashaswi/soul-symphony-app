@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,12 +22,17 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [lastRetryTime, setLastRetryTime] = useState<number>(0);
   const { storeEmbedding } = useTranscription();
 
   const MAX_RETRY_ATTEMPTS = 3;
+  const RETRY_DELAY = 5000; // 5 seconds between retries
 
   const fetchEntries = useCallback(async () => {
     if (!userId) return;
+    
+    // Prevent multiple simultaneous fetch attempts
+    if (isRetrying) return;
     
     try {
       setLoading(true);
@@ -43,12 +49,22 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         setLoadError(error.message);
         
         if (retryAttempt >= MAX_RETRY_ATTEMPTS) {
-          toast.error('Failed to load journal entries. Please try again later.');
+          toast.error('Failed to load journal entries. Please try again later.', {
+            id: 'journal-fetch-error', // Use consistent ID to prevent duplicate toasts
+            dismissible: true,
+          });
+          
+          // Reset retry counter after showing error to user
+          setTimeout(() => setRetryAttempt(0), 30000); // Reset after 30 seconds
         }
         
         throw error;
       }
       
+      // Clear any existing error toasts on success
+      toast.dismiss('journal-fetch-error');
+      
+      // Reset retry counter on success
       setRetryAttempt(0);
       
       const typedEntries = (data || []) as JournalEntry[];
@@ -68,6 +84,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.error('Error fetching entries:', error);
       setLoadError(error.message || 'Failed to load journal entries');
       
+      // Only increment retry counter if we're not already at max and not currently retrying
       if (!isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
         setRetryAttempt(prev => prev + 1);
       }
@@ -212,23 +229,39 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
 
   const refreshEntries = async () => {
     try {
+      // Prevent rapid successive refreshes
+      const now = Date.now();
+      if (now - lastRetryTime < 2000) {
+        console.log('Throttling refresh attempts');
+        return;
+      }
+      
+      setLastRetryTime(now);
       setIsRetrying(true);
       await fetchEntries();
       toast.success('Journal entries refreshed');
     } catch (error) {
       console.error('Error in manual refresh:', error);
-      toast.error('Failed to refresh entries. Please try again.');
+      toast.error('Failed to refresh entries. Please try again.', {
+        id: 'journal-refresh-error',
+        dismissible: true,
+      });
     }
   };
 
   useEffect(() => {
-    let retryTimeout: NodeJS.Timeout;
+    let retryTimeout: NodeJS.Timeout | null = null;
     
     if (loadError && !loading && !isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
-      console.log(`Auto-retrying fetch (attempt ${retryAttempt + 1}/${MAX_RETRY_ATTEMPTS}) in 3 seconds...`);
+      console.log(`Auto-retrying fetch (attempt ${retryAttempt + 1}/${MAX_RETRY_ATTEMPTS}) in ${RETRY_DELAY / 1000} seconds...`);
+      
+      // Use exponential backoff for retries
+      const backoffDelay = RETRY_DELAY * Math.pow(2, retryAttempt - 1);
+      
       retryTimeout = setTimeout(() => {
+        setIsRetrying(true);
         fetchEntries();
-      }, 3000);
+      }, backoffDelay);
     }
     
     return () => {
@@ -238,6 +271,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
 
   useEffect(() => {
     if (userId) {
+      // Clear any previous state when userId changes
+      setEntries([]);
+      setRetryAttempt(0);
+      setLoadError(null);
       fetchEntries();
     }
   }, [userId, refreshKey, fetchEntries]);

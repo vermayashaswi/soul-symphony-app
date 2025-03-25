@@ -142,38 +142,6 @@ export type Database = {
           },
         ]
       }
-      journal_embeddings: {
-        Row: {
-          content: string
-          created_at: string | null
-          embedding: string | null
-          id: number
-          journal_entry_id: number | null
-        }
-        Insert: {
-          content: string
-          created_at?: string | null
-          embedding?: string | null
-          id?: number
-          journal_entry_id?: number | null
-        }
-        Update: {
-          content?: string
-          created_at?: string | null
-          embedding?: string | null
-          id?: number
-          journal_entry_id?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "journal_embeddings_journal_entry_id_fkey"
-            columns: ["journal_entry_id"]
-            isOneToOne: false
-            referencedRelation: "Journal Entries"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           avatar_url: string | null
