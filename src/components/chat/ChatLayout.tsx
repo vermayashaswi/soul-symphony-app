@@ -2,7 +2,7 @@
 import React, { ReactNode, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useMediaQuery } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ChatLayoutProps {
   sidebar: ReactNode;
@@ -10,7 +10,7 @@ interface ChatLayoutProps {
 }
 
 export function ChatLayout({ sidebar, content }: ChatLayoutProps) {
-  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
 
   return (

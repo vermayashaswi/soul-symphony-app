@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentUserId } from './audio/auth-utils';
 import { toast } from 'sonner';
+import { JournalEntry } from '@/types/journal';
 
 /**
  * Generate embedding for a journal entry
@@ -105,6 +106,12 @@ export async function searchJournalEntries(query: string, threshold = 0.3, limit
   }
 }
 
+interface EntryWithoutEmbedding {
+  id: number;
+  "refined text"?: string | null;
+  "transcription text"?: string | null;
+}
+
 /**
  * Generate embeddings for all journal entries that don't have them
  */
@@ -127,15 +134,14 @@ export async function generateEmbeddingsForAllEntries() {
       return { success: true, message: 'All entries already have embeddings', processed: 0 };
     }
     
-    // Get entries without embeddings
-    const { data: entriesWithoutEmbeddings, error: entriesError } = await supabase.rpc(
-      'get_entries_without_embeddings',
-      { user_id_param: userId }
-    );
-    
+    // Get entries without embeddings - using a custom query instead of RPC function that might not exist yet
+    const { data: entriesWithoutEmbeddings, error: entriesError } = await supabase
+      .from('Journal Entries')
+      .select('id, refined text, transcription text')
+      .eq('user_id', userId);
+      
     if (entriesError) {
       console.error('Error getting entries without embeddings:', entriesError);
-      // Fallback method if the RPC function doesn't exist
       return await generateEmbeddingsManually(userId);
     }
     
@@ -143,11 +149,25 @@ export async function generateEmbeddingsForAllEntries() {
       return { success: true, message: 'No entries need embeddings', processed: 0 };
     }
     
+    // Filter entries that don't have embeddings yet
+    const { data: existingEmbeddings } = await supabase
+      .from('journal_embeddings')
+      .select('journal_entry_id');
+      
+    const existingEmbeddingIds = (existingEmbeddings || []).map(e => e.journal_entry_id);
+    const entriesToProcess = entriesWithoutEmbeddings.filter(
+      (entry: EntryWithoutEmbedding) => !existingEmbeddingIds.includes(entry.id)
+    );
+    
+    if (entriesToProcess.length === 0) {
+      return { success: true, message: 'All entries already have embeddings', processed: 0 };
+    }
+    
     // Process each entry
     let successCount = 0;
     let errorCount = 0;
     
-    for (const entry of entriesWithoutEmbeddings) {
+    for (const entry of entriesToProcess) {
       const text = entry["refined text"] || entry["transcription text"] || '';
       
       if (!text.trim()) {
@@ -208,7 +228,9 @@ async function generateEmbeddingsManually(userId: string) {
     
     // Filter out entries that already have embeddings
     const existingEmbeddingIds = (existingEmbeddings || []).map(e => e.journal_entry_id);
-    const entriesToProcess = allEntries.filter(entry => !existingEmbeddingIds.includes(entry.id));
+    const entriesToProcess = allEntries.filter(
+      (entry: JournalEntry) => !existingEmbeddingIds.includes(entry.id)
+    );
     
     if (entriesToProcess.length === 0) {
       return { success: true, message: 'All entries already have embeddings', processed: 0 };
@@ -254,11 +276,20 @@ async function generateEmbeddingsManually(userId: string) {
  */
 async function getEmbeddingStatus() {
   try {
-    const { totalEntries, embeddedEntries, error } = await supabase.functions.invoke('get-embedding-status', {
+    const { data, error } = await supabase.functions.invoke('get-embedding-status', {
       body: {}
     });
     
-    return { totalEntries, embeddedEntries, error };
+    if (error) {
+      console.error('Error invoking get-embedding-status function:', error);
+      return { totalEntries: 0, embeddedEntries: 0, error: error.message };
+    }
+    
+    return { 
+      totalEntries: data?.totalEntries || 0, 
+      embeddedEntries: data?.embeddedEntries || 0, 
+      error: null 
+    };
   } catch (error) {
     console.error('Error getting embedding status:', error);
     return { totalEntries: 0, embeddedEntries: 0, error: error.message };
