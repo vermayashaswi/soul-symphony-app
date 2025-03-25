@@ -1,5 +1,4 @@
 
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,11 +51,17 @@ export default function Index() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
-      <ParticleBackground />
+    <div className="min-h-screen flex flex-col">
+      {/* Particle background with relative positioning */}
+      <div className="fixed inset-0 w-full h-full -z-10">
+        <ParticleBackground />
+      </div>
+      
+      {/* Navbar with proper spacing */}
       <Navbar />
       
-      <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 relative z-10">
+      {/* Main content with padding to avoid navbar overlap */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 pt-24 pb-12">
         <div className="max-w-3xl w-full text-center mb-10">
           <h1 className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500 mb-4">
             Welcome to Feelosophy
@@ -69,7 +74,8 @@ export default function Index() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl w-full mt-16">
+        {/* Feature cards with responsive grid and proper spacing */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl w-full mt-8">
           {featureCards.map((card, index) => (
             <Card key={index} className="border shadow-lg hover:shadow-xl transition-shadow duration-300">
               <CardHeader>
