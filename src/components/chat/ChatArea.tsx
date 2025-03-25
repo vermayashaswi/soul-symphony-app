@@ -1,32 +1,22 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Bot, Loader2, Brain } from 'lucide-react';
+import { Send, Bot, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { verifyUserAuthentication, getCurrentUserId } from '@/utils/audio/auth-utils';
-import { ensureJournalEntriesHaveEmbeddings } from '@/utils/embeddings-utils';
-
-export interface MessageReference {
-  id: number;
-  date: string;
-  snippet: string;
-  similarity?: number;
-  type?: string;
-}
 
 export interface Message {
   id: string;
   content: string;
   sender: 'user' | 'assistant';
   created_at: string;
-  reference_entries?: MessageReference[] | null;
   thread_id?: string;
 }
 
@@ -43,7 +33,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showWelcome, setShowWelcome] = useState(true);
-  const [hasJournalEntries, setHasJournalEntries] = useState<boolean | null>(null);
   
   const demoQuestions = [
     "How can I manage my anxiety better?",
@@ -52,18 +41,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     "How can I improve my mindfulness practice?",
     "What are some techniques to help with overthinking?"
   ];
-
-  useEffect(() => {
-    if (userId) {
-      checkForJournalEntries(userId);
-    } else {
-      getCurrentUserId().then(id => {
-        if (id) {
-          checkForJournalEntries(id);
-        }
-      });
-    }
-  }, [userId]);
 
   useEffect(() => {
     if (threadId) {
@@ -77,51 +54,22 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
 
   useEffect(() => {
     if (messages.length === 0 && threadId === null) {
-      const welcomeMessage = hasJournalEntries === false
-        ? "Hi, I'm Feelosophy, your AI assistant. I noticed you don't have any journal entries yet. To get personalized insights, try creating some journal entries first. How can I help you today?"
-        : "Hi, I'm Feelosophy, your AI assistant. I'm here to help you reflect on your thoughts and feelings. How are you doing today?";
-        
       setMessages([
         {
           id: '1',
-          content: welcomeMessage,
+          content: "Hi, I'm Feelosophy, your AI assistant. I'm here to help you reflect on your thoughts and feelings. How are you doing today?",
           sender: 'assistant',
           created_at: new Date().toISOString(),
         }
       ]);
     }
-  }, [messages.length, threadId, hasJournalEntries]);
+  }, [messages.length, threadId]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
-
-  const checkForJournalEntries = async (userId: string) => {
-    try {
-      console.log('Checking for journal entries for user ID:', userId);
-      
-      const { count, error } = await supabase
-        .from('Journal Entries')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-        
-      if (error) {
-        console.error('Error checking journal entries:', error);
-        return;
-      }
-      
-      if (count > 0) {
-        await ensureJournalEntriesHaveEmbeddings(userId);
-      }
-      
-      setHasJournalEntries(count > 0);
-      console.log(`User has ${count} journal entries`);
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
 
   const fetchMessages = async (threadId: string) => {
     try {
@@ -138,38 +86,13 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
 
-      const formattedMessages: Message[] = data.map(msg => {
-        let references: MessageReference[] | null = null;
-        
-        if (msg.reference_entries && Array.isArray(msg.reference_entries)) {
-          references = msg.reference_entries.map(ref => {
-            if (typeof ref === 'object' && ref !== null &&
-                'id' in ref && 'date' in ref && 'snippet' in ref) {
-              return {
-                id: Number(ref.id),
-                date: String(ref.date),
-                snippet: String(ref.snippet),
-                similarity: 'similarity' in ref ? Number(ref.similarity) : undefined,
-                type: 'type' in ref ? String(ref.type) : undefined
-              };
-            }
-            return {
-              id: 0,
-              date: new Date().toISOString(),
-              snippet: 'Invalid reference entry'
-            };
-          });
-        }
-        
-        return {
-          id: msg.id,
-          content: msg.content,
-          sender: msg.sender as 'user' | 'assistant',
-          created_at: msg.created_at,
-          reference_entries: references,
-          thread_id: msg.thread_id
-        };
-      });
+      const formattedMessages: Message[] = data.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        sender: msg.sender as 'user' | 'assistant',
+        created_at: msg.created_at,
+        thread_id: msg.thread_id
+      }));
 
       setMessages(formattedMessages);
     } catch (error) {
@@ -201,18 +124,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       return;
     }
     
-    try {
-      const embeddingsResult = await ensureJournalEntriesHaveEmbeddings(currentUserId);
-      console.log('Embeddings generation result before chat:', embeddingsResult);
-      
-      if (!embeddingsResult) {
-        toast.warning('Some journal entries might not be available to the chat. Your question will still be processed.');
-      }
-    } catch (error) {
-      console.error('Error ensuring embeddings before chat:', error);
-      toast.warning('There was an issue preparing your journal entries. Your question will still be processed.');
-    }
-    
     const isNewThread = !threadId;
     
     const tempUserMessage: Message = {
@@ -228,11 +139,11 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     setShowWelcome(false);
     
     try {
-      console.log("Sending message to chat-with-rag function with userId:", currentUserId);
+      console.log("Sending message to chat function with userId:", currentUserId);
       
       const threadTitle = isNewThread ? content.substring(0, 30) + (content.length > 30 ? "..." : "") : undefined;
       
-      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+      const { data, error } = await supabase.functions.invoke('chat-simple', {
         body: { 
           message: content.trim(),
           userId: currentUserId,
@@ -249,32 +160,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
       
-      console.log("Received response from chat-with-rag function:", data);
-      
-      if (data.journal_entries_count === 0) {
-        const { count } = await supabase
-          .from('Journal Entries')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', currentUserId);
-          
-        if (count > 0) {
-          console.warn('Journal entries exist but RAG function could not access them.');
-          toast.warning('Your entries exist but could not be accessed. Trying to fix the issue...', {
-            action: {
-              label: 'Fix Now',
-              onClick: async () => {
-                toast.info('Attempting to fix journal entry access...');
-                const fixed = await ensureJournalEntriesHaveEmbeddings(currentUserId);
-                if (fixed) {
-                  toast.success('Journal entries are now ready for chat');
-                } else {
-                  toast.error('Could not fix journal entry access. Please try again later or contact support.');
-                }
-              }
-            }
-          });
-        }
-      }
+      console.log("Received response from chat function:", data);
       
       if (isNewThread && data.threadId) {
         console.log("New thread created with ID:", data.threadId);
@@ -285,8 +171,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         id: (Date.now() + 1).toString(),
         content: data.response || "I'm sorry, I couldn't process your request at the moment.",
         sender: 'assistant' as const,
-        created_at: new Date().toISOString(),
-        reference_entries: data.references
+        created_at: new Date().toISOString()
       };
       
       setMessages(prev => [...prev, assistantMessage]);
@@ -348,32 +233,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
                     )}>
                       <p className="whitespace-pre-wrap">{message.content}</p>
                     </Card>
-                    
-                    {message.reference_entries && message.reference_entries.length > 0 && (
-                      <div className="flex items-center text-xs text-muted-foreground">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center cursor-help">
-                                <Brain className="h-3 w-3 mr-1" />
-                                <span>Based on {message.reference_entries.length} journal entries</span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="w-64 p-2">
-                              <p className="font-medium mb-1">Referenced journal entries:</p>
-                              <ul className="space-y-1">
-                                {message.reference_entries.map((ref, idx) => (
-                                  <li key={idx} className="text-xs">
-                                    <span className="font-medium">{format(new Date(ref.date), 'MMM d, yyyy')}:</span>{' '}
-                                    {ref.snippet}
-                                  </li>
-                                ))}
-                              </ul>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    )}
                   </div>
                 </div>
               </motion.div>
@@ -396,17 +255,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         
         <div ref={messagesEndRef} />
       </div>
-      
-      {hasJournalEntries === false && !isLoadingMessages && (
-        <div className="mb-4 mx-4">
-          <Card className="bg-amber-50 border-amber-200">
-            <div className="p-3 text-sm text-amber-800">
-              <p className="font-medium">No Journal Entries Found</p>
-              <p className="mt-1">To get personalized insights, please add some journal entries first. This will help me provide more relevant advice based on your experiences.</p>
-            </div>
-          </Card>
-        </div>
-      )}
       
       <AnimatePresence>
         {showWelcome && messages.length <= 2 && (
