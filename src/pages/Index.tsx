@@ -53,7 +53,7 @@ export default function Index() {
       {/* Main content with padding to avoid navbar overlap */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 py-12">
         <div className="max-w-3xl w-full text-center mb-10">
-          <h1 className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500 mb-4">
+          <h1 className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-amber-500 to-orange-500 mb-4">
             Welcome to Feelosophy
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground mb-8">

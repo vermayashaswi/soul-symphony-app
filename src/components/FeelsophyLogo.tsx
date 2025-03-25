@@ -24,19 +24,20 @@ export function FeelsophyLogo({ className = "", size = 'md', withText = true }: 
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <div className={`relative ${sizeMap[size]} rounded-full bg-gradient-to-r from-purple-400 to-indigo-600 flex items-center justify-center overflow-hidden`}>
-        {/* Meditating person silhouette */}
+      <div className={`relative ${sizeMap[size]} rounded-full bg-gradient-to-r from-amber-400 to-orange-600 flex items-center justify-center overflow-hidden`}>
+        {/* Meditation silhouette based on the reference image */}
         <div className="absolute inset-0 flex items-center justify-center">
           <svg 
             viewBox="0 0 100 100" 
-            className="w-3/4 h-3/4 absolute opacity-20" 
-            fill="white"
+            className="w-4/5 h-4/5 absolute opacity-30" 
+            fill="black"
           >
-            {/* Simplified meditation pose silhouette */}
-            <path d="M50,30 C55,30 59,25 59,20 C59,15 55,10 50,10 C45,10 41,15 41,20 C41,25 45,30 50,30 Z" />
-            <path d="M30,90 C30,70 45,65 50,65 C55,65 70,70 70,90 C70,90 63,85 50,85 C37,85 30,90 30,90 Z" />
-            <path d="M38,50 C38,50 40,60 50,60 C60,60 62,50 62,50 C62,50 58,55 50,55 C42,55 38,50 38,50 Z" />
-            <path d="M35,40 L65,40 C65,45 60,50 50,50 C40,50 35,45 35,40 Z" />
+            {/* Simplified meditation silhouette inspired by the provided image */}
+            <path d="M50,15 C53,15 56,12 56,9 C56,6 53,3 50,3 C47,3 44,6 44,9 C44,12 47,15 50,15 Z" />
+            <path d="M37,34 L63,34 C63,44 58,50 50,50 C42,50 37,44 37,34 Z" />
+            <path d="M32,84 C32,70 40,65 50,65 C60,65 68,70 68,84 C68,84 62,82 50,82 C38,82 32,84 32,84 Z" />
+            <path d="M20,65 L30,60 C25,50 25,46 30,36 L25,34 C18,48 18,52 20,65 Z" />
+            <path d="M80,65 L70,60 C75,50 75,46 70,36 L75,34 C82,48 82,52 80,65 Z" />
           </svg>
         </div>
         
@@ -49,7 +50,7 @@ export function FeelsophyLogo({ className = "", size = 'md', withText = true }: 
       </div>
       
       {withText && (
-        <span className={`font-semibold ${textSizeMap[size]}`}>
+        <span className={`font-semibold ${textSizeMap[size]} bg-clip-text text-transparent bg-gradient-to-r from-amber-500 to-orange-600`}>
           Feelosophy
         </span>
       )}
