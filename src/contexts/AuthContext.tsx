@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -140,8 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Add a function to manually refresh the session
-  const refreshSession = async () => {
+  // Update the refreshSession function to match the Promise<void> return type
+  const refreshSession = async (): Promise<void> => {
     try {
       console.log('Manually refreshing session from AuthContext...');
       const { data, error } = await supabase.auth.refreshSession();
@@ -154,11 +153,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Session refreshed:', data.session?.user?.email);
       setSession(data.session);
       setUser(data.session?.user ?? null);
-      return true;
     } catch (error: any) {
       console.error('Error refreshing session:', error);
       toast.error(`Session refresh failed: ${error.message}`);
-      return false;
     }
   };
 

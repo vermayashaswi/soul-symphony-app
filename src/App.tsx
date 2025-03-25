@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -44,8 +43,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       setIsRefreshing(true);
       
       // Try refreshing the session if we don't have a user
-      refreshSession().then(success => {
-        console.log("Session refresh attempt result:", success);
+      refreshSession().then(() => {
+        console.log("Session refresh attempt completed");
         setIsRefreshing(false);
       }).catch(() => {
         setIsRefreshing(false);
