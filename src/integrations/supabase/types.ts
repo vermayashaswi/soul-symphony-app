@@ -146,18 +146,21 @@ export type Database = {
         Row: {
           content: string
           created_at: string | null
+          embedding: string | null
           id: number
           journal_entry_id: number | null
         }
         Insert: {
           content: string
           created_at?: string | null
+          embedding?: string | null
           id?: number
           journal_entry_id?: number | null
         }
         Update: {
           content?: string
           created_at?: string | null
+          embedding?: string | null
           id?: number
           journal_entry_id?: number | null
         }

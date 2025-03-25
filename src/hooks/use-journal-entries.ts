@@ -135,7 +135,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       if (textToEmbed.trim().length > 0) {
         try {
           console.log('Automatically generating embedding for entry:', data.id);
-          await storeEmbedding(data.id, textToEmbed);
+          await createEmbeddingForEntry(data.id, textToEmbed);
           console.log('Embedding generated successfully');
         } catch (embeddingError) {
           console.error('Error generating embedding:', embeddingError);
@@ -149,6 +149,28 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       throw error;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // New function to directly create embeddings using the updated edge function
+  const createEmbeddingForEntry = async (journalEntryId: number, text: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-embedding', {
+        body: { 
+          text, 
+          journalEntryId 
+        }
+      });
+      
+      if (error) {
+        console.error('Error creating embedding:', error);
+        return { success: false, error };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in createEmbeddingForEntry:', error);
+      return { success: false, error };
     }
   };
 

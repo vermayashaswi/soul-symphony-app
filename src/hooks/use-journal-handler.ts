@@ -82,8 +82,7 @@ export function useJournalHandler(userId: string | undefined) {
       }
       
       const resultMessage = `Found ${entriesData?.length || 0} journal entries. ${
-        embeddingResults ? `Embedding search returned ${embeddingResults.results?.length ||
-0} results.` : 'Embedding search was not tested.'
+        embeddingResults ? `Embedding search returned ${embeddingResults.results?.length || 0} results.` : 'Embedding search was not tested.'
       }`;
       
       console.log('Backend test results:', resultMessage);

@@ -84,9 +84,12 @@ export function useTranscription(): UseTranscriptionReturnType {
       setIsStoringEmbedding(true);
       console.log(`Storing embedding for journal entry ${journalEntryId}`);
       
-      // Call the embed-all-entries Edge Function with specific entry ID
-      const { data, error } = await supabase.functions.invoke('embed-all-entries', {
-        body: { entryId: journalEntryId },
+      // Call the create-embedding Edge Function directly
+      const { data, error } = await supabase.functions.invoke('create-embedding', {
+        body: { 
+          text, 
+          journalEntryId 
+        },
       });
       
       if (error) {

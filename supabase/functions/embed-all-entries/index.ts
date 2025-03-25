@@ -14,90 +14,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function createEmbedding(text: string) {
-  try {
-    console.log('Creating embedding for text (first 50 chars):', text.substring(0, 50));
-    
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        input: text,
-        model: 'text-embedding-ada-002',
-      }),
-    });
-
-    if (!embeddingResponse.ok) {
-      const errorData = await embeddingResponse.json();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${JSON.stringify(errorData)}`);
-    }
-
-    const embeddingData = await embeddingResponse.json();
-    return embeddingData.data[0].embedding;
-  } catch (error) {
-    console.error('Error creating embedding:', error);
-    throw error;
-  }
-}
-
-async function processEntry(entry) {
-  try {
-    // Skip if no text content
-    const textContent = entry["refined text"] || entry["transcription text"];
-    if (!textContent) {
-      return { id: entry.id, status: 'skipped', reason: 'No text content' };
-    }
-    
-    // Check if entry already has embedding
-    const { data: existingEmbedding } = await supabase
-      .from('journal_embeddings')
-      .select('id')
-      .eq('journal_entry_id', entry.id)
-      .single();
-      
-    // Create embedding
-    const embedding = await createEmbedding(textContent);
-    
-    let result;
-    if (existingEmbedding) {
-      // Update existing
-      result = await supabase
-        .from('journal_embeddings')
-        .update({ 
-          content: textContent,
-          embedding 
-        })
-        .eq('journal_entry_id', entry.id);
-      
-      console.log(`Updated embedding for entry ${entry.id}`);
-    } else {
-      // Insert new
-      result = await supabase
-        .from('journal_embeddings')
-        .insert([{ 
-          journal_entry_id: entry.id,
-          content: textContent,
-          embedding,
-        }]);
-      
-      console.log(`Created new embedding for entry ${entry.id}`);
-    }
-    
-    if (result.error) {
-      throw new Error(result.error.message);
-    }
-    
-    return { id: entry.id, status: 'success' };
-  } catch (error) {
-    console.error(`Error processing entry ${entry.id}:`, error);
-    return { id: entry.id, status: 'error', error: error.message };
-  }
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -107,104 +23,161 @@ serve(async (req) => {
   try {
     const { userId, entryId, processAll = false } = await req.json();
     
-    console.log(`Processing request: userId=${userId}, entryId=${entryId}, processAll=${processAll}`);
+    console.log('Received request to embed entries:', { userId, entryId, processAll });
     
-    let query = supabase
-      .from('Journal Entries')
-      .select('id, "refined text", "transcription text"')
-      .order('created_at', { ascending: false });
+    if (!userId && !entryId) {
+      throw new Error('Either userId or entryId must be provided');
+    }
+
+    // Get entries to process
+    let entries = [];
+    if (entryId) {
+      // Process a single entry
+      const { data, error } = await supabase
+        .from('Journal Entries')
+        .select('id, "refined text", "transcription text"')
+        .eq('id', entryId)
+        .single();
+        
+      if (error) {
+        throw new Error(`Error fetching entry ${entryId}: ${error.message}`);
+      }
       
-    // Filter by user if provided
-    if (userId) {
-      query = query.eq('user_id', userId);
-    }
-    
-    // Filter by entry if provided and not processing all
-    if (entryId && !processAll) {
-      query = query.eq('id', entryId);
-    }
-    
-    const { data: entries, error: entriesError } = await query;
-    
-    if (entriesError) {
-      console.error('Error fetching journal entries:', entriesError);
-      throw new Error(`Database error: ${entriesError.message}`);
+      if (data) entries = [data];
+    } else {
+      // Process all entries for a user
+      const query = supabase
+        .from('Journal Entries')
+        .select('id, "refined text", "transcription text"')
+        .eq('user_id', userId);
+      
+      // If not processing all, only get entries without embeddings
+      if (!processAll) {
+        const entriesWithEmbeddings = await supabase
+          .from('journal_embeddings')
+          .select('journal_entry_id');
+          
+        if (entriesWithEmbeddings.data && entriesWithEmbeddings.data.length > 0) {
+          const entriesWithEmbeddingsIds = entriesWithEmbeddings.data.map(e => e.journal_entry_id);
+          query.not('id', 'in', `(${entriesWithEmbeddingsIds.join(',')})`);
+        }
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        throw new Error(`Error fetching entries for user ${userId}: ${error.message}`);
+      }
+      
+      entries = data || [];
     }
     
     console.log(`Found ${entries.length} entries to process`);
     
-    if (entries.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: true,
-          message: "No entries found to process",
-          totalProcessed: 0,
-          successCount: 0,
-          errorCount: 0,
-          results: []
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    // Process each entry
+    const results = {
+      success: true,
+      totalProcessed: entries.length,
+      successCount: 0,
+      errorCount: 0,
+      errors: [] as Array<{ id: number; error: string }>,
+    };
+    
+    for (const entry of entries) {
+      try {
+        const text = entry["refined text"] || entry["transcription text"] || '';
+        
+        if (!text || text.trim() === '') {
+          console.log(`Skipping entry ${entry.id} - no text content`);
+          continue;
         }
-      );
+        
+        console.log(`Processing entry ${entry.id}, text length: ${text.length}`);
+        
+        // Generate embedding using OpenAI API
+        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            input: text,
+            model: 'text-embedding-ada-002',
+          }),
+        });
+
+        if (!embeddingResponse.ok) {
+          const errorData = await embeddingResponse.json();
+          throw new Error(`OpenAI API error: ${JSON.stringify(errorData)}`);
+        }
+
+        const embeddingData = await embeddingResponse.json();
+        const embedding = embeddingData.data[0].embedding;
+        
+        // Check if entry already has an embedding
+        const { data: existingEmbedding } = await supabase
+          .from('journal_embeddings')
+          .select('id')
+          .eq('journal_entry_id', entry.id)
+          .maybeSingle();
+          
+        // Insert or update embedding
+        let upsertResult;
+        if (existingEmbedding) {
+          // Update existing embedding
+          upsertResult = await supabase
+            .from('journal_embeddings')
+            .update({ 
+              content: text,
+              embedding: embedding
+            })
+            .eq('journal_entry_id', entry.id);
+        } else {
+          // Insert new embedding
+          upsertResult = await supabase
+            .from('journal_embeddings')
+            .insert({ 
+              journal_entry_id: entry.id,
+              content: text,
+              embedding: embedding
+            });
+        }
+        
+        if (upsertResult.error) {
+          throw new Error(`Error storing embedding: ${upsertResult.error.message}`);
+        }
+        
+        console.log(`Successfully processed entry ${entry.id}`);
+        results.successCount++;
+      } catch (error) {
+        console.error(`Error processing entry ${entry.id}:`, error);
+        results.errorCount++;
+        results.errors.push({ 
+          id: entry.id, 
+          error: error instanceof Error ? error.message : String(error) 
+        });
+      }
     }
     
-    // Process entries
-    let successCount = 0;
-    let errorCount = 0;
-    const results = [];
-    
-    // Process in smaller batches to avoid rate limits
-    const batchSize = 5;
-    for (let i = 0; i < entries.length; i += batchSize) {
-      const batch = entries.slice(i, i + batchSize);
-      
-      console.log(`Processing batch ${i/batchSize + 1} of ${Math.ceil(entries.length/batchSize)}`);
-      
-      // Process this batch concurrently
-      const batchPromises = batch.map(entry => processEntry(entry));
-      
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
-      
-      // Count successes and errors
-      for (const result of batchResults) {
-        if (result.status === 'success') {
-          successCount++;
-        } else if (result.status === 'error') {
-          errorCount++;
-        }
-      }
-      
-      // Add a short delay between batches to avoid rate limits
-      if (i + batchSize < entries.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    
-    console.log(`Batch embedding complete. Success: ${successCount}, Errors: ${errorCount}`);
-    
+    console.log('Embedding processing complete:', results);
+
     return new Response(
-      JSON.stringify({ 
-        success: true,
-        totalProcessed: entries.length,
-        successCount,
-        errorCount,
-        results
-      }),
+      JSON.stringify(results),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
       }
     );
     
   } catch (error) {
-    console.error("Error in batch embedding function:", error);
+    console.error("Error in embed-all-entries function:", error);
     
     return new Response(
       JSON.stringify({ 
-        error: error.message, 
+        error: error instanceof Error ? error.message : String(error), 
         success: false,
-        message: "Error occurred during batch embedding process"
+        message: "Failed to process embeddings"
       }),
       {
         status: 500,
