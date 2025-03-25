@@ -1,4 +1,5 @@
 
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,20 +16,43 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import ParticleBackground from "./components/ParticleBackground";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 import Navbar from "./components/Navbar";
 import { refreshAuthSession } from "./utils/audio/auth-utils";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+// Create queryClient inside the component to ensure it's created in React context
+const App = () => {
+  // Create a new QueryClient instance inside the component
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: 1,
+        refetchOnWindowFocus: false,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      },
     },
-  },
-});
+  });
+
+  return (
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <Toaster />
+            <Sonner position="top-center" />
+            <ParticleBackground />
+            <BrowserRouter>
+              <AnimatePresence mode="wait">
+                <AppRoutes />
+              </AnimatePresence>
+            </BrowserRouter>
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </React.StrictMode>
+  );
+};
 
 // Protected route component with location preservation
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -168,22 +192,5 @@ const AppRoutes = () => {
     </AppLayout>
   );
 };
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner position="top-center" />
-        <ParticleBackground />
-        <BrowserRouter>
-          <AnimatePresence mode="wait">
-            <AppRoutes />
-          </AnimatePresence>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
 
 export default App;
