@@ -49,7 +49,7 @@ export async function sendAudioForTranscription(base64String: string, userId: st
     console.log("Transcription response:", data);
     
     if (data && data.success) {
-      // Check if the transcription data includes refined text
+      // Check if the transcription data includes content
       if (!data.transcription && !data.refinedText) {
         console.warn("Transcription service didn't return any text content");
         

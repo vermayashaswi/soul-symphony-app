@@ -12,6 +12,7 @@ interface JournalEntryInput {
   "transcription text"?: string;
   "refined text"?: string;
   emotions?: string[] | null;
+  master_themes?: string[] | null;
   created_at: string;
 }
 
@@ -69,12 +70,32 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       const typedEntries = (data || []) as JournalEntry[];
       
-      for (const entry of typedEntries) {
-        if (!entry.master_themes && entry["refined text"]) {
+      // Process any entries without master_themes (would happen if using old transcription function)
+      const entriesNeedingThemes = typedEntries.filter(
+        entry => (!entry.master_themes || entry.master_themes.length === 0) && entry["refined text"]
+      );
+      
+      if (entriesNeedingThemes.length > 0) {
+        console.log(`Found ${entriesNeedingThemes.length} entries without themes, processing...`);
+        for (const entry of entriesNeedingThemes) {
           try {
             await generateThemesForEntry(entry);
           } catch (themeError) {
             console.error('Error generating themes for entry:', themeError);
+          }
+        }
+        
+        // Re-fetch entries if we updated any
+        if (entriesNeedingThemes.length > 0) {
+          const { data: refreshedData } = await supabase
+            .from('Journal Entries')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+            
+          if (refreshedData) {
+            setEntries(refreshedData as JournalEntry[]);
+            return;
           }
         }
       }
@@ -136,7 +157,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         "transcription text": entryData["transcription text"] || '',
         "refined text": entryData["refined text"] || '',
         created_at: entryData.created_at,
-        emotions: entryData.emotions
+        emotions: entryData.emotions,
+        master_themes: entryData.master_themes
       };
       
       let result;
@@ -282,9 +304,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   return { 
     entries, 
     loading, 
-    saveJournalEntry: () => {},
+    saveJournalEntry,
     isSaving,
-    deleteJournalEntry: () => {},
+    deleteJournalEntry,
     refreshEntries,
     journalEntries: entries,
     isLoading: loading,

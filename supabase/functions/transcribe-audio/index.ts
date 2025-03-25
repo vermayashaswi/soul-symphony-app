@@ -5,6 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -49,6 +50,235 @@ function processBase64Chunks(base64String: string, chunkSize = 32768) {
   } catch (error) {
     console.error('Error processing base64 chunks:', error);
     throw new Error('Failed to process audio data');
+  }
+}
+
+// Function to transcribe audio using Whisper API
+async function transcribeAudio(audioBlob: Uint8Array) {
+  if (!openAIApiKey) {
+    throw new Error('OpenAI API key is not configured');
+  }
+  
+  try {
+    const formData = new FormData();
+    const audioFile = new File([audioBlob], 'audio.webm', { type: 'audio/webm' });
+    
+    formData.append('file', audioFile);
+    formData.append('model', 'whisper-1');
+    formData.append('response_format', 'json');
+    
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Whisper API error:', errorData);
+      throw new Error(`Whisper API error: ${errorData.error?.message || 'Unknown error'}`);
+    }
+    
+    const data = await response.json();
+    return data.text || '';
+  } catch (error) {
+    console.error('Error in transcribeAudio:', error);
+    throw error;
+  }
+}
+
+// Function to refine/translate text if needed using GPT
+async function refineText(text: string) {
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openAIApiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that refines and improves transcribed text. If the text is not in English, translate it to English. Fix grammar, punctuation, and make the text more coherent without changing its meaning.'
+          },
+          {
+            role: 'user',
+            content: `Please refine this transcribed text: "${text}"`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1000
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('GPT API error during text refinement:', errorData);
+      throw new Error(`GPT API error: ${errorData.error?.message || 'Unknown error'}`);
+    }
+    
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('Error in refineText:', error);
+    throw error;
+  }
+}
+
+// Function to analyze emotions in text
+async function analyzeEmotions(text: string) {
+  try {
+    // Fetch emotion list from database
+    const { data: emotions, error: emotionsError } = await supabase
+      .from('emotions')
+      .select('name, description')
+      .order('id', { ascending: true });
+      
+    if (emotionsError) {
+      console.error('Error fetching emotions:', emotionsError);
+      throw new Error(`Database error: ${emotionsError.message}`);
+    }
+    
+    if (!emotions || emotions.length === 0) {
+      console.warn('No emotions found in database');
+      return [];
+    }
+    
+    const emotionNames = emotions.map(e => e.name);
+    const emotionDescriptions = emotions.map(e => `${e.name}: ${e.description || e.name}`);
+    
+    // Analyze emotions using GPT
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openAIApiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an emotion analysis assistant. Analyze the text and identify the emotions present from this list: ${emotionNames.join(', ')}. 
+            
+Here are some descriptions of these emotions: 
+${emotionDescriptions.join('\n')}
+
+Identify the top emotions present in the text. For each emotion present, generate a score from 0-100 based on how strongly it appears in the text. Only include emotions with a score of 20 or higher. Return the results as a simple JSON array with each entry having the format: {"emotion": "emotion_name", "score": score_number}. Sort by score in descending order.`
+          },
+          {
+            role: 'user',
+            content: `Analyze the emotions in this text: "${text}"`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500,
+        response_format: { type: "json_object" }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('GPT API error during emotion analysis:', errorData);
+      throw new Error(`GPT API error: ${errorData.error?.message || 'Unknown error'}`);
+    }
+    
+    const data = await response.json();
+    let result;
+    
+    try {
+      const content = data.choices[0].message.content.trim();
+      result = JSON.parse(content);
+      
+      // Extract the array if it's wrapped in another object
+      if (result.emotions && Array.isArray(result.emotions)) {
+        result = result.emotions;
+      }
+      
+      // If the result is not an array, try to convert it
+      if (!Array.isArray(result)) {
+        console.warn('Emotion analysis result is not an array:', result);
+        return Object.entries(result).map(([emotion, score]) => ({
+          emotion,
+          score: typeof score === 'number' ? score : 0
+        }));
+      }
+      
+      // Map to just emotion names for our theme storage
+      return result.map(item => item.emotion || '').filter(Boolean);
+    } catch (error) {
+      console.error('Error parsing emotion analysis result:', error, data.choices[0].message.content);
+      return [];
+    }
+  } catch (error) {
+    console.error('Error in analyzeEmotions:', error);
+    return [];
+  }
+}
+
+// Function to extract master themes from text
+async function extractThemes(text: string) {
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openAIApiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a thematic analysis assistant. Your task is to identify the 5 most prominent themes or topics discussed in the given text. Each theme should be a short phrase (2-4 words), not a complete sentence. Be specific rather than generic. Return only the list of themes as a JSON array of strings.'
+          },
+          {
+            role: 'user',
+            content: `Extract 5 key themes from this text: "${text}"`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500,
+        response_format: { type: "json_object" }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('GPT API error during theme extraction:', errorData);
+      throw new Error(`GPT API error: ${errorData.error?.message || 'Unknown error'}`);
+    }
+    
+    const data = await response.json();
+    let result;
+    
+    try {
+      const content = data.choices[0].message.content.trim();
+      result = JSON.parse(content);
+      
+      // Extract the array if it's wrapped in another object
+      if (result.themes && Array.isArray(result.themes)) {
+        return result.themes;
+      }
+      
+      // If the result is not an array, make it one
+      if (!Array.isArray(result)) {
+        console.warn('Theme extraction result is not an array:', result);
+        return Object.values(result).filter(theme => typeof theme === 'string');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error parsing theme extraction result:', error, data.choices[0].message.content);
+      return [];
+    }
+  } catch (error) {
+    console.error('Error in extractThemes:', error);
+    return [];
   }
 }
 
@@ -135,10 +365,47 @@ serve(async (req) => {
       console.error("Storage error:", err);
     }
     
-    // Instead of transcribing with AI, we'll just store a placeholder message
-    const placeholderText = "Audio transcription functionality has been removed temporarily.";
+    console.log("Transcribing audio...");
+    let transcriptionText;
+    try {
+      transcriptionText = await transcribeAudio(binaryAudio);
+      console.log("Transcription complete:", transcriptionText.substring(0, 100) + "...");
+    } catch (err) {
+      console.error("Transcription error:", err);
+      transcriptionText = "Error during transcription. Please try again.";
+    }
     
-    // Store entry without OpenAI processing
+    console.log("Refining and translating text...");
+    let refinedText;
+    try {
+      refinedText = await refineText(transcriptionText);
+      console.log("Text refinement complete:", refinedText.substring(0, 100) + "...");
+    } catch (err) {
+      console.error("Text refinement error:", err);
+      refinedText = transcriptionText;
+    }
+    
+    console.log("Analyzing emotions...");
+    let emotions;
+    try {
+      emotions = await analyzeEmotions(refinedText);
+      console.log("Emotion analysis complete:", emotions);
+    } catch (err) {
+      console.error("Emotion analysis error:", err);
+      emotions = [];
+    }
+    
+    console.log("Extracting themes...");
+    let themes;
+    try {
+      themes = await extractThemes(refinedText);
+      console.log("Theme extraction complete:", themes);
+    } catch (err) {
+      console.error("Theme extraction error:", err);
+      themes = [];
+    }
+    
+    // Store entry with processed data
     const audioDuration = Math.floor(binaryAudio.length / 16000);
     let entryId = null;
     
@@ -146,10 +413,13 @@ serve(async (req) => {
       const { data: entryData, error: insertError } = await supabase
         .from('Journal Entries')
         .insert([{ 
-          "transcription text": placeholderText,
+          "transcription text": transcriptionText,
+          "refined text": refinedText,
           "audio_url": audioUrl,
           "user_id": userId || null,
-          "duration": audioDuration
+          "duration": audioDuration,
+          "emotions": emotions,
+          "master_themes": themes
         }])
         .select();
           
@@ -171,9 +441,12 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        transcription: placeholderText,
+        transcription: transcriptionText,
+        refinedText: refinedText,
         audioUrl: audioUrl,
         entryId: entryId,
+        emotions: emotions,
+        themes: themes,
         success: true
       }),
       { 

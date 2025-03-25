@@ -23,7 +23,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
     return [];
   }, [entry.master_themes, entry.emotions]);
 
-  // Get text to display - first try refined text, then fall back to transcription
+  // Get text to display - always use refined text if available, then fall back to transcription
   const displayText = entry["refined text"] || entry["transcription text"] || '';
 
   return (
@@ -87,7 +87,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                 ) : (
                   <Alert variant="default" className="bg-muted/50">
                     <AlertDescription className="text-center">
-                      Analyzing emotions and themes...
+                      Analyzing themes...
                     </AlertDescription>
                   </Alert>
                 )}

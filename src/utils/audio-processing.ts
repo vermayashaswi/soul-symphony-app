@@ -32,7 +32,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     // Start processing in background
     toast.loading('Processing your journal entry with advanced AI...', {
       id: tempId,
-      duration: Infinity, // Toast remains until explicitly dismissed
+      duration: 120000, // Toast remains for 2 minutes or until explicitly dismissed
     });
     
     // Launch the processing without awaiting it
@@ -86,13 +86,15 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       return;
     }
 
-    // 3. Send audio for transcription
+    // 3. Send audio for transcription and AI analysis
     const result = await sendAudioForTranscription(base64String, userId);
     
     toast.dismiss(toastId);
     
     if (result.success) {
-      toast.success('Journal entry saved successfully!');
+      toast.success('Journal entry processed and saved successfully!', {
+        description: "Your entry has been analyzed for themes and emotions."
+      });
       
       // Add the processing entry to the URL to show it in the journal list
       if (window.location.pathname === '/journal') {
@@ -101,7 +103,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         url.searchParams.set('processing', toastId);
         window.history.replaceState({}, document.title, url.toString());
         
-        // Force a reload to show the processing entry
+        // Force a reload to show the new entry
         window.location.reload();
       } else {
         // Redirect to journal page with processing parameter
