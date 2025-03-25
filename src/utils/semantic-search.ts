@@ -134,32 +134,32 @@ export async function generateEmbeddingsForAllEntries() {
       return { success: true, message: 'All entries already have embeddings', processed: 0 };
     }
     
-    // Get entries without embeddings - using a custom query instead of RPC function that might not exist yet
+    // Get entries without embeddings using a direct query approach
     const { data: entriesData, error: entriesError } = await supabase
       .from('Journal Entries')
       .select('id, refined text, transcription text')
       .eq('user_id', userId);
       
     if (entriesError) {
-      console.error('Error getting entries without embeddings:', entriesError);
-      return await generateEmbeddingsManually(userId);
+      console.error('Error getting entries:', entriesError);
+      return { success: false, error: 'Failed to retrieve journal entries' };
     }
-    
-    // Type guard to ensure we're working with the right data format
+
+    // Safely handle null or invalid data
     if (!entriesData || !Array.isArray(entriesData) || entriesData.length === 0) {
       return { success: true, message: 'No entries need embeddings', processed: 0 };
     }
     
-    // Ensure entries match our expected shape
-    const entriesWithoutEmbeddings: EntryWithoutEmbedding[] = entriesData.filter(
-      (entry): entry is EntryWithoutEmbedding => 
-        entry !== null && 
-        typeof entry === 'object' && 
-        'id' in entry && 
-        typeof entry.id === 'number'
-    );
+    // Type guard to ensure we're working with valid entries
+    const validEntries: EntryWithoutEmbedding[] = [];
     
-    if (entriesWithoutEmbeddings.length === 0) {
+    for (const entry of entriesData) {
+      if (entry && typeof entry === 'object' && 'id' in entry && typeof entry.id === 'number') {
+        validEntries.push(entry as EntryWithoutEmbedding);
+      }
+    }
+    
+    if (validEntries.length === 0) {
       return { success: true, message: 'No valid entries found', processed: 0 };
     }
     
@@ -178,7 +178,7 @@ export async function generateEmbeddingsForAllEntries() {
     const existingEmbeddingIds = existingEmbeddings.map(e => e.journal_entry_id);
     
     // Filter entries that don't have embeddings yet
-    const entriesToProcess = entriesWithoutEmbeddings.filter(entry => 
+    const entriesToProcess = validEntries.filter(entry => 
       !existingEmbeddingIds.includes(entry.id)
     );
     
@@ -217,96 +217,6 @@ export async function generateEmbeddingsForAllEntries() {
     };
   } catch (error) {
     console.error('Error generating embeddings for all entries:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-/**
- * Fallback method to generate embeddings manually if the RPC function doesn't exist
- */
-async function generateEmbeddingsManually(userId: string) {
-  try {
-    // Get all entries for this user
-    const { data: entriesData, error: entriesError } = await supabase
-      .from('Journal Entries')
-      .select('id, refined text, transcription text')
-      .eq('user_id', userId);
-      
-    if (entriesError) {
-      throw entriesError;
-    }
-    
-    // Type guard for the entries data
-    if (!entriesData || !Array.isArray(entriesData) || entriesData.length === 0) {
-      return { success: true, message: 'No journal entries found', processed: 0 };
-    }
-    
-    // Ensure entries match our JournalEntry interface
-    const allEntries: EntryWithoutEmbedding[] = entriesData.filter(
-      (entry): entry is EntryWithoutEmbedding => 
-        entry !== null && 
-        typeof entry === 'object' && 
-        'id' in entry && 
-        typeof entry.id === 'number'
-    );
-    
-    if (allEntries.length === 0) {
-      return { success: true, message: 'No valid journal entries found', processed: 0 };
-    }
-    
-    // Get entries that already have embeddings
-    const { data: embeddingsData, error: embeddingsError } = await supabase
-      .from('journal_embeddings')
-      .select('journal_entry_id');
-      
-    if (embeddingsError) {
-      throw embeddingsError;
-    }
-    
-    // Ensure embeddings data is an array
-    const existingEmbeddings = Array.isArray(embeddingsData) ? embeddingsData : [];
-    const existingEmbeddingIds = existingEmbeddings.map(e => e.journal_entry_id);
-    
-    // Filter out entries that already have embeddings
-    const entriesToProcess = allEntries.filter(entry => 
-      !existingEmbeddingIds.includes(entry.id)
-    );
-    
-    if (entriesToProcess.length === 0) {
-      return { success: true, message: 'All entries already have embeddings', processed: 0 };
-    }
-    
-    // Process each entry
-    let successCount = 0;
-    let errorCount = 0;
-    
-    for (const entry of entriesToProcess) {
-      const text = entry["refined text"] || entry["transcription text"] || '';
-      
-      if (!text.trim()) {
-        console.log(`Skipping entry ${entry.id} - no text content`);
-        continue;
-      }
-      
-      const result = await generateEmbeddingForEntry(entry.id, text);
-      
-      if (result && result.success !== false) {
-        successCount++;
-      } else {
-        errorCount++;
-      }
-      
-      // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-    
-    return { 
-      success: true, 
-      message: `Successfully generated ${successCount} embeddings. Failed: ${errorCount}`,
-      processed: successCount
-    };
-  } catch (error) {
-    console.error('Error in generateEmbeddingsManually:', error);
     return { success: false, error: error.message };
   }
 }
