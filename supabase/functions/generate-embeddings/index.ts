@@ -18,6 +18,10 @@ const corsHeaders = {
 // Generate embeddings using OpenAI
 async function generateEmbedding(text: string) {
   try {
+    if (!text || typeof text !== 'string') {
+      throw new Error('Invalid text input for embedding generation');
+    }
+    
     console.log("Generating embedding for text:", text.substring(0, 100) + "...");
     const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
@@ -34,10 +38,13 @@ async function generateEmbedding(text: string) {
     if (!response.ok) {
       const error = await response.text();
       console.error('Error generating embedding:', error);
-      throw new Error('Failed to generate embedding');
+      throw new Error('Failed to generate embedding: ' + error);
     }
 
     const result = await response.json();
+    if (!result.data || !result.data[0] || !result.data[0].embedding) {
+      throw new Error('Invalid embedding result from OpenAI');
+    }
     return result.data[0].embedding;
   } catch (error) {
     console.error('Error in generateEmbedding:', error);
@@ -53,16 +60,23 @@ serve(async (req) => {
 
   try {
     const requestData = await req.json();
+    console.log("Request data:", JSON.stringify(requestData).substring(0, 200) + "...");
+    
     const { entryId, text, isTestQuery, forceRegenerate } = requestData;
     
     // Special case for test queries - just return the embedding without storing
-    if (isTestQuery && text) {
+    if (isTestQuery === true && text) {
       console.log("Generating test embedding without storing");
-      const embedding = await generateEmbedding(text);
-      return new Response(
-        JSON.stringify({ success: true, embedding: embedding }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      try {
+        const embedding = await generateEmbedding(text);
+        return new Response(
+          JSON.stringify({ success: true, embedding: embedding }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error("Error generating test embedding:", error);
+        throw new Error(`Test embedding generation failed: ${error.message}`);
+      }
     }
     
     if (!entryId || !text) {
@@ -72,7 +86,7 @@ serve(async (req) => {
     console.log(`Processing embedding generation for entry ID: ${entryId}`);
     
     // Check if embedding already exists for this entry
-    if (!forceRegenerate) {
+    if (forceRegenerate !== true) {
       const { count, error: checkError } = await supabase
         .from('journal_embeddings')
         .select('*', { count: 'exact', head: true })
@@ -90,8 +104,9 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-    } else if (forceRegenerate) {
+    } else if (forceRegenerate === true) {
       // Delete any existing embedding if force regenerate is true
+      console.log(`Force regenerating embedding for entry ${entryId}`);
       const { error: deleteError } = await supabase
         .from('journal_embeddings')
         .delete()
@@ -107,6 +122,10 @@ serve(async (req) => {
     
     // Generate embedding
     const embedding = await generateEmbedding(text);
+    
+    if (!embedding || !Array.isArray(embedding)) {
+      throw new Error('Failed to generate valid embedding');
+    }
     
     // Store embedding in database
     const { error: insertError } = await supabase

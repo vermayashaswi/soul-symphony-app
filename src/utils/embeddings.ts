@@ -3,6 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { JournalEntry } from '@/types/journal';
 
+// Type guard to check if an object is a valid journal entry
+function isValidJournalEntry(entry: any): entry is JournalEntry {
+  return (
+    entry !== null &&
+    typeof entry === 'object' &&
+    'id' in entry &&
+    typeof entry.id === 'number' &&
+    'refined text' in entry &&
+    typeof entry["refined text"] === 'string'
+  );
+}
+
 export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefined): Promise<boolean> {
   if (!userId) {
     console.error('No user ID provided for ensuring embeddings');
@@ -33,15 +45,10 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     // Filter valid entries with appropriate type checking
     const validEntries: Array<{id: number; "refined text": string}> = [];
     
-    for (const entry of entriesData) {
-      if (!entry) continue;
+    for (let i = 0; i < entriesData.length; i++) {
+      const entry = entriesData[i];
       
-      if (typeof entry === 'object' && 
-          entry !== null &&
-          'id' in entry && 
-          typeof entry.id === 'number' &&
-          'refined text' in entry &&
-          typeof entry["refined text"] === 'string') {
+      if (entry && isValidJournalEntry(entry)) {
         validEntries.push({
           id: entry.id,
           "refined text": entry["refined text"]
@@ -74,11 +81,11 @@ export async function ensureJournalEntriesHaveEmbeddings(userId: string | undefi
     
     // Only process if we got data back
     if (embeddingsData && Array.isArray(embeddingsData)) {
-      for (const item of embeddingsData) {
-        if (!item) continue;
+      for (let i = 0; i < embeddingsData.length; i++) {
+        const item = embeddingsData[i];
         
-        if (typeof item === 'object' && 
-            item !== null &&
+        if (item && 
+            typeof item === 'object' && 
             'journal_entry_id' in item &&
             typeof item.journal_entry_id === 'number') {
           entriesWithEmbeddings.add(item.journal_entry_id);
@@ -188,9 +195,20 @@ export async function debugEmbeddingIssues(userId: string | undefined): Promise<
       return "No journal entries found for this user";
     }
     
-    const entryIds = entriesData
-      .filter(e => e && typeof e.id === 'number')
-      .map(e => e.id);
+    // Filter valid entries
+    const validEntries: Array<{id: number; "refined text"?: string; created_at: string}> = [];
+    
+    for (const entry of entriesData) {
+      if (entry && isValidJournalEntry(entry)) {
+        validEntries.push({
+          id: entry.id,
+          "refined text": entry["refined text"],
+          created_at: entry.created_at
+        });
+      }
+    }
+    
+    const entryIds = validEntries.map(e => e.id);
       
     // Check for embeddings
     const { data: embedData, error: embedError } = await supabase
@@ -204,12 +222,12 @@ export async function debugEmbeddingIssues(userId: string | undefined): Promise<
     
     const embeddingIds = new Set(
       (embedData || [])
-        .filter(e => e && typeof e.journal_entry_id === 'number')
-        .map(e => e.journal_entry_id)
+        .filter(e => e && typeof e === 'object' && 'journal_entry_id' in e && typeof e.journal_entry_id === 'number')
+        .map(e => e.journal_entry_id as number)
     );
     
-    const entriesWithoutEmbeddings = entriesData
-      .filter(e => e && typeof e.id === 'number' && !embeddingIds.has(e.id))
+    const entriesWithoutEmbeddings = validEntries
+      .filter(e => !embeddingIds.has(e.id))
       .map(e => ({
         id: e.id,
         created_at: e.created_at,
@@ -257,5 +275,68 @@ export async function debugEmbeddingIssues(userId: string | undefined): Promise<
     }, null, 2);
   } catch (error: any) {
     return `Error in debugEmbeddingIssues: ${error.message}`;
+  }
+}
+
+// Individual entry troubleshooting
+export async function checkEmbeddingForEntry(entryId: number): Promise<boolean> {
+  try {
+    console.log(`Checking embedding for entry ${entryId}`);
+    
+    // First check if the entry exists and has text
+    const { data: entry, error: entryError } = await supabase
+      .from('Journal Entries')
+      .select('id, refined text')
+      .eq('id', entryId)
+      .single();
+      
+    if (entryError) {
+      console.error(`Error fetching entry ${entryId}:`, entryError);
+      return false;
+    }
+    
+    if (!entry || !entry["refined text"]) {
+      console.error(`Entry ${entryId} not found or has no text`);
+      return false;
+    }
+    
+    // Check if embedding exists
+    const { data: embedding, error: embError } = await supabase
+      .from('journal_embeddings')
+      .select('*')
+      .eq('journal_entry_id', entryId)
+      .single();
+      
+    if (embError) {
+      console.log(`No embedding found for entry ${entryId}, generating...`);
+      
+      // Generate embedding
+      const { data, error: genError } = await supabase.functions.invoke('generate-embeddings', {
+        body: { 
+          entryId: entryId,
+          text: entry["refined text"],
+          forceRegenerate: true
+        }
+      });
+      
+      if (genError) {
+        console.error(`Error generating embedding for entry ${entryId}:`, genError);
+        toast.error(`Failed to generate embedding for entry ${entryId}`);
+        return false;
+      }
+      
+      console.log(`Successfully generated embedding for entry ${entryId}`);
+      toast.success(`Generated embedding for entry ${entryId}`);
+      return true;
+    }
+    
+    console.log(`Embedding already exists for entry ${entryId}`);
+    toast.success(`Embedding already exists for entry ${entryId}`);
+    return true;
+    
+  } catch (error) {
+    console.error(`Error checking embedding for entry ${entryId}:`, error);
+    toast.error(`Error checking embedding for entry ${entryId}`);
+    return false;
   }
 }

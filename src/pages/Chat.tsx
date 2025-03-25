@@ -5,7 +5,7 @@ import { ChatContainer } from '@/components/chat/ChatContainer';
 import { getCurrentUserId } from '@/utils/audio/auth-utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { ensureJournalEntriesHaveEmbeddings, debugEmbeddingIssues } from '@/utils/embeddings';
+import { ensureJournalEntriesHaveEmbeddings, debugEmbeddingIssues, checkEmbeddingForEntry } from '@/utils/embeddings';
 import { JournalEntry } from '@/types/journal';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -104,7 +104,7 @@ export default function Chat() {
           
         if (!embeddingsResult) {
           console.error('Failed to generate embeddings after multiple attempts');
-          toast.warning('Could not prepare all journal entries for chat. Some entries may not be accessible.');
+          toast.error('Could not prepare all journal entries for chat. Some entries may not be accessible.');
         } else {
           console.log('Successfully ensured journal entries have embeddings');
           setEmbeddingsReady(true);
@@ -166,7 +166,7 @@ export default function Chat() {
       content={
         <>
           {hasEntries === false && !isLoading && (
-            <Alert variant="warning" className="m-4">
+            <Alert className="m-4">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>No Journal Entries Found</AlertTitle>
               <AlertDescription>
@@ -177,7 +177,7 @@ export default function Chat() {
           )}
           
           {hasEntries === true && !embeddingsReady && !isLoading && (
-            <Alert variant="warning" className="m-4">
+            <Alert className="m-4">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Embeddings Not Ready</AlertTitle>
               <AlertDescription className="flex flex-col gap-2">

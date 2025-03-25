@@ -3,6 +3,33 @@ import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry, EmbeddingReference } from '@/types/journal';
 
 /**
+ * Type guard to check if an object is a valid journal entry
+ */
+export function isValidJournalEntry(entry: any): entry is JournalEntry {
+  return (
+    entry !== null &&
+    typeof entry === 'object' &&
+    'id' in entry &&
+    typeof entry.id === 'number' &&
+    'refined text' in entry &&
+    typeof entry["refined text"] === 'string' &&
+    entry["refined text"].trim().length > 0
+  );
+}
+
+/**
+ * Type guard for embedding references
+ */
+export function isValidEmbeddingReference(item: any): item is EmbeddingReference {
+  return (
+    item !== null &&
+    typeof item === 'object' &&
+    'journal_entry_id' in item &&
+    typeof item.journal_entry_id === 'number'
+  );
+}
+
+/**
  * Fetches journal entries for a user
  * @param userId User ID to fetch entries for
  * @returns Array of journal entries or null if error
@@ -31,16 +58,9 @@ export async function fetchJournalEntriesWithText(userId: string): Promise<Journ
     
     console.log(`Found ${entriesData.length} journal entries for embedding check`);
     
-    // Safely cast and filter entries with valid text
-    // Cast to any[] first and then filter out entries without valid refined text
+    // Cast to any[] first and then filter entries using type guard
     const entries = entriesData as any[];
-    const validEntries = entries.filter(entry => 
-      entry && 
-      typeof entry.id === 'number' && 
-      entry["refined text"] && 
-      typeof entry["refined text"] === 'string' &&
-      entry["refined text"].trim().length > 0
-    ) as JournalEntry[];
+    const validEntries = entries.filter(entry => isValidJournalEntry(entry)) as JournalEntry[];
     
     if (validEntries.length === 0) {
       console.error('No valid journal entries with text found');
@@ -73,9 +93,10 @@ export async function checkExistingEmbeddings(entryIds: number[]): Promise<numbe
       return null;
     }
     
-    // Extract entry IDs from the results
-    const existingEmbeddingIds = (existingEmbeddings as EmbeddingReference[] || [])
-      .filter(e => e !== null && typeof e === 'object' && 'journal_entry_id' in e)
+    // Extract entry IDs from the results using type guard
+    const embeddingsArray = existingEmbeddings as any[] || [];
+    const existingEmbeddingIds = embeddingsArray
+      .filter(e => isValidEmbeddingReference(e))
       .map(e => e.journal_entry_id);
       
     return existingEmbeddingIds;
