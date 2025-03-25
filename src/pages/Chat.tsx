@@ -2,39 +2,67 @@
 import { useEffect, useState } from 'react';
 import { ChatLayout } from '@/components/chat/ChatLayout';
 import { ChatContainer } from '@/components/chat/ChatContainer';
-import { getCurrentUserId } from '@/utils/audio/auth-utils';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Chat() {
   const [isLoading, setIsLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user, session } = useAuth();
   const { sidebar, content } = ChatContainer();
   
   useEffect(() => {
-    async function initialize() {
+    async function checkUserProfile() {
       setIsLoading(true);
       
-      const currentUserId = await getCurrentUserId();
-      setUserId(currentUserId);
-      
-      if (!currentUserId) {
+      if (!user) {
         console.log('No authenticated user found');
         setIsLoading(false);
         return;
       }
       
       try {
-        console.log('User authenticated:', currentUserId);
+        // Check if user has a profile
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        if (profileError && profileError.code !== 'PGRST116') {
+          console.error('Error checking profile:', profileError);
+          toast.error('Error checking user profile');
+        }
+        
+        // If no profile exists, create one
+        if (!profile) {
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || null,
+              avatar_url: user.user_metadata?.avatar_url || null
+            });
+            
+          if (insertError) {
+            console.error('Error creating profile:', insertError);
+            toast.error('Failed to create user profile');
+          } else {
+            console.log('Created new user profile');
+          }
+        } else {
+          console.log('User profile exists:', profile.id);
+        }
       } catch (error) {
-        console.error('Error in initialization:', error);
+        console.error('Error in profile initialization:', error);
       } finally {
         setIsLoading(false);
       }
     }
     
-    initialize();
-  }, []);
+    checkUserProfile();
+  }, [user]);
   
   if (isLoading) {
     return (
