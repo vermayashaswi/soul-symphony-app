@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -129,7 +128,7 @@ async function refineText(text: string) {
   }
 }
 
-// Function to analyze emotions in text
+// Function to analyze emotions in text - UPDATED to return emotion scores
 async function analyzeEmotions(text: string) {
   try {
     // Fetch emotion list from database
@@ -145,7 +144,7 @@ async function analyzeEmotions(text: string) {
     
     if (!emotions || emotions.length === 0) {
       console.warn('No emotions found in database');
-      return [];
+      return {};
     }
     
     const emotionNames = emotions.map(e => e.name);
@@ -168,7 +167,7 @@ async function analyzeEmotions(text: string) {
 Here are some descriptions of these emotions: 
 ${emotionDescriptions.join('\n')}
 
-Identify the top emotions present in the text. For each emotion present, generate a score from 0-100 based on how strongly it appears in the text. Only include emotions with a score of 20 or higher. Return the results as a simple JSON array with each entry having the format: {"emotion": "emotion_name", "score": score_number}. Sort by score in descending order.`
+Identify the top emotions present in the text. For each emotion present, generate a score from 0-100 based on how strongly it appears in the text. Only include emotions with a score of 20 or higher. Return the results as a simple JSON object with emotion names as keys and scores as values, for example: {"happy": 80, "excited": 65}. Do not include any array structure.`
           },
           {
             role: 'user',
@@ -188,35 +187,27 @@ Identify the top emotions present in the text. For each emotion present, generat
     }
     
     const data = await response.json();
-    let result;
+    let emotionScores = {};
     
     try {
       const content = data.choices[0].message.content.trim();
-      result = JSON.parse(content);
+      emotionScores = JSON.parse(content);
+      console.log("Parsed emotion scores:", emotionScores);
       
-      // Extract the array if it's wrapped in another object
-      if (result.emotions && Array.isArray(result.emotions)) {
-        result = result.emotions;
+      // Validate the format - should be an object with emotion names as keys and scores as values
+      if (typeof emotionScores !== 'object' || Array.isArray(emotionScores)) {
+        console.warn('Emotion analysis result is not in the expected format:', emotionScores);
+        return {};
       }
       
-      // If the result is not an array, try to convert it
-      if (!Array.isArray(result)) {
-        console.warn('Emotion analysis result is not an array:', result);
-        return Object.entries(result).map(([emotion, score]) => ({
-          emotion,
-          score: typeof score === 'number' ? score : 0
-        }));
-      }
-      
-      // Map to just emotion names for our theme storage
-      return result.map(item => item.emotion || '').filter(Boolean);
+      return emotionScores;
     } catch (error) {
       console.error('Error parsing emotion analysis result:', error, data.choices[0].message.content);
-      return [];
+      return {};
     }
   } catch (error) {
     console.error('Error in analyzeEmotions:', error);
-    return [];
+    return {};
   }
 }
 
@@ -399,13 +390,13 @@ serve(async (req) => {
     }
     
     console.log("Analyzing emotions...");
-    let emotions;
+    let emotionScores = {};
     try {
-      emotions = await analyzeEmotions(refinedText);
-      console.log("Emotion analysis complete:", emotions);
+      emotionScores = await analyzeEmotions(refinedText);
+      console.log("Emotion analysis complete:", emotionScores);
     } catch (err) {
       console.error("Emotion analysis error:", err);
-      emotions = [];
+      emotionScores = {};
     }
     
     console.log("Extracting themes...");
@@ -431,7 +422,7 @@ serve(async (req) => {
           "audio_url": audioUrl,
           "user_id": userId || null,
           "duration": audioDuration,
-          "emotions": emotions,
+          "emotions": emotionScores, // Store emotion scores directly
           "master_themes": themes
         }])
         .select();
@@ -458,7 +449,7 @@ serve(async (req) => {
         refinedText: refinedText,
         audioUrl: audioUrl,
         entryId: entryId,
-        emotions: emotions,
+        emotions: emotionScores,
         themes: themes,
         success: true
       }),

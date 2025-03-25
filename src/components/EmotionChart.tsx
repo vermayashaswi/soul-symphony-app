@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from 'react';
 import { 
   LineChart, 
@@ -158,7 +159,7 @@ export function EmotionChart({
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
             <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
-            <YAxis stroke="#888" fontSize={12} tickMargin={10} domain={[0, 10]} />
+            <YAxis stroke="#888" fontSize={12} tickMargin={10} domain={[0, 'auto']} />
             <Tooltip 
               contentStyle={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.8)', 
@@ -202,12 +203,13 @@ export function EmotionChart({
       const containerWidth = 600;
       const containerHeight = 300;
       
+      // Calculate size scaling based on total score range
+      const maxValue = Math.max(...bubbles.map(b => b.value));
+      const minValue = Math.min(...bubbles.map(b => b.value));
       const maxSize = Math.min(containerWidth, containerHeight) * 0.25;
       const minSize = 40;
       
-      const maxValue = Math.max(...bubbles.map(b => b.value));
-      
-      const nodes: {x: number, y: number, size: number, vx: number, vy: number, name: string}[] = [];
+      const nodes: {x: number, y: number, size: number, vx: number, vy: number, name: string, value: number}[] = [];
       
       const columns = Math.ceil(Math.sqrt(bubbles.length));
       const rows = Math.ceil(bubbles.length / columns);
@@ -215,7 +217,11 @@ export function EmotionChart({
       const cellHeight = containerHeight / rows;
       
       bubbles.forEach((bubble, index) => {
-        const sizeScale = bubble.value / maxValue;
+        // Calculate size based on score relative to the maximum score
+        // Normalize between minSize and maxSize
+        const sizeScale = maxValue === minValue 
+          ? 0.5 // If all values are the same, use mid-range size
+          : (bubble.value - minValue) / (maxValue - minValue);
         const size = minSize + sizeScale * (maxSize - minSize);
         
         const row = Math.floor(index / columns);
@@ -230,7 +236,8 @@ export function EmotionChart({
           size,
           vx: 0,
           vy: 0,
-          name: bubble.name
+          name: bubble.name,
+          value: bubble.value
         });
       });
       
@@ -295,7 +302,8 @@ export function EmotionChart({
       return nodes.map((node) => ({
         x: node.x,
         y: node.y,
-        size: node.size
+        size: node.size,
+        value: node.value
       }));
     };
     
@@ -304,7 +312,7 @@ export function EmotionChart({
     return (
       <div className="w-full h-[340px] flex flex-col items-center justify-center relative">
         <div className="absolute top-0 right-0 text-xs text-muted-foreground">
-          * Size of bubble represents emotion intensity
+          * Size of bubble represents emotion intensity across entries
         </div>
         
         <div className="relative w-full h-[300px] overflow-hidden rounded-lg bg-background/50 border border-muted/20">
