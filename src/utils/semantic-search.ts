@@ -151,15 +151,23 @@ export async function generateEmbeddingsForAllEntries() {
     }
     
     // Define a type guard to ensure we're working with valid entries
-    function isValidEntry(entry: any): entry is EntryWithoutEmbedding {
+    function isValidEntry(entry: unknown): entry is EntryWithoutEmbedding {
       return entry !== null && 
              typeof entry === 'object' && 
              'id' in entry && 
              typeof entry.id === 'number';
     }
     
-    // Filter out invalid entries - using type assertion to help TypeScript understand the result type
-    const validEntries = entriesData.filter(isValidEntry) as EntryWithoutEmbedding[];
+    // Filter out invalid entries - using proper type handling
+    const validEntries: EntryWithoutEmbedding[] = [];
+    
+    for (const entry of entriesData) {
+      if (isValidEntry(entry)) {
+        validEntries.push(entry);
+      } else {
+        console.warn('Skipping invalid entry:', entry);
+      }
+    }
     
     if (validEntries.length === 0) {
       return { success: true, message: 'No valid entries found', processed: 0 };
