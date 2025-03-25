@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import VoiceRecorder from '@/components/VoiceRecorder';
@@ -12,22 +11,31 @@ export default function Record() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [mode, setMode] = useState<'record' | 'past'>('record');
+  const [isNavigating, setIsNavigating] = useState(false);
 
-  const handleRecordingComplete = (audioBlob: Blob, tempId?: string) => {
+  const handleRecordingComplete = async (audioBlob: Blob, tempId?: string) => {
     console.log('Recording completed, tempId:', tempId);
-    toast.success('Journal entry saved successfully!');
+    setIsNavigating(true);
     
-    // Navigate to the journal page with the temp ID as a query param
-    // This will allow us to show a loading state for just this entry
-    if (tempId) {
-      navigate(`/journal?processing=${tempId}`, { replace: true });
-    } else {
-      navigate('/journal', { replace: true });
+    try {
+      toast.success('Journal entry saved successfully!');
+      
+      // Navigate to the journal page with the temp ID as a query param
+      if (tempId) {
+        navigate(`/journal?processing=${tempId}`, { replace: true });
+      } else {
+        navigate('/journal', { replace: true });
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+      setIsNavigating(false);
+      toast.error('Error saving journal entry');
     }
   };
 
   const handleToggleMode = (value: string) => {
-    if (value === 'past') {
+    if (value === 'past' && !isNavigating) {
+      setIsNavigating(true);
       navigate('/journal');
     }
   };

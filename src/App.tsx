@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -57,44 +56,56 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const [refreshAttempted, setRefreshAttempted] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
-    // Only attempt to refresh once
+    const timeout = setTimeout(() => {
+      if (isLoading) {
+        console.log('Force completing session check due to timeout');
+        setSessionChecked(true);
+        setRefreshAttempted(true);
+      }
+    }, 5000);
+    
+    setLoadTimeout(timeout);
+    
+    return () => {
+      if (loadTimeout) {
+        clearTimeout(loadTimeout);
+      }
+    };
+  }, [isLoading]);
+  
+  useEffect(() => {
     if (!isLoading && !user && !refreshAttempted) {
       console.log("Protected route: No user found, attempting to refresh session", {
         path: location.pathname
       });
       
-      refreshAuthSession(false).then(success => {
-        console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
-        setRefreshAttempted(true);
-        setSessionChecked(true);
-      }).catch(() => {
-        setRefreshAttempted(true);
-        setSessionChecked(true);
-      });
+      refreshAuthSession(false)
+        .then(success => {
+          console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
+          setRefreshAttempted(true);
+          setSessionChecked(true);
+        })
+        .catch(() => {
+          setRefreshAttempted(true);
+          setSessionChecked(true);
+        });
     } else if (!refreshAttempted && (user || isLoading)) {
-      // Mark as checked if we have a user or still loading
       setSessionChecked(true);
     }
     
-    // Track session when user accesses a protected route - but don't block rendering on this
     if (user && !isLoading) {
-      // Add debug logging
       console.log("Protected route: Tracking session for user", user.id, "on path", location.pathname);
       
       createOrUpdateSession(user.id, location.pathname)
-        .then(result => {
-          console.log("Session tracking result:", result);
-        })
         .catch(err => {
           console.error("Error tracking session:", err);
-          // Don't block the app flow on session tracking errors
         });
     }
   }, [user, isLoading, location, refreshAttempted]);
   
-  // Show loading state only while doing initial check
   if (isLoading && !sessionChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -103,7 +114,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  // Once check is done, either show content or redirect
   if (user) {
     return <>{children}</>;
   }
@@ -113,7 +123,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
-  // Fallback loading state
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -144,7 +153,6 @@ const AppRoutes = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth event outside React context:", event, session?.user?.email);
       
-      // Track session events - but don't block rendering on this
       if (event === 'SIGNED_IN' && session?.user) {
         console.log("SIGNED_IN event detected - creating new session for user", session.user.id);
         
@@ -154,7 +162,6 @@ const AppRoutes = () => {
           })
           .catch(err => {
             console.error("Error creating session on sign in:", err);
-            // Don't block the app flow on session tracking errors
           });
       } else if (event === 'SIGNED_OUT' && user) {
         console.log("SIGNED_OUT event detected - ending session for user", user.id);
@@ -162,12 +169,10 @@ const AppRoutes = () => {
         endUserSession(user.id)
           .catch(err => {
             console.error("Error ending session on sign out:", err);
-            // Don't block the app flow on session tracking errors
           });
       }
     });
     
-    // Only do initial session checks once at startup - don't refresh on every route change
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) {
         console.error("Initial session check error:", error);
@@ -179,7 +184,6 @@ const AppRoutes = () => {
           expiresIn: Math.round((data.session.expires_at * 1000 - Date.now()) / 1000 / 60) + " minutes"
         });
         
-        // Create or update session for initial session - but don't block rendering on this
         if (data.session.user.id) {
           console.log("Creating/updating session for initial session user", data.session.user.id);
           
@@ -189,7 +193,6 @@ const AppRoutes = () => {
             })
             .catch(err => {
               console.error("Error tracking session on initial load:", err);
-              // Don't block the app flow on session tracking errors
             });
         }
       } else {
@@ -197,7 +200,6 @@ const AppRoutes = () => {
       }
     });
     
-    // Cleanup function
     return () => {
       subscription.unsubscribe();
     };

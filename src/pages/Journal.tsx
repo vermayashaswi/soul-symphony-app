@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import JournalHeader from '@/components/journal/JournalHeader';
@@ -34,8 +33,26 @@ export default function Journal() {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [mode, setMode] = useState<'record' | 'past'>('past');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // Extract processing entries from URL if present
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isLoading || isProcessingUnprocessedEntries) {
+        console.log('Force completing loading state due to timeout');
+        setIsRefreshing(false);
+        setProcessingEntries([]);
+      }
+    }, 10000);
+    
+    setLoadTimeout(timeout);
+    
+    return () => {
+      if (loadTimeout) {
+        clearTimeout(loadTimeout);
+      }
+    };
+  }, [isLoading, isProcessingUnprocessedEntries]);
+
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const tempId = queryParams.get('processing');
@@ -47,11 +64,9 @@ export default function Journal() {
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
       
-      // Set a timeout to remove the processing entry after some time
-      // This is just in case it doesn't get refreshed by the normal refresh mechanism
-      setTimeout(() => {
+      // Set a timeout to remove the processing entry
+      const processingTimeout = setTimeout(() => {
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
-        // Trigger a refresh to attempt to load the completed entry
         refreshEntries(false);
       }, 30000);
       
@@ -59,15 +74,16 @@ export default function Journal() {
       const refreshInterval = setInterval(() => {
         console.log("Auto-refreshing entries to check for processed entry");
         refreshEntries(false).then(() => {
-          // Check if we should clear the interval
           if (processingEntries.length === 0) {
             clearInterval(refreshInterval);
           }
         });
-      }, 5000); // Check every 5 seconds
+      }, 5000);
       
-      // Clean up interval
-      return () => clearInterval(refreshInterval);
+      return () => {
+        clearTimeout(processingTimeout);
+        clearInterval(refreshInterval);
+      };
     }
   }, [location.search, processingEntries]);
 
@@ -96,7 +112,6 @@ export default function Journal() {
     }
   };
 
-  // Run the processUnprocessedEntries function when the component mounts
   useEffect(() => {
     if (user?.id) {
       // Process unprocessed entries automatically on page load
