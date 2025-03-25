@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -95,7 +94,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
 
-      // Parse and convert the reference_entries to the correct type
       const formattedMessages: Message[] = data.map(msg => ({
         id: msg.id,
         content: msg.content,
@@ -157,7 +155,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     setShowWelcome(false);
     
     try {
-      // Use the chat-rag endpoint to get a response with relevant journal entries
       const response = await supabase.functions.invoke('chat-rag', {
         body: {
           message: content.trim(),
@@ -177,7 +174,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         onNewThreadCreated(newThreadId);
       }
       
-      // Update relevant entries if any were found
       if (foundEntries && foundEntries.length > 0) {
         setRelevantEntries(foundEntries);
       }
@@ -199,7 +195,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       console.error('Error in chat:', err);
       toast.error('Something went wrong. Please try again later.');
       
-      // Add a fallback message
       const fallbackMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: "I'm sorry, I'm having trouble processing your request. Please try again later.",

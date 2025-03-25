@@ -30,3 +30,23 @@ export async function verifyUserAuthentication() {
     };
   }
 }
+
+/**
+ * Gets the current user ID from the session
+ * Returns undefined if no user is authenticated
+ */
+export async function getCurrentUserId(): Promise<string | undefined> {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    
+    if (error || !data.session) {
+      console.error('Error getting user ID:', error);
+      return undefined;
+    }
+    
+    return data.session.user.id;
+  } catch (error: any) {
+    console.error('Unexpected error getting user ID:', error);
+    return undefined;
+  }
+}
