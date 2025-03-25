@@ -14,7 +14,7 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import ParticleBackground from "./components/ParticleBackground";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "./integrations/supabase/client";
 import Navbar from "./components/Navbar";
 import { refreshAuthSession } from "./utils/audio/auth-utils";
@@ -24,6 +24,7 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
     },
   },
 });
@@ -32,21 +33,28 @@ const queryClient = new QueryClient({
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, refreshSession } = useAuth();
   const location = useLocation();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   useEffect(() => {
-    if (!isLoading && !user) {
-      console.log("Protected route: No user, should redirect to /auth", {
+    if (!isLoading && !user && !isRefreshing) {
+      console.log("Protected route: No user found, attempting to refresh session", {
         path: location.pathname
       });
+      
+      setIsRefreshing(true);
+      
+      // Try refreshing the session if we don't have a user
+      refreshSession().then(success => {
+        console.log("Session refresh attempt result:", success);
+        setIsRefreshing(false);
+      }).catch(() => {
+        setIsRefreshing(false);
+      });
     }
-
-    // Try refreshing the session if we don't have a user
-    if (!isLoading && !user) {
-      refreshSession();
-    }
-  }, [user, isLoading, location, refreshSession]);
+  }, [user, isLoading, location, refreshSession, isRefreshing]);
   
-  if (isLoading) {
+  // Show loading spinner while authentication is being checked
+  if (isLoading || isRefreshing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -54,6 +62,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
+  // Redirect to auth page if user is not authenticated
   if (!user) {
     console.log("Redirecting to auth from protected route:", location.pathname);
     return <Navigate to="/auth" state={{ from: location }} replace />;
@@ -82,10 +91,12 @@ const AppRoutes = () => {
   // Ensure supabase client is properly configured and refreshing tokens
   useEffect(() => {
     console.log("Setting up Supabase auth debugging listener");
+    
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth event outside React context:", event, session?.user?.email);
       
-      // Extra debug for production auth issues
+      // Extra debug for auth issues
       if (session) {
         console.log("User authentication details:", {
           id: session.user?.id,
@@ -97,7 +108,7 @@ const AppRoutes = () => {
       }
     });
     
-    // Check the session on mount to debug production issues
+    // Check the session on mount for debugging
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) {
         console.error("Initial session check error:", error);

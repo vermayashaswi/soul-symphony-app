@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
-import ParticleBackground from '@/components/ParticleBackground';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Index() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
   const handleGetStarted = () => {
     if (user) {
@@ -51,11 +50,6 @@ export default function Index() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Particle background with relative positioning */}
-      <div className="fixed inset-0 w-full h-full -z-10">
-        <ParticleBackground />
-      </div>
-      
       {/* Main content with padding to avoid navbar overlap */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 py-12">
         <div className="max-w-3xl w-full text-center mb-10">
@@ -65,9 +59,16 @@ export default function Index() {
           <p className="text-lg md:text-xl text-muted-foreground mb-8">
             Explore your thoughts, track your emotions, and gain valuable insights with AI-powered journaling
           </p>
-          <Button size="lg" onClick={handleGetStarted} className="text-lg px-8 py-6">
-            {user ? 'Go to Journal' : 'Get Started'}
-          </Button>
+          
+          {isLoading ? (
+            <Button size="lg" disabled className="text-lg px-8 py-6">
+              <span className="animate-pulse">Loading...</span>
+            </Button>
+          ) : (
+            <Button size="lg" onClick={handleGetStarted} className="text-lg px-8 py-6">
+              {user ? 'Go to Journal' : 'Get Started'}
+            </Button>
+          )}
         </div>
 
         {/* Feature cards with responsive grid and proper spacing */}

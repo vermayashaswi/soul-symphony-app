@@ -72,13 +72,23 @@ export async function refreshAuthSession() {
     
     if (error) {
       console.error('Error refreshing session:', error);
+      toast.error(`Session refresh failed: ${error.message}`);
       return false;
     }
     
     console.log("Session refreshed successfully:", !!data.session);
+    
+    if (data.session) {
+      console.log("User info after refresh:", {
+        id: data.session.user.id,
+        email: data.session.user.email
+      });
+    }
+    
     return !!data.session;
   } catch (error: any) {
     console.error('Unexpected error refreshing session:', error);
+    toast.error(`Unexpected error refreshing session: ${error.message}`);
     return false;
   }
 }

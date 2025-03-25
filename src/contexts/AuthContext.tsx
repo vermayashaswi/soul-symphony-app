@@ -24,35 +24,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log("AuthProvider: Setting up auth state listener");
     
-    // Set up auth state listener first
+    // Check for existing session first
+    const initializeAuth = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting initial session:', error.message);
+          setIsLoading(false);
+          return;
+        }
+        
+        if (data.session) {
+          console.log('Initial session found:', data.session.user.email);
+          setSession(data.session);
+          setUser(data.session.user);
+        } else {
+          console.log('No initial session found');
+        }
+        
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Unexpected error checking session:', err);
+        setIsLoading(false);
+      }
+    };
+    
+    initializeAuth();
+    
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         console.log('Auth state changed:', event, currentSession?.user?.email);
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        setIsLoading(false);
-
-        if (event === 'SIGNED_IN') {
-          toast.success('Signed in successfully');
-          console.log('Full user data on sign in:', currentSession?.user);
+        
+        if (currentSession) {
+          setSession(currentSession);
+          setUser(currentSession.user);
+          
+          if (event === 'SIGNED_IN') {
+            toast.success('Signed in successfully');
+            console.log('Full user data on sign in:', currentSession.user);
+          } else if (event === 'TOKEN_REFRESHED') {
+            console.log('Token refreshed successfully');
+          }
         } else if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
           toast.info('Signed out');
-        } else if (event === 'TOKEN_REFRESHED') {
-          console.log('Token refreshed successfully');
         }
       }
     );
-
-    // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log('Initial session check:', currentSession?.user?.email);
-      if (currentSession) {
-        console.log('Initial user data:', currentSession.user);
-      }
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      setIsLoading(false);
-    });
 
     return () => {
       subscription.unsubscribe();
@@ -62,7 +83,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Get the correct redirect URL based on environment
   const getRedirectUrl = () => {
     const origin = window.location.origin;
-    // Format the redirect URL correctly for Supabase auth
     return `${origin}/auth`;
   };
 
@@ -85,6 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('Error initiating Google OAuth:', error);
+        toast.error(`Error signing in with Google: ${error.message}`);
+        setIsLoading(false);
         throw error;
       }
       
@@ -99,14 +121,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       console.log('Signing out user...');
+      setIsLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) {
+        console.error('Error signing out:', error);
+        toast.error(`Error signing out: ${error.message}`);
         throw error;
       }
+      
+      setSession(null);
+      setUser(null);
       console.log('Sign out successful');
     } catch (error: any) {
       console.error('Error signing out:', error);
       toast.error(`Error signing out: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -117,15 +147,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.refreshSession();
       if (error) {
         console.error('Error refreshing session:', error);
+        toast.error(`Session refresh failed: ${error.message}`);
         throw error;
       }
       
       console.log('Session refreshed:', data.session?.user?.email);
       setSession(data.session);
       setUser(data.session?.user ?? null);
+      return true;
     } catch (error: any) {
       console.error('Error refreshing session:', error);
       toast.error(`Session refresh failed: ${error.message}`);
+      return false;
     }
   };
 

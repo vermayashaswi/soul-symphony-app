@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, MessageCircle, BarChart2, Settings, Menu, X, LogOut, LogIn } from 'lucide-react';
+import { Home, MessageCircle, BarChart2, Settings, Menu, X, LogOut, LogIn, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,13 +51,22 @@ export function Navbar() {
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
-    { path: '/journal', label: 'Journal', icon: Home },
+    { path: '/journal', label: 'Journal', icon: BookOpen },
     { path: '/insights', label: 'Insights', icon: BarChart2 },
     { path: '/chat', label: 'AI Assistant', icon: MessageCircle },
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
   const closeMenu = () => setIsOpen(false);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      closeMenu();
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   return (
     <nav 
@@ -129,7 +139,7 @@ export function Navbar() {
                     <span>Settings</span>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={signOut}>
+                <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
@@ -160,7 +170,7 @@ export function Navbar() {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut}>
+                <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
