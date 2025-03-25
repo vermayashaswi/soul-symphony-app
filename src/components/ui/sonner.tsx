@@ -22,10 +22,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
         },
       }}
-      // Add limit to prevent toast overload and richColors for better visibility
+      // Add better visibility and control options
       richColors
       closeButton
-      limit={3}
       {...props}
     />
   )
