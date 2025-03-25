@@ -14,6 +14,22 @@ export async function sendAudioForTranscription(base64String: string, userId: st
     console.log("Sending audio to transcribe function...");
     console.log("Audio base64 length:", base64String.length);
     
+    // Validate input
+    if (!base64String || base64String.length < 50) {
+      return { 
+        success: false, 
+        error: 'Invalid audio data: too short or empty'
+      };
+    }
+    
+    if (!userId) {
+      return {
+        success: false,
+        error: 'User ID is required'
+      };
+    }
+    
+    // Call the Supabase function
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64String,
@@ -36,7 +52,7 @@ export async function sendAudioForTranscription(base64String: string, userId: st
     } else {
       return { 
         success: false, 
-        error: data?.error || 'Failed to process recording' 
+        error: data?.error || data?.message || 'Failed to process recording' 
       };
     }
   } catch (error: any) {

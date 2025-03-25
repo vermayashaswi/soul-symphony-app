@@ -11,6 +11,7 @@ import { RecordingVisualizer } from '@/components/voice-recorder/RecordingVisual
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -44,16 +45,33 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   } = useAudioPlayback({ audioBlob });
   
   const handleSaveEntry = async () => {
-    if (!audioBlob) return;
-    
-    setIsProcessing(true);
-    const result = await processRecording(audioBlob, user?.id);
-    
-    if (result.success && onRecordingComplete) {
-      onRecordingComplete(audioBlob, result.tempId);
+    if (!audioBlob) {
+      toast.error("No recording to save");
+      return;
     }
     
-    setIsProcessing(false);
+    if (!user) {
+      toast.error("Please sign in to save entries");
+      return;
+    }
+    
+    setIsProcessing(true);
+    
+    try {
+      console.log("Processing recording with blob size:", audioBlob.size);
+      const result = await processRecording(audioBlob, user?.id);
+      
+      if (result.success && onRecordingComplete) {
+        onRecordingComplete(audioBlob, result.tempId);
+      } else if (!result.success) {
+        toast.error(result.error || "Failed to process recording");
+      }
+    } catch (error) {
+      console.error("Error in handleSaveEntry:", error);
+      toast.error("Failed to save entry. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Automatically request permissions on component mount

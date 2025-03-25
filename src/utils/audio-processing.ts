@@ -16,7 +16,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   // 1. Validate the audio blob
   const validation = validateAudioBlob(audioBlob);
   if (!validation.isValid) {
-    toast.error(validation.errorMessage);
+    toast.error(validation.errorMessage || 'Invalid recording');
     return { success: false, error: validation.errorMessage };
   }
   
@@ -52,8 +52,14 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
  */
 async function processRecordingInBackground(audioBlob: Blob | null, userId: string, toastId: string): Promise<void> {
   try {
+    if (!audioBlob) {
+      toast.dismiss(toastId);
+      toast.error('No audio data available');
+      return;
+    }
+    
     // 1. Convert blob to base64
-    const base64Audio = await blobToBase64(audioBlob!);
+    const base64Audio = await blobToBase64(audioBlob);
     
     // Validate base64 data
     if (!base64Audio || base64Audio.length < 100) {
@@ -70,7 +76,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     const authStatus = await verifyUserAuthentication();
     if (!authStatus.isAuthenticated) {
       toast.dismiss(toastId);
-      toast.error(authStatus.error);
+      toast.error(authStatus.error || 'Authentication failed');
       return;
     }
 
