@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, PlusCircle, BarChart2 } from 'lucide-react';
+import { RefreshCw, PlusCircle, BarChart2, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface JournalHeaderProps {
@@ -18,6 +18,10 @@ export const JournalHeader: React.FC<JournalHeaderProps> = ({
   isRefreshing,
 }) => {
   const navigate = useNavigate();
+  
+  const handleChatNavigation = () => {
+    navigate('/chat');
+  };
   
   return (
     <div className="flex justify-between items-center mb-6">
@@ -40,6 +44,15 @@ export const JournalHeader: React.FC<JournalHeaderProps> = ({
               Refresh
             </>
           )}
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleChatNavigation}
+        >
+          <MessageSquare className="h-4 w-4 mr-2" />
+          Chat
         </Button>
         
         <Button 

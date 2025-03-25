@@ -19,6 +19,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
+        <Route path="/callback" element={<Auth />} />
         <Route path="/journal" element={
           <ProtectedRoute>
             <Journal />
