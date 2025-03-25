@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { JournalHeader } from '@/components/journal/JournalHeader';
@@ -172,48 +171,14 @@ export default function Journal() {
         </CardHeader>
       </Card>
       
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Your Entries</h2>
-        <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleProcessAllEntries}
-            disabled={isProcessingUnprocessedEntries}
-          >
-            {isProcessingUnprocessedEntries ? (
-              <>
-                <Database className="h-4 w-4 mr-2 animate-pulse" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Database className="h-4 w-4 mr-2" />
-                Process All Embeddings
-              </>
-            )}
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRefresh}
-            disabled={isRefreshing || isProcessingUnprocessedEntries}
-          >
-            {isRefreshing ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Refreshing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+      <JournalHeader
+        onCreateJournal={handleCreateJournal}
+        onViewInsights={handleViewInsights}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
+        onProcessAllEmbeddings={handleProcessAllEntries}
+        isProcessingEmbeddings={isProcessingUnprocessedEntries}
+      />
       
       {loadError && !isLoading && (
         <Alert variant="destructive" className="mb-4">

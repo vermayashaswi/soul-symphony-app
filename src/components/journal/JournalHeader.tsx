@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, PlusCircle, BarChart2 } from 'lucide-react';
+import { RefreshCw, PlusCircle, BarChart2, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface JournalHeaderProps {
@@ -9,13 +9,17 @@ interface JournalHeaderProps {
   onViewInsights: () => void;
   onRefresh: () => void;
   isRefreshing: boolean;
+  onProcessAllEmbeddings: () => void;
+  isProcessingEmbeddings: boolean;
 }
 
 export const JournalHeader: React.FC<JournalHeaderProps> = ({
   onCreateJournal,
   onViewInsights,
   onRefresh,
-  isRefreshing
+  isRefreshing,
+  onProcessAllEmbeddings,
+  isProcessingEmbeddings
 }) => {
   const navigate = useNavigate();
   
@@ -38,6 +42,25 @@ export const JournalHeader: React.FC<JournalHeaderProps> = ({
             <>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
+            </>
+          )}
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={onProcessAllEmbeddings}
+          disabled={isProcessingEmbeddings}
+        >
+          {isProcessingEmbeddings ? (
+            <>
+              <Database className="h-4 w-4 mr-2 animate-pulse" />
+              Processing Embeddings...
+            </>
+          ) : (
+            <>
+              <Database className="h-4 w-4 mr-2" />
+              Generate All Embeddings
             </>
           )}
         </Button>

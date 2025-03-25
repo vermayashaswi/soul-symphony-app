@@ -29,7 +29,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceRole);
 
     // Get the request body
-    const { userId, processAll = false } = await req.json();
+    const { userId, processAll = true } = await req.json();
 
     if (!userId) {
       throw new Error("Missing required field: userId");
@@ -66,6 +66,8 @@ serve(async (req) => {
       query = query.not('id', 'in', 
         supabase.from('journal_embeddings').select('journal_entry_id')
       );
+    } else {
+      console.log("Will process ALL entries regardless of existing embeddings");
     }
 
     const { data: entries, error: fetchError } = await query;
@@ -119,6 +121,7 @@ serve(async (req) => {
         // Log the entry being processed
         console.log(`Processing entry ${entry.id}`);
         console.log(`Text length: ${text.length} characters`);
+        console.log(`Text snippet: ${text.substring(0, 100)}...`);
         
         // Check for any existing embedding for this entry first
         const { data: existingEmbeddings, error: checkError } = await supabase
@@ -151,6 +154,10 @@ serve(async (req) => {
           model: "text-embedding-ada-002",
           input: text.trim(),
         });
+
+        if (!embeddingResponse.data || !embeddingResponse.data.data || embeddingResponse.data.data.length === 0) {
+          throw new Error(`OpenAI API returned an invalid response for entry ${entry.id}`);
+        }
 
         const [{ embedding }] = embeddingResponse.data.data;
         console.log(`Successfully generated embedding for entry ${entry.id}`);

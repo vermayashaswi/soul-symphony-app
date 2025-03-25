@@ -52,6 +52,8 @@ export function useJournalHandler(userId: string | undefined) {
         console.log('Unprocessed entries processed successfully:', data);
         if (data.processedCount > 0) {
           toast.success(`Successfully processed ${data.processedCount} journal entries`);
+        } else {
+          toast.info('No new journal entries to process');
         }
         return data;
       } else {
@@ -68,21 +70,25 @@ export function useJournalHandler(userId: string | undefined) {
     }
   };
 
-  // Same as above but for all entries (including those with embeddings)
+  // Process all entries, even those that already have embeddings
   const processAllEntries = async () => {
     if (!userId) {
       console.log("No user ID available for processing entries");
+      toast.error("Authentication required");
       return { success: false, message: "Authentication required" };
     }
 
     if (isProcessingUnprocessedEntries) {
       console.log("Already processing entries, skipping");
+      toast.info("Already processing entries");
       return { success: false, message: "Already processing" };
     }
 
     setIsProcessingUnprocessedEntries(true);
+    const toastId = 'process-all-entries';
+    
     toast.loading('Processing all journal entries...', {
-      id: 'process-all-entries',
+      id: toastId,
       duration: 10000,
     });
     
@@ -97,7 +103,7 @@ export function useJournalHandler(userId: string | undefined) {
         }
       });
       
-      toast.dismiss('process-all-entries');
+      toast.dismiss(toastId);
       
       if (error) {
         console.error('Error processing all entries:', error);
@@ -107,7 +113,11 @@ export function useJournalHandler(userId: string | undefined) {
       
       if (data?.success) {
         console.log('All entries processed successfully:', data);
-        toast.success(`Successfully processed ${data.processedCount} journal entries`);
+        if (data.processedCount > 0) {
+          toast.success(`Successfully processed ${data.processedCount} journal entries`);
+        } else {
+          toast.info('No journal entries to process');
+        }
         return data;
       } else {
         console.error('Failed to process all journal entries:', data);
@@ -115,7 +125,7 @@ export function useJournalHandler(userId: string | undefined) {
         return { success: false, message: data?.error || "Unknown error" };
       }
     } catch (error: any) {
-      toast.dismiss('process-all-entries');
+      toast.dismiss(toastId);
       console.error('Error in processAllEntries:', error);
       toast.error('Error processing journal embeddings');
       return { success: false, error: error.message || "Unknown error" };
