@@ -168,9 +168,12 @@ export default function Chat() {
       
       for (const entry of entriesData) {
         // Make sure entry is valid before accessing properties
-        if (!entry || typeof entry !== 'object') continue;
+        if (!entry || typeof entry !== 'object') {
+          diagnosticInfo += `Entry is null or not an object\n\n`;
+          continue;
+        }
         
-        const entryId = typeof entry.id === 'number' ? entry.id : null;
+        const entryId = entry && typeof entry.id === 'number' ? entry.id : null;
         if (entryId === null) {
           diagnosticInfo += `Entry has invalid ID: ${JSON.stringify(entry)}\n\n`;
           continue;
@@ -183,15 +186,15 @@ export default function Chat() {
           .eq('journal_entry_id', entryId)
           .maybeSingle();
         
-        const date = entry.created_at ? new Date(entry.created_at).toLocaleString() : 'unknown date';
+        const date = entry && entry.created_at ? new Date(entry.created_at).toLocaleString() : 'unknown date';
         const hasEmbedding = !embeddingError && embeddingData;
         
         diagnosticInfo += `Entry ${entryId} (${date}):\n`;
-        diagnosticInfo += `- Has text: ${entry["refined text"] ? "Yes" : "No"}\n`;
-        diagnosticInfo += `- Text length: ${entry["refined text"]?.length || 0} characters\n`;
+        diagnosticInfo += `- Has text: ${entry && entry["refined text"] ? "Yes" : "No"}\n`;
+        diagnosticInfo += `- Text length: ${entry && entry["refined text"] ? entry["refined text"].length : 0} characters\n`;
         diagnosticInfo += `- Has embedding: ${hasEmbedding ? "Yes" : "No"}\n`;
         
-        if (!hasEmbedding && entry["refined text"]) {
+        if (!hasEmbedding && entry && entry["refined text"]) {
           diagnosticInfo += "- Attempting to generate embedding...\n";
           try {
             const success = await checkEmbeddingForEntry(entryId);
