@@ -95,13 +95,21 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
 
+      // Parse and convert the reference_entries to the correct type
       const formattedMessages: Message[] = data.map(msg => ({
         id: msg.id,
         content: msg.content,
         sender: msg.sender as 'user' | 'assistant',
         created_at: msg.created_at,
         thread_id: msg.thread_id,
-        reference_entries: msg.reference_entries
+        reference_entries: msg.reference_entries ? 
+          (Array.isArray(msg.reference_entries) ? 
+            msg.reference_entries.map((ref: any) => ({
+              id: ref.id,
+              similarity: ref.similarity
+            })) : 
+            null) : 
+          null
       }));
 
       setMessages(formattedMessages);

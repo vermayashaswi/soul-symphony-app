@@ -4,9 +4,10 @@ import { Badge } from '@/components/ui/badge';
 
 interface EmotionBadgeProps {
   emotion: string;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-export function EmotionBadge({ emotion }: EmotionBadgeProps) {
+export function EmotionBadge({ emotion, size = 'md' }: EmotionBadgeProps) {
   const getEmotionColor = (emotion: string): string => {
     const emotionMap: Record<string, string> = {
       joy: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
@@ -40,8 +41,17 @@ export function EmotionBadge({ emotion }: EmotionBadgeProps) {
     return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
   };
 
+  const sizeClasses = {
+    sm: 'text-xs py-0 px-1.5',
+    md: 'text-sm py-0.5 px-2.5',
+    lg: 'text-base py-1 px-3'
+  };
+
   return (
-    <Badge variant="outline" className={getEmotionColor(emotion)}>
+    <Badge 
+      variant="outline" 
+      className={`${getEmotionColor(emotion)} ${sizeClasses[size]}`}
+    >
       {emotion}
     </Badge>
   );

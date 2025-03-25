@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Pause, Play, Trash2, Save, X, Check, Loader2, RefreshCw, Database } from 'lucide-react';
+import { Mic, Pause, Play, Trash2, Save, X, Check, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRecording } from '@/hooks/use-recording';
 import { useTranscription } from '@/hooks/use-transcription';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
+import { useJournalHandler } from '@/hooks/use-journal-handler';
 import { formatDate, formatTime, cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
@@ -20,6 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { EmotionBadge } from '@/components/EmotionBadge';
 import { JournalEntry } from '@/types/journal';
 import { JournalSearch } from '@/components/journal/JournalSearch';
+import { JournalHeader } from '@/components/journal/JournalHeader';
 
 export default function Journal() {
   const { toast } = useToast();
@@ -31,8 +34,14 @@ export default function Journal() {
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [isRefining, setIsRefining] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState<number | null>(null);
-  const [isProcessingEmbeddings, setIsProcessingEmbeddings] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  
+  const { 
+    handleCreateJournal, 
+    handleViewInsights,
+    handleProcessAllEmbeddings,
+    isProcessingEmbeddings
+  } = useJournalHandler(user?.id);
 
   const { 
     isRecording, 
@@ -58,12 +67,11 @@ export default function Journal() {
   
   const {
     journalEntries,
-    isLoading: isLoadingEntries,
+    isLoading,
     saveJournalEntry,
     isSaving,
     deleteJournalEntry,
-    refreshEntries,
-    processAllEmbeddings
+    refreshEntries
   } = useJournalEntries(user?.id);
   
   useEffect(() => {
@@ -244,7 +252,7 @@ export default function Journal() {
           isProcessingEmbeddings={isProcessingEmbeddings}
         />
         
-        <JournalSearch userId={userId} onSelectEntry={handleSearchEntrySelect} />
+        <JournalSearch userId={user?.id} onSelectEntry={handleSearchEntrySelect} />
         
         <div className="grid gap-6">
           {isLoading ? (
