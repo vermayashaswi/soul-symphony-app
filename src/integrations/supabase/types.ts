@@ -142,6 +142,38 @@ export type Database = {
           },
         ]
       }
+      journal_embeddings: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string
+          id: number
+          journal_entry_id: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding: string
+          id?: never
+          journal_entry_id: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string
+          id?: never
+          journal_entry_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_embeddings_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "Journal Entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -193,6 +225,7 @@ export type Database = {
       user_queries: {
         Row: {
           created_at: string
+          embedding: string | null
           id: string
           message_id: string | null
           query_text: string
@@ -201,6 +234,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          embedding?: string | null
           id?: string
           message_id?: string | null
           query_text: string
@@ -209,6 +243,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          embedding?: string | null
           id?: string
           message_id?: string | null
           query_text?: string

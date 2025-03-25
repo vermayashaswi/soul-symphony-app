@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,7 +36,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       return;
     }
     
-    // Prevent multiple simultaneous fetch attempts
     if (isRetrying) return;
     
     try {
@@ -59,28 +57,24 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         
         if (retryAttempt >= MAX_RETRY_ATTEMPTS) {
           toast.error('Failed to load journal entries. Please try again later.', {
-            id: 'journal-fetch-error', // Use consistent ID to prevent duplicate toasts
+            id: 'journal-fetch-error',
             dismissible: true,
           });
           
-          // Reset retry counter after showing error to user
-          setTimeout(() => setRetryAttempt(0), 30000); // Reset after 30 seconds
+          setTimeout(() => setRetryAttempt(0), 30000);
         }
         
         throw error;
       }
       
-      // Clear any existing error toasts on success
       toast.dismiss('journal-fetch-error');
       
-      // Reset retry counter on success
       setRetryAttempt(0);
       
       console.log(`Fetched ${data?.length || 0} entries successfully`);
       
       const typedEntries = (data || []) as JournalEntry[];
       
-      // Process any entries without master_themes (would happen if using old transcription function)
       const entriesNeedingThemes = typedEntries.filter(
         entry => (!entry.master_themes || entry.master_themes.length === 0) && entry["refined text"]
       );
@@ -95,7 +89,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           }
         }
         
-        // Re-fetch entries if we updated any
         if (entriesNeedingThemes.length > 0) {
           const { data: refreshedData, error: refreshError } = await supabase
             .from('Journal Entries')
@@ -120,7 +113,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.error('Error fetching entries:', error);
       setLoadError(error.message || 'Failed to load journal entries');
       
-      // Only increment retry counter if we're not already at max and not currently retrying
       if (!isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
         setRetryAttempt(prev => prev + 1);
       }
@@ -266,7 +258,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
 
   const refreshEntries = async (showToast = true) => {
     try {
-      // Prevent rapid successive refreshes
       const now = Date.now();
       if (now - lastRetryTime < 2000) {
         console.log('Throttling refresh attempts');
@@ -277,14 +268,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setIsRetrying(true);
       await fetchEntries();
       
-      // Only show toast when explicitly asked and not during auto-refresh operations
       if (showToast) {
-        // Dismiss any existing refresh toast before showing a new one
         if (lastRefreshToastId) {
           toast.dismiss(lastRefreshToastId);
         }
         
-        // Use a unique but predictable ID for the toast
         const toastId = `journal-refresh-${Date.now()}`;
         setLastRefreshToastId(toastId);
         
@@ -308,7 +296,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     if (loadError && !loading && !isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
       console.log(`Auto-retrying fetch (attempt ${retryAttempt + 1}/${MAX_RETRY_ATTEMPTS}) in ${RETRY_DELAY / 1000} seconds...`);
       
-      // Use exponential backoff for retries
       const backoffDelay = RETRY_DELAY * Math.pow(2, retryAttempt - 1);
       
       retryTimeout = setTimeout(() => {
@@ -324,7 +311,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
 
   useEffect(() => {
     if (userId) {
-      // Clear any previous state when userId changes
       setEntries([]);
       setRetryAttempt(0);
       setLoadError(null);
