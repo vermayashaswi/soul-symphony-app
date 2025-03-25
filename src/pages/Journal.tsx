@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import JournalHeader from '@/components/journal/JournalHeader';
@@ -7,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useJournalHandler } from '@/hooks/use-journal-handler';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Mic, BookOpen } from 'lucide-react';
+import { RefreshCw, Mic, BookOpen, Database } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -27,6 +28,7 @@ export default function Journal() {
     handleCreateJournal, 
     handleViewInsights,
     processUnprocessedEntries,
+    processAllEntries,
     isProcessingUnprocessedEntries
   } = useJournalHandler(user?.id);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -112,6 +114,16 @@ export default function Journal() {
     }
   };
 
+  const handleProcessAllEntries = async () => {
+    const result = await processAllEntries();
+    if (result?.success) {
+      // Refresh entries after processing
+      setTimeout(() => {
+        refreshEntries(false);
+      }, 2000);
+    }
+  };
+
   useEffect(() => {
     if (user?.id) {
       // Process unprocessed entries automatically on page load
@@ -162,24 +174,45 @@ export default function Journal() {
       
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Your Entries</h2>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleRefresh}
-          disabled={isRefreshing || isProcessingUnprocessedEntries}
-        >
-          {isRefreshing ? (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              Refreshing...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </>
-          )}
-        </Button>
+        <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleProcessAllEntries}
+            disabled={isProcessingUnprocessedEntries}
+          >
+            {isProcessingUnprocessedEntries ? (
+              <>
+                <Database className="h-4 w-4 mr-2 animate-pulse" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Database className="h-4 w-4 mr-2" />
+                Process All Embeddings
+              </>
+            )}
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={isRefreshing || isProcessingUnprocessedEntries}
+          >
+            {isRefreshing ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </>
+            )}
+          </Button>
+        </div>
       </div>
       
       {loadError && !isLoading && (

@@ -44,18 +44,24 @@ export function useJournalHandler(userId: string | undefined) {
       
       if (error) {
         console.error('Error processing unprocessed entries:', error);
+        toast.error('Failed to process journal embeddings');
         return { success: false, error: error.message };
       }
       
       if (data?.success) {
         console.log('Unprocessed entries processed successfully:', data);
+        if (data.processedCount > 0) {
+          toast.success(`Successfully processed ${data.processedCount} journal entries`);
+        }
         return data;
       } else {
         console.error('Failed to process unprocessed journal entries:', data);
+        toast.error('Failed to process journal embeddings');
         return { success: false, message: data?.error || "Unknown error" };
       }
     } catch (error: any) {
       console.error('Error in processUnprocessedEntries:', error);
+      toast.error('Error processing journal embeddings');
       return { success: false, error: error.message || "Unknown error" };
     } finally {
       setIsProcessingUnprocessedEntries(false);
@@ -75,6 +81,11 @@ export function useJournalHandler(userId: string | undefined) {
     }
 
     setIsProcessingUnprocessedEntries(true);
+    toast.loading('Processing all journal entries...', {
+      id: 'process-all-entries',
+      duration: 10000,
+    });
+    
     try {
       console.log('Processing ALL journal entries...');
       
@@ -86,20 +97,27 @@ export function useJournalHandler(userId: string | undefined) {
         }
       });
       
+      toast.dismiss('process-all-entries');
+      
       if (error) {
         console.error('Error processing all entries:', error);
+        toast.error('Failed to process journal embeddings');
         return { success: false, error: error.message };
       }
       
       if (data?.success) {
         console.log('All entries processed successfully:', data);
+        toast.success(`Successfully processed ${data.processedCount} journal entries`);
         return data;
       } else {
         console.error('Failed to process all journal entries:', data);
+        toast.error('Failed to process journal embeddings');
         return { success: false, message: data?.error || "Unknown error" };
       }
     } catch (error: any) {
+      toast.dismiss('process-all-entries');
       console.error('Error in processAllEntries:', error);
+      toast.error('Error processing journal embeddings');
       return { success: false, error: error.message || "Unknown error" };
     } finally {
       setIsProcessingUnprocessedEntries(false);

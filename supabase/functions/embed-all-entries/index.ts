@@ -103,6 +103,7 @@ serve(async (req) => {
 
     for (const entry of entries) {
       try {
+        // Get the text to use for embedding
         const text = entry["refined text"] || entry["transcription text"];
         
         if (!text || text.trim() === "") {
@@ -115,6 +116,35 @@ serve(async (req) => {
           continue;
         }
 
+        // Log the entry being processed
+        console.log(`Processing entry ${entry.id}`);
+        console.log(`Text length: ${text.length} characters`);
+        
+        // Check for any existing embedding for this entry first
+        const { data: existingEmbeddings, error: checkError } = await supabase
+          .from('journal_embeddings')
+          .select('id')
+          .eq('journal_entry_id', entry.id)
+          .limit(1);
+          
+        if (checkError) {
+          console.error(`Error checking for existing embedding for entry ${entry.id}:`, checkError);
+        } else if (existingEmbeddings && existingEmbeddings.length > 0) {
+          console.log(`Found existing embedding for entry ${entry.id}, deleting it first`);
+          
+          // Delete existing embedding
+          const { error: deleteError } = await supabase
+            .from('journal_embeddings')
+            .delete()
+            .eq('journal_entry_id', entry.id);
+            
+          if (deleteError) {
+            console.error(`Error deleting existing embedding for entry ${entry.id}:`, deleteError);
+          } else {
+            console.log(`Successfully deleted existing embedding for entry ${entry.id}`);
+          }
+        }
+
         // Generate embedding
         console.log(`Generating embedding for entry ${entry.id}...`);
         const embeddingResponse = await openai.createEmbedding({
@@ -123,16 +153,7 @@ serve(async (req) => {
         });
 
         const [{ embedding }] = embeddingResponse.data.data;
-
-        // Delete any existing embedding for this entry
-        const { error: deleteError } = await supabase
-          .from('journal_embeddings')
-          .delete()
-          .eq('journal_entry_id', entry.id);
-
-        if (deleteError) {
-          console.error(`Error deleting existing embedding for entry ${entry.id}:`, deleteError);
-        }
+        console.log(`Successfully generated embedding for entry ${entry.id}`);
 
         // Store the embedding
         const { data, error } = await supabase

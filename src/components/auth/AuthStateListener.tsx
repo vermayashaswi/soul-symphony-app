@@ -59,7 +59,8 @@ const AuthStateListener = () => {
           setTimeout(async () => {
             try {
               console.log("Processing unprocessed journal entries after sign in");
-              await processUnprocessedEntries();
+              const result = await processUnprocessedEntries();
+              console.log("Processing result:", result);
             } catch (err) {
               console.error("Error processing entries after sign in:", err);
             }
@@ -105,7 +106,8 @@ const AuthStateListener = () => {
         setTimeout(async () => {
           try {
             console.log("Processing unprocessed journal entries on initial load");
-            await processUnprocessedEntries();
+            const result = await processUnprocessedEntries();
+            console.log("Processing result:", result);
           } catch (err) {
             console.error("Error processing entries on initial load:", err);
           }
