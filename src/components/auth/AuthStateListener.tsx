@@ -25,55 +25,27 @@ const AuthStateListener = () => {
       location.hash.includes('type=recovery') ||
       location.pathname.includes('callback');
     
-    if (isOAuthRedirect) {
+    // If we're at the root and have an auth token in the hash, redirect to the callback route
+    if (location.pathname === '/' && location.hash.includes('access_token')) {
+      console.log("Detected OAuth token in URL hash at root path, redirecting to callback");
+      // Instead of processing here, redirect to the callback route with the hash intact
+      navigate('/callback' + location.hash, { replace: true });
+      return;
+    }
+    
+    // Only process auth redirects if we're not on the dedicated callback page
+    // Let the callback component handle its own logic
+    if (isOAuthRedirect && location.pathname !== '/callback') {
       console.log("Detected OAuth redirect", {
         hash: location.hash ? "Present (contains tokens)" : "None",
         search: location.search,
         pathname: location.pathname
       });
       
-      // Handle the OAuth callback immediately
+      // Redirect to the callback route with the hash
       if (location.hash.includes('access_token')) {
-        // The hash contains tokens we need to process
-        const params = new URLSearchParams(location.hash.substring(1));
-        const accessToken = params.get('access_token');
-        
-        if (accessToken) {
-          console.log("Processing access token from hash");
-          
-          // Let Supabase process the token
-          supabase.auth.getSession().then(async ({ data, error }) => {
-            if (error) {
-              console.error("Error getting session from hash:", error);
-              toast.error("Authentication error");
-            } else if (data.session) {
-              console.log("Successfully retrieved session from hash");
-              
-              // Force refresh our context state
-              await refreshSession();
-              
-              // Redirect to journal page
-              console.log("Redirecting to journal page after successful auth");
-              navigate('/journal', { replace: true });
-              
-              toast.success("Successfully signed in!");
-            }
-          });
-        }
-      } else {
-        // Add a small delay to allow auth state to process
-        setTimeout(async () => {
-          await refreshSession();
-          
-          // Check if we're authenticated now
-          if (user) {
-            console.log("User authenticated, redirecting to journal");
-            navigate('/journal', { replace: true });
-          } else {
-            console.log("Not authenticated after OAuth callback, redirecting to auth");
-            navigate('/auth', { replace: true });
-          }
-        }, 1000);
+        navigate('/callback' + location.hash, { replace: true });
+        return;
       }
     }
     
@@ -86,14 +58,6 @@ const AuthStateListener = () => {
         try {
           const result = await createOrUpdateSession(session.user.id, window.location.pathname);
           console.log("Session creation result:", result);
-          
-          // Redirect if on 404 page or OAuth callback page or at the hash URL
-          if (location.pathname === '/404' || 
-              location.pathname.includes('callback') || 
-              location.hash.includes('access_token')) {
-            console.log("Redirecting to journal after sign in");
-            navigate('/journal', { replace: true });
-          }
           
           // Process unprocessed journal entries after sign in
           setTimeout(async () => {
@@ -130,14 +94,6 @@ const AuthStateListener = () => {
           email: data.session.user.email,
           expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
         });
-        
-        // First, make sure the user is in the correct page, especially from auth callbacks
-        if (location.pathname === '/404' || 
-            location.pathname.includes('callback') || 
-            location.hash.includes('access_token')) {
-          console.log("Redirecting to journal with initial session");
-          navigate('/journal', { replace: true });
-        }
         
         createOrUpdateSession(data.session.user.id, window.location.pathname)
           .catch(err => {

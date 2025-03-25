@@ -11,6 +11,7 @@ import Auth from "@/pages/Auth";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import AppLayout from "@/components/layout/AppLayout";
 import AuthStateListener from "@/components/auth/AuthStateListener";
+import AuthCallback from "@/components/auth/AuthCallback";
 
 const AppRoutes = () => {
   return (
@@ -19,7 +20,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
-        <Route path="/callback" element={<Auth />} />
+        <Route path="/callback" element={<AuthCallback />} />
         <Route path="/journal" element={
           <ProtectedRoute>
             <Journal />
