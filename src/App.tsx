@@ -40,7 +40,7 @@ const App = () => {
         <TooltipProvider>
           <AuthProvider>
             <Toaster />
-            <Sonner position="top-center" />
+            <Sonner position="top-center" closeButton />
             <ParticleBackground />
             <BrowserRouter>
               <AnimatePresence mode="wait">
@@ -59,9 +59,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, refreshSession } = useAuth();
   const location = useLocation();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshAttempted, setRefreshAttempted] = useState(false);
   
   useEffect(() => {
-    if (!isLoading && !user && !isRefreshing) {
+    // Only attempt a refresh once to avoid redirect loop or multiple refresh attempts
+    if (!isLoading && !user && !isRefreshing && !refreshAttempted) {
       console.log("Protected route: No user found, attempting to refresh session", {
         path: location.pathname
       });
@@ -69,14 +71,16 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       setIsRefreshing(true);
       
       // Try refreshing the session if we don't have a user
-      refreshSession().then(() => {
-        console.log("Session refresh attempt completed");
+      refreshAuthSession(false).then(success => {
+        console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
         setIsRefreshing(false);
+        setRefreshAttempted(true);
       }).catch(() => {
         setIsRefreshing(false);
+        setRefreshAttempted(true);
       });
     }
-  }, [user, isLoading, location, refreshSession, isRefreshing]);
+  }, [user, isLoading, location, refreshSession, isRefreshing, refreshAttempted]);
   
   // Show loading spinner while authentication is being checked
   if (isLoading || isRefreshing) {
@@ -128,7 +132,7 @@ const AppRoutes = () => {
           email: session.user?.email,
           hasAccessToken: !!session.access_token,
           hasRefreshToken: !!session.refresh_token,
-          expiresAt: session.expires_at
+          expiresAt: new Date(session.expires_at! * 1000).toISOString()
         });
       }
     });
@@ -140,15 +144,23 @@ const AppRoutes = () => {
       } else if (data.session) {
         console.log("Initial session present:", {
           userId: data.session.user.id,
-          email: data.session.user.email
+          email: data.session.user.email,
+          expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
+          expiresIn: Math.round((data.session.expires_at * 1000 - Date.now()) / 1000 / 60) + " minutes"
         });
+        
+        // Try to refresh auth session when app loads if expiry is close
+        const timeToExpiry = data.session.expires_at * 1000 - Date.now();
+        const shouldRefresh = timeToExpiry < 30 * 60 * 1000; // Less than 30 minutes remaining
+        
+        if (shouldRefresh) {
+          console.log("Session expiring soon, refreshing...");
+          refreshAuthSession().then(success => {
+            console.log("Auto-refresh session result:", success ? "Success" : "Failed");
+          });
+        }
       } else {
         console.log("No initial session found");
-        
-        // Try to refresh auth session when app loads if no session is found
-        refreshAuthSession().then(success => {
-          console.log("Auto-refresh session result:", success ? "Success" : "Failed");
-        });
       }
     });
     

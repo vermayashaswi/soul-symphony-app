@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { refreshAuthSession } from '@/utils/audio/auth-utils';
 
 type AuthContextType = {
   session: Session | null;
@@ -74,10 +75,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
+    // Set up token refresh interval to keep the session alive
+    // This will prevent token expiration issues
+    const refreshInterval = setInterval(() => {
+      if (session) {
+        // Use the silent refresh (no toasts) for automatic background refreshes
+        refreshAuthSession(false).then(success => {
+          if (!success) {
+            console.warn("Background session refresh failed");
+          }
+        });
+      }
+    }, 10 * 60 * 1000); // Refresh every 10 minutes
+
     return () => {
       subscription.unsubscribe();
+      clearInterval(refreshInterval);
     };
-  }, []);
+  }, [session]);
 
   // Get the correct redirect URL based on environment
   const getRedirectUrl = () => {
@@ -139,23 +154,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Update the refreshSession function to match the Promise<void> return type
+  // Update the refreshSession function to use our improved utility function
   const refreshSession = async (): Promise<void> => {
     try {
       console.log('Manually refreshing session from AuthContext...');
-      const { data, error } = await supabase.auth.refreshSession();
+      // Use the version with toasts for manual refreshes
+      const success = await refreshAuthSession(true);
+      
+      if (!success) {
+        throw new Error("Session refresh failed");
+      }
+      
+      // Re-fetch session to update context state
+      const { data, error } = await supabase.auth.getSession();
       if (error) {
-        console.error('Error refreshing session:', error);
-        toast.error(`Session refresh failed: ${error.message}`);
         throw error;
       }
       
-      console.log('Session refreshed:', data.session?.user?.email);
       setSession(data.session);
       setUser(data.session?.user ?? null);
+      console.log('Session refreshed and updated in context');
     } catch (error: any) {
-      console.error('Error refreshing session:', error);
-      toast.error(`Session refresh failed: ${error.message}`);
+      console.error('Error refreshing session in AuthContext:', error);
+      // Toast already shown by refreshAuthSession
     }
   };
 
