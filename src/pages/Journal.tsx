@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Pause, Play, Trash2, Save, X, Check, Loader2, RefreshCw } from 'lucide-react';
@@ -218,17 +217,6 @@ export default function Journal() {
     }
   };
   
-  const handleProcessAllEmbeddings = async () => {
-    setIsProcessingEmbeddings(true);
-    try {
-      await processAllEmbeddings();
-    } catch (error) {
-      console.error('Error processing embeddings:', error);
-    } finally {
-      setIsProcessingEmbeddings(false);
-    }
-  };
-  
   const formatRecordingTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -411,8 +399,6 @@ export default function Journal() {
           )}
         </div>
       </div>
-      
-      {/* ... keep existing dialog components */}
     </div>
   );
 }
