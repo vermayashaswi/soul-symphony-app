@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export const refreshAuthSession = async (showToasts = true) => {
@@ -47,6 +46,30 @@ export const getCurrentUserId = async () => {
   } catch (error) {
     console.error("Error getting current user ID:", error);
     return null;
+  }
+};
+
+// Verify if the user is authenticated
+export const verifyUserAuthentication = async (showToasts = true) => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error("Error verifying authentication:", error.message);
+      return { isAuthenticated: false, error: error.message };
+    }
+    
+    if (!session) {
+      return { isAuthenticated: false };
+    }
+    
+    return {
+      isAuthenticated: true,
+      user: session.user
+    };
+  } catch (error) {
+    console.error("Exception in verifyUserAuthentication:", error);
+    return { isAuthenticated: false, error: error.message };
   }
 };
 

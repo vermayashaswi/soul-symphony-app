@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { verifyUserAuthentication, getCurrentUserId } from '@/utils/audio/auth-utils';
+import { verifyUserAuthentication } from '@/utils/audio/auth-utils';
 
 export interface Message {
   id: string;
