@@ -143,7 +143,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       const threadTitle = isNewThread ? content.substring(0, 30) + (content.length > 30 ? "..." : "") : undefined;
       
-      const { data, error } = await supabase.functions.invoke('chat-simple', {
+      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: { 
           message: content.trim(),
           userId: currentUserId,

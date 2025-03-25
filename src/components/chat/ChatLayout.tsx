@@ -1,9 +1,5 @@
 
-import { ReactNode } from 'react';
-import Navbar from '@/components/Navbar';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useState, useEffect } from 'react';
+import React, { ReactNode } from 'react';
 
 interface ChatLayoutProps {
   sidebar: ReactNode;
@@ -11,38 +7,13 @@ interface ChatLayoutProps {
 }
 
 export function ChatLayout({ sidebar, content }: ChatLayoutProps) {
-  const isMobile = useIsMobile();
-  const [showSidebar, setShowSidebar] = useState(!isMobile);
-
-  // Handle responsive layout
-  useEffect(() => {
-    setShowSidebar(!isMobile);
-  }, [isMobile]);
-  
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <Navbar />
-      
-      <div className="flex-1 pt-16 flex">
-        <ResizablePanelGroup direction="horizontal" className="w-full h-full">
-          {showSidebar && (
-            <>
-              <ResizablePanel 
-                defaultSize={20} 
-                minSize={15} 
-                maxSize={30}
-                className="bg-background/50 backdrop-blur-sm"
-              >
-                {sidebar}
-              </ResizablePanel>
-              <ResizableHandle />
-            </>
-          )}
-          
-          <ResizablePanel className="bg-background/80 backdrop-blur-md">
-            {content}
-          </ResizablePanel>
-        </ResizablePanelGroup>
+    <div className="flex h-screen max-h-screen overflow-hidden">
+      <div className="w-64 h-full border-r border-border dark:border-border">
+        {sidebar}
+      </div>
+      <div className="flex-1 h-full overflow-hidden">
+        {content}
       </div>
     </div>
   );
