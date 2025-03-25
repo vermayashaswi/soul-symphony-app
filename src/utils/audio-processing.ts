@@ -41,30 +41,55 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       .from('profiles')
       .select('id')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
       
-    if (profileError || !profileData) {
+    if (profileError && profileError.code !== 'PGRST116') {
       console.error('Profile check error:', profileError);
+      toast.error('Error checking user profile. Please try again.');
+      toast.dismiss(tempId);
+      return { success: false, error: 'Error checking user profile' };
+    }
       
-      // If profile doesn't exist, create one
+    // If profile doesn't exist, create one
+    if (!profileData) {
+      console.log('No profile found in audio processing, creating profile for user:', userId);
+      
+      // Get user details from auth
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('Error getting user data:', userError);
+        toast.error('Failed to get user information. Please try again later.');
+        toast.dismiss(tempId);
+        return { success: false, error: 'Failed to get user information' };
+      }
+      
       const { error: insertError } = await supabase
         .from('profiles')
         .insert({ 
           id: userId,
+          email: userData.user.email,
+          full_name: userData.user.user_metadata?.full_name || null,
+          avatar_url: userData.user.user_metadata?.avatar_url || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
         
       if (insertError) {
         console.error('Failed to create profile:', insertError);
-        toast.error('Failed to create user profile. Please try again later.');
-        toast.dismiss(tempId);
-        return { success: false, error: 'Failed to create user profile' };
+        
+        // If duplicate key error, profile probably got created in another process
+        if (insertError.code === '23505') {
+          console.log('Profile creation conflict - profile likely created by another process');
+        } else {
+          toast.error('Failed to create user profile. Please try again later.');
+          toast.dismiss(tempId);
+          return { success: false, error: 'Failed to create user profile' };
+        }
+      } else {
+        console.log('Successfully created profile for user in audio processing:', userId);
       }
-      
-      console.log('Successfully created profile for user:', userId);
     } else {
-      console.log('User profile exists:', profileData);
+      console.log('User profile exists, proceeding with journal entry:', profileData.id);
     }
     
     // Launch the processing without awaiting it
@@ -117,6 +142,44 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       toast.dismiss(toastId);
       toast.error(authStatus.error || 'Authentication failed');
       return;
+    }
+
+    // Check profile existence one more time before sending to transcription
+    const { data: profileCheck, error: profileCheckError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+      
+    if (profileCheckError) {
+      console.error('Final profile check error before transcription:', profileCheckError);
+      if (profileCheckError.code !== 'PGRST116') {
+        toast.dismiss(toastId);
+        toast.error('Error verifying user profile. Please try again.');
+        return;
+      }
+    }
+    
+    if (!profileCheck) {
+      console.log('No profile found in final check before transcription. Attempting one more creation.');
+      // Last attempt to create profile before transcription
+      const { data: userData } = await supabase.auth.getUser();
+      
+      const { error: createError } = await supabase
+        .from('profiles')
+        .insert({ 
+          id: userId,
+          email: userData.user?.email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      if (createError && createError.code !== '23505') {
+        console.error('Final attempt to create profile failed:', createError);
+        toast.dismiss(toastId);
+        toast.error('Unable to create user profile. Please try refreshing the page and trying again.');
+        return;
+      }
     }
 
     // 3. Send audio for transcription and AI analysis

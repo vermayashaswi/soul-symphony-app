@@ -21,12 +21,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [profileCreationInProgress, setProfileCreationInProgress] = useState(false);
 
   // Function to ensure user profile exists
   const ensureUserProfile = async (currentUser: User) => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || profileCreationInProgress) return;
     
     try {
+      setProfileCreationInProgress(true);
       console.log('Checking if profile exists for user:', currentUser.id);
       
       // Check if user already has a profile
@@ -34,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .select('id')
         .eq('id', currentUser.id)
-        .single();
+        .maybeSingle();
         
       if (profileError && profileError.code !== 'PGRST116') {
         console.error('Error checking profile:', profileError);
@@ -58,15 +60,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
         if (insertError) {
           console.error('Failed to create profile:', insertError);
-          toast.error('Failed to create user profile. Please try again.');
+          
+          // If we get a duplicate key error, the profile likely exists but wasn't found
+          if (insertError.code === '23505') { // Unique violation error code
+            console.log('Profile already exists (duplicate key), continuing...');
+          } else {
+            toast.error('Failed to create user profile. Please try again.');
+            throw insertError;
+          }
         } else {
           console.log('Successfully created profile for user:', currentUser.id);
+          toast.success('User profile created successfully');
         }
       } else {
         console.log('User profile exists:', profile.id);
       }
     } catch (err) {
       console.error('Error in profile initialization:', err);
+    } finally {
+      setProfileCreationInProgress(false);
     }
   };
 
