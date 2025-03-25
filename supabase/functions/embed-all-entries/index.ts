@@ -15,26 +15,31 @@ const corsHeaders = {
 };
 
 async function createEmbedding(text: string) {
-  const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      input: text,
-      model: 'text-embedding-ada-002',
-    }),
-  });
+  try {
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        input: text,
+        model: 'text-embedding-ada-002',
+      }),
+    });
 
-  if (!embeddingResponse.ok) {
-    const errorData = await embeddingResponse.json();
-    console.error('OpenAI API error:', errorData);
-    throw new Error(`OpenAI API error: ${JSON.stringify(errorData)}`);
+    if (!embeddingResponse.ok) {
+      const errorData = await embeddingResponse.json();
+      console.error('OpenAI API error:', errorData);
+      throw new Error(`OpenAI API error: ${JSON.stringify(errorData)}`);
+    }
+
+    const embeddingData = await embeddingResponse.json();
+    return embeddingData.data[0].embedding;
+  } catch (error) {
+    console.error('Error creating embedding:', error);
+    throw error;
   }
-
-  const embeddingData = await embeddingResponse.json();
-  return embeddingData.data[0].embedding;
 }
 
 serve(async (req) => {
@@ -44,18 +49,21 @@ serve(async (req) => {
   }
 
   try {
-    const { userId } = await req.json();
-    console.log(`Starting batch embedding for user: ${userId || 'all users'}`);
+    const { userId, entryId } = await req.json();
     
-    // Get entries that need embedding
-    const query = supabase
+    let query = supabase
       .from('Journal Entries')
       .select('id, "refined text", "transcription text"')
       .order('created_at', { ascending: false });
       
     // Filter by user if provided
     if (userId) {
-      query.eq('user_id', userId);
+      query = query.eq('user_id', userId);
+    }
+    
+    // Filter by entry if provided
+    if (entryId) {
+      query = query.eq('id', entryId);
     }
     
     const { data: entries, error: entriesError } = await query;

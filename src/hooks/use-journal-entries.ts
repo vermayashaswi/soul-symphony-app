@@ -19,7 +19,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isProcessingEmbeddings, setIsProcessingEmbeddings] = useState(false);
   const { storeEmbedding } = useTranscription();
 
   const fetchEntries = useCallback(async () => {
@@ -130,11 +129,13 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       // Re-fetch entries to update the list
       await fetchEntries();
       
-      // Generate embedding for the new/updated entry
+      // Automatically generate embedding for the new/updated entry
       const textToEmbed = data["refined text"] || data["transcription text"] || '';
       if (textToEmbed.trim().length > 0) {
         try {
+          console.log('Automatically generating embedding for entry:', data.id);
           await storeEmbedding(data.id, textToEmbed);
+          console.log('Embedding generated successfully');
         } catch (embeddingError) {
           console.error('Error generating embedding:', embeddingError);
           // Don't fail the entire operation if embedding fails
@@ -176,39 +177,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     fetchEntries();
   };
 
-  // Function to batch process embeddings for all entries
-  const processAllEmbeddings = async () => {
-    if (!userId) return;
-    
-    try {
-      toast.info('Starting to process embeddings for all journal entries...');
-      setIsProcessingEmbeddings(true);
-      
-      const { data, error } = await supabase.functions.invoke('embed-all-entries', {
-        body: { userId }
-      });
-      
-      if (error) {
-        console.error('Error processing embeddings:', error);
-        toast.error('Failed to process embeddings');
-        return null;
-      }
-      
-      toast.success(`Successfully processed embeddings for ${data.successCount} entries.`);
-      if (data.errorCount > 0) {
-        toast.warning(`Failed to process ${data.errorCount} entries.`);
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Error invoking embed-all-entries function:', error);
-      toast.error('Failed to process embeddings');
-      throw error;
-    } finally {
-      setIsProcessingEmbeddings(false);
-    }
-  };
-
   // Fetch entries on mount and when dependencies change
   useEffect(() => {
     if (userId) {
@@ -223,8 +191,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     isSaving,
     deleteJournalEntry,
     refreshEntries,
-    processAllEmbeddings,
-    isProcessingEmbeddings,
     journalEntries: entries, // Alias for backward compatibility
     isLoading: loading // Alias for backward compatibility
   };

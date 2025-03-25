@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
 import { useAuth } from '@/contexts/AuthContext';
-import BackendTester from '@/components/BackendTester';
 
 export default function Index() {
   const navigate = useNavigate();
@@ -36,12 +35,6 @@ export default function Index() {
             {user ? 'Go to Journal' : 'Get Started'}
           </Button>
         </div>
-        
-        {user && (
-          <div className="w-full max-w-3xl mt-8">
-            <BackendTester />
-          </div>
-        )}
       </div>
     </div>
   );

@@ -82,27 +82,28 @@ export function useTranscription(): UseTranscriptionReturnType {
   const storeEmbedding = async (journalEntryId: number, text: string) => {
     try {
       setIsStoringEmbedding(true);
+      console.log(`Storing embedding for journal entry ${journalEntryId}`);
       
-      // Call the create-embedding Edge Function
-      const { data, error } = await supabase.functions.invoke('create-embedding', {
-        body: { text, journalEntryId },
+      // Call the embed-all-entries Edge Function with specific entry ID
+      const { data, error } = await supabase.functions.invoke('embed-all-entries', {
+        body: { entryId: journalEntryId },
       });
       
       if (error) {
         console.error('Error creating embedding:', error);
-        toast.error('Failed to create embedding for journal entry');
         throw error;
       }
       
       if (data?.success) {
-        console.log('Embedding stored successfully for journal entry:', journalEntryId);
+        console.log('Embedding stored successfully:', data);
       } else {
-        console.error('No success response from embedding function');
-        toast.error('Failed to index journal entry for search');
+        console.error('No success response from embedding function:', data);
       }
+      
+      return data;
     } catch (error) {
       console.error('Error storing embedding:', error);
-      toast.error('Failed to index journal entry for search');
+      // We don't show an error toast here since this happens in the background
     } finally {
       setIsStoringEmbedding(false);
     }
