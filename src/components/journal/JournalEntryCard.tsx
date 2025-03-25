@@ -56,7 +56,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
             <div>
               <h3 className="font-medium mb-4 flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-amber-500" />
-                Key Themes
+                Soul-ubles
               </h3>
               
               <div className="h-60 mb-4 flex items-center justify-center">
@@ -66,7 +66,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                   entry.emotions && entry.emotions.length > 0 ? (
                     <EmotionBubbles themes={entry.emotions.slice(0, 10)} />
                   ) : (
-                    <p className="text-muted-foreground text-center">Analyzing themes...</p>
+                    <p className="text-muted-foreground text-center">Analyzing emotions...</p>
                   )
                 )}
               </div>

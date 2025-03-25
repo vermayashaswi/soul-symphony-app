@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface EmotionBubblesProps {
   themes: string[];
@@ -14,47 +14,6 @@ interface BubbleProps {
   children: React.ReactNode;
 }
 
-// More accurate emotion to emoji mapping
-const EMOTION_EMOJIS: Record<string, string> = {
-  // Positive emotions
-  joy: '😄',
-  happiness: '😊',
-  love: '❤️',
-  gratitude: '🙏',
-  excitement: '🤩',
-  contentment: '😌',
-  calm: '😌',
-  peaceful: '😇',
-  hope: '🌱',
-  relief: '😮‍💨',
-  pride: '🦚',
-  satisfaction: '👍',
-  
-  // Negative emotions
-  sadness: '😢',
-  anger: '😠',
-  fear: '😨',
-  anxiety: '😰',
-  stress: '😖',
-  disappointment: '😞',
-  frustration: '😤',
-  grief: '😭',
-  shame: '😳',
-  guilt: '😔',
-  jealousy: '😒',
-  regret: '😕',
-  
-  // Neutral or mixed emotions
-  surprise: '😲',
-  confusion: '🤔',
-  curiosity: '🧐',
-  nostalgia: '🕰️',
-  boredom: '😴',
-  anticipation: '👀',
-  awe: '😮',
-  ambivalence: '😐'
-};
-
 const getRandomValue = (min: number, max: number) => {
   return Math.random() * (max - min) + min;
 };
@@ -65,8 +24,8 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
       className="absolute flex items-center justify-center"
       initial={{ x, y, opacity: 0, scale: 0 }}
       animate={{ 
-        x: [x, x + getRandomValue(-5, 5)], 
-        y: [y, y - getRandomValue(3, 7)],
+        x: [x, x + getRandomValue(-10, 10)], 
+        y: [y, y - getRandomValue(5, 15)],
         opacity: [0, 1, 0.9],
         scale: [0, 1, 0.95]
       }}
@@ -76,13 +35,19 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
         repeat: Infinity,
         repeatType: "reverse"
       }}
+      whileHover={{ 
+        scale: 1.2, 
+        zIndex: 10,
+        boxShadow: "0px 5px 15px rgba(0, 0, 0, 0.1)" 
+      }}
     >
-      <div 
-        className="rounded-full bg-gradient-to-br from-primary/70 to-primary/20 flex items-center justify-center p-1 shadow-sm"
+      <motion.div 
+        className="rounded-full bg-gradient-to-br from-primary/70 to-primary/20 flex items-center justify-center p-1 shadow-sm cursor-pointer"
         style={{ width: `${size}px`, height: `${size}px` }}
+        whileTap={{ scale: 0.9 }}
       >
         {children}
-      </div>
+      </motion.div>
     </motion.div>
   );
 };
@@ -95,16 +60,11 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
     y: number;
     size: number;
     delay: number;
-    emoji: string;
   }>>([]);
   
   useEffect(() => {
     // Generate bubbles with a wider and more organized distribution
     const newBubbles = themes.slice(0, 10).map((theme, index) => {
-      // Get the appropriate emoji based on the theme
-      const normalizedTheme = theme.toLowerCase().trim();
-      const emoji = EMOTION_EMOJIS[normalizedTheme] || '';
-      
       // Use a circular arrangement with full 360 degree coverage
       // This gives better separation between bubbles
       const angle = (index / Math.min(themes.length, 10)) * 2 * Math.PI;
@@ -135,7 +95,6 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
         y,
         size: Math.max(size, 40), // Ensure minimum bubble size
         delay: index * 0.1, // Quicker appearance for all bubbles
-        emoji
       };
     });
     
@@ -144,19 +103,21 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
   
   return (
     <div className="relative w-full h-full overflow-visible">
-      {bubbles.map((bubble) => (
-        <Bubble
-          key={bubble.id}
-          x={bubble.x}
-          y={bubble.y}
-          size={bubble.size}
-          delay={bubble.delay}
-        >
-          <div className="flex flex-col items-center justify-center text-center">
-            <span className="text-sm font-semibold text-primary-foreground">{bubble.theme}</span>
-          </div>
-        </Bubble>
-      ))}
+      <AnimatePresence>
+        {bubbles.map((bubble) => (
+          <Bubble
+            key={bubble.id}
+            x={bubble.x}
+            y={bubble.y}
+            size={bubble.size}
+            delay={bubble.delay}
+          >
+            <div className="flex flex-col items-center justify-center text-center">
+              <span className="text-sm font-semibold text-primary-foreground">{bubble.theme}</span>
+            </div>
+          </Bubble>
+        ))}
+      </AnimatePresence>
     </div>
   );
 };
