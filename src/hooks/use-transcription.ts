@@ -40,9 +40,9 @@ export function useTranscription(): UseTranscriptionReturnType {
         throw error;
       }
       
-      if (data?.text) {
-        setTranscription(data.text);
-        toast.success('Audio transcribed successfully');
+      if (data?.transcription) {
+        setTranscription(data.transcription);
+        toast.success('Audio processing complete');
       } else {
         toast.error('No transcription returned');
       }
@@ -54,29 +54,22 @@ export function useTranscription(): UseTranscriptionReturnType {
     }
   };
 
+  // Simplified refineTranscription function without AI analysis
   const refineTranscription = async (text: string) => {
     try {
       setIsRefiningTranscription(true);
       
-      // Call the Supabase Edge Function to analyze sentiment and refine text
-      const { data, error } = await supabase.functions.invoke('analyze-sentiment', {
-        body: { text }
-      });
+      // Simply set the refined text to be the same as the input text
+      setRefinedText(text);
       
-      if (error) {
-        console.error('Error refining transcription:', error);
-        toast.error('Failed to analyze your journal entry');
-        throw error;
-      }
+      // Set empty emotions array
+      setEmotions([]);
       
-      if (data) {
-        setRefinedText(data.refinedText || null);
-        setEmotions(data.emotions || null);
-        toast.success('Journal entry refined with AI');
-      }
+      toast.success('Journal entry saved');
+      
     } catch (error) {
-      console.error('Error refining transcription:', error);
-      toast.error('Failed to analyze your journal entry');
+      console.error('Error saving transcription:', error);
+      toast.error('Failed to save your journal entry');
     } finally {
       setIsRefiningTranscription(false);
     }

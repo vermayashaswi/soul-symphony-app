@@ -139,39 +139,65 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     setShowWelcome(false);
     
     try {
-      console.log("Sending message to chat function with userId:", currentUserId);
+      // Simple placeholder response without RAG functionality
+      const placeholderResponse = "I'm a basic assistant without access to your journal entries yet. The RAG functionality has been removed and will be reimplemented. In the meantime, I can still chat with you about general wellness topics.";
       
-      const threadTitle = isNewThread ? content.substring(0, 30) + (content.length > 30 ? "..." : "") : undefined;
+      // Simulate a delay for the response
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-        body: { 
-          message: content.trim(),
-          userId: currentUserId,
-          threadId: threadId,
-          isNewThread: isNewThread,
-          threadTitle: threadTitle
+      // Determine thread ID for new threads
+      let currentThreadId = threadId;
+      if (isNewThread) {
+        // Create a basic thread title from the message
+        const title = content.substring(0, 30) + (content.length > 30 ? "..." : "");
+        
+        // Create a new thread
+        const { data: newThread, error } = await supabase
+          .from('chat_threads')
+          .insert({
+            user_id: currentUserId,
+            title: title
+          })
+          .select('id')
+          .single();
+          
+        if (error) {
+          console.error("Error creating new thread:", error);
+          throw error;
         }
-      });
-      
-      if (error) {
-        console.error('Error calling chat function:', error);
-        toast.error('Failed to get a response. Please try again.');
-        setIsLoading(false);
-        return;
+        
+        currentThreadId = newThread.id;
+        onNewThreadCreated(currentThreadId);
       }
       
-      console.log("Received response from chat function:", data);
+      // Store user message
+      if (currentThreadId) {
+        await supabase
+          .from('chat_messages')
+          .insert({
+            thread_id: currentThreadId,
+            content: content.trim(),
+            sender: 'user'
+          });
+      }
       
-      if (isNewThread && data.threadId) {
-        console.log("New thread created with ID:", data.threadId);
-        onNewThreadCreated(data.threadId);
+      // Store assistant response
+      if (currentThreadId) {
+        await supabase
+          .from('chat_messages')
+          .insert({
+            thread_id: currentThreadId,
+            content: placeholderResponse,
+            sender: 'assistant'
+          });
       }
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: data.response || "I'm sorry, I couldn't process your request at the moment.",
+        content: placeholderResponse,
         sender: 'assistant' as const,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        thread_id: currentThreadId
       };
       
       setMessages(prev => [...prev, assistantMessage]);
