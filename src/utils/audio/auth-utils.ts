@@ -58,15 +58,23 @@ export async function getJournalEntryEmbeddingStatus() {
       
     if (entriesError) throw entriesError;
     
+    // First get the IDs of user's journal entries
+    const { data: entryIds, error: idsError } = await supabase
+      .from('Journal Entries')
+      .select('id')
+      .eq('user_id', userId);
+      
+    if (idsError) throw idsError;
+    
+    if (!entryIds || entryIds.length === 0) {
+      return { totalEntries: 0, embeddedEntries: 0, error: null };
+    }
+    
     // Get entries with embeddings
     const { count: embeddedEntries, error: embeddingsError } = await supabase
       .from('journal_embeddings')
       .select('journal_entry_id', { count: 'exact', head: true })
-      .in('journal_entry_id', 
-        supabase.from('Journal Entries')
-          .select('id')
-          .eq('user_id', userId)
-      );
+      .in('journal_entry_id', entryIds.map(entry => entry.id));
       
     if (embeddingsError) throw embeddingsError;
     
