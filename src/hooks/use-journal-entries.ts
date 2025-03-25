@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/types/journal';
+import { useTranscription } from './use-transcription';
 
 interface JournalEntryInput {
   id?: number;
@@ -18,6 +19,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const { storeEmbedding } = useTranscription();
 
   const fetchEntries = useCallback(async () => {
     if (!userId) return;
@@ -126,6 +128,17 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       // Re-fetch entries to update the list
       await fetchEntries();
+      
+      // Generate embedding for the new/updated entry
+      const textToEmbed = data["refined text"] || data["transcription text"] || '';
+      if (textToEmbed.trim().length > 0) {
+        try {
+          await storeEmbedding(data.id, textToEmbed);
+        } catch (embeddingError) {
+          console.error('Error generating embedding:', embeddingError);
+          // Don't fail the entire operation if embedding fails
+        }
+      }
       
       return data;
     } catch (error) {

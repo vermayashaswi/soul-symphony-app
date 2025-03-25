@@ -146,21 +146,18 @@ export type Database = {
         Row: {
           content: string
           created_at: string | null
-          embedding: string
           id: number
           journal_entry_id: number | null
         }
         Insert: {
           content: string
           created_at?: string | null
-          embedding: string
           id?: number
           journal_entry_id?: number | null
         }
         Update: {
           content?: string
           created_at?: string | null
-          embedding?: string
           id?: number
           journal_entry_id?: number | null
         }
@@ -225,7 +222,6 @@ export type Database = {
       user_queries: {
         Row: {
           created_at: string
-          embedding: string | null
           id: string
           message_id: string | null
           query_text: string
@@ -234,7 +230,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          embedding?: string | null
           id?: string
           message_id?: string | null
           query_text: string
@@ -243,7 +238,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          embedding?: string | null
           id?: string
           message_id?: string | null
           query_text?: string

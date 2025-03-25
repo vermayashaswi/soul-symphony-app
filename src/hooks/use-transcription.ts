@@ -12,6 +12,8 @@ interface UseTranscriptionReturnType {
   emotions: string[] | null;
   refineTranscription: (text: string) => Promise<void>;
   isRefiningTranscription: boolean;
+  storeEmbedding: (journalEntryId: number, text: string) => Promise<void>;
+  isStoringEmbedding: boolean;
 }
 
 export function useTranscription(): UseTranscriptionReturnType {
@@ -20,6 +22,7 @@ export function useTranscription(): UseTranscriptionReturnType {
   const [refinedText, setRefinedText] = useState<string | null>(null);
   const [emotions, setEmotions] = useState<string[] | null>(null);
   const [isRefiningTranscription, setIsRefiningTranscription] = useState(false);
+  const [isStoringEmbedding, setIsStoringEmbedding] = useState(false);
 
   const transcribeAudio = async (audioBlob: Blob) => {
     try {
@@ -75,6 +78,37 @@ export function useTranscription(): UseTranscriptionReturnType {
     }
   };
 
+  // New function to store embeddings in the journal_embeddings table
+  const storeEmbedding = async (journalEntryId: number, text: string) => {
+    try {
+      setIsStoringEmbedding(true);
+      
+      // Call the OpenAI embeddings API through a Supabase Edge Function
+      const { data, error } = await supabase.functions.invoke('create-embedding', {
+        body: { text, journalEntryId },
+      });
+      
+      if (error) {
+        console.error('Error creating embedding:', error);
+        toast.error('Failed to create embedding for journal entry');
+        throw error;
+      }
+      
+      if (data?.success) {
+        console.log('Embedding stored successfully for journal entry:', journalEntryId);
+        toast.success('Journal entry indexed for search');
+      } else {
+        console.error('No success response from embedding function');
+        toast.error('Failed to index journal entry for search');
+      }
+    } catch (error) {
+      console.error('Error storing embedding:', error);
+      toast.error('Failed to index journal entry for search');
+    } finally {
+      setIsStoringEmbedding(false);
+    }
+  };
+
   const resetTranscription = () => {
     setTranscription(null);
     setRefinedText(null);
@@ -89,6 +123,8 @@ export function useTranscription(): UseTranscriptionReturnType {
     refinedText,
     emotions,
     refineTranscription,
-    isRefiningTranscription
+    isRefiningTranscription,
+    storeEmbedding,
+    isStoringEmbedding
   };
 }
