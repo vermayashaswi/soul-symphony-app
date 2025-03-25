@@ -4,10 +4,28 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEffect, useState } from 'react';
 
 export default function Index() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Add a timeout to prevent infinite loading state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAuthChecked(true);
+    }, 3000); // 3 second timeout
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Mark as checked once we have definitive auth state
+  useEffect(() => {
+    if (!isLoading) {
+      setAuthChecked(true);
+    }
+  }, [isLoading]);
 
   const handleGetStarted = () => {
     if (user) {
@@ -60,7 +78,7 @@ export default function Index() {
             Explore your thoughts, track your emotions, and gain valuable insights with AI-powered VOICE journaling
           </p>
           
-          {isLoading ? (
+          {isLoading && !authChecked ? (
             <Button size="lg" disabled className="text-lg px-8 py-6">
               <span className="animate-pulse">Loading...</span>
             </Button>

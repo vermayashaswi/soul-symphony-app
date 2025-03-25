@@ -56,8 +56,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
   const [refreshAttempted, setRefreshAttempted] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
   
   useEffect(() => {
+    // Only attempt to refresh once
     if (!isLoading && !user && !refreshAttempted) {
       console.log("Protected route: No user found, attempting to refresh session", {
         path: location.pathname
@@ -66,26 +68,28 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       refreshAuthSession(false).then(success => {
         console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
         setRefreshAttempted(true);
+        setSessionChecked(true);
       }).catch(() => {
         setRefreshAttempted(true);
+        setSessionChecked(true);
       });
+    } else if (!refreshAttempted && (user || isLoading)) {
+      // Mark as checked if we have a user or still loading
+      setSessionChecked(true);
     }
     
-    // Track session when user accesses a protected route
+    // Track session when user accesses a protected route - but don't block rendering on this
     if (user && !isLoading) {
       createOrUpdateSession(user.id, location.pathname)
-        .then(result => {
-          if (result.isNew) {
-            console.log("New session created for user:", user.id);
-          }
-        })
         .catch(err => {
           console.error("Error tracking session:", err);
+          // Don't block the app flow on session tracking errors
         });
     }
   }, [user, isLoading, location, refreshAttempted]);
   
-  if (isLoading && !refreshAttempted) {
+  // Show loading state only while doing initial check
+  if (isLoading && !sessionChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -93,15 +97,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
+  // Once check is done, either show content or redirect
   if (user) {
     return <>{children}</>;
   }
   
-  if (refreshAttempted || !isLoading) {
+  if (sessionChecked) {
     console.log("Redirecting to auth from protected route:", location.pathname);
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
+  // Fallback loading state
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -132,36 +138,23 @@ const AppRoutes = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth event outside React context:", event, session?.user?.email);
       
-      // Track session events
+      // Track session events - but don't block rendering on this
       if (event === 'SIGNED_IN' && session?.user) {
         createOrUpdateSession(session.user.id, window.location.pathname)
-          .then(result => {
-            console.log("Session created on sign in:", result);
-          })
           .catch(err => {
             console.error("Error creating session on sign in:", err);
+            // Don't block the app flow on session tracking errors
           });
       } else if (event === 'SIGNED_OUT' && user) {
         endUserSession(user.id)
-          .then(success => {
-            console.log("Session ended on sign out:", success);
-          })
           .catch(err => {
             console.error("Error ending session on sign out:", err);
+            // Don't block the app flow on session tracking errors
           });
-      }
-      
-      if (session) {
-        console.log("User authentication details:", {
-          id: session.user?.id,
-          email: session.user?.email,
-          hasAccessToken: !!session.access_token,
-          hasRefreshToken: !!session.refresh_token,
-          expiresAt: new Date(session.expires_at! * 1000).toISOString()
-        });
       }
     });
     
+    // Only do initial session checks once at startup - don't refresh on every route change
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) {
         console.error("Initial session check error:", error);
@@ -173,25 +166,13 @@ const AppRoutes = () => {
           expiresIn: Math.round((data.session.expires_at * 1000 - Date.now()) / 1000 / 60) + " minutes"
         });
         
-        // Create or update session for initial session
+        // Create or update session for initial session - but don't block rendering on this
         if (data.session.user.id) {
           createOrUpdateSession(data.session.user.id, window.location.pathname)
-            .then(result => {
-              console.log("Session tracking result on initial load:", result);
-            })
             .catch(err => {
               console.error("Error tracking session on initial load:", err);
+              // Don't block the app flow on session tracking errors
             });
-        }
-        
-        const timeToExpiry = data.session.expires_at * 1000 - Date.now();
-        const shouldRefresh = timeToExpiry < 30 * 60 * 1000;
-        
-        if (shouldRefresh) {
-          console.log("Session expiring soon, refreshing...");
-          refreshAuthSession().then(success => {
-            console.log("Auto-refresh session result:", success ? "Success" : "Failed");
-          });
         }
       } else {
         console.log("No initial session found");
@@ -202,23 +183,6 @@ const AppRoutes = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [user]);
-  
-  // Set up page view tracking
-  useEffect(() => {
-    if (user) {
-      const handlePageChange = () => {
-        createOrUpdateSession(user.id, window.location.pathname)
-          .catch(err => console.error("Error updating session on page change:", err));
-      };
-      
-      // Add event listener for route changes
-      window.addEventListener('popstate', handlePageChange);
-      
-      return () => {
-        window.removeEventListener('popstate', handlePageChange);
-      };
-    }
   }, [user]);
   
   return (

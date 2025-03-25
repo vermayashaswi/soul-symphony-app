@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export const refreshAuthSession = async (showToasts = true) => {
@@ -18,9 +17,10 @@ export const refreshAuthSession = async (showToasts = true) => {
     if (data.session) {
       // Update the session's last activity
       await updateSessionActivity(data.session.user.id);
+      return true;
     }
     
-    return !!data.session;
+    return false;
   } catch (error: any) {
     console.error("Exception in refreshAuthSession:", error?.message || error);
     return false;
@@ -147,6 +147,12 @@ export const createOrUpdateSession = async (userId: string, entryPage = '/') => 
       
       if (insertError) {
         console.error('Error creating session:', insertError);
+        // Check if it's a permissions error - this could be an auth state mismatch
+        if (insertError.message.includes('permission') || insertError.message.includes('JWTClaimsSetVerificationException')) {
+          console.warn('Permission error on session creation - possibly auth state mismatch');
+          // Return success to avoid blocking the app
+          return { success: true, isNew: false };
+        }
         return { success: false, error: insertError.message };
       }
       
@@ -154,7 +160,8 @@ export const createOrUpdateSession = async (userId: string, entryPage = '/') => 
     }
   } catch (error: any) {
     console.error('Exception in createOrUpdateSession:', error?.message || error);
-    return { success: false, error: error?.message || 'Unknown error' };
+    // Don't block the app flow on session tracking errors
+    return { success: true, error: error?.message, isNew: false };
   }
 };
 
