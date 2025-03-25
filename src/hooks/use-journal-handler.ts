@@ -1,3 +1,4 @@
+
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useJournalEntries } from './use-journal-entries';
@@ -35,11 +36,7 @@ export function useJournalHandler(userId: string | undefined) {
 
   const testJournalRetrieval = async () => {
     if (!userId) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to test journal retrieval",
-        variant: "destructive"
-      });
+      toast.error("Authentication required. Please sign in to test journal retrieval");
       return { success: false, message: "Authentication required" };
     }
 
@@ -56,11 +53,7 @@ export function useJournalHandler(userId: string | undefined) {
         
       if (entriesError) {
         console.error('Test failed - Error fetching journal entries:', entriesError);
-        toast({
-          title: "Backend test failed",
-          description: `Error: ${entriesError.message}`,
-          variant: "destructive"
-        });
+        toast.error(`Backend test failed: ${entriesError.message}`);
         return { success: false, message: entriesError.message };
       }
       
@@ -89,15 +82,13 @@ export function useJournalHandler(userId: string | undefined) {
       }
       
       const resultMessage = `Found ${entriesData?.length || 0} journal entries. ${
-        embeddingResults ? `Embedding search returned ${embeddingResults.results?.length || 0} results.` : 'Embedding search was not tested.'
+        embeddingResults ? `Embedding search returned ${embeddingResults.results?.length ||
+0} results.` : 'Embedding search was not tested.'
       }`;
       
       console.log('Backend test results:', resultMessage);
       
-      toast({
-        title: "Backend test completed",
-        description: resultMessage
-      });
+      toast.success(`Backend test completed: ${resultMessage}`);
       
       return { 
         success: true, 
@@ -107,11 +98,7 @@ export function useJournalHandler(userId: string | undefined) {
       };
     } catch (error) {
       console.error('Unexpected error during backend test:', error);
-      toast({
-        title: "Backend test failed",
-        description: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-        variant: "destructive"
-      });
+      toast.error(`Backend test failed: ${error instanceof Error ? error.message : String(error)}`);
       return { success: false, message: String(error) };
     } finally {
       setIsTestingBackend(false);
