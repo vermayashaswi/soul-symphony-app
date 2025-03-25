@@ -1,55 +1,48 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import Navbar from '@/components/Navbar';
+import ParticleBackground from '@/components/ParticleBackground';
+import { useAuth } from '@/contexts/AuthContext';
 import BackendTester from '@/components/BackendTester';
 
 export default function Index() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/journal');
+    } else {
+      navigate('/auth');
+    }
+  };
+
   return (
-    <div className="container py-8 max-w-6xl">
-      <section className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight">Welcome to Your Personal Journal</h1>
-        <p className="text-muted-foreground mt-4">
-          Capture your thoughts, track your emotions, and gain insights into your inner world.
-        </p>
-      </section>
-
-      <section className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="p-6 rounded-lg shadow-md">
-          <h2 className="text-2xl font-semibold mb-4">Start Journaling</h2>
-          <p className="text-muted-foreground mb-6">
-            Begin your journey of self-discovery by creating your first journal entry.
-          </p>
-          <Link to="/journal">
-            <Button className="w-full">
-              Go to Journal <ArrowRight className="ml-2" />
-            </Button>
-          </Link>
-        </div>
-
-        <div className="p-6 rounded-lg shadow-md">
-          <h2 className="text-2xl font-semibold mb-4">Explore Insights</h2>
-          <p className="text-muted-foreground mb-6">
-            Uncover patterns and trends in your journal entries to better understand yourself.
-          </p>
-          <Link to="/insights">
-            <Button className="w-full">
-              View Insights <ArrowRight className="ml-2" />
-            </Button>
-          </Link>
-        </div>
-      </section>
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      <ParticleBackground />
+      <Navbar />
       
-      <section className="my-12">
-        <h2 className="text-3xl font-bold tracking-tight mb-6">Backend Connection Tests</h2>
-        <BackendTester />
-      </section>
-
-      <footer className="text-center mt-12">
-        <p className="text-muted-foreground">
-          © {new Date().getFullYear()} Your Journal. All rights reserved.
-        </p>
-      </footer>
+      <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 relative z-10">
+        <div className="max-w-3xl w-full text-center mb-10">
+          <h1 className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500 mb-4">
+            Welcome to Feelosophy
+          </h1>
+          <p className="text-lg md:text-xl text-muted-foreground mb-8">
+            Explore your thoughts, track your emotions, and gain valuable insights with AI-powered journaling
+          </p>
+          <Button size="lg" onClick={handleGetStarted} className="text-lg px-8 py-6">
+            {user ? 'Go to Journal' : 'Get Started'}
+          </Button>
+        </div>
+        
+        {user && (
+          <div className="w-full max-w-3xl mt-8">
+            <BackendTester />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

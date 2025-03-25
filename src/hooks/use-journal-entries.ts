@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -190,16 +191,19 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       if (error) {
         console.error('Error processing embeddings:', error);
         toast.error('Failed to process embeddings');
-        return;
+        return null;
       }
       
       toast.success(`Successfully processed embeddings for ${data.successCount} entries.`);
       if (data.errorCount > 0) {
         toast.warning(`Failed to process ${data.errorCount} entries.`);
       }
+      
+      return data;
     } catch (error) {
       console.error('Error invoking embed-all-entries function:', error);
       toast.error('Failed to process embeddings');
+      throw error;
     } finally {
       setIsProcessingEmbeddings(false);
     }
