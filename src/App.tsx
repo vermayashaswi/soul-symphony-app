@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { AnimatePresence } from "framer-motion";
 import Index from "./pages/Index";
 import Journal from "./pages/Journal";
+import Record from "./pages/Record";
 import Insights from "./pages/Insights";
 import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
@@ -139,6 +141,11 @@ const AppRoutes = () => {
         <Route path="/journal" element={
           <ProtectedRoute>
             <Journal />
+          </ProtectedRoute>
+        } />
+        <Route path="/record" element={
+          <ProtectedRoute>
+            <Record />
           </ProtectedRoute>
         } />
         <Route path="/insights" element={

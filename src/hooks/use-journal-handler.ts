@@ -9,7 +9,7 @@ export function useJournalHandler(userId: string | undefined) {
   const [isProcessingUnprocessedEntries, setIsProcessingUnprocessedEntries] = useState(false);
 
   const handleCreateJournal = () => {
-    // Navigate to the record tab or show the journal creation dialog
+    // Navigate to the record page
     navigate('/record');
   };
 
