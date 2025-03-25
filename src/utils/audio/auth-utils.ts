@@ -1,154 +1,172 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+let refreshInProgress = false;
 
 /**
- * Verifies that the user is authenticated
+ * Checks if the current user is authenticated
+ * @param showToast Whether to show a toast message if not authenticated
+ * @returns Object with authentication status and user information
  */
-export async function verifyUserAuthentication() {
+export async function verifyUserAuthentication(showToast = true): Promise<{
+  isAuthenticated: boolean;
+  user?: any;
+  error?: string;
+}> {
   try {
-    console.log("Verifying user authentication...");
-    const { data, error } = await supabase.auth.getSession();
+    const { data, error } = await supabase.auth.getUser();
     
     if (error) {
-      console.error('Auth session error:', error);
-      return { 
-        isAuthenticated: false, 
-        error: `Authentication error: ${error.message}` 
-      };
+      console.error('Auth error:', error);
+      if (showToast) {
+        toast.error('Authentication error. Please sign in again.');
+      }
+      return { isAuthenticated: false, error: error.message };
     }
     
-    if (!data.session) {
-      console.log('No session found in auth-utils verification');
-      return { isAuthenticated: false, error: 'User is not authenticated' };
+    if (!data.user) {
+      if (showToast) {
+        toast.error('Authentication required. Please sign in.');
+      }
+      return { isAuthenticated: false, error: 'No authenticated user found' };
     }
     
-    console.log("User authenticated successfully:", data.session.user.id);
-    return { isAuthenticated: true, userId: data.session.user.id };
+    return { isAuthenticated: true, user: data.user };
   } catch (error: any) {
-    console.error('Unexpected authentication error:', error);
-    return { 
-      isAuthenticated: false, 
-      error: `Unexpected authentication error: ${error.message}` 
-    };
+    console.error('Error verifying authentication:', error);
+    if (showToast) {
+      toast.error('Authentication error. Please try again.');
+    }
+    return { isAuthenticated: false, error: error.message || 'Authentication check failed' };
   }
 }
 
 /**
- * Gets the current user ID from the session
- * Returns undefined if no user is authenticated
+ * Ensures that the current user has a profile
+ * @param userId The ID of the user to check
+ * @returns Success status and error message if applicable
  */
-export async function getCurrentUserId(): Promise<string | undefined> {
-  try {
-    console.log("Getting current user ID...");
-    const { data, error } = await supabase.auth.getSession();
-    
-    if (error) {
-      console.error('Error getting user ID:', error);
-      return undefined;
-    }
-    
-    if (!data.session) {
-      console.log('No session found when getting user ID');
-      return undefined;
-    }
-    
-    console.log("Retrieved user ID:", data.session.user.id);
-    return data.session.user.id;
-  } catch (error: any) {
-    console.error('Unexpected error getting user ID:', error);
-    return undefined;
+export async function ensureUserProfile(userId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  if (!userId) {
+    return { success: false, error: 'No user ID provided' };
   }
-}
-
-/**
- * Force refreshes the current session
- * Useful for cases where the session state might be outdated
- * 
- * This version implements retry logic and silent failures to prevent
- * annoying error messages when refresh attempts fail in the background
- */
-export async function refreshAuthSession(showToasts: boolean = false): Promise<boolean> {
-  let retryCount = 0;
-  const maxRetries = 3;
-  let lastError = null;
   
-  async function attemptRefresh(): Promise<boolean> {
-    try {
-      console.log(`Attempting to refresh auth session... (attempt ${retryCount + 1}/${maxRetries + 1})`);
+  try {
+    // Check if profile exists
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
       
-      const { data, error } = await supabase.auth.refreshSession();
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error('Profile check error:', profileError);
+      return { success: false, error: `Error checking profile: ${profileError.message}` };
+    }
+    
+    // If profile exists, return success
+    if (profileData) {
+      console.log('User profile exists:', profileData.id);
+      return { success: true };
+    }
+    
+    // Profile doesn't exist, create one
+    console.log('No profile found, creating profile for user:', userId);
+    
+    // Get user details from auth
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('Error getting user data:', userError);
+      return { success: false, error: `Failed to get user information: ${userError.message}` };
+    }
+    
+    if (!userData.user) {
+      return { success: false, error: 'User not found' };
+    }
+    
+    // Extract user information
+    const email = userData.user.email;
+    const fullName = userData.user.user_metadata?.full_name || null;
+    const avatarUrl = userData.user.user_metadata?.avatar_url || null;
+    
+    // Insert profile with retry logic for concurrent creation
+    const { error: insertError } = await supabase
+      .from('profiles')
+      .insert({ 
+        id: userId,
+        email: email,
+        full_name: fullName,
+        avatar_url: avatarUrl,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
       
-      if (error) {
-        lastError = error;
-        console.error('Error refreshing session:', error);
-        
-        // Only show toast on explicit refresh requests, not background ones
-        if (showToasts) {
-          toast.error(`Session refresh failed: ${error.message}`);
-        }
-        
-        // If error is retriable and we haven't exceeded retries
-        if (retryCount < maxRetries && 
-            (error.message.includes('network') || 
-             error.message.includes('timeout') ||
-             error.message.includes('rate limit') ||
-             error.message.includes('auth'))) {
-          retryCount++;
-          // Wait with exponential backoff before retrying
-          const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
-          console.log(`Retrying session refresh in ${delay}ms...`);
-          
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return attemptRefresh();
-        }
-        
-        return false;
+    if (insertError) {
+      // If duplicate key error, profile was created in another process
+      if (insertError.code === '23505') {
+        console.log('Profile already exists (created by another process)');
+        return { success: true };
       }
       
-      console.log("Session refreshed successfully:", !!data.session);
-      
-      if (data.session) {
-        console.log("User info after refresh:", {
-          id: data.session.user.id,
-          email: data.session.user.email
-        });
-        
-        if (showToasts) {
-          toast.success("Session refreshed successfully");
-        }
-      }
-      
-      return !!data.session;
-    } catch (error: any) {
-      lastError = error;
-      console.error('Unexpected error refreshing session:', error);
-      
-      // Only show toast on explicit refresh requests
-      if (showToasts) {
-        toast.error(`Unexpected error refreshing session: ${error.message}`);
-      }
-      
-      // Try retrying on unexpected errors too
-      if (retryCount < maxRetries) {
-        retryCount++;
-        const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
-        console.log(`Retrying after error in ${delay}ms...`);
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return attemptRefresh();
-      }
-      
+      console.error('Failed to create profile:', insertError);
+      return { success: false, error: `Failed to create profile: ${insertError.message}` };
+    }
+    
+    console.log('Successfully created profile for user:', userId);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error in ensureUserProfile:', error);
+    return { success: false, error: error.message || 'Unknown error ensuring user profile' };
+  }
+}
+
+/**
+ * Refreshes the auth session and updates the session state
+ * @param showToast Whether to show toast messages
+ * @returns Whether the refresh was successful
+ */
+export async function refreshAuthSession(showToast = true): Promise<boolean> {
+  if (refreshInProgress) {
+    console.log('Session refresh already in progress, skipping...');
+    return false;
+  }
+  
+  refreshInProgress = true;
+  
+  try {
+    console.log('Refreshing auth session...');
+    
+    const { data, error } = await supabase.auth.refreshSession();
+    
+    if (error) {
+      console.error('Session refresh error:', error);
+      refreshInProgress = false;
       return false;
     }
+    
+    if (!data.session) {
+      console.log('No session after refresh attempt');
+      refreshInProgress = false;
+      return false;
+    }
+    
+    console.log('Session refreshed successfully, expires:', 
+                new Date(data.session.expires_at * 1000).toISOString());
+    
+    // Ensure user profile exists
+    if (data.user) {
+      await ensureUserProfile(data.user.id);
+    }
+    
+    refreshInProgress = false;
+    return true;
+  } catch (error) {
+    console.error('Error in refreshAuthSession:', error);
+    refreshInProgress = false;
+    return false;
   }
-  
-  const result = await attemptRefresh();
-  
-  // If all retries failed and we're in silent mode, log a summary but don't toast
-  if (!result && !showToasts && lastError) {
-    console.warn(`Session refresh failed after ${retryCount + 1} attempts. Last error: ${lastError.message}`);
-  }
-  
-  return result;
 }
