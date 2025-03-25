@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +23,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [lastRetryTime, setLastRetryTime] = useState<number>(0);
+  const [lastRefreshToastId, setLastRefreshToastId] = useState<string | null>(null);
   const { storeEmbedding } = useTranscription();
 
   const MAX_RETRY_ATTEMPTS = 3;
@@ -249,7 +249,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  const refreshEntries = async () => {
+  const refreshEntries = async (showToast = true) => {
     try {
       // Prevent rapid successive refreshes
       const now = Date.now();
@@ -261,7 +261,23 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLastRetryTime(now);
       setIsRetrying(true);
       await fetchEntries();
-      toast.success('Journal entries refreshed');
+      
+      // Only show toast when explicitly asked and not during auto-refresh operations
+      if (showToast) {
+        // Dismiss any existing refresh toast before showing a new one
+        if (lastRefreshToastId) {
+          toast.dismiss(lastRefreshToastId);
+        }
+        
+        // Use a unique but predictable ID for the toast
+        const toastId = `journal-refresh-${Date.now()}`;
+        setLastRefreshToastId(toastId);
+        
+        toast.success('Journal entries refreshed', {
+          id: toastId,
+          dismissible: true,
+        });
+      }
     } catch (error) {
       console.error('Error in manual refresh:', error);
       toast.error('Failed to refresh entries. Please try again.', {

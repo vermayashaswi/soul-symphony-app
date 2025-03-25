@@ -1,3 +1,4 @@
+
 import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
 
@@ -21,6 +22,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
         },
       }}
+      // Add limit to prevent toast overload and richColors for better visibility
+      richColors
+      closeButton
+      limit={3}
       {...props}
     />
   )

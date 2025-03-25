@@ -59,7 +59,8 @@ export default function Journal() {
     
     setIsRefreshing(true);
     try {
-      await refreshEntries();
+      // Pass true to show a toast notification for manual refresh
+      await refreshEntries(true);
       // After refresh, clear any processing entries that might have been completed
       setProcessingEntries([]);
       setRefreshKey(prev => prev + 1); // Force a fresh fetch
@@ -82,15 +83,16 @@ export default function Journal() {
   useEffect(() => {
     if (user?.id) {
       // Process unprocessed entries automatically on page load
+      // Don't show a toast for this automatic process
       processUnprocessedEntries().then(result => {
         if (result?.success) {
           console.log('Successfully processed unprocessed entries');
-          // Refresh entries to show the newly processed ones
-          refreshEntries();
+          // Refresh entries without showing toast
+          refreshEntries(false);
         }
       });
     }
-  }, [user?.id, processUnprocessedEntries, refreshEntries]);
+  }, [user?.id, processUnprocessedEntries]);
 
   return (
     <div className="container px-4 md:px-6 max-w-6xl space-y-6 py-6">
