@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { AudioWaveform } from 'lucide-react';
 
 interface LogoProps {
   className?: string;
@@ -26,11 +25,11 @@ export function FeelsophyLogo({ className = "", size = 'md', withText = true }: 
     <div className={`flex items-center gap-2 ${className}`}>
       <div className={`relative ${sizeMap[size]} rounded-full bg-gradient-to-r from-amber-400 to-orange-600 flex items-center justify-center overflow-hidden`}>
         {/* Meditation silhouette based on the reference image */}
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex items-center justify-center">
           <svg 
             viewBox="0 0 100 100" 
-            className="w-4/5 h-4/5 absolute opacity-30" 
-            fill="black"
+            className="w-4/5 h-4/5" 
+            fill="white"
           >
             {/* Simplified meditation silhouette inspired by the provided image */}
             <path d="M50,15 C53,15 56,12 56,9 C56,6 53,3 50,3 C47,3 44,6 44,9 C44,12 47,15 50,15 Z" />
@@ -40,13 +39,6 @@ export function FeelsophyLogo({ className = "", size = 'md', withText = true }: 
             <path d="M80,65 L70,60 C75,50 75,46 70,36 L75,34 C82,48 82,52 80,65 Z" />
           </svg>
         </div>
-        
-        {/* Voice waveform overlay */}
-        <AudioWaveform 
-          className="relative text-white z-10" 
-          size={size === 'sm' ? 16 : size === 'md' ? 20 : 24} 
-          strokeWidth={2.5}
-        />
       </div>
       
       {withText && (
