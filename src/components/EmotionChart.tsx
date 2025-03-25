@@ -88,8 +88,7 @@ export function EmotionChart({
         value: value,
         color: getEmotionColor(name)
       }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
+      .sort((a, b) => b.value - a.value);
   };
   
   const getLineChartData = (): EmotionData[] => {
@@ -200,30 +199,104 @@ export function EmotionChart({
     }
     
     const calculateBubblePositions = (bubbles: EmotionBubbleData[]) => {
-      const canvasWidth = 600;
-      const canvasHeight = 300;
+      const containerWidth = 600;
+      const containerHeight = 300;
       
-      const positions: {x: number, y: number, size: number}[] = [];
+      const maxSize = Math.min(containerWidth, containerHeight) * 0.25;
+      const minSize = 40;
+      
+      const maxValue = Math.max(...bubbles.map(b => b.value));
+      
+      const nodes: {x: number, y: number, size: number, vx: number, vy: number, name: string}[] = [];
+      
+      const columns = Math.ceil(Math.sqrt(bubbles.length));
+      const rows = Math.ceil(bubbles.length / columns);
+      const cellWidth = containerWidth / columns;
+      const cellHeight = containerHeight / rows;
       
       bubbles.forEach((bubble, index) => {
-        const maxSize = 100;
-        const minSize = 40;
-        const maxValue = Math.max(...bubbles.map(b => b.value));
-        const size = minSize + ((bubble.value / maxValue) * (maxSize - minSize));
+        const sizeScale = bubble.value / maxValue;
+        const size = minSize + sizeScale * (maxSize - minSize);
         
-        const angle = (index / bubbles.length) * 2 * Math.PI;
-        const radius = 100;
-        const centerX = canvasWidth / 2;
-        const centerY = canvasHeight / 2;
+        const row = Math.floor(index / columns);
+        const col = index % columns;
         
-        const offsetRadius = radius + (index % 3 * 30);
-        const x = centerX + Math.cos(angle) * offsetRadius;
-        const y = centerY + Math.sin(angle) * offsetRadius;
+        const x = (col + 0.5) * cellWidth + (Math.random() - 0.5) * 20;
+        const y = (row + 0.5) * cellHeight + (Math.random() - 0.5) * 20;
         
-        positions.push({ x, y, size });
+        nodes.push({
+          x: Math.max(size/2, Math.min(containerWidth - size/2, x)),
+          y: Math.max(size/2, Math.min(containerHeight - size/2, y)),
+          size,
+          vx: 0,
+          vy: 0,
+          name: bubble.name
+        });
       });
       
-      return positions;
+      const iterations = 50;
+      const repulsionStrength = 0.8;
+      const centerAttraction = 0.01;
+      
+      for (let i = 0; i < iterations; i++) {
+        for (let a = 0; a < nodes.length; a++) {
+          const nodeA = nodes[a];
+          
+          const centerX = containerWidth / 2;
+          const centerY = containerHeight / 2;
+          const toCenterX = centerX - nodeA.x;
+          const toCenterY = centerY - nodeA.y;
+          const distanceToCenter = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY);
+          
+          if (distanceToCenter > 0) {
+            nodeA.vx += (toCenterX / distanceToCenter) * centerAttraction * distanceToCenter;
+            nodeA.vy += (toCenterY / distanceToCenter) * centerAttraction * distanceToCenter;
+          }
+          
+          for (let b = a + 1; b < nodes.length; b++) {
+            const nodeB = nodes[b];
+            
+            const dx = nodeB.x - nodeA.x;
+            const dy = nodeB.y - nodeA.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = (nodeA.size + nodeB.size) / 2;
+            
+            if (distance < minDistance) {
+              const force = repulsionStrength * (minDistance - distance) / distance;
+              
+              if (distance > 0) {
+                nodeA.vx -= dx * force / distance;
+                nodeA.vy -= dy * force / distance;
+                nodeB.vx += dx * force / distance;
+                nodeB.vy += dy * force / distance;
+              } else {
+                const angle = Math.random() * Math.PI * 2;
+                nodeA.vx -= Math.cos(angle) * 0.5;
+                nodeA.vy -= Math.sin(angle) * 0.5;
+                nodeB.vx += Math.cos(angle) * 0.5;
+                nodeB.vy += Math.sin(angle) * 0.5;
+              }
+            }
+          }
+        }
+        
+        for (const node of nodes) {
+          node.x += node.vx;
+          node.y += node.vy;
+          
+          node.vx *= 0.5;
+          node.vy *= 0.5;
+          
+          node.x = Math.max(node.size/2, Math.min(containerWidth - node.size/2, node.x));
+          node.y = Math.max(node.size/2, Math.min(containerHeight - node.size/2, node.y));
+        }
+      }
+      
+      return nodes.map((node) => ({
+        x: node.x,
+        y: node.y,
+        size: node.size
+      }));
     };
     
     const bubblePositions = calculateBubblePositions(bubbleData);
@@ -231,10 +304,10 @@ export function EmotionChart({
     return (
       <div className="w-full h-[340px] flex flex-col items-center justify-center relative">
         <div className="absolute top-0 right-0 text-xs text-muted-foreground">
-          * Size of bubble represents intensity
+          * Size of bubble represents emotion intensity
         </div>
         
-        <div className="relative w-full h-[300px] border-2 border-dashed border-muted/20 rounded-lg overflow-visible">
+        <div className="relative w-full h-[300px] overflow-hidden rounded-lg bg-background/50 border border-muted/20">
           {bubbleData.map((item, index) => {
             const position = bubblePositions[index];
             
@@ -244,43 +317,46 @@ export function EmotionChart({
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ 
                   scale: 1, 
-                  opacity: 1,
-                  x: [
-                    position.x - 5, 
-                    position.x + 5, 
-                    position.x
-                  ],
-                  y: [
-                    position.y - 5, 
-                    position.y + 5, 
-                    position.y
-                  ]
+                  opacity: 0.9,
+                  x: position.x - (position.size / 2),
+                  y: position.y - (position.size / 2)
                 }}
                 transition={{ 
                   duration: 0.5, 
-                  delay: index * 0.1,
-                  x: { repeat: Infinity, duration: 3 + index, repeatType: "reverse" },
-                  y: { repeat: Infinity, duration: 4 + index, repeatType: "reverse" }
+                  delay: index * 0.05,
+                  type: "spring",
+                  stiffness: 100,
+                  damping: 15
+                }}
+                whileHover={{ 
+                  scale: 1.05, 
+                  opacity: 1,
+                  zIndex: 10,
+                  boxShadow: "0px 5px 15px rgba(0, 0, 0, 0.1)" 
                 }}
                 style={{
                   width: `${position.size}px`,
                   height: `${position.size}px`,
-                  backgroundColor: item.color,
                   position: 'absolute',
-                  left: position.x - (position.size / 2),
-                  top: position.y - (position.size / 2),
+                  backgroundColor: item.color,
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'white',
-                  fontSize: position.size > 70 ? '16px' : '14px',
+                  fontSize: position.size > 60 ? '16px' : '12px',
                   fontWeight: 'bold',
-                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  padding: '5px',
+                  wordBreak: 'break-word',
+                  lineHeight: '1.1',
                   zIndex: Math.floor(item.value)
                 }}
+                title={`${item.name}: ${item.value.toFixed(1)}`}
               >
-                {item.name}
+                {position.size >= 45 ? item.name : ''}
               </motion.div>
             );
           })}
