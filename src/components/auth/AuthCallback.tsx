@@ -15,35 +15,26 @@ const AuthCallback = () => {
       try {
         console.log("Auth callback page: Processing authentication...");
         
-        // If we have a hash in the URL, we need to process it
-        if (window.location.hash) {
-          console.log("Hash detected in URL, processing auth data");
+        // Get session from hash and handle the redirect internally
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error getting session:", error);
+          toast.error("Authentication error: " + error.message);
+          navigate("/auth", { replace: true });
+          return;
+        }
+        
+        if (data.session) {
+          console.log("Successfully retrieved session");
           
-          // Get session from hash and handle the redirect internally
-          const { data, error } = await supabase.auth.getSession();
+          // Force refresh our auth context
+          await refreshSession();
           
-          if (error) {
-            console.error("Error getting session from hash:", error);
-            toast.error("Authentication error: " + error.message);
-            navigate("/auth", { replace: true });
-            return;
-          }
-          
-          if (data.session) {
-            console.log("Successfully retrieved session from hash");
-            
-            // Force refresh our auth context
-            await refreshSession();
-            
-            toast.success("Successfully signed in!");
-            navigate("/journal", { replace: true });
-          } else {
-            console.log("No session found after processing hash");
-            navigate("/auth", { replace: true });
-          }
+          toast.success("Successfully signed in!");
+          navigate("/journal", { replace: true });
         } else {
-          // If there's no hash but we're on the callback page, redirect to auth
-          console.log("No hash found in callback URL");
+          console.log("No session found after processing hash");
           navigate("/auth", { replace: true });
         }
       } catch (error) {

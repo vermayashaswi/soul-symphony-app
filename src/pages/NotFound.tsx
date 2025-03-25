@@ -14,8 +14,6 @@ const NotFound = () => {
   useEffect(() => {
     console.log("NotFound: Current path:", location.pathname);
     console.log("NotFound: Current hash:", location.hash ? "Present (contains auth tokens)" : "None");
-    console.log("NotFound: Current search:", location.search);
-    console.log("NotFound: Auth state:", { user: !!user, isLoading });
     
     // Improved OAuth redirect detection
     const isFromRedirect = 
