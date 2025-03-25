@@ -52,31 +52,26 @@ const App = () => {
 };
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading, refreshSession } = useAuth();
+  const { user, isLoading } = useAuth();
   const location = useLocation();
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshAttempted, setRefreshAttempted] = useState(false);
   
   useEffect(() => {
-    if (!isLoading && !user && !isRefreshing && !refreshAttempted) {
+    if (!isLoading && !user && !refreshAttempted) {
       console.log("Protected route: No user found, attempting to refresh session", {
         path: location.pathname
       });
       
-      setIsRefreshing(true);
-      
       refreshAuthSession(false).then(success => {
         console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
-        setIsRefreshing(false);
         setRefreshAttempted(true);
       }).catch(() => {
-        setIsRefreshing(false);
         setRefreshAttempted(true);
       });
     }
-  }, [user, isLoading, location, refreshSession, isRefreshing, refreshAttempted]);
+  }, [user, isLoading, location, refreshAttempted]);
   
-  if (isLoading || isRefreshing) {
+  if (isLoading && !refreshAttempted) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -84,12 +79,20 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  if (!user) {
+  if (user) {
+    return <>{children}</>;
+  }
+  
+  if (refreshAttempted || !isLoading) {
     console.log("Redirecting to auth from protected route:", location.pathname);
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
-  return <>{children}</>;
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    </div>
+  );
 };
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {

@@ -23,6 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [profileCreationAttempted, setProfileCreationAttempted] = useState(false);
+  const [initialSessionCheckDone, setInitialSessionCheckDone] = useState(false);
   
   // Function to handle profile creation with rate limiting
   const createUserProfile = useCallback(async (userId: string) => {
@@ -113,6 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       setIsLoading(false);
+      setInitialSessionCheckDone(true);
       
       // Ensure user profile exists for existing session
       if (initialSession?.user) {
@@ -133,6 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).catch(error => {
       console.error('Error checking session, but continuing:', error);
       setIsLoading(false);
+      setInitialSessionCheckDone(true);
     });
     
     return () => {
@@ -205,6 +208,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('Session refresh error:', error);
+        if (error.message.includes('Auth session missing')) {
+          // This is a normal state for unauthenticated users, not an error
+          console.log('No session exists to refresh (user not authenticated)');
+          setIsLoading(false);
+          return false;
+        }
         return false;
       }
       

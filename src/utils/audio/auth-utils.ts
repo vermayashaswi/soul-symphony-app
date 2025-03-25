@@ -1,16 +1,23 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export const refreshAuthSession = async (showToasts = true) => {
   try {
     const { data, error } = await supabase.auth.refreshSession();
+    
     if (error) {
+      if (error.message.includes('Auth session missing')) {
+        console.log("No session exists to refresh (user not authenticated)");
+        return false;
+      }
+      
       console.error("Error refreshing session:", error.message);
       return false;
     }
     
     return !!data.session;
-  } catch (error) {
-    console.error("Exception in refreshAuthSession:", error);
+  } catch (error: any) {
+    console.error("Exception in refreshAuthSession:", error?.message || error);
     return false;
   }
 };
@@ -32,9 +39,9 @@ export const checkAuth = async () => {
       isAuthenticated: true,
       user: session.user
     };
-  } catch (error) {
-    console.error("Error checking auth:", error);
-    return { isAuthenticated: false, error: error.message };
+  } catch (error: any) {
+    console.error("Error checking auth:", error?.message || error);
+    return { isAuthenticated: false, error: error?.message || 'Unknown error' };
   }
 };
 
@@ -67,9 +74,9 @@ export const verifyUserAuthentication = async (showToasts = true) => {
       isAuthenticated: true,
       user: session.user
     };
-  } catch (error) {
-    console.error("Exception in verifyUserAuthentication:", error);
-    return { isAuthenticated: false, error: error.message };
+  } catch (error: any) {
+    console.error("Exception in verifyUserAuthentication:", error?.message || error);
+    return { isAuthenticated: false, error: error?.message || 'Unknown error' };
   }
 };
 
@@ -138,8 +145,8 @@ export const ensureUserProfile = async (userId: string) => {
     
     console.log('New profile created successfully for user:', userId);
     return { success: true, profile: newProfile, isNew: true };
-  } catch (error) {
-    console.error('Exception in ensureUserProfile:', error);
-    return { success: false, error: error.message };
+  } catch (error: any) {
+    console.error('Exception in ensureUserProfile:', error?.message || error);
+    return { success: false, error: error?.message || 'Unknown error' };
   }
 };
