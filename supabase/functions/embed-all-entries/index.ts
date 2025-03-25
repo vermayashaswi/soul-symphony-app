@@ -54,6 +54,7 @@ serve(async (req) => {
     }
 
     // Fetch journal entries that need embeddings
+    console.log("Fetching entries that need processing...");
     let query = supabase
       .from("Journal Entries")
       .select("id, refined text, transcription text")
@@ -61,6 +62,7 @@ serve(async (req) => {
 
     // If not processing all entries, only get ones without embeddings
     if (!processAll) {
+      console.log("Filtering for entries without embeddings");
       query = query.not('id', 'in', 
         supabase.from('journal_embeddings').select('journal_entry_id')
       );
