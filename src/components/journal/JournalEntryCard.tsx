@@ -6,17 +6,25 @@ import { Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EmotionBubbles from '@/components/EmotionBubbles';
 import { JournalEntry } from '@/types/journal';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
 }
 
 const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
-  // For debugging purposes
-  console.log("Rendering entry:", entry);
-  console.log("Entry refined text:", entry["refined text"]);
-  console.log("Entry emotions:", entry.emotions);
-  console.log("Entry master_themes:", entry.master_themes);
+  // Get themes to display - first try master_themes, then fall back to emotions
+  const themesToDisplay = React.useMemo(() => {
+    if (entry.master_themes && entry.master_themes.length > 0) {
+      return entry.master_themes.slice(0, 10);
+    } else if (entry.emotions && Array.isArray(entry.emotions) && entry.emotions.length > 0) {
+      return entry.emotions.slice(0, 10);
+    }
+    return [];
+  }, [entry.master_themes, entry.emotions]);
+
+  // Get text to display - first try refined text, then fall back to transcription
+  const displayText = entry["refined text"] || entry["transcription text"] || '';
 
   return (
     <motion.div
@@ -55,12 +63,14 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
               
               <div>
                 <h3 className="font-medium mb-2">Journal Entry</h3>
-                {entry["refined text"] ? (
-                  <p className="whitespace-pre-line">{entry["refined text"]}</p>
-                ) : entry["transcription text"] ? (
-                  <p className="whitespace-pre-line">{entry["transcription text"]}</p>
+                {displayText ? (
+                  <p className="whitespace-pre-line">{displayText}</p>
                 ) : (
-                  <p className="text-muted-foreground">Your entry is being processed...</p>
+                  <Alert variant="default" className="bg-muted/50">
+                    <AlertDescription>
+                      Your entry is being processed... This may take a moment.
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
             </div>
@@ -72,12 +82,14 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
               </h3>
               
               <div className="h-60 mb-4 flex items-center justify-center">
-                {entry.master_themes && entry.master_themes.length > 0 ? (
-                  <EmotionBubbles themes={entry.master_themes.slice(0, 10)} />
-                ) : entry.emotions && entry.emotions.length > 0 ? (
-                  <EmotionBubbles themes={Array.isArray(entry.emotions) ? entry.emotions.slice(0, 10) : []} />
+                {themesToDisplay.length > 0 ? (
+                  <EmotionBubbles themes={themesToDisplay} />
                 ) : (
-                  <p className="text-muted-foreground text-center">Analyzing emotions...</p>
+                  <Alert variant="default" className="bg-muted/50">
+                    <AlertDescription className="text-center">
+                      Analyzing emotions and themes...
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
             </div>

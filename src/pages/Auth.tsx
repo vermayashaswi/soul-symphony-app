@@ -18,10 +18,6 @@ export default function Auth() {
   const from = location.state?.from?.pathname || '/journal';
 
   useEffect(() => {
-    const currentUrl = window.location.href;
-    console.log('Auth page loaded at URL:', currentUrl);
-    console.log('Current origin:', window.location.origin);
-    
     if (user && !redirecting) {
       console.log('Auth page: User detected, redirecting to:', from);
       setRedirecting(true);
@@ -41,11 +37,6 @@ export default function Auth() {
                            window.location.search.includes('error');
                            
       if (hasHashParams) {
-        console.log('Detected auth redirect with hash/search params:', { 
-          hash: window.location.hash,
-          search: window.location.search 
-        });
-        
         if (window.location.hash.includes('error') || window.location.search.includes('error')) {
           console.error('Error detected in redirect URL');
           const errorMessage = window.location.search.includes('error_description') 
@@ -64,10 +55,6 @@ export default function Auth() {
             console.error('Error getting session after redirect:', error);
             setAuthError(error.message);
             toast.error('Authentication error. Please try again.');
-          } else if (data.session) {
-            console.log('Successfully retrieved session after redirect');
-            console.log('User:', data.session.user.email);
-            console.log('Current domain:', window.location.origin);
           }
         } catch (e) {
           console.error('Exception during auth redirect handling:', e);
@@ -77,15 +64,11 @@ export default function Auth() {
       }
     };
     
-    // Run hash redirect handler immediately
     handleHashRedirect();
   }, []);
 
   const handleSignIn = async () => {
     setAuthError(null);
-    const callbackUrl = `${window.location.origin}/auth`;
-    console.log('Initiating Google sign-in from', window.location.origin);
-    console.log('Using callback URL:', callbackUrl);
     
     try {
       await signInWithGoogle();
@@ -105,7 +88,6 @@ export default function Auth() {
   }
 
   if (user) {
-    console.log('Auth page: User exists in render, redirecting to', from);
     return <Navigate to={from} replace />;
   }
 

@@ -12,11 +12,17 @@ import { RefreshCw, Mic, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function Journal() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { journalEntries, isLoading, refreshEntries } = useJournalEntries(user?.id);
+  const { 
+    journalEntries, 
+    isLoading, 
+    refreshEntries, 
+    loadError 
+  } = useJournalEntries(user?.id);
   const { 
     handleCreateJournal, 
     handleViewInsights,
@@ -53,10 +59,8 @@ export default function Journal() {
       await refreshEntries();
       // After refresh, clear any processing entries that might have been completed
       setProcessingEntries([]);
-      toast.success('Journal entries refreshed');
     } catch (error) {
       console.error('Error refreshing entries:', error);
-      toast.error('Failed to refresh entries');
     } finally {
       setIsRefreshing(false);
     }
@@ -82,7 +86,7 @@ export default function Journal() {
         }
       });
     }
-  }, [user?.id, processUnprocessedEntries]);
+  }, [user?.id, processUnprocessedEntries, refreshEntries]);
 
   return (
     <div className="container px-4 md:px-6 max-w-6xl space-y-6 py-6">
@@ -139,6 +143,21 @@ export default function Journal() {
           )}
         </Button>
       </div>
+      
+      {loadError && !isLoading && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>
+            Failed to load journal entries. 
+            <Button 
+              variant="link" 
+              className="p-0 h-auto text-destructive-foreground underline ml-2" 
+              onClick={handleRefresh}
+            >
+              Click to retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       
       {isLoading ? (
         <div className="flex justify-center items-center min-h-[300px]">

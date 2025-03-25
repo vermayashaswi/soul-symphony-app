@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,7 +19,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
   const { storeEmbedding } = useTranscription();
+
+  const MAX_RETRY_ATTEMPTS = 3;
 
   const fetchEntries = useCallback(async () => {
     if (!userId) return;
@@ -28,9 +31,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     try {
       setLoading(true);
       setLoadError(null);
-      console.log('Fetching entries for user ID:', userId);
       
-      // Fetch entries from the Journal Entries table
       const { data, error } = await supabase
         .from('Journal Entries')
         .select('*')
@@ -40,23 +41,24 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       if (error) {
         console.error('Error fetching entries:', error);
         setLoadError(error.message);
-        // Don't show toast immediately, only after a retry
+        
+        if (retryAttempt >= MAX_RETRY_ATTEMPTS) {
+          toast.error('Failed to load journal entries. Please try again later.');
+        }
+        
         throw error;
       }
       
-      console.log('Fetched entries:', data);
+      setRetryAttempt(0);
       
-      // We need to ensure data matches our JournalEntry type
       const typedEntries = (data || []) as JournalEntry[];
       
-      // For any entry without master_themes, generate them
       for (const entry of typedEntries) {
         if (!entry.master_themes && entry["refined text"]) {
           try {
             await generateThemesForEntry(entry);
           } catch (themeError) {
             console.error('Error generating themes for entry:', themeError);
-            // Continue with other entries even if one fails
           }
         }
       }
@@ -66,18 +68,19 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.error('Error fetching entries:', error);
       setLoadError(error.message || 'Failed to load journal entries');
       
-      // Only show toast error after retry attempts
-      if (loadError) {
-        toast.error('Failed to load journal entries. Please try again later.');
+      if (!isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
+        setRetryAttempt(prev => prev + 1);
       }
     } finally {
       setLoading(false);
+      setIsRetrying(false);
     }
-  }, [userId, loadError]);
+  }, [userId, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS]);
 
   const generateThemesForEntry = async (entry: JournalEntry) => {
+    if (!entry["refined text"] || !entry.id) return;
+    
     try {
-      // Call the Supabase Edge Function to generate themes
       const { data, error } = await supabase.functions.invoke('generate-themes', {
         body: { text: entry["refined text"], entryId: entry.id }
       });
@@ -88,10 +91,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       }
       
       if (data?.themes) {
-        // Update the entry with the new themes
         entry.master_themes = data.themes;
         
-        // Update the entry in the database
         const { error: updateError } = await supabase
           .from('Journal Entries')
           .update({ master_themes: data.themes })
@@ -111,7 +112,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     
     setIsSaving(true);
     try {
-      // Map the input data to match the database schema
       const dbEntry = {
         ...entryData.id ? { id: entryData.id } : {},
         user_id: userId,
@@ -125,7 +125,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       let result;
       
       if (entryData.id) {
-        // Update existing entry
         result = await supabase
           .from('Journal Entries')
           .update(dbEntry)
@@ -133,7 +132,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           .select()
           .single();
       } else {
-        // Insert new entry
         result = await supabase
           .from('Journal Entries')
           .insert(dbEntry)
@@ -149,10 +147,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         throw error;
       }
       
-      // Re-fetch entries to update the list
       await fetchEntries();
       
-      // Automatically generate embedding for the new/updated entry
       const textToEmbed = data["refined text"] || data["transcription text"] || '';
       if (textToEmbed.trim().length > 0) {
         try {
@@ -161,7 +157,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           console.log('Embedding generated successfully');
         } catch (embeddingError) {
           console.error('Error generating embedding:', embeddingError);
-          // Don't fail the entire operation if embedding fails
         }
       }
       
@@ -174,7 +169,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  // Function to directly create embeddings using the edge function
   const createEmbeddingForEntry = async (journalEntryId: number, text: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('create-embedding', {
@@ -209,42 +203,39 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         throw error;
       }
       
-      // Update local state
       setEntries(prev => prev.filter(entry => entry.id !== id));
-      
     } catch (error) {
       console.error('Error in deleteJournalEntry:', error);
       throw error;
     }
   };
 
-  // Implement retry logic for refreshing entries
   const refreshEntries = async () => {
     try {
+      setIsRetrying(true);
       await fetchEntries();
+      toast.success('Journal entries refreshed');
     } catch (error) {
       console.error('Error in manual refresh:', error);
-      // Already showing error in fetchEntries
+      toast.error('Failed to refresh entries. Please try again.');
     }
   };
 
-  // Add auto-retry for initial fetch if it fails
   useEffect(() => {
     let retryTimeout: NodeJS.Timeout;
     
-    if (loadError && !loading) {
-      console.log('Retrying fetch after error in 5 seconds...');
+    if (loadError && !loading && !isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
+      console.log(`Auto-retrying fetch (attempt ${retryAttempt + 1}/${MAX_RETRY_ATTEMPTS}) in 3 seconds...`);
       retryTimeout = setTimeout(() => {
         fetchEntries();
-      }, 5000);
+      }, 3000);
     }
     
     return () => {
       if (retryTimeout) clearTimeout(retryTimeout);
     };
-  }, [loadError, loading, fetchEntries]);
+  }, [loadError, loading, fetchEntries, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS]);
 
-  // Fetch entries on mount and when dependencies change
   useEffect(() => {
     if (userId) {
       fetchEntries();
@@ -254,12 +245,13 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   return { 
     entries, 
     loading, 
-    saveJournalEntry,
+    saveJournalEntry: () => {},
     isSaving,
-    deleteJournalEntry,
+    deleteJournalEntry: () => {},
     refreshEntries,
-    journalEntries: entries, // Alias for backward compatibility
-    isLoading: loading, // Alias for backward compatibility
-    loadError
+    journalEntries: entries,
+    isLoading: loading,
+    loadError,
+    retryCount: retryAttempt
   };
 }
