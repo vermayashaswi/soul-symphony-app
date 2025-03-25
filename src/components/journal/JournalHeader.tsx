@@ -37,7 +37,8 @@ export const JournalHeader: React.FC<JournalHeaderProps> = ({
         return;
       }
       
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/embed-all-entries`, {
+      // Use the correct URL format for the edge function
+      const response = await fetch('https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/embed-all-entries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

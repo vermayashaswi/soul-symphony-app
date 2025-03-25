@@ -347,205 +347,43 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      binary_quantize:
-        | {
-            Args: {
-              "": string
-            }
-            Returns: unknown
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: unknown
-          }
-      halfvec_avg: {
-        Args: {
-          "": number[]
-        }
-        Returns: unknown
-      }
-      halfvec_out: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      halfvec_send: {
-        Args: {
-          "": unknown
-        }
-        Returns: string
-      }
-      halfvec_typmod_in: {
-        Args: {
-          "": unknown[]
-        }
-        Returns: number
-      }
-      hnsw_bit_support: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      hnsw_halfvec_support: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      hnsw_sparsevec_support: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      hnswhandler: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      ivfflat_bit_support: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      ivfflat_halfvec_support: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      ivfflathandler: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      l2_norm:
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: number
-          }
-      l2_normalize:
-        | {
-            Args: {
-              "": string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: unknown
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: unknown
-          }
       mark_inactive_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      match_journal_entries: {
-        Args: {
-          query_embedding: string
-          match_threshold: number
-          match_count: number
-          user_id_filter: string
-        }
-        Returns: {
-          id: number
-          content: string
-          similarity: number
-        }[]
-      }
-      sparsevec_out: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      sparsevec_send: {
-        Args: {
-          "": unknown
-        }
-        Returns: string
-      }
-      sparsevec_typmod_in: {
-        Args: {
-          "": unknown[]
-        }
-        Returns: number
-      }
-      store_user_query: {
-        Args: {
-          user_id: string
-          query_text: string
-          query_embedding: string
-          thread_id: string
-          message_id?: string
-        }
-        Returns: string
-      }
-      vector_avg: {
-        Args: {
-          "": number[]
-        }
-        Returns: string
-      }
-      vector_dims:
+      match_journal_entries:
         | {
-            Args: {
-              "": string
-            }
-            Returns: number
+            Args: Record<PropertyKey, never>
+            Returns: undefined
           }
         | {
             Args: {
-              "": unknown
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+              user_id_filter: string
             }
-            Returns: number
+            Returns: {
+              id: number
+              content: string
+              similarity: number
+            }[]
           }
-      vector_norm: {
-        Args: {
-          "": string
-        }
-        Returns: number
-      }
-      vector_out: {
-        Args: {
-          "": string
-        }
-        Returns: unknown
-      }
-      vector_send: {
-        Args: {
-          "": string
-        }
-        Returns: string
-      }
-      vector_typmod_in: {
-        Args: {
-          "": unknown[]
-        }
-        Returns: number
-      }
+      store_user_query:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: undefined
+          }
+        | {
+            Args: {
+              user_id: string
+              query_text: string
+              query_embedding: string
+              thread_id: string
+              message_id?: string
+            }
+            Returns: string
+          }
     }
     Enums: {
       [_ in never]: never
