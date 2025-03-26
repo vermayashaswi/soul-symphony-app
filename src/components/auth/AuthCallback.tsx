@@ -20,13 +20,13 @@ const AuthCallback = () => {
         console.log("Hash content:", location.hash ? location.hash.substring(0, 20) + "..." : "None");
         console.log("Search params:", location.search || "None");
         
-        // Handle various authentication callback scenarios
+        // Handle hash-based authentication (implicit flow)
         if (location.hash && (location.hash.includes('access_token') || location.hash.includes('id_token'))) {
           console.log("Processing hash-based auth callback");
           
           try {
-            // For access_token in hash (implicit flow), use the correct method
-            const url = window.location.href;
+            // When we have a hash with access_token, Supabase has already processed this
+            // We just need to check if we have a valid session
             const { data, error } = await supabase.auth.getSession();
             
             if (error) {
@@ -37,13 +37,21 @@ const AuthCallback = () => {
             }
             
             if (data?.session) {
-              console.log("Successfully created session from hash");
+              console.log("Successfully authenticated with hash");
               await refreshSession();
               toast.success("Successfully signed in!");
               navigate("/journal", { replace: true });
               return;
             } else {
-              console.log("No session data returned from hash processing");
+              // If no session is found but we have hash tokens, try to use them
+              console.log("No session found, but hash tokens present - attempting to use them");
+              
+              // Forward the hash to the root URL where AuthStateListener can process it
+              navigate("/?hash_auth=true", { 
+                replace: true,
+                state: { fromCallback: true }
+              });
+              return;
             }
           } catch (hashProcessingError) {
             console.error("Error processing auth callback:", hashProcessingError);
@@ -51,8 +59,10 @@ const AuthCallback = () => {
             navigate("/auth", { replace: true });
             return;
           }
-        } else if (location.search && (location.search.includes('code=') || location.search.includes('error='))) {
-          console.log("Processing query parameter-based auth callback");
+        } 
+        // Handle code-based authentication
+        else if (location.search && location.search.includes('code=')) {
+          console.log("Processing code-based auth callback");
           
           if (location.search.includes('error')) {
             const errorDescription = new URLSearchParams(location.search).get('error_description');
@@ -63,7 +73,6 @@ const AuthCallback = () => {
           }
           
           try {
-            // Handle the authorization code (code=) flow with the correct method
             const code = new URLSearchParams(location.search).get('code');
             if (code) {
               const { data, error } = await supabase.auth.exchangeCodeForSession(code);

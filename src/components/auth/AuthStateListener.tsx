@@ -20,7 +20,9 @@ const AuthStateListener = () => {
     
     // Skip handling token redirects if we're already on callback or auth routes
     // or if we're already in the process of handling an auth redirect
-    if (location.pathname === '/callback' || location.pathname === '/auth') {
+    if (location.pathname === '/callback' || 
+        location.pathname === '/auth/callback' || 
+        location.pathname === '/auth') {
       console.log("Already on callback or auth route, not redirecting");
       return;
     }

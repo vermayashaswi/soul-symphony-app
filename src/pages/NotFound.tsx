@@ -32,7 +32,9 @@ const NotFound = () => {
       location.search.includes('state=') ||  // OAuth state parameter
       location.search.includes('session_id=') || // Session related parameter
       // Special case for Google OAuth
-      location.pathname.includes('google-callback'); 
+      location.pathname.includes('google-callback') ||
+      // Additional edge cases
+      location.pathname.includes('auth/callback'); 
                           
     if (isFromAuthRedirect) {
       console.log("NotFound: Detected auth redirect, navigating to callback handler");
