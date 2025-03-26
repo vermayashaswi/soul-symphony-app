@@ -1,583 +1,884 @@
+
 import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { RefreshCw, CheckCircle, XCircle, AlertTriangle, InfoIcon, Download, Bug } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { AlertTriangle, CheckCircle, XCircle, RefreshCw, Download, Database, Wifi, Mic, HardDrive } from 'lucide-react';
-import { testRecordingPipeline } from '@/utils/diagnostics-utils';
-import { checkSupabaseConnection } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useDebug } from '@/contexts/debug/DebugContext';
+import { useAuth } from '@/contexts/AuthContext';
 
-interface DiagnosticsResult {
+// Diagnostic test types
+type TestResult = {
+  name: string;
+  status: 'success' | 'error' | 'pending';
+  message: string;
+  details?: string;
   timestamp: string;
-  status: 'success' | 'error' | 'warning';
-  details: {
-    database: {
-      success: boolean;
-      error?: string;
-      latency?: number;
-    };
-    storage: {
-      audioBucketExists: boolean;
-      hasPermission: boolean;
-      error?: string;
-    };
-    auth: {
-      success: boolean;
-      hasSession: boolean;
-      error?: string;
-    };
-    edgeFunctions: {
-      transcribeAudio: {
-        reachable: boolean;
-        error?: string;
-      };
-    };
-    network: {
-      online: boolean;
-      supabaseLatency?: number;
-      error?: string;
-    };
-    recording: {
-      audioContextAvailable: boolean;
-      mediaDevicesAvailable: boolean;
-      storageAccessible: boolean;
-      error?: string;
-    };
-  };
-  recommendedActions: string[];
-}
+};
 
-const JournalDiagnostics: React.FC = () => {
+type DiagnosticReport = {
+  connectionStatus: 'connected' | 'error' | 'checking';
+  tests: TestResult[];
+  performanceMetrics: {
+    responseTime: number | null;
+    loadingTime: number | null;
+  };
+  clientInfo: {
+    userAgent: string;
+    timestamp: string;
+  };
+  errors: Array<{
+    message: string;
+    timestamp: string;
+    context?: string;
+  }>;
+};
+
+export default function JournalDiagnostics() {
   const [isRunningTests, setIsRunningTests] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [results, setResults] = useState<DiagnosticsResult | null>(null);
-  const [isInitialCheck, setIsInitialCheck] = useState(true);
+  const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport>({
+    connectionStatus: 'checking',
+    tests: [],
+    performanceMetrics: {
+      responseTime: null,
+      loadingTime: null,
+    },
+    clientInfo: {
+      userAgent: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+    },
+    errors: [],
+  });
+  const { addLog } = useDebug();
+  const { user } = useAuth();
 
-  const testAudioBucket = async () => {
-    try {
-      const { data: buckets, error } = await supabase.storage.listBuckets();
-      
-      if (error) {
-        return {
-          audioBucketExists: false,
-          hasPermission: false,
-          error: `Storage access error: ${error.message}`
-        };
-      }
-      
-      const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
-      
-      if (!audioBucket) {
-        return {
-          audioBucketExists: false,
-          hasPermission: true,
-          error: 'Audio bucket not found in storage'
-        };
-      }
-      
+  // Run basic connection check on component mount
+  useEffect(() => {
+    const checkConnection = async () => {
+      const start = performance.now();
       try {
-        const { error: listError } = await supabase.storage
-          .from('audio')
-          .list('');
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
           
-        return {
-          audioBucketExists: true,
-          hasPermission: !listError,
-          error: listError ? `Permission error: ${listError.message}` : undefined
-        };
-      } catch (err) {
-        return {
-          audioBucketExists: true,
-          hasPermission: false,
-          error: `Permission test error: ${err instanceof Error ? err.message : String(err)}`
-        };
+        const end = performance.now();
+        const responseTime = end - start;
+        
+        setDiagnosticReport(prev => ({
+          ...prev,
+          connectionStatus: error ? 'error' : 'connected',
+          performanceMetrics: {
+            ...prev.performanceMetrics,
+            responseTime
+          },
+          errors: error ? [
+            ...prev.errors, 
+            { 
+              message: `Initial connection check failed: ${error.message}`, 
+              timestamp: new Date().toISOString(),
+              context: 'connection-check'
+            }
+          ] : prev.errors
+        }));
+        
+        addLog('connection', `Initial database connection check: ${error ? 'Failed' : 'Success'}`, {
+          responseTime,
+          error: error?.message
+        });
+      } catch (err: any) {
+        const end = performance.now();
+        setDiagnosticReport(prev => ({
+          ...prev,
+          connectionStatus: 'error',
+          performanceMetrics: {
+            ...prev.performanceMetrics,
+            responseTime: end - start
+          },
+          errors: [
+            ...prev.errors, 
+            { 
+              message: `Connection check exception: ${err.message}`, 
+              timestamp: new Date().toISOString(),
+              context: 'connection-check-exception'
+            }
+          ]
+        }));
+        
+        addLog('error', `Database connection check exception`, {
+          error: err.message
+        });
       }
-    } catch (error) {
-      return {
-        audioBucketExists: false,
-        hasPermission: false,
-        error: `Storage test error: ${error instanceof Error ? error.message : String(error)}`
-      };
-    }
+    };
+    
+    checkConnection();
+  }, [addLog]);
+
+  const runDiagnosticTests = async () => {
+    if (isRunningTests) return;
+    
+    setIsRunningTests(true);
+    setIsExpanded(true);
+    addLog('action', 'Manual diagnostic tests started');
+    
+    // Reset tests
+    setDiagnosticReport(prev => ({
+      ...prev,
+      tests: []
+    }));
+    
+    // Run tests in sequence
+    await testDatabaseConnection();
+    await testAuthConnection();
+    await testJournalEntriesTable();
+    await testStorageBucket();
+    await testEdgeFunctions();
+    
+    setIsRunningTests(false);
+    addLog('info', 'Diagnostic tests completed');
   };
 
-  const testEdgeFunctions = async () => {
+  const testDatabaseConnection = async () => {
+    const testName = 'Database Connection';
+    
+    // Add pending test
+    setDiagnosticReport(prev => ({
+      ...prev,
+      tests: [...prev.tests, {
+        name: testName,
+        status: 'pending',
+        message: 'Testing database connection...',
+        timestamp: new Date().toISOString()
+      }]
+    }));
+    
     try {
-      const { error } = await supabase.functions.invoke('transcribe-audio', {
-        body: { test: true }
-      });
-      
-      return {
-        transcribeAudio: {
-          reachable: !error,
-          error: error ? `Edge function error: ${error.message}` : undefined
-        }
-      };
-    } catch (error) {
-      return {
-        transcribeAudio: {
-          reachable: false,
-          error: `Edge function test error: ${error instanceof Error ? error.message : String(error)}`
-        }
-      };
-    }
-  };
-
-  const testDatabase = async () => {
-    const startTime = performance.now();
-    try {
+      const start = performance.now();
       const { data, error } = await supabase
         .from('profiles')
         .select('id')
         .limit(1);
         
-      const latency = Math.round(performance.now() - startTime);
+      const end = performance.now();
       
       if (error) {
-        return {
-          success: false,
-          error: `Database error: ${error.message}`,
-          latency
-        };
+        setDiagnosticReport(prev => ({
+          ...prev,
+          tests: prev.tests.map(test => 
+            test.name === testName ? {
+              ...test,
+              status: 'error',
+              message: 'Database connection failed',
+              details: `Error: ${error.message}`,
+              timestamp: new Date().toISOString()
+            } : test
+          ),
+          errors: [...prev.errors, {
+            message: `Database connection test failed: ${error.message}`,
+            timestamp: new Date().toISOString(),
+            context: 'database-test'
+          }]
+        }));
+        
+        addLog('error', 'Database connection test failed', {
+          error: error.message,
+          responseTime: end - start
+        });
+      } else {
+        setDiagnosticReport(prev => ({
+          ...prev,
+          tests: prev.tests.map(test => 
+            test.name === testName ? {
+              ...test,
+              status: 'success',
+              message: 'Database connection successful',
+              details: `Response time: ${(end - start).toFixed(2)}ms`,
+              timestamp: new Date().toISOString()
+            } : test
+          )
+        }));
+        
+        addLog('info', 'Database connection test successful', {
+          responseTime: end - start
+        });
       }
+    } catch (err: any) {
+      setDiagnosticReport(prev => ({
+        ...prev,
+        tests: prev.tests.map(test => 
+          test.name === testName ? {
+            ...test,
+            status: 'error',
+            message: 'Database connection failed with exception',
+            details: `Exception: ${err.message}`,
+            timestamp: new Date().toISOString()
+          } : test
+        ),
+        errors: [...prev.errors, {
+          message: `Database test exception: ${err.message}`,
+          timestamp: new Date().toISOString(),
+          context: 'database-test-exception'
+        }]
+      }));
       
-      return {
-        success: true,
-        latency
-      };
-    } catch (error) {
-      const latency = Math.round(performance.now() - startTime);
-      return {
-        success: false,
-        error: `Database test error: ${error instanceof Error ? error.message : String(error)}`,
-        latency
-      };
+      addLog('error', 'Database connection test exception', {
+        error: err.message
+      });
     }
   };
 
-  const testAuth = async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        return {
-          success: false,
-          hasSession: false,
-          error: `Auth error: ${error.message}`
-        };
-      }
-      
-      return {
-        success: true,
-        hasSession: !!data.session
-      };
-    } catch (error) {
-      return {
-        success: false,
-        hasSession: false,
-        error: `Auth test error: ${error instanceof Error ? error.message : String(error)}`
-      };
-    }
-  };
-
-  const testNetwork = async () => {
-    const online = navigator.onLine;
+  const testAuthConnection = async () => {
+    const testName = 'Authentication Service';
+    
+    // Add pending test
+    setDiagnosticReport(prev => ({
+      ...prev,
+      tests: [...prev.tests, {
+        name: testName,
+        status: 'pending',
+        message: 'Testing authentication service...',
+        timestamp: new Date().toISOString()
+      }]
+    }));
     
     try {
       const start = performance.now();
-      const result = await checkSupabaseConnection();
-      const supabaseLatency = Math.round(performance.now() - start);
+      const { data, error } = await supabase.auth.getSession();
+      const end = performance.now();
       
-      if (!result.success) {
-        return {
-          online,
-          supabaseLatency,
-          error: 'Failed to connect to Supabase'
-        };
+      if (error) {
+        setDiagnosticReport(prev => ({
+          ...prev,
+          tests: prev.tests.map(test => 
+            test.name === testName ? {
+              ...test,
+              status: 'error',
+              message: 'Authentication service error',
+              details: `Error: ${error.message}`,
+              timestamp: new Date().toISOString()
+            } : test
+          ),
+          errors: [...prev.errors, {
+            message: `Auth test failed: ${error.message}`,
+            timestamp: new Date().toISOString(),
+            context: 'auth-test'
+          }]
+        }));
+        
+        addLog('error', 'Authentication service test failed', {
+          error: error.message
+        });
+      } else {
+        const sessionStatus = data.session ? 'Active session found' : 'No active session';
+        
+        setDiagnosticReport(prev => ({
+          ...prev,
+          tests: prev.tests.map(test => 
+            test.name === testName ? {
+              ...test,
+              status: 'success',
+              message: 'Authentication service working',
+              details: `${sessionStatus}. Response time: ${(end - start).toFixed(2)}ms`,
+              timestamp: new Date().toISOString()
+            } : test
+          )
+        }));
+        
+        addLog('info', 'Authentication service test successful', {
+          sessionStatus: sessionStatus,
+          responseTime: end - start
+        });
       }
+    } catch (err: any) {
+      setDiagnosticReport(prev => ({
+        ...prev,
+        tests: prev.tests.map(test => 
+          test.name === testName ? {
+            ...test,
+            status: 'error',
+            message: 'Authentication service exception',
+            details: `Exception: ${err.message}`,
+            timestamp: new Date().toISOString()
+          } : test
+        ),
+        errors: [...prev.errors, {
+          message: `Auth test exception: ${err.message}`,
+          timestamp: new Date().toISOString(),
+          context: 'auth-test-exception'
+        }]
+      }));
       
-      return {
-        online,
-        supabaseLatency
-      };
-    } catch (error) {
-      return {
-        online,
-        error: `Network test error: ${error instanceof Error ? error.message : String(error)}`
-      };
+      addLog('error', 'Authentication service test exception', {
+        error: err.message
+      });
     }
   };
 
-  const runDiagnostics = async () => {
-    setIsRunningTests(true);
-    setIsExpanded(true);
+  const testJournalEntriesTable = async () => {
+    const testName = 'Journal Entries Table';
+    
+    // Add pending test
+    setDiagnosticReport(prev => ({
+      ...prev,
+      tests: [...prev.tests, {
+        name: testName,
+        status: 'pending',
+        message: 'Testing Journal Entries table access...',
+        timestamp: new Date().toISOString()
+      }]
+    }));
     
     try {
-      const [
-        databaseResult,
-        storageResult,
-        authResult,
-        edgeFunctionsResult,
-        networkResult,
-        recordingResult
-      ] = await Promise.all([
-        testDatabase(),
-        testAudioBucket(),
-        testAuth(),
-        testEdgeFunctions(),
-        testNetwork(),
-        testRecordingPipeline()
-      ]);
+      // First test - check table structure
+      const start = performance.now();
+      let testSuccessful = true;
+      let errorMessage = '';
+      let detailsMessage = '';
       
-      let overallStatus: 'success' | 'error' | 'warning' = 'success';
-      const recommendedActions: string[] = [];
+      // Try to select from the table
+      const { data: entriesData, error: entriesError } = await supabase
+        .from('Journal Entries')
+        .select('id')
+        .limit(1);
       
-      if (!databaseResult.success) {
-        overallStatus = 'error';
-        recommendedActions.push('Check Supabase database connection settings and availability.');
-      }
-      
-      if (!authResult.success) {
-        overallStatus = 'error';
-        recommendedActions.push('Verify authentication configuration and session management.');
-      }
-      
-      if (!networkResult.online) {
-        overallStatus = 'error';
-        recommendedActions.push('Check internet connection and network status.');
-      }
-      
-      if (!storageResult.audioBucketExists) {
-        overallStatus = 'error';
-        recommendedActions.push('Create the "audio" storage bucket in Supabase.');
-      } else if (!storageResult.hasPermission) {
-        overallStatus = 'warning';
-        recommendedActions.push('Verify storage bucket permissions for the audio bucket.');
-      }
-      
-      if (!edgeFunctionsResult.transcribeAudio.reachable) {
-        overallStatus = 'warning';
-        recommendedActions.push('Check the transcribe-audio edge function is deployed and configured correctly.');
-      }
-      
-      if (!recordingResult.audioContext || !recordingResult.mediaDevices || !recordingResult.mediaRecorder) {
-        overallStatus = 'warning';
-        recommendedActions.push('Verify browser supports required audio recording APIs.');
-      }
-      
-      const diagnosticResults: DiagnosticsResult = {
-        timestamp: new Date().toISOString(),
-        status: overallStatus,
-        details: {
-          database: databaseResult,
-          storage: storageResult,
-          auth: authResult,
-          edgeFunctions: edgeFunctionsResult,
-          network: networkResult,
-          recording: {
-            audioContextAvailable: !!recordingResult.audioContext,
-            mediaDevicesAvailable: !!recordingResult.mediaDevices,
-            storageAccessible: !!recordingResult.storageAccess,
-            error: recordingResult.errors?.join('; ')
-          }
-        },
-        recommendedActions
-      };
-      
-      setResults(diagnosticResults);
-
-      if (isInitialCheck && overallStatus !== 'success') {
-        const criticalIssues = recommendedActions.filter(action => 
-          action.includes('Create the "audio" storage bucket') || 
-          action.includes('transcribe-audio edge function')
-        );
+      if (entriesError) {
+        testSuccessful = false;
+        errorMessage = 'Journal Entries table access failed';
+        detailsMessage = `Error: ${entriesError.message}`;
         
-        if (criticalIssues.length > 0) {
-          toast.error('Journal functionality issues detected', {
-            description: criticalIssues[0],
-            duration: 8000,
-          });
+        addLog('error', 'Journal Entries table test failed', {
+          error: entriesError.message
+        });
+      } else {
+        detailsMessage = 'Journal Entries table accessible. ';
+        
+        // Check if user has entries (if authenticated)
+        if (user?.id) {
+          const { data: userEntries, error: userEntriesError } = await supabase
+            .from('Journal Entries')
+            .select('id, created_at')
+            .eq('user_id', user.id)
+            .limit(3);
+            
+          if (userEntriesError) {
+            testSuccessful = false;
+            errorMessage = 'User journal entries query failed';
+            detailsMessage += `User entries error: ${userEntriesError.message}`;
+            
+            addLog('error', 'User journal entries test failed', {
+              error: userEntriesError.message,
+              userId: user.id
+            });
+          } else {
+            const entriesCount = userEntries?.length || 0;
+            detailsMessage += `Found ${entriesCount} entries for current user. `;
+            
+            addLog('info', 'User journal entries test successful', {
+              entriesCount,
+              userId: user.id
+            });
+          }
+        } else {
+          detailsMessage += 'No authenticated user to test specific entries. ';
         }
       }
       
-      setIsInitialCheck(false);
-    } catch (error) {
-      console.error('Diagnostics error:', error);
-      toast.error('Error running diagnostics');
-    } finally {
-      setIsRunningTests(false);
+      // Try to get the embeddings table
+      const { data: embeddingsData, error: embeddingsError } = await supabase
+        .from('journal_embeddings')
+        .select('id')
+        .limit(1);
+        
+      if (embeddingsError) {
+        detailsMessage += `Embeddings table error: ${embeddingsError.message}`;
+        
+        addLog('error', 'Journal embeddings table test failed', {
+          error: embeddingsError.message
+        });
+      } else {
+        detailsMessage += 'Embeddings table accessible. ';
+        
+        addLog('info', 'Journal embeddings table test successful');
+      }
+      
+      const end = performance.now();
+      
+      setDiagnosticReport(prev => ({
+        ...prev,
+        tests: prev.tests.map(test => 
+          test.name === testName ? {
+            ...test,
+            status: testSuccessful ? 'success' : 'error',
+            message: testSuccessful ? 'Journal Entries table accessible' : errorMessage,
+            details: `${detailsMessage} Response time: ${(end - start).toFixed(2)}ms`,
+            timestamp: new Date().toISOString()
+          } : test
+        ),
+        errors: !testSuccessful ? [...prev.errors, {
+          message: `Journal entries test failed: ${errorMessage}`,
+          timestamp: new Date().toISOString(),
+          context: 'journal-entries-test'
+        }] : prev.errors
+      }));
+    } catch (err: any) {
+      setDiagnosticReport(prev => ({
+        ...prev,
+        tests: prev.tests.map(test => 
+          test.name === testName ? {
+            ...test,
+            status: 'error',
+            message: 'Journal Entries exception',
+            details: `Exception: ${err.message}`,
+            timestamp: new Date().toISOString()
+          } : test
+        ),
+        errors: [...prev.errors, {
+          message: `Journal entries test exception: ${err.message}`,
+          timestamp: new Date().toISOString(),
+          context: 'journal-entries-test-exception'
+        }]
+      }));
+      
+      addLog('error', 'Journal entries test exception', {
+        error: err.message
+      });
     }
   };
 
-  const downloadResults = () => {
-    if (!results) return;
+  const testStorageBucket = async () => {
+    const testName = 'Audio Storage Bucket';
     
-    const fileName = `feelosophy-diagnostics-${new Date().toISOString().split('T')[0]}.json`;
-    const json = JSON.stringify(results, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const href = URL.createObjectURL(blob);
+    // Add pending test
+    setDiagnosticReport(prev => ({
+      ...prev,
+      tests: [...prev.tests, {
+        name: testName,
+        status: 'pending',
+        message: 'Testing audio storage bucket...',
+        timestamp: new Date().toISOString()
+      }]
+    }));
     
-    const link = document.createElement('a');
-    link.href = href;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(href);
-    
-    toast.success('Diagnostics report downloaded');
+    try {
+      const start = performance.now();
+      
+      // Check if the audio bucket exists
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+      
+      if (bucketsError) {
+        setDiagnosticReport(prev => ({
+          ...prev,
+          tests: prev.tests.map(test => 
+            test.name === testName ? {
+              ...test,
+              status: 'error',
+              message: 'Storage API error',
+              details: `Error: ${bucketsError.message}`,
+              timestamp: new Date().toISOString()
+            } : test
+          ),
+          errors: [...prev.errors, {
+            message: `Storage test failed: ${bucketsError.message}`,
+            timestamp: new Date().toISOString(),
+            context: 'storage-test'
+          }]
+        }));
+        
+        addLog('error', 'Storage bucket test failed', {
+          error: bucketsError.message
+        });
+        return;
+      }
+      
+      const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
+      const end = performance.now();
+      
+      if (!audioBucket) {
+        setDiagnosticReport(prev => ({
+          ...prev,
+          tests: prev.tests.map(test => 
+            test.name === testName ? {
+              ...test,
+              status: 'error',
+              message: 'Audio bucket not found',
+              details: `The 'audio' bucket does not exist in storage. This will cause recording uploads to fail.`,
+              timestamp: new Date().toISOString()
+            } : test
+          ),
+          errors: [...prev.errors, {
+            message: 'Audio bucket not found in storage',
+            timestamp: new Date().toISOString(),
+            context: 'storage-test-missing-bucket'
+          }]
+        }));
+        
+        addLog('error', 'Audio bucket not found in storage');
+      } else {
+        // Try to get a file list to test permissions
+        const { data: files, error: filesError } = await supabase.storage
+          .from('audio')
+          .list('journal', {
+            limit: 1
+          });
+          
+        let detailsMessage = `Audio bucket exists. Response time: ${(end - start).toFixed(2)}ms. `;
+        
+        if (filesError) {
+          detailsMessage += `List files error: ${filesError.message}`;
+          
+          addLog('warning', 'Audio bucket exists but listing files failed', {
+            error: filesError.message
+          });
+        } else {
+          detailsMessage += `List files successful.`;
+          
+          addLog('info', 'Audio storage bucket test fully successful');
+        }
+        
+        setDiagnosticReport(prev => ({
+          ...prev,
+          tests: prev.tests.map(test => 
+            test.name === testName ? {
+              ...test,
+              status: 'success',
+              message: 'Audio bucket exists',
+              details: detailsMessage,
+              timestamp: new Date().toISOString()
+            } : test
+          )
+        }));
+      }
+    } catch (err: any) {
+      setDiagnosticReport(prev => ({
+        ...prev,
+        tests: prev.tests.map(test => 
+          test.name === testName ? {
+            ...test,
+            status: 'error',
+            message: 'Storage test exception',
+            details: `Exception: ${err.message}`,
+            timestamp: new Date().toISOString()
+          } : test
+        ),
+        errors: [...prev.errors, {
+          message: `Storage test exception: ${err.message}`,
+          timestamp: new Date().toISOString(),
+          context: 'storage-test-exception'
+        }]
+      }));
+      
+      addLog('error', 'Storage bucket test exception', {
+        error: err.message
+      });
+    }
   };
 
-  useEffect(() => {
-    runDiagnostics();
-  }, []);
+  const testEdgeFunctions = async () => {
+    const testName = 'Edge Functions';
+    
+    // Add pending test
+    setDiagnosticReport(prev => ({
+      ...prev,
+      tests: [...prev.tests, {
+        name: testName,
+        status: 'pending',
+        message: 'Testing edge functions...',
+        timestamp: new Date().toISOString()
+      }]
+    }));
+    
+    try {
+      const start = performance.now();
+      
+      // Test the transcribe-audio function with a test request
+      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+        body: { test: true }
+      });
+      
+      const end = performance.now();
+      
+      if (error) {
+        setDiagnosticReport(prev => ({
+          ...prev,
+          tests: prev.tests.map(test => 
+            test.name === testName ? {
+              ...test,
+              status: 'error',
+              message: 'Edge function error',
+              details: `Error: ${error.message}`,
+              timestamp: new Date().toISOString()
+            } : test
+          ),
+          errors: [...prev.errors, {
+            message: `Edge function test failed: ${error.message}`,
+            timestamp: new Date().toISOString(),
+            context: 'edge-function-test'
+          }]
+        }));
+        
+        addLog('error', 'Edge function test failed', {
+          error: error.message
+        });
+      } else {
+        setDiagnosticReport(prev => ({
+          ...prev,
+          tests: prev.tests.map(test => 
+            test.name === testName ? {
+              ...test,
+              status: 'success',
+              message: 'Edge function accessible',
+              details: `Response time: ${(end - start).toFixed(2)}ms`,
+              timestamp: new Date().toISOString()
+            } : test
+          )
+        }));
+        
+        addLog('info', 'Edge function test successful', {
+          responseTime: end - start
+        });
+      }
+    } catch (err: any) {
+      setDiagnosticReport(prev => ({
+        ...prev,
+        tests: prev.tests.map(test => 
+          test.name === testName ? {
+            ...test,
+            status: 'error',
+            message: 'Edge function exception',
+            details: `Exception: ${err.message}`,
+            timestamp: new Date().toISOString()
+          } : test
+        ),
+        errors: [...prev.errors, {
+          message: `Edge function test exception: ${err.message}`,
+          timestamp: new Date().toISOString(),
+          context: 'edge-function-test-exception'
+        }]
+      }));
+      
+      addLog('error', 'Edge function test exception', {
+        error: err.message
+      });
+    }
+  };
 
-  if (!isExpanded && !results?.recommendedActions.length) {
-    return (
-      <Button 
-        variant="ghost" 
-        size="sm" 
-        className="absolute top-2 right-2 z-10"
-        onClick={() => setIsExpanded(true)}
-      >
-        {isRunningTests ? (
-          <RefreshCw className="h-4 w-4 animate-spin" />
-        ) : (
-          <span className="flex items-center gap-1">
-            {results?.status === 'success' ? (
-              <CheckCircle className="h-3 w-3 text-green-500" />
-            ) : results?.status === 'warning' ? (
-              <AlertTriangle className="h-3 w-3 text-yellow-500" />
-            ) : (
-              <AlertTriangle className="h-3 w-3 text-red-500" />
-            )}
-            Diagnostics
-          </span>
-        )}
-      </Button>
+  const downloadReport = () => {
+    const reportBlob = new Blob(
+      [JSON.stringify(diagnosticReport, null, 2)], 
+      { type: 'application/json' }
     );
-  }
+    const url = URL.createObjectURL(reportBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `journal-diagnostics-${new Date().toISOString()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    addLog('action', 'Diagnostic report downloaded');
+  };
+
+  const generateSummary = () => {
+    const totalTests = diagnosticReport.tests.length;
+    const passedTests = diagnosticReport.tests.filter(test => test.status === 'success').length;
+    const failedTests = diagnosticReport.tests.filter(test => test.status === 'error').length;
+    const pendingTests = diagnosticReport.tests.filter(test => test.status === 'pending').length;
+    
+    if (totalTests === 0) {
+      return 'No diagnostic tests have been run yet';
+    }
+    
+    let summary = `${passedTests} of ${totalTests} tests passed`;
+    if (failedTests > 0) {
+      summary += `, ${failedTests} failed`;
+    }
+    if (pendingTests > 0) {
+      summary += `, ${pendingTests} pending`;
+    }
+    
+    return summary;
+  };
+
+  const getOverallStatus = () => {
+    if (diagnosticReport.tests.length === 0) {
+      return diagnosticReport.connectionStatus;
+    }
+    
+    const hasFailures = diagnosticReport.tests.some(test => test.status === 'error');
+    const allPending = diagnosticReport.tests.every(test => test.status === 'pending');
+    
+    if (allPending) return 'checking';
+    return hasFailures ? 'error' : 'connected';
+  };
+
+  const renderStatusBadge = (status: 'success' | 'error' | 'pending') => {
+    if (status === 'success') {
+      return <Badge variant="outline" className="bg-green-100 text-green-800">Success</Badge>;
+    } else if (status === 'error') {
+      return <Badge variant="outline" className="bg-red-100 text-red-800">Failed</Badge>;
+    } else {
+      return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+    }
+  };
+
+  const getConnectionStatusAlert = () => {
+    const overallStatus = getOverallStatus();
+    
+    if (overallStatus === 'checking') {
+      return (
+        <Alert className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Checking Connection</AlertTitle>
+          <AlertDescription>
+            System is checking database connectivity...
+          </AlertDescription>
+        </Alert>
+      );
+    } else if (overallStatus === 'error') {
+      return (
+        <Alert variant="destructive" className="mb-4">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Connection Issues Detected</AlertTitle>
+          <AlertDescription>
+            There are connectivity issues with the journal system.
+            {diagnosticReport.errors.length > 0 && (
+              <div className="mt-2">
+                <strong>Latest error:</strong> {diagnosticReport.errors[diagnosticReport.errors.length - 1].message}
+              </div>
+            )}
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    
+    return (
+      <Alert variant="default" className="mb-4 bg-green-50 border-green-200">
+        <CheckCircle className="h-4 w-4 text-green-500" />
+        <AlertTitle>Connection Established</AlertTitle>
+        <AlertDescription>
+          The journal system is connected successfully.
+        </AlertDescription>
+      </Alert>
+    );
+  };
 
   return (
-    <Card className="mb-6 relative">
+    <Card className="mb-4">
       <CardHeader className="pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-lg flex items-center gap-2">
-            {results?.status === 'success' ? (
-              <CheckCircle className="h-5 w-5 text-green-500" />
-            ) : results?.status === 'warning' ? (
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
-            ) : results?.status === 'error' ? (
-              <XCircle className="h-5 w-5 text-red-500" />
-            ) : null}
-            Journal Diagnostics
-          </CardTitle>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Bug className="h-4 w-4" />
+              Journal Diagnostics
+              {getOverallStatus() === 'connected' && (
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              )}
+              {getOverallStatus() === 'error' && (
+                <XCircle className="h-4 w-4 text-red-500" />
+              )}
+              {getOverallStatus() === 'checking' && (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              )}
+            </CardTitle>
+            <CardDescription>{generateSummary()}</CardDescription>
+          </div>
           <div className="flex gap-2">
             <Button 
-              variant="outline" 
               size="sm" 
-              onClick={runDiagnostics} 
+              variant="outline" 
+              onClick={runDiagnosticTests}
               disabled={isRunningTests}
             >
               {isRunningTests ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Running...
+                </>
               ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Run Tests
+                </>
               )}
-              Run Tests
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="px-2"
-              onClick={() => setIsExpanded(false)}
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => setIsExpanded(!isExpanded)}
             >
-              {results?.recommendedActions.length ? 'Minimize' : 'Close'}
+              {isExpanded ? 'Collapse' : 'Expand'}
             </Button>
           </div>
         </div>
       </CardHeader>
       
-      <CardContent>
-        {results?.recommendedActions.length > 0 && (
-          <Alert className="mb-4" variant={results.status === 'error' ? 'destructive' : 'default'}>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>{results.status === 'error' ? 'Critical Issues' : 'Issues'} Detected</AlertTitle>
-            <AlertDescription>
-              <ul className="list-disc pl-5 mt-2 space-y-1">
-                {results.recommendedActions.map((action, i) => (
-                  <li key={i}>{action}</li>
+      {isExpanded && (
+        <CardContent>
+          {getConnectionStatusAlert()}
+          
+          {diagnosticReport.tests.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">Test Results</h3>
+              <div className="space-y-2">
+                {diagnosticReport.tests.map((test, index) => (
+                  <div key={index} className="border rounded-md p-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="font-medium">{test.name}</div>
+                      {renderStatusBadge(test.status)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">{test.message}</div>
+                    {test.details && (
+                      <div className="mt-1 text-xs text-muted-foreground">{test.details}</div>
+                    )}
+                  </div>
                 ))}
-              </ul>
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        <Tabs defaultValue="summary">
-          <TabsList>
-            <TabsTrigger value="summary">Summary</TabsTrigger>
-            <TabsTrigger value="details">Details</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="summary" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              <div className="flex items-center gap-2 p-3 border rounded-md">
-                <Database className="h-5 w-5" />
-                <div>
-                  <div className="text-sm font-medium">Database</div>
-                  <div className="flex items-center gap-1">
-                    {results?.details.database.success ? (
-                      <CheckCircle className="h-3 w-3 text-green-500" />
-                    ) : (
-                      <XCircle className="h-3 w-3 text-red-500" />
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {results?.details.database.success 
-                        ? `Connected (${results?.details.database.latency}ms)` 
-                        : 'Failed'}
-                    </span>
-                  </div>
-                </div>
               </div>
               
-              <div className="flex items-center gap-2 p-3 border rounded-md">
-                <HardDrive className="h-5 w-5" />
-                <div>
-                  <div className="text-sm font-medium">Storage</div>
-                  <div className="flex items-center gap-1">
-                    {results?.details.storage.audioBucketExists ? (
-                      <CheckCircle className="h-3 w-3 text-green-500" />
-                    ) : (
-                      <XCircle className="h-3 w-3 text-red-500" />
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {results?.details.storage.audioBucketExists 
-                        ? 'Audio bucket exists' 
-                        : 'Audio bucket missing'}
-                    </span>
+              {diagnosticReport.errors.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-1 text-amber-500" />
+                      Errors Detected ({diagnosticReport.errors.length})
+                    </h3>
+                    <div className="max-h-40 overflow-y-auto space-y-2">
+                      {diagnosticReport.errors.map((error, index) => (
+                        <div key={index} className="text-xs p-2 bg-red-50 border border-red-100 rounded">
+                          <div className="text-red-800">{error.message}</div>
+                          <div className="text-muted-foreground mt-1">
+                            {new Date(error.timestamp).toLocaleTimeString()} 
+                            {error.context && ` - ${error.context}`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 p-3 border rounded-md">
-                <Wifi className="h-5 w-5" />
-                <div>
-                  <div className="text-sm font-medium">Edge Functions</div>
-                  <div className="flex items-center gap-1">
-                    {results?.details.edgeFunctions.transcribeAudio.reachable ? (
-                      <CheckCircle className="h-3 w-3 text-green-500" />
-                    ) : (
-                      <XCircle className="h-3 w-3 text-red-500" />
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {results?.details.edgeFunctions.transcribeAudio.reachable 
-                        ? 'Transcription API ready' 
-                        : 'Transcription API error'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 p-3 border rounded-md">
-                <Mic className="h-5 w-5" />
-                <div>
-                  <div className="text-sm font-medium">Recording</div>
-                  <div className="flex items-center gap-1">
-                    {results?.details.recording.mediaDevicesAvailable ? (
-                      <CheckCircle className="h-3 w-3 text-green-500" />
-                    ) : (
-                      <XCircle className="h-3 w-3 text-red-500" />
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {results?.details.recording.mediaDevicesAvailable 
-                        ? 'Media devices ready' 
-                        : 'Media devices issue'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
-          </TabsContent>
+          )}
           
-          <TabsContent value="details" className="mt-4">
-            <div className="space-y-4 text-sm">
-              <div>
-                <h3 className="font-semibold mb-1">Database</h3>
-                <div className="pl-4 space-y-0.5">
-                  <div>Status: {results?.details.database.success ? 'Connected' : 'Failed'}</div>
-                  <div>Latency: {results?.details.database.latency || 'N/A'} ms</div>
-                  {results?.details.database.error && (
-                    <div className="text-red-500">Error: {results.details.database.error}</div>
-                  )}
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold mb-1">Storage</h3>
-                <div className="pl-4 space-y-0.5">
-                  <div>Audio Bucket: {results?.details.storage.audioBucketExists ? 'Exists' : 'Missing'}</div>
-                  <div>Permissions: {results?.details.storage.hasPermission ? 'Granted' : 'Denied'}</div>
-                  {results?.details.storage.error && (
-                    <div className="text-red-500">Error: {results.details.storage.error}</div>
-                  )}
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold mb-1">Edge Functions</h3>
-                <div className="pl-4 space-y-0.5">
-                  <div>Transcribe Function: {results?.details.edgeFunctions.transcribeAudio.reachable ? 'Available' : 'Unreachable'}</div>
-                  {results?.details.edgeFunctions.transcribeAudio.error && (
-                    <div className="text-red-500">Error: {results.details.edgeFunctions.transcribeAudio.error}</div>
-                  )}
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold mb-1">Network</h3>
-                <div className="pl-4 space-y-0.5">
-                  <div>Online: {results?.details.network.online ? 'Yes' : 'No'}</div>
-                  <div>Supabase Latency: {results?.details.network.supabaseLatency || 'N/A'} ms</div>
-                  {results?.details.network.error && (
-                    <div className="text-red-500">Error: {results.details.network.error}</div>
-                  )}
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold mb-1">Recording</h3>
-                <div className="pl-4 space-y-0.5">
-                  <div>Audio Context: {results?.details.recording.audioContextAvailable ? 'Available' : 'Unavailable'}</div>
-                  <div>Media Devices: {results?.details.recording.mediaDevicesAvailable ? 'Available' : 'Unavailable'}</div>
-                  <div>Storage Access: {results?.details.recording.storageAccessible ? 'Available' : 'Unavailable'}</div>
-                  {results?.details.recording.error && (
-                    <div className="text-red-500">Error: {results.details.recording.error}</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-      
-      <CardFooter className="pt-2 flex justify-between">
-        <div className="text-xs text-muted-foreground">
-          Last checked: {results?.timestamp ? new Date(results.timestamp).toLocaleString() : 'Never'}
-        </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={downloadResults} 
-          disabled={!results}
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Download Report
-        </Button>
-      </CardFooter>
+          <div className="mt-4">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={downloadReport}
+              className="flex items-center"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download Report
+            </Button>
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
-};
-
-export default JournalDiagnostics;
+}
