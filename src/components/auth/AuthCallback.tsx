@@ -25,8 +25,8 @@ const AuthCallback = () => {
           console.log("Processing hash-based auth callback");
           
           try {
-            // Handle the OAuth callback with the correct method
-            // For access_token in hash (implicit flow)
+            // For access_token in hash (implicit flow), use the correct method
+            const url = window.location.href;
             const { data, error } = await supabase.auth.getSession();
             
             if (error) {
@@ -63,7 +63,7 @@ const AuthCallback = () => {
           }
           
           try {
-            // Handle the authorization code (code=) flow
+            // Handle the authorization code (code=) flow with the correct method
             const code = new URLSearchParams(location.search).get('code');
             if (code) {
               const { data, error } = await supabase.auth.exchangeCodeForSession(code);

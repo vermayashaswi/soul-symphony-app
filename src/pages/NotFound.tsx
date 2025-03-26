@@ -15,7 +15,7 @@ const NotFound = () => {
     console.log("NotFound: Current hash:", location.hash ? "Present (length: " + location.hash.length + ")" : "None");
     console.log("NotFound: Current search:", location.search || "None");
     
-    // Check for auth-related parameters in URL - expanded to catch more cases
+    // Check for auth-related parameters in URL - expanded to detect more patterns
     const isFromAuthRedirect = 
       // OAuth flow parameters
       location.hash.includes('access_token') ||
@@ -30,13 +30,17 @@ const NotFound = () => {
       location.search.includes('provider=google') ||
       // Additional checks
       location.search.includes('state=') ||  // OAuth state parameter
-      location.search.includes('session_id='); // Session related parameter
+      location.search.includes('session_id=') || // Session related parameter
+      // Special case for Google OAuth
+      location.pathname.includes('google-callback'); 
                           
     if (isFromAuthRedirect) {
       console.log("NotFound: Detected auth redirect, navigating to callback handler");
       
       // Always redirect to the callback route with the full hash/search intact
-      navigate('/callback' + location.search + location.hash, { replace: true });
+      const callbackUrl = '/callback' + location.search + location.hash;
+      console.log("Redirecting to:", callbackUrl);
+      navigate(callbackUrl, { replace: true });
       return;
     }
   }, [location, navigate]);

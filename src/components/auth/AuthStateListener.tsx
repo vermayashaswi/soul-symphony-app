@@ -34,8 +34,11 @@ const AuthStateListener = () => {
         (location.search.includes('code=') || 
          location.search.includes('state=')))) {
       console.log("AuthStateListener: Detected OAuth token or code in URL, redirecting to callback");
+      
       // Redirect to the callback route with the hash and search params intact
-      navigate('/callback' + location.search + location.hash, { replace: true });
+      const callbackUrl = '/callback' + location.search + location.hash;
+      console.log("Redirecting to:", callbackUrl);
+      navigate(callbackUrl, { replace: true });
       return;
     }
     
