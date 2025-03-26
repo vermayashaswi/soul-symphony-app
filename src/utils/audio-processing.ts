@@ -164,9 +164,10 @@ export const ensureAudioBucketExists = async (): Promise<boolean> => {
     }
     
     console.log('journal-audio-entries bucket does not exist');
-    
-    // Don't attempt to create the bucket from frontend code
-    // We should create it via SQL migrations only
+    toast.error('Audio storage is not properly configured. Please contact support.', {
+      duration: 5000,
+      id: 'audio-bucket-missing'
+    });
     
     return false;
   } catch (err) {

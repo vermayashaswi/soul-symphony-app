@@ -32,7 +32,7 @@ export default function BackendTester() {
         return;
       }
       
-      const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
+      const audioBucket = buckets?.find(bucket => bucket.name === 'journal-audio-entries');
       
       if (audioBucket) {
         toast.success('Audio bucket exists, checking policies...', { id: 'storage-check' });
@@ -43,7 +43,7 @@ export default function BackendTester() {
           
           // Try to upload a test file
           const { error: uploadError } = await supabase.storage
-            .from('audio')
+            .from('journal-audio-entries')
             .upload(testFilePath, new Blob(['test']), {
               contentType: 'text/plain',
               upsert: true
@@ -62,7 +62,7 @@ export default function BackendTester() {
             }
           } else {
             // Clean up the test file
-            await supabase.storage.from('audio').remove([testFilePath]);
+            await supabase.storage.from('journal-audio-entries').remove([testFilePath]);
             toast.success('Audio storage is working correctly', { id: 'storage-check' });
           }
         } catch (testError) {
@@ -70,15 +70,15 @@ export default function BackendTester() {
           toast.error('Failed to test bucket access', { id: 'storage-check' });
         }
       } else {
-        toast.error('Audio bucket does not exist, creating it now...', { id: 'storage-check' });
+        toast.error('Audio bucket does not exist, contact administrator...', { id: 'storage-check' });
         
-        // Create the bucket and policies using type assertion for edge function
+        // Attempt to check if the bucket can be created
         const result = await createAudioBucket();
         
         if (result.success) {
-          toast.success('Audio bucket created successfully', { id: 'storage-check' });
+          toast.success('Audio bucket verified successfully', { id: 'storage-check' });
         } else {
-          toast.error(`Failed to create audio bucket: ${result.error}`, { id: 'storage-check' });
+          toast.error(`Audio storage not available: ${result.error}`, { id: 'storage-check' });
         }
       }
     } catch (error: any) {
