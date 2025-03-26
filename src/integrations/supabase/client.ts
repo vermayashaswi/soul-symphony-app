@@ -40,9 +40,8 @@ export const checkSupabaseConnection = async () => {
     const { data, error } = await supabase
       .from('profiles')
       .select('id')
-      .limit(1)
-      // Remove the timeout method as it's not supported in the current version
-      
+      .limit(1);
+    
     const duration = Date.now() - start;
     
     if (error) {

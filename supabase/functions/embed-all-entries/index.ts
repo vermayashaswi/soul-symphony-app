@@ -1,239 +1,165 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.22.0";
-import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
-import { createJournalEmbeddingsTable } from "../_shared/sql-helpers.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { calculateEmbedding } from "../_shared/openai-helpers.ts";
 
-// Set up CORS headers
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+const createTableSchema = `
+CREATE TABLE IF NOT EXISTS journal_embeddings (
+  id BIGSERIAL PRIMARY KEY,
+  journal_entry_id BIGINT REFERENCES "Journal Entries" (id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  embedding VECTOR(1536) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', now())
+);
+`;
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Create a Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseServiceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const openaiKey = Deno.env.get("OPENAI_API_KEY") || "";
-
-    if (!supabaseUrl || !supabaseServiceRole || !openaiKey) {
-      throw new Error("Missing environment variables");
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceRole);
-
-    // Get the request body
-    const { userId, processAll = true } = await req.json();
-
+    const { userId, processAll = false } = await req.json();
+    
     if (!userId) {
-      throw new Error("Missing required field: userId");
+      throw new Error('User ID is required');
     }
-
+    
     console.log(`Processing journal entries for user ${userId}`);
-    console.log(`Process all entries: ${processAll ? "Yes" : "No"}`);
-
-    // First, make sure the journal_embeddings table exists
+    console.log(`Process all entries: ${processAll ? 'Yes' : 'No'}`);
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Ensure the embedding table exists
     try {
-      const { error: tableError } = await supabase.query(createJournalEmbeddingsTable);
+      const { error } = await supabase.rpc('execute_sql', { sql: createTableSchema });
       
-      if (tableError) {
-        console.error("Error creating table:", tableError);
-        // Continue anyway as the table might already exist
-      } else {
-        console.log("Journal embeddings table created or already exists");
+      if (error) {
+        console.error('Error running table creation SQL:', error);
       }
-    } catch (tableErr) {
-      console.error("Error running table creation SQL:", tableErr);
-      // Continue anyway as the table might already exist
+    } catch (error) {
+      console.error('Error running table creation SQL:', error);
     }
-
-    // Fetch journal entries that need embeddings
-    console.log("Fetching entries that need processing...");
+    
+    // Fetch journal entries that need processing
+    console.log('Fetching entries that need processing...');
+    
     let query = supabase
-      .from("Journal Entries")
-      .select("id, refined text, transcription text")
-      .eq("user_id", userId);
-
-    // If not processing all entries, only get ones without embeddings - with fixed filter
+      .from('Journal Entries')
+      .select('id, "refined text", "transcription text"')
+      .eq('user_id', userId);
+    
     if (!processAll) {
-      try {
-        const { data: existingEmbeddings } = await supabase
-          .from('journal_embeddings')
-          .select('journal_entry_id');
-          
-        const embeddedIds = existingEmbeddings?.map(e => e.journal_entry_id) || [];
-        
-        if (embeddedIds.length > 0) {
-          query = query.not('id', 'in', embeddedIds);
-        }
-      } catch (error) {
-        console.error("Error fetching existing embeddings:", error);
-        // Continue without filtering
+      console.log('Filtering for entries without embeddings');
+      
+      const { data: existingEmbeddings, error: embeddingsError } = await supabase
+        .from('journal_embeddings')
+        .select('journal_entry_id');
+      
+      if (embeddingsError) {
+        console.error('Error fetching existing embeddings:', embeddingsError);
+        throw new Error('Failed to fetch existing embeddings');
       }
-    } else {
-      console.log("Will process ALL entries regardless of existing embeddings");
+      
+      const processedIds = (existingEmbeddings || []).map(e => e.journal_entry_id);
+      
+      if (processedIds.length > 0) {
+        query = query.not('id', 'in', processedIds);
+      }
     }
-
-    const { data: entries, error: fetchError } = await query;
-
-    if (fetchError) {
-      console.error("Error fetching journal entries:", fetchError);
-      throw new Error(`Failed to fetch entries: ${fetchError.message}`);
+    
+    const { data: entries, error: entriesError } = await query;
+    
+    if (entriesError) {
+      console.error('Error fetching journal entries:', entriesError);
+      throw new Error('Failed to fetch entries: ' + entriesError.message);
     }
-
+    
     if (!entries || entries.length === 0) {
-      console.log("No entries to process");
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: "No entries to process",
-          processedCount: 0
+          message: 'No entries to process',
+          processedCount: 0 
         }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200 
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
+    
     console.log(`Found ${entries.length} entries to process`);
-
-    // Initialize OpenAI
-    const configuration = new Configuration({ apiKey: openaiKey });
-    const openai = new OpenAIApi(configuration);
-
-    // Process each entry
-    const results = [];
-    let successCount = 0;
-    let failureCount = 0;
-
+    
+    let processedCount = 0;
+    
     for (const entry of entries) {
+      const textToEmbed = entry["refined text"] || entry["transcription text"];
+      
+      if (!textToEmbed || textToEmbed.trim() === '') {
+        console.log(`Skipping entry ${entry.id} - no text to embed`);
+        continue;
+      }
+      
       try {
-        // Get the text to use for embedding
-        const text = entry["refined text"] || entry["transcription text"];
+        // Generate embedding for the journal entry text
+        const embedding = await calculateEmbedding(textToEmbed);
         
-        if (!text || text.trim() === "") {
-          console.log(`Skipping entry ${entry.id} - no valid text content`);
-          results.push({
-            id: entry.id,
-            status: "skipped",
-            reason: "No valid text content"
-          });
+        if (!embedding) {
+          console.error(`Failed to generate embedding for entry ${entry.id}`);
           continue;
         }
-
-        // Log the entry being processed
-        console.log(`Processing entry ${entry.id}`);
-        console.log(`Text length: ${text.length} characters`);
-        console.log(`Text snippet: ${text.substring(0, 100)}...`);
         
-        // Check for any existing embedding for this entry first
-        const { data: existingEmbeddings, error: checkError } = await supabase
-          .from('journal_embeddings')
-          .select('id')
-          .eq('journal_entry_id', entry.id)
-          .limit(1);
-          
-        if (checkError) {
-          console.error(`Error checking for existing embedding for entry ${entry.id}:`, checkError);
-        } else if (existingEmbeddings && existingEmbeddings.length > 0) {
-          console.log(`Found existing embedding for entry ${entry.id}, deleting it first`);
-          
-          // Delete existing embedding
-          const { error: deleteError } = await supabase
-            .from('journal_embeddings')
-            .delete()
-            .eq('journal_entry_id', entry.id);
-            
-          if (deleteError) {
-            console.error(`Error deleting existing embedding for entry ${entry.id}:`, deleteError);
-          } else {
-            console.log(`Successfully deleted existing embedding for entry ${entry.id}`);
-          }
-        }
-
-        // Generate embedding
-        console.log(`Generating embedding for entry ${entry.id}...`);
-        const embeddingResponse = await openai.createEmbedding({
-          model: "text-embedding-ada-002",
-          input: text.trim(),
-        });
-
-        if (!embeddingResponse.data || !embeddingResponse.data.data || embeddingResponse.data.data.length === 0) {
-          throw new Error(`OpenAI API returned an invalid response for entry ${entry.id}`);
-        }
-
-        const [{ embedding }] = embeddingResponse.data.data;
-        console.log(`Successfully generated embedding for entry ${entry.id}`);
-
-        // Store the embedding
-        const { data, error } = await supabase
+        // Store the embedding in the database
+        const { error: insertError } = await supabase
           .from('journal_embeddings')
           .insert({
             journal_entry_id: entry.id,
-            embedding,
-            content: text
+            content: textToEmbed,
+            embedding: embedding,
           });
-
-        if (error) {
-          console.error(`Error storing embedding for entry ${entry.id}:`, error);
-          results.push({
-            id: entry.id,
-            status: "failed",
-            error: error.message
-          });
-          failureCount++;
-        } else {
-          console.log(`Successfully stored embedding for entry ${entry.id}`);
-          results.push({
-            id: entry.id,
-            status: "success"
-          });
-          successCount++;
+          
+        if (insertError) {
+          console.error(`Error storing embedding for entry ${entry.id}:`, insertError);
+          continue;
         }
+        
+        processedCount++;
+        console.log(`Processed entry ${entry.id}`);
+        
       } catch (error) {
         console.error(`Error processing entry ${entry.id}:`, error);
-        results.push({
-          id: entry.id,
-          status: "failed",
-          error: error.message
-        });
-        failureCount++;
       }
     }
-
-    console.log(`Processing complete: ${successCount} successful, ${failureCount} failed`);
-
+    
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Processing complete: ${successCount} successful, ${failureCount} failed`,
-        results,
-        processedCount: successCount,
-        failedCount: failureCount
+        message: `Successfully processed ${processedCount} of ${entries.length} entries`,
+        processedCount
       }),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+    
   } catch (error) {
-    console.error("Error in embed-all-entries function:", error);
+    console.error('Error in embed-all-entries function:', error);
     
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message 
+        error: error.message || 'An unknown error occurred',
+        processedCount: 0
       }),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500 
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
