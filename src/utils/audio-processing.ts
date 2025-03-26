@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { processAudioBlobForTranscription } from './audio/transcription-service';
@@ -136,5 +137,40 @@ export const processRecording = async (
       success: false,
       error: error.message || 'Unknown error processing recording'
     };
+  }
+};
+
+/**
+ * Check if the journal-audio-entries bucket exists on Supabase
+ * @returns A promise resolving to true if the bucket exists, false otherwise
+ */
+export const ensureAudioBucketExists = async (): Promise<boolean> => {
+  try {
+    console.log('Checking if journal-audio-entries bucket exists');
+    
+    // Check if the bucket exists
+    const { data: buckets, error } = await supabase.storage.listBuckets();
+    
+    if (error) {
+      console.error('Error checking buckets:', error);
+      return false;
+    }
+    
+    const audioBucket = buckets.find(bucket => bucket.name === 'journal-audio-entries');
+    
+    if (audioBucket) {
+      console.log('journal-audio-entries bucket exists');
+      return true;
+    }
+    
+    console.log('journal-audio-entries bucket does not exist');
+    
+    // Don't attempt to create the bucket from frontend code
+    // We should create it via SQL migrations only
+    
+    return false;
+  } catch (err) {
+    console.error('Error checking audio bucket:', err);
+    return false;
   }
 };
