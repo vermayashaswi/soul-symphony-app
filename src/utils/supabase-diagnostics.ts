@@ -112,7 +112,8 @@ export async function createAudioBucket() {
     const policySetup = async () => {
       try {
         // Allow users to create folders/read their own data
-        const { error: policyError } = await supabase.rpc('create_storage_policy', {
+        // Use type assertion to avoid TypeScript error with RPC function
+        const { error: policyError } = await (supabase.rpc as any)('create_storage_policy', {
           bucket_name: 'audio',
           policy_name: 'Allow individual user access',
           definition: "(auth.uid() = owner) OR (bucket_id = 'audio' AND name LIKE auth.uid() || '/%')"
