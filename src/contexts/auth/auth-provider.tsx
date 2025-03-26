@@ -110,13 +110,13 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
         console.log('Force ending auth loading state after timeout');
         setIsLoading(false);
       }
-    }, 1500);
+    }, 2500);
     
     // Set up auth state change listener
     try {
       // Wrap in try/catch to handle storage access errors
       const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-        console.log('Auth state changed:', event);
+        console.log('Auth state changed:', event, 'Session exists:', !!newSession);
         
         // Debug session info on critical events
         if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
@@ -142,6 +142,14 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
           // Only show toast for SIGNED_IN once per session
           if (event === 'SIGNED_IN' && !user) {
             toast.success('Signed in successfully');
+            
+            // Set a persistent flag to indicate successful auth
+            try {
+              localStorage.setItem('auth_success', 'true');
+              localStorage.setItem('last_auth_time', Date.now().toString());
+            } catch (e) {
+              console.warn('Could not save auth success flag:', e);
+            }
           }
           
           // Ensure user profile exists after sign-in
@@ -203,6 +211,14 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
           setProfileCreationAttempted(false);
           setProfileCreationErrorShown(false);
           setIsLoading(false);
+          
+          // Clear auth success flag
+          try {
+            localStorage.removeItem('auth_success');
+            localStorage.removeItem('last_auth_time');
+          } catch (e) {
+            console.warn('Could not clear auth success flag:', e);
+          }
         } else if (event === 'INITIAL_SESSION') {
           // This event indicates the initial session check is complete
           setInitialSessionCheckDone(true);
@@ -256,8 +272,44 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
         }
         
         console.log('Initial session checked:', initialSession ? 'Found' : 'Not found');
-        if (!initialSession) {
+        if (initialSession) {
+          console.log('Session found with user ID:', initialSession.user.id);
+          
+          // Set a persistent flag to indicate successful auth
+          try {
+            localStorage.setItem('auth_success', 'true');
+            localStorage.setItem('last_auth_time', Date.now().toString());
+          } catch (e) {
+            console.warn('Could not save auth success flag:', e);
+          }
+        } else {
           console.log('No initial session found');
+          
+          // Check if we had a previous successful auth that might have been lost
+          try {
+            const hadPreviousAuth = localStorage.getItem('auth_success') === 'true';
+            const lastAuthTime = localStorage.getItem('last_auth_time');
+            
+            if (hadPreviousAuth && lastAuthTime) {
+              const timeSinceAuth = Date.now() - parseInt(lastAuthTime, 10);
+              const isRecent = timeSinceAuth < 24 * 60 * 60 * 1000; // Less than 24 hours
+              
+              if (isRecent) {
+                console.log('Recent auth detected but session missing, attempting refresh');
+                
+                // Try to refresh the session
+                const refreshResult = await supabase.auth.refreshSession();
+                
+                if (refreshResult.data.session) {
+                  console.log('Session successfully refreshed');
+                  setSession(refreshResult.data.session);
+                  setUser(refreshResult.data.session.user);
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Could not check previous auth status:', e);
+          }
         }
         
         setSession(initialSession);
@@ -371,21 +423,36 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       // First try to clear local storage 
       try {
         safeStorage.removeItem('supabase.auth.token');
+        const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
+        safeStorage.removeItem(`${storageKeyPrefix}-auth-token`);
+        safeStorage.removeItem('auth_success');
+        safeStorage.removeItem('last_auth_time');
       } catch (e) {
         console.warn('Could not clear localStorage but continuing:', e);
       }
       
-      // Then sign out via Supabase
-      await supabase.auth.signOut({ scope: 'global' });
+      // Then sign out via Supabase with global scope
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
       
+      if (error) {
+        console.error('Error during signOut:', error);
+        toast.error(`Sign out failed: ${error.message}`);
+      }
+      
+      // Force state update regardless of API response
       setUser(null);
       setSession(null);
       
+      setIsLoading(false);
       // The auth state change listener will handle updating the state
     } catch (error: any) {
       console.error('Sign out error:', error);
       toast.error(`Sign out failed: ${error.message}`);
       setIsLoading(false);
+      
+      // Force state update even on error
+      setUser(null);
+      setSession(null);
     }
   };
   

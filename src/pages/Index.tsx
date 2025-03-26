@@ -1,4 +1,3 @@
-
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +5,7 @@ import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/auth';
 import { useEffect, useState, useRef } from 'react';
 import { createOrUpdateSession } from '@/utils/audio/auth-profile';
+import { toast } from 'sonner';
 
 export default function Index() {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ export default function Index() {
   const [authChecked, setAuthChecked] = useState(false);
   const [sessionTracked, setSessionTracked] = useState(false);
   const sessionTrackingAttemptedRef = useRef(false);
+  const redirectAttemptedRef = useRef(false);
 
   // Add a timeout to prevent infinite loading state
   useEffect(() => {
@@ -33,6 +34,21 @@ export default function Index() {
       setAuthChecked(true);
     }
   }, [isLoading]);
+
+  // Redirect authenticated users to journal page
+  useEffect(() => {
+    if (user && !redirectAttemptedRef.current && !isLoading) {
+      console.log("User is authenticated, redirecting to journal page");
+      redirectAttemptedRef.current = true;
+      
+      // Use a short delay to ensure any other state updates complete
+      const redirectTimer = setTimeout(() => {
+        navigate('/journal');
+      }, 100);
+      
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [user, isLoading, navigate]);
 
   // Track session when user visits index page - only if authenticated
   useEffect(() => {
@@ -56,6 +72,30 @@ export default function Index() {
         });
     }
   }, [user, sessionTracked]);
+
+  // Check for auth state issues
+  useEffect(() => {
+    if (authChecked && !isLoading) {
+      try {
+        const authSuccess = localStorage.getItem('auth_success') === 'true';
+        const lastAuthTime = localStorage.getItem('last_auth_time');
+        
+        if (authSuccess && lastAuthTime && !user) {
+          const timeSinceAuth = Date.now() - parseInt(lastAuthTime, 10);
+          const isRecent = timeSinceAuth < 30 * 60 * 1000; // Less than 30 minutes
+          
+          if (isRecent) {
+            console.warn('Auth inconsistency detected: localStorage indicates recent auth but no user object');
+            toast.error('Session error detected. Please try signing in again.');
+            localStorage.removeItem('auth_success');
+            localStorage.removeItem('last_auth_time');
+          }
+        }
+      } catch (e) {
+        console.warn('Error checking auth state consistency:', e);
+      }
+    }
+  }, [authChecked, isLoading, user]);
 
   const handleGetStarted = () => {
     if (user) {
