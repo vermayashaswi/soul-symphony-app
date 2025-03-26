@@ -63,13 +63,13 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
     const controller = new AbortController();
     const uploadTimeout = setTimeout(() => controller.abort(), 15000); // 15 second timeout
     
+    // Remove the signal property from the options as it's not supported in FileOptions
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('audio')
       .upload(filePath, audioBlob, {
         contentType: 'audio/webm',
         cacheControl: '3600',
-        upsert: false,
-        signal: controller.signal
+        upsert: false
       });
     
     clearTimeout(uploadTimeout);
@@ -122,6 +122,7 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
     const entryCreateController = new AbortController();
     const entryTimeout = setTimeout(() => entryCreateController.abort(), 8000);
     
+    // Remove the abortSignal from the supabase call as it's not supported
     const { data: entryData, error: entryError } = await supabase
       .from('Journal Entries')
       .insert([
@@ -133,7 +134,6 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
         }
       ])
       .select()
-      .abortSignal(entryCreateController.signal)
       .single();
     
     clearTimeout(entryTimeout);

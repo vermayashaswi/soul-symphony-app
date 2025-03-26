@@ -111,14 +111,13 @@ export async function sendAudioForTranscription(base64String: string, userId: st
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
-    // Call the Supabase function
+    // Call the Supabase function - removing the signal property as it's not supported
     console.log("Calling transcribe-audio edge function...");
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64String,
         userId
-      },
-      signal: controller.signal
+      }
     });
     
     clearTimeout(timeoutId);
