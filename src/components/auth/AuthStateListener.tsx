@@ -12,8 +12,9 @@ const AuthStateListener = () => {
   
   // Handle OAuth redirects that come with tokens in the URL
   useEffect(() => {
-    // Prevent multiple initializations
+    // Prevent multiple initializations with a strong guard
     if (initializeAttemptedRef.current) {
+      console.log("AuthStateListener already initialized, skipping duplicate setup");
       return;
     }
     
@@ -48,6 +49,7 @@ const AuthStateListener = () => {
     
     return () => {
       console.log("Cleaning up AuthStateListener");
+      initializeAttemptedRef.current = false; // Reset on unmount
     };
   }, [location.pathname, location.hash, location.search, navigate]);
 

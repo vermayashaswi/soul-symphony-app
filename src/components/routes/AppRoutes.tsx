@@ -1,5 +1,5 @@
 
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import Index from "@/pages/Index";
 import Journal from "@/pages/Journal";
 import Record from "@/pages/Record";
@@ -12,13 +12,21 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import AppLayout from "@/components/layout/AppLayout";
 import AuthStateListener from "@/components/auth/AuthStateListener";
 import AuthCallback from "@/components/auth/AuthCallback";
+import { useEffect } from "react";
 
 const AppRoutes = () => {
-  console.log("AppRoutes rendering with origin:", window.location.origin);
+  const location = useLocation();
+  
+  // Log initial route for debugging
+  useEffect(() => {
+    console.log("AppRoutes rendering on path:", location.pathname, "with origin:", window.location.origin);
+  }, [location.pathname]);
   
   return (
     <AppLayout>
+      {/* Only render AuthStateListener once */}
       <AuthStateListener />
+      
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />

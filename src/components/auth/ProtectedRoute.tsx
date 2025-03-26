@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/auth";
+import { toast } from "sonner";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,31 +15,51 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   
   // Try to refresh the session once when component mounts
   useEffect(() => {
+    let isMounted = true;
+    
     const checkAuth = async () => {
-      try {
-        if (!user && !authChecked) {
-          console.log("Protected route: No user found, attempting to refresh session");
-          await refreshSession();
+      if (!user && !authChecked) {
+        console.log("Protected route: No user found, attempting to refresh session");
+        
+        try {
+          const refreshed = await refreshSession();
+          
+          // Only update state if the component is still mounted
+          if (isMounted) {
+            if (!refreshed) {
+              console.log("Session refresh failed, redirecting to auth");
+            }
+            setAuthChecked(true);
+          }
+        } catch (err) {
+          console.error("Error refreshing session:", err);
+          if (isMounted) {
+            setAuthChecked(true);
+          }
         }
-      } catch (err) {
-        console.error("Error refreshing session:", err);
-      } finally {
-        setAuthChecked(true);
+      } else if (user && !authChecked) {
+        console.log("Protected route: Tracking session for user", user.id, "on path", location.pathname);
+        if (isMounted) {
+          setAuthChecked(true);
+        }
       }
     };
     
     checkAuth();
     
-    // Force complete the check after a short timeout to prevent getting stuck
+    // Shorter timeout to prevent getting stuck
     const timeout = setTimeout(() => {
-      if (!authChecked) {
+      if (isMounted && !authChecked) {
         console.log('Force completing auth check due to timeout');
         setAuthChecked(true);
       }
-    }, 1000); // Shorter timeout for faster fallback
+    }, 800);
     
-    return () => clearTimeout(timeout);
-  }, [user, authChecked, refreshSession]);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
+  }, [user, authChecked, refreshSession, location.pathname]);
   
   // If we have a user, render the protected content immediately
   if (user) {
