@@ -52,7 +52,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
           }
         }
       } else if (user && !authChecked) {
-        logInfo("Protected route: Tracking session for user", user.id, "on path", location.pathname);
+        // Fix: Only passing the message and optional details to logInfo
+        logInfo("Protected route: Tracking session for user " + user.id + " on path " + location.pathname);
         if (isMounted) {
           setAuthChecked(true);
         }
@@ -92,7 +93,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
   
   // If auth check is complete and no user is found, redirect to auth
-  logInfo("Redirecting to auth from protected route:", location.pathname);
+  logInfo("Redirecting to auth from protected route: " + location.pathname);
   return <Navigate to="/auth" state={{ from: location }} replace />;
 };
 
