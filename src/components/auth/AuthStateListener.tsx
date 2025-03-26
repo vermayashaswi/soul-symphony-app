@@ -12,7 +12,6 @@ const AuthStateListener = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const initializeAttemptedRef = useRef(false);
-  const handleAuthTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { logInfo, logError } = useDebugLogger();
   
   // Handle OAuth redirects that come with tokens in the URL
@@ -102,11 +101,6 @@ const AuthStateListener = () => {
       logInfo("Cleaning up AuthStateListener");
       clearInterval(sessionCheckInterval);
       
-      // Clear any pending timeouts
-      if (handleAuthTimeoutRef.current) {
-        clearTimeout(handleAuthTimeoutRef.current);
-      }
-      
       // Only reset the flag on actual unmount, not just re-renders
       document.addEventListener('beforeunload', () => {
         initializeAttemptedRef.current = false;
@@ -114,35 +108,7 @@ const AuthStateListener = () => {
     };
   }, [location.pathname, location.hash, location.search, navigate, logInfo, logError, refreshSession, user]);
 
-  // Force session check when on index page and user appears to be logged in
-  useEffect(() => {
-    if (location.pathname === '/' && localStorage.getItem('auth_success') === 'true' && !user) {
-      logInfo("Index page: User should be logged in but no user object exists, checking session");
-      
-      // Set a short timeout to avoid immediate execution
-      const checkSessionTimeout = setTimeout(async () => {
-        try {
-          const { data, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            logError("Error getting session on index page:", error);
-            return;
-          }
-          
-          if (data.session) {
-            logInfo("Found valid session on index page, redirecting to journal");
-            await refreshSession();
-            navigate('/journal');
-          }
-        } catch (e) {
-          logError("Error in index page session check:", e);
-        }
-      }, 500);
-      
-      return () => clearTimeout(checkSessionTimeout);
-    }
-  }, [location.pathname, navigate, user, refreshSession, logInfo, logError]);
-
+  // No rendering - this is just a background listener
   return null;
 };
 

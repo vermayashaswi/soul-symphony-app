@@ -41,7 +41,6 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Get user's initials for avatar
   const getUserInitials = () => {
     if (!user) return "?";
     
@@ -73,7 +72,8 @@ export function Navbar() {
       
       // First clear local storage to ensure no cached session data
       try {
-        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('auth_success');
+        localStorage.removeItem('last_auth_time');
         const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
         localStorage.removeItem(`${storageKeyPrefix}-auth-token`);
       } catch (e) {
@@ -82,13 +82,6 @@ export function Navbar() {
       
       // Call the context's signOut first for state management
       await signOut();
-      
-      // Then directly call Supabase as a fallback
-      const { error } = await supabase.auth.signOut({ scope: 'global' });
-      
-      if (error) {
-        throw error;
-      }
       
       toast.success('Successfully signed out');
       closeMenu();
@@ -127,7 +120,6 @@ export function Navbar() {
           </motion.span>
         </Link>
 
-        {/* Desktop navigation */}
         <div className="hidden md:flex items-center gap-1">
           {navItems.map((item) => (
             <Link
@@ -187,7 +179,6 @@ export function Navbar() {
           )}
         </div>
 
-        {/* Mobile menu button */}
         <div className="md:hidden flex items-center gap-2">
           {user ? (
             <DropdownMenu>
@@ -231,7 +222,6 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {isMobile && (
         <motion.div
           initial={{ height: 0, opacity: 0 }}

@@ -37,10 +37,7 @@ const AuthCallback = () => {
     const handleAuthCallback = async () => {
       try {
         console.log("Auth callback page: Processing authentication...");
-        console.log("Current path:", location.pathname);
-        console.log("Current URL:", window.location.href);
         console.log("Hash present:", location.hash ? "Yes (length: " + location.hash.length + ")" : "No");
-        console.log("Hash content:", location.hash ? location.hash.substring(0, 20) + "..." : "None");
         console.log("Search params:", location.search || "None");
         
         // Validate we have auth parameters
@@ -55,7 +52,7 @@ const AuthCallback = () => {
           console.log("Processing hash-based auth callback");
           
           try {
-            // Explicitly exchange hash values for a session
+            // Exchange hash values for a session
             const { data, error } = await supabase.auth.getSession();
             
             if (error) {
@@ -67,15 +64,11 @@ const AuthCallback = () => {
             
             if (data?.session) {
               console.log("Successfully authenticated with hash");
-              console.log("Session details:", {
-                userId: data.session.user.id,
-                expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
-                tokenLength: data.session.access_token.length
-              });
               
               // Force storage sync after successful authentication
               try {
                 localStorage.setItem('sb-last-auth-time', Date.now().toString());
+                localStorage.setItem('auth_success', 'true');
               } catch (e) {
                 console.warn('LocalStorage access error, but continuing:', e);
               }
@@ -86,9 +79,7 @@ const AuthCallback = () => {
               return;
             } else {
               // If no session is found but we have hash tokens, try to use them
-              console.log("No session found, but hash tokens present - attempting to use them");
-              
-              // Forward the hash to the root URL where AuthStateListener can process it
+              console.log("No session found, but hash tokens present - attempting to redirect");
               navigate("/?hash_auth=true", { 
                 replace: true,
                 state: { fromCallback: true }
@@ -130,15 +121,11 @@ const AuthCallback = () => {
               
               if (data?.session) {
                 console.log("Successfully created session from code");
-                console.log("Session details:", {
-                  userId: data.session.user.id,
-                  expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
-                  tokenLength: data.session.access_token.length
-                });
                 
                 // Force storage sync after successful authentication
                 try {
-                  localStorage.setItem('sb-last-auth-time', Date.now().toString());
+                  localStorage.setItem('auth_success', 'true');
+                  localStorage.setItem('last_auth_time', Date.now().toString());
                 } catch (e) {
                   console.warn('LocalStorage access error, but continuing:', e);
                 }
@@ -157,7 +144,7 @@ const AuthCallback = () => {
           }
         }
         
-        // Check if we already have a session (fallback)
+        // Fallback check for existing session
         try {
           const { data, error } = await supabase.auth.getSession();
           
@@ -170,12 +157,6 @@ const AuthCallback = () => {
           
           if (data.session) {
             console.log("Successfully retrieved existing session");
-            console.log("Session details:", {
-              userId: data.session.user.id,
-              expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
-              tokenLength: data.session.access_token.length
-            });
-            
             await refreshSession();
             toast.success("Successfully signed in!");
             navigate("/journal", { replace: true });

@@ -39,7 +39,6 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
   const [isLoading, setIsLoading] = useState(true);
   const [profileCreationAttempted, setProfileCreationAttempted] = useState(false);
   const [initialSessionCheckDone, setInitialSessionCheckDone] = useState(false);
-  const [authEventsProcessed, setAuthEventsProcessed] = useState<Set<string>>(new Set());
   const [profileCreationErrorShown, setProfileCreationErrorShown] = useState(false);
   const [refreshInProgress, setRefreshInProgress] = useState(false);
   const authTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -114,235 +113,89 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
     
     // Set up auth state change listener
     try {
-      // Wrap in try/catch to handle storage access errors
-      const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-        console.log('Auth state changed:', event, 'Session exists:', !!newSession);
-        
-        // Debug session info on critical events
-        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-          debugSessionStatus().catch(console.error);
-        }
-        
-        // Create a unique ID for this event to prevent duplicate processing
-        const eventId = `${event}-${Date.now()}`;
-        
-        // Check if we've already processed this event
-        if (authEventsProcessed.has(eventId)) {
-          console.log('Skipping duplicate auth event:', event);
-          return;
-        }
-        
-        // Mark this event as processed
-        setAuthEventsProcessed(prev => new Set(prev).add(eventId));
-        
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-        
-        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-          // Only show toast for SIGNED_IN once per session
-          if (event === 'SIGNED_IN' && !user) {
-            toast.success('Signed in successfully');
-            
-            // Set a persistent flag to indicate successful auth
-            try {
-              localStorage.setItem('auth_success', 'true');
-              localStorage.setItem('last_auth_time', Date.now().toString());
-            } catch (e) {
-              console.warn('Could not save auth success flag:', e);
-            }
+      // Set up the auth state listener first - correct initialization order
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event, newSession) => {
+          console.log('Auth state changed:', event, 'Session exists:', !!newSession);
+          
+          // Update state immediately - synchronously
+          setSession(newSession);
+          setUser(newSession?.user ?? null);
+          
+          // Debug session info on critical events
+          if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+            debugSessionStatus().catch(console.error);
           }
           
-          // Ensure user profile exists after sign-in
-          if (newSession?.user) {
-            // Reset profile creation flag on new sign-in
-            setProfileCreationAttempted(false);
-            
-            // Log user data for debugging
-            console.log('User data after sign-in:', {
-              id: newSession.user.id,
-              email: newSession.user.email,
-              name: newSession.user.user_metadata?.full_name,
-              avatar: newSession.user.user_metadata?.avatar_url
-            });
-            
-            try {
-              // Update the profile with Google info if available
-              if (newSession.user.app_metadata?.provider === 'google' && 
-                  newSession.user.user_metadata?.full_name) {
-                try {
-                  const { data: existingProfile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', newSession.user.id)
-                    .maybeSingle();
-                    
-                  // Only update if it doesn't have data already
-                  if (existingProfile && (!existingProfile?.full_name || !existingProfile?.avatar_url)) {
-                    await supabase
-                      .from('profiles')
-                      .update({
-                        full_name: newSession.user.user_metadata.full_name,
-                        avatar_url: newSession.user.user_metadata.avatar_url,
-                        email: newSession.user.email
-                      })
-                      .eq('id', newSession.user.id);
-                  }
-                } catch (profileError) {
-                  console.error('Error updating profile with Google data but continuing:', profileError);
-                  // Continue even if this fails - the database trigger should have created the profile
-                }
-              }
+          if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+            // Only show toast for SIGNED_IN once per session
+            if (event === 'SIGNED_IN' && !user) {
+              toast.success('Signed in successfully');
               
-              // Use a short delay to ensure other auth processing completes first
+              // Set a persistent flag to indicate successful auth
+              safeStorage.setItem('auth_success', 'true');
+              safeStorage.setItem('last_auth_time', Date.now().toString());
+            }
+            
+            // Use setTimeout to avoid Supabase auth deadlock
+            if (newSession?.user) {
               setTimeout(() => {
                 createUserProfile(newSession.user.id).catch(err => {
-                  console.warn('Profile creation error on delayed attempt, but continuing:', err);
+                  console.warn('Profile creation error, but continuing:', err);
                 });
-              }, 500);
-            } catch (err) {
-              console.error('Profile creation error on auth state change, but continuing:', err);
+              }, 0);
             }
-          }
-          
-          // Always set loading to false after sign-in
-          setIsLoading(false);
-        } else if (event === 'SIGNED_OUT') {
-          toast.info('Signed out successfully');
-          setProfileCreationAttempted(false);
-          setProfileCreationErrorShown(false);
-          setIsLoading(false);
-          
-          // Clear auth success flag
-          try {
-            localStorage.removeItem('auth_success');
-            localStorage.removeItem('last_auth_time');
-          } catch (e) {
-            console.warn('Could not clear auth success flag:', e);
-          }
-        } else if (event === 'INITIAL_SESSION') {
-          // This event indicates the initial session check is complete
-          setInitialSessionCheckDone(true);
-          setIsLoading(false);
-        }
-      });
-      
-      authListenerRef.current = data;
-    } catch (error) {
-      console.error('Error setting up auth state listener:', error);
-      // Still mark as not loading even if we couldn't set up the listener
-      setIsLoading(false);
-    }
-    
-    // Check for existing session - only once
-    const checkInitialSession = async () => {
-      // Prevent duplicate initial checks
-      if (initialCheckPerformedRef.current) {
-        console.log('Initial session check already performed, skipping');
-        setIsLoading(false);
-        return;
-      }
-      
-      initialCheckPerformedRef.current = true;
-      
-      try {
-        if (initialSessionCheckDone) {
-          console.log('Initial session check already done, skipping');
-          setIsLoading(false);
-          return;
-        }
-        
-        console.log('Checking for initial session...');
-        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          // Handle missing session cleanly
-          if (error.message.includes('Auth session missing')) {
-            console.log("No initial session exists (user not authenticated)");
-            setSession(null);
-            setUser(null);
+            
             setIsLoading(false);
+          } else if (event === 'SIGNED_OUT') {
+            toast.info('Signed out successfully');
+            setProfileCreationAttempted(false);
+            setProfileCreationErrorShown(false);
+            setIsLoading(false);
+            
+            // Clear auth success flag
+            safeStorage.removeItem('auth_success');
+            safeStorage.removeItem('last_auth_time');
+          } else if (event === 'INITIAL_SESSION') {
             setInitialSessionCheckDone(true);
-            return;
+            setIsLoading(false);
           }
-          
+        }
+      );
+      
+      authListenerRef.current = { subscription };
+      
+      // THEN check for existing session
+      supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
+        if (error) {
           console.error('Error checking session, but continuing:', error);
           setIsLoading(false);
-          setInitialSessionCheckDone(true);
           return;
         }
         
-        console.log('Initial session checked:', initialSession ? 'Found' : 'Not found');
+        console.log('Initial session check:', initialSession ? 'Found' : 'Not found');
+        
         if (initialSession) {
           console.log('Session found with user ID:', initialSession.user.id);
+          safeStorage.setItem('auth_success', 'true');
           
-          // Set a persistent flag to indicate successful auth
-          try {
-            localStorage.setItem('auth_success', 'true');
-            localStorage.setItem('last_auth_time', Date.now().toString());
-          } catch (e) {
-            console.warn('Could not save auth success flag:', e);
-          }
-        } else {
-          console.log('No initial session found');
-          
-          // Check if we had a previous successful auth that might have been lost
-          try {
-            const hadPreviousAuth = localStorage.getItem('auth_success') === 'true';
-            const lastAuthTime = localStorage.getItem('last_auth_time');
-            
-            if (hadPreviousAuth && lastAuthTime) {
-              const timeSinceAuth = Date.now() - parseInt(lastAuthTime, 10);
-              const isRecent = timeSinceAuth < 24 * 60 * 60 * 1000; // Less than 24 hours
-              
-              if (isRecent) {
-                console.log('Recent auth detected but session missing, attempting refresh');
-                
-                // Try to refresh the session
-                const refreshResult = await supabase.auth.refreshSession();
-                
-                if (refreshResult.data.session) {
-                  console.log('Session successfully refreshed');
-                  setSession(refreshResult.data.session);
-                  setUser(refreshResult.data.session.user);
-                }
-              }
-            }
-          } catch (e) {
-            console.warn('Could not check previous auth status:', e);
-          }
+          // Use setTimeout to avoid Supabase auth deadlock
+          setTimeout(() => {
+            createUserProfile(initialSession.user.id).catch(err => {
+              console.warn('Profile creation error on initial session, but continuing:', err);
+            });
+          }, 0);
         }
         
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
         setIsLoading(false);
-        setInitialSessionCheckDone(true);
-        
-        // Ensure user profile exists for existing session
-        if (initialSession?.user) {
-          // Log user data for debugging
-          console.log('User data from existing session:', {
-            id: initialSession.user.id,
-            email: initialSession.user.email,
-            name: initialSession.user.user_metadata?.full_name,
-            avatar: initialSession.user.user_metadata?.avatar_url
-          });
-          
-          // Use a short delay to ensure other auth processing completes first
-          setTimeout(() => {
-            createUserProfile(initialSession.user.id).catch(err => {
-              console.warn('Profile creation error on delayed initial session, but continuing:', err);
-            });
-          }, 500);
-        }
-      } catch (error) {
-        console.error('Error checking session, but continuing:', error);
-        setIsLoading(false);
-        setInitialSessionCheckDone(true);
-      }
-    };
-    
-    // Check initial session with a small delay to allow auth state listener to set up
-    setTimeout(checkInitialSession, 100);
+      });
+      
+    } catch (error) {
+      console.error('Error setting up auth state listener:', error);
+      setIsLoading(false);
+    }
     
     return () => {
       console.log('Cleaning up auth provider');
@@ -350,70 +203,7 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       if (authListenerRef.current) authListenerRef.current.subscription.unsubscribe();
       authListenerRef.current = null;
     };
-  }, []);
-  
-  // Sign in with email and password
-  const signIn = async (email: string, password: string) => {
-    try {
-      return await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-    } catch (error: any) {
-      console.error('Sign in error:', error);
-      toast.error(`Sign in failed: ${error.message}`);
-      return { error };
-    }
-  };
-  
-  // Sign in with Google
-  const signInWithGoogle = async () => {
-    try {
-      // Clear any stored session data first to force a clean login
-      try {
-        safeStorage.removeItem('supabase.auth.token');
-        const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
-        safeStorage.removeItem(`${storageKeyPrefix}-auth-token`);
-      } catch (e) {
-        console.warn('Could not clear localStorage but continuing:', e);
-      }
-      
-      // Log that we're initiating Google sign-in
-      console.log('Initiating Google sign-in, redirecting to:', `${window.location.origin}/auth/callback`);
-      
-      return await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            prompt: 'select_account', // Force account selection
-            access_type: 'offline'
-          }
-        }
-      });
-    } catch (error: any) {
-      console.error('Google sign in error:', error);
-      toast.error(`Google sign in failed: ${error.message}`);
-      return { error };
-    }
-  };
-  
-  // Sign up with email and password
-  const signUp = async (email: string, password: string, metadata?: { [key: string]: any }) => {
-    try {
-      return await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: metadata
-        }
-      });
-    } catch (error: any) {
-      console.error('Sign up error:', error);
-      toast.error(`Sign up failed: ${error.message}`);
-      return { error, data: null };
-    }
-  };
+  }, [createUserProfile, isLoading, user]);
   
   // Sign out
   const signOut = async () => {
@@ -421,15 +211,8 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       setIsLoading(true);
       
       // First try to clear local storage 
-      try {
-        safeStorage.removeItem('supabase.auth.token');
-        const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
-        safeStorage.removeItem(`${storageKeyPrefix}-auth-token`);
-        safeStorage.removeItem('auth_success');
-        safeStorage.removeItem('last_auth_time');
-      } catch (e) {
-        console.warn('Could not clear localStorage but continuing:', e);
-      }
+      safeStorage.removeItem('auth_success');
+      safeStorage.removeItem('last_auth_time');
       
       // Then sign out via Supabase with global scope
       const { error } = await supabase.auth.signOut({ scope: 'global' });
@@ -444,7 +227,6 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       setSession(null);
       
       setIsLoading(false);
-      // The auth state change listener will handle updating the state
     } catch (error: any) {
       console.error('Sign out error:', error);
       toast.error(`Sign out failed: ${error.message}`);
@@ -465,90 +247,37 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
         return false;
       }
       
-      // Skip refresh if we have an active session
-      if (session && session.expires_at) {
-        const expiresAt = new Date(session.expires_at * 1000);
-        const now = new Date();
-        // If session expires more than 5 minutes from now, don't refresh
-        if (expiresAt.getTime() - now.getTime() > 5 * 60 * 1000) {
-          console.log("Current session is still valid, skipping refresh");
-          return true;
-        }
-      }
-      
       setRefreshInProgress(true);
       console.log("Attempting to refresh session...");
       
       // Debug current session state before refresh
       await debugSessionStatus();
       
-      const refreshOperation = async () => {
-        // Skip refresh if we don't have any session tokens to refresh from
-        const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
-        const hasTokens = safeStorage.getItem('supabase.auth.token') || 
-                        safeStorage.getItem(`${storageKeyPrefix}-auth-token`);
-        
-        if (!hasTokens) {
-          console.log('No stored tokens found to refresh session from');
-          return { data: { session: null }, error: null };
-        }
-        
-        const { data, error } = await supabase.auth.refreshSession();
-        
-        // Handle the "Auth session missing" error case cleanly
-        if (error) {
-          if (error.message.includes('Auth session missing')) {
-            console.log('No session exists to refresh (user not authenticated)');
-            return { data, error: null }; // Convert to non-error for unauthenticated state
-          }
-          throw error;
-        }
-        
-        return { data, error };
-      };
-      
-      // Only try one refresh attempt to avoid endless loops
-      let result;
-      
-      try {
-        result = await refreshOperation();
-      } catch (err: any) {
-        console.warn(`Session refresh failed:`, err);
-        setIsLoading(false);
-        setRefreshInProgress(false);
-        return false;
-      }
-      
-      if (!result) {
-        setIsLoading(false);
-        setRefreshInProgress(false);
-        return false;
-      }
-      
-      const { data, error } = result;
+      const { data, error } = await supabase.auth.refreshSession();
       
       if (error) {
+        // Handle the "Auth session missing" error case cleanly
+        if (error.message.includes('Auth session missing')) {
+          console.log('No session exists to refresh (user not authenticated)');
+          setRefreshInProgress(false);
+          return false;
+        }
+        
         console.error('Session refresh error:', error);
-        setIsLoading(false);
         setRefreshInProgress(false);
         return false;
       }
       
       console.log("Session refresh result:", data.session ? "Success" : "No session returned");
       
-      // Debug session state after refresh
-      await debugSessionStatus();
-      
       // Update state with refreshed session
       setSession(data.session);
       setUser(data.session?.user ?? null);
-      setIsLoading(false);
       setRefreshInProgress(false);
       
       return !!data.session;
     } catch (error) {
       console.error('Error refreshing session:', error);
-      setIsLoading(false);
       setRefreshInProgress(false);
       return false;
     } finally {
@@ -556,6 +285,57 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       setTimeout(() => {
         setRefreshInProgress(false);
       }, 500);
+    }
+  };
+
+  // Simplified auth methods - only keeping what's necessary
+  const signIn = async (email: string, password: string) => {
+    try {
+      return await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      toast.error(`Sign in failed: ${error.message}`);
+      return { error };
+    }
+  };
+  
+  const signInWithGoogle = async () => {
+    try {
+      console.log('Initiating Google sign-in, redirecting to:', `${window.location.origin}/auth/callback`);
+      
+      return await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            prompt: 'select_account', 
+            access_type: 'offline'
+          }
+        }
+      });
+    } catch (error: any) {
+      console.error('Google sign in error:', error);
+      toast.error(`Google sign in failed: ${error.message}`);
+      return { error };
+    }
+  };
+  
+  const signUp = async (email: string, password: string, metadata?: { [key: string]: any }) => {
+    try {
+      return await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: metadata
+        }
+      });
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      toast.error(`Sign up failed: ${error.message}`);
+      return { error, data: null };
     }
   };
   

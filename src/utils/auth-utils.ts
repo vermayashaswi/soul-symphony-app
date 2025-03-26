@@ -88,7 +88,7 @@ export const debugSessionStatus = async (): Promise<void> => {
     
     try {
       hasLocalTokens = !!localStorage.getItem('supabase.auth.token') || 
-                     !!localStorage.getItem(`${storageKeyPrefix}-auth-token`);
+                    !!localStorage.getItem(`${storageKeyPrefix}-auth-token`);
     } catch (e) {
       console.error('❌ Error accessing localStorage:', e);
     }

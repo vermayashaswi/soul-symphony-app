@@ -61,14 +61,6 @@ export default function Auth() {
           const { data, error } = await supabase.auth.getSession();
           
           if (error) {
-            // Handle missing session cleanly
-            if (error.message.includes('Auth session missing')) {
-              console.log("No session exists in hash redirect handling (user not authenticated)");
-              setAuthError("Authentication session could not be established. Please try again.");
-              toast.error("Authentication error. Please try again.");
-              return;
-            }
-            
             console.error('Error getting session after redirect:', error);
             setAuthError(error.message);
             toast.error('Authentication error. Please try again.');
