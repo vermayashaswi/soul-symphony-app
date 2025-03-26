@@ -22,8 +22,13 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
-        <Route path="/callback" element={<AuthCallback />} />
+        
+        {/* Handle all auth callback paths - IMPORTANT: Must match Google Console */}
         <Route path="/auth/callback" element={<AuthCallback />} />
+        
+        {/* Legacy callback paths - redirect to the main callback */}
+        <Route path="/callback" element={<AuthCallback />} />
+        
         <Route path="/journal" element={
           <ProtectedRoute>
             <Journal />

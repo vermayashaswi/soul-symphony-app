@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -7,6 +6,7 @@ import { useAuth } from '@/contexts/auth';
 import ParticleBackground from '@/components/ParticleBackground';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getOAuthRedirectUrl } from '@/utils/auth-utils';
 
 export default function Auth() {
   const { user, isLoading } = useAuth();
@@ -19,11 +19,6 @@ export default function Auth() {
   const authProcessedRef = useRef(false);
   
   const from = location.state?.from?.pathname || '/journal';
-
-  // Properly format the redirect URL with origin
-  const getRedirectUrl = () => {
-    return `${window.location.origin}/callback`;
-  };
 
   useEffect(() => {
     if (user && !redirecting) {
@@ -108,9 +103,9 @@ export default function Auth() {
         console.warn('LocalStorage access error:', e);
       }
       
-      // Use the consistent redirect URL
-      const redirectUrl = getRedirectUrl();
-      console.log("Using redirect URL:", redirectUrl);
+      // Get the redirect URL from centralized utility
+      const redirectUrl = getOAuthRedirectUrl();
+      console.log("Using OAuth redirect URL:", redirectUrl);
       
       // Force a new Google sign-in with explicit provider selection
       const { error } = await supabase.auth.signInWithOAuth({
