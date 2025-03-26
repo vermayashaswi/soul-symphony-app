@@ -35,6 +35,29 @@ export default function Journal() {
   const [mode, setMode] = useState<'record' | 'past'>('past');
   const [refreshCount, setRefreshCount] = useState(0);
   const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'error' | 'checking'>('checking');
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        setConnectionStatus('checking');
+        const { data, error } = await supabase.from('profiles').select('id').limit(1);
+        
+        if (error) {
+          console.error('Supabase connection check failed:', error);
+          setConnectionStatus('error');
+        } else {
+          console.log('Supabase connection confirmed');
+          setConnectionStatus('connected');
+        }
+      } catch (err) {
+        console.error('Supabase connection check error:', err);
+        setConnectionStatus('error');
+      }
+    };
+    
+    checkConnection();
+  }, []);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -81,6 +104,7 @@ export default function Journal() {
     if (user) {
       const checkProfile = async () => {
         try {
+          console.log('Checking for profile:', user.id);
           const { data, error } = await supabase
             .from('profiles')
             .select('id')
@@ -100,6 +124,8 @@ export default function Journal() {
               console.log('Profile created successfully');
               setTimeout(() => refreshEntries(false), 1000);
             }
+          } else {
+            console.log('Profile exists:', data.id);
           }
         } catch (err) {
           console.error('Error in profile check/creation:', err);
@@ -185,6 +211,25 @@ export default function Journal() {
     }
   };
 
+  if (connectionStatus === 'error') {
+    return (
+      <div className="container px-4 md:px-6 max-w-6xl space-y-6 py-6">
+        <Alert variant="destructive">
+          <AlertDescription>
+            Unable to connect to the database. This could be due to network issues or server maintenance.
+            <Button 
+              variant="outline" 
+              className="ml-4" 
+              onClick={() => window.location.reload()}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" /> Retry Connection
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="container px-4 md:px-6 max-w-6xl space-y-6 py-6">
       <Card>
@@ -240,6 +285,13 @@ export default function Journal() {
             </Button>
           </AlertDescription>
         </Alert>
+      )}
+      
+      {connectionStatus === 'checking' && (
+        <div className="text-center py-6">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Connecting to database...</p>
+        </div>
       )}
       
       {isLoading && (

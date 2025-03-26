@@ -5,24 +5,41 @@ import JournalEntryCard from './JournalEntryCard';
 import { JournalEntry } from '@/types/journal';
 import EmptyJournalState from './EmptyJournalState';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
   loading: boolean;
   processingEntries?: string[]; // Entries that are currently being processed
   onStartRecording: () => void;
+  onRefresh?: () => void;
 }
 
 const JournalEntriesList: React.FC<JournalEntriesListProps> = ({ 
   entries, 
   loading,
   processingEntries = [],
-  onStartRecording
+  onStartRecording,
+  onRefresh
 }) => {
   if (loading && entries.length === 0 && processingEntries.length === 0) {
     return (
-      <div className="flex justify-center my-12">
+      <div className="flex flex-col items-center justify-center space-y-4 my-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="text-muted-foreground">Loading your journal entries...</p>
+        <div>
+          {onRefresh && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onRefresh}
+              className="mt-4"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" /> Retry
+            </Button>
+          )}
+        </div>
       </div>
     );
   }

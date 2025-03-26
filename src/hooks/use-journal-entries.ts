@@ -24,9 +24,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [lastRetryTime, setLastRetryTime] = useState<number>(0);
   const [lastRefreshToastId, setLastRefreshToastId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [fetchTimeout, setFetchTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const MAX_RETRY_ATTEMPTS = 3;
   const RETRY_DELAY = 5000; // 5 seconds between retries
+  const FETCH_TIMEOUT = 10000; // 10 seconds timeout for fetch operations
 
   const fetchEntries = useCallback(async () => {
     if (!userId) {
@@ -46,11 +48,34 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       // Add a short timeout to prevent multiple rapid requests
       await new Promise(resolve => setTimeout(resolve, 200));
       
+      // Set a timeout to handle hanging requests
+      if (fetchTimeout) {
+        clearTimeout(fetchTimeout);
+      }
+      
+      const timeoutId = setTimeout(() => {
+        console.error('Fetch entries operation timed out after', FETCH_TIMEOUT, 'ms');
+        setLoading(false);
+        setLoadError('Request timed out. Please try again later.');
+        toast.error('Loading journal entries timed out', {
+          id: 'journal-fetch-timeout',
+          dismissible: true,
+        });
+      }, FETCH_TIMEOUT);
+      
+      setFetchTimeout(timeoutId);
+      
       const { data, error } = await supabase
         .from('Journal Entries')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
+        
+      // Clear the timeout since the operation completed
+      if (fetchTimeout) {
+        clearTimeout(fetchTimeout);
+        setFetchTimeout(null);
+      }
         
       if (error) {
         console.error('Error fetching entries:', error);
@@ -129,10 +154,15 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         setRetryAttempt(prev => prev + 1);
       }
     } finally {
+      // Clear any pending timeouts
+      if (fetchTimeout) {
+        clearTimeout(fetchTimeout);
+        setFetchTimeout(null);
+      }
       setLoading(false);
       setIsRetrying(false);
     }
-  }, [userId, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS]);
+  }, [userId, retryAttempt, isRetrying, fetchTimeout, MAX_RETRY_ATTEMPTS, FETCH_TIMEOUT]);
 
   const generateThemesForEntry = async (entry: JournalEntry) => {
     if (!entry["refined text"] || !entry.id) return;
@@ -272,7 +302,21 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       setLastRetryTime(now);
       setIsRetrying(true);
+      
+      // Set a timeout to force completion if the fetch hangs
+      const forceCompleteTimeout = setTimeout(() => {
+        console.log('Force completing refresh due to timeout');
+        setIsRetrying(false);
+        setLoading(false);
+        toast.error('Refresh timed out. Please try again.', {
+          id: 'journal-refresh-timeout',
+          dismissible: true,
+        });
+      }, FETCH_TIMEOUT);
+      
       await fetchEntries();
+      
+      clearTimeout(forceCompleteTimeout);
       
       if (showToast) {
         if (lastRefreshToastId) {
@@ -352,21 +396,38 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     
     return () => {
       if (retryTimeout) clearTimeout(retryTimeout);
+      if (fetchTimeout) clearTimeout(fetchTimeout);
     };
-  }, [loadError, loading, fetchEntries, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS]);
+  }, [loadError, loading, fetchEntries, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS, fetchTimeout]);
 
   useEffect(() => {
     if (userId) {
       setRetryAttempt(0);
       setLoadError(null);
       console.log(`Initial fetch triggered for user ${userId} with refreshKey ${refreshKey}`);
-      fetchEntries();
+      
+      // Set a force complete timeout
+      const forceCompleteTimeout = setTimeout(() => {
+        console.log('Force completing initial fetch due to timeout');
+        setLoading(false);
+      }, FETCH_TIMEOUT);
+      
+      fetchEntries().finally(() => {
+        clearTimeout(forceCompleteTimeout);
+      });
     } else {
       console.log('No user ID available for fetching journal entries');
       setLoading(false); // Important: ensure loading is set to false when no user ID
       setEntries([]); // Clear entries when no user
     }
-  }, [userId, refreshKey, fetchEntries]);
+    
+    // Cleanup function
+    return () => {
+      if (fetchTimeout) {
+        clearTimeout(fetchTimeout);
+      }
+    };
+  }, [userId, refreshKey, fetchEntries, FETCH_TIMEOUT]);
 
   return { 
     entries, 
