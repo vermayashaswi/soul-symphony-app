@@ -54,13 +54,15 @@ export default function ChatThreadList({
       
       console.log("Threads fetched:", fetchedThreads.length || 0);
       
-      // Safely cast the response data to our ChatThread type
-      const typedThreads = fetchedThreads.map(thread => ({
-        id: thread.id,
-        title: thread.title,
-        created_at: thread.created_at,
-        updated_at: thread.updated_at
-      }));
+      // Safely cast the response data to our ChatThread type with better error handling
+      const typedThreads: ChatThread[] = fetchedThreads
+        .filter(thread => thread != null)
+        .map(thread => ({
+          id: String(thread.id || ''),
+          title: String(thread.title || 'Untitled Chat'),
+          created_at: String(thread.created_at || new Date().toISOString()),
+          updated_at: String(thread.updated_at || new Date().toISOString())
+        }));
       
       setThreads(typedThreads);
     } catch (error) {

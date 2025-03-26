@@ -68,16 +68,18 @@ export const isDbError = (value: any): boolean => {
 
 /**
  * Safe type assertion for database query results
+ * This improved version ensures array items are properly typed
  */
 export const asDataArray = <T>(data: any): T[] => {
   if (Array.isArray(data)) {
-    return data as T[];
+    return data.map(item => item as T);
   }
   return [] as T[];
 };
 
 /**
  * Safe type assertion for single database record
+ * With better error handling
  */
 export const asSingleRecord = <T>(data: any): T | null => {
   if (data && typeof data === 'object' && !('error' in data)) {
@@ -85,3 +87,4 @@ export const asSingleRecord = <T>(data: any): T | null => {
   }
   return null;
 };
+

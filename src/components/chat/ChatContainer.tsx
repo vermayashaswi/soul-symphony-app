@@ -13,7 +13,7 @@ export function ChatContainer() {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Simplified profile check using our new helpers
+  // Simplified profile check using our improved helpers
   const checkProfile = useCallback(async () => {
     if (!user) return;
     
@@ -27,7 +27,7 @@ export function ChatContainer() {
       });
       
       if (profile) {
-        console.log('Profile exists or was created:', profile.id);
+        console.log('Profile exists or was created:', profile ? profile.id : 'no profile');
         setIsInitialized(true);
       } else {
         console.error('Failed to ensure profile existence');
