@@ -14,6 +14,8 @@ import AuthStateListener from "@/components/auth/AuthStateListener";
 import AuthCallback from "@/components/auth/AuthCallback";
 
 const AppRoutes = () => {
+  console.log("AppRoutes rendering with origin:", window.location.origin);
+  
   return (
     <AppLayout>
       <AuthStateListener />

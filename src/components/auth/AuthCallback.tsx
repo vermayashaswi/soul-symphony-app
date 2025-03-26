@@ -37,6 +37,7 @@ const AuthCallback = () => {
       try {
         console.log("Auth callback page: Processing authentication...");
         console.log("Current path:", location.pathname);
+        console.log("Current URL:", window.location.href);
         console.log("Hash present:", location.hash ? "Yes (length: " + location.hash.length + ")" : "No");
         console.log("Hash content:", location.hash ? location.hash.substring(0, 20) + "..." : "None");
         console.log("Search params:", location.search || "None");

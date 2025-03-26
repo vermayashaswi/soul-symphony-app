@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -18,6 +19,11 @@ export default function Auth() {
   const authProcessedRef = useRef(false);
   
   const from = location.state?.from?.pathname || '/journal';
+
+  // Properly format the redirect URL with origin
+  const getRedirectUrl = () => {
+    return `${window.location.origin}/callback`;
+  };
 
   useEffect(() => {
     if (user && !redirecting) {
@@ -102,11 +108,15 @@ export default function Auth() {
         console.warn('LocalStorage access error:', e);
       }
       
+      // Use the consistent redirect URL
+      const redirectUrl = getRedirectUrl();
+      console.log("Using redirect URL:", redirectUrl);
+      
       // Force a new Google sign-in with explicit provider selection
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/callback`,
+          redirectTo: redirectUrl,
           queryParams: {
             // Force Google account selection screen
             prompt: 'select_account',
