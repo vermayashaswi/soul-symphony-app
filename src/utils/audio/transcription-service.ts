@@ -16,9 +16,18 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
       return { success: false, error: 'No audio recording found' };
     }
     
+    // First, check if we're signed in
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    
+    if (!accessToken) {
+      console.error('No access token available for transcription');
+      return { success: false, error: 'Authentication required for transcription' };
+    }
+    
     // Convert to FormData for direct upload to edge function
     const formData = new FormData();
-    formData.append('file', audioBlob);
+    formData.append('file', audioBlob, 'recording.webm');
     formData.append('userId', userId);
     
     console.log('Preparing to send audio for transcription, blob size:', audioBlob.size);
@@ -29,13 +38,15 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
     
     try {
       // Direct function invocation with FormData
-      const response = await fetch('https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/transcribe-audio', {
+      const functionUrl = 'https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/transcribe-audio';
+      
+      console.log(`Calling transcribe-audio edge function at: ${functionUrl}`);
+      const response = await fetch(functionUrl, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
         headers: {
-          // Get auth header to pass user's auth context
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
+          'Authorization': `Bearer ${accessToken}`
         }
       });
       
@@ -43,7 +54,7 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Transcription function error:', errorText);
+        console.error('Transcription function error:', response.status, response.statusText, errorText);
         return { 
           success: false, 
           error: `Transcription failed: ${response.status} ${response.statusText}`
@@ -62,6 +73,8 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
         };
       }
     } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      
       if (fetchError.name === 'AbortError') {
         console.error('Transcription request timed out');
         return { 
@@ -81,7 +94,7 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
 }
 
 /**
- * Handles sending audio data to the transcription service (legacy method)
+ * Fallback function for sending audio data to the transcription service
  */
 export async function sendAudioForTranscription(base64String: string, userId: string): Promise<{
   success: boolean;
@@ -89,7 +102,7 @@ export async function sendAudioForTranscription(base64String: string, userId: st
   error?: string;
 }> {
   try {
-    console.log("Sending audio to transcribe function...");
+    console.log("Sending audio to transcribe function using fallback method...");
     console.log("Audio base64 length:", base64String.length);
     
     // Validate input
@@ -107,20 +120,26 @@ export async function sendAudioForTranscription(base64String: string, userId: st
       };
     }
     
-    // Set up a timeout to prevent the call from hanging indefinitely
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    // Get auth token for the request
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
     
-    // Call the Supabase function - removing the signal property as it's not supported
-    console.log("Calling transcribe-audio edge function...");
+    if (!accessToken) {
+      console.error('No access token available for transcription');
+      return { success: false, error: 'Authentication required for transcription' };
+    }
+    
+    // Call the Supabase function with the access token
+    console.log("Calling transcribe-audio edge function with JSON payload...");
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64String,
         userId
+      },
+      headers: {
+        Authorization: `Bearer ${accessToken}`
       }
     });
-    
-    clearTimeout(timeoutId);
     
     if (error) {
       console.error('Transcription error:', error);
@@ -143,14 +162,6 @@ export async function sendAudioForTranscription(base64String: string, userId: st
       };
     }
   } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.error('Transcription request timed out');
-      return { 
-        success: false, 
-        error: 'Request timed out while processing audio'
-      };
-    }
-    
     console.error('Error sending audio for transcription:', error);
     return { 
       success: false, 

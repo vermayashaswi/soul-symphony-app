@@ -8,9 +8,9 @@ import { processAudioBlobForTranscription } from './audio/transcription-service'
 const processingStatus = new Map<string, 'pending' | 'completed' | 'error'>();
 
 /**
- * Ensures the audio storage bucket exists
+ * Checks if the audio storage bucket exists
  */
-export async function ensureAudioBucketExists(): Promise<boolean> {
+export async function checkAudioBucket(): Promise<boolean> {
   try {
     console.log('Checking if audio bucket exists');
     
@@ -23,21 +23,9 @@ export async function ensureAudioBucketExists(): Promise<boolean> {
     }
     
     const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
-    
-    if (!audioBucket) {
-      console.log('Audio bucket not found, notify user to set it up');
-      
-      // We can't create buckets from the client side due to RLS policies
-      // The user should have run the SQL migration to create the bucket
-      toast.error('Audio storage is not configured. Please contact support.');
-      
-      return false;
-    } else {
-      console.log('Audio bucket already exists');
-      return true;
-    }
+    return !!audioBucket;
   } catch (error) {
-    console.error('Unexpected error checking/creating audio bucket:', error);
+    console.error('Error checking audio bucket:', error);
     return false;
   }
 }
@@ -74,25 +62,23 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
     // Create a file path for storage
     const filePath = `journal/${userId}/${tempId}.webm`;
     
-    console.log('Uploading audio to:', filePath);
+    console.log('Verifying audio bucket exists before uploading to:', filePath);
     
-    // Make sure the audio bucket exists
-    const bucketExists = await ensureAudioBucketExists();
+    // Check if the audio bucket exists
+    const bucketExists = await checkAudioBucket();
     if (!bucketExists) {
-      console.error('Failed to ensure audio bucket exists');
-      processingStatus.set(tempId, 'error');
+      console.error('Audio bucket does not exist in Supabase');
+      toast.error('Audio storage is not configured. Please contact support.');
       return { 
         success: false, 
-        error: 'Unable to create audio storage. Please check your connection and try again.'
+        error: 'Audio storage bucket not found. Please check Supabase configuration.'
       };
     }
     
-    // Upload the audio file to Supabase Storage with timeout
-    const controller = new AbortController();
-    const uploadTimeout = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    console.log('Audio bucket exists, proceeding with upload');
     
+    // Upload the audio file to Supabase Storage
     try {
-      // Remove the signal property from the options as it's not supported in FileOptions
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('audio')
         .upload(filePath, audioBlob, {
@@ -101,21 +87,25 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
           upsert: false
         });
       
-      clearTimeout(uploadTimeout);
-      
       if (uploadError) {
         console.error('Error uploading audio:', uploadError);
         processingStatus.set(tempId, 'error');
         return { success: false, error: 'Failed to upload audio: ' + uploadError.message };
       }
+      
+      if (!uploadData || !uploadData.path) {
+        console.error('Upload succeeded but no path returned');
+        return { success: false, error: 'Upload successful but no file path returned' };
+      }
+      
+      console.log('Audio uploaded successfully:', uploadData.path);
     } catch (uploadErr) {
-      clearTimeout(uploadTimeout);
       console.error('Upload error:', uploadErr);
       processingStatus.set(tempId, 'error');
       return { success: false, error: 'Audio upload failed. Please try again.' };
     }
     
-    console.log('Audio uploaded successfully, getting public URL');
+    console.log('Getting public URL for uploaded audio');
     
     // Get the public URL for the uploaded file
     const { data: urlData } = supabase.storage
@@ -130,6 +120,7 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
       return { success: false, error: 'Could not generate audio URL' };
     }
     
+    console.log('Audio URL generated:', audioUrl);
     console.log('Creating initial journal entry with temp ID:', tempId);
     
     // Check if user profile exists before creating journal entry
@@ -154,11 +145,7 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
     }
     
     // Create an initial journal entry in the database
-    const entryCreateController = new AbortController();
-    const entryTimeout = setTimeout(() => entryCreateController.abort(), 8000);
-    
     try {
-      // Remove the abortSignal from the supabase call as it's not supported
       const { data: entryData, error: entryError } = await supabase
         .from('Journal Entries')
         .insert([
@@ -172,12 +159,15 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
         .select()
         .single();
       
-      clearTimeout(entryTimeout);
-      
       if (entryError) {
         console.error('Error creating journal entry:', entryError);
         processingStatus.set(tempId, 'error');
         return { success: false, error: 'Failed to create journal entry: ' + entryError.message };
+      }
+      
+      if (!entryData || !entryData.id) {
+        console.error('Journal entry created but no ID returned');
+        return { success: false, error: 'Journal entry created but no ID returned' };
       }
       
       console.log('Journal entry created with ID:', entryData.id);
@@ -220,7 +210,6 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
         entryId: entryData.id
       };
     } catch (entryErr) {
-      clearTimeout(entryTimeout);
       console.error('Journal entry creation error:', entryErr);
       processingStatus.set(tempId, 'error');
       return { 

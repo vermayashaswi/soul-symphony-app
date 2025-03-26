@@ -103,6 +103,7 @@ export const safeInsert = async <T>(
 
 /**
  * Helper for safely updating records with proper type handling
+ * Simplified to avoid TypeScript recursion issues
  */
 export const safeUpdate = async <T>(
   tableName: TableName,
@@ -110,22 +111,24 @@ export const safeUpdate = async <T>(
   condition: Record<string, any>
 ): Promise<T | null> => {
   try {
-    // Completely simplify the approach to avoid deep type recursion
-    // Start with a basic query
     let query = supabase.from(tableName).update(values);
     
-    // Instead of building conditions dynamically, use a simple for loop with direct method calls
+    // Apply conditions one by one using any casting to avoid type recursion
     const keys = Object.keys(condition);
     
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      const value = condition[key];
+    if (keys.length > 0) {
+      const firstKey = keys[0];
+      query = query.eq(firstKey, condition[firstKey]);
       
-      // Use any casting to avoid TypeScript recursion
-      query = (query as any).eq(key, value);
+      // Apply remaining conditions
+      for (let i = 1; i < keys.length; i++) {
+        const key = keys[i];
+        // Break the type chain with any casting
+        query = (query as any).eq(key, condition[key]);
+      }
     }
     
-    // Finally execute with select
+    // Execute with select
     const { data, error } = await (query as any).select();
     
     if (error) {
@@ -142,6 +145,7 @@ export const safeUpdate = async <T>(
 
 /**
  * Helper for safely selecting records with proper type handling
+ * Simplified to avoid TypeScript recursion issues
  */
 export const safeSelect = async <T>(
   tableName: TableName,
@@ -150,30 +154,33 @@ export const safeSelect = async <T>(
   options?: { single?: boolean, limit?: number }
 ): Promise<T | null> => {
   try {
-    // Create basic query
     let query = supabase.from(tableName).select(columns);
     
-    // Apply conditions if provided using the simpler approach
+    // Apply conditions if provided
     if (condition && Object.keys(condition).length > 0) {
       const keys = Object.keys(condition);
       
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        const value = condition[key];
+      if (keys.length > 0) {
+        const firstKey = keys[0];
+        query = query.eq(firstKey, condition[firstKey]);
         
-        // Use any casting to avoid TypeScript recursion
-        query = (query as any).eq(key, value);
+        // Apply remaining conditions
+        for (let i = 1; i < keys.length; i++) {
+          const key = keys[i];
+          // Break the type chain with any casting
+          query = (query as any).eq(key, condition[key]);
+        }
       }
     }
     
     // Apply limit if provided
     if (options?.limit) {
-      query = (query as any).limit(options.limit);
+      query = query.limit(options.limit);
     }
     
     // Execute query
     if (options?.single) {
-      const { data, error } = await (query as any).maybeSingle();
+      const { data, error } = await query.maybeSingle();
       
       if (error) {
         console.error(`Error selecting from ${tableName}:`, error);

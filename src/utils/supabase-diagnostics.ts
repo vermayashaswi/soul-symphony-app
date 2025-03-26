@@ -13,6 +13,7 @@ export async function diagnoseDatabaseIssues() {
     edgeFunctions: false,
     journalTable: false,
     embeddingsTable: false,
+    audioBucket: false,
     errorDetails: [] as string[],
   };
 
@@ -43,6 +44,7 @@ export async function diagnoseDatabaseIssues() {
     } else {
       // Check if audio bucket exists
       const audioBucket = storageData?.find(bucket => bucket.name === 'audio');
+      results.audioBucket = !!audioBucket;
       if (!audioBucket) {
         results.errorDetails.push('Storage: Audio bucket does not exist');
       }
@@ -86,10 +88,12 @@ export async function diagnoseDatabaseIssues() {
     }
 
     return {
-      success: results.database && results.journalTable,
+      success: results.database && results.journalTable && results.audioBucket,
       results,
       isClientSideIssue: !results.database || !results.auth,
-      isServerSideIssue: results.database && results.auth && (!results.journalTable || !results.storage || !results.edgeFunctions),
+      isServerSideIssue: results.database && results.auth && 
+                        (!results.journalTable || !results.storage || 
+                         !results.edgeFunctions || !results.audioBucket),
       errorDetails: results.errorDetails
     };
   } catch (error: any) {
@@ -104,9 +108,9 @@ export async function diagnoseDatabaseIssues() {
 }
 
 /**
- * Attempts to fix common storage issues automatically
+ * Creates the audio bucket if it doesn't exist
  */
-export async function attemptStorageAutoFix() {
+export async function createAudioBucket() {
   try {
     // First check if the audio bucket exists
     const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
@@ -119,19 +123,31 @@ export async function attemptStorageAutoFix() {
     const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
     
     if (!audioBucket) {
-      // Try to create the audio bucket
-      toast.info('Audio bucket not found, creating now...');
+      toast.info('Audio bucket not found, attempting to create...');
       
-      // Instead of trying to create the bucket directly (which may fail due to RLS),
-      // we'll call our SQL function instead through a toast notification to the user
-      toast.error('Audio bucket does not exist. Please run diagnostics again or contact support.');
-      return { success: false, error: 'Audio bucket not found' };
+      try {
+        const { data, error } = await supabase.storage.createBucket('audio', {
+          public: true, // Make bucket public
+          fileSizeLimit: 52428800, // 50MB
+        });
+        
+        if (error) {
+          toast.error(`Failed to create audio bucket: ${error.message}`);
+          return { success: false, error: error.message };
+        }
+        
+        toast.success('Audio bucket created successfully');
+        return { success: true, message: 'Audio bucket created' };
+      } catch (createError: any) {
+        toast.error(`Error creating bucket: ${createError.message}`);
+        return { success: false, error: createError.message };
+      }
     }
     
     toast.success('Audio bucket exists');
     return { success: true, message: 'Audio bucket already exists' };
   } catch (error: any) {
-    toast.error('Error fixing storage');
+    toast.error('Error checking/creating storage');
     return { success: false, error: error.message };
   }
 }
