@@ -40,8 +40,8 @@ export function useSearch(userId: string | undefined): UseSearchReturn {
     setSearchQuery(query);
 
     try {
-      // Invoke the edge function which handles the database interactions
-      // This avoids direct interaction with the modified match_journal_entries function
+      // Invoke the updated edge function which handles the database interactions
+      // The function now handles the fixed search path issue
       const response = await supabase.functions.invoke('search-journal', {
         body: {
           query: query.trim(),

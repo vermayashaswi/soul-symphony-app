@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.journal_embeddings (
 CREATE INDEX IF NOT EXISTS journal_embeddings_journal_entry_id_idx ON public.journal_embeddings (journal_entry_id);
 `;
 
-// This function definition matches what you manually created in Supabase
+// Updated version of the match_journal_entries function with fixed search path
 export const matchJournalEntries = `
 CREATE OR REPLACE FUNCTION public.match_journal_entries(
   query_embedding VECTOR(1536),
