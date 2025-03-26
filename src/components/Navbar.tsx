@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Home, MessageCircle, BarChart2, Settings, Menu, X, LogOut, LogIn, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { Button } from '@/components/ui/button';
 import { FeelsophyLogo } from '@/components/FeelsophyLogo';
 import { toast } from 'sonner';
@@ -69,22 +69,26 @@ export function Navbar() {
     try {
       setIsSigningOut(true);
       
+      console.log('Starting sign out process...');
+      
       // First clear local storage to ensure no cached session data
       try {
         localStorage.removeItem('supabase.auth.token');
+        const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
+        localStorage.removeItem(`${storageKeyPrefix}-auth-token`);
       } catch (e) {
         console.warn('Could not clear localStorage but continuing:', e);
       }
       
-      // Direct call to Supabase client
-      const { error } = await supabase.auth.signOut();
+      // Call the context's signOut first for state management
+      await signOut();
+      
+      // Then directly call Supabase as a fallback
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
       
       if (error) {
         throw error;
       }
-      
-      // Also call the context's signOut for state management
-      await signOut();
       
       toast.success('Successfully signed out');
       closeMenu();
