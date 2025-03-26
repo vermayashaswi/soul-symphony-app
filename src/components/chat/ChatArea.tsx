@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { verifyUserAuthentication } from '@/utils/audio/auth-utils';
 import { getChatMessages, addChatMessage } from '@/utils/supabase-helpers';
+import { asDataArray } from '@/utils/supabase-type-utils';
 
 export interface Message {
   id: string;
@@ -91,21 +93,26 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
       
-      const formattedMessages: Message[] = fetchedMessages.map(msg => ({
-        id: msg.id,
-        content: msg.content,
-        sender: msg.sender as 'user' | 'assistant',
-        created_at: msg.created_at,
-        thread_id: msg.thread_id,
-        reference_entries: msg.reference_entries ? 
-          (Array.isArray(msg.reference_entries) ? 
-            msg.reference_entries.map((ref: any) => ({
-              id: ref.id,
-              similarity: ref.similarity
-            })) : 
-            null) : 
-          null
-      }));
+      // Safely transform the response data to our Message type
+      const formattedMessages: Message[] = fetchedMessages.map(msg => {
+        if (!msg) return null;
+        
+        return {
+          id: msg.id,
+          content: msg.content,
+          sender: msg.sender as 'user' | 'assistant',
+          created_at: msg.created_at,
+          thread_id: msg.thread_id,
+          reference_entries: msg.reference_entries ? 
+            (Array.isArray(msg.reference_entries) ? 
+              msg.reference_entries.map((ref: any) => ({
+                id: ref.id,
+                similarity: ref.similarity
+              })) : 
+              null) : 
+            null
+        };
+      }).filter(Boolean) as Message[];
 
       setMessages(formattedMessages);
     } catch (error) {
@@ -358,4 +365,113 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       </div>
     </div>
   );
+
+  function handleSendMessage(content: string = inputValue) {
+    if (!content.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+    
+    let currentUserId = userId;
+    if (!currentUserId) {
+      verifyUserAuthentication().then(authCheck => {
+        if (!authCheck.isAuthenticated) {
+          toast.error(authCheck.error || 'You must be signed in to use the chat');
+          return;
+        }
+        currentUserId = authCheck.user?.id;
+        
+        if (!currentUserId) {
+          toast.error('User ID not found');
+          return;
+        }
+        
+        processSendMessage(content, currentUserId);
+      });
+    } else {
+      processSendMessage(content, currentUserId);
+    }
+  }
+  
+  function processSendMessage(content: string, userId: string) {
+    const isNewThread = !threadId;
+    
+    const tempUserMessage: Message = {
+      id: Date.now().toString(),
+      content: content.trim(),
+      sender: 'user' as const,
+      created_at: new Date().toISOString()
+    };
+    
+    setMessages(prev => [...prev, tempUserMessage]);
+    setInputValue('');
+    setIsLoading(true);
+    setShowWelcome(false);
+    
+    supabase.functions.invoke('chat-rag', {
+      body: {
+        message: content.trim(),
+        userId: userId,
+        threadId,
+        isNewThread
+      }
+    })
+    .then(response => {
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to get response');
+      }
+      
+      const { threadId: newThreadId, response: aiResponse, relevantEntries: foundEntries } = response.data;
+      
+      if (isNewThread && newThreadId) {
+        onNewThreadCreated(newThreadId);
+      }
+      
+      if (foundEntries && foundEntries.length > 0) {
+        setRelevantEntries(foundEntries);
+      }
+      
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: aiResponse,
+        sender: 'assistant' as const,
+        created_at: new Date().toISOString(),
+        thread_id: newThreadId || threadId,
+        reference_entries: foundEntries ? foundEntries.map(entry => ({ 
+          id: entry.id, 
+          similarity: entry.similarity 
+        })) : null
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+    })
+    .catch(err => {
+      console.error('Error in chat:', err);
+      toast.error('Something went wrong. Please try again later.');
+      
+      const fallbackMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I'm sorry, I'm having trouble processing your request. Please try again later.",
+        sender: 'assistant' as const,
+        created_at: new Date().toISOString(),
+        thread_id: threadId || undefined
+      };
+      
+      setMessages(prev => [...prev, fallbackMessage]);
+    })
+    .finally(() => {
+      setIsLoading(false);
+    });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  }
+
+  function formatDate(dateString: string) {
+    return format(new Date(dateString), 'MMM d, yyyy');
+  }
 }

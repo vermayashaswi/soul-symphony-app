@@ -6,6 +6,7 @@ import ChatArea from '@/components/chat/ChatArea';
 import ChatThreadList from '@/components/chat/ChatThreadList';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ensureUserProfile } from '@/utils/profile-helpers';
+import { asSingleRecord } from '@/utils/supabase-type-utils';
 
 export function ChatContainer() {
   const { user, isLoading: authLoading } = useAuth();

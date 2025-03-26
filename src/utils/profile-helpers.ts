@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { asId, createProfileData, asSingleRecord } from './supabase-type-utils';
 
 /**
  * Check if a profile exists for a user and create one if it doesn't
@@ -21,7 +22,7 @@ export const ensureUserProfile = async (userId: string, userData?: {
     const { data: existingProfile, error: checkError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', userId)
+      .eq('id', asId(userId))
       .maybeSingle();
     
     if (checkError) {
@@ -31,19 +32,19 @@ export const ensureUserProfile = async (userId: string, userData?: {
     // Return the existing profile if it exists
     if (existingProfile) {
       console.log('Profile already exists:', existingProfile.id);
-      return existingProfile;
+      return asSingleRecord(existingProfile);
     }
     
     // Profile does not exist, create it
     console.log('Profile not found, creating one');
     
-    const profileData = {
+    const profileData = createProfileData({
       id: userId,
       email: userData?.email || null,
       full_name: userData?.full_name || null,
       avatar_url: userData?.avatar_url || null,
       updated_at: new Date().toISOString()
-    };
+    });
     
     // Insert the profile directly
     const { data: newProfile, error: insertError } = await supabase
@@ -58,7 +59,7 @@ export const ensureUserProfile = async (userId: string, userData?: {
     }
     
     console.log('Profile created successfully');
-    return newProfile;
+    return asSingleRecord(newProfile);
   } catch (err) {
     console.error('Error in ensureUserProfile:', err);
     return null;
@@ -75,7 +76,7 @@ export const getUserProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', userId)
+      .eq('id', asId(userId))
       .maybeSingle();
     
     if (error) {
@@ -83,7 +84,7 @@ export const getUserProfile = async (userId: string) => {
       return null;
     }
     
-    return data;
+    return asSingleRecord(data);
   } catch (err) {
     console.error('Unexpected error in getUserProfile:', err);
     return null;

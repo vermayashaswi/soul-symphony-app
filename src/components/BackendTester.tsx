@@ -53,7 +53,7 @@ export default function BackendTester() {
             console.error('Access test failed:', uploadError);
             toast.error('Storage bucket exists but policies need to be fixed', { id: 'storage-check' });
             
-            // Fix policies
+            // Fix policies using type assertion for edge function
             const result = await createAudioBucket();
             if (result.success) {
               toast.success('Audio bucket policies fixed successfully', { id: 'storage-check' });
@@ -72,7 +72,7 @@ export default function BackendTester() {
       } else {
         toast.error('Audio bucket does not exist, creating it now...', { id: 'storage-check' });
         
-        // Create the bucket and policies
+        // Create the bucket and policies using type assertion for edge function
         const result = await createAudioBucket();
         
         if (result.success) {

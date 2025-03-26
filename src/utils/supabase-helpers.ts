@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ensureUserProfile } from './profile-helpers';
+import { asId, createChatThreadData, createChatMessageData, asSingleRecord, asDataArray } from './supabase-type-utils';
 
 /**
  * Helper function to safely handle Supabase queries with proper error handling
@@ -36,13 +36,15 @@ export const createChatThread = async (userId: string, title: string) => {
   await ensureUserProfile(userId);
   
   try {
+    const threadData = createChatThreadData({
+      user_id: asId(userId),
+      title: title,
+      updated_at: new Date().toISOString()
+    });
+
     const { data, error } = await supabase
       .from('chat_threads')
-      .insert({
-        user_id: userId as any,
-        title: title,
-        updated_at: new Date().toISOString()
-      })
+      .insert(threadData)
       .select()
       .single();
     
@@ -51,7 +53,7 @@ export const createChatThread = async (userId: string, title: string) => {
       return null;
     }
     
-    return data;
+    return asSingleRecord(data);
   } catch (err) {
     console.error('Unexpected error in createChatThread:', err);
     return null;
@@ -68,7 +70,7 @@ export const getChatThreads = async (userId: string) => {
     const { data, error } = await supabase
       .from('chat_threads')
       .select('*')
-      .eq('user_id', userId as any)
+      .eq('user_id', asId(userId))
       .order('updated_at', { ascending: false });
     
     if (error) {
@@ -76,7 +78,7 @@ export const getChatThreads = async (userId: string) => {
       return [];
     }
     
-    return data || [];
+    return asDataArray(data);
   } catch (err) {
     console.error('Unexpected error in getChatThreads:', err);
     return [];
@@ -93,7 +95,7 @@ export const getChatMessages = async (threadId: string) => {
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
-      .eq('thread_id', threadId as any)
+      .eq('thread_id', asId(threadId))
       .order('created_at', { ascending: true });
     
     if (error) {
@@ -101,7 +103,7 @@ export const getChatMessages = async (threadId: string) => {
       return [];
     }
     
-    return data || [];
+    return asDataArray(data);
   } catch (err) {
     console.error('Unexpected error in getChatMessages:', err);
     return [];
@@ -118,14 +120,16 @@ export const addChatMessage = async (threadId: string, content: string, sender: 
   }
   
   try {
+    const messageData = createChatMessageData({
+      thread_id: asId(threadId),
+      content: content,
+      sender: sender,
+      reference_entries: referenceEntries || null
+    });
+
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert({
-        thread_id: threadId as any,
-        content: content,
-        sender: sender,
-        reference_entries: referenceEntries || null
-      })
+      .insert(messageData)
       .select()
       .single();
     
@@ -134,7 +138,7 @@ export const addChatMessage = async (threadId: string, content: string, sender: 
       return null;
     }
     
-    return data;
+    return asSingleRecord(data);
   } catch (err) {
     console.error('Unexpected error in addChatMessage:', err);
     return null;
@@ -152,7 +156,7 @@ export const deleteChatThread = async (threadId: string) => {
     const { error: messagesError } = await supabase
       .from('chat_messages')
       .delete()
-      .eq('thread_id', threadId as any);
+      .eq('thread_id', asId(threadId));
     
     if (messagesError) {
       console.error('Error deleting chat messages:', messagesError);
@@ -163,7 +167,7 @@ export const deleteChatThread = async (threadId: string) => {
     const { error: threadError } = await supabase
       .from('chat_threads')
       .delete()
-      .eq('id', threadId as any);
+      .eq('id', asId(threadId));
     
     if (threadError) {
       console.error('Error deleting chat thread:', threadError);
@@ -250,7 +254,7 @@ export const getJournalEntries = async (userId: string) => {
     const { data, error } = await supabase
       .from('Journal Entries')
       .select('*')
-      .eq('user_id', userId as any)
+      .eq('user_id', asId(userId))
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -258,7 +262,7 @@ export const getJournalEntries = async (userId: string) => {
       return [];
     }
     
-    return data || [];
+    return asDataArray(data);
   } catch (err) {
     console.error('Unexpected error in getJournalEntries:', err);
     return [];
