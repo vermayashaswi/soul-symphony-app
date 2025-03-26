@@ -27,17 +27,27 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     params: {
       eventsPerSecond: 1 // Reduced to avoid potential rate limiting
     }
-  },
-  // Add fetch configuration to prevent long-running requests
-  fetch: (url, options) => {
-    const fetchOptions = {
-      ...options,
-      // Set global timeout at 20 seconds
-      signal: options?.signal || AbortSignal.timeout(20000)
-    };
-    return fetch(url, fetchOptions);
   }
 });
+
+// Add custom fetch with timeout on the client instance
+const originalFetch = supabase.rest.fetch;
+supabase.rest.fetch = async (url, options) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  
+  try {
+    const fetchOptions = {
+      ...options,
+      signal: options?.signal || controller.signal
+    };
+    
+    const response = await originalFetch(url, fetchOptions);
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
 
 // Simple function to check if Supabase is reachable
 export const checkSupabaseConnection = async () => {

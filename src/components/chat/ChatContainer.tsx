@@ -1,49 +1,36 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import ChatArea from '@/components/chat/ChatArea';
 import ChatThreadList from '@/components/chat/ChatThreadList';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
+import { ensureUserProfile } from '@/utils/profile-helpers';
 
 export function ChatContainer() {
   const { user, isLoading: authLoading } = useAuth();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Simplified profile check that assumes no RLS restrictions
+  // Simplified profile check using our new helpers
   const checkProfile = useCallback(async () => {
     if (!user) return;
     
     try {
       console.log('Checking if profile exists for user:', user.id);
       
-      // Simple profile check - we know the table has no RLS now
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .single();
-        
-      if (error) {
-        console.log('No profile found, creating one');
-        
-        // Try to create a profile - again, no RLS restrictions
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email,
-            full_name: user.user_metadata?.full_name || null,
-            avatar_url: user.user_metadata?.avatar_url || null
-          });
-          
-        if (insertError) {
-          console.error('Error creating profile:', insertError);
-          // Don't show error to user - the database trigger will handle it
-        }
+      const profile = await ensureUserProfile(user.id, {
+        email: user.email,
+        full_name: user.user_metadata?.full_name,
+        avatar_url: user.user_metadata?.avatar_url
+      });
+      
+      if (profile) {
+        console.log('Profile exists or was created:', profile.id);
+        setIsInitialized(true);
       } else {
-        console.log('Profile exists:', data.id);
+        console.error('Failed to ensure profile existence');
+        toast.error('Failed to initialize user profile');
       }
     } catch (error) {
       console.error('Error in profile check:', error);

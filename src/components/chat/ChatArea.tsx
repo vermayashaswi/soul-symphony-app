@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { verifyUserAuthentication } from '@/utils/audio/auth-utils';
+import { getChatMessages, addChatMessage } from '@/utils/supabase-helpers';
 
 export interface Message {
   id: string;
@@ -82,19 +83,15 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   const fetchMessages = async (threadId: string) => {
     try {
       setIsLoadingMessages(true);
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('thread_id', threadId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching messages:', error);
-        toast.error('Failed to load chat history');
+      
+      const fetchedMessages = await getChatMessages(threadId);
+      
+      if (fetchedMessages.length === 0) {
+        setIsLoadingMessages(false);
         return;
       }
-
-      const formattedMessages: Message[] = data.map(msg => ({
+      
+      const formattedMessages: Message[] = fetchedMessages.map(msg => ({
         id: msg.id,
         content: msg.content,
         sender: msg.sender as 'user' | 'assistant',
