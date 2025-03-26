@@ -12,11 +12,15 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
+import JournalDiagnostics from '@/components/diagnostics/JournalDiagnostics';
+import { useDebug } from '@/contexts/debug/DebugContext';
 
 export default function Journal() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { addLog } = useDebug();
+  
   const { 
     entries: journalEntries, 
     loading: isLoading, 
@@ -37,6 +41,22 @@ export default function Journal() {
   const [mode, setMode] = useState<'record' | 'past'>('past');
   const [refreshCount, setRefreshCount] = useState(0);
   const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    addLog('navigation', 'Journal page mounted', { userId: user?.id });
+    
+    return () => {
+      addLog('navigation', 'Journal page unmounted');
+    };
+  }, [addLog, user?.id]);
+
+  useEffect(() => {
+    addLog('network', `Journal page connection status: ${connectionStatus}`);
+  }, [connectionStatus, addLog]);
+
+  useEffect(() => {
+    addLog('info', `Journal entries loading state: ${isLoading}`);
+  }, [isLoading, addLog]);
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -184,22 +204,28 @@ export default function Journal() {
   const handleRefresh = async () => {
     if (isRefreshing) return;
     
+    addLog('action', 'Manual refresh requested on Journal page');
     setIsRefreshing(true);
     try {
       if (user?.id) {
+        addLog('action', 'Processing unprocessed entries');
         const processingResult = await processUnprocessedEntries();
         
         if (processingResult.alreadyProcessing) {
+          addLog('info', 'Entries already being processed');
           setIsRefreshing(false);
           return;
         }
       }
       
+      addLog('action', 'Refreshing journal entries');
       await refreshEntries(true);
       setProcessingEntries([]);
+      addLog('info', 'Journal entries refreshed successfully');
       
     } catch (error) {
       console.error('Error refreshing entries:', error);
+      addLog('error', 'Error refreshing entries', { error });
     } finally {
       setIsRefreshing(false);
     }
@@ -276,6 +302,8 @@ export default function Journal() {
 
   return (
     <div className="container px-4 md:px-6 max-w-6xl space-y-6 py-6">
+      <JournalDiagnostics />
+      
       <Card>
         <CardHeader className="pb-4">
           <CardTitle className="text-2xl">Journal</CardTitle>

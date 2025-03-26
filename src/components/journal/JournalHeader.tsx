@@ -1,8 +1,9 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, PlusCircle, BarChart2, MessageSquare } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Card, CardContent } from '@/components/ui/card';
+import { RefreshCw, Plus, ChartBar } from 'lucide-react';
+import DiagnosticsButton from '@/components/diagnostics/DiagnosticsButton';
 
 interface JournalHeaderProps {
   onCreateJournal: () => void;
@@ -11,64 +12,36 @@ interface JournalHeaderProps {
   isRefreshing: boolean;
 }
 
-export const JournalHeader: React.FC<JournalHeaderProps> = ({
-  onCreateJournal,
-  onViewInsights,
-  onRefresh,
-  isRefreshing,
-}) => {
-  const navigate = useNavigate();
-  
-  const handleChatNavigation = () => {
-    navigate('/chat');
-  };
-  
+export function JournalHeader({ onCreateJournal, onViewInsights, onRefresh, isRefreshing }: JournalHeaderProps) {
   return (
-    <div className="flex justify-between items-center mb-6">
-      <h1 className="text-3xl font-bold">Your Journal</h1>
-      <div className="flex space-x-2">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={onRefresh}
-          disabled={isRefreshing}
-        >
-          {isRefreshing ? (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              Refreshing...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </>
-          )}
-        </Button>
+    <Card className="border border-input">
+      <CardContent className="p-4 flex justify-between items-center flex-wrap gap-3">
+        <div className="flex items-center space-x-2">
+          <Button onClick={onCreateJournal} className="flex items-center gap-1">
+            <Plus className="h-4 w-4" />
+            <span>New Entry</span>
+          </Button>
+          
+          <Button variant="outline" onClick={onViewInsights} className="flex items-center gap-1">
+            <ChartBar className="h-4 w-4" />
+            <span>Insights</span>
+          </Button>
+        </div>
         
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleChatNavigation}
-        >
-          <MessageSquare className="h-4 w-4 mr-2" />
-          Chat
-        </Button>
-        
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={onViewInsights}
-        >
-          <BarChart2 className="h-4 w-4 mr-2" />
-          Insights
-        </Button>
-        
-        <Button onClick={onCreateJournal}>
-          <PlusCircle className="h-4 w-4 mr-2" />
-          New Entry
-        </Button>
-      </div>
-    </div>
+        <div className="flex items-center space-x-2">
+          <DiagnosticsButton variant="minimal" />
+          
+          <Button 
+            variant="outline" 
+            onClick={onRefresh} 
+            disabled={isRefreshing} 
+            className="flex items-center gap-1"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
-};
+}
