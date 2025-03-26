@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { generateUUID } from './audio/blob-utils';
 import { toast } from 'sonner';
@@ -24,29 +25,13 @@ export async function ensureAudioBucketExists(): Promise<boolean> {
     const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
     
     if (!audioBucket) {
-      console.log('Audio bucket not found, attempting to create it');
+      console.log('Audio bucket not found, notify user to set it up');
       
-      try {
-        const { data, error } = await supabase.storage.createBucket('audio', {
-          public: false,
-          fileSizeLimit: 52428800 // 50MB
-        });
-        
-        if (error) {
-          console.error('Error creating audio bucket:', error);
-          return false;
-        }
-        
-        console.log('Audio bucket created successfully');
-        
-        // Note about storage policies - don't try to call RPC functions directly
-        console.log('Storage bucket created, but policies need to be configured');
-        
-        return true;
-      } catch (createError) {
-        console.error('Error creating audio bucket:', createError);
-        return false;
-      }
+      // We can't create buckets from the client side due to RLS policies
+      // The user should have run the SQL migration to create the bucket
+      toast.error('Audio storage is not configured. Please contact support.');
+      
+      return false;
     } else {
       console.log('Audio bucket already exists');
       return true;
