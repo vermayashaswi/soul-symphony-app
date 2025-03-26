@@ -102,8 +102,8 @@ export const safeInsert = async <T>(
 };
 
 /**
- * Helper for safely updating records with proper type handling
- * Simplified to avoid TypeScript recursion issues
+ * Helper for safely updating records
+ * Uses type casting to avoid TypeScript recursion issues
  */
 export const safeUpdate = async <T>(
   tableName: TableName,
@@ -111,25 +111,28 @@ export const safeUpdate = async <T>(
   condition: Record<string, any>
 ): Promise<T | null> => {
   try {
-    let query = supabase.from(tableName).update(values);
+    // Start with the base query
+    const query = supabase.from(tableName).update(values);
     
-    // Apply conditions one by one using any casting to avoid type recursion
+    // Apply conditions one by one, breaking type recursion with "any" casting
     const keys = Object.keys(condition);
+    let finalQuery = query;
     
     if (keys.length > 0) {
       const firstKey = keys[0];
-      query = query.eq(firstKey, condition[firstKey]);
+      finalQuery = finalQuery.eq(firstKey, condition[firstKey]);
       
-      // Apply remaining conditions
+      // Apply remaining conditions using type casting to avoid deep inference
       for (let i = 1; i < keys.length; i++) {
         const key = keys[i];
-        // Break the type chain with any casting
-        query = (query as any).eq(key, condition[key]);
+        // @ts-ignore - Break the type chain
+        finalQuery = finalQuery.eq(key, condition[key]);
       }
     }
     
     // Execute with select
-    const { data, error } = await (query as any).select();
+    // @ts-ignore - Safely convert to any to avoid deep type inference
+    const { data, error } = await finalQuery.select();
     
     if (error) {
       console.error(`Error updating ${tableName}:`, error);
@@ -144,8 +147,8 @@ export const safeUpdate = async <T>(
 };
 
 /**
- * Helper for safely selecting records with proper type handling
- * Simplified to avoid TypeScript recursion issues
+ * Helper for safely selecting records
+ * Uses type casting to avoid TypeScript recursion issues
  */
 export const safeSelect = async <T>(
   tableName: TableName,
@@ -154,33 +157,36 @@ export const safeSelect = async <T>(
   options?: { single?: boolean, limit?: number }
 ): Promise<T | null> => {
   try {
-    let query = supabase.from(tableName).select(columns);
+    // Start with the base query
+    const query = supabase.from(tableName).select(columns);
     
-    // Apply conditions if provided
+    // Apply conditions if provided, using type casting to avoid deep inference
+    let finalQuery = query;
+    
     if (condition && Object.keys(condition).length > 0) {
       const keys = Object.keys(condition);
       
       if (keys.length > 0) {
         const firstKey = keys[0];
-        query = query.eq(firstKey, condition[firstKey]);
+        finalQuery = finalQuery.eq(firstKey, condition[firstKey]);
         
         // Apply remaining conditions
         for (let i = 1; i < keys.length; i++) {
           const key = keys[i];
-          // Break the type chain with any casting
-          query = (query as any).eq(key, condition[key]);
+          // @ts-ignore - Break the type chain
+          finalQuery = finalQuery.eq(key, condition[key]);
         }
       }
     }
     
     // Apply limit if provided
     if (options?.limit) {
-      query = query.limit(options.limit);
+      finalQuery = finalQuery.limit(options.limit);
     }
     
-    // Execute query
+    // Execute query with appropriate method
     if (options?.single) {
-      const { data, error } = await query.maybeSingle();
+      const { data, error } = await finalQuery.maybeSingle();
       
       if (error) {
         console.error(`Error selecting from ${tableName}:`, error);
@@ -189,7 +195,7 @@ export const safeSelect = async <T>(
       
       return data as unknown as T;
     } else {
-      const { data, error } = await query;
+      const { data, error } = await finalQuery;
       
       if (error) {
         console.error(`Error selecting from ${tableName}:`, error);

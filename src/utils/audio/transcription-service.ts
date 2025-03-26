@@ -2,6 +2,7 @@
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from './blob-utils';
+import { ensureAudioBucketExists } from '@/utils/audio-processing';
 
 /**
  * Processes audio blob directly for transcription
@@ -16,7 +17,14 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
       return { success: false, error: 'No audio recording found' };
     }
     
-    // First, check if we're signed in
+    // First, ensure audio bucket exists
+    const bucketExists = await ensureAudioBucketExists();
+    if (!bucketExists) {
+      console.error('Audio storage bucket not available');
+      return { success: false, error: 'Audio storage not available' };
+    }
+    
+    // Check if we're signed in
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
     
@@ -55,6 +63,14 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Transcription function error:', response.status, response.statusText, errorText);
+        
+        // Check if the error is related to body format
+        if (errorText.includes('Body can not be decoded as form data')) {
+          // Fall back to the alternative method
+          console.log('FormData not supported, falling back to base64 method');
+          return sendAudioForTranscription(await blobToBase64(audioBlob), userId);
+        }
+        
         return { 
           success: false, 
           error: `Transcription failed: ${response.status} ${response.statusText}`
@@ -82,7 +98,10 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
           error: 'Request timed out while processing audio'
         };
       }
-      throw fetchError; // Re-throw for the outer catch
+      
+      // Try the fallback method if the FormData method fails
+      console.log('FormData method failed, trying fallback with base64 encoding');
+      return sendAudioForTranscription(await blobToBase64(audioBlob), userId);
     }
   } catch (error: any) {
     console.error('Error in processAudioBlobForTranscription:', error);
@@ -119,6 +138,9 @@ export async function sendAudioForTranscription(base64String: string, userId: st
         error: 'User ID is required'
       };
     }
+    
+    // Ensure audio bucket exists for storage references
+    await ensureAudioBucketExists();
     
     // Get auth token for the request
     const { data: sessionData } = await supabase.auth.getSession();

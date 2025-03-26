@@ -1,184 +1,127 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { ensureAudioBucketExists } from '@/utils/audio-processing';
 
 /**
- * Performs a comprehensive check of Supabase services needed for the journal functionality
+ * Diagnoses common database and configuration issues
+ * @returns Results of diagnostic checks
  */
 export async function diagnoseDatabaseIssues() {
   const results = {
-    database: false,
-    auth: false,
-    storage: false,
-    edgeFunctions: false,
-    journalTable: false,
-    embeddingsTable: false,
-    audioBucket: false,
-    errorDetails: [] as string[],
+    success: false,
+    results: {
+      database: false,
+      auth: false,
+      journalTable: false,
+      audioBucket: false,
+      edgeFunctions: false,
+      embeddingsTable: false
+    },
+    errorDetails: [] as string[]
   };
 
   try {
-    // Test basic database connectivity
-    const { data: dbData, error: dbError } = await supabase
+    // Check database connection
+    console.log('Checking database connection...');
+    const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
       .select('id')
       .limit(1);
+      
+    results.results.database = !profilesError;
+    if (profilesError) {
+      results.errorDetails.push(`Database connection error: ${profilesError.message}`);
+    }
     
-    results.database = !dbError;
-    if (dbError) {
-      results.errorDetails.push(`Database: ${dbError.message}`);
+    // Check auth service
+    console.log('Checking auth service...');
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    results.results.auth = !sessionError && !!sessionData;
+    if (sessionError) {
+      results.errorDetails.push(`Auth service error: ${sessionError.message}`);
     }
-
-    // Test auth service
-    const { data: authData, error: authError } = await supabase.auth.getSession();
-    results.auth = !authError;
-    if (authError) {
-      results.errorDetails.push(`Auth: ${authError.message}`);
-    }
-
-    // Test storage
-    const { data: storageData, error: storageError } = await supabase.storage.listBuckets();
-    results.storage = !storageError;
-    if (storageError) {
-      results.errorDetails.push(`Storage: ${storageError.message}`);
-    } else {
-      // Check if audio bucket exists
-      const audioBucket = storageData?.find(bucket => bucket.name === 'audio');
-      results.audioBucket = !!audioBucket;
-      if (!audioBucket) {
-        results.errorDetails.push('Storage: Audio bucket does not exist');
-      }
-    }
-
-    // Test journal entries table
-    const { data: journalData, error: journalError } = await supabase
+    
+    // Check Journal Entries table
+    console.log('Checking Journal Entries table...');
+    const { error: journalError } = await supabase
       .from('Journal Entries')
       .select('id')
       .limit(1);
-    
-    results.journalTable = !journalError;
+      
+    results.results.journalTable = !journalError;
     if (journalError) {
-      results.errorDetails.push(`Journal table: ${journalError.message}`);
+      results.errorDetails.push(`Journal table error: ${journalError.message}`);
     }
-
-    // Test embeddings table
-    const { data: embeddingsData, error: embeddingsError } = await supabase
+    
+    // Check audio bucket
+    console.log('Checking audio storage bucket...');
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    const audioBucket = buckets?.find(b => b.name === 'audio');
+    results.results.audioBucket = !bucketsError && !!audioBucket;
+    if (!audioBucket) {
+      results.errorDetails.push('Audio storage bucket not found');
+    }
+    
+    // Check edge functions
+    console.log('Checking edge functions...');
+    try {
+      const response = await fetch('https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/transcribe-audio', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ test: true })
+      });
+      
+      // 401 is expected if not authenticated, but means the function exists
+      results.results.edgeFunctions = response.status === 401 || response.ok;
+      if (!response.ok && response.status !== 401) {
+        results.errorDetails.push(`Edge functions error: HTTP ${response.status}`);
+      }
+    } catch (e) {
+      results.results.edgeFunctions = false;
+      results.errorDetails.push('Could not connect to edge functions');
+    }
+    
+    // Check embeddings table
+    console.log('Checking embeddings table...');
+    const { error: embeddingsError } = await supabase
       .from('journal_embeddings')
       .select('id')
       .limit(1);
-    
-    results.embeddingsTable = !embeddingsError;
-    if (embeddingsError) {
-      results.errorDetails.push(`Embeddings table: ${embeddingsError.message}`);
-    }
-
-    // Test edge functions
-    try {
-      const { data: fnData, error: fnError } = await supabase.functions.invoke('transcribe-audio', {
-        body: { test: true }
-      });
       
-      results.edgeFunctions = !fnError;
-      if (fnError) {
-        results.errorDetails.push(`Edge functions: ${fnError.message}`);
-      }
-    } catch (edgeFnError: any) {
-      results.edgeFunctions = false;
-      results.errorDetails.push(`Edge functions exception: ${edgeFnError.message}`);
+    results.results.embeddingsTable = !embeddingsError;
+    if (embeddingsError) {
+      results.errorDetails.push(`Embeddings table error: ${embeddingsError.message}`);
     }
-
-    return {
-      success: results.database && results.journalTable && results.audioBucket,
-      results,
-      isClientSideIssue: !results.database || !results.auth,
-      isServerSideIssue: results.database && results.auth && 
-                        (!results.journalTable || !results.storage || 
-                         !results.edgeFunctions || !results.audioBucket),
-      errorDetails: results.errorDetails
-    };
+    
+    // Calculate overall success
+    const allChecks = Object.values(results.results);
+    results.success = allChecks.every(result => result === true);
+    
+    return results;
   } catch (error: any) {
-    return {
-      success: false,
-      results,
-      isClientSideIssue: true,
-      isServerSideIssue: false,
-      errorDetails: [`Unhandled error: ${error.message}`]
-    };
+    console.error('Error in diagnoseDatabaseIssues:', error);
+    results.errorDetails.push(`Unexpected error: ${error.message}`);
+    return results;
   }
 }
 
 /**
  * Creates the audio bucket if it doesn't exist
+ * @returns Result of operation
  */
 export async function createAudioBucket() {
   try {
-    // First check if the audio bucket exists
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    const bucketCreated = await ensureAudioBucketExists();
     
-    if (bucketsError) {
-      toast.error('Unable to check storage buckets');
-      return { success: false, error: bucketsError.message };
+    if (bucketCreated) {
+      return { success: true };
+    } else {
+      return { success: false, error: 'Failed to create audio bucket' };
     }
-    
-    const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
-    
-    if (!audioBucket) {
-      toast.info('Audio bucket not found, attempting to create...');
-      
-      try {
-        const { data, error } = await supabase.storage.createBucket('audio', {
-          public: true, // Make bucket public
-          fileSizeLimit: 52428800, // 50MB
-        });
-        
-        if (error) {
-          toast.error(`Failed to create audio bucket: ${error.message}`);
-          return { success: false, error: error.message };
-        }
-        
-        toast.success('Audio bucket created successfully');
-        return { success: true, message: 'Audio bucket created' };
-      } catch (createError: any) {
-        toast.error(`Error creating bucket: ${createError.message}`);
-        return { success: false, error: createError.message };
-      }
-    }
-    
-    toast.success('Audio bucket exists');
-    return { success: true, message: 'Audio bucket already exists' };
   } catch (error: any) {
-    toast.error('Error checking/creating storage');
+    console.error('Error in createAudioBucket:', error);
     return { success: false, error: error.message };
-  }
-}
-
-/**
- * Checks if there are any journal entries for the current user
- */
-export async function checkUserJournalEntries(userId: string | undefined) {
-  if (!userId) {
-    return { success: false, error: 'No user ID provided' };
-  }
-  
-  try {
-    const { data, error } = await supabase
-      .from('Journal Entries')
-      .select('id, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-      
-    if (error) {
-      return { success: false, error: error.message, entries: [] };
-    }
-    
-    return { 
-      success: true, 
-      entries: data || [],
-      hasEntries: data && data.length > 0,
-      count: data?.length || 0
-    };
-  } catch (error: any) {
-    return { success: false, error: error.message, entries: [] };
   }
 }
