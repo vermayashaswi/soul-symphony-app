@@ -1,12 +1,25 @@
-
 // This file handles session management functionality separated from auth-utils.ts
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 // Function to refresh the auth session
 export const refreshAuthSession = async (showToasts = false) => {
   try {
     console.log("Starting session refresh");
+    
+    // Check if we have token in storage before attempting refresh
+    let hasTokens = false;
+    try {
+      hasTokens = !!localStorage.getItem('supabase.auth.token') || 
+                 !!localStorage.getItem('sb-' + window.location.hostname.split('.')[0] + '-auth-token');
+                 
+      if (!hasTokens) {
+        console.log("No stored tokens found to refresh session from");
+        return false;
+      }
+    } catch (storageError) {
+      console.error("Storage error checking tokens:", storageError);
+      return false;
+    }
     
     // Wrap in try/catch to handle potential storage errors
     let refreshResult;

@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ export default function Auth() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authAttemptMade, setAuthAttemptMade] = useState(false);
+  const authProcessedRef = useRef(false);
   
   const from = location.state?.from?.pathname || '/journal';
 
@@ -33,10 +33,12 @@ export default function Auth() {
   }, [user, navigate, redirecting, from]);
 
   useEffect(() => {
-    // Avoid auto-processing hash if a manual auth attempt was made
-    if (authAttemptMade) {
+    // Skip if already processed or manual auth attempt was made
+    if (authProcessedRef.current || authAttemptMade) {
       return;
     }
+    
+    authProcessedRef.current = true;
     
     const handleHashRedirect = async () => {
       const hasHashParams = window.location.hash.includes('access_token') || 
@@ -44,6 +46,8 @@ export default function Auth() {
                            window.location.search.includes('error');
                            
       if (hasHashParams) {
+        console.log("Processing auth hash/params in URL");
+        
         if (window.location.hash.includes('error') || window.location.search.includes('error')) {
           console.error('Error detected in redirect URL');
           const errorMessage = window.location.search.includes('error_description') 
@@ -90,6 +94,14 @@ export default function Auth() {
     setAuthAttemptMade(true);
     
     try {
+      // Clear any stored tokens to ensure a fresh login
+      try {
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('sb-' + window.location.hostname.split('.')[0] + '-auth-token');
+      } catch (e) {
+        console.warn('LocalStorage access error:', e);
+      }
+      
       // Force a new Google sign-in with explicit provider selection
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

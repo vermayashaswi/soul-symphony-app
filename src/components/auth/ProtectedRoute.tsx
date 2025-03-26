@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/auth";
 import { createOrUpdateSession } from "@/utils/audio/auth-profile";
@@ -13,9 +13,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const location = useLocation();
   const [refreshAttempted, setRefreshAttempted] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [silentError, setSilentError] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const refreshAttemptedRef = useRef(false);
   
   // Force complete the loading state after a short timeout to prevent getting stuck
   useEffect(() => {
@@ -31,11 +30,11 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return () => clearTimeout(timeout);
   }, [sessionChecked]);
   
-  // Try to refresh the session if needed - with error handling
+  // Try to refresh the session if needed - with simplified logic
   useEffect(() => {
     const handleSessionRefresh = async () => {
-      // Skip if we already have user, already tried refreshing, are still loading, or have error
-      if (user || refreshAttempted || !isCheckingAuth || silentError) {
+      // Skip if we already have user, already tried refreshing, or are still loading
+      if (user || refreshAttemptedRef.current || !isCheckingAuth) {
         return;
       }
       
@@ -43,30 +42,19 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         path: location.pathname
       });
       
+      // Mark as attempted to prevent duplicate refresh attempts
+      refreshAttemptedRef.current = true;
+      setRefreshAttempted(true);
+      
       try {
         setIsCheckingAuth(true);
         const success = await refreshSession();
         console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
         
-        // If refresh failed but we haven't exceeded retry limit, try again
-        if (!success && retryCount < 1) { // Limited to only 1 retry
-          console.log(`Session refresh failed, retrying (${retryCount + 1}/1)...`);
-          setRetryCount(prev => prev + 1);
-          
-          // Add a small delay before retrying
-          setTimeout(() => {
-            setRefreshAttempted(false);
-          }, 500);
-          
-          return;
-        }
-        
-        setRefreshAttempted(true);
         setSessionChecked(true);
         setIsCheckingAuth(false);
       } catch (err) {
         console.error("Error refreshing session but continuing:", err);
-        setSilentError(true);
         setRefreshAttempted(true);
         setSessionChecked(true);
         setIsCheckingAuth(false);
@@ -98,8 +86,6 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     location, 
     refreshAttempted, 
     refreshSession, 
-    retryCount, 
-    silentError, 
     sessionChecked,
     isCheckingAuth
   ]);

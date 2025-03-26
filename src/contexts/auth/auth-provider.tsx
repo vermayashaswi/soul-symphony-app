@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,6 +42,8 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
   const [profileCreationErrorShown, setProfileCreationErrorShown] = useState(false);
   const [refreshInProgress, setRefreshInProgress] = useState(false);
   const authTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const authListenerRef = useRef<{ subscription: { unsubscribe: () => void } } | null>(null);
+  const initialCheckPerformedRef = useRef(false);
   
   // Function to handle profile creation with rate limiting
   const createUserProfile = useCallback(async (userId: string) => {
@@ -92,19 +93,25 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
   
   // Initialize auth state and set up listeners
   useEffect(() => {
-    console.log('AuthProvider: Setting up auth state listener');
+    // Prevent duplicate initializations
+    if (authListenerRef.current) {
+      console.log('Auth listener already set up, skipping duplicate initialization');
+      return;
+    }
+    
+    console.log('AuthProvider: Setting up auth state listener (initial setup)');
     
     // Set a global timeout to force complete loading state - shorter timeout
+    if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
+    
     authTimeoutRef.current = setTimeout(() => {
       if (isLoading) {
         console.log('Force ending auth loading state after timeout');
         setIsLoading(false);
       }
-    }, 1500); // Reduced from 2000ms to 1500ms
+    }, 1500);
     
     // Set up auth state change listener
-    let subscription: { unsubscribe: () => void } | null = null;
-    
     try {
       // Wrap in try/catch to handle storage access errors
       const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
@@ -197,7 +204,7 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
         }
       });
       
-      subscription = data.subscription;
+      authListenerRef.current = data;
     } catch (error) {
       console.error('Error setting up auth state listener:', error);
       // Still mark as not loading even if we couldn't set up the listener
@@ -206,6 +213,15 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
     
     // Check for existing session - only once
     const checkInitialSession = async () => {
+      // Prevent duplicate initial checks
+      if (initialCheckPerformedRef.current) {
+        console.log('Initial session check already performed, skipping');
+        setIsLoading(false);
+        return;
+      }
+      
+      initialCheckPerformedRef.current = true;
+      
       try {
         if (initialSessionCheckDone) {
           console.log('Initial session check already done, skipping');
@@ -234,6 +250,10 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
         }
         
         console.log('Initial session checked:', initialSession ? 'Found' : 'Not found');
+        if (!initialSession) {
+          console.log('No initial session found');
+        }
+        
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
         setIsLoading(false);
@@ -267,10 +287,12 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
     setTimeout(checkInitialSession, 100);
     
     return () => {
+      console.log('Cleaning up auth provider');
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
-      if (subscription) subscription.unsubscribe();
+      if (authListenerRef.current) authListenerRef.current.subscription.unsubscribe();
+      authListenerRef.current = null;
     };
-  }, [createUserProfile, authEventsProcessed, user, initialSessionCheckDone]);
+  }, []);
   
   // Sign in with email and password
   const signIn = async (email: string, password: string) => {
@@ -365,11 +387,30 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
         return false;
       }
       
+      // Skip refresh if we have an active session
+      if (session && session.expires_at) {
+        const expiresAt = new Date(session.expires_at * 1000);
+        const now = new Date();
+        // If session expires more than 5 minutes from now, don't refresh
+        if (expiresAt.getTime() - now.getTime() > 5 * 60 * 1000) {
+          console.log("Current session is still valid, skipping refresh");
+          return true;
+        }
+      }
+      
       setRefreshInProgress(true);
-      setIsLoading(true);
       console.log("Attempting to refresh session...");
       
       const refreshOperation = async () => {
+        // Skip refresh if we don't have any session tokens to refresh from
+        const hasTokens = safeStorage.getItem('supabase.auth.token') || 
+                          safeStorage.getItem('sb-' + window.location.hostname.split('.')[0] + '-auth-token');
+        
+        if (!hasTokens) {
+          console.log('No stored tokens found to refresh session from');
+          return { data: { session: null }, error: null };
+        }
+        
         const { data, error } = await supabase.auth.refreshSession();
         
         // Handle the "Auth session missing" error case cleanly
@@ -384,29 +425,16 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
         return { data, error };
       };
       
-      // Add retry logic for network failures
-      let attempts = 0;
-      const maxAttempts = 2; // Reduced from 3 to 2
+      // Only try one refresh attempt to avoid endless loops
       let result;
       
-      while (attempts < maxAttempts) {
-        try {
-          result = await refreshOperation();
-          break;
-        } catch (err: any) {
-          attempts++;
-          console.warn(`Session refresh attempt ${attempts} failed:`, err);
-          
-          if (attempts >= maxAttempts) {
-            console.error('Session refresh failed after all retries:', err);
-            setIsLoading(false);
-            setRefreshInProgress(false);
-            return false;
-          }
-          
-          // Exponential backoff
-          await new Promise(resolve => setTimeout(resolve, 300 * Math.pow(2, attempts - 1)));
-        }
+      try {
+        result = await refreshOperation();
+      } catch (err: any) {
+        console.warn(`Session refresh failed:`, err);
+        setIsLoading(false);
+        setRefreshInProgress(false);
+        return false;
       }
       
       if (!result) {
@@ -425,8 +453,10 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       }
       
       console.log("Session refresh result:", data.session ? "Success" : "No session returned");
+      
+      // Update state with refreshed session
       setSession(data.session);
-      setUser(data.user);
+      setUser(data.session?.user ?? null);
       setIsLoading(false);
       setRefreshInProgress(false);
       
@@ -436,6 +466,11 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       setIsLoading(false);
       setRefreshInProgress(false);
       return false;
+    } finally {
+      // Ensure refresh flag is reset even if there's an exception
+      setTimeout(() => {
+        setRefreshInProgress(false);
+      }, 500);
     }
   };
   

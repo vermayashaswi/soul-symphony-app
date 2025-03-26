@@ -1,5 +1,5 @@
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,8 @@ const AuthStateListener = () => {
   const [storageAccessFailed, setStorageAccessFailed] = useState(false);
   const [processAttempted, setProcessAttempted] = useState(false);
   const [isProcessingAuthEvent, setIsProcessingAuthEvent] = useState(false);
+  const initializeAttemptedRef = useRef(false);
+  const authListenerRef = useRef<{ subscription?: { unsubscribe: () => void } } | null>(null);
   
   // Create a function to process entries with retry logic
   const safelyProcessEntries = useCallback(async () => {
@@ -41,17 +43,19 @@ const AuthStateListener = () => {
   
   // Handle OAuth redirects that come with tokens in the URL
   useEffect(() => {
+    // Prevent multiple initializations
+    if (initializeAttemptedRef.current) {
+      console.log("AuthStateListener already initialized, skipping duplicate setup");
+      return;
+    }
+    
+    initializeAttemptedRef.current = true;
     console.log("AuthStateListener: Setting up authentication listener");
     
     const handleAuthRedirection = () => {
-      // Prevent processing multiple auth events at once
-      if (isProcessingAuthEvent) {
-        console.log("Already processing an auth event, skipping");
-        return;
-      }
-      
-      // Skip handling token redirects if we're already on callback or auth routes
-      if (location.pathname === '/callback' || 
+      // Skip if already processing or on auth-related pages
+      if (isProcessingAuthEvent || 
+          location.pathname === '/callback' || 
           location.pathname === '/auth/callback' || 
           location.pathname === '/auth') {
         return;
@@ -85,13 +89,16 @@ const AuthStateListener = () => {
     }
     
     // Set up auth state change listener with error handling
-    let subscription;
-    
     try {
+      // Clean up previous subscription if it exists
+      if (authListenerRef.current?.subscription) {
+        authListenerRef.current.subscription.unsubscribe();
+      }
+      
       const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log("Auth event:", event, "User:", session?.user?.email);
         
-        // Only handle SIGNED_IN event when needed to avoid duplicate processing
+        // Handle auth events - simplified to reduce complexity
         if (event === 'SIGNED_IN' && session?.user) {
           console.log("SIGNED_IN event detected for:", session.user.id);
           
@@ -133,14 +140,14 @@ const AuthStateListener = () => {
         }
       });
       
-      subscription = data.subscription;
+      authListenerRef.current = { subscription: data.subscription };
     } catch (error) {
       console.error("Error setting up auth state listener:", error);
       setStorageAccessFailed(true);
       setIsProcessingAuthEvent(false);
     }
     
-    // Check initial session - with error handling
+    // Check initial session - simplified to reduce session refresh attempts
     const checkInitialSession = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
@@ -165,21 +172,26 @@ const AuthStateListener = () => {
             console.error("Error tracking initial session but continuing:", err);
           }
           
-          // Process unprocessed journal entries on initial load with delay
-          setTimeout(() => {
-            if (!processAttempted) {
+          // Process unprocessed journal entries once on initial load
+          if (!processAttempted) {
+            setTimeout(() => {
               safelyProcessEntries().catch(err => {
                 console.error("Error in delayed initial processing but continuing:", err);
               });
-            }
-          }, 3000);
+            }, 3000);
+          }
         } else {
           console.log("No initial session found");
           
-          // Force a refresh of the session on initial load if no session is found
-          refreshSession().catch(err => {
-            console.error("Error refreshing session on initial load but continuing:", err);
-          });
+          // Only try to refresh session if at a protected route
+          const isProtectedRoute = !['/auth', '/callback', '/auth/callback', '/'].includes(location.pathname);
+          
+          if (isProtectedRoute) {
+            console.log("Protected route without session, attempting refresh");
+            refreshSession().catch(err => {
+              console.error("Error refreshing session on initial load but continuing:", err);
+            });
+          }
         }
         
         setIsProcessingAuthEvent(false);
@@ -190,11 +202,15 @@ const AuthStateListener = () => {
       }
     };
     
-    // Check initial session with a small delay to avoid rapid requests
+    // Check initial session with a small delay
     setTimeout(checkInitialSession, 500);
     
     return () => {
-      if (subscription) subscription.unsubscribe();
+      console.log("Cleaning up AuthStateListener");
+      if (authListenerRef.current?.subscription) {
+        authListenerRef.current.subscription.unsubscribe();
+        authListenerRef.current = null;
+      }
     };
   }, [
     location.pathname, 

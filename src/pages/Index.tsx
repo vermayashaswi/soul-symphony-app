@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/auth';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createOrUpdateSession } from '@/utils/audio/auth-profile';
 
 export default function Index() {
@@ -12,11 +12,13 @@ export default function Index() {
   const { user, isLoading } = useAuth();
   const [authChecked, setAuthChecked] = useState(false);
   const [sessionTracked, setSessionTracked] = useState(false);
+  const sessionTrackingAttemptedRef = useRef(false);
 
   // Add a timeout to prevent infinite loading state
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!authChecked) {
+        console.log("Force completing auth check on index page due to timeout");
         setAuthChecked(true);
       }
     }, 1500); // Reduced from 2 seconds to 1.5 second timeout
@@ -27,13 +29,20 @@ export default function Index() {
   // Mark as checked once we have definitive auth state
   useEffect(() => {
     if (!isLoading) {
+      console.log("Auth loading complete on index page, setting authChecked to true");
       setAuthChecked(true);
     }
   }, [isLoading]);
 
   // Track session when user visits index page - only if authenticated
   useEffect(() => {
+    // Prevent multiple session tracking attempts
+    if (sessionTrackingAttemptedRef.current) {
+      return;
+    }
+    
     if (user && !sessionTracked) {
+      sessionTrackingAttemptedRef.current = true;
       console.log("Index page: Tracking session for user", user.id);
       
       // Track session once without retries to avoid unnecessary operations
