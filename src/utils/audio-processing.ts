@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { processAudioBlobForTranscription } from './audio/transcription-service';
@@ -28,13 +29,32 @@ export const ensureAudioBucketExists = async (): Promise<boolean> => {
     console.log('Creating audio bucket...');
     
     const { error: createError } = await supabase.storage.createBucket('audio', {
-      public: true,
+      public: false, // Set to false for security
       fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
+      allowedMimeTypes: ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/ogg'],
     });
     
     if (createError) {
       console.error('Error creating audio bucket:', createError);
-      return false;
+      
+      // Check if it's a permissions error which can happen on initial load
+      if (createError.message.includes('permission') || createError.message.includes('policy')) {
+        // Wait a moment and try again - sometimes policy propagation takes a moment
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const { error: retryError } = await supabase.storage.createBucket('audio', {
+          public: false,
+          fileSizeLimit: 50 * 1024 * 1024,
+          allowedMimeTypes: ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/ogg'],
+        });
+        
+        if (retryError) {
+          console.error('Error creating audio bucket on retry:', retryError);
+          return false;
+        }
+      } else {
+        return false;
+      }
     }
     
     console.log('Audio bucket created successfully');

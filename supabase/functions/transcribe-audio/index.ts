@@ -31,6 +31,25 @@ serve(async (req) => {
     try {
       const testRequest = await req.clone().json();
       if (testRequest && testRequest.test === true) {
+        // First ensure the 'audio' bucket exists
+        try {
+          const { data: buckets } = await supabase.storage.listBuckets();
+          const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
+          
+          if (!audioBucket) {
+            // Bucket doesn't exist, try to create it
+            await supabase.storage.createBucket('audio', {
+              public: false,
+              fileSizeLimit: 50 * 1024 * 1024,
+              allowedMimeTypes: ['audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/wav']
+            });
+            
+            console.log("Created audio bucket during test request");
+          }
+        } catch (storageError) {
+          console.log("Note: Could not check/create audio bucket:", storageError);
+        }
+        
         console.log("Received test request, responding with success");
         return new Response(
           JSON.stringify({ 

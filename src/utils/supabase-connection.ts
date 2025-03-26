@@ -11,7 +11,7 @@ export async function testDatabaseConnection() {
     
     // Use a timeout to prevent hanging connections
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // Increase timeout to 10 seconds
     
     // Use the type-safe approach with a known table name instead of variable string
     const { data, error } = await supabase

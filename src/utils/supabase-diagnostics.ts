@@ -65,22 +65,17 @@ export async function diagnoseDatabaseIssues() {
     // Check edge functions
     console.log('Checking edge functions...');
     try {
-      const response = await fetch('https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/transcribe-audio', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ test: true })
+      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+        body: { test: true }
       });
       
-      // 401 is expected if not authenticated, but means the function exists
-      results.results.edgeFunctions = response.status === 401 || response.ok;
-      if (!response.ok && response.status !== 401) {
-        results.errorDetails.push(`Edge functions error: HTTP ${response.status}`);
+      results.results.edgeFunctions = !error;
+      if (error) {
+        results.errorDetails.push(`Edge functions error: ${error.message}`);
       }
-    } catch (e) {
+    } catch (e: any) {
       results.results.edgeFunctions = false;
-      results.errorDetails.push('Could not connect to edge functions');
+      results.errorDetails.push(`Could not connect to edge functions: ${e.message || 'Unknown error'}`);
     }
     
     // Check embeddings table
@@ -113,12 +108,49 @@ export async function diagnoseDatabaseIssues() {
  */
 export async function createAudioBucket() {
   try {
-    const bucketCreated = await ensureAudioBucketExists();
+    // Create RLS policy for audio storage
+    const policySetup = async () => {
+      try {
+        // Allow users to create folders/read their own data
+        const { error: policyError } = await supabase.rpc('create_storage_policy', {
+          bucket_name: 'audio',
+          policy_name: 'Allow individual user access',
+          definition: "(auth.uid() = owner) OR (bucket_id = 'audio' AND name LIKE auth.uid() || '/%')"
+        });
+        
+        if (policyError) {
+          console.warn('Policy creation may have failed, but bucket might still work:', policyError);
+        }
+        
+        return !policyError;
+      } catch (err) {
+        console.warn('Could not set up storage policies, continuing anyway:', err);
+        return false;
+      }
+    };
+    
+    // Try up to 3 times to create the bucket, with a delay between attempts
+    let bucketCreated = false;
+    let attempts = 0;
+    
+    while (!bucketCreated && attempts < 3) {
+      attempts++;
+      bucketCreated = await ensureAudioBucketExists();
+      
+      if (!bucketCreated) {
+        // Wait a moment before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log(`Retrying bucket creation, attempt ${attempts}`);
+      } else {
+        // Try to set up policies, but don't fail if it doesn't work
+        await policySetup();
+      }
+    }
     
     if (bucketCreated) {
       return { success: true };
     } else {
-      return { success: false, error: 'Failed to create audio bucket' };
+      return { success: false, error: 'Failed to create audio bucket after multiple attempts' };
     }
   } catch (error: any) {
     console.error('Error in createAudioBucket:', error);

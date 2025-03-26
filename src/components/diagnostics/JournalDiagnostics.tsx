@@ -19,12 +19,15 @@ export function JournalDiagnostics() {
     setResults(null);
     
     try {
-      const results = await diagnoseDatabaseIssues();
-      console.log('Diagnostic results:', results);
-      setResults(results);
+      const diagnosticResults = await diagnoseDatabaseIssues();
+      console.log('Diagnostic results:', diagnosticResults);
+      setResults(diagnosticResults);
       
-      if (!results.success) {
-        toast.error('Issues detected with journal system');
+      if (!diagnosticResults.success) {
+        toast.error('Issues detected with journal system', {
+          description: 'See the diagnostics panel for details',
+          duration: 5000
+        });
       } else {
         toast.success('Journal system is working properly');
       }
@@ -45,20 +48,21 @@ export function JournalDiagnostics() {
 
   const fixAudioBucket = async () => {
     setIsFixing(true);
+    toast.loading('Creating audio bucket...', { id: 'create-bucket' });
     
     try {
       const result = await createAudioBucket();
       
       if (result.success) {
-        toast.success('Audio bucket created successfully');
+        toast.success('Audio bucket created successfully', { id: 'create-bucket' });
         // Run diagnostics again to update results
         runDiagnostics();
       } else {
-        toast.error(`Failed to create audio bucket: ${result.error}`);
+        toast.error(`Failed to create audio bucket: ${result.error}`, { id: 'create-bucket' });
       }
     } catch (error: any) {
       console.error('Error fixing audio bucket:', error);
-      toast.error(`Error fixing audio bucket: ${error.message}`);
+      toast.error(`Error fixing audio bucket: ${error.message}`, { id: 'create-bucket' });
     } finally {
       setIsFixing(false);
     }
