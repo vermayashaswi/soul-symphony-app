@@ -110,29 +110,23 @@ export const safeUpdate = async <T>(
   condition: Record<string, any>
 ): Promise<T | null> => {
   try {
-    // To avoid complex type instantiation, we'll handle this differently
-    // First create the base update query
-    const baseQuery = supabase.from(tableName).update(values);
+    // Completely simplify the approach to avoid deep type recursion
+    // Start with a basic query
+    let query = supabase.from(tableName).update(values);
     
-    // Build a filter string instead of chaining .eq() calls
-    const entries = Object.entries(condition);
-    let query = baseQuery;
+    // Instead of building conditions dynamically, use a simple for loop with direct method calls
+    const keys = Object.keys(condition);
     
-    // Apply only the first condition with .eq() directly
-    if (entries.length > 0) {
-      const [firstKey, firstValue] = entries[0];
-      query = baseQuery.eq(firstKey, firstValue);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const value = condition[key];
       
-      // Then apply additional conditions if any
-      for (let i = 1; i < entries.length; i++) {
-        const [key, value] = entries[i];
-        // @ts-ignore - TypeScript will complain but this works at runtime
-        query = query.eq(key, value);
-      }
+      // Use any casting to avoid TypeScript recursion
+      query = (query as any).eq(key, value);
     }
     
-    // Execute the query
-    const { data, error } = await query.select();
+    // Finally execute with select
+    const { data, error } = await (query as any).select();
     
     if (error) {
       console.error(`Error updating ${tableName}:`, error);
@@ -157,35 +151,29 @@ export const safeSelect = async <T>(
 ): Promise<T | null> => {
   try {
     // Create basic query
-    let selectBuilder = supabase.from(tableName).select(columns);
+    let query = supabase.from(tableName).select(columns);
     
-    // Apply conditions if provided using the same approach as safeUpdate
-    if (condition) {
-      const entries = Object.entries(condition);
-      let query = selectBuilder;
+    // Apply conditions if provided using the simpler approach
+    if (condition && Object.keys(condition).length > 0) {
+      const keys = Object.keys(condition);
       
-      if (entries.length > 0) {
-        const [firstKey, firstValue] = entries[0];
-        query = selectBuilder.eq(firstKey, firstValue);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const value = condition[key];
         
-        for (let i = 1; i < entries.length; i++) {
-          const [key, value] = entries[i];
-          // @ts-ignore - TypeScript will complain but this works at runtime
-          query = query.eq(key, value);
-        }
-        
-        selectBuilder = query;
+        // Use any casting to avoid TypeScript recursion
+        query = (query as any).eq(key, value);
       }
     }
     
     // Apply limit if provided
     if (options?.limit) {
-      selectBuilder = selectBuilder.limit(options.limit);
+      query = (query as any).limit(options.limit);
     }
     
     // Execute query
     if (options?.single) {
-      const { data, error } = await selectBuilder.maybeSingle();
+      const { data, error } = await (query as any).maybeSingle();
       
       if (error) {
         console.error(`Error selecting from ${tableName}:`, error);
@@ -194,7 +182,7 @@ export const safeSelect = async <T>(
       
       return data as unknown as T;
     } else {
-      const { data, error } = await selectBuilder;
+      const { data, error } = await query;
       
       if (error) {
         console.error(`Error selecting from ${tableName}:`, error);
