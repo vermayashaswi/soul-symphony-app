@@ -21,13 +21,13 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [lastRetryTime, setLastRetryTime] = useState<number>(0);
   const [lastRefreshToastId, setLastRefreshToastId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [fetchTimeout, setFetchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'checking' | 'error'>('checking');
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
-  const MAX_RETRY_ATTEMPTS = 3;
-  const RETRY_DELAY = 5000; // 5 seconds between retries
-  const FETCH_TIMEOUT = 8000; // 8 seconds timeout for fetch operations
-  const CONNECTION_TIMEOUT = 10000; // 10 seconds timeout for initial connection
+  const MAX_RETRY_ATTEMPTS = 2;
+  const RETRY_DELAY = 3000; // 3 seconds between retries
+  const FETCH_TIMEOUT = 6000; // 6 seconds timeout for fetch operations
+  const CONNECTION_TIMEOUT = 6000; // 6 seconds timeout for initial connection
 
   const checkDatabaseConnection = useCallback(async () => {
     console.log('Testing database connection...');
@@ -53,54 +53,34 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   }, []);
 
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        setConnectionStatus('checking');
-        console.log('Checking Supabase connection...');
-        
-        const connectionTimeoutId = setTimeout(() => {
-          console.error('Database connection check timed out after', CONNECTION_TIMEOUT, 'ms');
-          setConnectionStatus('error');
-          setLoadError('Connection to database timed out. Please try again later.');
-          setLoading(false);
-        }, CONNECTION_TIMEOUT);
-        
-        const isConnected = await checkDatabaseConnection();
-        
-        clearTimeout(connectionTimeoutId);
-        
-        if (!isConnected) {
-          console.error('Failed to connect to database');
-          setLoading(false);
-        } else {
-          console.log('Successfully connected to database');
-        }
-      } catch (err) {
-        console.error('Supabase connection check error:', err);
-        setConnectionStatus('error');
-        setLoadError('Connection to database failed');
-        setLoading(false);
-      }
-    };
-    
-    checkConnection();
-  }, [checkDatabaseConnection]);
+  // Abort in-flight requests function
+  const abortFetchRequests = useCallback(() => {
+    if (abortController) {
+      console.log('Aborting previous fetch requests');
+      abortController.abort();
+    }
+    const newController = new AbortController();
+    setAbortController(newController);
+    return newController.signal;
+  }, [abortController]);
 
-  const fetchEntriesInternal = useCallback(async () => {
+  const fetchEntriesInternal = useCallback(async (forceRefresh = false) => {
     if (!userId) {
       console.log('No userId provided to useJournalEntries');
       setLoading(false);
       return;
     }
     
-    if (isRetrying) return;
+    if (isRetrying && !forceRefresh) return;
     
-    if (connectionStatus === 'error') {
+    if (connectionStatus === 'error' && !forceRefresh) {
       console.log('Cannot fetch entries: connection error');
       setLoading(false);
       return;
     }
+    
+    // Abort any in-flight requests
+    const signal = abortFetchRequests();
     
     try {
       setLoading(true);
@@ -108,7 +88,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       console.log(`Attempting database access for user ${userId}`);
       
-      if (connectionStatus !== 'connected') {
+      if (connectionStatus !== 'connected' || forceRefresh) {
         const connectionTest = await checkDatabaseConnection();
         if (!connectionTest) {
           console.error('Database connection test failed before fetching entries');
@@ -116,30 +96,31 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         }
       }
       
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      if (fetchTimeout) {
-        clearTimeout(fetchTimeout);
+      // Add some debouncing to prevent rapid successive calls
+      if (Date.now() - lastRetryTime < 1000 && !forceRefresh) {
+        console.log('Throttling fetch requests');
+        return;
       }
       
+      setLastRetryTime(Date.now());
+      
+      // Set a timeout to prevent hanging requests
       const timeoutId = setTimeout(() => {
-        console.error('Fetch entries operation timed out after', FETCH_TIMEOUT, 'ms');
-        setLoading(false);
-        setLoadError('Request timed out. Please try again later.');
-        toast.error('Loading journal entries timed out', {
-          id: 'journal-fetch-timeout',
-          dismissible: true,
-        });
+        if (loading) {
+          console.error('Fetch entries operation timed out after', FETCH_TIMEOUT, 'ms');
+          setLoading(false);
+          setLoadError('Request timed out. Please try again later.');
+          toast.error('Loading journal entries timed out', {
+            id: 'journal-fetch-timeout',
+            dismissible: true,
+          });
+        }
       }, FETCH_TIMEOUT);
       
-      setFetchTimeout(timeoutId);
-      
+      console.log('Fetching journal entries...');
       const typedEntries = await fetchJournalEntries(userId);
       
-      if (fetchTimeout) {
-        clearTimeout(fetchTimeout);
-        setFetchTimeout(null);
-      }
+      clearTimeout(timeoutId);
       
       toast.dismiss('journal-fetch-error');
       
@@ -175,21 +156,22 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       }
       
     } catch (error: any) {
-      console.error('Error fetching entries:', error);
-      setLoadError(error.message || 'Failed to load journal entries');
-      
-      if (!isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
-        setRetryAttempt(prev => prev + 1);
+      // Only handle if the request wasn't aborted
+      if (error.name !== 'AbortError') {
+        console.error('Error fetching entries:', error);
+        setLoadError(error.message || 'Failed to load journal entries');
+        
+        if (!isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
+          setRetryAttempt(prev => prev + 1);
+        }
+      } else {
+        console.log('Fetch request was aborted');
       }
     } finally {
-      if (fetchTimeout) {
-        clearTimeout(fetchTimeout);
-        setFetchTimeout(null);
-      }
       setLoading(false);
       setIsRetrying(false);
     }
-  }, [userId, retryAttempt, isRetrying, fetchTimeout, MAX_RETRY_ATTEMPTS, FETCH_TIMEOUT, connectionStatus, checkDatabaseConnection]);
+  }, [userId, retryAttempt, isRetrying, lastRetryTime, connectionStatus, loading, checkDatabaseConnection, abortFetchRequests, MAX_RETRY_ATTEMPTS, FETCH_TIMEOUT]);
 
   const saveJournalEntry = async (entryData: any) => {
     if (!userId) throw new Error('User ID is required to save journal entries');
@@ -228,19 +210,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLastRetryTime(now);
       setIsRetrying(true);
       
-      const forceCompleteTimeout = setTimeout(() => {
-        console.log('Force completing refresh due to timeout');
-        setIsRetrying(false);
-        setLoading(false);
-        toast.error('Refresh timed out. Please try again.', {
-          id: 'journal-refresh-timeout',
-          dismissible: true,
-        });
-      }, FETCH_TIMEOUT);
-      
-      await fetchEntriesInternal();
-      
-      clearTimeout(forceCompleteTimeout);
+      await fetchEntriesInternal(true);
       
       if (showToast) {
         if (lastRefreshToastId) {
@@ -292,24 +262,30 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   }, [userId, isProcessing]);
 
   useEffect(() => {
+    return () => {
+      // Clean up by aborting any in-flight requests on unmount
+      if (abortController) {
+        abortController.abort();
+      }
+    };
+  }, [abortController]);
+
+  useEffect(() => {
     let retryTimeout: NodeJS.Timeout | null = null;
     
     if (loadError && !loading && !isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS && connectionStatus !== 'error') {
       console.log(`Auto-retrying fetch (attempt ${retryAttempt + 1}/${MAX_RETRY_ATTEMPTS}) in ${RETRY_DELAY / 1000} seconds...`);
       
-      const backoffDelay = RETRY_DELAY * Math.pow(2, retryAttempt - 1);
-      
       retryTimeout = setTimeout(() => {
         setIsRetrying(true);
         fetchEntriesInternal();
-      }, backoffDelay);
+      }, RETRY_DELAY);
     }
     
     return () => {
       if (retryTimeout) clearTimeout(retryTimeout);
-      if (fetchTimeout) clearTimeout(fetchTimeout);
     };
-  }, [loadError, loading, fetchEntriesInternal, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS, fetchTimeout, connectionStatus, RETRY_DELAY]);
+  }, [loadError, loading, fetchEntriesInternal, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS, connectionStatus, RETRY_DELAY]);
 
   useEffect(() => {
     const forceCompleteTimeout = setTimeout(() => {
@@ -322,7 +298,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           setLoadError('Connection to database timed out. Please try again.');
         }
       }
-    }, 15000); // 15 seconds max loading time
+    }, 8000); // 8 seconds max loading time
     
     return () => {
       clearTimeout(forceCompleteTimeout);
@@ -335,14 +311,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoadError(null);
       console.log(`Initial fetch triggered for user ${userId} with refreshKey ${refreshKey}`);
       
-      const forceCompleteTimeout = setTimeout(() => {
-        console.log('Force completing initial fetch due to timeout');
-        setLoading(false);
-      }, FETCH_TIMEOUT);
-      
-      fetchEntriesInternal().finally(() => {
-        clearTimeout(forceCompleteTimeout);
-      });
+      fetchEntriesInternal();
     } else if (connectionStatus === 'error') {
       console.log('Cannot fetch entries: connection error');
       setLoading(false);
@@ -351,13 +320,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoading(false);
       setEntries([]);
     }
-    
-    return () => {
-      if (fetchTimeout) {
-        clearTimeout(fetchTimeout);
-      }
-    };
-  }, [userId, refreshKey, fetchEntriesInternal, FETCH_TIMEOUT, connectionStatus]);
+  }, [userId, refreshKey, fetchEntriesInternal, connectionStatus]);
 
   return { 
     entries, 

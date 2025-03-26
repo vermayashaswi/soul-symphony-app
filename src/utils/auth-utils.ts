@@ -116,3 +116,45 @@ export const debugSessionStatus = async (): Promise<void> => {
   
   console.groupEnd();
 };
+
+/**
+ * Ensures healthy authentication state by checking and refreshing token
+ */
+export const ensureHealthyAuth = async (): Promise<boolean> => {
+  try {
+    console.log('Checking and ensuring healthy auth state...');
+    const { data, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('Error getting session in ensureHealthyAuth:', error);
+      return false;
+    }
+    
+    if (!data.session) {
+      console.log('No session found in ensureHealthyAuth');
+      return false;
+    }
+    
+    // If session exists but expires soon (within 5 minutes), try to refresh
+    const expiresAt = data.session.expires_at * 1000; // convert to ms
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+    
+    if (expiresAt - now < fiveMinutes) {
+      console.log('Session expires soon, refreshing token...');
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) {
+        console.error('Error refreshing session:', refreshError);
+        return false;
+      }
+      
+      console.log('Session refreshed successfully');
+    }
+    
+    return true;
+  } catch (e) {
+    console.error('Exception in ensureHealthyAuth:', e);
+    return false;
+  }
+};

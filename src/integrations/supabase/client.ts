@@ -22,6 +22,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   },
   db: {
     schema: 'public'
+  },
+  // Add retry and timeout configuration
+  realtime: {
+    params: {
+      eventsPerSecond: 2
+    }
   }
 });
 
@@ -31,10 +37,17 @@ export const checkSupabaseConnection = async () => {
     const start = Date.now();
     console.log('Testing Supabase connection...');
     
-    const { data, error } = await supabase
+    // Add a timeout to prevent hanging requests
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Connection test timed out after 5 seconds')), 5000);
+    });
+    
+    const fetchPromise = supabase
       .from('profiles')
       .select('id')
       .limit(1);
+    
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
     
     const duration = Date.now() - start;
     

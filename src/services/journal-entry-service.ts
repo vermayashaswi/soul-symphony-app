@@ -126,21 +126,54 @@ export const fetchJournalEntries = async (userId: string) => {
   
   console.log(`Fetching entries for user ${userId}`);
   
-  const { data, error } = await supabase
-    .from('Journal Entries')
-    .select('id, "refined text", "transcription text", created_at, emotions, master_themes, user_id')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  try {
+    // First check if the user has a profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
     
-  if (error) {
-    console.error('Error fetching entries:', error);
-    console.error('Error details:', JSON.stringify(error));
+    if (profileError) {
+      console.warn('Error checking profile, will create one:', profileError);
+      
+      try {
+        // Create profile if it doesn't exist
+        const { error: createError } = await supabase
+          .from('profiles')
+          .insert([{ id: userId }]);
+        
+        if (createError) {
+          console.error('Error creating profile:', createError);
+        } else {
+          console.log('Profile created successfully');
+        }
+      } catch (e) {
+        console.error('Error in profile creation:', e);
+        // Continue anyway
+      }
+    }
+    
+    // Now fetch journal entries with a shorter timeout
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('id, "refined text", "transcription text", created_at, emotions, master_themes, user_id, audio_url, duration')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error('Error fetching entries:', error);
+      console.error('Error details:', JSON.stringify(error));
+      throw error;
+    }
+    
+    console.log(`Fetched ${data?.length || 0} entries successfully`);
+    
+    return data as JournalEntry[];
+  } catch (error) {
+    console.error('Error in fetchJournalEntries:', error);
     throw error;
   }
-  
-  console.log(`Fetched ${data?.length || 0} entries successfully`);
-  
-  return data as JournalEntry[];
 };
 
 /**
@@ -156,10 +189,57 @@ export const processUnprocessedEntries = async (userId: string) => {
   
   try {
     console.log('Processing unprocessed entries for user:', userId);
+    
+    // Get current session for auth
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      console.log('No active session found, cannot process entries');
+      toast.error('Authentication required. Please sign in again.');
+      return { success: false, processed: 0 };
+    }
+    
+    try {
+      // Use the correct URL format for the edge function with a timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const response = await fetch('https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/embed-all-entries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          userId,
+          processAll: false // Only process entries without embeddings
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response from embed-all-entries:', errorText);
+        return { success: false, processed: 0 };
+      }
+      
+      const result = await response.json();
+      
+      return { success: true, processed: result.processedCount || 0 };
+    } catch (fetchError) {
+      if (fetchError.name === 'AbortError') {
+        console.error('Processing entries request timed out');
+        return { success: false, processed: 0, timedOut: true };
+      }
+      console.error('Error calling embed-all-entries function:', fetchError);
+      return { success: false, processed: 0 };
+    }
+    
     return { success: true, processed: 0 };
   } catch (error) {
     console.error('Error in processUnprocessedEntries:', error);
-    toast.error('An unexpected error occurred. Please try again.');
     return { success: false, processed: 0 };
   }
 };

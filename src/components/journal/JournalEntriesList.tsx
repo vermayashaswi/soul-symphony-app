@@ -57,23 +57,23 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     );
   }
 
-  if (loading && entries.length === 0 && processingEntries.length === 0) {
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center space-y-4 my-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="text-muted-foreground">Loading your journal entries...</p>
-        <div>
-          {onRefresh && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onRefresh}
-              className="mt-4"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" /> Retry
-            </Button>
-          )}
-        </div>
+      <div className="space-y-6">
+        {[1, 2, 3].map((i) => (
+          <div key={`skeleton-${i}`} className="border rounded-lg p-6 shadow-sm">
+            <div className="flex justify-between items-start">
+              <div className="w-2/3">
+                <Skeleton className="h-7 w-3/4 mb-2" />
+                <Skeleton className="h-4 w-1/2 mb-4" />
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+              <Skeleton className="h-20 w-20 rounded-md" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -110,7 +110,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       animate={{ opacity: 1 }}
       transition={{ staggerChildren: 0.1 }}
     >
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {/* Processing entry placeholders */}
         {processingEntries.map((tempId) => (
           <motion.div 
