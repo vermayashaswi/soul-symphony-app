@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { JournalEntry } from '@/types/journal';
@@ -23,9 +22,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'checking' | 'error'>('checking');
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
-  const MAX_RETRY_ATTEMPTS = 1;
-  const RETRY_DELAY = 3000; // 3 seconds between retries
-  const CONNECTION_TIMEOUT = 5000; // 5 seconds timeout for initial connection
+  const MAX_RETRY_ATTEMPTS = 3;
+  const RETRY_DELAY = 3000;
+  const CONNECTION_TIMEOUT = 5000;
 
   const checkDatabaseConnection = useCallback(async () => {
     console.log('Testing database connection...');
@@ -51,7 +50,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   }, []);
 
-  // Abort in-flight requests function
   const abortFetchRequests = useCallback(() => {
     if (abortController) {
       console.log('Aborting previous fetch requests');
@@ -77,7 +75,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       return;
     }
     
-    // Abort any in-flight requests
     const signal = abortFetchRequests();
     
     try {
@@ -92,7 +89,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         }
       }
       
-      // Add some debouncing to prevent rapid successive calls
       if (Date.now() - lastRetryTime < 1000 && !forceRefresh) {
         console.log('Throttling fetch requests');
         return;
@@ -108,43 +104,42 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setEntries(typedEntries);
       setLoading(false);
 
-      if (typedEntries.length > 0) {
-        const entriesNeedingThemes = typedEntries.filter(
-          entry => (!entry.master_themes || entry.master_themes.length === 0) && entry["refined text"]
-        );
+      const entriesNeedingThemes = typedEntries.filter(
+        entry => (!entry.master_themes || entry.master_themes.length === 0) && entry["refined text"]
+      );
+      
+      if (entriesNeedingThemes.length > 0) {
+        console.log(`Found ${entriesNeedingThemes.length} entries without themes, processing...`);
+        for (const entry of entriesNeedingThemes) {
+          try {
+            await generateThemesForEntry(entry);
+          } catch (error) {
+            console.log('Error generating themes for entry');
+          }
+        }
         
         if (entriesNeedingThemes.length > 0) {
-          console.log(`Found ${entriesNeedingThemes.length} entries without themes, processing...`);
-          for (const entry of entriesNeedingThemes) {
-            try {
-              await generateThemesForEntry(entry);
-            } catch (error) {
-              console.log('Error generating themes for entry');
-            }
-          }
-          
-          if (entriesNeedingThemes.length > 0) {
-            try {
-              const refreshedData = await fetchJournalEntries(userId);
-              setEntries(refreshedData);
-            } catch (error) {
-              console.log('Error in refresh after theme generation');
-            }
+          try {
+            const refreshedData = await fetchJournalEntries(userId);
+            setEntries(refreshedData);
+          } catch (error) {
+            console.log('Error in refresh after theme generation');
           }
         }
       }
       
     } catch (error: any) {
-      // Only handle if the request wasn't aborted
       if (error.name !== 'AbortError') {
-        console.log('Error fetching entries');
-        setLoadError('Failed to load journal entries');
+        console.log('Error fetching entries:', error);
+        setLoadError('Failed to load journal entries. ' + (error.message || ''));
         
         if (!isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
           setRetryAttempt(prev => prev + 1);
+          console.log(`Will retry fetch (attempt ${retryAttempt + 1}/${MAX_RETRY_ATTEMPTS})`);
         }
       } else {
         console.log('Fetch request was aborted');
+        setLoadError('Request timed out. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -233,7 +228,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
 
   useEffect(() => {
     return () => {
-      // Clean up by aborting any in-flight requests on unmount
       if (abortController) {
         abortController.abort();
       }
@@ -265,10 +259,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         
         if (connectionStatus === 'checking') {
           setConnectionStatus('error');
-          setLoadError('Connection to database timed out. Please try again.');
+          setLoadError('Connection to database timed out. Please check your internet connection and try again.');
         }
       }
-    }, 8000); // 8 seconds max loading time
+    }, 15000);
     
     return () => {
       clearTimeout(forceCompleteTimeout);

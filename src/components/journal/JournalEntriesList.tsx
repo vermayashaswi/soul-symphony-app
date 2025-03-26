@@ -6,7 +6,7 @@ import { JournalEntry } from '@/types/journal';
 import EmptyJournalState from './EmptyJournalState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -39,6 +39,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   if (connectionStatus === 'error') {
     return (
       <div className="flex flex-col items-center justify-center space-y-4 my-12 p-6 border rounded-lg border-destructive bg-destructive/10">
+        <WifiOff className="h-12 w-12 text-destructive mb-2" />
         <p className="text-destructive font-medium">Connection to database failed</p>
         <p className="text-muted-foreground text-center max-w-md">
           We're having trouble connecting to the database. This could be due to network issues.
@@ -83,7 +84,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       <div className="flex flex-col items-center justify-center space-y-4 my-12 p-6 border rounded-lg border-destructive bg-destructive/10">
         <p className="text-destructive font-medium">Error loading entries</p>
         <p className="text-muted-foreground text-center max-w-md">
-          Failed to load your journal entries. Please try again.
+          {loadError || 'Failed to load your journal entries. Please try again.'}
         </p>
         {onRefresh && (
           <Button 
@@ -141,6 +142,11 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           <JournalEntryCard key={`entry-${entry.id}`} entry={entry} />
         ))}
       </AnimatePresence>
+      {entries.length > 0 && connectionStatus === 'connected' && (
+        <div className="flex items-center justify-center text-sm text-muted-foreground mt-4">
+          <Wifi className="h-4 w-4 mr-2 text-green-500" /> Connected to database
+        </div>
+      )}
     </motion.div>
   );
 }

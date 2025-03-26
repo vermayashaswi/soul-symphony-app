@@ -27,6 +27,15 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     params: {
       eventsPerSecond: 1 // Reduced to avoid potential rate limiting
     }
+  },
+  // Add fetch configuration to prevent long-running requests
+  fetch: (url, options) => {
+    const fetchOptions = {
+      ...options,
+      // Set global timeout at 20 seconds
+      signal: options?.signal || AbortSignal.timeout(20000)
+    };
+    return fetch(url, fetchOptions);
   }
 });
 

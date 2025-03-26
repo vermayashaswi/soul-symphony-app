@@ -13,11 +13,12 @@ export const testDatabaseConnection = async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     
-    // Use a simple query to test the connection - without using abortSignal
+    // Use a simple query to test the connection - using the signal from controller
     const { data, error } = await supabase
       .from('profiles')
       .select('id')
-      .limit(1);
+      .limit(1)
+      .abortSignal(controller.signal);
     
     clearTimeout(timeoutId);
     

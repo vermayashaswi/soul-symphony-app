@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/types/journal';
 import { toast } from 'sonner';
@@ -183,9 +182,11 @@ export const fetchJournalEntries = async (userId: string) => {
       console.log('Profile check handled by database');
     }
     
-    // Now fetch journal entries with request timeout
+    // Now fetch journal entries with increased timeout (15 seconds)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    console.log('Starting journal entries fetch with timeout');
     
     const { data, error } = await supabase
       .from('Journal Entries')
@@ -197,7 +198,7 @@ export const fetchJournalEntries = async (userId: string) => {
     clearTimeout(timeoutId);
       
     if (error) {
-      console.error('Error fetching entries');
+      console.error('Error fetching entries:', error);
       throw error;
     }
     
@@ -207,10 +208,10 @@ export const fetchJournalEntries = async (userId: string) => {
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       console.error('Fetch journal entries aborted due to timeout');
-      throw new Error('Request timed out after 8 seconds');
+      throw new Error('Request timed out after 15 seconds. Please check your internet connection and try again.');
     }
     
-    console.error('Error in fetchJournalEntries');
+    console.error('Error in fetchJournalEntries:', error);
     throw error;
   }
 };
