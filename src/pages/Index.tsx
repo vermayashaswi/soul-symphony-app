@@ -5,8 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/auth';
 import { useEffect, useState } from 'react';
-import { createOrUpdateSession } from '@/utils/audio/auth-utils';
-import { toast } from 'sonner';
+import { createOrUpdateSession } from '@/utils/audio/auth-profile';
 
 export default function Index() {
   const navigate = useNavigate();
@@ -17,8 +16,10 @@ export default function Index() {
   // Add a timeout to prevent infinite loading state
   useEffect(() => {
     const timer = setTimeout(() => {
-      setAuthChecked(true);
-    }, 2000); // 2 second timeout
+      if (!authChecked) {
+        setAuthChecked(true);
+      }
+    }, 1500); // Reduced from 2 seconds to 1.5 second timeout
     
     return () => clearTimeout(timer);
   }, []);
@@ -32,33 +33,20 @@ export default function Index() {
 
   // Track session when user visits index page - only if authenticated
   useEffect(() => {
-    if (user && !isLoading && !sessionTracked) {
+    if (user && !sessionTracked) {
       console.log("Index page: Tracking session for user", user.id);
       
-      // Add retry logic for session tracking
-      const trackSession = async () => {
-        try {
-          const result = await createOrUpdateSession(user.id, '/');
-          console.log("Session tracking result:", result);
+      // Track session once without retries to avoid unnecessary operations
+      createOrUpdateSession(user.id, '/')
+        .then(() => {
           setSessionTracked(true);
-        } catch (error) {
+        })
+        .catch(error => {
           console.error("Error tracking session on index page:", error);
-          // We don't want to show this error to users since it's non-critical
-        }
-      };
-      
-      // Try session tracking with a backoff interval
-      const retryIntervals = [0, 1000, 3000]; // Retry immediately, then after 1s, then after 3s
-      
-      for (let i = 0; i < retryIntervals.length; i++) {
-        setTimeout(() => {
-          if (!sessionTracked) {
-            trackSession();
-          }
-        }, retryIntervals[i]);
-      }
+          // Don't show errors to users since it's non-critical
+        });
     }
-  }, [user, isLoading, sessionTracked]);
+  }, [user, sessionTracked]);
 
   const handleGetStarted = () => {
     if (user) {

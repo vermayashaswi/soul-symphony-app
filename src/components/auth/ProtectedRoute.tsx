@@ -26,7 +26,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         setRefreshAttempted(true);
         setIsCheckingAuth(false);
       }
-    }, 2000); // Reduced timeout for faster fallback
+    }, 1500); // Reduced timeout for faster fallback
     
     return () => clearTimeout(timeout);
   }, [sessionChecked]);
@@ -49,7 +49,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
         
         // If refresh failed but we haven't exceeded retry limit, try again
-        if (!success && retryCount < 1) { // Reduced retry count to minimize flickering
+        if (!success && retryCount < 1) { // Limited to only 1 retry
           console.log(`Session refresh failed, retrying (${retryCount + 1}/1)...`);
           setRetryCount(prev => prev + 1);
           
@@ -120,7 +120,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     <div className="flex items-center justify-center h-screen">
       <div className="text-center">
         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <p className="text-sm text-muted-foreground">Authenticating...</p>
       </div>
     </div>
   );

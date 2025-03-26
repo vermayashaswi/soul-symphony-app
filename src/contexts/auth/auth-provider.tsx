@@ -41,6 +41,7 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
   const [initialSessionCheckDone, setInitialSessionCheckDone] = useState(false);
   const [authEventsProcessed, setAuthEventsProcessed] = useState<Set<string>>(new Set());
   const [profileCreationErrorShown, setProfileCreationErrorShown] = useState(false);
+  const [refreshInProgress, setRefreshInProgress] = useState(false);
   const authTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Function to handle profile creation with rate limiting
@@ -93,13 +94,13 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
   useEffect(() => {
     console.log('AuthProvider: Setting up auth state listener');
     
-    // Set a global timeout to force complete loading state
+    // Set a global timeout to force complete loading state - shorter timeout
     authTimeoutRef.current = setTimeout(() => {
       if (isLoading) {
         console.log('Force ending auth loading state after timeout');
         setIsLoading(false);
       }
-    }, 2000);
+    }, 1500); // Reduced from 2000ms to 1500ms
     
     // Set up auth state change listener
     let subscription: { unsubscribe: () => void } | null = null;
@@ -203,9 +204,16 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       setIsLoading(false);
     }
     
-    // Check for existing session
+    // Check for existing session - only once
     const checkInitialSession = async () => {
       try {
+        if (initialSessionCheckDone) {
+          console.log('Initial session check already done, skipping');
+          setIsLoading(false);
+          return;
+        }
+        
+        console.log('Checking for initial session...');
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -225,6 +233,7 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
           return;
         }
         
+        console.log('Initial session checked:', initialSession ? 'Found' : 'Not found');
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
         setIsLoading(false);
@@ -261,7 +270,7 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
       if (subscription) subscription.unsubscribe();
     };
-  }, [createUserProfile, authEventsProcessed, user]);
+  }, [createUserProfile, authEventsProcessed, user, initialSessionCheckDone]);
   
   // Sign in with email and password
   const signIn = async (email: string, password: string) => {
@@ -350,6 +359,13 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
   // Refresh session
   const refreshSession = async () => {
     try {
+      // Prevent multiple refresh attempts
+      if (refreshInProgress) {
+        console.log("Session refresh already in progress, skipping...");
+        return false;
+      }
+      
+      setRefreshInProgress(true);
       setIsLoading(true);
       console.log("Attempting to refresh session...");
       
@@ -370,7 +386,7 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       
       // Add retry logic for network failures
       let attempts = 0;
-      const maxAttempts = 3;
+      const maxAttempts = 2; // Reduced from 3 to 2
       let result;
       
       while (attempts < maxAttempts) {
@@ -384,6 +400,7 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
           if (attempts >= maxAttempts) {
             console.error('Session refresh failed after all retries:', err);
             setIsLoading(false);
+            setRefreshInProgress(false);
             return false;
           }
           
@@ -394,6 +411,7 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       
       if (!result) {
         setIsLoading(false);
+        setRefreshInProgress(false);
         return false;
       }
       
@@ -402,6 +420,7 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       if (error) {
         console.error('Session refresh error:', error);
         setIsLoading(false);
+        setRefreshInProgress(false);
         return false;
       }
       
@@ -409,11 +428,13 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       setSession(data.session);
       setUser(data.user);
       setIsLoading(false);
+      setRefreshInProgress(false);
       
       return !!data.session;
     } catch (error) {
       console.error('Error refreshing session:', error);
       setIsLoading(false);
+      setRefreshInProgress(false);
       return false;
     }
   };

@@ -15,6 +15,7 @@ export default function Auth() {
   const [redirecting, setRedirecting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authAttemptMade, setAuthAttemptMade] = useState(false);
   
   const from = location.state?.from?.pathname || '/journal';
 
@@ -32,6 +33,11 @@ export default function Auth() {
   }, [user, navigate, redirecting, from]);
 
   useEffect(() => {
+    // Avoid auto-processing hash if a manual auth attempt was made
+    if (authAttemptMade) {
+      return;
+    }
+    
     const handleHashRedirect = async () => {
       const hasHashParams = window.location.hash.includes('access_token') || 
                            window.location.hash.includes('error') ||
@@ -74,13 +80,14 @@ export default function Auth() {
     };
     
     handleHashRedirect();
-  }, []);
+  }, [authAttemptMade]);
 
   const handleSignIn = async () => {
     if (isAuthenticating) return;
     
     setIsAuthenticating(true);
     setAuthError(null);
+    setAuthAttemptMade(true);
     
     try {
       // Force a new Google sign-in with explicit provider selection
@@ -104,7 +111,6 @@ export default function Auth() {
       console.error('Failed to initiate Google sign-in:', error);
       setAuthError(error instanceof Error ? error.message : 'Unknown error');
       toast.error('Failed to initiate sign-in process. Please try again.');
-    } finally {
       setIsAuthenticating(false);
     }
   };
