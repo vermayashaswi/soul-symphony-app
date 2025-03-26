@@ -23,7 +23,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         setSessionChecked(true);
         setRefreshAttempted(true);
       }
-    }, 1000); // Reduced timeout to prevent long loading screens
+    }, 800); // Further reduced timeout for faster UI response
     
     return () => clearTimeout(timeout);
   }, [sessionChecked]);
@@ -78,13 +78,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   
   // Show minimal loading UI with a shorter delay
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-4">
-        <div className="flex justify-center mb-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-        <Skeleton className="h-12 w-full rounded-md" />
-        <Skeleton className="h-24 w-full rounded-md" />
+    <div className="flex items-center justify-center h-screen">
+      <div className="text-center">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+        <p className="text-sm text-muted-foreground">Loading...</p>
       </div>
     </div>
   );

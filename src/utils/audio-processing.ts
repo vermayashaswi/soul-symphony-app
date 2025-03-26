@@ -106,6 +106,12 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         toast.error('Authentication failed. Please try signing in again.');
         return;
       }
+      
+      // Double check that we have the user ID from auth
+      if (authStatus.user && authStatus.user.id !== userId) {
+        console.warn('User ID mismatch detected, using auth user ID instead');
+        userId = authStatus.user.id;
+      }
     } catch (authError) {
       console.error('Authentication verification error:', authError);
       toast.dismiss(toastId);
@@ -153,14 +159,30 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         console.error('Transcription service error:', result.error);
         toast.error('Failed to process recording. Please try again later.');
       }
-    } catch (transcriptionError) {
+    } catch (transcriptionError: any) {
       console.error('Transcription error:', transcriptionError);
       toast.dismiss(toastId);
-      toast.error('Failed to transcribe audio. Please try again later.');
+      
+      const errorMessage = transcriptionError?.message || 'Unknown error';
+      console.error('Detailed transcription error:', errorMessage);
+      
+      toast.error(`Failed to transcribe audio: ${errorMessage.substring(0, 100)}...`);
+      
+      // Try to log the error to the database for debugging
+      try {
+        await supabase.from('error_logs').insert({
+          user_id: userId,
+          error_source: 'audio_processing',
+          error_message: errorMessage,
+          error_details: JSON.stringify(transcriptionError)
+        });
+      } catch (logError) {
+        console.error('Failed to log error to database:', logError);
+      }
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
     toast.dismiss(toastId);
-    toast.error(`Error processing recording. Please try again later.`);
+    toast.error(`Error processing recording: ${error.message || 'Unknown error'}`);
   }
 }

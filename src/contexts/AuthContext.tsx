@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,7 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [profileCreationAttempted, setProfileCreationAttempted] = useState(false);
   const [initialSessionCheckDone, setInitialSessionCheckDone] = useState(false);
-  const [lastSignInEvent, setLastSignInEvent] = useState<number>(0);
+  const [authEventsProcessed, setAuthEventsProcessed] = useState<Set<string>>(new Set());
   
   // Function to handle profile creation with rate limiting
   const createUserProfile = useCallback(async (userId: string) => {
@@ -38,14 +37,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!result.success) {
         console.warn('Profile creation attempted but had issues:', result.error);
-        // Don't show toast here to prevent multiple errors
-        // The error is not fatal - the database trigger might have created the profile
       } else {
         console.log('Profile check/creation completed successfully');
       }
     } catch (error) {
       console.error('Error in createUserProfile, but continuing:', error);
-      // Don't throw the error as it's not fatal
     }
   }, [profileCreationAttempted]);
   
@@ -60,20 +56,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Force ending auth loading state after timeout');
         setIsLoading(false);
       }
-    }, 3000);
+    }, 2000);
     
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log('Auth state changed:', event);
       
+      // Create a unique ID for this event to prevent duplicate processing
+      const eventId = `${event}-${Date.now()}`;
+      
+      // Check if we've already processed this event
+      if (authEventsProcessed.has(eventId)) {
+        console.log('Skipping duplicate auth event:', event);
+        return;
+      }
+      
+      // Mark this event as processed
+      setAuthEventsProcessed(prev => new Set(prev).add(eventId));
+      
       setSession(newSession);
       setUser(newSession?.user ?? null);
       
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        // Prevent duplicate toast messages by checking time since last event
-        const now = Date.now();
-        if (now - lastSignInEvent > 5000) { // 5 seconds between toast messages
-          setLastSignInEvent(now);
+        // Only show toast for SIGNED_IN once per session
+        if (event === 'SIGNED_IN' && !user) {
           toast.success('Signed in successfully');
         }
         
@@ -165,7 +171,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (authTimeout) clearTimeout(authTimeout);
       subscription.unsubscribe();
     };
-  }, [createUserProfile, lastSignInEvent]);
+  }, [createUserProfile, authEventsProcessed]);
   
   // Sign in with email and password
   const signIn = async (email: string, password: string) => {
@@ -231,6 +237,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshSession = async () => {
     try {
       setIsLoading(true);
+      console.log("Attempting to refresh session...");
       const { data, error } = await supabase.auth.refreshSession();
       
       if (error) {
@@ -244,6 +251,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
+      console.log("Session refresh result:", data.session ? "Success" : "No session returned");
       setSession(data.session);
       setUser(data.user);
       setIsLoading(false);
