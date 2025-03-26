@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, checkSupabaseConnection } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/types/journal';
 
 interface JournalEntryInput {
@@ -35,20 +35,16 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const testDatabaseConnection = useCallback(async () => {
     console.log('Testing database connection...');
     try {
-      // Use a simple direct query to check database health
-      const { data, error: healthError } = await supabase
-        .from('profiles')
-        .select('id')
-        .limit(1);
+      const connectionTest = await checkSupabaseConnection();
       
-      if (healthError) {
-        console.error('Database health check failed:', healthError);
+      if (!connectionTest.success) {
+        console.error('Database health check failed:', connectionTest.error);
         setConnectionStatus('error');
-        setLoadError('Connection to database failed: ' + healthError.message);
+        setLoadError('Connection to database failed: ' + connectionTest.error);
         return false;
       }
       
-      console.log('Database connection test successful:', data);
+      console.log(`Database connection test successful (${connectionTest.duration}ms)`);
       setConnectionStatus('connected');
       setLoadError(null);
       return true;
@@ -60,14 +56,12 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   }, []);
 
-  // Check initial database connection
   useEffect(() => {
     const checkConnection = async () => {
       try {
         setConnectionStatus('checking');
         console.log('Checking Supabase connection...');
         
-        // Set a timeout to force complete the connection check
         const connectionTimeoutId = setTimeout(() => {
           console.error('Database connection check timed out after', CONNECTION_TIMEOUT, 'ms');
           setConnectionStatus('error');
@@ -96,7 +90,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     checkConnection();
   }, [testDatabaseConnection]);
 
-  // Main function to fetch entries
   const fetchEntries = useCallback(async () => {
     if (!userId) {
       console.log('No userId provided to useJournalEntries');
@@ -118,7 +111,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       console.log(`Attempting database access for user ${userId}`);
       
-      // Skip the connection test if we've already established a connection
       if (connectionStatus !== 'connected') {
         const connectionTest = await testDatabaseConnection();
         if (!connectionTest) {
@@ -129,7 +121,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       console.log(`Fetching entries for user ${userId}`);
       
-      // Add a small delay to allow UI to update
       await new Promise(resolve => setTimeout(resolve, 200));
       
       if (fetchTimeout) {
@@ -474,7 +465,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     };
   }, [loadError, loading, fetchEntries, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS, fetchTimeout, connectionStatus]);
 
-  // Force complete loading state after timeout
   useEffect(() => {
     const forceCompleteTimeout = setTimeout(() => {
       if (loading) {
@@ -493,7 +483,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     };
   }, [loading, connectionStatus]);
 
-  // Initial data fetch when user is available
   useEffect(() => {
     if (userId && connectionStatus === 'connected') {
       setRetryAttempt(0);

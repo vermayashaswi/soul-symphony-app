@@ -17,5 +17,43 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'implicit',
+  },
+  global: {
+    headers: {
+      'x-client-info': 'Feelosophy App'
+    },
+  },
+  db: {
+    schema: 'public'
+  },
+  realtime: {
+    timeout: 10000, // 10s
   }
 });
+
+// Simple function to check if Supabase is reachable
+export const checkSupabaseConnection = async () => {
+  try {
+    const start = Date.now();
+    console.log('Testing Supabase connection...');
+    
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .limit(1)
+      .timeout(5000); // Add 5s timeout for the query
+    
+    const duration = Date.now() - start;
+    
+    if (error) {
+      console.error('Supabase connection test failed:', error);
+      return { success: false, error: error.message, duration };
+    }
+    
+    console.log(`Supabase connection successful (${duration}ms)`);
+    return { success: true, duration, data };
+  } catch (err) {
+    console.error('Supabase connection error:', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error', duration: -1 };
+  }
+};

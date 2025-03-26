@@ -46,6 +46,10 @@ export default function Journal() {
         
         if (error) {
           console.error('Supabase connection check failed:', error);
+          toast.error('Database connection failed', {
+            id: 'db-connection-error',
+            dismissible: true,
+          });
         } else {
           console.log('Supabase connection confirmed');
         }
@@ -245,9 +249,9 @@ export default function Journal() {
           <AlertDescription className="mt-2">
             <p className="mb-4">Unable to connect to the database. This could be due to:</p>
             <ul className="list-disc pl-6 mb-4 space-y-1">
-              <li>Network issues</li>
-              <li>Server maintenance</li>
-              <li>Security or permission issues</li>
+              <li>Network issues or firewall restrictions</li>
+              <li>Server maintenance or temporary outage</li>
+              <li>Application configuration issues</li>
             </ul>
             <div className="flex gap-3 mt-4">
               <Button 
