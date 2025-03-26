@@ -60,12 +60,22 @@ serve(async (req) => {
       .select("id, refined text, transcription text")
       .eq("user_id", userId);
 
-    // If not processing all entries, only get ones without embeddings
+    // If not processing all entries, only get ones without embeddings - with fixed filter
     if (!processAll) {
-      console.log("Filtering for entries without embeddings");
-      query = query.not('id', 'in', 
-        supabase.from('journal_embeddings').select('journal_entry_id')
-      );
+      try {
+        const { data: existingEmbeddings } = await supabase
+          .from('journal_embeddings')
+          .select('journal_entry_id');
+          
+        const embeddedIds = existingEmbeddings?.map(e => e.journal_entry_id) || [];
+        
+        if (embeddedIds.length > 0) {
+          query = query.not('id', 'in', embeddedIds);
+        }
+      } catch (error) {
+        console.error("Error fetching existing embeddings:", error);
+        // Continue without filtering
+      }
     } else {
       console.log("Will process ALL entries regardless of existing embeddings");
     }

@@ -18,6 +18,32 @@ interface AuthContextProps {
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
+// Safe storage wrapper to handle storage access errors
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      console.warn('LocalStorage access error:', e);
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      console.warn('LocalStorage write error:', e);
+    }
+  },
+  removeItem: (key: string): void => {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.warn('LocalStorage remove error:', e);
+    }
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -27,32 +53,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authEventsProcessed, setAuthEventsProcessed] = useState<Set<string>>(new Set());
   const [profileCreationErrorShown, setProfileCreationErrorShown] = useState(false);
   const authTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Function to safely access localStorage with fallback
-  const safeLocalStorage = {
-    getItem: (key: string): string | null => {
-      try {
-        return localStorage.getItem(key);
-      } catch (e) {
-        console.warn('LocalStorage access error:', e);
-        return null;
-      }
-    },
-    setItem: (key: string, value: string): void => {
-      try {
-        localStorage.setItem(key, value);
-      } catch (e) {
-        console.warn('LocalStorage write error:', e);
-      }
-    },
-    removeItem: (key: string): void => {
-      try {
-        localStorage.removeItem(key);
-      } catch (e) {
-        console.warn('LocalStorage remove error:', e);
-      }
-    }
-  };
   
   // Function to handle profile creation with rate limiting
   const createUserProfile = useCallback(async (userId: string) => {
@@ -281,10 +281,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sign in with Google
   const signInWithGoogle = async () => {
     try {
+      // Clear any stored session data first to force a clean login
+      try {
+        safeStorage.removeItem('supabase.auth.token');
+      } catch (e) {
+        console.warn('Could not clear localStorage but continuing:', e);
+      }
+      
       return await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: `${window.location.origin}/callback`,
+          queryParams: {
+            prompt: 'select_account', // Force account selection
+            access_type: 'offline'
+          }
         }
       });
     } catch (error: any) {
@@ -315,7 +326,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       setIsLoading(true);
-      await supabase.auth.signOut();
+      
+      // First try to clear local storage 
+      try {
+        safeStorage.removeItem('supabase.auth.token');
+      } catch (e) {
+        console.warn('Could not clear localStorage but continuing:', e);
+      }
+      
+      // Then sign out via Supabase
+      await supabase.auth.signOut({ scope: 'global' });
+      
+      setUser(null);
+      setSession(null);
+      
       // The auth state change listener will handle updating the state
     } catch (error: any) {
       console.error('Sign out error:', error);

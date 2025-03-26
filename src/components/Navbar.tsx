@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BarChart2, Settings, Menu, X, LogOut, LogIn, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -8,6 +7,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { FeelsophyLogo } from '@/components/FeelsophyLogo';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,9 +22,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [scrolled, setScrolled] = useState(false);
   const { user, signOut } = useAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -61,11 +64,36 @@ export function Navbar() {
   const closeMenu = () => setIsOpen(false);
 
   const handleSignOut = async () => {
+    if (isSigningOut) return;
+    
     try {
+      setIsSigningOut(true);
+      
+      // First clear local storage to ensure no cached session data
+      try {
+        localStorage.removeItem('supabase.auth.token');
+      } catch (e) {
+        console.warn('Could not clear localStorage but continuing:', e);
+      }
+      
+      // Direct call to Supabase client
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Also call the context's signOut for state management
       await signOut();
+      
+      toast.success('Successfully signed out');
       closeMenu();
+      navigate('/');
     } catch (error) {
       console.error("Error signing out:", error);
+      toast.error("Error signing out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -139,9 +167,9 @@ export function Navbar() {
                     <span>Settings</span>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSignOut}>
+                <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
+                  <span>{isSigningOut ? 'Signing out...' : 'Log out'}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -170,9 +198,9 @@ export function Navbar() {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>
+                <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
+                  <span>{isSigningOut ? 'Signing out...' : 'Log out'}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
