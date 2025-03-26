@@ -209,6 +209,16 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
         if (error) {
+          // Handle missing session cleanly
+          if (error.message.includes('Auth session missing')) {
+            console.log("No initial session exists (user not authenticated)");
+            setSession(null);
+            setUser(null);
+            setIsLoading(false);
+            setInitialSessionCheckDone(true);
+            return;
+          }
+          
           console.error('Error checking session, but continuing:', error);
           setIsLoading(false);
           setInitialSessionCheckDone(true);

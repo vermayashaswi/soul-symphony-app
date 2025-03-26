@@ -65,6 +65,11 @@ export const checkAuth = async () => {
     const { data: { session }, error } = sessionResult;
     
     if (error) {
+      // Handle missing session cleanly
+      if (error.message.includes('Auth session missing')) {
+        console.log("No session exists to check (user not authenticated)");
+        return { isAuthenticated: false };
+      }
       return { isAuthenticated: false, error: error.message };
     }
     
@@ -100,7 +105,14 @@ export const getCurrentUserId = async () => {
       return null;
     }
     
-    const { data: { session } } = sessionResult;
+    const { data: { session }, error } = sessionResult;
+    
+    // Handle missing session cleanly
+    if (error && error.message.includes('Auth session missing')) {
+      console.log("No session exists to get user ID (user not authenticated)");
+      return null;
+    }
+    
     return session?.user?.id;
   } catch (error) {
     console.error("Error getting current user ID:", error);
@@ -176,4 +188,3 @@ export const endUserSession = async (userId: string) => {
     return true; // Return success to prevent blocking
   }
 };
-
