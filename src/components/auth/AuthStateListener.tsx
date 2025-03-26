@@ -43,27 +43,30 @@ const AuthStateListener = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth event:", event, "User:", session?.user?.email);
       
-      // Only show toast notification for SIGNED_IN events when directly triggered by user action
+      // Only handle SIGNED_IN event when needed - prevent duplicate notifications
       if (event === 'SIGNED_IN' && session?.user) {
-        console.log("SIGNED_IN event detected - creating session for", session.user.id);
+        console.log("SIGNED_IN event detected for:", session.user.id);
         
         try {
+          // Only update session silently - no toast notifications here
           await createOrUpdateSession(session.user.id, window.location.pathname);
           
           // Process unprocessed entries after sign in
-          setTimeout(async () => {
-            try {
-              console.log("Processing unprocessed journal entries after sign in");
-              await processUnprocessedEntries();
-            } catch (err) {
-              console.error("Error processing entries after sign in:", err);
-            }
-          }, 3000);
+          if (user?.id !== session.user.id) {
+            setTimeout(async () => {
+              try {
+                console.log("Processing unprocessed journal entries after sign in");
+                await processUnprocessedEntries();
+              } catch (err) {
+                console.error("Error processing entries after sign in:", err);
+              }
+            }, 3000);
+          }
         } catch (err) {
           console.error("Error creating session on sign in:", err);
         }
       } else if (event === 'SIGNED_OUT' && user) {
-        console.log("SIGNED_OUT event detected - ending session for", user.id);
+        console.log("SIGNED_OUT event detected for:", user.id);
         
         try {
           await endUserSession(user.id);
@@ -84,6 +87,7 @@ const AuthStateListener = () => {
           expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
         });
         
+        // Only create/update session silently - no toast notifications
         createOrUpdateSession(data.session.user.id, window.location.pathname)
           .catch(err => {
             console.error("Error tracking initial session:", err);

@@ -37,16 +37,17 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     });
     
     // Check if user profile exists before proceeding
-    // This is now a non-blocking call - we don't care if it fails
     try {
+      console.log('Ensuring user profile exists for userId:', userId);
       const profileResult = await ensureUserProfile(userId);
       if (!profileResult.success) {
-        console.warn('Profile creation warning in processRecording - continuing anyway:', profileResult.error);
+        console.warn('Profile creation warning in processRecording:', profileResult.error);
       } else {
-        console.log('Profile check completed. Proceeding with recording processing');
+        console.log('Profile check completed successfully:', profileResult);
       }
     } catch (profileError) {
-      console.error('Profile check error, but continuing with recording process:', profileError);
+      console.error('Profile check error:', profileError);
+      // Continue anyway - non-blocking
     }
       
     // Launch the processing without awaiting it
@@ -76,10 +77,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       return;
     }
     
-    console.log("Processing blob in background:", audioBlob);
-    console.log("Blob type:", audioBlob.type);
-    console.log("Blob size:", audioBlob.size);
-    console.log("User ID:", userId);
+    console.log("Processing blob in background - Type:", audioBlob.type, "Size:", audioBlob.size, "User ID:", userId);
     
     // 1. Convert blob to base64
     const base64Audio = await blobToBase64(audioBlob);
@@ -95,10 +93,11 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
     const base64String = base64Audio.split(',')[1]; 
     
-    console.log("Base64 audio length:", base64String.length);
+    console.log("Base64 audio converted - length:", base64String.length);
     
     // 2. Verify user authentication
     try {
+      console.log('Verifying user authentication for userId:', userId);
       const authStatus = await verifyUserAuthentication(false); // Don't show toast here
       if (!authStatus.isAuthenticated) {
         console.error('Authentication verification failed:', authStatus.error);
@@ -109,8 +108,9 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       
       // Double check that we have the user ID from auth
       if (authStatus.user && authStatus.user.id !== userId) {
-        console.warn('User ID mismatch detected, using auth user ID instead');
+        console.warn('User ID mismatch detected, using auth user ID instead of:', userId);
         userId = authStatus.user.id;
+        console.log('Updated userId to:', userId);
       }
     } catch (authError) {
       console.error('Authentication verification error:', authError);
@@ -123,21 +123,23 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     try {
       const profileResult = await ensureUserProfile(userId);
       if (!profileResult.success) {
-        console.warn('Profile creation issue before transcription, continuing anyway:', profileResult.error);
+        console.warn('Profile creation issue before transcription:', profileResult.error);
       } else {
         console.log('Profile check completed before transcription');
       }
     } catch (profileError) {
-      console.error('Profile check error before transcription, continuing anyway:', profileError);
+      console.error('Profile check error before transcription:', profileError);
     }
 
     // 3. Send audio for transcription and AI analysis
     try {
+      console.log('Sending audio for transcription - userId:', userId, 'base64Length:', base64String.length);
       const result = await sendAudioForTranscription(base64String, userId);
       
       toast.dismiss(toastId);
       
       if (result.success) {
+        console.log('Transcription successful:', result);
         toast.success('Journal entry processed and saved successfully!', {
           description: "Your entry has been analyzed for themes and emotions."
         });

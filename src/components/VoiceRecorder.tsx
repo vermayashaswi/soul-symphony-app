@@ -57,19 +57,24 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       return;
     }
     
+    if (isProcessing) {
+      console.log("Already processing, ignoring duplicate save attempt");
+      return;
+    }
+    
     setIsProcessing(true);
     
     try {
-      console.log("Processing recording with blob size:", audioBlob.size);
-      console.log("Audio blob type:", audioBlob.type);
-      console.log("User ID:", user.id);
+      console.log("Processing recording with blob size:", audioBlob.size, "type:", audioBlob.type, "for user:", user.id);
       
       const result = await processRecording(audioBlob, user.id);
       
       if (result.success && onRecordingComplete) {
+        console.log("Processing successful, tempId:", result.tempId);
         // Call the completion handler with the temp ID
         onRecordingComplete(audioBlob, result.tempId);
       } else if (!result.success) {
+        console.error("Processing failed:", result.error);
         setIsProcessing(false);
         toast.error(result.error || "Failed to process recording");
       }
@@ -86,6 +91,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
 
   // Handle recording restart
   const handleRestartRecording = () => {
+    if (isProcessing) {
+      console.log("Cannot restart while processing");
+      return;
+    }
     resetRecording();
   };
 
@@ -95,6 +104,15 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       requestPermissions();
     }
   }, [hasPermission, requestPermissions]);
+  
+  // Clear any stuck processing state when the component is unmounted
+  useEffect(() => {
+    return () => {
+      if (isProcessing) {
+        console.log("Component unmounted while processing");
+      }
+    };
+  }, [isProcessing]);
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
@@ -107,7 +125,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             className="sr-only"
             checked={noiseReduction}
             onChange={() => setNoiseReduction(!noiseReduction)}
-            disabled={isRecording}
+            disabled={isRecording || isProcessing}
           />
           <div className={`h-5 w-10 rounded-full transition-colors ${noiseReduction ? 'bg-primary' : 'bg-gray-300'} relative`}>
             <div className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${noiseReduction ? 'translate-x-5' : ''}`} />
@@ -132,7 +150,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           onPermissionRequest={requestPermissions}
         />
         
-        {!isRecording && audioBlob && (
+        {!isRecording && audioBlob && !isProcessing && (
           <Button 
             onClick={handleRestartRecording}
             variant="outline"

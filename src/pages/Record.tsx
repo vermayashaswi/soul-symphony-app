@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,19 +13,25 @@ export default function Record() {
   const { user } = useAuth();
   const [mode, setMode] = useState<'record' | 'past'>('record');
   const [isNavigating, setIsNavigating] = useState(false);
+  const [recordingCompleted, setRecordingCompleted] = useState(false);
 
   const handleRecordingComplete = async (audioBlob: Blob, tempId?: string) => {
     console.log('Recording completed, tempId:', tempId);
     
-    if (isNavigating) {
-      console.log('Already navigating, ignoring duplicate completion event');
+    if (isNavigating || recordingCompleted) {
+      console.log('Already navigating or completed, ignoring duplicate completion event');
       return;
     }
     
     setIsNavigating(true);
+    setRecordingCompleted(true);
     
     try {
+      // Notify user
       toast.success('Journal entry saved successfully!');
+      
+      // Add a small delay to ensure processing has started
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Navigate to the journal page with the temp ID as a query param
       if (tempId) {
@@ -38,9 +44,17 @@ export default function Record() {
     } catch (error) {
       console.error('Navigation error:', error);
       setIsNavigating(false);
-      toast.error('Error saving journal entry');
+      toast.error('Error navigating after saving journal entry');
     }
   };
+
+  // Reset state when component unmounts
+  useEffect(() => {
+    return () => {
+      setIsNavigating(false);
+      setRecordingCompleted(false);
+    };
+  }, []);
 
   const handleToggleMode = (value: string) => {
     if (value === 'past' && !isNavigating) {
