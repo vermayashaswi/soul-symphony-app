@@ -45,15 +45,10 @@ export const ensureUserProfile = async (userId: string, userData?: {
       updated_at: new Date().toISOString()
     };
     
-    // Insert directly rather than using RPC
+    // Insert the profile directly
     const { data: newProfile, error: insertError } = await supabase
       .from('profiles')
-      .insert({
-        email: profileData.email,
-        full_name: profileData.full_name,
-        avatar_url: profileData.avatar_url,
-        id: userId
-      })
+      .insert(profileData)
       .select()
       .single();
     

@@ -71,13 +71,15 @@ export const safeInsert = async <T>(
   options?: { select?: boolean }
 ): Promise<T | null> => {
   try {
-    let query = supabase.from(tableName).insert(values);
+    // Build the query without chaining additional methods yet
+    const insertQuery = supabase.from(tableName).insert(values);
     
-    if (options?.select !== false) {
-      query = query.select();
-    }
+    // Add the select method only if the option is true or undefined (default to true)
+    const finalQuery = options?.select !== false 
+      ? insertQuery.select() 
+      : insertQuery;
     
-    const { data, error } = await query;
+    const { data, error } = await finalQuery;
     
     if (error) {
       console.error(`Error inserting into ${tableName}:`, error);
@@ -100,14 +102,19 @@ export const safeUpdate = async <T>(
   condition: Record<string, any>
 ): Promise<T | null> => {
   try {
-    let query = supabase.from(tableName).update(values);
+    // Start the update query
+    const updateQuery = supabase.from(tableName).update(values);
     
-    // Apply conditions
+    // Apply all conditions before executing the query
+    let filteredQuery = updateQuery;
+    
+    // Apply each condition separately
     Object.entries(condition).forEach(([key, value]) => {
-      query = query.eq(key, value);
+      filteredQuery = filteredQuery.eq(key, value);
     });
     
-    const { data, error } = await query.select();
+    // Execute the query with the select
+    const { data, error } = await filteredQuery.select();
     
     if (error) {
       console.error(`Error updating ${tableName}:`, error);
@@ -131,21 +138,27 @@ export const safeSelect = async <T>(
   options?: { single?: boolean, limit?: number }
 ): Promise<T | null> => {
   try {
-    let query = supabase.from(tableName).select(columns);
+    // Start the select query
+    const baseQuery = supabase.from(tableName).select(columns);
+    
+    // Apply conditions if provided
+    let filteredQuery = baseQuery;
     
     if (condition) {
-      // Apply all conditions
+      // Apply each condition separately
       Object.entries(condition).forEach(([key, value]) => {
-        query = query.eq(key, value);
+        filteredQuery = filteredQuery.eq(key, value);
       });
     }
     
+    // Apply limit if provided
     if (options?.limit) {
-      query = query.limit(options.limit);
+      filteredQuery = filteredQuery.limit(options.limit);
     }
     
+    // Execute the query based on whether we want a single record or multiple
     if (options?.single) {
-      const { data, error } = await query.maybeSingle();
+      const { data, error } = await filteredQuery.maybeSingle();
       
       if (error) {
         console.error(`Error selecting from ${tableName}:`, error);
@@ -154,7 +167,7 @@ export const safeSelect = async <T>(
       
       return data as unknown as T;
     } else {
-      const { data, error } = await query;
+      const { data, error } = await filteredQuery;
       
       if (error) {
         console.error(`Error selecting from ${tableName}:`, error);
