@@ -6,11 +6,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useJournalHandler } from '@/hooks/use-journal-handler';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Mic, BookOpen } from 'lucide-react';
+import { RefreshCw, Mic, BookOpen, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Journal() {
@@ -21,7 +21,9 @@ export default function Journal() {
     entries: journalEntries, 
     loading: isLoading, 
     refreshEntries, 
-    loadError 
+    loadError,
+    connectionStatus,
+    testDatabaseConnection
   } = useJournalEntries(user?.id);
   const { 
     handleCreateJournal, 
@@ -35,7 +37,6 @@ export default function Journal() {
   const [mode, setMode] = useState<'record' | 'past'>('past');
   const [refreshCount, setRefreshCount] = useState(0);
   const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'error' | 'checking'>('checking');
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -211,19 +212,61 @@ export default function Journal() {
     }
   };
 
+  const handleTestConnection = async () => {
+    if (!testDatabaseConnection) return;
+    
+    toast.loading('Testing database connection...', {
+      id: 'test-connection',
+    });
+    
+    try {
+      const result = await testDatabaseConnection();
+      
+      if (result) {
+        toast.success('Successfully connected to database', {
+          id: 'test-connection',
+        });
+        setTimeout(() => refreshEntries(false), 500);
+      } else {
+        toast.error('Failed to connect to database', {
+          id: 'test-connection',
+        });
+      }
+    } catch (err) {
+      toast.error('Connection test failed', {
+        id: 'test-connection',
+      });
+    }
+  };
+
   if (connectionStatus === 'error') {
     return (
       <div className="container px-4 md:px-6 max-w-6xl space-y-6 py-6">
-        <Alert variant="destructive">
-          <AlertDescription>
-            Unable to connect to the database. This could be due to network issues or server maintenance.
-            <Button 
-              variant="outline" 
-              className="ml-4" 
-              onClick={() => window.location.reload()}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" /> Retry Connection
-            </Button>
+        <Alert variant="destructive" className="mb-4">
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          <AlertTitle>Database Connection Error</AlertTitle>
+          <AlertDescription className="mt-2">
+            <p className="mb-4">Unable to connect to the database. This could be due to:</p>
+            <ul className="list-disc pl-6 mb-4 space-y-1">
+              <li>Network issues</li>
+              <li>Server maintenance</li>
+              <li>Security or permission issues</li>
+            </ul>
+            <div className="flex gap-3 mt-4">
+              <Button 
+                variant="default" 
+                onClick={handleTestConnection}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" /> Test Connection
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => window.location.reload()}
+              >
+                Reload Page
+              </Button>
+            </div>
           </AlertDescription>
         </Alert>
       </div>
@@ -273,15 +316,17 @@ export default function Journal() {
       
       {loadError && !isLoading && (
         <Alert variant="destructive" className="mb-4">
-          <AlertDescription>
-            Failed to load journal entries. 
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          <AlertTitle>Error Loading Entries</AlertTitle>
+          <AlertDescription className="flex justify-between items-center">
+            <span>{loadError}</span>
             <Button 
-              variant="link" 
-              className="p-0 h-auto text-destructive-foreground underline ml-2"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
+              variant="outline" 
+              className="ml-2"
+              onClick={handleTestConnection}
+              size="sm"
             >
-              Click to retry
+              <RefreshCw className="h-4 w-4 mr-2" /> Test Connection
             </Button>
           </AlertDescription>
         </Alert>
@@ -301,6 +346,9 @@ export default function Journal() {
             loading={true}
             processingEntries={processingEntries}
             onStartRecording={() => navigate('/record')}
+            onRefresh={handleTestConnection}
+            connectionStatus={connectionStatus}
+            loadError={loadError}
           />
         </div>
       )}
@@ -311,6 +359,9 @@ export default function Journal() {
           loading={false}
           processingEntries={processingEntries}
           onStartRecording={() => navigate('/record')}
+          onRefresh={handleTestConnection}
+          connectionStatus={connectionStatus}
+          loadError={loadError}
         />
       )}
     </div>

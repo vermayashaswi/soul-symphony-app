@@ -34,6 +34,15 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const testDatabaseConnection = useCallback(async () => {
     console.log('Testing database connection...');
     try {
+      const { error: healthError } = await supabase.rpc('pg_is_in_recovery');
+      
+      if (healthError) {
+        console.error('Database health check failed:', healthError);
+        setConnectionStatus('error');
+        setLoadError('Connection to database failed: ' + healthError.message);
+        return false;
+      }
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('id')
@@ -49,7 +58,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         setConnectionStatus('connected');
         return true;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Database connection test error:', err);
       setConnectionStatus('error');
       setLoadError('Connection error: ' + (err.message || 'Unknown error'));
@@ -102,7 +111,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       console.log(`Attempting database access for user ${userId}`);
       
-      // Test direct database access first
       const connectionTest = await testDatabaseConnection();
       if (!connectionTest) {
         console.error('Database connection test failed before fetching entries');
@@ -111,10 +119,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       console.log(`Fetching entries for user ${userId}`);
       
-      // Add a short timeout to prevent multiple rapid requests
       await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Set a timeout to handle hanging requests
       if (fetchTimeout) {
         clearTimeout(fetchTimeout);
       }
@@ -131,14 +137,14 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       setFetchTimeout(timeoutId);
       
-      // Use a more specific query with fewer columns to improve performance
+      console.log(`Running query: SELECT id, "refined text", "transcription text", created_at, emotions, master_themes, user_id FROM "Journal Entries" WHERE user_id = '${userId}' ORDER BY created_at DESC`);
+      
       const { data, error } = await supabase
         .from('Journal Entries')
         .select('id, "refined text", "transcription text", created_at, emotions, master_themes, user_id')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
         
-      // Clear the timeout since the operation completed
       if (fetchTimeout) {
         clearTimeout(fetchTimeout);
         setFetchTimeout(null);
@@ -149,7 +155,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         console.error('Error details:', JSON.stringify(error));
         setLoadError(error.message);
         
-        // Handle max retry attempts
         if (retryAttempt >= MAX_RETRY_ATTEMPTS) {
           toast.error('Failed to load journal entries. Please try again later.', {
             id: 'journal-fetch-error',
@@ -157,7 +162,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           });
           
           setTimeout(() => setRetryAttempt(0), 30000);
-          setLoading(false); // Make sure to exit loading state even on error
+          setLoading(false);
           return;
         }
         
@@ -169,12 +174,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setRetryAttempt(0);
       
       console.log(`Fetched ${data?.length || 0} entries successfully`);
+      console.log('Sample data:', data ? JSON.stringify(data[0] || {}) : 'No data');
       
-      // Set entries even if empty array
       const typedEntries = (data || []) as JournalEntry[];
       setEntries(typedEntries);
 
-      // Check if entries need themes - only if we have entries
       if (typedEntries.length > 0) {
         const entriesNeedingThemes = typedEntries.filter(
           entry => (!entry.master_themes || entry.master_themes.length === 0) && entry["refined text"]
@@ -190,7 +194,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
             }
           }
           
-          // Only refetch if we actually processed entries
           if (entriesNeedingThemes.length > 0) {
             try {
               const { data: refreshedData, error: refreshError } = await supabase
@@ -222,7 +225,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         setRetryAttempt(prev => prev + 1);
       }
     } finally {
-      // Clear any pending timeouts
       if (fetchTimeout) {
         clearTimeout(fetchTimeout);
         setFetchTimeout(null);
@@ -305,13 +307,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       await fetchEntries();
       
-      // Automatically generate embedding after saving the entry
       try {
         const textToEmbed = data["refined text"] || data["transcription text"] || '';
         if (textToEmbed.trim().length > 0) {
           console.log('Automatically generating embedding for entry:', data.id);
           
-          // Call the Edge Function to create the embedding
           const { error: embeddingError } = await supabase.functions.invoke('create-embedding', {
             body: { 
               text: textToEmbed, 
@@ -321,14 +321,12 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           
           if (embeddingError) {
             console.error('Error automatically generating embedding:', embeddingError);
-            // Don't show an error toast to the user, as this happens in the background
           } else {
             console.log('Embedding generated successfully');
           }
         }
       } catch (embeddingError) {
         console.error('Error in automatic embedding generation:', embeddingError);
-        // Don't surface this error to the user
       }
       
       return data;
@@ -371,7 +369,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLastRetryTime(now);
       setIsRetrying(true);
       
-      // Set a timeout to force completion if the fetch hangs
       const forceCompleteTimeout = setTimeout(() => {
         console.log('Force completing refresh due to timeout');
         setIsRetrying(false);
@@ -427,11 +424,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.log('Processing unprocessed entries for user:', userId);
       
       try {
-        // Modified approach - just do a simple check to avoid the not.in filter
-        // instead of trying to filter server-side
         console.log('Checking if any entries need processing');
         
-        // Return early with success to avoid errors in edge function
         setIsProcessing(false);
         return { success: true, processed: 0 };
       } catch (fetchError) {
@@ -474,7 +468,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoadError(null);
       console.log(`Initial fetch triggered for user ${userId} with refreshKey ${refreshKey}`);
       
-      // Set a force complete timeout
       const forceCompleteTimeout = setTimeout(() => {
         console.log('Force completing initial fetch due to timeout');
         setLoading(false);
@@ -488,11 +481,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoading(false);
     } else if (!userId) {
       console.log('No user ID available for fetching journal entries');
-      setLoading(false); // Important: ensure loading is set to false when no user ID
-      setEntries([]); // Clear entries when no user
+      setLoading(false);
+      setEntries([]);
     }
     
-    // Cleanup function
     return () => {
       if (fetchTimeout) {
         clearTimeout(fetchTimeout);
