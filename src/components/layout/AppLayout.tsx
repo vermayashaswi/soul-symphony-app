@@ -1,5 +1,5 @@
 
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { useDebug } from "@/contexts/debug/DebugContext";
@@ -17,17 +17,21 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const { logInfo } = useDebugLogger();
   
   // Memoize the location data to prevent re-renders
-  const locationData = useCallback(() => ({
+  const locationData = useMemo(() => ({
     isAuthPage,
     pathname: location.pathname,
     search: location.search
   }), [location.pathname, location.search, isAuthPage]);
   
-  // Only run once on mount, then use locationData as a dependency
-  useEffect(() => {
-    // Log the initial render without causing infinite loops
-    logInfo(`AppLayout rendered for path: ${location.pathname}`, locationData());
+  // Memoize the logging function to prevent infinite updates
+  const logLocationInfo = useCallback(() => {
+    logInfo(`AppLayout rendered for path: ${location.pathname}`, locationData);
   }, [location.pathname, locationData, logInfo]);
+  
+  // Only run once when location changes
+  useEffect(() => {
+    logLocationInfo();
+  }, [location.pathname, logLocationInfo]);
   
   return (
     <ErrorBoundary addLog={addLog}>
