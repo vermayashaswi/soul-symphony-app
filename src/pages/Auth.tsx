@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -6,7 +7,7 @@ import { useAuth } from '@/contexts/auth';
 import ParticleBackground from '@/components/ParticleBackground';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { getOAuthRedirectUrl } from '@/utils/auth-utils';
+import { getOAuthRedirectUrl, hasAuthParams } from '@/utils/auth-utils';
 
 export default function Auth() {
   const { user, isLoading } = useAuth();
@@ -42,11 +43,7 @@ export default function Auth() {
     authProcessedRef.current = true;
     
     const handleHashRedirect = async () => {
-      const hasHashParams = window.location.hash.includes('access_token') || 
-                           window.location.hash.includes('error') ||
-                           window.location.search.includes('error');
-                           
-      if (hasHashParams) {
+      if (hasAuthParams()) {
         console.log("Processing auth hash/params in URL");
         
         if (window.location.hash.includes('error') || window.location.search.includes('error')) {

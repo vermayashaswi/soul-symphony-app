@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth";
+import { hasAuthParams } from "@/utils/auth-utils";
 
 const AuthCallback = () => {
   const [isProcessing, setIsProcessing] = useState(true);
@@ -41,6 +42,13 @@ const AuthCallback = () => {
         console.log("Hash present:", location.hash ? "Yes (length: " + location.hash.length + ")" : "No");
         console.log("Hash content:", location.hash ? location.hash.substring(0, 20) + "..." : "None");
         console.log("Search params:", location.search || "None");
+        
+        // Validate we have auth parameters
+        if (!hasAuthParams()) {
+          console.log("No auth parameters found in URL, redirecting to auth page");
+          navigate("/auth", { replace: true });
+          return;
+        }
         
         // Handle hash-based authentication (implicit flow)
         if (location.hash && (location.hash.includes('access_token') || location.hash.includes('id_token'))) {

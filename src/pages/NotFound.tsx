@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { hasAuthParams } from "@/utils/auth-utils";
 
 const NotFound = () => {
   const location = useLocation();
@@ -15,32 +16,15 @@ const NotFound = () => {
     console.log("NotFound: Current hash:", location.hash ? "Present (length: " + location.hash.length + ")" : "None");
     console.log("NotFound: Current search:", location.search || "None");
     
-    // Check for auth-related parameters in URL - expanded to detect more patterns
-    const isFromAuthRedirect = 
-      // OAuth flow parameters
-      location.hash.includes('access_token') ||
-      location.hash.includes('id_token') ||
-      location.hash.includes('refresh_token') ||
-      location.hash.includes('type=recovery') ||
-      // Error parameters
-      location.search.includes('error') ||
-      location.search.includes('code=') ||
-      // Provider-specific parameters
-      location.hash.includes('provider=google') ||
-      location.search.includes('provider=google') ||
-      // Additional checks
-      location.search.includes('state=') ||  // OAuth state parameter
-      location.search.includes('session_id=') || // Session related parameter
-      // Special case for Google OAuth
-      location.pathname.includes('google-callback') ||
-      // Additional edge cases
-      location.pathname.includes('auth/callback'); 
-                          
-    if (isFromAuthRedirect) {
+    // Check for auth-related parameters in URL using the utility function
+    if (hasAuthParams() || 
+        // Special cases
+        location.pathname.includes('google-callback') ||
+        location.pathname.includes('auth/callback')) {
       console.log("NotFound: Detected auth redirect, navigating to callback handler");
       
-      // Always redirect to the callback route with the full hash/search intact
-      const callbackUrl = '/callback' + location.search + location.hash;
+      // Always redirect to the main callback route with the full hash/search intact
+      const callbackUrl = '/auth/callback' + location.search + location.hash;
       console.log("Redirecting to:", callbackUrl);
       navigate(callbackUrl, { replace: true });
       return;
