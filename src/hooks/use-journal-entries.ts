@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,7 +42,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           .from('profiles')
           .select('id')
           .limit(1)
-          .timeout(3000); // 3 second timeout for just the connection check
+          .abortSignal(AbortSignal.timeout(3000)); // 3 second timeout for just the connection check
         
         if (error) {
           console.error('Supabase connection check failed:', error);
@@ -489,4 +490,3 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     connectionStatus
   };
 }
-
