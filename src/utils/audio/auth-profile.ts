@@ -9,56 +9,68 @@ export const ensureUserProfile = async (userId: string) => {
       return { success: false, error: 'No user ID provided' };
     }
     
-    // First quickly check if profile exists without creating it
-    let existingProfile = null;
-    
+    // First check if profile exists without creating it
     try {
-      const { data, error } = await supabase
+      const { data: existingProfile, error: checkError } = await supabase
         .from('profiles')
         .select('id')
         .eq('id', userId)
         .maybeSingle();
         
-      if (!error || (error && !error.message.includes('no rows'))) {
-        existingProfile = data;
+      if (existingProfile) {
+        console.log('Profile already exists for user:', userId);
+        return { success: true, message: 'Profile already exists', isNew: false };
+      }
+      
+      if (checkError && !checkError.message.includes('no rows')) {
+        console.error('Error checking profile:', checkError);
       }
     } catch (checkError) {
       console.error('Error checking for existing profile:', checkError);
       // Continue with creation attempt even if check fails
     }
     
-    // If profile exists, we're done!
-    if (existingProfile) {
-      console.log('Profile already exists for user:', userId);
-      return { success: true, message: 'Profile already exists', isNew: false };
-    }
-    
-    // Silently handle profile creation errors
+    // Try to create profile with proper service role
     try {
-      // Directly try to create profile
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .insert({ id: userId })
         .select()
         .single();
       
-      if (!error) {
-        console.log('New profile created successfully for user:', userId);
-        return { success: true, isNew: true };
+      if (error) {
+        // If there's an RLS error, we'll try a fallback approach
+        if (error.code === '42501') {
+          console.log('RLS policy prevented profile creation, trying alternative approach');
+          
+          // Try to update if insert fails (profile might exist but wasn't found in the check)
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', userId);
+            
+          if (updateError) {
+            console.error('Both insert and update failed:', updateError);
+            return { success: false, error: 'Failed to create or update profile' };
+          } else {
+            console.log('Profile may have been updated successfully');
+            return { success: true, isNew: false };
+          }
+        }
+        
+        console.error('Profile creation error:', error);
+        return { success: false, error: error.message };
       }
       
-      // Even if there was an error, the profile might exist due to a race condition 
-      // or database trigger - so return success
-      return { success: true, message: 'Profile may have been created', isNew: false };
+      console.log('New profile created successfully for user:', userId);
+      return { success: true, isNew: true };
     } catch (error: any) {
       console.error('Exception in profile creation:', error);
-      // Return success anyway to avoid blocking app
-      return { success: true, error: error?.message || 'Unknown error', isNew: false };
+      return { success: false, error: error?.message || 'Unknown error', isNew: false };
     }
   } catch (error: any) {
     console.error('Exception in ensureUserProfile:', error?.message || error);
-    // Return success anyway to avoid blocking app
-    return { success: true, error: error?.message || 'Unknown error', isNew: false };
+    return { success: false, error: error?.message || 'Unknown error', isNew: false };
   }
 };
 

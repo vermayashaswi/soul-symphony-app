@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,7 +44,7 @@ export function useJournalHandler(userId: string | undefined) {
         if (profileError) {
           console.error('Profile check error:', profileError);
           // Try to create profile if it doesn't exist
-          if (profileError.code === 'PGRST116') {
+          if (profileError.code === 'PGRST116' || profileError.message.includes('no rows')) {
             console.log('Profile might not exist, trying to create one');
             
             const { error: insertError } = await supabase

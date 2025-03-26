@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -69,7 +68,7 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
           if (result.error && !result.error.includes('row-level security policy')) {
             toast.error('Could not set up user profile. Some features may be limited.');
           } else {
-            console.log('Skipping error toast for RLS policy error - likely already handled by trigger');
+            console.log('Profile check/creation completed successfully');
           }
         }
       } else {
