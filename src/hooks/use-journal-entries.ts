@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +35,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const testDatabaseConnection = useCallback(async () => {
     console.log('Testing database connection...');
     try {
-      const { error: healthError } = await supabase.rpc('pg_is_in_recovery');
+      // Fix: Use a direct query instead of rpc to check database health
+      const { error: healthError } = await supabase
+        .from('profiles')
+        .select('id')
+        .limit(1);
       
       if (healthError) {
         console.error('Database health check failed:', healthError);

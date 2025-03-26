@@ -41,19 +41,16 @@ export default function Journal() {
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        setConnectionStatus('checking');
+        console.log('Checking Supabase connection...');
         const { data, error } = await supabase.from('profiles').select('id').limit(1);
         
         if (error) {
           console.error('Supabase connection check failed:', error);
-          setConnectionStatus('error');
         } else {
           console.log('Supabase connection confirmed');
-          setConnectionStatus('connected');
         }
       } catch (err) {
         console.error('Supabase connection check error:', err);
-        setConnectionStatus('error');
       }
     };
     
