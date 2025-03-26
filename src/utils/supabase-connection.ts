@@ -1,4 +1,39 @@
+
 import { supabase } from '@/integrations/supabase/client';
+
+/**
+ * Tests the database connection
+ * @returns Result with success status and error message if applicable
+ */
+export async function testDatabaseConnection() {
+  try {
+    console.log('Testing database connection...');
+    
+    // Use a timeout to prevent hanging connections
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    // Use the type-safe approach with a known table name instead of variable string
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .limit(1)
+      .abortSignal(controller.signal);
+    
+    clearTimeout(timeoutId);
+    
+    if (error) {
+      console.error('Database connection test failed:', error);
+      return { success: false, error: error.message };
+    }
+    
+    console.log('Database connection test successful');
+    return { success: true, data };
+  } catch (err: any) {
+    console.error('Database connection error:', err);
+    return { success: false, error: err?.message || 'Unknown error' };
+  }
+}
 
 /**
  * Safely performs a database update with conditions
@@ -10,11 +45,13 @@ export async function safeUpdate<T>(
   conditions: Record<string, any>
 ) {
   try {
-    let query = supabase.from(table).update(updates);
+    // For type safety, we need to use 'any' for the dynamic table name
+    // but we still maintain runtime safety through error handling
+    let query = (supabase.from(table as any) as any).update(updates);
     
     // Use a simpler approach to avoid TypeScript's deep type instantiation
     query = Object.entries(conditions).reduce((acc, [key, value]) => {
-      return (acc as any).eq(key, value);
+      return acc.eq(key, value);
     }, query);
     
     const { data, error } = await query.select();
@@ -47,12 +84,12 @@ export async function safeSelect<T>(
   } = {}
 ) {
   try {
-    // Start with the basic query
-    let query = supabase.from(table).select(options.columns || '*');
+    // For type safety with dynamic table names
+    let query = (supabase.from(table as any) as any).select(options.columns || '*');
     
     // Apply conditions using a for loop to avoid deep type recursion
     for (const [key, value] of Object.entries(conditions)) {
-      query = (query as any).eq(key, value);
+      query = query.eq(key, value);
     }
     
     // Apply ordering if specified

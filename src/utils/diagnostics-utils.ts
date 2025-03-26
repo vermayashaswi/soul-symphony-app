@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { testDatabaseConnection } from '@/utils/supabase-connection';
 
 /**
  * Tests each step of the recording and upload pipeline
@@ -185,34 +185,6 @@ export const runCompleteDiagnostics = async () => {
   };
   
   return results;
-};
-
-/**
- * Tests the database connection
- */
-const testDatabaseConnection = async () => {
-  try {
-    const startTime = performance.now();
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .limit(1);
-    const endTime = performance.now();
-    
-    return {
-      success: !error,
-      error: error?.message,
-      latency: Math.round(endTime - startTime),
-      data
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-      latency: null,
-      data: null
-    };
-  }
 };
 
 /**
