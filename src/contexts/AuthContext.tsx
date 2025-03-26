@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,6 +52,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize auth state and set up listeners
   useEffect(() => {
     console.log('AuthProvider: Setting up auth state listener');
+    let authTimeout: NodeJS.Timeout | null = null;
+    
+    // Set a global timeout to force complete loading state
+    authTimeout = setTimeout(() => {
+      if (isLoading) {
+        console.log('Force ending auth loading state after timeout');
+        setIsLoading(false);
+      }
+    }, 3000);
     
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
@@ -62,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         // Prevent duplicate toast messages by checking time since last event
         const now = Date.now();
-        if (now - lastSignInEvent > 2000) {
+        if (now - lastSignInEvent > 5000) { // Increased from 2000ms to 5000ms to prevent multiple toasts
           setLastSignInEvent(now);
           toast.success('Signed in successfully');
         }
@@ -108,9 +118,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error('Profile creation error on auth state change, but continuing:', err);
           }
         }
+        
+        // Always set loading to false after sign-in
+        setIsLoading(false);
       } else if (event === 'SIGNED_OUT') {
         toast.info('Signed out successfully');
         setProfileCreationAttempted(false);
+        setIsLoading(false);
       }
     });
     
@@ -144,6 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     return () => {
+      if (authTimeout) clearTimeout(authTimeout);
       subscription.unsubscribe();
     };
   }, [createUserProfile, lastSignInEvent]);
@@ -213,10 +228,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('Session refresh error:', error);
+        setIsLoading(false);
         if (error.message.includes('Auth session missing')) {
           // This is a normal state for unauthenticated users, not an error
           console.log('No session exists to refresh (user not authenticated)');
-          setIsLoading(false);
           return false;
         }
         return false;
@@ -224,13 +239,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setSession(data.session);
       setUser(data.user);
+      setIsLoading(false);
       
       return !!data.session;
     } catch (error) {
       console.error('Error refreshing session:', error);
-      return false;
-    } finally {
       setIsLoading(false);
+      return false;
     }
   };
   

@@ -22,14 +22,14 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         setSessionChecked(true);
         setRefreshAttempted(true);
       }
-    }, 3000); // Reduced from 5000ms to 3000ms to improve user experience
+    }, 1500); // Reduced from 3000ms to 1500ms to improve user experience
     
     return () => clearTimeout(timeout);
   }, [isLoading, sessionChecked]);
   
   // Try to refresh the session if needed
   useEffect(() => {
-    if (!isLoading && !user && !refreshAttempted) {
+    if (!user && !refreshAttempted && !isLoading) {
       console.log("Protected route: No user found, attempting to refresh session", {
         path: location.pathname
       });
@@ -44,11 +44,12 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
           setRefreshAttempted(true);
           setSessionChecked(true);
         });
-    } else if (!refreshAttempted && (user || isLoading)) {
+    } else if (!refreshAttempted) {
+      // Either we have a user or we're still loading
       setSessionChecked(true);
     }
     
-    if (user && !isLoading) {
+    if (user) {
       console.log("Protected route: Tracking session for user", user.id, "on path", location.pathname);
       
       // Update the session tracking without waiting for it to complete
