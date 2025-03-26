@@ -31,25 +31,6 @@ serve(async (req) => {
     try {
       const testRequest = await req.clone().json();
       if (testRequest && testRequest.test === true) {
-        // First ensure the 'audio' bucket exists
-        try {
-          const { data: buckets } = await supabase.storage.listBuckets();
-          const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
-          
-          if (!audioBucket) {
-            // Bucket doesn't exist, try to create it
-            await supabase.storage.createBucket('audio', {
-              public: false,
-              fileSizeLimit: 50 * 1024 * 1024,
-              allowedMimeTypes: ['audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/wav']
-            });
-            
-            console.log("Created audio bucket during test request");
-          }
-        } catch (storageError) {
-          console.log("Note: Could not check/create audio bucket:", storageError);
-        }
-        
         console.log("Received test request, responding with success");
         return new Response(
           JSON.stringify({ 
@@ -120,25 +101,6 @@ serve(async (req) => {
     if (!allowedFileTypes.includes(file.type)) {
       throw new Error("Invalid file type. Only webm, ogg, mp3, and wav are allowed.");
     }
-
-    // Check if audio bucket exists and create it if needed
-    try {
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
-      
-      if (!audioBucket) {
-        // Create the audio bucket if it doesn't exist
-        await supabase.storage.createBucket('audio', {
-          public: false,
-          fileSizeLimit: 50 * 1024 * 1024,
-          allowedMimeTypes: ['audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/wav']
-        });
-        console.log("Created audio bucket for file storage");
-      }
-    } catch (bucketError) {
-      console.log("Note: Error checking/creating audio bucket:", bucketError);
-      // Continue anyway, since this is just a precaution
-    }
     
     // Try to upload the file to storage before transcription
     try {
@@ -147,7 +109,7 @@ serve(async (req) => {
       const filePath = `${folderPath}/${fileName}`;
       
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('audio')
+        .from('journal-audio-entries')
         .upload(filePath, file, {
           contentType: file.type,
           upsert: true

@@ -1,95 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { processAudioBlobForTranscription } from './audio/transcription-service';
-
-/**
- * Ensures that the audio storage bucket exists
- * @returns Promise resolving to a boolean indicating if the bucket exists or was created
- */
-export const ensureAudioBucketExists = async (): Promise<boolean> => {
-  try {
-    // First check if the bucket already exists
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    
-    if (listError) {
-      console.error('Error checking storage buckets:', listError);
-      return false;
-    }
-    
-    // Check if audio bucket exists
-    const audioExists = buckets?.some(bucket => bucket.name === 'audio');
-    
-    if (audioExists) {
-      console.log('Audio bucket already exists');
-      return true;
-    }
-    
-    // Create the bucket if it doesn't exist
-    console.log('Creating audio bucket...');
-    
-    const { error: createError } = await supabase.storage.createBucket('audio', {
-      public: false, // Set to false for security
-      fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
-      allowedMimeTypes: ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/ogg'],
-    });
-    
-    if (createError) {
-      console.error('Error creating audio bucket:', createError);
-      
-      // If bucket already exists (this can happen with concurrent requests)
-      if (createError.message.includes('already exists')) {
-        return true;
-      }
-      
-      // Wait a moment and try again - sometimes policy propagation takes a moment
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const { error: retryError } = await supabase.storage.createBucket('audio', {
-        public: false,
-        fileSizeLimit: 50 * 1024 * 1024,
-        allowedMimeTypes: ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/ogg'],
-      });
-      
-      if (retryError) {
-        console.error('Error creating audio bucket on retry:', retryError);
-        
-        // If bucket already exists in the retry (race condition resolved)
-        if (retryError.message.includes('already exists')) {
-          return true;
-        }
-        
-        return false;
-      }
-    }
-    
-    // Set up RLS policies for the bucket
-    try {
-      // Use type assertion to avoid TypeScript error
-      await (supabase.rpc as any)('create_storage_policy', {
-        bucket_name: 'audio',
-        policy_name: 'Allow individual user access - SELECT',
-        operation: 'SELECT',
-        definition: "(bucket_id = 'audio' AND (auth.uid() = owner OR path LIKE auth.uid() || '/%'))"
-      });
-      
-      await (supabase.rpc as any)('create_storage_policy', {
-        bucket_name: 'audio',
-        policy_name: 'Allow individual user access - INSERT',
-        operation: 'INSERT',
-        definition: "(bucket_id = 'audio' AND path LIKE auth.uid() || '/%')"
-      });
-    } catch (policyError) {
-      console.warn('Could not set up all policies, continuing anyway:', policyError);
-    }
-    
-    console.log('Audio bucket created successfully');
-    return true;
-  } catch (err) {
-    console.error('Error in ensureAudioBucketExists:', err);
-    return false;
-  }
-};
 
 /**
  * Creates a unique folder path for user audio recordings
@@ -118,22 +29,16 @@ export const uploadAudioToStorage = async (
   }
   
   try {
-    // Ensure bucket exists
-    const bucketExists = await ensureAudioBucketExists();
-    
-    if (!bucketExists) {
-      toast.error('Could not access audio storage');
-      return null;
-    }
-    
     // Create file path with user ID as folder for isolation
     const folderPath = createUserAudioFolderPath(userId);
     const fileName = filename || `recording-${Date.now()}.webm`;
     const filePath = `${folderPath}/${fileName}`;
     
+    console.log('Uploading audio to journal-audio-entries bucket, path:', filePath);
+    
     // Upload file to storage
     const { data, error } = await supabase.storage
-      .from('audio')
+      .from('journal-audio-entries')
       .upload(filePath, audioBlob, {
         contentType: 'audio/webm',
         upsert: true
@@ -146,7 +51,7 @@ export const uploadAudioToStorage = async (
     
     // Generate public URL if successful
     const { data: { publicUrl } } = supabase.storage
-      .from('audio')
+      .from('journal-audio-entries')
       .getPublicUrl(data.path);
       
     return publicUrl;

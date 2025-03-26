@@ -2,7 +2,6 @@
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from './blob-utils';
-import { ensureAudioBucketExists } from '@/utils/audio-processing';
 
 /**
  * Processes audio blob directly for transcription
@@ -15,13 +14,6 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
   try {
     if (!audioBlob) {
       return { success: false, error: 'No audio recording found' };
-    }
-    
-    // First, ensure audio bucket exists
-    const bucketExists = await ensureAudioBucketExists();
-    if (!bucketExists) {
-      console.error('Audio storage bucket not available');
-      return { success: false, error: 'Audio storage not available' };
     }
     
     // Check if we're signed in
@@ -138,9 +130,6 @@ export async function sendAudioForTranscription(base64String: string, userId: st
         error: 'User ID is required'
       };
     }
-    
-    // Ensure audio bucket exists for storage references
-    await ensureAudioBucketExists();
     
     // Get auth token for the request
     const { data: sessionData } = await supabase.auth.getSession();
