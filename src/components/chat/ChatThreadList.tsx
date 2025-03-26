@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -6,7 +5,7 @@ import { Plus, MessageSquare, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { getChatThreads, deleteChatThread } from '@/utils/supabase-helpers';
-import { asDataArray } from '@/utils/supabase-type-utils';
+import { asChatThread } from '@/utils/supabase-type-utils';
 
 interface ChatThread {
   id: string;
@@ -54,15 +53,10 @@ export default function ChatThreadList({
       
       console.log("Threads fetched:", fetchedThreads.length || 0);
       
-      // Safely cast the response data to our ChatThread type with better error handling
+      // Use our improved type assertion utility
       const typedThreads: ChatThread[] = fetchedThreads
-        .filter(thread => thread != null)
-        .map(thread => ({
-          id: String(thread.id || ''),
-          title: String(thread.title || 'Untitled Chat'),
-          created_at: String(thread.created_at || new Date().toISOString()),
-          updated_at: String(thread.updated_at || new Date().toISOString())
-        }));
+        .map(thread => asChatThread(thread))
+        .filter((thread): thread is ChatThread => thread !== null);
       
       setThreads(typedThreads);
     } catch (error) {

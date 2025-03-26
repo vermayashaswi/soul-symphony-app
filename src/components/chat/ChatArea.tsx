@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { verifyUserAuthentication } from '@/utils/audio/auth-utils';
 import { getChatMessages, addChatMessage } from '@/utils/supabase-helpers';
-import { asDataArray } from '@/utils/supabase-type-utils';
+import { asDataArray, asChatMessage } from '@/utils/supabase-type-utils';
 
 export interface Message {
   id: string;
@@ -93,25 +92,10 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
       
-      // Safely transform the response data to our Message type with type assertions
       const formattedMessages: Message[] = fetchedMessages
-        .filter(msg => msg != null)
-        .map(msg => ({
-          id: String(msg.id || ''),
-          content: String(msg.content || ''),
-          sender: (msg.sender as 'user' | 'assistant') || 'user',
-          created_at: String(msg.created_at || new Date().toISOString()),
-          thread_id: msg.thread_id ? String(msg.thread_id) : undefined,
-          reference_entries: msg.reference_entries ? 
-            (Array.isArray(msg.reference_entries) ? 
-              msg.reference_entries.map((ref: any) => ({
-                id: Number(ref.id || 0),
-                similarity: Number(ref.similarity || 0)
-              })) : 
-              null) : 
-            null
-        }));
-
+        .map(msg => asChatMessage(msg))
+        .filter((msg): msg is Message => msg !== null);
+      
       setMessages(formattedMessages);
     } catch (error) {
       console.error('Error:', error);

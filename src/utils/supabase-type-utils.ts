@@ -88,3 +88,71 @@ export const asSingleRecord = <T>(data: any): T | null => {
   return null;
 };
 
+/**
+ * Type-safe assertion for chat messages
+ * This ensures all properties exist before they're accessed
+ */
+export const asChatMessage = (msg: any): {
+  id: string;
+  content: string;
+  sender: 'user' | 'assistant';
+  created_at: string;
+  thread_id?: string;
+  reference_entries?: Array<{id: number, similarity: number}> | null;
+} | null => {
+  if (!msg || typeof msg !== 'object') return null;
+  
+  return {
+    id: String(msg.id || ''),
+    content: String(msg.content || ''),
+    sender: (msg.sender as 'user' | 'assistant') || 'user',
+    created_at: String(msg.created_at || new Date().toISOString()),
+    thread_id: msg.thread_id ? String(msg.thread_id) : undefined,
+    reference_entries: msg.reference_entries ? 
+      (Array.isArray(msg.reference_entries) ? 
+        msg.reference_entries.map((ref: any) => ({
+          id: Number(ref.id || 0),
+          similarity: Number(ref.similarity || 0)
+        })) : 
+        null) : 
+      null
+  };
+};
+
+/**
+ * Type-safe assertion for chat threads
+ */
+export const asChatThread = (thread: any): {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+} | null => {
+  if (!thread || typeof thread !== 'object') return null;
+  
+  return {
+    id: String(thread.id || ''),
+    title: String(thread.title || 'Untitled Chat'),
+    created_at: String(thread.created_at || new Date().toISOString()),
+    updated_at: String(thread.updated_at || new Date().toISOString())
+  };
+};
+
+/**
+ * Type-safe assertion for user profiles
+ */
+export const asUserProfile = (profile: any): {
+  id: string;
+  email?: string;
+  full_name?: string;
+  avatar_url?: string;
+} | null => {
+  if (!profile || typeof profile !== 'object') return null;
+  
+  return {
+    id: String(profile.id || ''),
+    email: profile.email ? String(profile.email) : undefined,
+    full_name: profile.full_name ? String(profile.full_name) : undefined,
+    avatar_url: profile.avatar_url ? String(profile.avatar_url) : undefined
+  };
+};
