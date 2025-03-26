@@ -1,6 +1,21 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+// Simple exponential backoff retry mechanism
+const retry = async (fn, maxRetries = 3, delay = 300) => {
+  let retries = 0;
+  while (retries < maxRetries) {
+    try {
+      return await fn();
+    } catch (err) {
+      retries++;
+      if (retries >= maxRetries) throw err;
+      console.log(`Retrying operation (${retries}/${maxRetries}) after error:`, err);
+      await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, retries - 1)));
+    }
+  }
+};
+
 export const refreshAuthSession = async (showToasts = true) => {
   try {
     console.log("Starting session refresh");
@@ -45,7 +60,11 @@ export const checkAuth = async () => {
     }
     
     // Update the session's last activity if authenticated
-    await updateSessionActivity(session.user.id);
+    try {
+      await updateSessionActivity(session.user.id);
+    } catch (err) {
+      console.warn("Could not update session activity, but continuing:", err);
+    }
     
     return {
       isAuthenticated: true,
@@ -83,7 +102,11 @@ export const verifyUserAuthentication = async (showToasts = true) => {
     }
     
     // Update the session's last activity if authenticated
-    await updateSessionActivity(session.user.id);
+    try {
+      await updateSessionActivity(session.user.id);
+    } catch (err) {
+      console.warn("Could not update session activity, but continuing:", err);
+    }
     
     return {
       isAuthenticated: true,
@@ -97,77 +120,77 @@ export const verifyUserAuthentication = async (showToasts = true) => {
 
 // Create a new session or update an existing one's activity
 export const createOrUpdateSession = async (userId: string, entryPage = '/') => {
+  if (!userId) return { success: false, error: 'No user ID provided' };
+  
   try {
-    if (!userId) return { success: false, error: 'No user ID provided' };
-
     // Get user agent and other client info
     const userAgent = navigator.userAgent;
     const deviceType = getDeviceType(userAgent);
     
     // Check for existing active session for this user
-    const { data: existingSession, error: fetchError } = await supabase
-      .from('user_sessions')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .maybeSingle();
+    const checkExistingSession = async () => {
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
+        
+      if (error) throw error;
+      return data;
+    };
     
-    if (fetchError) {
-      console.error('Error checking for existing session:', fetchError);
-      return { success: false, error: fetchError.message };
-    }
+    const existingSession = await retry(checkExistingSession).catch(error => {
+      console.error('Error checking for existing session:', error);
+      // Return a fake "success" to prevent blocking the app
+      return null;
+    });
     
     if (existingSession) {
-      // Update existing session
-      const { error: updateError } = await supabase
-        .from('user_sessions')
-        .update({ 
-          last_activity: new Date().toISOString(),
-          last_active_page: window.location.pathname
-        })
-        .eq('id', existingSession.id);
-      
-      if (updateError) {
-        console.error('Error updating session:', updateError);
-        return { success: false, error: updateError.message };
+      // Update existing session but don't block on it
+      try {
+        await supabase
+          .from('user_sessions')
+          .update({ 
+            last_activity: new Date().toISOString(),
+            last_active_page: window.location.pathname
+          })
+          .eq('id', existingSession.id);
+        
+        console.log('Updated existing session:', existingSession.id);
+      } catch (updateError) {
+        console.error('Error updating session, but continuing:', updateError);
       }
       
-      console.log('Updated existing session:', existingSession.id);
       return { success: true, sessionId: existingSession.id, isNew: false };
     } else {
-      // Create new session
-      const { data: newSession, error: insertError } = await supabase
-        .from('user_sessions')
-        .insert({
-          user_id: userId,
-          ip_address: '', // Can't reliably get client IP from browser
-          user_agent: userAgent,
-          device_type: deviceType,
-          entry_page: entryPage,
-          last_active_page: entryPage,
-          referrer: document.referrer || ''
-        })
-        .select()
-        .single();
-      
-      if (insertError) {
-        console.error('Error creating session:', insertError);
-        // Check if it's a permissions error - this could be an auth state mismatch
-        if (insertError.message.includes('permission') || insertError.message.includes('JWTClaimsSetVerificationException')) {
-          console.warn('Permission error on session creation - possibly auth state mismatch');
-          // Try to refresh the session and try again
-          const refreshed = await refreshAuthSession(false);
-          if (refreshed) {
-            return createOrUpdateSession(userId, entryPage);
-          }
-          // Return success to avoid blocking the app
-          return { success: true, isNew: false };
+      // Try to create new session but don't block on failures
+      try {
+        const { data: newSession, error: insertError } = await supabase
+          .from('user_sessions')
+          .insert({
+            user_id: userId,
+            ip_address: '', // Can't reliably get client IP from browser
+            user_agent: userAgent,
+            device_type: deviceType,
+            entry_page: entryPage,
+            last_active_page: entryPage,
+            referrer: document.referrer || ''
+          })
+          .select()
+          .single();
+        
+        if (insertError) {
+          console.warn('Session creation error but continuing:', insertError.message);
+          return { success: true, isNew: false }; // Don't block the app
         }
-        return { success: false, error: insertError.message };
+        
+        console.log('Created new session:', newSession.id);
+        return { success: true, sessionId: newSession.id, isNew: true };
+      } catch (insertCatchError: any) {
+        console.warn('Exception in session creation but continuing:', insertCatchError);
+        return { success: true, isNew: false }; // Don't block the app
       }
-      
-      console.log('Created new session:', newSession.id);
-      return { success: true, sessionId: newSession.id, isNew: true };
     }
   } catch (error: any) {
     console.error('Exception in createOrUpdateSession:', error?.message || error);
@@ -185,24 +208,31 @@ export const updateSessionActivity = async (userId: string) => {
     }
     
     console.log("Updating session activity for user:", userId);
-    const { error } = await supabase
-      .from('user_sessions')
-      .update({ 
-        last_activity: new Date().toISOString(),
-        last_active_page: window.location.pathname
-      })
-      .eq('user_id', userId)
-      .eq('is_active', true);
     
-    if (error) {
-      console.error('Error updating session activity:', error);
+    // Wrap the update in a retry function but don't block on failures
+    const updateOperation = async () => {
+      const { error } = await supabase
+        .from('user_sessions')
+        .update({ 
+          last_activity: new Date().toISOString(),
+          last_active_page: window.location.pathname
+        })
+        .eq('user_id', userId)
+        .eq('is_active', true);
+        
+      if (error) throw error;
+      return true;
+    };
+    
+    // Use retry but don't throw if all retries fail
+    await retry(updateOperation).catch(error => {
+      console.warn('Failed to update session activity after retries:', error);
       return false;
-    }
+    });
     
-    console.log("Session activity updated successfully");
     return true;
   } catch (error) {
-    console.error('Exception in updateSessionActivity:', error);
+    console.warn('Exception in updateSessionActivity but continuing:', error);
     return false;
   }
 };
@@ -212,24 +242,28 @@ export const endUserSession = async (userId: string) => {
   try {
     if (!userId) return false;
     
-    const { error } = await supabase
-      .from('user_sessions')
-      .update({ 
-        is_active: false,
-        session_end: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('is_active', true);
+    const endSessionOperation = async () => {
+      const { error } = await supabase
+        .from('user_sessions')
+        .update({ 
+          is_active: false,
+          session_end: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .eq('is_active', true);
+        
+      if (error) throw error;
+      return true;
+    };
     
-    if (error) {
-      console.error('Error ending session:', error);
-      return false;
-    }
-    
-    return true;
+    // Use retry but don't block on failures
+    return await retry(endSessionOperation).catch(error => {
+      console.warn('Error ending session after retries, but continuing:', error);
+      return true; // Return success to prevent blocking
+    });
   } catch (error) {
-    console.error('Exception in endUserSession:', error);
-    return false;
+    console.warn('Exception in endUserSession but continuing:', error);
+    return true; // Return success to prevent blocking
   }
 };
 
@@ -251,89 +285,101 @@ export const ensureUserProfile = async (userId: string) => {
       return { success: false, error: 'No user ID provided' };
     }
     
-    // Check if a profile already exists for this user
-    try {
-      const { data: existingProfile, error: profileError } = await supabase
+    // First quickly check if profile exists without creating it
+    const checkProfile = async () => {
+      const { data, error } = await supabase
         .from('profiles')
         .select('id')
         .eq('id', userId)
         .maybeSingle();
-      
-      // If there's a query error that isn't just "no rows returned", report it
-      if (profileError && !profileError.message.includes('no rows')) {
-        console.error('Error checking for existing profile:', profileError);
-        return { success: false, error: profileError.message };
-      }
-      
-      // If profile exists, we're done!
-      if (existingProfile) {
-        console.log('Profile already exists for user:', userId);
-        return { success: true, message: 'Profile already exists', isNew: false };
-      }
-    } catch (checkError) {
+        
+      if (error && !error.message.includes('no rows')) throw error;
+      return data;
+    };
+    
+    // Use retry for the profile check
+    const existingProfile = await retry(checkProfile).catch(checkError => {
       console.error('Error checking for existing profile:', checkError);
-      // Continue with creation attempt even if check fails
+      return null; // Continue with creation attempt even if check fails
+    });
+    
+    // If profile exists, we're done!
+    if (existingProfile) {
+      console.log('Profile already exists for user:', userId);
+      return { success: true, message: 'Profile already exists', isNew: false };
     }
     
     // Get the user data to populate the profile
-    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const getUserData = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) throw error;
+      return data;
+    };
     
-    if (userError) {
+    const userData = await retry(getUserData).catch(userError => {
       console.error('Error getting user data:', userError);
-      return { success: false, error: userError.message };
-    }
+      return null;
+    });
     
-    const user = userData?.user;
-    if (!user) {
+    if (!userData?.user) {
       return { success: false, error: 'User not found' };
     }
     
-    // Create a new profile - we have a database trigger too, but this is a failsafe
+    // Don't block the app if profile creation fails
     try {
-      const { data: newProfile, error: insertError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          email: user.email,
-          full_name: user.user_metadata?.full_name,
-          avatar_url: user.user_metadata?.avatar_url
-        })
-        .select()
-        .single();
-      
-      if (insertError) {
-        // If the error is about unique violation or RLS, the profile might have been 
-        // created by the database trigger, so we can consider this a non-critical error
-        if (insertError.message.includes('unique constraint') || 
-            insertError.message.includes('violates row-level security policy')) {
-          console.log('Profile likely created by database trigger for user:', userId);
+      const createProfile = async () => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            email: userData.user.email,
+            full_name: userData.user.user_metadata?.full_name,
+            avatar_url: userData.user.user_metadata?.avatar_url
+          })
+          .select()
+          .single();
           
-          // Double check if profile exists despite the error
-          const { data: confirmProfile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', userId)
-            .maybeSingle();
-            
-          if (confirmProfile) {
-            return { success: true, message: 'Profile exists (created by trigger)', isNew: false };
-          } else {
-            return { success: false, error: insertError.message, isNonCritical: true };
-          }
+        if (error) throw error;
+        return data;
+      };
+      
+      const newProfile = await retry(createProfile).catch(insertError => {
+        // If error is due to unique constraint or RLS, the profile might already exist
+        if (insertError.message && (
+            insertError.message.includes('unique constraint') || 
+            insertError.message.includes('violates row-level security policy')
+        )) {
+          console.log('Profile likely created by database trigger for user:', userId);
+          return { success: true, message: 'Profile exists (created by trigger)', isNew: false };
         }
         
-        console.error('Error creating profile:', insertError);
-        return { success: false, error: insertError.message };
-      }
+        console.error('Error creating profile after retries:', insertError);
+        throw insertError;
+      });
       
-      console.log('New profile created successfully for user:', userId);
-      return { success: true, profile: newProfile, isNew: true };
-    } catch (insertCatchError) {
-      console.error('Exception in profile creation:', insertCatchError);
-      return { success: false, error: insertCatchError.message };
+      if (newProfile) {
+        console.log('New profile created successfully for user:', userId);
+        return { success: true, profile: newProfile, isNew: true };
+      } else {
+        // Double check if profile exists despite issues
+        const confirmProfile = await retry(() => 
+          supabase.from('profiles').select('id').eq('id', userId).maybeSingle()
+        ).catch(() => ({ data: null }));
+        
+        if (confirmProfile.data) {
+          return { success: true, message: 'Profile exists (confirmed check)', isNew: false };
+        } else {
+          return { success: false, error: 'Failed to create profile', isNonCritical: true };
+        }
+      }
+    } catch (error: any) {
+      console.error('Exception in profile creation:', error);
+      // Mark as non-critical to prevent blocking the app
+      return { success: false, error: error?.message || 'Unknown error', isNonCritical: true };
     }
   } catch (error: any) {
     console.error('Exception in ensureUserProfile:', error?.message || error);
-    return { success: false, error: error?.message || 'Unknown error' };
+    // Mark as non-critical to prevent blocking the app
+    return { success: false, error: error?.message || 'Unknown error', isNonCritical: true };
   }
 };

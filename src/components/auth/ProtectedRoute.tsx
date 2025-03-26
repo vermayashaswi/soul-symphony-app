@@ -14,6 +14,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const location = useLocation();
   const [refreshAttempted, setRefreshAttempted] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   
   // Force complete the loading state after a shorter timeout
   useEffect(() => {
@@ -39,9 +40,24 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         try {
           const success = await refreshSession();
           console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
+          
+          // If refresh failed but we haven't exceeded retry limit, try again
+          if (!success && retryCount < 2) {
+            console.log(`Session refresh failed, retrying (${retryCount + 1}/2)...`);
+            setRetryCount(prev => prev + 1);
+            
+            // Add a small delay before retrying
+            setTimeout(() => {
+              setRefreshAttempted(false);
+            }, 500);
+            
+            return;
+          }
+          
+          setRefreshAttempted(true);
+          setSessionChecked(true);
         } catch (err) {
-          console.error("Error refreshing session:", err);
-        } finally {
+          console.error("Error refreshing session but continuing:", err);
           setRefreshAttempted(true);
           setSessionChecked(true);
         }
@@ -60,10 +76,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       // Update the session tracking without waiting for it to complete
       createOrUpdateSession(user.id, location.pathname)
         .catch(err => {
-          console.error("Error tracking session:", err);
+          console.error("Error tracking session but continuing:", err);
         });
     }
-  }, [user, isLoading, location, refreshAttempted, refreshSession]);
+  }, [user, isLoading, location, refreshAttempted, refreshSession, retryCount]);
   
   // If we have a user, render the protected content immediately
   if (user) {

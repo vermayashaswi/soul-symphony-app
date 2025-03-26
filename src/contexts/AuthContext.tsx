@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -26,6 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initialSessionCheckDone, setInitialSessionCheckDone] = useState(false);
   const [authEventsProcessed, setAuthEventsProcessed] = useState<Set<string>>(new Set());
   const [profileCreationErrorShown, setProfileCreationErrorShown] = useState(false);
+  const authTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Function to handle profile creation with rate limiting
   const createUserProfile = useCallback(async (userId: string) => {
@@ -37,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const result = await ensureUserProfile(userId);
       
-      if (!result.success) {
+      if (!result.success && !result.isNonCritical) {
         console.warn('Profile creation attempted but had issues:', result.error);
         
         // Show the error only once to prevent loops
@@ -76,10 +77,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize auth state and set up listeners
   useEffect(() => {
     console.log('AuthProvider: Setting up auth state listener');
-    let authTimeout: NodeJS.Timeout | null = null;
     
     // Set a global timeout to force complete loading state
-    authTimeout = setTimeout(() => {
+    authTimeoutRef.current = setTimeout(() => {
       if (isLoading) {
         console.log('Force ending auth loading state after timeout');
         setIsLoading(false);
@@ -126,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           try {
             // Update the profile with Google info if available
-            if (newSession.user.app_metadata.provider === 'google' && 
+            if (newSession.user.app_metadata?.provider === 'google' && 
                 newSession.user.user_metadata?.full_name) {
               try {
                 const { data: existingProfile } = await supabase
@@ -147,12 +147,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     .eq('id', newSession.user.id);
                 }
               } catch (profileError) {
-                console.error('Error updating profile with Google data:', profileError);
+                console.error('Error updating profile with Google data but continuing:', profileError);
                 // Continue even if this fails - the database trigger should have created the profile
               }
             }
             
-            await createUserProfile(newSession.user.id);
+            // Use a short delay to ensure other auth processing completes first
+            setTimeout(() => {
+              createUserProfile(newSession.user.id).catch(err => {
+                console.warn('Profile creation error on delayed attempt, but continuing:', err);
+              });
+            }, 500);
           } catch (err) {
             console.error('Profile creation error on auth state change, but continuing:', err);
           }
@@ -173,36 +178,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      setIsLoading(false);
-      setInitialSessionCheckDone(true);
-      
-      // Ensure user profile exists for existing session
-      if (initialSession?.user) {
-        // Log user data for debugging
-        console.log('User data from existing session:', {
-          id: initialSession.user.id,
-          email: initialSession.user.email,
-          name: initialSession.user.user_metadata?.full_name,
-          avatar: initialSession.user.user_metadata?.avatar_url
-        });
+    const checkInitialSession = async () => {
+      try {
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
-        try {
-          createUserProfile(initialSession.user.id);
-        } catch (err) {
-          console.error('Profile creation error on initial session, but continuing:', err);
+        if (error) {
+          console.error('Error checking session, but continuing:', error);
+          setIsLoading(false);
+          setInitialSessionCheckDone(true);
+          return;
         }
+        
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+        setIsLoading(false);
+        setInitialSessionCheckDone(true);
+        
+        // Ensure user profile exists for existing session
+        if (initialSession?.user) {
+          // Log user data for debugging
+          console.log('User data from existing session:', {
+            id: initialSession.user.id,
+            email: initialSession.user.email,
+            name: initialSession.user.user_metadata?.full_name,
+            avatar: initialSession.user.user_metadata?.avatar_url
+          });
+          
+          // Use a short delay to ensure other auth processing completes first
+          setTimeout(() => {
+            createUserProfile(initialSession.user.id).catch(err => {
+              console.warn('Profile creation error on delayed initial session, but continuing:', err);
+            });
+          }, 500);
+        }
+      } catch (error) {
+        console.error('Error checking session, but continuing:', error);
+        setIsLoading(false);
+        setInitialSessionCheckDone(true);
       }
-    }).catch(error => {
-      console.error('Error checking session, but continuing:', error);
-      setIsLoading(false);
-      setInitialSessionCheckDone(true);
-    });
+    };
+    
+    // Check initial session with a small delay to allow auth state listener to set up
+    setTimeout(checkInitialSession, 100);
     
     return () => {
-      if (authTimeout) clearTimeout(authTimeout);
+      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
       subscription.unsubscribe();
     };
   }, [createUserProfile, authEventsProcessed]);
@@ -272,7 +292,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       console.log("Attempting to refresh session...");
-      const { data, error } = await supabase.auth.refreshSession();
+      
+      const refreshOperation = async () => {
+        const { data, error } = await supabase.auth.refreshSession();
+        if (error && !error.message.includes('Auth session missing')) throw error;
+        return { data, error };
+      };
+      
+      // Add retry logic for network failures
+      let attempts = 0;
+      const maxAttempts = 3;
+      let result;
+      
+      while (attempts < maxAttempts) {
+        try {
+          result = await refreshOperation();
+          break;
+        } catch (err: any) {
+          attempts++;
+          console.warn(`Session refresh attempt ${attempts} failed:`, err);
+          
+          if (attempts >= maxAttempts) {
+            console.error('Session refresh failed after all retries:', err);
+            setIsLoading(false);
+            return false;
+          }
+          
+          // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, 300 * Math.pow(2, attempts - 1)));
+        }
+      }
+      
+      if (!result) {
+        setIsLoading(false);
+        return false;
+      }
+      
+      const { data, error } = result;
       
       if (error) {
         console.error('Session refresh error:', error);
