@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,26 +31,44 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const RETRY_DELAY = 5000; // 5 seconds between retries
   const FETCH_TIMEOUT = 8000; // 8 seconds timeout for fetch operations
 
+  const testDatabaseConnection = useCallback(async () => {
+    console.log('Testing database connection...');
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .limit(1);
+      
+      if (error) {
+        console.error('Database connection test failed:', error);
+        setConnectionStatus('error');
+        setLoadError('Connection to database failed: ' + error.message);
+        return false;
+      } else {
+        console.log('Database connection test successful:', data);
+        setConnectionStatus('connected');
+        return true;
+      }
+    } catch (err) {
+      console.error('Database connection test error:', err);
+      setConnectionStatus('error');
+      setLoadError('Connection error: ' + (err.message || 'Unknown error'));
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     const checkConnection = async () => {
       try {
         setConnectionStatus('checking');
         console.log('Checking Supabase connection...');
         
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id')
-          .limit(1)
-          .abortSignal(AbortSignal.timeout(3000)); // 3 second timeout for just the connection check
+        const isConnected = await testDatabaseConnection();
         
-        if (error) {
-          console.error('Supabase connection check failed:', error);
-          setConnectionStatus('error');
-          setLoadError('Connection to database failed');
-          setLoading(false);
+        if (!isConnected) {
+          console.error('Failed to connect to database');
         } else {
-          console.log('Supabase connection confirmed');
-          setConnectionStatus('connected');
+          console.log('Successfully connected to database');
         }
       } catch (err) {
         console.error('Supabase connection check error:', err);
@@ -62,7 +79,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     };
     
     checkConnection();
-  }, []);
+  }, [testDatabaseConnection]);
 
   const fetchEntries = useCallback(async () => {
     if (!userId) {
@@ -82,6 +99,15 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     try {
       setLoading(true);
       setLoadError(null);
+      
+      console.log(`Attempting database access for user ${userId}`);
+      
+      // Test direct database access first
+      const connectionTest = await testDatabaseConnection();
+      if (!connectionTest) {
+        console.error('Database connection test failed before fetching entries');
+        throw new Error('Database connection test failed');
+      }
       
       console.log(`Fetching entries for user ${userId}`);
       
@@ -204,7 +230,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoading(false);
       setIsRetrying(false);
     }
-  }, [userId, retryAttempt, isRetrying, fetchTimeout, MAX_RETRY_ATTEMPTS, FETCH_TIMEOUT, connectionStatus]);
+  }, [userId, retryAttempt, isRetrying, fetchTimeout, MAX_RETRY_ATTEMPTS, FETCH_TIMEOUT, connectionStatus, testDatabaseConnection]);
 
   const generateThemesForEntry = async (entry: JournalEntry) => {
     if (!entry["refined text"] || !entry.id) return;
@@ -487,6 +513,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     retryCount: retryAttempt,
     processUnprocessedEntries,
     isProcessing,
-    connectionStatus
+    connectionStatus,
+    testDatabaseConnection
   };
 }
