@@ -15,15 +15,11 @@ const AuthStateListener = () => {
   // Handle OAuth redirects that come with tokens in the URL
   useEffect(() => {
     console.log("AuthStateListener: Setting up authentication listener");
-    console.log("Current path:", location.pathname);
-    console.log("Current hash:", location.hash ? "Present (contains tokens)" : "None");
     
     // Skip handling token redirects if we're already on callback or auth routes
-    // or if we're already in the process of handling an auth redirect
     if (location.pathname === '/callback' || 
         location.pathname === '/auth/callback' || 
         location.pathname === '/auth') {
-      console.log("Already on callback or auth route, not redirecting");
       return;
     }
     
@@ -39,44 +35,30 @@ const AuthStateListener = () => {
       
       // Redirect to the callback route with the hash and search params intact
       const callbackUrl = '/callback' + location.search + location.hash;
-      console.log("Redirecting to:", callbackUrl);
       navigate(callbackUrl, { replace: true });
       return;
     }
-    
-    let isFirstLoad = true;
     
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth event:", event, "User:", session?.user?.email);
       
-      // Only process once for initial load
-      if (event === 'INITIAL_SESSION') {
-        isFirstLoad = false;
-      }
-      
       // Only show toast notification for SIGNED_IN events when directly triggered by user action
-      // Not for token refreshes or initial session checks
       if (event === 'SIGNED_IN' && session?.user) {
         console.log("SIGNED_IN event detected - creating session for", session.user.id);
         
         try {
-          const result = await createOrUpdateSession(session.user.id, window.location.pathname);
-          console.log("Session creation result:", result);
+          await createOrUpdateSession(session.user.id, window.location.pathname);
           
-          // Only process unprocessed entries if this is not the first initial load
-          // to prevent duplicate processing
-          if (!isFirstLoad) {
-            setTimeout(async () => {
-              try {
-                console.log("Processing unprocessed journal entries after sign in");
-                const result = await processUnprocessedEntries();
-                console.log("Processing result:", result);
-              } catch (err) {
-                console.error("Error processing entries after sign in:", err);
-              }
-            }, 3000);
-          }
+          // Process unprocessed entries after sign in
+          setTimeout(async () => {
+            try {
+              console.log("Processing unprocessed journal entries after sign in");
+              await processUnprocessedEntries();
+            } catch (err) {
+              console.error("Error processing entries after sign in:", err);
+            }
+          }, 3000);
         } catch (err) {
           console.error("Error creating session on sign in:", err);
         }
@@ -111,14 +93,17 @@ const AuthStateListener = () => {
         setTimeout(async () => {
           try {
             console.log("Processing unprocessed journal entries on initial load");
-            const result = await processUnprocessedEntries();
-            console.log("Processing result:", result);
+            await processUnprocessedEntries();
           } catch (err) {
             console.error("Error processing entries on initial load:", err);
           }
         }, 3000);
       } else {
         console.log("No initial session found");
+        // Force a refresh of the session on initial load if no session is found
+        refreshSession().catch(err => {
+          console.error("Error refreshing session on initial load:", err);
+        });
       }
     });
     
