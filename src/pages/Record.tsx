@@ -7,6 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { BookOpen, Mic } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Record() {
   const navigate = useNavigate();
@@ -14,6 +15,46 @@ export default function Record() {
   const [mode, setMode] = useState<'record' | 'past'>('record');
   const [isNavigating, setIsNavigating] = useState(false);
   const [recordingCompleted, setRecordingCompleted] = useState(false);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(false);
+
+  useEffect(() => {
+    // Check if user profile exists when component mounts
+    if (user && !isCheckingProfile) {
+      setIsCheckingProfile(true);
+      
+      const checkUserProfile = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', user.id)
+            .maybeSingle();
+            
+          if (error || !data) {
+            console.log('Profile check error or not found:', error);
+            
+            // Try to create profile
+            const { error: createError } = await supabase
+              .from('profiles')
+              .insert([{ id: user.id }]);
+              
+            if (createError) {
+              console.error('Failed to create profile:', createError);
+              toast.error('Failed to set up your profile. Some features may not work properly.');
+            } else {
+              console.log('Profile created successfully');
+            }
+          }
+        } catch (err) {
+          console.error('Error checking profile:', err);
+        } finally {
+          setIsCheckingProfile(false);
+        }
+      };
+      
+      checkUserProfile();
+    }
+  }, [user, isCheckingProfile]);
 
   const handleRecordingComplete = async (audioBlob: Blob, tempId?: string) => {
     console.log('Recording completed, tempId:', tempId);

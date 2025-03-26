@@ -13,6 +13,8 @@ import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -119,19 +121,15 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       <audio ref={audioRef} className="hidden" />
       
       <div className="flex items-center justify-center mb-4">
-        <label className="flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            className="sr-only"
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="noise-reduction"
             checked={noiseReduction}
-            onChange={() => setNoiseReduction(!noiseReduction)}
+            onCheckedChange={setNoiseReduction}
             disabled={isRecording || isProcessing}
           />
-          <div className={`h-5 w-10 rounded-full transition-colors ${noiseReduction ? 'bg-primary' : 'bg-gray-300'} relative`}>
-            <div className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${noiseReduction ? 'translate-x-5' : ''}`} />
-          </div>
-          <span className="ml-2 text-sm">Noise Reduction</span>
-        </label>
+          <Label htmlFor="noise-reduction" className="text-sm">Noise Reduction</Label>
+        </div>
       </div>
       
       <RecordingVisualizer 

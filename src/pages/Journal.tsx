@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Journal() {
   const navigate = useNavigate();
@@ -27,20 +28,69 @@ export default function Journal() {
   const { 
     handleCreateJournal, 
     handleViewInsights,
+    processUnprocessedEntries,
+    isProcessing
   } = useJournalHandler(user?.id);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [mode, setMode] = useState<'record' | 'past'>('past');
   const [refreshKey, setRefreshKey] = useState(0);
   const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [hasTriedProfileCreation, setHasTriedProfileCreation] = useState(false);
 
+  // Check profile exists and create if needed
   useEffect(() => {
+    if (user && !hasTriedProfileCreation) {
+      const checkAndCreateProfile = async () => {
+        try {
+          // Check if profile exists
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (!data || error) {
+            console.log('Profile not found or error:', error);
+            
+            // Try to create profile
+            const { error: createError } = await supabase
+              .from('profiles')
+              .insert([{ id: user.id }]);
+            
+            if (createError) {
+              console.error('Failed to create profile:', createError);
+              toast.error('Unable to set up your profile. Some features might not work properly.');
+            } else {
+              console.log('Profile created successfully');
+              // Refresh entries after creating profile
+              setTimeout(() => refreshEntries(false), 1000);
+            }
+          }
+        } catch (err) {
+          console.error('Error in profile check/creation:', err);
+        } finally {
+          setHasTriedProfileCreation(true);
+        }
+      };
+      
+      checkAndCreateProfile();
+    }
+  }, [user, hasTriedProfileCreation, refreshEntries]);
+
+  // Handle loading timeout
+  useEffect(() => {
+    // Set a timeout to force-complete loading state after 15 seconds
     const timeout = setTimeout(() => {
       if (isLoading) {
         console.log('Force completing loading state due to timeout');
         setIsRefreshing(false);
+        // Try process entries to ensure everything is set up
+        if (user?.id && !isProcessing) {
+          processUnprocessedEntries();
+        }
       }
-    }, 10000);
+    }, 15000);
     
     setLoadTimeout(timeout);
     
@@ -49,8 +99,9 @@ export default function Journal() {
         clearTimeout(loadTimeout);
       }
     };
-  }, [isLoading]);
+  }, [isLoading, user?.id, processUnprocessedEntries, isProcessing]);
 
+  // Handle URL processing parameters
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const tempId = queryParams.get('processing');
@@ -85,13 +136,26 @@ export default function Journal() {
     }
   }, [location.search, processingEntries, refreshEntries]);
 
+  // Handle manual refresh button click
   const handleRefresh = async () => {
     if (isRefreshing) return;
     
     setIsRefreshing(true);
     try {
+      // Process any unprocessed entries
+      if (user?.id) {
+        const processingResult = await processUnprocessedEntries();
+        
+        // Only continue if processing is not already happening
+        if (processingResult.alreadyProcessing) {
+          setIsRefreshing(false);
+          return;
+        }
+      }
+      
       // Pass true to show a toast notification for manual refresh
       await refreshEntries(true);
+      
       // After refresh, clear any processing entries that might have been completed
       setProcessingEntries([]);
       setRefreshKey(prev => prev + 1); // Force a fresh fetch
