@@ -14,6 +14,8 @@ interface JournalEntriesListProps {
   processingEntries?: string[]; // Entries that are currently being processed
   onStartRecording: () => void;
   onRefresh?: () => void;
+  connectionStatus?: 'connected' | 'checking' | 'error';
+  loadError?: string | null;
 }
 
 const JournalEntriesList: React.FC<JournalEntriesListProps> = ({ 
@@ -21,8 +23,40 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   loading,
   processingEntries = [],
   onStartRecording,
-  onRefresh
+  onRefresh,
+  connectionStatus = 'connected',
+  loadError
 }) => {
+  if (connectionStatus === 'checking') {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-4 my-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="text-muted-foreground">Checking connection to database...</p>
+      </div>
+    );
+  }
+  
+  if (connectionStatus === 'error') {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-4 my-12 p-6 border rounded-lg border-destructive bg-destructive/10">
+        <p className="text-destructive font-medium">Connection to database failed</p>
+        <p className="text-muted-foreground text-center max-w-md">
+          We're having trouble connecting to the database. This could be due to network issues.
+        </p>
+        {onRefresh && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onRefresh}
+            className="mt-4"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" /> Try Again
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   if (loading && entries.length === 0 && processingEntries.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center space-y-4 my-12">
@@ -40,6 +74,27 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             </Button>
           )}
         </div>
+      </div>
+    );
+  }
+  
+  if (loadError && !loading) {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-4 my-12 p-6 border rounded-lg border-destructive bg-destructive/10">
+        <p className="text-destructive font-medium">Error loading entries</p>
+        <p className="text-muted-foreground text-center max-w-md">
+          {loadError || "Failed to load your journal entries. Please try again."}
+        </p>
+        {onRefresh && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onRefresh}
+            className="mt-4"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" /> Try Again
+          </Button>
+        )}
       </div>
     );
   }

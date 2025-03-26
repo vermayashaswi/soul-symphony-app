@@ -1,3 +1,4 @@
+
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,14 +7,16 @@ import { useAuth } from '@/contexts/auth';
 import { useEffect, useState, useRef } from 'react';
 import { createOrUpdateSession } from '@/utils/audio/auth-profile';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Index() {
   const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refreshSession } = useAuth();
   const [authChecked, setAuthChecked] = useState(false);
   const [sessionTracked, setSessionTracked] = useState(false);
   const sessionTrackingAttemptedRef = useRef(false);
   const redirectAttemptedRef = useRef(false);
+  const sessionCheckAttemptedRef = useRef(false);
 
   // Add a timeout to prevent infinite loading state
   useEffect(() => {
@@ -34,6 +37,50 @@ export default function Index() {
       setAuthChecked(true);
     }
   }, [isLoading]);
+
+  // Forceful session check to address redirect issues
+  useEffect(() => {
+    if (authChecked && !isLoading && !user && !sessionCheckAttemptedRef.current) {
+      sessionCheckAttemptedRef.current = true;
+      
+      // Check if we should have a session based on localStorage flag
+      const authSuccess = localStorage.getItem('auth_success') === 'true';
+      if (authSuccess) {
+        console.log("Auth success flag is true but no user object exists, checking session");
+        
+        // Force a session check
+        const checkSession = async () => {
+          try {
+            console.log("Performing manual session check");
+            const { data, error } = await supabase.auth.getSession();
+            
+            if (error) {
+              console.error("Error getting session during manual check:", error);
+              localStorage.removeItem('auth_success');
+              return;
+            }
+            
+            if (data.session) {
+              console.log("Found valid session during manual check, refreshing session");
+              const refreshResult = await refreshSession();
+              
+              if (refreshResult) {
+                console.log("Session refreshed successfully, redirecting to journal");
+                setTimeout(() => navigate('/journal'), 100);
+              }
+            } else {
+              console.log("No session found during manual check, clearing auth success flag");
+              localStorage.removeItem('auth_success');
+            }
+          } catch (e) {
+            console.error("Error in manual session check:", e);
+          }
+        };
+        
+        checkSession();
+      }
+    }
+  }, [authChecked, isLoading, user, navigate, refreshSession]);
 
   // Redirect authenticated users to journal page
   useEffect(() => {

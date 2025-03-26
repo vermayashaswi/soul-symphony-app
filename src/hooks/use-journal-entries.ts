@@ -25,10 +25,43 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [lastRefreshToastId, setLastRefreshToastId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fetchTimeout, setFetchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'checking' | 'error'>('checking');
 
   const MAX_RETRY_ATTEMPTS = 3;
   const RETRY_DELAY = 5000; // 5 seconds between retries
-  const FETCH_TIMEOUT = 10000; // 10 seconds timeout for fetch operations
+  const FETCH_TIMEOUT = 8000; // 8 seconds timeout for fetch operations
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        setConnectionStatus('checking');
+        console.log('Checking Supabase connection...');
+        
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .limit(1)
+          .timeout(3000); // 3 second timeout for just the connection check
+        
+        if (error) {
+          console.error('Supabase connection check failed:', error);
+          setConnectionStatus('error');
+          setLoadError('Connection to database failed');
+          setLoading(false);
+        } else {
+          console.log('Supabase connection confirmed');
+          setConnectionStatus('connected');
+        }
+      } catch (err) {
+        console.error('Supabase connection check error:', err);
+        setConnectionStatus('error');
+        setLoadError('Connection to database failed');
+        setLoading(false);
+      }
+    };
+    
+    checkConnection();
+  }, []);
 
   const fetchEntries = useCallback(async () => {
     if (!userId) {
@@ -38,6 +71,12 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
     
     if (isRetrying) return;
+    
+    if (connectionStatus === 'error') {
+      console.log('Cannot fetch entries: connection error');
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
@@ -65,9 +104,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       setFetchTimeout(timeoutId);
       
+      // Use a more specific query with fewer columns to improve performance
       const { data, error } = await supabase
         .from('Journal Entries')
-        .select('*')
+        .select('id, "refined text", "transcription text", created_at, emotions, master_themes, user_id')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
         
@@ -106,42 +146,43 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       // Set entries even if empty array
       const typedEntries = (data || []) as JournalEntry[];
       setEntries(typedEntries);
-      
-      // Handle entries that need themes
-      const entriesNeedingThemes = typedEntries.filter(
-        entry => (!entry.master_themes || entry.master_themes.length === 0) && entry["refined text"]
-      );
-      
-      if (entriesNeedingThemes.length > 0) {
-        console.log(`Found ${entriesNeedingThemes.length} entries without themes, processing...`);
-        for (const entry of entriesNeedingThemes) {
-          try {
-            await generateThemesForEntry(entry);
-          } catch (themeError) {
-            console.error('Error generating themes for entry:', themeError);
-          }
-        }
+
+      // Check if entries need themes - only if we have entries
+      if (typedEntries.length > 0) {
+        const entriesNeedingThemes = typedEntries.filter(
+          entry => (!entry.master_themes || entry.master_themes.length === 0) && entry["refined text"]
+        );
         
         if (entriesNeedingThemes.length > 0) {
-          // Add error handling here to prevent loading state getting stuck
-          try {
-            const { data: refreshedData, error: refreshError } = await supabase
-              .from('Journal Entries')
-              .select('*')
-              .eq('user_id', userId)
-              .order('created_at', { ascending: false });
-              
-            if (refreshError) {
-              console.error('Error re-fetching entries after theme generation:', refreshError);
+          console.log(`Found ${entriesNeedingThemes.length} entries without themes, processing...`);
+          for (const entry of entriesNeedingThemes) {
+            try {
+              await generateThemesForEntry(entry);
+            } catch (themeError) {
+              console.error('Error generating themes for entry:', themeError);
             }
-              
-            if (refreshedData) {
-              console.log(`Re-fetched ${refreshedData.length} entries after theme generation`);
-              setEntries(refreshedData as JournalEntry[]);
+          }
+          
+          // Only refetch if we actually processed entries
+          if (entriesNeedingThemes.length > 0) {
+            try {
+              const { data: refreshedData, error: refreshError } = await supabase
+                .from('Journal Entries')
+                .select('id, "refined text", "transcription text", created_at, emotions, master_themes, user_id')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+                
+              if (refreshError) {
+                console.error('Error re-fetching entries after theme generation:', refreshError);
+              }
+                
+              if (refreshedData) {
+                console.log(`Re-fetched ${refreshedData.length} entries after theme generation`);
+                setEntries(refreshedData as JournalEntry[]);
+              }
+            } catch (refreshError) {
+              console.error('Error in refresh after theme generation:', refreshError);
             }
-          } catch (refreshError) {
-            console.error('Error in refresh after theme generation:', refreshError);
-            // Continue anyway, don't get stuck
           }
         }
       }
@@ -162,7 +203,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoading(false);
       setIsRetrying(false);
     }
-  }, [userId, retryAttempt, isRetrying, fetchTimeout, MAX_RETRY_ATTEMPTS, FETCH_TIMEOUT]);
+  }, [userId, retryAttempt, isRetrying, fetchTimeout, MAX_RETRY_ATTEMPTS, FETCH_TIMEOUT, connectionStatus]);
 
   const generateThemesForEntry = async (entry: JournalEntry) => {
     if (!entry["refined text"] || !entry.id) return;
@@ -383,7 +424,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   useEffect(() => {
     let retryTimeout: NodeJS.Timeout | null = null;
     
-    if (loadError && !loading && !isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
+    if (loadError && !loading && !isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS && connectionStatus !== 'error') {
       console.log(`Auto-retrying fetch (attempt ${retryAttempt + 1}/${MAX_RETRY_ATTEMPTS}) in ${RETRY_DELAY / 1000} seconds...`);
       
       const backoffDelay = RETRY_DELAY * Math.pow(2, retryAttempt - 1);
@@ -398,10 +439,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       if (retryTimeout) clearTimeout(retryTimeout);
       if (fetchTimeout) clearTimeout(fetchTimeout);
     };
-  }, [loadError, loading, fetchEntries, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS, fetchTimeout]);
+  }, [loadError, loading, fetchEntries, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS, fetchTimeout, connectionStatus]);
 
   useEffect(() => {
-    if (userId) {
+    if (userId && connectionStatus === 'connected') {
       setRetryAttempt(0);
       setLoadError(null);
       console.log(`Initial fetch triggered for user ${userId} with refreshKey ${refreshKey}`);
@@ -415,7 +456,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       fetchEntries().finally(() => {
         clearTimeout(forceCompleteTimeout);
       });
-    } else {
+    } else if (connectionStatus === 'error') {
+      console.log('Cannot fetch entries: connection error');
+      setLoading(false);
+    } else if (!userId) {
       console.log('No user ID available for fetching journal entries');
       setLoading(false); // Important: ensure loading is set to false when no user ID
       setEntries([]); // Clear entries when no user
@@ -427,11 +471,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         clearTimeout(fetchTimeout);
       }
     };
-  }, [userId, refreshKey, fetchEntries, FETCH_TIMEOUT]);
+  }, [userId, refreshKey, fetchEntries, FETCH_TIMEOUT, connectionStatus]);
 
   return { 
     entries, 
-    loading, 
+    loading,
     saveJournalEntry,
     isSaving,
     deleteJournalEntry,
@@ -441,6 +485,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     loadError,
     retryCount: retryAttempt,
     processUnprocessedEntries,
-    isProcessing
+    isProcessing,
+    connectionStatus
   };
 }
+
