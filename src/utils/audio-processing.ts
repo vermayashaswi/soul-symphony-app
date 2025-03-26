@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { processAudioBlobForTranscription } from './audio/transcription-service';
 
 /**
  * Ensures that the audio storage bucket exists
@@ -110,3 +110,80 @@ export const uploadAudioToStorage = async (
   }
 };
 
+/**
+ * Process a recording for transcription and storage
+ * @param audioBlob Audio blob to process
+ * @param userId User ID for the owner of the audio
+ * @returns Promise resolving to an object with success flag and data
+ */
+export const processRecording = async (
+  audioBlob: Blob,
+  userId: string
+): Promise<{
+  success: boolean;
+  tempId?: string;
+  entryId?: number;
+  error?: string;
+}> => {
+  if (!audioBlob || !userId) {
+    return {
+      success: false,
+      error: 'Missing audio data or user ID'
+    };
+  }
+
+  try {
+    console.log('Processing recording, blob size:', audioBlob.size, 'type:', audioBlob.type);
+    
+    // Generate a temporary ID for tracking this processing job
+    const tempId = `temp-${Date.now()}`;
+    
+    // Upload audio to storage
+    const audioUrl = await uploadAudioToStorage(audioBlob, userId);
+    
+    if (!audioUrl) {
+      return {
+        success: false,
+        tempId,
+        error: 'Failed to upload audio to storage'
+      };
+    }
+    
+    console.log('Audio uploaded successfully. URL:', audioUrl);
+    
+    // Process audio for transcription
+    const transcriptionResult = await processAudioBlobForTranscription(audioBlob, userId);
+    
+    if (!transcriptionResult.success) {
+      console.error('Transcription failed:', transcriptionResult.error);
+      return {
+        success: false,
+        tempId,
+        error: transcriptionResult.error || 'Transcription failed'
+      };
+    }
+    
+    console.log('Transcription successful:', transcriptionResult.data);
+    
+    // If we have an entry ID from the transcription service, return it
+    if (transcriptionResult.data && transcriptionResult.data.entryId) {
+      return {
+        success: true,
+        tempId,
+        entryId: transcriptionResult.data.entryId
+      };
+    }
+    
+    // Otherwise just return success with the temp ID
+    return {
+      success: true,
+      tempId
+    };
+  } catch (error: any) {
+    console.error('Error in processRecording:', error);
+    return {
+      success: false,
+      error: error.message || 'Unknown error processing recording'
+    };
+  }
+};

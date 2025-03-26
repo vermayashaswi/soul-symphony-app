@@ -1,211 +1,85 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import type { PostgrestError } from '@supabase/supabase-js';
-
-type TableName = 'profiles' | 'Journal Entries' | 'chat_threads' | 'chat_messages' | 'journal_embeddings' | 'user_queries' | 'user_sessions';
 
 /**
- * Tests the connection to the Supabase database with improved error handling
- * @returns An object with the test results
+ * Safely performs a database update with conditions
+ * This implementation avoids deep type recursion
  */
-export const testDatabaseConnection = async () => {
+export async function safeUpdate<T>(
+  table: string, 
+  updates: Record<string, any>,
+  conditions: Record<string, any>
+) {
   try {
-    console.log('Testing Supabase connection...');
+    let query = supabase.from(table).update(updates);
     
-    // Create a new AbortController with a reasonable timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    // Use a simpler approach to avoid TypeScript's deep type instantiation
+    query = Object.entries(conditions).reduce((acc, [key, value]) => {
+      return (acc as any).eq(key, value);
+    }, query);
     
-    // Use a simple query to test the connection - using the signal from controller
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .limit(1)
-      .abortSignal(controller.signal);
-    
-    clearTimeout(timeoutId);
+    const { data, error } = await query.select();
     
     if (error) {
-      console.error('Supabase connection test failed:', error.message);
-      return { success: false, error: 'Database connection failed' };
+      console.error(`Error updating ${table}:`, error);
+      return { success: false, error };
     }
     
-    console.log('Supabase connection successful');
     return { success: true, data };
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      console.error('Connection test aborted due to timeout');
-      return { success: false, error: 'Connection timed out' };
-    }
-    
-    console.error('Supabase connection error:', err);
-    return { success: false, error: 'Connection error' };
+    console.error(`Exception in safeUpdate for ${table}:`, err);
+    return { success: false, error: err };
   }
-};
+}
 
 /**
- * Helper to handle typesafe Supabase operations with error checking
+ * Safely performs a database select with conditions
+ * This implementation avoids deep type recursion
  */
-export const safeQuerySingle = async <T>(
-  query: Promise<{ data: T | null; error: PostgrestError | null }>
-): Promise<T | null> => {
+export async function safeSelect<T>(
+  table: string,
+  conditions: Record<string, any> = {},
+  options: {
+    columns?: string;
+    orderBy?: string;
+    ascending?: boolean;
+    limit?: number;
+    single?: boolean;
+  } = {}
+) {
   try {
-    const { data, error } = await query;
-    if (error) {
-      console.error('Database query error:', error);
-      return null;
-    }
-    return data;
-  } catch (err) {
-    console.error('Unexpected error in database query:', err);
-    return null;
-  }
-};
-
-/**
- * Helper for safely inserting records with proper type handling
- */
-export const safeInsert = async <T>(
-  tableName: TableName, 
-  values: any,
-  options?: { select?: boolean }
-): Promise<T | null> => {
-  try {
-    let result;
+    // Start with the basic query
+    let query = supabase.from(table).select(options.columns || '*');
     
-    if (options?.select !== false) {
-      // If select is requested (default)
-      result = await supabase
-        .from(tableName)
-        .insert(values)
-        .select()
-        .single();
-    } else {
-      // If no select is requested
-      result = await supabase
-        .from(tableName)
-        .insert(values);
+    // Apply conditions using a for loop to avoid deep type recursion
+    for (const [key, value] of Object.entries(conditions)) {
+      query = (query as any).eq(key, value);
     }
     
-    const { data, error } = result;
+    // Apply ordering if specified
+    if (options.orderBy) {
+      query = query.order(options.orderBy, { 
+        ascending: options.ascending !== false 
+      });
+    }
+    
+    // Apply limit if specified
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    
+    // Execute as single or multiple
+    const { data, error } = options.single 
+      ? await query.maybeSingle() 
+      : await query;
     
     if (error) {
-      console.error(`Error inserting into ${tableName}:`, error);
-      return null;
+      console.error(`Error selecting from ${table}:`, error);
+      return { success: false, error };
     }
     
-    return data as unknown as T;
+    return { success: true, data };
   } catch (err) {
-    console.error(`Unexpected error inserting into ${tableName}:`, err);
-    return null;
+    console.error(`Exception in safeSelect for ${table}:`, err);
+    return { success: false, error: err };
   }
-};
-
-/**
- * Helper for safely updating records
- * Uses type casting to avoid TypeScript recursion issues
- */
-export const safeUpdate = async <T>(
-  tableName: TableName,
-  values: any,
-  condition: Record<string, any>
-): Promise<T | null> => {
-  try {
-    // Start with the base query
-    const query = supabase.from(tableName).update(values);
-    
-    // Apply conditions one by one, breaking type recursion with "any" casting
-    const keys = Object.keys(condition);
-    let finalQuery = query;
-    
-    if (keys.length > 0) {
-      const firstKey = keys[0];
-      finalQuery = finalQuery.eq(firstKey, condition[firstKey]);
-      
-      // Apply remaining conditions using type casting to avoid deep inference
-      for (let i = 1; i < keys.length; i++) {
-        const key = keys[i];
-        // @ts-ignore - Break the type chain
-        finalQuery = finalQuery.eq(key, condition[key]);
-      }
-    }
-    
-    // Execute with select
-    // @ts-ignore - Safely convert to any to avoid deep type inference
-    const { data, error } = await finalQuery.select();
-    
-    if (error) {
-      console.error(`Error updating ${tableName}:`, error);
-      return null;
-    }
-    
-    return data as unknown as T;
-  } catch (err) {
-    console.error(`Unexpected error updating ${tableName}:`, err);
-    return null;
-  }
-};
-
-/**
- * Helper for safely selecting records
- * Uses type casting to avoid TypeScript recursion issues
- */
-export const safeSelect = async <T>(
-  tableName: TableName,
-  columns: string,
-  condition?: Record<string, any>,
-  options?: { single?: boolean, limit?: number }
-): Promise<T | null> => {
-  try {
-    // Start with the base query
-    const query = supabase.from(tableName).select(columns);
-    
-    // Apply conditions if provided, using type casting to avoid deep inference
-    let finalQuery = query;
-    
-    if (condition && Object.keys(condition).length > 0) {
-      const keys = Object.keys(condition);
-      
-      if (keys.length > 0) {
-        const firstKey = keys[0];
-        finalQuery = finalQuery.eq(firstKey, condition[firstKey]);
-        
-        // Apply remaining conditions
-        for (let i = 1; i < keys.length; i++) {
-          const key = keys[i];
-          // @ts-ignore - Break the type chain
-          finalQuery = finalQuery.eq(key, condition[key]);
-        }
-      }
-    }
-    
-    // Apply limit if provided
-    if (options?.limit) {
-      finalQuery = finalQuery.limit(options.limit);
-    }
-    
-    // Execute query with appropriate method
-    if (options?.single) {
-      const { data, error } = await finalQuery.maybeSingle();
-      
-      if (error) {
-        console.error(`Error selecting from ${tableName}:`, error);
-        return null;
-      }
-      
-      return data as unknown as T;
-    } else {
-      const { data, error } = await finalQuery;
-      
-      if (error) {
-        console.error(`Error selecting from ${tableName}:`, error);
-        return null;
-      }
-      
-      return data as unknown as T;
-    }
-  } catch (err) {
-    console.error(`Unexpected error selecting from ${tableName}:`, err);
-    return null;
-  }
-};
+}
