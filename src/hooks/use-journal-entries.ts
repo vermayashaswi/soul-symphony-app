@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,6 +24,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [isRetrying, setIsRetrying] = useState(false);
   const [lastRetryTime, setLastRetryTime] = useState<number>(0);
   const [lastRefreshToastId, setLastRefreshToastId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const MAX_RETRY_ATTEMPTS = 3;
   const RETRY_DELAY = 5000; // 5 seconds between retries
@@ -410,6 +412,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     isLoading: loading,
     loadError,
     retryCount: retryAttempt,
-    processUnprocessedEntries
+    processUnprocessedEntries,
+    isProcessing
   };
 }
