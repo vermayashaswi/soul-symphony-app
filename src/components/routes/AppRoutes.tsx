@@ -12,19 +12,23 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import AppLayout from "@/components/layout/AppLayout";
 import AuthStateListener from "@/components/auth/AuthStateListener";
 import AuthCallback from "@/components/auth/AuthCallback";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 const AppRoutes = () => {
   const location = useLocation();
+  const isFirstRender = useRef(true);
   
-  // Log initial route for debugging
+  // Log initial route for debugging only once
   useEffect(() => {
-    console.log("AppRoutes rendering on path:", location.pathname, "with origin:", window.location.origin);
+    if (isFirstRender.current) {
+      console.log("AppRoutes rendering on path:", location.pathname, "with origin:", window.location.origin);
+      isFirstRender.current = false;
+    }
   }, [location.pathname]);
   
   return (
     <AppLayout>
-      {/* Only render AuthStateListener once */}
+      {/* Only render AuthStateListener once at the top level */}
       <AuthStateListener />
       
       <Routes>

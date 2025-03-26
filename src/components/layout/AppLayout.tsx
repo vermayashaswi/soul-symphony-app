@@ -23,9 +23,14 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     search: location.search
   }), [location.pathname, location.search, isAuthPage]);
   
-  // Log only once when the path changes, not on every render
+  // Log once when the path changes, not on every render
   useEffect(() => {
-    logInfo(`AppLayout rendered for path: ${location.pathname}`, locationData);
+    // Use a non-blocking approach for logging to prevent cascading effects
+    const timeoutId = setTimeout(() => {
+      logInfo(`AppLayout rendered for path: ${location.pathname}`, locationData);
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]); // Only depend on pathname, not the logInfo function
   

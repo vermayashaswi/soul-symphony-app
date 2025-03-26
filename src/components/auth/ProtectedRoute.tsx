@@ -1,8 +1,9 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/auth";
 import { toast } from "sonner";
+import { useDebugLogger } from "@/hooks/use-debug-logger";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,14 +13,27 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, isLoading, refreshSession } = useAuth();
   const location = useLocation();
   const [authChecked, setAuthChecked] = useState(false);
+  const { logInfo, logError } = useDebugLogger();
+  const refreshAttemptedRef = useRef(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Try to refresh the session once when component mounts
   useEffect(() => {
     let isMounted = true;
     
+    // Set a max timeout to prevent getting stuck in loading state
+    timeoutRef.current = setTimeout(() => {
+      if (isMounted && !authChecked) {
+        logInfo('Force completing auth check due to timeout');
+        setAuthChecked(true);
+      }
+    }, 1200); // Shorter timeout
+    
     const checkAuth = async () => {
-      if (!user && !authChecked) {
-        console.log("Protected route: No user found, attempting to refresh session");
+      // Only try to refresh once
+      if (!user && !authChecked && !refreshAttemptedRef.current) {
+        refreshAttemptedRef.current = true;
+        logInfo("Protected route: No user found, attempting to refresh session");
         
         try {
           const refreshed = await refreshSession();
@@ -27,18 +41,18 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
           // Only update state if the component is still mounted
           if (isMounted) {
             if (!refreshed) {
-              console.log("Session refresh failed, redirecting to auth");
+              logInfo("Session refresh failed, redirecting to auth");
             }
             setAuthChecked(true);
           }
         } catch (err) {
-          console.error("Error refreshing session:", err);
+          logError("Error refreshing session:", err);
           if (isMounted) {
             setAuthChecked(true);
           }
         }
       } else if (user && !authChecked) {
-        console.log("Protected route: Tracking session for user", user.id, "on path", location.pathname);
+        logInfo("Protected route: Tracking session for user", user.id, "on path", location.pathname);
         if (isMounted) {
           setAuthChecked(true);
         }
@@ -47,22 +61,21 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     
     checkAuth();
     
-    // Shorter timeout to prevent getting stuck
-    const timeout = setTimeout(() => {
-      if (isMounted && !authChecked) {
-        console.log('Force completing auth check due to timeout');
-        setAuthChecked(true);
-      }
-    }, 800);
-    
     return () => {
       isMounted = false;
-      clearTimeout(timeout);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
     };
-  }, [user, authChecked, refreshSession, location.pathname]);
+  }, [user, authChecked, refreshSession, location.pathname, logInfo, logError]);
   
   // If we have a user, render the protected content immediately
   if (user) {
+    // Clean up timeout to prevent memory leaks
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     return <>{children}</>;
   }
   
@@ -79,7 +92,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
   
   // If auth check is complete and no user is found, redirect to auth
-  console.log("Redirecting to auth from protected route:", location.pathname);
+  logInfo("Redirecting to auth from protected route:", location.pathname);
   return <Navigate to="/auth" state={{ from: location }} replace />;
 };
 
