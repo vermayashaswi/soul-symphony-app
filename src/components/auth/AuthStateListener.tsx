@@ -3,7 +3,8 @@ import { useEffect, useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { createOrUpdateSession, endUserSession } from "@/utils/audio/auth-profile";
+import { createOrUpdateSession } from "@/utils/audio/auth-profile";
+import { endUserSession } from "@/utils/audio/auth-session";
 import { useJournalHandler } from "@/hooks/use-journal-handler";
 import { toast } from "sonner";
 

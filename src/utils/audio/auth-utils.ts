@@ -24,6 +24,16 @@ const retry = async (fn: () => Promise<any>, maxRetries = 3, delay = 300) => {
   }
 };
 
+// Verify user authentication with proper error handling
+export const verifyUserAuthentication = async () => {
+  try {
+    return await checkAuth();
+  } catch (error) {
+    console.error("Error verifying authentication:", error);
+    return { isAuthenticated: false, error: "Authentication verification failed" };
+  }
+};
+
 // Safe storage access function that prevents crashes from storage access errors
 const safeStorageAccess = (fn: () => any) => {
   try {
