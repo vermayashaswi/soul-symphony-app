@@ -28,21 +28,16 @@ export function ChatContainer() {
         .eq('id', user.id)
         .maybeSingle();
         
-      if (profileError || !profile) {
-        console.log('Profile not found or error, trying to create one:', profileError);
-        
-        // Try to create profile
-        const { error: createError } = await supabase
-          .from('profiles')
-          .insert([{ id: user.id }]);
-          
-        if (createError) {
-          console.error('Failed to create profile:', createError);
-          // Don't show error toast here as it could appear multiple times
-          // Instead, we'll set profile checked to true anyway to prevent infinite retries
-        } else {
-          console.log('Profile created successfully');
-        }
+      if (profileError && !profileError.message.includes('Results contain 0 rows')) {
+        console.error('Error checking profile:', profileError);
+      }
+      
+      if (!profile) {
+        console.log('Profile not found, relying on database trigger');
+        // We don't need to create the profile manually anymore 
+        // as our database trigger will handle it
+      } else {
+        console.log('Profile found:', profile.id);
       }
     } catch (error) {
       console.error('Error in profile check/creation:', error);

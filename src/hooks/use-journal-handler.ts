@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,29 +42,14 @@ export function useJournalHandler(userId: string | undefined) {
           .eq('id', userId)
           .maybeSingle();
           
-        if (profileError) {
+        if (profileError && !profileError.message.includes('Results contain 0 rows')) {
           console.error('Profile check error:', profileError);
-          // Try to create profile if it doesn't exist
-          if (profileError.code === 'PGRST116' || profileError.message.includes('no rows')) {
-            console.log('Profile might not exist, trying to create one');
-            
-            const { error: insertError } = await supabase
-              .from('profiles')
-              .insert([{ id: userId }]);
-              
-            if (insertError) {
-              console.error('Failed to create profile:', insertError);
-              toast.error('Failed to set up your profile. Please try logging out and in again.');
-              setIsProcessing(false);
-              return { success: false, processed: 0 };
-            } else {
-              console.log('Profile created successfully');
-            }
-          } else {
-            toast.error('Profile access error. Please try again later.');
-            setIsProcessing(false);
-            return { success: false, processed: 0 };
-          }
+          // With our new trigger function, we don't need to manually create profiles
+          console.log('Relying on database trigger to handle profile');
+        }
+        
+        if (!profileCheck) {
+          console.log('Profile might not exist, but trigger should handle it');
         }
       } catch (profileCheckError) {
         console.error('Error checking profile:', profileCheckError);
