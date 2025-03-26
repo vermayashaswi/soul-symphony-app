@@ -88,7 +88,7 @@ export default function JournalDiagnostics() {
           ] : prev.errors
         }));
         
-        addLog('connection', `Initial database connection check: ${error ? 'Failed' : 'Success'}`, {
+        addLog('network', `Initial database connection check: ${error ? 'Failed' : 'Success'}`, {
           responseTime,
           error: error?.message
         });
@@ -532,7 +532,7 @@ export default function JournalDiagnostics() {
         if (filesError) {
           detailsMessage += `List files error: ${filesError.message}`;
           
-          addLog('warning', 'Audio bucket exists but listing files failed', {
+          addLog('info', 'Audio bucket exists but listing files failed', {
             error: filesError.message
           });
         } else {
