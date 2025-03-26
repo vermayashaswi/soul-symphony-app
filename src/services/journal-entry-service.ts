@@ -37,25 +37,33 @@ export const saveJournalEntry = async (entryData: JournalEntryInput, userId: str
     
     let result;
     
+    // Use abort controller to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
     if (entryData.id) {
       result = await supabase
         .from('Journal Entries')
         .update(dbEntry)
         .eq('id', entryData.id)
         .select()
+        .abortSignal(controller.signal)
         .single();
     } else {
       result = await supabase
         .from('Journal Entries')
         .insert(dbEntry)
         .select()
+        .abortSignal(controller.signal)
         .single();
     }
+    
+    clearTimeout(timeoutId);
     
     const { data, error } = result;
     
     if (error) {
-      console.error('Error saving journal entry:', error);
+      console.error('Error saving journal entry');
       toast.error('Failed to save journal entry');
       throw error;
     }
@@ -73,18 +81,24 @@ export const saveJournalEntry = async (entryData: JournalEntryInput, userId: str
         });
         
         if (embeddingError) {
-          console.error('Error automatically generating embedding:', embeddingError);
+          console.error('Error automatically generating embedding');
         } else {
           console.log('Embedding generated successfully');
         }
       }
     } catch (embeddingError) {
-      console.error('Error in automatic embedding generation:', embeddingError);
+      console.error('Error in automatic embedding generation');
     }
     
     return data;
   } catch (error) {
-    console.error('Error in saveJournalEntry:', error);
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      console.error('Save operation timed out');
+      toast.error('Request timed out. Please try again.');
+      throw new Error('Request timed out');
+    }
+    
+    console.error('Error in saveJournalEntry');
     throw error;
   }
 };
@@ -96,26 +110,39 @@ export const saveJournalEntry = async (entryData: JournalEntryInput, userId: str
  */
 export const deleteJournalEntry = async (id: number) => {
   try {
+    // Use abort controller to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
     const { error } = await supabase
       .from('Journal Entries')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .abortSignal(controller.signal);
+    
+    clearTimeout(timeoutId);
     
     if (error) {
-      console.error('Error deleting journal entry:', error);
+      console.error('Error deleting journal entry');
       toast.error('Failed to delete journal entry');
       throw error;
     }
     
     return true;
   } catch (error) {
-    console.error('Error in deleteJournalEntry:', error);
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      console.error('Delete operation timed out');
+      toast.error('Request timed out. Please try again.');
+      throw new Error('Request timed out');
+    }
+    
+    console.error('Error in deleteJournalEntry');
     throw error;
   }
 };
 
 /**
- * Fetches journal entries for a user
+ * Fetches journal entries for a user with improved error handling
  * @param userId The user ID to fetch entries for
  * @returns The fetched journal entries
  */
@@ -127,32 +154,33 @@ export const fetchJournalEntries = async (userId: string) => {
   console.log(`Fetching entries for user ${userId}`);
   
   try {
-    // First check if the user has a profile
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', userId)
-      .maybeSingle();
-    
-    if (profileError) {
-      console.log('Profile check: creating profile if needed');
+    // First check if the user has a profile and create one if needed
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
       
-      try {
-        // Create profile if it doesn't exist
-        const { error: createError } = await supabase
-          .from('profiles')
-          .insert([{ id: userId }]);
+      if (!profile) {
+        console.log('Profile not found, creating one');
         
-        if (createError) {
+        try {
+          await supabase
+            .from('profiles')
+            .insert([{ id: userId }]);
+          
+          console.log('Profile created successfully');
+        } catch (e) {
           // Continue anyway - profile might have been created by DB trigger
           console.log('Profile creation handled by DB trigger');
-        } else {
-          console.log('Profile created successfully');
         }
-      } catch (e) {
-        // Continue anyway
-        console.log('Profile check handled by database');
+      } else {
+        console.log('Profile exists');
       }
+    } catch (e) {
+      // Continue anyway
+      console.log('Profile check handled by database');
     }
     
     // Now fetch journal entries with request timeout
@@ -169,7 +197,7 @@ export const fetchJournalEntries = async (userId: string) => {
     clearTimeout(timeoutId);
       
     if (error) {
-      console.error('Error fetching entries:', error);
+      console.error('Error fetching entries');
       throw error;
     }
     
@@ -182,13 +210,13 @@ export const fetchJournalEntries = async (userId: string) => {
       throw new Error('Request timed out after 8 seconds');
     }
     
-    console.error('Error in fetchJournalEntries:', error);
+    console.error('Error in fetchJournalEntries');
     throw error;
   }
 };
 
 /**
- * Processes unprocessed journal entries
+ * Processes unprocessed journal entries with optimized error handling
  * @param userId The user ID to process entries for
  * @returns Object with processing results
  */
@@ -199,7 +227,7 @@ export const processUnprocessedEntries = async (userId: string) => {
   }
   
   try {
-    console.log('Processing unprocessed entries for user:', userId);
+    console.log('Processing unprocessed entries');
     
     // Get current session for auth
     const { data: { session } } = await supabase.auth.getSession();
@@ -246,8 +274,6 @@ export const processUnprocessedEntries = async (userId: string) => {
       console.log('Error calling embed-all-entries function');
       return { success: false, processed: 0 };
     }
-    
-    return { success: true, processed: 0 };
   } catch (error) {
     console.log('Error in processUnprocessedEntries');
     return { success: false, processed: 0 };

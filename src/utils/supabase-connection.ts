@@ -2,17 +2,18 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Tests the connection to the Supabase database
+ * Tests the connection to the Supabase database with improved error handling
  * @returns An object with the test results
  */
 export const testDatabaseConnection = async () => {
   try {
     console.log('Testing Supabase connection...');
     
-    // Add a timeout to prevent hanging requests
+    // Create a new AbortController with a reasonable timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     
+    // Use a simple query to test the connection
     const { data, error } = await supabase
       .from('profiles')
       .select('id')
@@ -22,8 +23,8 @@ export const testDatabaseConnection = async () => {
     clearTimeout(timeoutId);
     
     if (error) {
-      console.error('Supabase connection test failed:', error);
-      return { success: false, error: error.message };
+      console.error('Supabase connection test failed');
+      return { success: false, error: 'Database connection failed' };
     }
     
     console.log('Supabase connection successful');
@@ -31,10 +32,10 @@ export const testDatabaseConnection = async () => {
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       console.error('Connection test aborted due to timeout');
-      return { success: false, error: 'Connection timed out after 5 seconds' };
+      return { success: false, error: 'Connection timed out' };
     }
     
-    console.error('Supabase connection error:', err);
-    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+    console.error('Supabase connection error');
+    return { success: false, error: 'Connection error' };
   }
 };

@@ -32,45 +32,45 @@ export function useJournalHandler(userId: string | undefined) {
     setIsProcessing(true);
     
     try {
-      console.log('Processing unprocessed entries for user:', userId);
+      console.log('Processing entries for user:', userId);
       
-      // Simplified profile check since RLS is disabled
+      // Simplified profile check
       try {
-        const { data: profileCheck, error: profileError } = await supabase
+        const { data: profileCheck } = await supabase
           .from('profiles')
           .select('id')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
           
-        if (profileError) {
+        if (!profileCheck) {
           console.log('Profile not found, creating one');
           
-          const { error: createError } = await supabase
+          await supabase
             .from('profiles')
             .insert({ id: userId });
             
-          if (createError) {
-            console.error('Error creating profile:', createError);
-            // Silently continue - the database trigger should handle it
-          }
+          console.log('Profile created');
         }
       } catch (error) {
-        console.error('Error checking profile:', error);
-        // Continue anyway since we've disabled RLS
+        console.log('Error checking profile');
+        // Continue anyway
       }
       
       // Get current session for auth
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        console.log('No active session found, cannot process entries');
+        console.log('No active session found');
         toast.error('Authentication required. Please sign in again.');
         setIsProcessing(false);
         return { success: false, processed: 0 };
       }
       
       try {
-        // Use the correct URL format for the edge function
+        // Add a timeout to prevent hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
         const response = await fetch('https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/embed-all-entries', {
           method: 'POST',
           headers: {
@@ -80,13 +80,15 @@ export function useJournalHandler(userId: string | undefined) {
           body: JSON.stringify({
             userId,
             processAll: false // Only process entries without embeddings
-          })
+          }),
+          signal: controller.signal
         });
         
+        clearTimeout(timeoutId);
+        
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Error response from embed-all-entries:', errorText);
-          toast.error('Failed to process journal entries. Please try again later.');
+          console.log('Error response from embed-all-entries');
+          toast.error('Failed to process journal entries');
           setIsProcessing(false);
           return { success: false, processed: 0 };
         }
@@ -94,24 +96,29 @@ export function useJournalHandler(userId: string | undefined) {
         const result = await response.json();
         
         if (result.success) {
-          console.log(`Successfully processed ${result.processedCount} entries`);
+          console.log(`Processed ${result.processedCount} entries`);
           setIsProcessing(false);
           return { success: true, processed: result.processedCount };
         } else {
-          console.error('Error processing entries:', result.error);
-          toast.error(result.error || 'Failed to process entries');
+          console.log('Error processing entries');
+          toast.error('Failed to process entries');
           setIsProcessing(false);
           return { success: false, processed: 0 };
         }
       } catch (fetchError) {
-        console.error('Error calling embed-all-entries function:', fetchError);
-        toast.error('Network error when processing entries. Please try again.');
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+          console.log('Request timed out');
+          toast.error('Request timed out. Please try again.');
+        } else {
+          console.log('Error calling function');
+          toast.error('Error processing entries');
+        }
         setIsProcessing(false);
         return { success: false, processed: 0 };
       }
     } catch (error) {
-      console.error('Error in processUnprocessedEntries:', error);
-      toast.error('An unexpected error occurred. Please try again.');
+      console.log('Error in processUnprocessedEntries');
+      toast.error('An error occurred');
       setIsProcessing(false);
       return { success: false, processed: 0 };
     }

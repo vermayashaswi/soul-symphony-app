@@ -6,7 +6,7 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://kwnwhgucnzqxndzjayyq.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3bndoZ3VjbnpxeG5kempheXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzMzk4ODMsImV4cCI6MjA1NzkxNTg4M30.UAB3e5b44iJa9kKT391xyJKoQmlUOtsAi-yp4UEqZrc";
 
-// Create a singleton instance with proper storage configuration
+// Create a singleton instance with optimized storage configuration
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
@@ -25,7 +25,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   },
   realtime: {
     params: {
-      eventsPerSecond: 2
+      eventsPerSecond: 1 // Reduced to avoid potential rate limiting
     }
   }
 });
@@ -35,27 +35,27 @@ export const checkSupabaseConnection = async () => {
   try {
     console.log('Testing Supabase connection...');
     
-    // Add a timeout to prevent hanging requests
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Connection test timed out after 5 seconds')), 5000);
-    });
+    // Use a reasonable timeout to prevent hanging connections
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     
-    const fetchPromise = supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('id')
-      .limit(1);
+      .limit(1)
+      .abortSignal(controller.signal);
     
-    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+    clearTimeout(timeoutId);
     
     if (error) {
-      console.error('Supabase connection test failed:', error);
-      return { success: false, error: error.message };
+      console.error('Supabase connection test failed');
+      return { success: false };
     }
     
     console.log('Supabase connection successful');
-    return { success: true, data };
+    return { success: true };
   } catch (err) {
-    console.error('Supabase connection error:', err);
-    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+    console.error('Supabase connection error');
+    return { success: false };
   }
 };
