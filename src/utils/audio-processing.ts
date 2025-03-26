@@ -41,17 +41,41 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
     
     console.log('Uploading audio to:', filePath);
     
-    // Upload the audio file to Supabase Storage
+    // Make sure the audio bucket exists in storage
+    try {
+      // Check if 'audio' bucket exists, if not this will error
+      const { data: bucketExists } = await supabase.storage.getBucket('audio');
+      
+      if (!bucketExists) {
+        // Create the bucket if it doesn't exist
+        console.log('Creating audio bucket');
+        await supabase.storage.createBucket('audio', {
+          public: false
+        });
+      }
+    } catch (bucketError) {
+      // If error is not about bucket not existing, log it
+      console.log('Checking or creating bucket:', bucketError);
+      // Continue anyway, the bucket might exist but we don't have permission to check
+    }
+    
+    // Upload the audio file to Supabase Storage with timeout
+    const controller = new AbortController();
+    const uploadTimeout = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('audio')
       .upload(filePath, audioBlob, {
         contentType: 'audio/webm',
         cacheControl: '3600',
+        upsert: false,
+        signal: controller.signal
       });
+    
+    clearTimeout(uploadTimeout);
     
     if (uploadError) {
       console.error('Error uploading audio:', uploadError);
-      logError('Audio upload failed', uploadError, userId);
       processingStatus.set(tempId, 'error');
       return { success: false, error: 'Failed to upload audio' };
     }
@@ -73,7 +97,31 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
     
     console.log('Creating initial journal entry with temp ID:', tempId);
     
+    // Check if user profile exists before creating journal entry
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+      
+    if (profileError || !profileData) {
+      console.log('Profile check or create needed');
+      // Try to create profile
+      try {
+        await supabase
+          .from('profiles')
+          .insert([{ id: userId }]);
+        console.log('Profile created');
+      } catch (profileCreateError) {
+        console.log('Profile creation handled by trigger or already exists');
+        // Continue anyway as profile might have been created by DB trigger
+      }
+    }
+    
     // Create an initial journal entry in the database
+    const entryCreateController = new AbortController();
+    const entryTimeout = setTimeout(() => entryCreateController.abort(), 8000);
+    
     const { data: entryData, error: entryError } = await supabase
       .from('Journal Entries')
       .insert([
@@ -85,11 +133,13 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
         }
       ])
       .select()
+      .abortSignal(entryCreateController.signal)
       .single();
+    
+    clearTimeout(entryTimeout);
     
     if (entryError) {
       console.error('Error creating journal entry:', entryError);
-      logError('Journal entry creation failed', entryError, userId);
       processingStatus.set(tempId, 'error');
       return { success: false, error: 'Failed to create journal entry' };
     }
@@ -135,27 +185,7 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
     };
   } catch (error: any) {
     console.error('Unexpected error in audio processing:', error);
-    logError('Unexpected error in audio processing', error, userId);
     return { success: false, error: 'An unexpected error occurred' };
-  }
-}
-
-/**
- * Log an error for debugging
- */
-function logError(message: string, error: any, userId: string) {
-  console.error(`Error: ${message}`, error);
-  
-  try {
-    // Log to console only instead of trying to insert into a non-existent table
-    console.error('Error details:', {
-      message,
-      error_details: JSON.stringify(error),
-      user_id: userId,
-      timestamp: new Date().toISOString()
-    });
-  } catch (logError) {
-    console.error('Failed to log error:', logError);
   }
 }
 

@@ -4,7 +4,84 @@ import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from './blob-utils';
 
 /**
- * Handles sending audio data to the transcription service
+ * Processes audio blob directly for transcription
+ */
+export async function processAudioBlobForTranscription(audioBlob: Blob, userId: string): Promise<{
+  success: boolean;
+  data?: any;
+  error?: string;
+}> {
+  try {
+    if (!audioBlob) {
+      return { success: false, error: 'No audio recording found' };
+    }
+    
+    // Convert to FormData for direct upload to edge function
+    const formData = new FormData();
+    formData.append('file', audioBlob);
+    formData.append('userId', userId);
+    
+    console.log('Preparing to send audio for transcription, blob size:', audioBlob.size);
+    
+    // Set up a timeout to prevent the call from hanging indefinitely
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    try {
+      // Direct function invocation with FormData
+      const response = await fetch('https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/transcribe-audio', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+        headers: {
+          // Get auth header to pass user's auth context
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Transcription function error:', errorText);
+        return { 
+          success: false, 
+          error: `Transcription failed: ${response.status} ${response.statusText}`
+        };
+      }
+      
+      const result = await response.json();
+      console.log('Transcription function response:', result);
+      
+      if (result.success) {
+        return { success: true, data: result.data };
+      } else {
+        return { 
+          success: false, 
+          error: result.error || 'Transcription failed with unknown error'
+        };
+      }
+    } catch (fetchError: any) {
+      if (fetchError.name === 'AbortError') {
+        console.error('Transcription request timed out');
+        return { 
+          success: false, 
+          error: 'Request timed out while processing audio'
+        };
+      }
+      throw fetchError; // Re-throw for the outer catch
+    }
+  } catch (error: any) {
+    console.error('Error in processAudioBlobForTranscription:', error);
+    return {
+      success: false,
+      error: `Failed to process audio: ${error.message || 'Unknown error'}`
+    };
+  }
+}
+
+/**
+ * Handles sending audio data to the transcription service (legacy method)
  */
 export async function sendAudioForTranscription(base64String: string, userId: string): Promise<{
   success: boolean;
@@ -31,27 +108,21 @@ export async function sendAudioForTranscription(base64String: string, userId: st
     }
     
     // Set up a timeout to prevent the call from hanging indefinitely
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Transcription request timed out'));
-      }, 30000); // 30 second timeout
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
     // Call the Supabase function
     console.log("Calling transcribe-audio edge function...");
-    const functionPromise = supabase.functions.invoke('transcribe-audio', {
+    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64String,
         userId
-      }
+      },
+      signal: controller.signal
     });
     
-    // Race the function call against the timeout
-    const { data, error } = await Promise.race([
-      functionPromise,
-      timeoutPromise.then(() => ({ data: null, error: new Error('Transcription timed out') }))
-    ]) as any;
-
+    clearTimeout(timeoutId);
+    
     if (error) {
       console.error('Transcription error:', error);
       return { 
@@ -59,31 +130,10 @@ export async function sendAudioForTranscription(base64String: string, userId: st
         error: `Failed to transcribe audio: ${error.message || 'Unknown error'}`
       };
     }
-
+    
     console.log("Transcription response:", data);
     
     if (data && data.success) {
-      // Check if the transcription data includes content
-      if (!data.transcription && !data.refinedText) {
-        console.warn("Transcription service didn't return any text content");
-        
-        // If we have an entry ID but no text, let's add some placeholder text
-        if (data.entryId) {
-          // Update the entry with placeholder text
-          const { error: updateError } = await supabase
-            .from('Journal Entries')
-            .update({
-              "transcription text": "Audio processing completed. Text will be available soon.",
-              "refined text": "Your journal entry is being processed. The content will appear here shortly."
-            })
-            .eq('id', data.entryId);
-            
-          if (updateError) {
-            console.error("Error updating entry with placeholder text:", updateError);
-          }
-        }
-      }
-      
       return { success: true, data };
     } else {
       const errorMsg = data?.error || data?.message || 'Failed to process recording';
@@ -94,40 +144,18 @@ export async function sendAudioForTranscription(base64String: string, userId: st
       };
     }
   } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.error('Transcription request timed out');
+      return { 
+        success: false, 
+        error: 'Request timed out while processing audio'
+      };
+    }
+    
     console.error('Error sending audio for transcription:', error);
     return { 
       success: false, 
       error: `Error processing recording: ${error.message || 'Unknown error'}`
-    };
-  }
-}
-
-/**
- * Processes audio blob directly for transcription
- */
-export async function processAudioBlobForTranscription(audioBlob: Blob, userId: string): Promise<{
-  success: boolean;
-  data?: any;
-  error?: string;
-}> {
-  try {
-    if (!audioBlob) {
-      return { success: false, error: 'No audio recording found' };
-    }
-    
-    // Convert blob to base64
-    const base64Audio = await blobToBase64(audioBlob);
-    
-    // Extract the base64 data, removing the data URL prefix
-    const base64Data = base64Audio.split(',')[1] || base64Audio;
-    
-    // Send for transcription
-    return await sendAudioForTranscription(base64Data, userId);
-  } catch (error: any) {
-    console.error('Error processing audio blob:', error);
-    return {
-      success: false,
-      error: `Failed to process audio: ${error.message || 'Unknown error'}`
     };
   }
 }

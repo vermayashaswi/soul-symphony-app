@@ -11,7 +11,7 @@ export const testDatabaseConnection = async () => {
     
     // Create a new AbortController with a reasonable timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     
     // Use a simple query to test the connection
     const { data, error } = await supabase
@@ -23,7 +23,7 @@ export const testDatabaseConnection = async () => {
     clearTimeout(timeoutId);
     
     if (error) {
-      console.error('Supabase connection test failed');
+      console.error('Supabase connection test failed:', error.message);
       return { success: false, error: 'Database connection failed' };
     }
     
@@ -35,7 +35,7 @@ export const testDatabaseConnection = async () => {
       return { success: false, error: 'Connection timed out' };
     }
     
-    console.error('Supabase connection error');
+    console.error('Supabase connection error:', err);
     return { success: false, error: 'Connection error' };
   }
 };
