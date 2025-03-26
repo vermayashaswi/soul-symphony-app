@@ -272,28 +272,16 @@ export default function Journal() {
         <Alert variant="destructive" className="mb-4">
           <AlertTriangle className="h-4 w-4 mr-2" />
           <AlertTitle>Database Connection Error</AlertTitle>
-          <AlertDescription className="mt-2">
-            <p className="mb-4">Unable to connect to the database. This could be due to:</p>
-            <ul className="list-disc pl-6 mb-4 space-y-1">
-              <li>Network issues or firewall restrictions</li>
-              <li>Server maintenance or temporary outage</li>
-              <li>Application configuration issues</li>
-            </ul>
-            <div className="flex gap-3 mt-4">
-              <Button 
-                variant="default" 
-                onClick={handleTestConnection}
-                className="gap-2"
-              >
-                <RefreshCw className="h-4 w-4" /> Test Connection
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => window.location.reload()}
-              >
-                Reload Page
-              </Button>
-            </div>
+          <AlertDescription className="flex justify-between items-center">
+            <span>{loadError}</span>
+            <Button 
+              variant="outline" 
+              className="ml-2"
+              onClick={handleTestConnection}
+              size="sm"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" /> Test Connection
+            </Button>
           </AlertDescription>
         </Alert>
       </div>
