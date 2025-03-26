@@ -7,6 +7,7 @@ import { createOrUpdateSession } from "@/utils/audio/auth-profile";
 import { endUserSession } from "@/utils/audio/auth-session";
 import { useJournalHandler } from "@/hooks/use-journal-handler";
 import { toast } from "sonner";
+import { hasAuthParams, debugSessionStatus } from "@/utils/auth-utils";
 
 const AuthStateListener = () => {
   const { user, refreshSession } = useAuth();
@@ -52,6 +53,9 @@ const AuthStateListener = () => {
     initializeAttemptedRef.current = true;
     console.log("AuthStateListener: Setting up authentication listener");
     
+    // Run session debug on initialization
+    debugSessionStatus().catch(console.error);
+    
     const handleAuthRedirection = () => {
       // Skip if already processing or on auth-related pages
       if (isProcessingAuthEvent || 
@@ -62,19 +66,13 @@ const AuthStateListener = () => {
       }
       
       // Check if we have an auth token at any path (not just root)
-      if ((location.hash && 
-          (location.hash.includes('access_token') || 
-           location.hash.includes('id_token') ||
-           location.hash.includes('type=recovery'))) ||
-          (location.search && 
-          (location.search.includes('code=') || 
-           location.search.includes('state=')))) {
+      if (hasAuthParams()) {
         console.log("AuthStateListener: Detected OAuth token or code in URL, redirecting to callback");
         
         setIsProcessingAuthEvent(true);
         
         // Redirect to the callback route with the hash and search params intact
-        const callbackUrl = '/callback' + location.search + location.hash;
+        const callbackUrl = '/auth/callback' + location.search + location.hash;
         navigate(callbackUrl, { replace: true });
         return;
       }
@@ -97,6 +95,11 @@ const AuthStateListener = () => {
       
       const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log("Auth event:", event, "User:", session?.user?.email);
+        
+        // Debug session on important events
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          debugSessionStatus().catch(console.error);
+        }
         
         // Handle auth events - simplified to reduce complexity
         if (event === 'SIGNED_IN' && session?.user) {
@@ -182,6 +185,9 @@ const AuthStateListener = () => {
           }
         } else {
           console.log("No initial session found");
+          
+          // Debug session state to help troubleshoot
+          debugSessionStatus().catch(console.error);
           
           // Only try to refresh session if at a protected route
           const isProtectedRoute = !['/auth', '/callback', '/auth/callback', '/'].includes(location.pathname);

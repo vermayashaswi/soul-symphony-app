@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -5,6 +6,7 @@ import { toast } from 'sonner';
 import { ensureUserProfile } from '@/utils/audio/auth-profile';
 import { AuthContextProps, AuthContextProviderProps } from './types';
 import { AuthContext } from './auth-context';
+import { debugSessionStatus } from '@/utils/auth-utils';
 
 // Safe storage wrapper to handle storage access errors
 const safeStorage = {
@@ -116,6 +118,11 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       // Wrap in try/catch to handle storage access errors
       const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
         console.log('Auth state changed:', event);
+        
+        // Debug session info on critical events
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          debugSessionStatus().catch(console.error);
+        }
         
         // Create a unique ID for this event to prevent duplicate processing
         const eventId = `${event}-${Date.now()}`;
@@ -314,14 +321,19 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       // Clear any stored session data first to force a clean login
       try {
         safeStorage.removeItem('supabase.auth.token');
+        const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
+        safeStorage.removeItem(`${storageKeyPrefix}-auth-token`);
       } catch (e) {
         console.warn('Could not clear localStorage but continuing:', e);
       }
       
+      // Log that we're initiating Google sign-in
+      console.log('Initiating Google sign-in, redirecting to:', `${window.location.origin}/auth/callback`);
+      
       return await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/callback`,
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             prompt: 'select_account', // Force account selection
             access_type: 'offline'
@@ -401,10 +413,14 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       setRefreshInProgress(true);
       console.log("Attempting to refresh session...");
       
+      // Debug current session state before refresh
+      await debugSessionStatus();
+      
       const refreshOperation = async () => {
         // Skip refresh if we don't have any session tokens to refresh from
+        const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
         const hasTokens = safeStorage.getItem('supabase.auth.token') || 
-                          safeStorage.getItem('sb-' + window.location.hostname.split('.')[0] + '-auth-token');
+                        safeStorage.getItem(`${storageKeyPrefix}-auth-token`);
         
         if (!hasTokens) {
           console.log('No stored tokens found to refresh session from');
@@ -453,6 +469,9 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       }
       
       console.log("Session refresh result:", data.session ? "Success" : "No session returned");
+      
+      // Debug session state after refresh
+      await debugSessionStatus();
       
       // Update state with refreshed session
       setSession(data.session);

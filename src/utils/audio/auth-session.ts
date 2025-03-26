@@ -7,7 +7,7 @@ export const refreshAuthSession = async (showToasts = false) => {
   try {
     console.log("Starting session refresh");
     
-    // Check if we have token in storage before attempting refresh
+    // Check for token in storage to optimize refresh attempts
     let hasTokens = false;
     try {
       const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
@@ -27,6 +27,18 @@ export const refreshAuthSession = async (showToasts = false) => {
     let refreshResult;
     try {
       console.log("Attempting to refresh session from storage");
+      
+      // Log stored token info to debug
+      try {
+        const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
+        const tokenStr = localStorage.getItem('supabase.auth.token') || 
+                        localStorage.getItem(`${storageKeyPrefix}-auth-token`);
+        console.log("Stored token exists:", !!tokenStr);
+        console.log("Token length:", tokenStr ? tokenStr.length : 0);
+      } catch (err) {
+        console.warn("Could not check token details:", err);
+      }
+      
       refreshResult = await supabase.auth.refreshSession();
       console.log("Refresh result:", refreshResult.data ? "Success" : "Failed");
     } catch (storageError) {
@@ -81,6 +93,28 @@ export const checkAuth = async () => {
     let sessionResult;
     try {
       sessionResult = await supabase.auth.getSession();
+      
+      // Log detailed session info for debugging
+      if (sessionResult.data.session) {
+        console.log("Session found with details:", {
+          userId: sessionResult.data.session.user.id,
+          expiresAt: new Date(sessionResult.data.session.expires_at * 1000).toISOString(),
+          tokenLength: sessionResult.data.session.access_token.length
+        });
+      } else {
+        console.log("No session found in getSession response");
+        
+        // Check storage for tokens
+        try {
+          const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
+          const hasToken = !!localStorage.getItem('supabase.auth.token') || 
+                          !!localStorage.getItem(`${storageKeyPrefix}-auth-token`);
+          console.log("Token exists in storage:", hasToken);
+        } catch (err) {
+          console.warn("Could not check storage for tokens:", err);
+        }
+      }
+      
     } catch (storageError) {
       console.error("Storage error checking auth:", storageError);
       return { isAuthenticated: false, error: "Storage access error" };

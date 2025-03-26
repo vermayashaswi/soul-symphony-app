@@ -3,6 +3,8 @@
  * Utility functions for authentication
  */
 
+import { supabase } from '@/integrations/supabase/client';
+
 /**
  * Returns the full callback URL for OAuth providers including the origin
  * This ensures consistent redirect URLs across the application
@@ -59,4 +61,40 @@ export const clearAuthStorage = (): void => {
   } catch (e) {
     console.warn('LocalStorage access error during cleanup:', e);
   }
+};
+
+/**
+ * Debug function to help troubleshoot session issues
+ */
+export const debugSessionStatus = async (): Promise<void> => {
+  console.group('📋 Auth Session Debug Info');
+  
+  try {
+    // Check if we have tokens in localStorage
+    const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
+    const hasLocalTokens = !!localStorage.getItem('supabase.auth.token') || 
+                         !!localStorage.getItem(`${storageKeyPrefix}-auth-token`);
+    
+    console.log('🔑 Local storage tokens present:', hasLocalTokens);
+    
+    // Check current session from Supabase
+    const { data, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('❌ Error getting session:', error.message);
+    } else if (data?.session) {
+      console.log('✅ Active session found:', {
+        userId: data.session.user.id,
+        email: data.session.user.email,
+        expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
+        tokenLength: data.session.access_token.length,
+      });
+    } else {
+      console.log('❌ No active session found from Supabase');
+    }
+  } catch (e) {
+    console.error('❌ Exception checking session:', e);
+  }
+  
+  console.groupEnd();
 };
