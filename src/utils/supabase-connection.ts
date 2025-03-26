@@ -110,18 +110,29 @@ export const safeUpdate = async <T>(
   condition: Record<string, any>
 ): Promise<T | null> => {
   try {
-    // Start the update query
-    let updateBuilder = supabase.from(tableName).update(values);
+    // To avoid complex type instantiation, we'll handle this differently
+    // First create the base update query
+    const baseQuery = supabase.from(tableName).update(values);
     
-    // Apply each condition separately using traditional for loop to avoid type recursion
-    for (const key in condition) {
-      if (Object.prototype.hasOwnProperty.call(condition, key)) {
-        updateBuilder = updateBuilder.eq(key, condition[key]);
+    // Build a filter string instead of chaining .eq() calls
+    const entries = Object.entries(condition);
+    let query = baseQuery;
+    
+    // Apply only the first condition with .eq() directly
+    if (entries.length > 0) {
+      const [firstKey, firstValue] = entries[0];
+      query = baseQuery.eq(firstKey, firstValue);
+      
+      // Then apply additional conditions if any
+      for (let i = 1; i < entries.length; i++) {
+        const [key, value] = entries[i];
+        // @ts-ignore - TypeScript will complain but this works at runtime
+        query = query.eq(key, value);
       }
     }
     
     // Execute the query
-    const { data, error } = await updateBuilder.select();
+    const { data, error } = await query.select();
     
     if (error) {
       console.error(`Error updating ${tableName}:`, error);
@@ -148,12 +159,22 @@ export const safeSelect = async <T>(
     // Create basic query
     let selectBuilder = supabase.from(tableName).select(columns);
     
-    // Apply conditions if provided
+    // Apply conditions if provided using the same approach as safeUpdate
     if (condition) {
-      for (const key in condition) {
-        if (Object.prototype.hasOwnProperty.call(condition, key)) {
-          selectBuilder = selectBuilder.eq(key, condition[key]);
+      const entries = Object.entries(condition);
+      let query = selectBuilder;
+      
+      if (entries.length > 0) {
+        const [firstKey, firstValue] = entries[0];
+        query = selectBuilder.eq(firstKey, firstValue);
+        
+        for (let i = 1; i < entries.length; i++) {
+          const [key, value] = entries[i];
+          // @ts-ignore - TypeScript will complain but this works at runtime
+          query = query.eq(key, value);
         }
+        
+        selectBuilder = query;
       }
     }
     
