@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export const refreshAuthSession = async (showToasts = true) => {
   try {
+    console.log("Starting session refresh");
     const { data, error } = await supabase.auth.refreshSession();
     
     if (error) {
@@ -16,11 +17,13 @@ export const refreshAuthSession = async (showToasts = true) => {
     }
     
     if (data.session) {
+      console.log("Session refreshed successfully");
       // Update the session's last activity
       await updateSessionActivity(data.session.user.id);
       return true;
     }
     
+    console.log("No session was returned after refresh");
     return false;
   } catch (error: any) {
     console.error("Exception in refreshAuthSession:", error?.message || error);
@@ -176,9 +179,13 @@ export const createOrUpdateSession = async (userId: string, entryPage = '/') => 
 // Update session activity timestamp and current page
 export const updateSessionActivity = async (userId: string) => {
   try {
-    if (!userId) return false;
+    if (!userId) {
+      console.log("No user ID provided for session activity update");
+      return false;
+    }
     
-    const { data, error } = await supabase
+    console.log("Updating session activity for user:", userId);
+    const { error } = await supabase
       .from('user_sessions')
       .update({ 
         last_activity: new Date().toISOString(),
@@ -192,6 +199,7 @@ export const updateSessionActivity = async (userId: string) => {
       return false;
     }
     
+    console.log("Session activity updated successfully");
     return true;
   } catch (error) {
     console.error('Exception in updateSessionActivity:', error);

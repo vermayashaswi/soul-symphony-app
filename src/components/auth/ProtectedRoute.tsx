@@ -3,13 +3,14 @@ import { useState, useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { createOrUpdateSession, refreshAuthSession } from "@/utils/audio/auth-utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refreshSession } = useAuth();
   const location = useLocation();
   const [refreshAttempted, setRefreshAttempted] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
@@ -17,36 +18,42 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // Force complete the loading state after a short timeout
   useEffect(() => {
     const timeout = setTimeout(() => {
-      if (isLoading || !sessionChecked) {
+      if (!sessionChecked) {
         console.log('Force completing session check due to timeout');
         setSessionChecked(true);
         setRefreshAttempted(true);
       }
-    }, 1500); // Reduced from 3000ms to 1500ms to improve user experience
+    }, 2000); // Balanced timeout that's not too short or long
     
     return () => clearTimeout(timeout);
-  }, [isLoading, sessionChecked]);
+  }, [sessionChecked]);
   
   // Try to refresh the session if needed
   useEffect(() => {
-    if (!user && !refreshAttempted && !isLoading) {
-      console.log("Protected route: No user found, attempting to refresh session", {
-        path: location.pathname
-      });
-      
-      refreshAuthSession(false)
-        .then(success => {
-          console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
-          setRefreshAttempted(true);
-          setSessionChecked(true);
-        })
-        .catch(() => {
-          setRefreshAttempted(true);
-          setSessionChecked(true);
+    const handleSessionRefresh = async () => {
+      if (!user && !refreshAttempted) {
+        console.log("Protected route: No user found, attempting to refresh session", {
+          path: location.pathname
         });
-    } else if (!refreshAttempted) {
-      // Either we have a user or we're still loading
-      setSessionChecked(true);
+        
+        try {
+          // Use the AuthContext refreshSession method instead for better state management
+          const success = await refreshSession();
+          console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
+        } catch (err) {
+          console.error("Error refreshing session:", err);
+        } finally {
+          setRefreshAttempted(true);
+          setSessionChecked(true);
+        }
+      } else if (!refreshAttempted) {
+        // Either we have a user or we're still loading
+        setSessionChecked(true);
+      }
+    };
+    
+    if (!isLoading) {
+      handleSessionRefresh();
     }
     
     if (user) {
@@ -58,16 +65,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
           console.error("Error tracking session:", err);
         });
     }
-  }, [user, isLoading, location, refreshAttempted]);
-  
-  // Don't show loading state for too long
-  if (isLoading && !sessionChecked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  }, [user, isLoading, location, refreshAttempted, refreshSession]);
   
   // If we have a user, render the protected content
   if (user) {
@@ -80,10 +78,17 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
-  // Fallback loading state - this should rarely be seen due to the timeout
+  // Better loading UI with skeleton components
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-4">
+        <Skeleton className="h-12 w-full rounded-md" />
+        <Skeleton className="h-32 w-full rounded-md" />
+        <Skeleton className="h-12 w-3/4 rounded-md mx-auto" />
+        <div className="flex justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
     </div>
   );
 };

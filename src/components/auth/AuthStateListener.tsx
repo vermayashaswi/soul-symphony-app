@@ -44,9 +44,16 @@ const AuthStateListener = () => {
       return;
     }
     
+    let isFirstLoad = true;
+    
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth event:", event, "User:", session?.user?.email);
+      
+      // Only process once for initial load
+      if (event === 'INITIAL_SESSION') {
+        isFirstLoad = false;
+      }
       
       // Only show toast notification for SIGNED_IN events when directly triggered by user action
       // Not for token refreshes or initial session checks
@@ -57,17 +64,19 @@ const AuthStateListener = () => {
           const result = await createOrUpdateSession(session.user.id, window.location.pathname);
           console.log("Session creation result:", result);
           
-          // Process unprocessed journal entries after sign in
-          setTimeout(async () => {
-            try {
-              console.log("Processing unprocessed journal entries after sign in");
-              const result = await processUnprocessedEntries();
-              console.log("Processing result:", result);
-            } catch (err) {
-              console.error("Error processing entries after sign in:", err);
-            }
-          }, 3000);
-          
+          // Only process unprocessed entries if this is not the first initial load
+          // to prevent duplicate processing
+          if (!isFirstLoad) {
+            setTimeout(async () => {
+              try {
+                console.log("Processing unprocessed journal entries after sign in");
+                const result = await processUnprocessedEntries();
+                console.log("Processing result:", result);
+              } catch (err) {
+                console.error("Error processing entries after sign in:", err);
+              }
+            }, 3000);
+          }
         } catch (err) {
           console.error("Error creating session on sign in:", err);
         }

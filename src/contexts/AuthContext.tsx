@@ -72,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         // Prevent duplicate toast messages by checking time since last event
         const now = Date.now();
-        if (now - lastSignInEvent > 5000) { // Increased from 2000ms to 5000ms to prevent multiple toasts
+        if (now - lastSignInEvent > 5000) { // 5 seconds between toast messages
           setLastSignInEvent(now);
           toast.success('Signed in successfully');
         }
@@ -124,6 +124,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'SIGNED_OUT') {
         toast.info('Signed out successfully');
         setProfileCreationAttempted(false);
+        setIsLoading(false);
+      } else if (event === 'INITIAL_SESSION') {
+        // This event indicates the initial session check is complete
+        setInitialSessionCheckDone(true);
         setIsLoading(false);
       }
     });
@@ -213,10 +217,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sign out
   const signOut = async () => {
     try {
+      setIsLoading(true);
       await supabase.auth.signOut();
+      // The auth state change listener will handle updating the state
     } catch (error: any) {
       console.error('Sign out error:', error);
       toast.error(`Sign out failed: ${error.message}`);
+      setIsLoading(false);
     }
   };
   
