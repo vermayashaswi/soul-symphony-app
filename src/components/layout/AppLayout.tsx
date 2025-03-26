@@ -23,15 +23,11 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     search: location.search
   }), [location.pathname, location.search, isAuthPage]);
   
-  // Memoize the logging function to prevent infinite updates
-  const logLocationInfo = useCallback(() => {
-    logInfo(`AppLayout rendered for path: ${location.pathname}`, locationData);
-  }, [location.pathname, locationData, logInfo]);
-  
-  // Only run once when location changes
+  // Log only once when the path changes, not on every render
   useEffect(() => {
-    logLocationInfo();
-  }, [location.pathname, logLocationInfo]);
+    logInfo(`AppLayout rendered for path: ${location.pathname}`, locationData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]); // Only depend on pathname, not the logInfo function
   
   return (
     <ErrorBoundary addLog={addLog}>

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -31,9 +32,9 @@ export const DebugProvider = ({ children }: { children: ReactNode }) => {
   const [logs, setLogs] = useState<DebugLogEntry[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const location = useLocation();
-
-  // Add a log entry
-  const addLog = (type: DebugLogEntry['type'], message: string, details?: any) => {
+  
+  // Memoize the addLog function to prevent it from being recreated on each render
+  const addLog = useCallback((type: DebugLogEntry['type'], message: string, details?: any) => {
     setLogs(prevLogs => {
       const newLog: DebugLogEntry = {
         id: Date.now().toString(),
@@ -47,24 +48,24 @@ export const DebugProvider = ({ children }: { children: ReactNode }) => {
       const updatedLogs = [newLog, ...prevLogs].slice(0, MAX_LOGS);
       return updatedLogs;
     });
-  };
+  }, []);
 
   // Toggle the visibility of the debug panel
-  const toggleVisibility = () => {
+  const toggleVisibility = useCallback(() => {
     setIsVisible(prev => !prev);
-  };
+  }, []);
 
   // Clear all logs
-  const clearLogs = () => {
+  const clearLogs = useCallback(() => {
     setLogs([]);
-  };
+  }, []);
 
   // Log navigation changes
   useEffect(() => {
     addLog('navigation', `Navigated to: ${location.pathname}`);
-  }, [location.pathname]);
+  }, [location.pathname, addLog]);
 
-  // Log auth state changes
+  // Log auth state changes - only set up once
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       addLog('auth', `Auth state changed: ${event}`, { 
@@ -77,9 +78,9 @@ export const DebugProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [addLog]);
 
-  // Check and log session on mount
+  // Check and log session on mount - only run once
   useEffect(() => {
     const checkSession = async () => {
       try {
@@ -100,10 +101,19 @@ export const DebugProvider = ({ children }: { children: ReactNode }) => {
     };
     
     checkSession();
-  }, []);
+  }, [addLog]);
+
+  // Memoize the context value to prevent unnecessary renders
+  const contextValue = React.useMemo(() => ({
+    logs,
+    isVisible,
+    toggleVisibility,
+    clearLogs,
+    addLog
+  }), [logs, isVisible, toggleVisibility, clearLogs, addLog]);
 
   return (
-    <DebugContext.Provider value={{ logs, isVisible, toggleVisibility, clearLogs, addLog }}>
+    <DebugContext.Provider value={contextValue}>
       {children}
     </DebugContext.Provider>
   );
