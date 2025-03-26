@@ -20,6 +20,7 @@ export const refreshAuthSession = async (showToasts = false) => {
     const { data, error } = refreshResult;
     
     if (error) {
+      // This is normal for non-authenticated users, don't treat as error
       if (error.message.includes('Auth session missing')) {
         console.log("No session exists to refresh (user not authenticated)");
         return false;
@@ -175,3 +176,4 @@ export const endUserSession = async (userId: string) => {
     return true; // Return success to prevent blocking
   }
 };
+

@@ -345,7 +345,16 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       
       const refreshOperation = async () => {
         const { data, error } = await supabase.auth.refreshSession();
-        if (error && !error.message.includes('Auth session missing')) throw error;
+        
+        // Handle the "Auth session missing" error case cleanly
+        if (error) {
+          if (error.message.includes('Auth session missing')) {
+            console.log('No session exists to refresh (user not authenticated)');
+            return { data, error: null }; // Convert to non-error for unauthenticated state
+          }
+          throw error;
+        }
+        
         return { data, error };
       };
       
@@ -383,11 +392,6 @@ export const AuthProvider: React.FC<AuthContextProviderProps> = ({ children }) =
       if (error) {
         console.error('Session refresh error:', error);
         setIsLoading(false);
-        if (error.message.includes('Auth session missing')) {
-          // This is a normal state for unauthenticated users, not an error
-          console.log('No session exists to refresh (user not authenticated)');
-          return false;
-        }
         return false;
       }
       

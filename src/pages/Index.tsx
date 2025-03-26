@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/auth';
 import { useEffect, useState } from 'react';
 import { createOrUpdateSession } from '@/utils/audio/auth-utils';
 import { toast } from 'sonner';
@@ -18,7 +18,7 @@ export default function Index() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setAuthChecked(true);
-    }, 3000); // 3 second timeout
+    }, 2000); // 2 second timeout
     
     return () => clearTimeout(timer);
   }, []);
@@ -30,7 +30,7 @@ export default function Index() {
     }
   }, [isLoading]);
 
-  // Track session when user visits index page
+  // Track session when user visits index page - only if authenticated
   useEffect(() => {
     if (user && !isLoading && !sessionTracked) {
       console.log("Index page: Tracking session for user", user.id);
