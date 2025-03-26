@@ -121,6 +121,44 @@ serve(async (req) => {
       throw new Error("Invalid file type. Only webm, ogg, mp3, and wav are allowed.");
     }
 
+    // Check if audio bucket exists and create it if needed
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
+      
+      if (!audioBucket) {
+        // Create the audio bucket if it doesn't exist
+        await supabase.storage.createBucket('audio', {
+          public: false,
+          fileSizeLimit: 50 * 1024 * 1024,
+          allowedMimeTypes: ['audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/wav']
+        });
+        console.log("Created audio bucket for file storage");
+      }
+    } catch (bucketError) {
+      console.log("Note: Error checking/creating audio bucket:", bucketError);
+      // Continue anyway, since this is just a precaution
+    }
+    
+    // Try to upload the file to storage before transcription
+    try {
+      const folderPath = `${userId}/recordings`;
+      const fileName = `recording-${Date.now()}.webm`;
+      const filePath = `${folderPath}/${fileName}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('audio')
+        .upload(filePath, file, {
+          contentType: file.type,
+          upsert: true
+        });
+        
+      console.log("Uploaded audio file to storage:", uploadError ? "Failed" : "Success");
+    } catch (uploadError) {
+      console.log("Note: Could not upload to storage:", uploadError);
+      // Continue with transcription even if storage fails
+    }
+
     // Call the OpenAI transcription API
     console.log(`Transcribing audio file (${file.size} bytes) for user ${userId}`);
     const configuration = new Configuration({ apiKey: openaiKey });
@@ -146,6 +184,7 @@ serve(async (req) => {
             "transcription text": transcription,
             "refined text": transcription, // Initialize refined text as the same as transcription
             created_at: new Date().toISOString(),
+            audio_url: `${userId}/recordings/recording-${Date.now()}.webm` // Store the audio path reference
           }
         ])
         .select()

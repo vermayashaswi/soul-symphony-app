@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { createAudioBucket } from '@/utils/supabase-diagnostics';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string, entryId?: number) => void;
@@ -48,6 +49,20 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     togglePlayback,
     audioRef
   } = useAudioPlayback({ audioBlob });
+  
+  // Ensure audio bucket exists when component mounts
+  useEffect(() => {
+    const checkAudioBucket = async () => {
+      if (user) {
+        const result = await createAudioBucket();
+        if (!result.success) {
+          console.warn('Could not verify audio bucket:', result.error);
+        }
+      }
+    };
+    
+    checkAudioBucket();
+  }, [user]);
   
   const handleSaveEntry = async () => {
     if (!audioBlob) {
