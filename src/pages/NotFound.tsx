@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -15,29 +14,21 @@ const NotFound = () => {
     console.log("NotFound: Current path:", location.pathname);
     console.log("NotFound: Current hash:", location.hash ? "Present (contains auth tokens)" : "None");
     
-    // Improved OAuth redirect detection - look for tokens anywhere in the hash
-    const isFromRedirect = 
+    // Check for auth-related parameters in URL
+    const isFromAuthRedirect = 
       location.search.includes('error') || 
       location.hash.includes('access_token') ||
-      location.hash.includes('type=recovery');
+      location.hash.includes('type=recovery') ||
+      location.hash.includes('id_token');
                           
-    if (isFromRedirect) {
-      console.log("Detected redirect with auth tokens, redirecting to callback route");
+    if (isFromAuthRedirect) {
+      console.log("NotFound: Detected auth redirect, navigating to callback handler");
       
-      // Always redirect to the callback route which will handle the auth flow
-      if (location.hash.includes('access_token') || location.hash.includes('type=recovery')) {
-        navigate('/callback' + location.hash, { replace: true });
-        return;
-      }
-      
-      // Handle error cases
-      if (location.search.includes('error')) {
-        toast.error("Authentication error. Please try again.");
-        navigate('/auth', { replace: true });
-        return;
-      }
+      // Always redirect to the callback route with the full hash/search intact
+      navigate('/callback' + location.search + location.hash, { replace: true });
+      return;
     }
-  }, [location.pathname, location.search, location.hash, navigate]);
+  }, [location, navigate]);
 
   return (
     <div className="min-h-screen">

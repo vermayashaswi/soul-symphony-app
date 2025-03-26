@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,15 +14,22 @@ const AuthStateListener = () => {
   
   // Handle OAuth redirects that come with tokens in the URL
   useEffect(() => {
-    console.log("Setting up authentication listener");
+    console.log("AuthStateListener: Setting up authentication listener");
     console.log("Current path:", location.pathname);
     console.log("Current hash:", location.hash ? "Present (contains tokens)" : "None");
+    
+    // If we're already on the callback route, don't redirect again
+    if (location.pathname === '/callback') {
+      console.log("Already on callback route, not redirecting");
+      return;
+    }
     
     // Check if we have an auth token at any path (not just root)
     if (location.hash && 
         (location.hash.includes('access_token') || 
+         location.hash.includes('id_token') ||
          location.hash.includes('type=recovery'))) {
-      console.log("Detected OAuth token in URL hash, redirecting to callback");
+      console.log("AuthStateListener: Detected OAuth token in URL hash, redirecting to callback");
       // Redirect to the callback route with the hash intact
       navigate('/callback' + location.hash, { replace: true });
       return;
