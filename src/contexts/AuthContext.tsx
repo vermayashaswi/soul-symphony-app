@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [profileCreationAttempted, setProfileCreationAttempted] = useState(false);
   const [initialSessionCheckDone, setInitialSessionCheckDone] = useState(false);
+  const [lastSignInEvent, setLastSignInEvent] = useState<number>(0);
   
   // Function to handle profile creation with rate limiting
   const createUserProfile = useCallback(async (userId: string) => {
@@ -60,7 +60,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(newSession?.user ?? null);
       
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        toast.success('Signed in successfully');
+        // Prevent duplicate toast messages by checking time since last event
+        const now = Date.now();
+        if (now - lastSignInEvent > 2000) {
+          setLastSignInEvent(now);
+          toast.success('Signed in successfully');
+        }
         
         // Ensure user profile exists after sign-in
         if (newSession?.user) {
@@ -141,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       subscription.unsubscribe();
     };
-  }, [createUserProfile]);
+  }, [createUserProfile, lastSignInEvent]);
   
   // Sign in with email and password
   const signIn = async (email: string, password: string) => {

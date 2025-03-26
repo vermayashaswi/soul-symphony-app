@@ -48,6 +48,8 @@ const AuthStateListener = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth event:", event, "User:", session?.user?.email);
       
+      // Only show toast notification for SIGNED_IN events when directly triggered by user action
+      // Not for token refreshes or initial session checks
       if (event === 'SIGNED_IN' && session?.user) {
         console.log("SIGNED_IN event detected - creating session for", session.user.id);
         
