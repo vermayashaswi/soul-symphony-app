@@ -27,7 +27,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     schema: 'public'
   },
   realtime: {
-    timeout: 10000, // 10s
+    // Note: Removed timeout property as it's not supported in the current version
   }
 });
 
