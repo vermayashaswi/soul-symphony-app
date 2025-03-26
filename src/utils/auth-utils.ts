@@ -65,13 +65,13 @@ export const clearAuthStorage = (): void => {
       try {
         localStorage.removeItem(key);
       } catch (e) {
-        console.warn(`Error removing ${key}:`, e);
+        console.warn(`Error removing ${key}`);
       }
     });
     
     console.log('Auth storage cleared');
   } catch (e) {
-    console.warn('LocalStorage access error during cleanup:', e);
+    console.warn('LocalStorage access error during cleanup');
   }
 };
 
@@ -90,28 +90,23 @@ export const debugSessionStatus = async (): Promise<void> => {
       hasLocalTokens = !!localStorage.getItem('supabase.auth.token') || 
                     !!localStorage.getItem(`${storageKeyPrefix}-auth-token`);
     } catch (e) {
-      console.error('❌ Error accessing localStorage:', e);
+      console.error('Error accessing localStorage');
     }
     
-    console.log('🔑 Local storage tokens present:', hasLocalTokens);
+    console.log('Local storage tokens present:', hasLocalTokens);
     
     // Check current session from Supabase
     const { data, error } = await supabase.auth.getSession();
     
     if (error) {
-      console.error('❌ Error getting session:', error.message);
+      console.error('Error getting session:', error.message);
     } else if (data?.session) {
-      console.log('✅ Active session found:', {
-        userId: data.session.user.id,
-        email: data.session.user.email,
-        expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
-        tokenLength: data.session.access_token.length,
-      });
+      console.log('Active session found');
     } else {
-      console.log('❌ No active session found from Supabase');
+      console.log('No active session found from Supabase');
     }
   } catch (e) {
-    console.error('❌ Exception checking session:', e);
+    console.error('Exception checking session');
   }
   
   console.groupEnd();
@@ -126,7 +121,7 @@ export const ensureHealthyAuth = async (): Promise<boolean> => {
     const { data, error } = await supabase.auth.getSession();
     
     if (error) {
-      console.error('Error getting session in ensureHealthyAuth:', error);
+      console.error('Error getting session in ensureHealthyAuth');
       return false;
     }
     
@@ -145,7 +140,7 @@ export const ensureHealthyAuth = async (): Promise<boolean> => {
       const { error: refreshError } = await supabase.auth.refreshSession();
       
       if (refreshError) {
-        console.error('Error refreshing session:', refreshError);
+        console.error('Error refreshing session');
         return false;
       }
       
@@ -154,7 +149,7 @@ export const ensureHealthyAuth = async (): Promise<boolean> => {
     
     return true;
   } catch (e) {
-    console.error('Exception in ensureHealthyAuth:', e);
+    console.error('Exception in ensureHealthyAuth');
     return false;
   }
 };

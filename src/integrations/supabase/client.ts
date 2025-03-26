@@ -23,7 +23,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   db: {
     schema: 'public'
   },
-  // Add retry and timeout configuration
   realtime: {
     params: {
       eventsPerSecond: 2
@@ -34,7 +33,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Simple function to check if Supabase is reachable
 export const checkSupabaseConnection = async () => {
   try {
-    const start = Date.now();
     console.log('Testing Supabase connection...');
     
     // Add a timeout to prevent hanging requests
@@ -49,17 +47,15 @@ export const checkSupabaseConnection = async () => {
     
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
     
-    const duration = Date.now() - start;
-    
     if (error) {
       console.error('Supabase connection test failed:', error);
-      return { success: false, error: error.message, duration };
+      return { success: false, error: error.message };
     }
     
-    console.log(`Supabase connection successful (${duration}ms)`);
-    return { success: true, duration, data };
+    console.log('Supabase connection successful');
+    return { success: true, data };
   } catch (err) {
     console.error('Supabase connection error:', err);
-    return { success: false, error: err instanceof Error ? err.message : 'Unknown error', duration: -1 };
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 };

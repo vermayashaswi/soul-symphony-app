@@ -1,9 +1,6 @@
-
 import React from 'react';
 
-// This component was previously used for testing 
-// It's now empty as testing buttons are removed
-
+// Component removed to prevent front-end error traceability
 export default function BackendTester() {
   return null;
 }

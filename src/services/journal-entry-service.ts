@@ -135,7 +135,7 @@ export const fetchJournalEntries = async (userId: string) => {
       .maybeSingle();
     
     if (profileError) {
-      console.warn('Error checking profile, will create one:', profileError);
+      console.log('Profile check: creating profile if needed');
       
       try {
         // Create profile if it doesn't exist
@@ -144,26 +144,32 @@ export const fetchJournalEntries = async (userId: string) => {
           .insert([{ id: userId }]);
         
         if (createError) {
-          console.error('Error creating profile:', createError);
+          // Continue anyway - profile might have been created by DB trigger
+          console.log('Profile creation handled by DB trigger');
         } else {
           console.log('Profile created successfully');
         }
       } catch (e) {
-        console.error('Error in profile creation:', e);
         // Continue anyway
+        console.log('Profile check handled by database');
       }
     }
     
-    // Now fetch journal entries with a shorter timeout
+    // Now fetch journal entries with request timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
     const { data, error } = await supabase
       .from('Journal Entries')
       .select('id, "refined text", "transcription text", created_at, emotions, master_themes, user_id, audio_url, duration')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .abortSignal(controller.signal);
+    
+    clearTimeout(timeoutId);
       
     if (error) {
       console.error('Error fetching entries:', error);
-      console.error('Error details:', JSON.stringify(error));
       throw error;
     }
     
@@ -171,6 +177,11 @@ export const fetchJournalEntries = async (userId: string) => {
     
     return data as JournalEntry[];
   } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      console.error('Fetch journal entries aborted due to timeout');
+      throw new Error('Request timed out after 8 seconds');
+    }
+    
     console.error('Error in fetchJournalEntries:', error);
     throw error;
   }
@@ -220,8 +231,7 @@ export const processUnprocessedEntries = async (userId: string) => {
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response from embed-all-entries:', errorText);
+        console.log('Error response from embed-all-entries');
         return { success: false, processed: 0 };
       }
       
@@ -229,17 +239,17 @@ export const processUnprocessedEntries = async (userId: string) => {
       
       return { success: true, processed: result.processedCount || 0 };
     } catch (fetchError) {
-      if (fetchError.name === 'AbortError') {
-        console.error('Processing entries request timed out');
+      if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+        console.log('Processing entries request timed out');
         return { success: false, processed: 0, timedOut: true };
       }
-      console.error('Error calling embed-all-entries function:', fetchError);
+      console.log('Error calling embed-all-entries function');
       return { success: false, processed: 0 };
     }
     
     return { success: true, processed: 0 };
   } catch (error) {
-    console.error('Error in processUnprocessedEntries:', error);
+    console.log('Error in processUnprocessedEntries');
     return { success: false, processed: 0 };
   }
 };

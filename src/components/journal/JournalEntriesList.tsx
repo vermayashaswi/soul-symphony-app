@@ -83,7 +83,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       <div className="flex flex-col items-center justify-center space-y-4 my-12 p-6 border rounded-lg border-destructive bg-destructive/10">
         <p className="text-destructive font-medium">Error loading entries</p>
         <p className="text-muted-foreground text-center max-w-md">
-          {loadError || "Failed to load your journal entries. Please try again."}
+          Failed to load your journal entries. Please try again.
         </p>
         {onRefresh && (
           <Button 

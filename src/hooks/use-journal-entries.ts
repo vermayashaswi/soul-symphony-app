@@ -19,15 +19,13 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [lastRetryTime, setLastRetryTime] = useState<number>(0);
-  const [lastRefreshToastId, setLastRefreshToastId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'checking' | 'error'>('checking');
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
-  const MAX_RETRY_ATTEMPTS = 2;
+  const MAX_RETRY_ATTEMPTS = 1;
   const RETRY_DELAY = 3000; // 3 seconds between retries
-  const FETCH_TIMEOUT = 6000; // 6 seconds timeout for fetch operations
-  const CONNECTION_TIMEOUT = 6000; // 6 seconds timeout for initial connection
+  const CONNECTION_TIMEOUT = 5000; // 5 seconds timeout for initial connection
 
   const checkDatabaseConnection = useCallback(async () => {
     console.log('Testing database connection...');
@@ -35,20 +33,20 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const connectionTest = await testDatabaseConnection();
       
       if (!connectionTest.success) {
-        console.error('Database health check failed:', connectionTest.error);
+        console.log('Database health check failed');
         setConnectionStatus('error');
-        setLoadError('Connection to database failed: ' + connectionTest.error);
+        setLoadError('Connection to database failed');
         return false;
       }
       
-      console.log(`Database connection test successful (${connectionTest.duration}ms)`);
+      console.log('Database connection test successful');
       setConnectionStatus('connected');
       setLoadError(null);
       return true;
-    } catch (err: any) {
-      console.error('Database connection test error:', err);
+    } catch (err) {
+      console.log('Database connection test error');
       setConnectionStatus('error');
-      setLoadError('Connection error: ' + (err.message || 'Unknown error'));
+      setLoadError('Connection error');
       return false;
     }
   }, []);
@@ -86,12 +84,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoading(true);
       setLoadError(null);
       
-      console.log(`Attempting database access for user ${userId}`);
-      
       if (connectionStatus !== 'connected' || forceRefresh) {
         const connectionTest = await checkDatabaseConnection();
         if (!connectionTest) {
-          console.error('Database connection test failed before fetching entries');
+          console.log('Database connection test failed before fetching entries');
           throw new Error('Database connection test failed');
         }
       }
@@ -104,25 +100,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       setLastRetryTime(Date.now());
       
-      // Set a timeout to prevent hanging requests
-      const timeoutId = setTimeout(() => {
-        if (loading) {
-          console.error('Fetch entries operation timed out after', FETCH_TIMEOUT, 'ms');
-          setLoading(false);
-          setLoadError('Request timed out. Please try again later.');
-          toast.error('Loading journal entries timed out', {
-            id: 'journal-fetch-timeout',
-            dismissible: true,
-          });
-        }
-      }, FETCH_TIMEOUT);
-      
       console.log('Fetching journal entries...');
       const typedEntries = await fetchJournalEntries(userId);
-      
-      clearTimeout(timeoutId);
-      
-      toast.dismiss('journal-fetch-error');
       
       setRetryAttempt(0);
       
@@ -139,8 +118,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           for (const entry of entriesNeedingThemes) {
             try {
               await generateThemesForEntry(entry);
-            } catch (themeError) {
-              console.error('Error generating themes for entry:', themeError);
+            } catch (error) {
+              console.log('Error generating themes for entry');
             }
           }
           
@@ -148,8 +127,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
             try {
               const refreshedData = await fetchJournalEntries(userId);
               setEntries(refreshedData);
-            } catch (refreshError) {
-              console.error('Error in refresh after theme generation:', refreshError);
+            } catch (error) {
+              console.log('Error in refresh after theme generation');
             }
           }
         }
@@ -158,8 +137,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     } catch (error: any) {
       // Only handle if the request wasn't aborted
       if (error.name !== 'AbortError') {
-        console.error('Error fetching entries:', error);
-        setLoadError(error.message || 'Failed to load journal entries');
+        console.log('Error fetching entries');
+        setLoadError('Failed to load journal entries');
         
         if (!isRetrying && retryAttempt < MAX_RETRY_ATTEMPTS) {
           setRetryAttempt(prev => prev + 1);
@@ -171,7 +150,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoading(false);
       setIsRetrying(false);
     }
-  }, [userId, retryAttempt, isRetrying, lastRetryTime, connectionStatus, loading, checkDatabaseConnection, abortFetchRequests, MAX_RETRY_ATTEMPTS, FETCH_TIMEOUT]);
+  }, [userId, retryAttempt, isRetrying, lastRetryTime, connectionStatus, abortFetchRequests, checkDatabaseConnection, MAX_RETRY_ATTEMPTS]);
 
   const saveJournalEntry = async (entryData: any) => {
     if (!userId) throw new Error('User ID is required to save journal entries');
@@ -182,7 +161,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       await fetchEntriesInternal();
       return data;
     } catch (error) {
-      console.error('Error in saveJournalEntry:', error);
+      console.log('Error in saveJournalEntry');
       throw error;
     } finally {
       setIsSaving(false);
@@ -194,7 +173,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       await deleteFromDB(id);
       setEntries(prev => prev.filter(entry => entry.id !== id));
     } catch (error) {
-      console.error('Error in deleteJournalEntry:', error);
+      console.log('Error in deleteJournalEntry');
       throw error;
     }
   };
@@ -213,22 +192,13 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       await fetchEntriesInternal(true);
       
       if (showToast) {
-        if (lastRefreshToastId) {
-          toast.dismiss(lastRefreshToastId);
-        }
-        
-        const toastId = `journal-refresh-${Date.now()}`;
-        setLastRefreshToastId(toastId);
-        
         toast.success('Journal entries refreshed', {
-          id: toastId,
           dismissible: true,
         });
       }
     } catch (error) {
-      console.error('Error in manual refresh:', error);
+      console.log('Error in manual refresh');
       toast.error('Failed to refresh entries. Please try again.', {
-        id: 'journal-refresh-error',
         dismissible: true,
       });
     } finally {
@@ -254,7 +224,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setIsProcessing(false);
       return result;
     } catch (error) {
-      console.error('Error in processUnprocessedEntries:', error);
+      console.log('Error in processUnprocessedEntries');
       toast.error('An unexpected error occurred. Please try again.');
       setIsProcessing(false);
       return { success: false, processed: 0 };
@@ -309,7 +279,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     if (userId && connectionStatus === 'connected') {
       setRetryAttempt(0);
       setLoadError(null);
-      console.log(`Initial fetch triggered for user ${userId} with refreshKey ${refreshKey}`);
       
       fetchEntriesInternal();
     } else if (connectionStatus === 'error') {
