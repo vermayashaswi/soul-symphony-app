@@ -25,6 +25,18 @@ export function useJournalHandler(userId: string | undefined) {
     try {
       console.log('Processing unprocessed entries for user:', userId);
       
+      // Check if user profile exists before proceeding
+      const { data: profileCheck, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
+        
+      if (profileError || !profileCheck) {
+        console.log('Cannot process entries: User profile not fully set up');
+        return { success: false, processed: 0 };
+      }
+      
       // Get current session for auth
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -33,32 +45,37 @@ export function useJournalHandler(userId: string | undefined) {
         return { success: false, processed: 0 };
       }
       
-      // Use the correct URL format for the edge function
-      const response = await fetch('https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/embed-all-entries', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          userId,
-          processAll: false // Only process entries without embeddings
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response from embed-all-entries:', errorText);
-        return { success: false, processed: 0 };
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log(`Successfully processed ${result.processedCount} entries`);
-        return { success: true, processed: result.processedCount };
-      } else {
-        console.error('Error processing entries:', result.error);
+      try {
+        // Use the correct URL format for the edge function
+        const response = await fetch('https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/embed-all-entries', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            userId,
+            processAll: false // Only process entries without embeddings
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Error response from embed-all-entries:', errorText);
+          return { success: false, processed: 0 };
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log(`Successfully processed ${result.processedCount} entries`);
+          return { success: true, processed: result.processedCount };
+        } else {
+          console.error('Error processing entries:', result.error);
+          return { success: false, processed: 0 };
+        }
+      } catch (fetchError) {
+        console.error('Error calling embed-all-entries function:', fetchError);
         return { success: false, processed: 0 };
       }
     } catch (error) {

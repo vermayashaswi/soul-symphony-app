@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profileCreationAttempted, setProfileCreationAttempted] = useState(false);
   const [initialSessionCheckDone, setInitialSessionCheckDone] = useState(false);
   const [authEventsProcessed, setAuthEventsProcessed] = useState<Set<string>>(new Set());
+  const [profileCreationErrorShown, setProfileCreationErrorShown] = useState(false);
   
   // Function to handle profile creation with rate limiting
   const createUserProfile = useCallback(async (userId: string) => {
@@ -37,13 +39,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!result.success) {
         console.warn('Profile creation attempted but had issues:', result.error);
+        
+        // Show the error only once to prevent loops
+        if (!profileCreationErrorShown) {
+          setProfileCreationErrorShown(true);
+          
+          // Only show error toast for certain errors - RLS policy violations are likely
+          // due to the database trigger handling profile creation already
+          if (result.error && !result.error.includes('row-level security policy')) {
+            toast.error('Could not set up user profile. Some features may be limited.');
+          } else {
+            console.log('Skipping error toast for RLS policy error - likely already handled by trigger');
+          }
+        }
       } else {
         console.log('Profile check/creation completed successfully');
       }
     } catch (error) {
       console.error('Error in createUserProfile, but continuing:', error);
+      
+      // Only show the error once
+      if (!profileCreationErrorShown) {
+        setProfileCreationErrorShown(true);
+        toast.error('Could not set up user profile. Some features may be limited.');
+      }
     }
-  }, [profileCreationAttempted]);
+  }, [profileCreationAttempted, profileCreationErrorShown]);
+  
+  // Reset the error flag when user changes
+  useEffect(() => {
+    if (user === null) {
+      setProfileCreationErrorShown(false);
+    }
+  }, [user]);
   
   // Initialize auth state and set up listeners
   useEffect(() => {
@@ -100,22 +128,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Update the profile with Google info if available
             if (newSession.user.app_metadata.provider === 'google' && 
                 newSession.user.user_metadata?.full_name) {
-              const { data: existingProfile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', newSession.user.id)
-                .maybeSingle();
-                
-              // Only update if it doesn't have data already
-              if (!existingProfile?.full_name || !existingProfile?.avatar_url) {
-                await supabase
+              try {
+                const { data: existingProfile } = await supabase
                   .from('profiles')
-                  .update({
-                    full_name: newSession.user.user_metadata.full_name,
-                    avatar_url: newSession.user.user_metadata.avatar_url,
-                    email: newSession.user.email
-                  })
-                  .eq('id', newSession.user.id);
+                  .select('*')
+                  .eq('id', newSession.user.id)
+                  .maybeSingle();
+                  
+                // Only update if it doesn't have data already
+                if (existingProfile && (!existingProfile?.full_name || !existingProfile?.avatar_url)) {
+                  await supabase
+                    .from('profiles')
+                    .update({
+                      full_name: newSession.user.user_metadata.full_name,
+                      avatar_url: newSession.user.user_metadata.avatar_url,
+                      email: newSession.user.email
+                    })
+                    .eq('id', newSession.user.id);
+                }
+              } catch (profileError) {
+                console.error('Error updating profile with Google data:', profileError);
+                // Continue even if this fails - the database trigger should have created the profile
               }
             }
             
@@ -130,6 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'SIGNED_OUT') {
         toast.info('Signed out successfully');
         setProfileCreationAttempted(false);
+        setProfileCreationErrorShown(false);
         setIsLoading(false);
       } else if (event === 'INITIAL_SESSION') {
         // This event indicates the initial session check is complete

@@ -252,22 +252,27 @@ export const ensureUserProfile = async (userId: string) => {
     }
     
     // Check if a profile already exists for this user
-    const { data: existingProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', userId)
-      .maybeSingle();
-    
-    // If there's a query error that isn't just "no rows returned", report it
-    if (profileError && !profileError.message.includes('no rows')) {
-      console.error('Error checking for existing profile:', profileError);
-      return { success: false, error: profileError.message };
-    }
-    
-    // If profile exists, we're done!
-    if (existingProfile) {
-      console.log('Profile already exists for user:', userId);
-      return { success: true, message: 'Profile already exists', isNew: false };
+    try {
+      const { data: existingProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      // If there's a query error that isn't just "no rows returned", report it
+      if (profileError && !profileError.message.includes('no rows')) {
+        console.error('Error checking for existing profile:', profileError);
+        return { success: false, error: profileError.message };
+      }
+      
+      // If profile exists, we're done!
+      if (existingProfile) {
+        console.log('Profile already exists for user:', userId);
+        return { success: true, message: 'Profile already exists', isNew: false };
+      }
+    } catch (checkError) {
+      console.error('Error checking for existing profile:', checkError);
+      // Continue with creation attempt even if check fails
     }
     
     // Get the user data to populate the profile
@@ -284,31 +289,49 @@ export const ensureUserProfile = async (userId: string) => {
     }
     
     // Create a new profile - we have a database trigger too, but this is a failsafe
-    const { data: newProfile, error: insertError } = await supabase
-      .from('profiles')
-      .insert({
-        id: userId,
-        email: user.email,
-        full_name: user.user_metadata?.full_name,
-        avatar_url: user.user_metadata?.avatar_url
-      })
-      .select()
-      .single();
-    
-    if (insertError) {
-      // If the error is about unique violation, the profile might have been 
-      // created by the database trigger, so we can consider this a success
-      if (insertError.message.includes('unique constraint')) {
-        console.log('Profile likely created by database trigger for user:', userId);
-        return { success: true, message: 'Profile created by database trigger', isNew: true };
+    try {
+      const { data: newProfile, error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          email: user.email,
+          full_name: user.user_metadata?.full_name,
+          avatar_url: user.user_metadata?.avatar_url
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        // If the error is about unique violation or RLS, the profile might have been 
+        // created by the database trigger, so we can consider this a non-critical error
+        if (insertError.message.includes('unique constraint') || 
+            insertError.message.includes('violates row-level security policy')) {
+          console.log('Profile likely created by database trigger for user:', userId);
+          
+          // Double check if profile exists despite the error
+          const { data: confirmProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', userId)
+            .maybeSingle();
+            
+          if (confirmProfile) {
+            return { success: true, message: 'Profile exists (created by trigger)', isNew: false };
+          } else {
+            return { success: false, error: insertError.message, isNonCritical: true };
+          }
+        }
+        
+        console.error('Error creating profile:', insertError);
+        return { success: false, error: insertError.message };
       }
       
-      console.error('Error creating profile:', insertError);
-      return { success: false, error: insertError.message };
+      console.log('New profile created successfully for user:', userId);
+      return { success: true, profile: newProfile, isNew: true };
+    } catch (insertCatchError) {
+      console.error('Exception in profile creation:', insertCatchError);
+      return { success: false, error: insertCatchError.message };
     }
-    
-    console.log('New profile created successfully for user:', userId);
-    return { success: true, profile: newProfile, isNew: true };
   } catch (error: any) {
     console.error('Exception in ensureUserProfile:', error?.message || error);
     return { success: false, error: error?.message || 'Unknown error' };

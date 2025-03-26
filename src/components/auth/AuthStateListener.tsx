@@ -51,12 +51,23 @@ const AuthStateListener = () => {
           // Only update session silently - no toast notifications here
           await createOrUpdateSession(session.user.id, window.location.pathname);
           
-          // Process unprocessed entries after sign in
+          // Process unprocessed entries after sign in, but with delay and only if user is fully set up
           if (user?.id !== session.user.id) {
             setTimeout(async () => {
               try {
-                console.log("Processing unprocessed journal entries after sign in");
-                await processUnprocessedEntries();
+                // Check if user profile exists before processing entries
+                const { data: profileCheck } = await supabase
+                  .from('profiles')
+                  .select('id')
+                  .eq('id', session.user.id)
+                  .maybeSingle();
+                  
+                if (profileCheck) {
+                  console.log("Processing unprocessed journal entries after sign in");
+                  await processUnprocessedEntries();
+                } else {
+                  console.log("Skipping entry processing - user profile not fully set up yet");
+                }
               } catch (err) {
                 console.error("Error processing entries after sign in:", err);
               }
@@ -93,11 +104,22 @@ const AuthStateListener = () => {
             console.error("Error tracking initial session:", err);
           });
           
-        // Process unprocessed journal entries on initial load
+        // Process unprocessed journal entries on initial load, but only if profile exists
         setTimeout(async () => {
           try {
-            console.log("Processing unprocessed journal entries on initial load");
-            await processUnprocessedEntries();
+            // Check if user profile exists before processing entries
+            const { data: profileCheck } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('id', data.session.user.id)
+              .maybeSingle();
+              
+            if (profileCheck) {
+              console.log("Processing unprocessed journal entries on initial load");
+              await processUnprocessedEntries();
+            } else {
+              console.log("Skipping entry processing - user profile not fully set up yet");
+            }
           } catch (err) {
             console.error("Error processing entries on initial load:", err);
           }
