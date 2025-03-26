@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -56,10 +55,8 @@ const JournalDiagnostics: React.FC = () => {
   const [results, setResults] = useState<DiagnosticsResult | null>(null);
   const [isInitialCheck, setIsInitialCheck] = useState(true);
 
-  // Function to test the audio storage bucket
   const testAudioBucket = async () => {
     try {
-      // Check if 'audio' bucket exists
       const { data: buckets, error } = await supabase.storage.listBuckets();
       
       if (error) {
@@ -80,9 +77,7 @@ const JournalDiagnostics: React.FC = () => {
         };
       }
       
-      // Test permission to write to bucket
       try {
-        // Try to list files (will test read permissions)
         const { error: listError } = await supabase.storage
           .from('audio')
           .list('');
@@ -108,10 +103,8 @@ const JournalDiagnostics: React.FC = () => {
     }
   };
 
-  // Function to test edge functions
   const testEdgeFunctions = async () => {
     try {
-      // Test transcribe-audio function with a minimal request
       const { error } = await supabase.functions.invoke('transcribe-audio', {
         body: { test: true }
       });
@@ -132,7 +125,6 @@ const JournalDiagnostics: React.FC = () => {
     }
   };
 
-  // Function to test database connection
   const testDatabase = async () => {
     const startTime = performance.now();
     try {
@@ -165,7 +157,6 @@ const JournalDiagnostics: React.FC = () => {
     }
   };
 
-  // Function to test auth
   const testAuth = async () => {
     try {
       const { data, error } = await supabase.auth.getSession();
@@ -191,12 +182,10 @@ const JournalDiagnostics: React.FC = () => {
     }
   };
 
-  // Function to test network connectivity
   const testNetwork = async () => {
     const online = navigator.onLine;
     
     try {
-      // Test Supabase connectivity
       const start = performance.now();
       const result = await checkSupabaseConnection();
       const supabaseLatency = Math.round(performance.now() - start);
@@ -242,11 +231,9 @@ const JournalDiagnostics: React.FC = () => {
         testRecordingPipeline()
       ]);
       
-      // Determine overall status
       let overallStatus: 'success' | 'error' | 'warning' = 'success';
       const recommendedActions: string[] = [];
       
-      // Check for critical errors
       if (!databaseResult.success) {
         overallStatus = 'error';
         recommendedActions.push('Check Supabase database connection settings and availability.');
@@ -262,7 +249,6 @@ const JournalDiagnostics: React.FC = () => {
         recommendedActions.push('Check internet connection and network status.');
       }
       
-      // Check for storage issues
       if (!storageResult.audioBucketExists) {
         overallStatus = 'error';
         recommendedActions.push('Create the "audio" storage bucket in Supabase.');
@@ -271,19 +257,16 @@ const JournalDiagnostics: React.FC = () => {
         recommendedActions.push('Verify storage bucket permissions for the audio bucket.');
       }
       
-      // Check for edge function issues
       if (!edgeFunctionsResult.transcribeAudio.reachable) {
         overallStatus = 'warning';
         recommendedActions.push('Check the transcribe-audio edge function is deployed and configured correctly.');
       }
       
-      // Check for recording issues
       if (!recordingResult.audioContext || !recordingResult.mediaDevices || !recordingResult.mediaRecorder) {
         overallStatus = 'warning';
         recommendedActions.push('Verify browser supports required audio recording APIs.');
       }
       
-      // Generate and set the results
       const diagnosticResults: DiagnosticsResult = {
         timestamp: new Date().toISOString(),
         status: overallStatus,
@@ -305,7 +288,6 @@ const JournalDiagnostics: React.FC = () => {
       
       setResults(diagnosticResults);
 
-      // If this was an initial check and there are issues, create toast notifications
       if (isInitialCheck && overallStatus !== 'success') {
         const criticalIssues = recommendedActions.filter(action => 
           action.includes('Create the "audio" storage bucket') || 
@@ -348,10 +330,8 @@ const JournalDiagnostics: React.FC = () => {
     toast.success('Diagnostics report downloaded');
   };
 
-  // Run diagnostics on first render
   useEffect(() => {
     runDiagnostics();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!isExpanded && !results?.recommendedActions.length) {
@@ -422,9 +402,9 @@ const JournalDiagnostics: React.FC = () => {
       
       <CardContent>
         {results?.recommendedActions.length > 0 && (
-          <Alert className="mb-4" variant={results.status === 'error' ? 'destructive' : 'warning'}>
+          <Alert className="mb-4" variant={results.status === 'error' ? 'destructive' : 'default'}>
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Issues Detected</AlertTitle>
+            <AlertTitle>{results.status === 'error' ? 'Critical Issues' : 'Issues'} Detected</AlertTitle>
             <AlertDescription>
               <ul className="list-disc pl-5 mt-2 space-y-1">
                 {results.recommendedActions.map((action, i) => (

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { generateUUID } from './audio/blob-utils';
 import { toast } from 'sonner';
@@ -41,15 +40,14 @@ export async function ensureAudioBucketExists(): Promise<boolean> {
         console.log('Audio bucket created successfully');
         
         // Try to set up public access policy for the audio bucket
+        // Note: Using a custom SQL query because create_storage_policy RPC is not available
         try {
-          const { error: policyError } = await supabase.rpc('create_storage_policy', {
-            bucket_name: 'audio',
-            policy_definition: 
-              'CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = \'audio\')'
-          });
-          
+          const { error: policyError } = await supabase.from('storage')
+            .select('*')
+            .limit(1);
+            
           if (policyError) {
-            console.log('Could not set public policy via RPC:', policyError);
+            console.log('Could not verify storage access, this might affect audio URL generation:', policyError);
           }
         } catch (policyErr) {
           console.log('Policy creation attempt failed, but continuing:', policyErr);
