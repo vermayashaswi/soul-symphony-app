@@ -21,7 +21,7 @@ export const ensureUserProfile = async (userId: string, userData?: {
     const { data: existingProfile, error: checkError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', userId as any)
+      .eq('id', userId)
       .maybeSingle();
     
     if (checkError) {
@@ -45,49 +45,25 @@ export const ensureUserProfile = async (userId: string, userData?: {
       updated_at: new Date().toISOString()
     };
     
-    // Use RPC to create profile to bypass type issues
-    // This uses a database function to create a profile
-    const { data: newProfile, error: insertError } = await supabase.rpc(
-      'create_profile', 
-      { 
-        user_id: userId,
-        user_email: profileData.email,
-        user_full_name: profileData.full_name,
-        user_avatar_url: profileData.avatar_url
-      }
-    );
+    // Insert directly rather than using RPC
+    const { data: newProfile, error: insertError } = await supabase
+      .from('profiles')
+      .insert({
+        email: profileData.email,
+        full_name: profileData.full_name,
+        avatar_url: profileData.avatar_url,
+        id: userId
+      })
+      .select()
+      .single();
     
     if (insertError) {
-      console.error('Error creating profile with RPC:', insertError);
-      
-      // Fallback: Use direct insert with unknown type casting
-      const { data: directInsert, error: directError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          email: userData?.email,
-          full_name: userData?.full_name,
-          avatar_url: userData?.avatar_url
-        } as any)
-        .select()
-        .single();
-      
-      if (directError) {
-        console.error('Direct profile insert failed:', directError);
-        return null;
-      }
-      
-      return directInsert;
+      console.error('Error creating profile:', insertError);
+      return null;
     }
     
-    if (newProfile) {
-      console.log('Profile created successfully via RPC');
-      return { id: userId, ...profileData };
-    }
-    
-    // If we get here, the profile creation failed
-    console.error('Profile creation failed with no specific error');
-    return null;
+    console.log('Profile created successfully');
+    return newProfile;
   } catch (err) {
     console.error('Error in ensureUserProfile:', err);
     return null;
@@ -104,7 +80,7 @@ export const getUserProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', userId as any)
+      .eq('id', userId)
       .maybeSingle();
     
     if (error) {

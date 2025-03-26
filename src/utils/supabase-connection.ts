@@ -1,5 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import type { PostgrestError } from '@supabase/supabase-js';
+
+type TableName = 'profiles' | 'Journal Entries' | 'chat_threads' | 'chat_messages' | 'journal_embeddings' | 'user_queries' | 'user_sessions';
 
 /**
  * Tests the connection to the Supabase database with improved error handling
@@ -42,10 +45,9 @@ export const testDatabaseConnection = async () => {
 
 /**
  * Helper to handle typesafe Supabase operations with error checking
- * This helps with the TypeScript issues related to Supabase queries
  */
 export const safeQuerySingle = async <T>(
-  query: Promise<{ data: T | null; error: any }>
+  query: Promise<{ data: T | null; error: PostgrestError | null }>
 ): Promise<T | null> => {
   try {
     const { data, error } = await query;
@@ -64,12 +66,12 @@ export const safeQuerySingle = async <T>(
  * Helper for safely inserting records with proper type handling
  */
 export const safeInsert = async <T>(
-  table: string, 
-  values: Record<string, any>,
+  tableName: TableName, 
+  values: any,
   options?: { select?: boolean }
 ): Promise<T | null> => {
   try {
-    let query = supabase.from(table).insert(values);
+    let query = supabase.from(tableName).insert(values);
     
     if (options?.select !== false) {
       query = query.select();
@@ -78,13 +80,13 @@ export const safeInsert = async <T>(
     const { data, error } = await query;
     
     if (error) {
-      console.error(`Error inserting into ${table}:`, error);
+      console.error(`Error inserting into ${tableName}:`, error);
       return null;
     }
     
     return data as unknown as T;
   } catch (err) {
-    console.error(`Unexpected error inserting into ${table}:`, err);
+    console.error(`Unexpected error inserting into ${tableName}:`, err);
     return null;
   }
 };
@@ -93,25 +95,28 @@ export const safeInsert = async <T>(
  * Helper for safely updating records with proper type handling
  */
 export const safeUpdate = async <T>(
-  table: string,
-  values: Record<string, any>,
+  tableName: TableName,
+  values: any,
   condition: Record<string, any>
 ): Promise<T | null> => {
   try {
-    const { data, error } = await supabase
-      .from(table)
-      .update(values)
-      .match(condition)
-      .select();
+    let query = supabase.from(tableName).update(values);
+    
+    // Apply conditions
+    Object.entries(condition).forEach(([key, value]) => {
+      query = query.eq(key, value);
+    });
+    
+    const { data, error } = await query.select();
     
     if (error) {
-      console.error(`Error updating ${table}:`, error);
+      console.error(`Error updating ${tableName}:`, error);
       return null;
     }
     
     return data as unknown as T;
   } catch (err) {
-    console.error(`Unexpected error updating ${table}:`, err);
+    console.error(`Unexpected error updating ${tableName}:`, err);
     return null;
   }
 };
@@ -120,13 +125,13 @@ export const safeUpdate = async <T>(
  * Helper for safely selecting records with proper type handling
  */
 export const safeSelect = async <T>(
-  table: string,
+  tableName: TableName,
   columns: string,
   condition?: Record<string, any>,
   options?: { single?: boolean, limit?: number }
 ): Promise<T | null> => {
   try {
-    let query = supabase.from(table).select(columns);
+    let query = supabase.from(tableName).select(columns);
     
     if (condition) {
       // Apply all conditions
@@ -143,7 +148,7 @@ export const safeSelect = async <T>(
       const { data, error } = await query.maybeSingle();
       
       if (error) {
-        console.error(`Error selecting from ${table}:`, error);
+        console.error(`Error selecting from ${tableName}:`, error);
         return null;
       }
       
@@ -152,14 +157,14 @@ export const safeSelect = async <T>(
       const { data, error } = await query;
       
       if (error) {
-        console.error(`Error selecting from ${table}:`, error);
+        console.error(`Error selecting from ${tableName}:`, error);
         return null;
       }
       
       return data as unknown as T;
     }
   } catch (err) {
-    console.error(`Unexpected error selecting from ${table}:`, err);
+    console.error(`Unexpected error selecting from ${tableName}:`, err);
     return null;
   }
 };

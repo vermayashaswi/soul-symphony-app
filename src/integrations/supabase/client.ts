@@ -30,22 +30,23 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Add custom fetch with timeout on the client instance
-const originalFetch = supabase.rest.fetch;
-supabase.rest.fetch = async (url, options) => {
+// For adding timeout capability to requests
+export const fetchWithTimeout = async (
+  url: string, 
+  options: RequestInit & { timeoutMs?: number } = {}
+) => {
+  const { timeoutMs = 15000, ...fetchOptions } = options;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  const id = setTimeout(() => controller.abort(), timeoutMs);
   
   try {
-    const fetchOptions = {
-      ...options,
-      signal: options?.signal || controller.signal
-    };
-    
-    const response = await originalFetch(url, fetchOptions);
+    const response = await fetch(url, {
+      ...fetchOptions,
+      signal: options.signal || controller.signal,
+    });
     return response;
   } finally {
-    clearTimeout(timeoutId);
+    clearTimeout(id);
   }
 };
 
