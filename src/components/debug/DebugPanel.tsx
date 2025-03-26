@@ -48,6 +48,17 @@ const getTypeColor = (type: DebugLogEntry['type']) => {
   }
 };
 
+// Type augmentation for Chrome's performance.memory
+interface MemoryInfo {
+  usedJSHeapSize: number;
+  jsHeapSizeLimit: number;
+  totalJSHeapSize?: number;
+}
+
+interface ExtendedPerformance extends Performance {
+  memory?: MemoryInfo;
+}
+
 const LogEntry = ({ log }: { log: DebugLogEntry }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -167,6 +178,19 @@ export function DebugPanel() {
     addLog('auth', 'Auth check result', result);
   };
 
+  // Cast performance to extended type that includes optional memory property
+  const extendedPerformance = performance as ExtendedPerformance;
+  const memoryInfo = extendedPerformance.memory;
+  
+  const getMemoryUsage = () => {
+    if (memoryInfo) {
+      const usedMB = Math.round(memoryInfo.usedJSHeapSize / (1024 * 1024));
+      const limitMB = Math.round(memoryInfo.jsHeapSizeLimit / (1024 * 1024));
+      return `${usedMB}MB / ${limitMB}MB`;
+    }
+    return 'Not available';
+  };
+
   return (
     <div className="fixed bottom-0 right-0 z-50 w-full sm:w-96 max-h-[80vh] bg-white/95 shadow-lg rounded-t-lg border border-b-0 overflow-hidden backdrop-blur-sm">
       <div className="flex justify-between items-center p-2 border-b bg-background/95">
@@ -265,10 +289,7 @@ export function DebugPanel() {
               </CollapsibleTrigger>
               <CollapsibleContent className="p-3 pt-0 space-y-2">
                 <div className="text-sm text-muted-foreground py-2">
-                  Memory: {performance.memory ? 
-                    `${Math.round(performance.memory.usedJSHeapSize / (1024 * 1024))}MB / 
-                     ${Math.round(performance.memory.jsHeapSizeLimit / (1024 * 1024))}MB` : 
-                    'Not available'}
+                  Memory: {getMemoryUsage()}
                 </div>
                 <Button 
                   variant="outline" 
@@ -276,9 +297,9 @@ export function DebugPanel() {
                   className="w-full" 
                   onClick={() => {
                     addLog('action', 'Manual garbage collection requested');
-                    if (window.gc) {
+                    if ('gc' in window) {
                       try {
-                        window.gc();
+                        (window as any).gc();
                         addLog('info', 'Garbage collection triggered');
                       } catch (e) {
                         addLog('error', 'Failed to trigger garbage collection', e);

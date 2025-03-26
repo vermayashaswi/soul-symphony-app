@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 export const useDebugLogger = () => {
   const { addLog } = useDebug();
   
+  // Using useCallback to memoize these functions and prevent unnecessary re-renders
   const logAction = useCallback((message: string, details?: any) => {
     addLog('action', message, details);
   }, [addLog]);
