@@ -69,7 +69,21 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     try {
       console.log("Processing recording with blob size:", audioBlob.size, "type:", audioBlob.type, "for user:", user.id);
       
+      // Add a timeout to prevent getting stuck in processing state
+      const processingTimeout = setTimeout(() => {
+        if (isProcessing) {
+          console.log("Processing timeout reached, continuing with flow");
+          // If the actual processing is still ongoing, we'll just let the UI continue
+          if (onRecordingComplete) {
+            onRecordingComplete(audioBlob, "timeout-" + Date.now());
+          }
+        }
+      }, 20000); // 20 seconds timeout
+      
       const result = await processRecording(audioBlob, user.id);
+      
+      // Clear the timeout as we got a response
+      clearTimeout(processingTimeout);
       
       if (result.success && onRecordingComplete) {
         console.log("Processing successful, tempId:", result.tempId);

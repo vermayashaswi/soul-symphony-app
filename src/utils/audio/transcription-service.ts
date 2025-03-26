@@ -29,14 +29,27 @@ export async function sendAudioForTranscription(base64String: string, userId: st
       };
     }
     
+    // Set up a timeout to prevent the call from hanging indefinitely
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Transcription request timed out'));
+      }, 30000); // 30 second timeout
+    });
+    
     // Call the Supabase function
     console.log("Calling transcribe-audio edge function...");
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+    const functionPromise = supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64String,
         userId
       }
     });
+    
+    // Race the function call against the timeout
+    const { data, error } = await Promise.race([
+      functionPromise,
+      timeoutPromise.then(() => ({ data: null, error: new Error('Transcription timed out') }))
+    ]) as any;
 
     if (error) {
       console.error('Transcription error:', error);

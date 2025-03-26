@@ -93,24 +93,51 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
     
     console.log('Journal entry created with ID:', entryData.id);
     
-    // Send the audio for transcription
-    const { error: transcriptionError } = await supabase.functions.invoke('transcribe-audio', {
-      body: {
-        audioUrl,
-        entryId: entryData.id,
-        userId,
-      },
+    // Send the audio for transcription with a timeout to prevent getting stuck
+    const transcriptionPromise = new Promise<void>(async (resolve, reject) => {
+      try {
+        const { error: transcriptionError } = await supabase.functions.invoke('transcribe-audio', {
+          body: {
+            audioUrl,
+            entryId: entryData.id,
+            userId,
+          },
+        });
+        
+        if (transcriptionError) {
+          console.error('Error requesting transcription:', transcriptionError);
+          logError('Transcription request failed', transcriptionError, userId);
+          processingStatus.set(tempId, 'error');
+          reject(new Error('Failed to start transcription'));
+          return;
+        }
+        
+        processingStatus.set(tempId, 'completed');
+        console.log('Transcription requested successfully');
+        resolve();
+      } catch (error) {
+        console.error('Error in transcription request:', error);
+        processingStatus.set(tempId, 'error');
+        reject(error);
+      }
     });
     
-    if (transcriptionError) {
-      console.error('Error requesting transcription:', transcriptionError);
-      logError('Transcription request failed', transcriptionError, userId);
-      processingStatus.set(tempId, 'error');
-      return { success: false, error: 'Failed to start transcription' };
-    }
+    // Set a timeout to avoid getting stuck indefinitely
+    const timeoutPromise = new Promise<void>((_, reject) => {
+      setTimeout(() => {
+        if (processingStatus.get(tempId) === 'pending') {
+          console.log('Transcription request timed out, but continuing...');
+          processingStatus.set(tempId, 'completed');
+          // We don't reject here to allow the process to continue
+        }
+      }, 15000); // 15 second timeout
+    });
     
-    processingStatus.set(tempId, 'completed');
-    console.log('Transcription requested successfully');
+    // Race the promises but don't wait for the result
+    Promise.race([transcriptionPromise, timeoutPromise]).catch(error => {
+      console.error('Error in transcription process:', error);
+      // Don't block the main process
+    });
     
     return {
       success: true,

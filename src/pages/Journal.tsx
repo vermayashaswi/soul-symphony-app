@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { JournalHeader } from '@/components/journal/JournalHeader';
@@ -38,12 +37,10 @@ export default function Journal() {
   const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
   const [hasTriedProfileCreation, setHasTriedProfileCreation] = useState(false);
 
-  // Check profile exists and create if needed
   useEffect(() => {
     if (user && !hasTriedProfileCreation) {
       const checkAndCreateProfile = async () => {
         try {
-          // Check if profile exists
           const { data, error } = await supabase
             .from('profiles')
             .select('id')
@@ -53,7 +50,6 @@ export default function Journal() {
           if (!data || error) {
             console.log('Profile not found or error:', error);
             
-            // Try to create profile
             const { error: createError } = await supabase
               .from('profiles')
               .insert([{ id: user.id }]);
@@ -63,7 +59,6 @@ export default function Journal() {
               toast.error('Unable to set up your profile. Some features might not work properly.');
             } else {
               console.log('Profile created successfully');
-              // Refresh entries after creating profile
               setTimeout(() => refreshEntries(false), 1000);
             }
           }
@@ -78,14 +73,17 @@ export default function Journal() {
     }
   }, [user, hasTriedProfileCreation, refreshEntries]);
 
-  // Handle loading timeout
   useEffect(() => {
-    // Set a timeout to force-complete loading state after 15 seconds
     const timeout = setTimeout(() => {
       if (isLoading) {
         console.log('Force completing loading state due to timeout');
         setIsRefreshing(false);
-        // Try process entries to ensure everything is set up
+        
+        if (processingEntries.length > 0) {
+          console.log('Clearing stuck processing entries');
+          setProcessingEntries([]);
+        }
+        
         if (user?.id && !isProcessing) {
           processUnprocessedEntries();
         }
@@ -99,9 +97,8 @@ export default function Journal() {
         clearTimeout(loadTimeout);
       }
     };
-  }, [isLoading, user?.id, processUnprocessedEntries, isProcessing]);
+  }, [isLoading, user?.id, processUnprocessedEntries, isProcessing, processingEntries.length]);
 
-  // Handle URL processing parameters
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const tempId = queryParams.get('processing');
@@ -109,17 +106,15 @@ export default function Journal() {
     if (tempId && !processingEntries.includes(tempId)) {
       setProcessingEntries(prev => [...prev, tempId]);
       
-      // Clean URL without reloading page
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
       
-      // Set a timeout to remove the processing entry
       const processingTimeout = setTimeout(() => {
+        console.log('Processing entry timeout reached, removing from list:', tempId);
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
         refreshEntries(false);
       }, 30000);
       
-      // Schedule periodic refreshes while processing
       const refreshInterval = setInterval(() => {
         console.log("Auto-refreshing entries to check for processed entry");
         refreshEntries(false).then(() => {
@@ -136,29 +131,24 @@ export default function Journal() {
     }
   }, [location.search, processingEntries, refreshEntries]);
 
-  // Handle manual refresh button click
   const handleRefresh = async () => {
     if (isRefreshing) return;
     
     setIsRefreshing(true);
     try {
-      // Process any unprocessed entries
       if (user?.id) {
         const processingResult = await processUnprocessedEntries();
         
-        // Only continue if processing is not already happening
         if (processingResult.alreadyProcessing) {
           setIsRefreshing(false);
           return;
         }
       }
       
-      // Pass true to show a toast notification for manual refresh
       await refreshEntries(true);
       
-      // After refresh, clear any processing entries that might have been completed
       setProcessingEntries([]);
-      setRefreshKey(prev => prev + 1); // Force a fresh fetch
+      setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Error refreshing entries:', error);
     } finally {
@@ -231,7 +221,6 @@ export default function Journal() {
         </Alert>
       )}
       
-      {/* Show a message when loading takes too long */}
       {isLoading && (
         <div className="text-center py-6">
           <JournalEntriesList 
@@ -243,7 +232,6 @@ export default function Journal() {
         </div>
       )}
       
-      {/* Show entries when not loading */}
       {!isLoading && (
         <JournalEntriesList 
           entries={journalEntries || []} 
