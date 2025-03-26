@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { generateUUID } from './audio/blob-utils';
 import { toast } from 'sonner';
@@ -40,9 +39,7 @@ export async function ensureAudioBucketExists(): Promise<boolean> {
         
         console.log('Audio bucket created successfully');
         
-        // Try to set up public access policy for the audio bucket
-        // Note: We can't use the create_storage_policy RPC as it's not available
-        // Instead, we'll only log this and continue
+        // Note about storage policies - don't try to call RPC functions directly
         console.log('Storage bucket created, but policies need to be configured');
         
         return true;
