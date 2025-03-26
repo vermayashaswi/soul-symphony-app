@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -12,14 +13,22 @@ const NotFound = () => {
 
   useEffect(() => {
     console.log("NotFound: Current path:", location.pathname);
-    console.log("NotFound: Current hash:", location.hash ? "Present (contains auth tokens)" : "None");
+    console.log("NotFound: Current hash:", location.hash ? "Present (length: " + location.hash.length + ")" : "None");
+    console.log("NotFound: Current search:", location.search || "None");
     
-    // Check for auth-related parameters in URL
+    // Check for auth-related parameters in URL - expanded to catch more cases
     const isFromAuthRedirect = 
-      location.search.includes('error') || 
+      // OAuth flow parameters
       location.hash.includes('access_token') ||
+      location.hash.includes('id_token') ||
+      location.hash.includes('refresh_token') ||
       location.hash.includes('type=recovery') ||
-      location.hash.includes('id_token');
+      // Error parameters
+      location.search.includes('error') ||
+      location.search.includes('code=') ||
+      // Provider-specific parameters
+      location.hash.includes('provider=google') ||
+      location.search.includes('provider=google');
                           
     if (isFromAuthRedirect) {
       console.log("NotFound: Detected auth redirect, navigating to callback handler");

@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,9 +17,9 @@ const AuthStateListener = () => {
     console.log("Current path:", location.pathname);
     console.log("Current hash:", location.hash ? "Present (contains tokens)" : "None");
     
-    // If we're already on the callback route, don't redirect again
-    if (location.pathname === '/callback') {
-      console.log("Already on callback route, not redirecting");
+    // Skip handling token redirects if we're already on callback or auth routes
+    if (location.pathname === '/callback' || location.pathname === '/auth') {
+      console.log("Already on callback or auth route, not redirecting");
       return;
     }
     
