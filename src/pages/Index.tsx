@@ -1,4 +1,3 @@
-
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,20 +16,20 @@ export default function Index() {
   const sessionTrackingAttemptedRef = useRef(false);
   const redirectAttemptedRef = useRef(false);
   const sessionCheckAttemptedRef = useRef(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'checking' | 'error'>('checking');
+  const [connectionMessage, setConnectionMessage] = useState<string>('');
 
-  // Add a timeout to prevent infinite loading state
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!authChecked) {
         console.log("Force completing auth check on index page due to timeout");
         setAuthChecked(true);
       }
-    }, 1500); // Reduced from 2 seconds to 1.5 second timeout
+    }, 1500);
     
     return () => clearTimeout(timer);
   }, []);
 
-  // Mark as checked once we have definitive auth state
   useEffect(() => {
     if (!isLoading) {
       console.log("Auth loading complete on index page, setting authChecked to true");
@@ -38,17 +37,14 @@ export default function Index() {
     }
   }, [isLoading]);
 
-  // Forceful session check to address redirect issues
   useEffect(() => {
     if (authChecked && !isLoading && !user && !sessionCheckAttemptedRef.current) {
       sessionCheckAttemptedRef.current = true;
       
-      // Check if we should have a session based on localStorage flag
       const authSuccess = localStorage.getItem('auth_success') === 'true';
       if (authSuccess) {
         console.log("Auth success flag is true but no user object exists, checking session");
         
-        // Force a session check
         const checkSession = async () => {
           try {
             console.log("Performing manual session check");
@@ -82,13 +78,11 @@ export default function Index() {
     }
   }, [authChecked, isLoading, user, navigate, refreshSession]);
 
-  // Redirect authenticated users to journal page
   useEffect(() => {
     if (user && !redirectAttemptedRef.current && !isLoading) {
       console.log("User is authenticated, redirecting to journal page");
       redirectAttemptedRef.current = true;
       
-      // Use a short delay to ensure any other state updates complete
       const redirectTimer = setTimeout(() => {
         navigate('/journal');
       }, 100);
@@ -97,30 +91,21 @@ export default function Index() {
     }
   }, [user, isLoading, navigate]);
 
-  // Track session when user visits index page - only if authenticated
   useEffect(() => {
-    // Prevent multiple session tracking attempts
-    if (sessionTrackingAttemptedRef.current) {
-      return;
-    }
-    
     if (user && !sessionTracked) {
       sessionTrackingAttemptedRef.current = true;
       console.log("Index page: Tracking session for user", user.id);
       
-      // Track session once without retries to avoid unnecessary operations
       createOrUpdateSession(user.id, '/')
         .then(() => {
           setSessionTracked(true);
         })
         .catch(error => {
           console.error("Error tracking session on index page:", error);
-          // Don't show errors to users since it's non-critical
         });
     }
   }, [user, sessionTracked]);
 
-  // Check for auth state issues
   useEffect(() => {
     if (authChecked && !isLoading) {
       try {
@@ -129,7 +114,7 @@ export default function Index() {
         
         if (authSuccess && lastAuthTime && !user) {
           const timeSinceAuth = Date.now() - parseInt(lastAuthTime, 10);
-          const isRecent = timeSinceAuth < 30 * 60 * 1000; // Less than 30 minutes
+          const isRecent = timeSinceAuth < 30 * 60 * 1000;
           
           if (isRecent) {
             console.warn('Auth inconsistency detected: localStorage indicates recent auth but no user object');
@@ -183,9 +168,47 @@ export default function Index() {
     }
   ];
 
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        const { testDatabaseConnection } = await import('@/utils/supabase-connection');
+        setConnectionStatus('checking');
+        setConnectionMessage('Testing connection to Supabase...');
+        
+        const result = await testDatabaseConnection();
+        
+        if (result.success) {
+          setConnectionStatus('connected');
+          setConnectionMessage('Successfully connected to Supabase!');
+          console.log('Connection test successful:', result);
+        } else {
+          setConnectionStatus('error');
+          setConnectionMessage(`Connection failed: ${result.error}`);
+          console.error('Connection test failed:', result);
+        }
+      } catch (error) {
+        console.error('Error testing connection:', error);
+        setConnectionStatus('error');
+        setConnectionMessage('Error testing connection');
+      }
+    };
+    
+    testConnection();
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Main content with padding to avoid navbar overlap */}
+      <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-md ${
+        connectionStatus === 'connected' ? 'bg-green-100 text-green-800' : 
+        connectionStatus === 'checking' ? 'bg-blue-100 text-blue-800' : 
+        'bg-red-100 text-red-800'
+      }`}>
+        {connectionStatus === 'connected' && '✓ '}
+        {connectionStatus === 'checking' && '⟳ '}
+        {connectionStatus === 'error' && '✗ '}
+        {connectionMessage}
+      </div>
+      
       <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 py-12">
         <div className="max-w-3xl w-full text-center mb-10">
           <h1 className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-violet-500 mb-4">
@@ -206,7 +229,6 @@ export default function Index() {
           )}
         </div>
 
-        {/* Feature cards with responsive grid and proper spacing */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl w-full mt-8">
           {featureCards.map((card, index) => (
             <Card key={index} className="border shadow-lg hover:shadow-xl transition-shadow duration-300">
