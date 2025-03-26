@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { JournalHeader } from '@/components/journal/JournalHeader';
@@ -14,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import JournalDiagnostics from '@/components/diagnostics/JournalDiagnostics';
 import { useDebug } from '@/contexts/debug/DebugContext';
+import { ensureAudioBucketExists } from '@/utils/audio-processing';
 
 export default function Journal() {
   const navigate = useNavigate();
@@ -41,6 +43,7 @@ export default function Journal() {
   const [mode, setMode] = useState<'record' | 'past'>('past');
   const [refreshCount, setRefreshCount] = useState(0);
   const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isFixingStorage, setIsFixingStorage] = useState(false);
 
   useEffect(() => {
     addLog('navigation', 'Journal page mounted', { userId: user?.id });
@@ -80,6 +83,53 @@ export default function Journal() {
     
     checkConnection();
   }, []);
+
+  // Check for and try to fix storage bucket issues
+  useEffect(() => {
+    const checkAndFixStorage = async () => {
+      if (user?.id && !isFixingStorage) {
+        setIsFixingStorage(true);
+        
+        try {
+          // Check if audio bucket exists
+          const { data: buckets, error } = await supabase.storage.listBuckets();
+          
+          if (error) {
+            console.error('Error checking storage buckets:', error);
+            setIsFixingStorage(false);
+            return;
+          }
+          
+          const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
+          
+          if (!audioBucket) {
+            console.log('Audio bucket missing, attempting to create');
+            const bucketCreated = await ensureAudioBucketExists();
+            
+            if (bucketCreated) {
+              toast.success('Audio storage configured successfully', {
+                duration: 3000,
+              });
+              
+              // Refresh after storage is fixed
+              setTimeout(() => refreshEntries(false), 1000);
+            } else {
+              console.error('Failed to create audio bucket');
+              toast.error('Could not configure audio storage', {
+                duration: 5000,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Error in storage check/fix:', err);
+        } finally {
+          setIsFixingStorage(false);
+        }
+      }
+    };
+    
+    checkAndFixStorage();
+  }, [user?.id, isFixingStorage, refreshEntries]);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -218,6 +268,9 @@ export default function Journal() {
         }
       }
       
+      // Check/fix storage bucket issues before refreshing
+      await ensureAudioBucketExists();
+      
       addLog('action', 'Refreshing journal entries');
       await refreshEntries(true);
       setProcessingEntries([]);
@@ -232,7 +285,7 @@ export default function Journal() {
   };
 
   const handleToggleMode = (value: string) => {
-    if (value === 'record') {
+    if (value === 'record' && !isRefreshing) {
       navigate('/record');
     } else {
       setMode('past');
@@ -253,6 +306,15 @@ export default function Journal() {
         toast.success('Successfully connected to database', {
           id: 'test-connection',
         });
+        
+        // Also check and fix storage bucket if needed
+        const bucketExists = await ensureAudioBucketExists();
+        if (bucketExists) {
+          toast.success('Audio storage is configured properly', {
+            duration: 3000,
+          });
+        }
+        
         setTimeout(() => refreshEntries(false), 500);
       } else {
         toast.error('Failed to connect to database', {
@@ -269,6 +331,8 @@ export default function Journal() {
   if (connectionStatus === 'error') {
     return (
       <div className="container px-4 md:px-6 max-w-6xl space-y-6 py-6">
+        <JournalDiagnostics />
+        
         <Alert variant="destructive" className="mb-4">
           <AlertTriangle className="h-4 w-4 mr-2" />
           <AlertTitle>Database Connection Error</AlertTitle>

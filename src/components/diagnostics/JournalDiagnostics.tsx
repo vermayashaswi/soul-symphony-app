@@ -1,380 +1,602 @@
 
 import React, { useState, useEffect } from 'react';
-import { useDebug } from '@/contexts/debug/DebugContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CheckCircle, XCircle, Clock, Database, RefreshCw, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { AlertTriangle, CheckCircle, XCircle, RefreshCw, Download, Database, Wifi, Mic, HardDrive } from 'lucide-react';
+import { testRecordingPipeline } from '@/utils/diagnostics-utils';
+import { checkSupabaseConnection } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { testDatabaseConnection } from '@/utils/supabase-connection';
 
-interface OperationStatus {
-  name: string;
-  status: 'success' | 'error' | 'pending' | 'waiting';
-  timestamp: number;
-  duration?: number;
-  details?: string;
-  error?: any;
+interface DiagnosticsResult {
+  timestamp: string;
+  status: 'success' | 'error' | 'warning';
+  details: {
+    database: {
+      success: boolean;
+      error?: string;
+      latency?: number;
+    };
+    storage: {
+      audioBucketExists: boolean;
+      hasPermission: boolean;
+      error?: string;
+    };
+    auth: {
+      success: boolean;
+      hasSession: boolean;
+      error?: string;
+    };
+    edgeFunctions: {
+      transcribeAudio: {
+        reachable: boolean;
+        error?: string;
+      };
+    };
+    network: {
+      online: boolean;
+      supabaseLatency?: number;
+      error?: string;
+    };
+    recording: {
+      audioContextAvailable: boolean;
+      mediaDevicesAvailable: boolean;
+      storageAccessible: boolean;
+      error?: string;
+    };
+  };
+  recommendedActions: string[];
 }
 
-const JournalDiagnostics = () => {
-  const { addLog } = useDebug();
-  const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(true);
-  const [operations, setOperations] = useState<OperationStatus[]>([]);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'error' | 'checking'>('checking');
-  const [isRunningTest, setIsRunningTest] = useState(false);
+const JournalDiagnostics: React.FC = () => {
+  const [isRunningTests, setIsRunningTests] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [results, setResults] = useState<DiagnosticsResult | null>(null);
+  const [isInitialCheck, setIsInitialCheck] = useState(true);
 
-  // Add a new operation status or update an existing one
-  const updateOperation = (operation: OperationStatus) => {
-    setOperations(prev => {
-      const existing = prev.findIndex(op => op.name === operation.name);
-      if (existing >= 0) {
-        const newOps = [...prev];
-        newOps[existing] = operation;
-        return newOps;
-      }
-      return [...prev, operation];
-    });
-    
-    // Also log to debug context
-    if (operation.status === 'error') {
-      addLog('error', `Journal diagnostic: ${operation.name} failed`, operation);
-    } else {
-      addLog('info', `Journal diagnostic: ${operation.name} ${operation.status}`, operation);
-    }
-  };
-
-  // Test database connection
-  const testConnection = async () => {
-    setIsRunningTest(true);
-    updateOperation({
-      name: 'Database Connection Test',
-      status: 'pending',
-      timestamp: Date.now()
-    });
-    
+  // Function to test the audio storage bucket
+  const testAudioBucket = async () => {
     try {
-      const startTime = Date.now();
-      const result = await testDatabaseConnection();
-      const duration = Date.now() - startTime;
+      // Check if 'audio' bucket exists
+      const { data: buckets, error } = await supabase.storage.listBuckets();
       
-      if (result.success) {
-        setConnectionStatus('connected');
-        updateOperation({
-          name: 'Database Connection Test',
-          status: 'success',
-          timestamp: Date.now(),
-          duration,
-          details: 'Successfully connected to database'
-        });
-      } else {
-        setConnectionStatus('error');
-        updateOperation({
-          name: 'Database Connection Test',
-          status: 'error',
-          timestamp: Date.now(),
-          duration,
-          details: `Failed to connect: ${result.error || 'Unknown error'}`,
-          error: result.error
-        });
+      if (error) {
+        return {
+          audioBucketExists: false,
+          hasPermission: false,
+          error: `Storage access error: ${error.message}`
+        };
+      }
+      
+      const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
+      
+      if (!audioBucket) {
+        return {
+          audioBucketExists: false,
+          hasPermission: true,
+          error: 'Audio bucket not found in storage'
+        };
+      }
+      
+      // Test permission to write to bucket
+      try {
+        // Try to list files (will test read permissions)
+        const { error: listError } = await supabase.storage
+          .from('audio')
+          .list('');
+          
+        return {
+          audioBucketExists: true,
+          hasPermission: !listError,
+          error: listError ? `Permission error: ${listError.message}` : undefined
+        };
+      } catch (err) {
+        return {
+          audioBucketExists: true,
+          hasPermission: false,
+          error: `Permission test error: ${err instanceof Error ? err.message : String(err)}`
+        };
       }
     } catch (error) {
-      setConnectionStatus('error');
-      updateOperation({
-        name: 'Database Connection Test',
-        status: 'error',
-        timestamp: Date.now(),
-        details: 'Exception during connection test',
-        error
-      });
-    } finally {
-      setIsRunningTest(false);
+      return {
+        audioBucketExists: false,
+        hasPermission: false,
+        error: `Storage test error: ${error instanceof Error ? error.message : String(error)}`
+      };
     }
   };
 
-  // Test profile access
-  const testProfileAccess = async () => {
-    updateOperation({
-      name: 'Profile Access Test',
-      status: 'pending',
-      timestamp: Date.now()
-    });
-    
+  // Function to test edge functions
+  const testEdgeFunctions = async () => {
     try {
-      const startTime = Date.now();
+      // Test transcribe-audio function with a minimal request
+      const { error } = await supabase.functions.invoke('transcribe-audio', {
+        body: { test: true }
+      });
+      
+      return {
+        transcribeAudio: {
+          reachable: !error,
+          error: error ? `Edge function error: ${error.message}` : undefined
+        }
+      };
+    } catch (error) {
+      return {
+        transcribeAudio: {
+          reachable: false,
+          error: `Edge function test error: ${error instanceof Error ? error.message : String(error)}`
+        }
+      };
+    }
+  };
+
+  // Function to test database connection
+  const testDatabase = async () => {
+    const startTime = performance.now();
+    try {
       const { data, error } = await supabase
         .from('profiles')
         .select('id')
         .limit(1);
-      const duration = Date.now() - startTime;
+        
+      const latency = Math.round(performance.now() - startTime);
       
       if (error) {
-        updateOperation({
-          name: 'Profile Access Test',
-          status: 'error',
-          timestamp: Date.now(),
-          duration,
-          details: `Failed to access profiles: ${error.message}`,
-          error
-        });
-      } else {
-        updateOperation({
-          name: 'Profile Access Test',
-          status: 'success',
-          timestamp: Date.now(),
-          duration,
-          details: `Successfully fetched ${data?.length || 0} profiles`
-        });
+        return {
+          success: false,
+          error: `Database error: ${error.message}`,
+          latency
+        };
       }
+      
+      return {
+        success: true,
+        latency
+      };
     } catch (error) {
-      updateOperation({
-        name: 'Profile Access Test',
-        status: 'error',
-        timestamp: Date.now(),
-        details: 'Exception during profile access test',
-        error
-      });
+      const latency = Math.round(performance.now() - startTime);
+      return {
+        success: false,
+        error: `Database test error: ${error instanceof Error ? error.message : String(error)}`,
+        latency
+      };
     }
   };
 
-  // Test journal entries access
-  const testJournalEntriesAccess = async () => {
-    updateOperation({
-      name: 'Journal Entries Access Test',
-      status: 'pending',
-      timestamp: Date.now()
-    });
-    
+  // Function to test auth
+  const testAuth = async () => {
     try {
-      const startTime = Date.now();
-      const { data, error } = await supabase
-        .from('Journal Entries')
-        .select('id')
-        .limit(1);
-      const duration = Date.now() - startTime;
-      
-      if (error) {
-        updateOperation({
-          name: 'Journal Entries Access Test',
-          status: 'error',
-          timestamp: Date.now(),
-          duration,
-          details: `Failed to access journal entries: ${error.message}`,
-          error
-        });
-      } else {
-        updateOperation({
-          name: 'Journal Entries Access Test',
-          status: 'success',
-          timestamp: Date.now(),
-          duration,
-          details: `Successfully fetched ${data?.length || 0} journal entries`
-        });
-      }
-    } catch (error) {
-      updateOperation({
-        name: 'Journal Entries Access Test',
-        status: 'error',
-        timestamp: Date.now(),
-        details: 'Exception during journal entries access test',
-        error
-      });
-    }
-  };
-
-  // Check auth session
-  const checkAuthSession = async () => {
-    updateOperation({
-      name: 'Auth Session Test',
-      status: 'pending',
-      timestamp: Date.now()
-    });
-    
-    try {
-      const startTime = Date.now();
       const { data, error } = await supabase.auth.getSession();
-      const duration = Date.now() - startTime;
       
       if (error) {
-        updateOperation({
-          name: 'Auth Session Test',
-          status: 'error',
-          timestamp: Date.now(),
-          duration,
-          details: `Failed to get auth session: ${error.message}`,
-          error
-        });
-      } else {
-        updateOperation({
-          name: 'Auth Session Test',
-          status: 'success',
-          timestamp: Date.now(),
-          duration,
-          details: data.session ? 'Active session found' : 'No active session'
-        });
+        return {
+          success: false,
+          hasSession: false,
+          error: `Auth error: ${error.message}`
+        };
       }
+      
+      return {
+        success: true,
+        hasSession: !!data.session
+      };
     } catch (error) {
-      updateOperation({
-        name: 'Auth Session Test',
-        status: 'error',
-        timestamp: Date.now(),
-        details: 'Exception during auth session test',
-        error
-      });
+      return {
+        success: false,
+        hasSession: false,
+        error: `Auth test error: ${error instanceof Error ? error.message : String(error)}`
+      };
     }
   };
 
-  // Run all tests
-  const runAllTests = async () => {
-    setIsRunningTest(true);
-    await testConnection();
-    await checkAuthSession();
-    await testProfileAccess();
-    await testJournalEntriesAccess();
-    setIsRunningTest(false);
-    toast.success('Diagnostics completed');
+  // Function to test network connectivity
+  const testNetwork = async () => {
+    const online = navigator.onLine;
+    
+    try {
+      // Test Supabase connectivity
+      const start = performance.now();
+      const result = await checkSupabaseConnection();
+      const supabaseLatency = Math.round(performance.now() - start);
+      
+      if (!result.success) {
+        return {
+          online,
+          supabaseLatency,
+          error: 'Failed to connect to Supabase'
+        };
+      }
+      
+      return {
+        online,
+        supabaseLatency
+      };
+    } catch (error) {
+      return {
+        online,
+        error: `Network test error: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
   };
 
-  // Run initial connection test
+  const runDiagnostics = async () => {
+    setIsRunningTests(true);
+    setIsExpanded(true);
+    
+    try {
+      const [
+        databaseResult,
+        storageResult,
+        authResult,
+        edgeFunctionsResult,
+        networkResult,
+        recordingResult
+      ] = await Promise.all([
+        testDatabase(),
+        testAudioBucket(),
+        testAuth(),
+        testEdgeFunctions(),
+        testNetwork(),
+        testRecordingPipeline()
+      ]);
+      
+      // Determine overall status
+      let overallStatus: 'success' | 'error' | 'warning' = 'success';
+      const recommendedActions: string[] = [];
+      
+      // Check for critical errors
+      if (!databaseResult.success) {
+        overallStatus = 'error';
+        recommendedActions.push('Check Supabase database connection settings and availability.');
+      }
+      
+      if (!authResult.success) {
+        overallStatus = 'error';
+        recommendedActions.push('Verify authentication configuration and session management.');
+      }
+      
+      if (!networkResult.online) {
+        overallStatus = 'error';
+        recommendedActions.push('Check internet connection and network status.');
+      }
+      
+      // Check for storage issues
+      if (!storageResult.audioBucketExists) {
+        overallStatus = 'error';
+        recommendedActions.push('Create the "audio" storage bucket in Supabase.');
+      } else if (!storageResult.hasPermission) {
+        overallStatus = 'warning';
+        recommendedActions.push('Verify storage bucket permissions for the audio bucket.');
+      }
+      
+      // Check for edge function issues
+      if (!edgeFunctionsResult.transcribeAudio.reachable) {
+        overallStatus = 'warning';
+        recommendedActions.push('Check the transcribe-audio edge function is deployed and configured correctly.');
+      }
+      
+      // Check for recording issues
+      if (!recordingResult.audioContext || !recordingResult.mediaDevices || !recordingResult.mediaRecorder) {
+        overallStatus = 'warning';
+        recommendedActions.push('Verify browser supports required audio recording APIs.');
+      }
+      
+      // Generate and set the results
+      const diagnosticResults: DiagnosticsResult = {
+        timestamp: new Date().toISOString(),
+        status: overallStatus,
+        details: {
+          database: databaseResult,
+          storage: storageResult,
+          auth: authResult,
+          edgeFunctions: edgeFunctionsResult,
+          network: networkResult,
+          recording: {
+            audioContextAvailable: !!recordingResult.audioContext,
+            mediaDevicesAvailable: !!recordingResult.mediaDevices,
+            storageAccessible: !!recordingResult.storageAccess,
+            error: recordingResult.errors?.join('; ')
+          }
+        },
+        recommendedActions
+      };
+      
+      setResults(diagnosticResults);
+
+      // If this was an initial check and there are issues, create toast notifications
+      if (isInitialCheck && overallStatus !== 'success') {
+        const criticalIssues = recommendedActions.filter(action => 
+          action.includes('Create the "audio" storage bucket') || 
+          action.includes('transcribe-audio edge function')
+        );
+        
+        if (criticalIssues.length > 0) {
+          toast.error('Journal functionality issues detected', {
+            description: criticalIssues[0],
+            duration: 8000,
+          });
+        }
+      }
+      
+      setIsInitialCheck(false);
+    } catch (error) {
+      console.error('Diagnostics error:', error);
+      toast.error('Error running diagnostics');
+    } finally {
+      setIsRunningTests(false);
+    }
+  };
+
+  const downloadResults = () => {
+    if (!results) return;
+    
+    const fileName = `feelosophy-diagnostics-${new Date().toISOString().split('T')[0]}.json`;
+    const json = JSON.stringify(results, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const href = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+    
+    toast.success('Diagnostics report downloaded');
+  };
+
+  // Run diagnostics on first render
   useEffect(() => {
-    testConnection();
+    runDiagnostics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (!isExpanded && !results?.recommendedActions.length) {
+    return (
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="absolute top-2 right-2 z-10"
+        onClick={() => setIsExpanded(true)}
+      >
+        {isRunningTests ? (
+          <RefreshCw className="h-4 w-4 animate-spin" />
+        ) : (
+          <span className="flex items-center gap-1">
+            {results?.status === 'success' ? (
+              <CheckCircle className="h-3 w-3 text-green-500" />
+            ) : results?.status === 'warning' ? (
+              <AlertTriangle className="h-3 w-3 text-yellow-500" />
+            ) : (
+              <AlertTriangle className="h-3 w-3 text-red-500" />
+            )}
+            Diagnostics
+          </span>
+        )}
+      </Button>
+    );
+  }
+
   return (
-    <div className="fixed right-4 bottom-4 z-50 transition-all">
-      {isMinimized ? (
-        <Button
-          onClick={() => setIsMinimized(false)}
-          className="flex items-center gap-2 shadow-lg"
-          variant={connectionStatus === 'error' ? 'destructive' : 'default'}
-        >
-          {connectionStatus === 'checking' && <Clock className="h-4 w-4 animate-spin" />}
-          {connectionStatus === 'connected' && <CheckCircle className="h-4 w-4" />}
-          {connectionStatus === 'error' && <AlertCircle className="h-4 w-4" />}
-          <span>Diagnostics</span>
-        </Button>
-      ) : (
-        <Card className="w-80 shadow-xl">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-md flex items-center gap-2">
-              {connectionStatus === 'checking' && <Clock className="h-4 w-4 animate-spin" />}
-              {connectionStatus === 'connected' && <CheckCircle className="h-4 w-4 text-green-500" />}
-              {connectionStatus === 'error' && <XCircle className="h-4 w-4 text-red-500" />}
-              Journal Diagnostics
-            </CardTitle>
-            <div className="flex gap-1">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7"
-                onClick={() => setIsOpen(!isOpen)}
-              >
-                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7"
-                onClick={() => setIsMinimized(true)}
-              >
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
+    <Card className="mb-6 relative">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-lg flex items-center gap-2">
+            {results?.status === 'success' ? (
+              <CheckCircle className="h-5 w-5 text-green-500" />
+            ) : results?.status === 'warning' ? (
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+            ) : results?.status === 'error' ? (
+              <XCircle className="h-5 w-5 text-red-500" />
+            ) : null}
+            Journal Diagnostics
+          </CardTitle>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={runDiagnostics} 
+              disabled={isRunningTests}
+            >
+              {isRunningTests ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Run Tests
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-2"
+              onClick={() => setIsExpanded(false)}
+            >
+              {results?.recommendedActions.length ? 'Minimize' : 'Close'}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      
+      <CardContent>
+        {results?.recommendedActions.length > 0 && (
+          <Alert className="mb-4" variant={results.status === 'error' ? 'destructive' : 'warning'}>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Issues Detected</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc pl-5 mt-2 space-y-1">
+                {results.recommendedActions.map((action, i) => (
+                  <li key={i}>{action}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        <Tabs defaultValue="summary">
+          <TabsList>
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="details">Details</TabsTrigger>
+          </TabsList>
           
-          <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-            <CollapsibleTrigger asChild>
-              <CardContent className="pb-3 pt-2 cursor-pointer">
-                <div className="flex justify-between items-center">
-                  <div className="flex gap-2">
-                    <Badge variant={connectionStatus === 'connected' ? 'outline' : 'destructive'}>
-                      {connectionStatus === 'connected' ? 'Connected' : 'Connection Issues'}
-                    </Badge>
-                    {isRunningTest && <Badge variant="secondary">Running Tests...</Badge>}
+          <TabsContent value="summary" className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="flex items-center gap-2 p-3 border rounded-md">
+                <Database className="h-5 w-5" />
+                <div>
+                  <div className="text-sm font-medium">Database</div>
+                  <div className="flex items-center gap-1">
+                    {results?.details.database.success ? (
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <XCircle className="h-3 w-3 text-red-500" />
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {results?.details.database.success 
+                        ? `Connected (${results?.details.database.latency}ms)` 
+                        : 'Failed'}
+                    </span>
                   </div>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="h-7"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      runAllTests();
-                    }}
-                    disabled={isRunningTest}
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isRunningTest ? 'animate-spin' : ''}`} />
-                    Test All
-                  </Button>
                 </div>
-              </CardContent>
-            </CollapsibleTrigger>
-            
-            <CollapsibleContent>
-              <CardContent className="pt-0 pb-3">
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {operations.map((op, index) => (
-                    <div key={`${op.name}-${index}`} className="text-sm border rounded-md p-2">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-1.5">
-                          {op.status === 'pending' && <Clock className="h-3.5 w-3.5 text-blue-500 animate-spin" />}
-                          {op.status === 'success' && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
-                          {op.status === 'error' && <XCircle className="h-3.5 w-3.5 text-red-500" />}
-                          {op.status === 'waiting' && <Clock className="h-3.5 w-3.5 text-gray-500" />}
-                          <span className="font-medium">{op.name}</span>
-                        </div>
-                        {op.duration && (
-                          <span className="text-xs text-muted-foreground">
-                            {op.duration}ms
-                          </span>
-                        )}
-                      </div>
-                      
-                      {op.details && (
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {op.details}
-                        </div>
-                      )}
-                      
-                      {op.error && (
-                        <div className="mt-1 text-xs text-red-500 whitespace-pre-wrap break-words font-mono">
-                          {typeof op.error === 'object' 
-                            ? JSON.stringify(op.error, null, 2) 
-                            : String(op.error)}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+              </div>
+              
+              <div className="flex items-center gap-2 p-3 border rounded-md">
+                <HardDrive className="h-5 w-5" />
+                <div>
+                  <div className="text-sm font-medium">Storage</div>
+                  <div className="flex items-center gap-1">
+                    {results?.details.storage.audioBucketExists ? (
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <XCircle className="h-3 w-3 text-red-500" />
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {results?.details.storage.audioBucketExists 
+                        ? 'Audio bucket exists' 
+                        : 'Audio bucket missing'}
+                    </span>
+                  </div>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={testConnection}
-                    disabled={isRunningTest}
-                    className="flex gap-1 items-center"
-                  >
-                    <Database className="h-3.5 w-3.5" />
-                    <span>Test DB</span>
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={checkAuthSession}
-                    disabled={isRunningTest}
-                  >
-                    Test Auth
-                  </Button>
+              </div>
+              
+              <div className="flex items-center gap-2 p-3 border rounded-md">
+                <Wifi className="h-5 w-5" />
+                <div>
+                  <div className="text-sm font-medium">Edge Functions</div>
+                  <div className="flex items-center gap-1">
+                    {results?.details.edgeFunctions.transcribeAudio.reachable ? (
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <XCircle className="h-3 w-3 text-red-500" />
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {results?.details.edgeFunctions.transcribeAudio.reachable 
+                        ? 'Transcription API ready' 
+                        : 'Transcription API error'}
+                    </span>
+                  </div>
                 </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
-      )}
-    </div>
+              </div>
+              
+              <div className="flex items-center gap-2 p-3 border rounded-md">
+                <Mic className="h-5 w-5" />
+                <div>
+                  <div className="text-sm font-medium">Recording</div>
+                  <div className="flex items-center gap-1">
+                    {results?.details.recording.mediaDevicesAvailable ? (
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <XCircle className="h-3 w-3 text-red-500" />
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {results?.details.recording.mediaDevicesAvailable 
+                        ? 'Media devices ready' 
+                        : 'Media devices issue'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="details" className="mt-4">
+            <div className="space-y-4 text-sm">
+              <div>
+                <h3 className="font-semibold mb-1">Database</h3>
+                <div className="pl-4 space-y-0.5">
+                  <div>Status: {results?.details.database.success ? 'Connected' : 'Failed'}</div>
+                  <div>Latency: {results?.details.database.latency || 'N/A'} ms</div>
+                  {results?.details.database.error && (
+                    <div className="text-red-500">Error: {results.details.database.error}</div>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="font-semibold mb-1">Storage</h3>
+                <div className="pl-4 space-y-0.5">
+                  <div>Audio Bucket: {results?.details.storage.audioBucketExists ? 'Exists' : 'Missing'}</div>
+                  <div>Permissions: {results?.details.storage.hasPermission ? 'Granted' : 'Denied'}</div>
+                  {results?.details.storage.error && (
+                    <div className="text-red-500">Error: {results.details.storage.error}</div>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="font-semibold mb-1">Edge Functions</h3>
+                <div className="pl-4 space-y-0.5">
+                  <div>Transcribe Function: {results?.details.edgeFunctions.transcribeAudio.reachable ? 'Available' : 'Unreachable'}</div>
+                  {results?.details.edgeFunctions.transcribeAudio.error && (
+                    <div className="text-red-500">Error: {results.details.edgeFunctions.transcribeAudio.error}</div>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="font-semibold mb-1">Network</h3>
+                <div className="pl-4 space-y-0.5">
+                  <div>Online: {results?.details.network.online ? 'Yes' : 'No'}</div>
+                  <div>Supabase Latency: {results?.details.network.supabaseLatency || 'N/A'} ms</div>
+                  {results?.details.network.error && (
+                    <div className="text-red-500">Error: {results.details.network.error}</div>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="font-semibold mb-1">Recording</h3>
+                <div className="pl-4 space-y-0.5">
+                  <div>Audio Context: {results?.details.recording.audioContextAvailable ? 'Available' : 'Unavailable'}</div>
+                  <div>Media Devices: {results?.details.recording.mediaDevicesAvailable ? 'Available' : 'Unavailable'}</div>
+                  <div>Storage Access: {results?.details.recording.storageAccessible ? 'Available' : 'Unavailable'}</div>
+                  {results?.details.recording.error && (
+                    <div className="text-red-500">Error: {results.details.recording.error}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+      
+      <CardFooter className="pt-2 flex justify-between">
+        <div className="text-xs text-muted-foreground">
+          Last checked: {results?.timestamp ? new Date(results.timestamp).toLocaleString() : 'Never'}
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={downloadResults} 
+          disabled={!results}
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Download Report
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 
