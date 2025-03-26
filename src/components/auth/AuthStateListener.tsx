@@ -1,5 +1,5 @@
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,7 @@ const AuthStateListener = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { processUnprocessedEntries } = useJournalHandler(user?.id);
+  const [storageAccessFailed, setStorageAccessFailed] = useState(false);
   
   // Create a function to process entries with retry logic
   const safelyProcessEntries = useCallback(async () => {
@@ -63,60 +64,78 @@ const AuthStateListener = () => {
   useEffect(() => {
     console.log("AuthStateListener: Setting up authentication listener");
     
-    // Skip handling token redirects if we're already on callback or auth routes
-    if (location.pathname === '/callback' || 
-        location.pathname === '/auth/callback' || 
-        location.pathname === '/auth') {
-      return;
-    }
-    
-    // Check if we have an auth token at any path (not just root)
-    if ((location.hash && 
-        (location.hash.includes('access_token') || 
-         location.hash.includes('id_token') ||
-         location.hash.includes('type=recovery'))) ||
-        (location.search && 
-        (location.search.includes('code=') || 
-         location.search.includes('state=')))) {
-      console.log("AuthStateListener: Detected OAuth token or code in URL, redirecting to callback");
+    const handleAuthRedirection = () => {
+      // Skip handling token redirects if we're already on callback or auth routes
+      if (location.pathname === '/callback' || 
+          location.pathname === '/auth/callback' || 
+          location.pathname === '/auth') {
+        return;
+      }
       
-      // Redirect to the callback route with the hash and search params intact
-      const callbackUrl = '/callback' + location.search + location.hash;
-      navigate(callbackUrl, { replace: true });
-      return;
+      // Check if we have an auth token at any path (not just root)
+      if ((location.hash && 
+          (location.hash.includes('access_token') || 
+           location.hash.includes('id_token') ||
+           location.hash.includes('type=recovery'))) ||
+          (location.search && 
+          (location.search.includes('code=') || 
+           location.search.includes('state=')))) {
+        console.log("AuthStateListener: Detected OAuth token or code in URL, redirecting to callback");
+        
+        // Redirect to the callback route with the hash and search params intact
+        const callbackUrl = '/callback' + location.search + location.hash;
+        navigate(callbackUrl, { replace: true });
+        return;
+      }
+    };
+    
+    // Handle any auth redirects in the URL 
+    try {
+      handleAuthRedirection();
+    } catch (error) {
+      console.error("Error handling auth redirection:", error);
     }
     
     // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth event:", event, "User:", session?.user?.email);
-      
-      // Only handle SIGNED_IN event when needed - prevent duplicate notifications
-      if (event === 'SIGNED_IN' && session?.user) {
-        console.log("SIGNED_IN event detected for:", session.user.id);
+    let subscription;
+    
+    try {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log("Auth event:", event, "User:", session?.user?.email);
         
-        try {
-          // Only update session silently - no toast notifications here
-          await createOrUpdateSession(session.user.id, window.location.pathname);
+        // Only handle SIGNED_IN event when needed - prevent duplicate notifications
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log("SIGNED_IN event detected for:", session.user.id);
           
-          // Process unprocessed entries after sign in, but with delay and only if user is fully set up
-          if (user?.id !== session.user.id) {
-            setTimeout(() => {
-              safelyProcessEntries();
-            }, 3000);
+          try {
+            // Only update session silently - no toast notifications here
+            await createOrUpdateSession(session.user.id, window.location.pathname);
+            
+            // Process unprocessed entries after sign in, but with delay and only if user is fully set up
+            if (user?.id !== session.user.id) {
+              setTimeout(() => {
+                safelyProcessEntries();
+              }, 3000);
+            }
+          } catch (err) {
+            console.error("Error creating session on sign in but continuing:", err);
           }
-        } catch (err) {
-          console.error("Error creating session on sign in but continuing:", err);
+        } else if (event === 'SIGNED_OUT' && user) {
+          console.log("SIGNED_OUT event detected for:", user.id);
+          
+          try {
+            await endUserSession(user.id);
+          } catch (err) {
+            console.error("Error ending session on sign out but continuing:", err);
+          }
         }
-      } else if (event === 'SIGNED_OUT' && user) {
-        console.log("SIGNED_OUT event detected for:", user.id);
-        
-        try {
-          await endUserSession(user.id);
-        } catch (err) {
-          console.error("Error ending session on sign out but continuing:", err);
-        }
-      }
-    });
+      });
+      
+      subscription = data.subscription;
+    } catch (error) {
+      console.error("Error setting up auth state listener:", error);
+      setStorageAccessFailed(true);
+    }
     
     // Check initial session
     const checkInitialSession = async () => {
@@ -155,6 +174,7 @@ const AuthStateListener = () => {
         }
       } catch (err) {
         console.error("Exception checking initial session but continuing:", err);
+        setStorageAccessFailed(true);
       }
     };
     
@@ -162,7 +182,7 @@ const AuthStateListener = () => {
     setTimeout(checkInitialSession, 500);
     
     return () => {
-      subscription.unsubscribe();
+      if (subscription) subscription.unsubscribe();
     };
   }, [location.pathname, location.hash, location.search, navigate, user, safelyProcessEntries, refreshSession]);
 

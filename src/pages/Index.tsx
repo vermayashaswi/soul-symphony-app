@@ -6,11 +6,13 @@ import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { createOrUpdateSession } from '@/utils/audio/auth-utils';
+import { toast } from 'sonner';
 
 export default function Index() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
   const [authChecked, setAuthChecked] = useState(false);
+  const [sessionTracked, setSessionTracked] = useState(false);
 
   // Add a timeout to prevent infinite loading state
   useEffect(() => {
@@ -30,17 +32,33 @@ export default function Index() {
 
   // Track session when user visits index page
   useEffect(() => {
-    if (user && !isLoading) {
+    if (user && !isLoading && !sessionTracked) {
       console.log("Index page: Tracking session for user", user.id);
-      createOrUpdateSession(user.id, '/')
-        .then(result => {
+      
+      // Add retry logic for session tracking
+      const trackSession = async () => {
+        try {
+          const result = await createOrUpdateSession(user.id, '/');
           console.log("Session tracking result:", result);
-        })
-        .catch(error => {
+          setSessionTracked(true);
+        } catch (error) {
           console.error("Error tracking session on index page:", error);
-        });
+          // We don't want to show this error to users since it's non-critical
+        }
+      };
+      
+      // Try session tracking with a backoff interval
+      const retryIntervals = [0, 1000, 3000]; // Retry immediately, then after 1s, then after 3s
+      
+      for (let i = 0; i < retryIntervals.length; i++) {
+        setTimeout(() => {
+          if (!sessionTracked) {
+            trackSession();
+          }
+        }, retryIntervals[i]);
+      }
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, sessionTracked]);
 
   const handleGetStarted = () => {
     if (user) {

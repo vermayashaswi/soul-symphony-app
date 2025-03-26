@@ -15,8 +15,9 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [refreshAttempted, setRefreshAttempted] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [silentError, setSilentError] = useState(false);
   
-  // Force complete the loading state after a shorter timeout
+  // Force complete the loading state after a short timeout
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!sessionChecked) {
@@ -24,7 +25,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         setSessionChecked(true);
         setRefreshAttempted(true);
       }
-    }, 800); // Further reduced timeout for faster UI response
+    }, 800); // Reduced timeout for faster UI response
     
     return () => clearTimeout(timeout);
   }, [sessionChecked]);
@@ -32,7 +33,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // Try to refresh the session if needed
   useEffect(() => {
     const handleSessionRefresh = async () => {
-      if (!user && !refreshAttempted && !isLoading) {
+      if (!user && !refreshAttempted && !isLoading && !silentError) {
         console.log("Protected route: No user found, attempting to refresh session", {
           path: location.pathname
         });
@@ -58,6 +59,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
           setSessionChecked(true);
         } catch (err) {
           console.error("Error refreshing session but continuing:", err);
+          setSilentError(true);
           setRefreshAttempted(true);
           setSessionChecked(true);
         }
@@ -79,7 +81,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
           console.error("Error tracking session but continuing:", err);
         });
     }
-  }, [user, isLoading, location, refreshAttempted, refreshSession, retryCount]);
+  }, [user, isLoading, location, refreshAttempted, refreshSession, retryCount, silentError]);
   
   // If we have a user, render the protected content immediately
   if (user) {

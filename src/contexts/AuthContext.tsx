@@ -28,6 +28,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profileCreationErrorShown, setProfileCreationErrorShown] = useState(false);
   const authTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Function to safely access localStorage with fallback
+  const safeLocalStorage = {
+    getItem: (key: string): string | null => {
+      try {
+        return localStorage.getItem(key);
+      } catch (e) {
+        console.warn('LocalStorage access error:', e);
+        return null;
+      }
+    },
+    setItem: (key: string, value: string): void => {
+      try {
+        localStorage.setItem(key, value);
+      } catch (e) {
+        console.warn('LocalStorage write error:', e);
+      }
+    },
+    removeItem: (key: string): void => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {
+        console.warn('LocalStorage remove error:', e);
+      }
+    }
+  };
+  
   // Function to handle profile creation with rate limiting
   const createUserProfile = useCallback(async (userId: string) => {
     if (!userId || profileCreationAttempted) return;
@@ -87,95 +113,106 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 2000);
     
     // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log('Auth state changed:', event);
-      
-      // Create a unique ID for this event to prevent duplicate processing
-      const eventId = `${event}-${Date.now()}`;
-      
-      // Check if we've already processed this event
-      if (authEventsProcessed.has(eventId)) {
-        console.log('Skipping duplicate auth event:', event);
-        return;
-      }
-      
-      // Mark this event as processed
-      setAuthEventsProcessed(prev => new Set(prev).add(eventId));
-      
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-      
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        // Only show toast for SIGNED_IN once per session
-        if (event === 'SIGNED_IN' && !user) {
-          toast.success('Signed in successfully');
+    let subscription: { unsubscribe: () => void } | null = null;
+    
+    try {
+      // Wrap in try/catch to handle storage access errors
+      const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+        console.log('Auth state changed:', event);
+        
+        // Create a unique ID for this event to prevent duplicate processing
+        const eventId = `${event}-${Date.now()}`;
+        
+        // Check if we've already processed this event
+        if (authEventsProcessed.has(eventId)) {
+          console.log('Skipping duplicate auth event:', event);
+          return;
         }
         
-        // Ensure user profile exists after sign-in
-        if (newSession?.user) {
-          // Reset profile creation flag on new sign-in
-          setProfileCreationAttempted(false);
-          
-          // Log user data for debugging
-          console.log('User data after sign-in:', {
-            id: newSession.user.id,
-            email: newSession.user.email,
-            name: newSession.user.user_metadata?.full_name,
-            avatar: newSession.user.user_metadata?.avatar_url
-          });
-          
-          try {
-            // Update the profile with Google info if available
-            if (newSession.user.app_metadata?.provider === 'google' && 
-                newSession.user.user_metadata?.full_name) {
-              try {
-                const { data: existingProfile } = await supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('id', newSession.user.id)
-                  .maybeSingle();
-                  
-                // Only update if it doesn't have data already
-                if (existingProfile && (!existingProfile?.full_name || !existingProfile?.avatar_url)) {
-                  await supabase
-                    .from('profiles')
-                    .update({
-                      full_name: newSession.user.user_metadata.full_name,
-                      avatar_url: newSession.user.user_metadata.avatar_url,
-                      email: newSession.user.email
-                    })
-                    .eq('id', newSession.user.id);
-                }
-              } catch (profileError) {
-                console.error('Error updating profile with Google data but continuing:', profileError);
-                // Continue even if this fails - the database trigger should have created the profile
-              }
-            }
-            
-            // Use a short delay to ensure other auth processing completes first
-            setTimeout(() => {
-              createUserProfile(newSession.user.id).catch(err => {
-                console.warn('Profile creation error on delayed attempt, but continuing:', err);
-              });
-            }, 500);
-          } catch (err) {
-            console.error('Profile creation error on auth state change, but continuing:', err);
+        // Mark this event as processed
+        setAuthEventsProcessed(prev => new Set(prev).add(eventId));
+        
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          // Only show toast for SIGNED_IN once per session
+          if (event === 'SIGNED_IN' && !user) {
+            toast.success('Signed in successfully');
           }
+          
+          // Ensure user profile exists after sign-in
+          if (newSession?.user) {
+            // Reset profile creation flag on new sign-in
+            setProfileCreationAttempted(false);
+            
+            // Log user data for debugging
+            console.log('User data after sign-in:', {
+              id: newSession.user.id,
+              email: newSession.user.email,
+              name: newSession.user.user_metadata?.full_name,
+              avatar: newSession.user.user_metadata?.avatar_url
+            });
+            
+            try {
+              // Update the profile with Google info if available
+              if (newSession.user.app_metadata?.provider === 'google' && 
+                  newSession.user.user_metadata?.full_name) {
+                try {
+                  const { data: existingProfile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', newSession.user.id)
+                    .maybeSingle();
+                    
+                  // Only update if it doesn't have data already
+                  if (existingProfile && (!existingProfile?.full_name || !existingProfile?.avatar_url)) {
+                    await supabase
+                      .from('profiles')
+                      .update({
+                        full_name: newSession.user.user_metadata.full_name,
+                        avatar_url: newSession.user.user_metadata.avatar_url,
+                        email: newSession.user.email
+                      })
+                      .eq('id', newSession.user.id);
+                  }
+                } catch (profileError) {
+                  console.error('Error updating profile with Google data but continuing:', profileError);
+                  // Continue even if this fails - the database trigger should have created the profile
+                }
+              }
+              
+              // Use a short delay to ensure other auth processing completes first
+              setTimeout(() => {
+                createUserProfile(newSession.user.id).catch(err => {
+                  console.warn('Profile creation error on delayed attempt, but continuing:', err);
+                });
+              }, 500);
+            } catch (err) {
+              console.error('Profile creation error on auth state change, but continuing:', err);
+            }
+          }
+          
+          // Always set loading to false after sign-in
+          setIsLoading(false);
+        } else if (event === 'SIGNED_OUT') {
+          toast.info('Signed out successfully');
+          setProfileCreationAttempted(false);
+          setProfileCreationErrorShown(false);
+          setIsLoading(false);
+        } else if (event === 'INITIAL_SESSION') {
+          // This event indicates the initial session check is complete
+          setInitialSessionCheckDone(true);
+          setIsLoading(false);
         }
-        
-        // Always set loading to false after sign-in
-        setIsLoading(false);
-      } else if (event === 'SIGNED_OUT') {
-        toast.info('Signed out successfully');
-        setProfileCreationAttempted(false);
-        setProfileCreationErrorShown(false);
-        setIsLoading(false);
-      } else if (event === 'INITIAL_SESSION') {
-        // This event indicates the initial session check is complete
-        setInitialSessionCheckDone(true);
-        setIsLoading(false);
-      }
-    });
+      });
+      
+      subscription = data.subscription;
+    } catch (error) {
+      console.error('Error setting up auth state listener:', error);
+      // Still mark as not loading even if we couldn't set up the listener
+      setIsLoading(false);
+    }
     
     // Check for existing session
     const checkInitialSession = async () => {
@@ -223,7 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     return () => {
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
-      subscription.unsubscribe();
+      if (subscription) subscription.unsubscribe();
     };
   }, [createUserProfile, authEventsProcessed]);
   
