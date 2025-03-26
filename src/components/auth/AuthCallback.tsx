@@ -3,13 +3,34 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/auth";
 
 const AuthCallback = () => {
   const [isProcessing, setIsProcessing] = useState(true);
+  const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { refreshSession } = useAuth();
+
+  // Set a timeout to prevent indefinite processing state
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isProcessing) {
+        console.log("Auth callback processing timed out");
+        setIsProcessing(false);
+        navigate("/auth", { replace: true });
+        toast.error("Authentication timed out. Please try again.");
+      }
+    }, 10000); // 10 seconds timeout
+    
+    setProcessingTimeout(timeout);
+    
+    return () => {
+      if (processingTimeout) {
+        clearTimeout(processingTimeout);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -101,37 +122,47 @@ const AuthCallback = () => {
         }
         
         // Check if we already have a session (fallback)
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error("Error getting existing session:", error);
-          toast.error("Authentication error: " + error.message);
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error("Error getting existing session:", error);
+            toast.error("Authentication error: " + error.message);
+            navigate("/auth", { replace: true });
+            return;
+          }
+          
+          if (data.session) {
+            console.log("Successfully retrieved existing session");
+            await refreshSession();
+            toast.success("Successfully signed in!");
+            navigate("/journal", { replace: true });
+            return;
+          }
+          
+          // If we reach here, we couldn't establish a session
+          console.log("No session could be established in the callback handler");
+          navigate("/auth", { replace: true });
+        } catch (sessionError) {
+          console.error("Error retrieving session:", sessionError);
+          toast.error("Authentication error occurred");
           navigate("/auth", { replace: true });
           return;
         }
-        
-        if (data.session) {
-          console.log("Successfully retrieved existing session");
-          await refreshSession();
-          toast.success("Successfully signed in!");
-          navigate("/journal", { replace: true });
-          return;
-        }
-        
-        // If we reach here, we couldn't establish a session
-        console.log("No session could be established in the callback handler");
-        navigate("/auth", { replace: true });
       } catch (error) {
         console.error("Unexpected error in auth callback:", error);
         toast.error("An unexpected error occurred during authentication");
         navigate("/auth", { replace: true });
       } finally {
+        if (processingTimeout) {
+          clearTimeout(processingTimeout);
+        }
         setIsProcessing(false);
       }
     };
 
     handleAuthCallback();
-  }, [navigate, refreshSession, location]);
+  }, [navigate, refreshSession, location, processingTimeout]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

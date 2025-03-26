@@ -1,9 +1,9 @@
 
 import { useEffect, useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { createOrUpdateSession, endUserSession } from "@/utils/audio/auth-utils";
+import { createOrUpdateSession, endUserSession } from "@/utils/audio/auth-profile";
 import { useJournalHandler } from "@/hooks/use-journal-handler";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ const AuthStateListener = () => {
   const { processUnprocessedEntries } = useJournalHandler(user?.id);
   const [storageAccessFailed, setStorageAccessFailed] = useState(false);
   const [processAttempted, setProcessAttempted] = useState(false);
+  const [isProcessingAuthEvent, setIsProcessingAuthEvent] = useState(false);
   
   // Create a function to process entries with retry logic
   const safelyProcessEntries = useCallback(async () => {
@@ -42,6 +43,12 @@ const AuthStateListener = () => {
     console.log("AuthStateListener: Setting up authentication listener");
     
     const handleAuthRedirection = () => {
+      // Prevent processing multiple auth events at once
+      if (isProcessingAuthEvent) {
+        console.log("Already processing an auth event, skipping");
+        return;
+      }
+      
       // Skip handling token redirects if we're already on callback or auth routes
       if (location.pathname === '/callback' || 
           location.pathname === '/auth/callback' || 
@@ -59,6 +66,8 @@ const AuthStateListener = () => {
            location.search.includes('state=')))) {
         console.log("AuthStateListener: Detected OAuth token or code in URL, redirecting to callback");
         
+        setIsProcessingAuthEvent(true);
+        
         // Redirect to the callback route with the hash and search params intact
         const callbackUrl = '/callback' + location.search + location.hash;
         navigate(callbackUrl, { replace: true });
@@ -71,6 +80,7 @@ const AuthStateListener = () => {
       handleAuthRedirection();
     } catch (error) {
       console.error("Error handling auth redirection:", error);
+      setIsProcessingAuthEvent(false);
     }
     
     // Set up auth state change listener with error handling
@@ -101,6 +111,8 @@ const AuthStateListener = () => {
             }
           } catch (err) {
             console.error("Error creating session on sign in but continuing:", err);
+          } finally {
+            setIsProcessingAuthEvent(false);
           }
         } else if (event === 'SIGNED_OUT') {
           if (user) {
@@ -116,6 +128,7 @@ const AuthStateListener = () => {
           
           // Reset flags on sign out
           setProcessAttempted(false);
+          setIsProcessingAuthEvent(false);
         }
       });
       
@@ -123,6 +136,7 @@ const AuthStateListener = () => {
     } catch (error) {
       console.error("Error setting up auth state listener:", error);
       setStorageAccessFailed(true);
+      setIsProcessingAuthEvent(false);
     }
     
     // Check initial session - with error handling
@@ -132,6 +146,7 @@ const AuthStateListener = () => {
         
         if (error) {
           console.error("Initial session check error but continuing:", error);
+          setIsProcessingAuthEvent(false);
           return;
         }
         
@@ -165,9 +180,12 @@ const AuthStateListener = () => {
             console.error("Error refreshing session on initial load but continuing:", err);
           });
         }
+        
+        setIsProcessingAuthEvent(false);
       } catch (err) {
         console.error("Exception checking initial session but continuing:", err);
         setStorageAccessFailed(true);
+        setIsProcessingAuthEvent(false);
       }
     };
     
@@ -177,7 +195,17 @@ const AuthStateListener = () => {
     return () => {
       if (subscription) subscription.unsubscribe();
     };
-  }, [location.pathname, location.hash, location.search, navigate, user, safelyProcessEntries, refreshSession, processAttempted]);
+  }, [
+    location.pathname, 
+    location.hash, 
+    location.search, 
+    navigate, 
+    user, 
+    safelyProcessEntries, 
+    refreshSession, 
+    processAttempted, 
+    isProcessingAuthEvent
+  ]);
 
   return null;
 };

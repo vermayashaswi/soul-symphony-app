@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import ParticleBackground from "./components/ParticleBackground";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider } from "./contexts/auth";
 import AppRoutes from "./components/routes/AppRoutes";
 
 const App = () => {

@@ -1,8 +1,8 @@
 
 import { useState, useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { createOrUpdateSession } from "@/utils/audio/auth-utils";
+import { useAuth } from "@/contexts/auth";
+import { createOrUpdateSession } from "@/utils/audio/auth-profile";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ProtectedRouteProps {
@@ -16,6 +16,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [silentError, setSilentError] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Force complete the loading state after a short timeout to prevent getting stuck
   useEffect(() => {
@@ -24,8 +25,9 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         console.log('Force completing session check due to timeout');
         setSessionChecked(true);
         setRefreshAttempted(true);
+        setIsCheckingAuth(false);
       }
-    }, 1500); // Increased timeout for better reliability
+    }, 2000); // Reduced timeout for faster fallback
     
     return () => clearTimeout(timeout);
   }, [sessionChecked]);
@@ -33,8 +35,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // Try to refresh the session if needed - with error handling
   useEffect(() => {
     const handleSessionRefresh = async () => {
-      // Skip if we already have user, already tried refreshing, or are still loading
-      if (user || refreshAttempted || isLoading || silentError) {
+      // Skip if we already have user, already tried refreshing, are still loading, or have error
+      if (user || refreshAttempted || !isCheckingAuth || silentError) {
         return;
       }
       
@@ -43,6 +45,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       });
       
       try {
+        setIsCheckingAuth(true);
         const success = await refreshSession();
         console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
         
@@ -61,11 +64,13 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         
         setRefreshAttempted(true);
         setSessionChecked(true);
+        setIsCheckingAuth(false);
       } catch (err) {
         console.error("Error refreshing session but continuing:", err);
         setSilentError(true);
         setRefreshAttempted(true);
         setSessionChecked(true);
+        setIsCheckingAuth(false);
       }
     };
     
@@ -85,9 +90,20 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       if (!sessionChecked) {
         setSessionChecked(true);
         setRefreshAttempted(true);
+        setIsCheckingAuth(false);
       }
     }
-  }, [user, isLoading, location, refreshAttempted, refreshSession, retryCount, silentError, sessionChecked]);
+  }, [
+    user, 
+    isLoading, 
+    location, 
+    refreshAttempted, 
+    refreshSession, 
+    retryCount, 
+    silentError, 
+    sessionChecked,
+    isCheckingAuth
+  ]);
   
   // If we have a user, render the protected content immediately
   if (user) {
@@ -95,7 +111,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
   
   // If we've checked the session, completed loading, and still don't have a user, redirect to auth
-  if ((sessionChecked && refreshAttempted) || !isLoading) {
+  if ((sessionChecked && refreshAttempted) || !isLoading || !isCheckingAuth) {
     console.log("Redirecting to auth from protected route:", location.pathname);
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
