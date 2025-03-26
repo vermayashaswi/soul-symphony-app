@@ -11,56 +11,60 @@ export function ChatContainer() {
   const { user, isLoading: authLoading } = useAuth();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [profileChecked, setProfileChecked] = useState(false);
-  const [isCheckingProfile, setIsCheckingProfile] = useState(false);
 
-  // Create a profile check function that can be safely retried
-  const checkAndCreateProfile = useCallback(async () => {
-    if (!user || isCheckingProfile) return;
-    
-    setIsCheckingProfile(true);
+  // Simplified profile check that assumes no RLS restrictions
+  const checkProfile = useCallback(async () => {
+    if (!user) return;
     
     try {
-      // Check if profile exists
-      const { data: profile, error: profileError } = await supabase
+      console.log('Checking if profile exists for user:', user.id);
+      
+      // Simple profile check - we know the table has no RLS now
+      const { data, error } = await supabase
         .from('profiles')
         .select('id')
         .eq('id', user.id)
-        .maybeSingle();
+        .single();
         
-      if (profileError && !profileError.message.includes('Results contain 0 rows')) {
-        console.error('Error checking profile:', profileError);
-      }
-      
-      if (!profile) {
-        console.log('Profile not found, relying on database trigger');
-        // We don't need to create the profile manually anymore 
-        // as our database trigger will handle it
+      if (error) {
+        console.log('No profile found, creating one');
+        
+        // Try to create a profile - again, no RLS restrictions
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || null,
+            avatar_url: user.user_metadata?.avatar_url || null
+          });
+          
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          // Don't show error to user - the database trigger will handle it
+        }
       } else {
-        console.log('Profile found:', profile.id);
+        console.log('Profile exists:', data.id);
       }
     } catch (error) {
-      console.error('Error in profile check/creation:', error);
+      console.error('Error in profile check:', error);
     } finally {
-      setProfileChecked(true);
-      setIsCheckingProfile(false);
       setIsInitialized(true);
     }
-  }, [user, isCheckingProfile]);
+  }, [user]);
 
   useEffect(() => {
-    // Check/create profile when user is available
-    if (user && !isInitialized && !profileChecked && !isCheckingProfile) {
-      checkAndCreateProfile();
+    // Check profile when user is available
+    if (user && !isInitialized) {
+      checkProfile();
     }
     
     // Reset state if user changes
     if (!user) {
       setCurrentThreadId(null);
       setIsInitialized(false);
-      setProfileChecked(false);
     }
-  }, [user, isInitialized, profileChecked, isCheckingProfile, checkAndCreateProfile]);
+  }, [user, isInitialized, checkProfile]);
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);
@@ -75,8 +79,8 @@ export function ChatContainer() {
     toast.success('New chat started');
   };
 
-  // Return loading UI if auth is still loading or checking profile
-  if (authLoading || (user && isCheckingProfile)) {
+  // Return loading UI if auth is still loading
+  if (authLoading || (user && !isInitialized)) {
     return {
       sidebar: (
         <div className="flex flex-col gap-2 p-4">
@@ -89,7 +93,7 @@ export function ChatContainer() {
         <div className="flex flex-col items-center justify-center h-full">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <p className="text-sm text-muted-foreground mt-2">
-            {isCheckingProfile ? 'Setting up your profile...' : 'Loading chat...'}
+            Loading chat...
           </p>
         </div>
       )

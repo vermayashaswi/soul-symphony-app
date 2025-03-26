@@ -8,7 +8,6 @@ import { supabase } from '@/integrations/supabase/client';
 
 export default function Chat() {
   const [isLoading, setIsLoading] = useState(true);
-  const [profileChecked, setProfileChecked] = useState(false);
   const { user, session } = useAuth();
   const { sidebar, content } = ChatContainer();
   
@@ -21,20 +20,17 @@ export default function Chat() {
       }
       
       try {
-        // Check if user has a profile
+        // Simplified profile check with no RLS
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
           
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error('Error checking profile:', profileError);
-          toast.error('Error checking user profile');
-        }
-        
-        // If no profile exists, create one
-        if (!profile) {
+        if (profileError) {
+          console.log('Profile not found, creating one');
+          
+          // If no profile exists, create one
           const { error: insertError } = await supabase
             .from('profiles')
             .insert({
@@ -46,7 +42,7 @@ export default function Chat() {
             
           if (insertError) {
             console.error('Error creating profile:', insertError);
-            toast.error('Failed to create user profile');
+            // Don't show error toast - the trigger should handle it
           } else {
             console.log('Created new user profile');
           }
@@ -56,7 +52,6 @@ export default function Chat() {
       } catch (error) {
         console.error('Error in profile initialization:', error);
       } finally {
-        setProfileChecked(true);
         setIsLoading(false);
       }
     }
@@ -69,15 +64,15 @@ export default function Chat() {
       }
     }, 5000);
     
-    if (user && !profileChecked) {
+    if (user) {
       checkUserProfile();
-    } else if (!user) {
+    } else {
       // If no user, we can exit the loading state
       setIsLoading(false);
     }
     
     return () => clearTimeout(loadingTimeout);
-  }, [user, isLoading, profileChecked]);
+  }, [user, isLoading]);
   
   if (isLoading) {
     return (

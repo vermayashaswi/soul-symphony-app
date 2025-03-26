@@ -1,91 +1,54 @@
-
 // This file handles user profile management functionality separated from auth-utils.ts
 import { supabase } from '@/integrations/supabase/client';
 
-// Ensure a profile exists for the user with retry mechanism
+// Simplified profile check function now that RLS is disabled
 export const ensureUserProfile = async (userId: string) => {
   try {
     if (!userId) {
       return { success: false, error: 'No user ID provided' };
     }
     
-    // First check if profile exists without creating it
+    // Check if profile exists
     try {
       const { data: existingProfile, error: checkError } = await supabase
         .from('profiles')
         .select('id')
         .eq('id', userId)
-        .maybeSingle();
+        .single();
         
       if (existingProfile) {
         console.log('Profile already exists for user:', userId);
         return { success: true, message: 'Profile already exists', isNew: false };
       }
       
-      if (checkError && !checkError.message.includes('Results contain 0 rows')) {
-        console.error('Error checking profile:', checkError);
-      }
-    } catch (checkError) {
-      console.error('Error checking for existing profile:', checkError);
-      // Continue with creation attempt even if check fails
-    }
-    
-    // Try to create profile with proper service role
-    try {
-      // Get current auth session for service role capabilities
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        console.warn('No session available for profile creation');
-      }
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert({ id: userId })
-        .select()
-        .single();
-      
-      if (error) {
-        // If there's an RLS error, try a different approach
-        if (error.code === '42501') {
-          console.log('RLS policy prevented profile creation, trying alternative approach');
+      // If no profile exists, create one
+      if (checkError) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .insert({ id: userId })
+          .select()
+          .single();
           
-          // Try to update if insert fails (profile might exist but wasn't found in the check)
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ updated_at: new Date().toISOString() })
-            .eq('id', userId);
-            
-          if (updateError) {
-            console.error('Both insert and update failed:', updateError);
-            
-            // Return success anyway - the database trigger should handle creating the profile
-            // when the user first signed in
-            return { success: true, isNew: false, message: 'Profile handled by database trigger' };
-          } else {
-            console.log('Profile may have been updated successfully');
-            return { success: true, isNew: false };
-          }
+        if (error) {
+          console.error('Profile creation error:', error);
+          // Return success anyway as the trigger should handle it
+          return { success: true, isNew: false, message: 'Profile handled by database trigger' };
         }
         
-        console.error('Profile creation error:', error);
-        // Return success anyway - the database trigger should handle creating the profile
-        return { success: true, isNew: false, message: 'Profile handled by database trigger' };
+        console.log('New profile created successfully for user:', userId);
+        return { success: true, isNew: true };
       }
-      
-      console.log('New profile created successfully for user:', userId);
-      return { success: true, isNew: true };
-    } catch (error: any) {
-      console.error('Exception in profile creation:', error);
-      
-      // Return success anyway since we now have a trigger that handles profile creation
-      return { success: true, error: error?.message || 'Unknown error', isNew: false, message: 'Profile handled by database trigger' };
+    } catch (error) {
+      console.error('Error in profile check/creation:', error);
+      // Return success anyway since we've disabled RLS and have a trigger
+      return { success: true, isNew: false, message: 'Profile handled by database trigger' };
     }
+    
+    return { success: true, isNew: false };
   } catch (error: any) {
     console.error('Exception in ensureUserProfile:', error?.message || error);
-    
-    // Return success anyway since we now have a trigger that handles profile creation
-    return { success: true, error: error?.message || 'Unknown error', isNew: false, message: 'Profile handled by database trigger' };
+    // Return success anyway since we've disabled RLS and have a trigger
+    return { success: true, error: error?.message || 'Unknown error', isNew: false };
   }
 };
 

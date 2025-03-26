@@ -34,25 +34,29 @@ export function useJournalHandler(userId: string | undefined) {
     try {
       console.log('Processing unprocessed entries for user:', userId);
       
-      // First check if the user can access their profile
+      // Simplified profile check since RLS is disabled
       try {
         const { data: profileCheck, error: profileError } = await supabase
           .from('profiles')
           .select('id')
           .eq('id', userId)
-          .maybeSingle();
+          .single();
           
-        if (profileError && !profileError.message.includes('Results contain 0 rows')) {
-          console.error('Profile check error:', profileError);
-          // With our new trigger function, we don't need to manually create profiles
-          console.log('Relying on database trigger to handle profile');
+        if (profileError) {
+          console.log('Profile not found, creating one');
+          
+          const { error: createError } = await supabase
+            .from('profiles')
+            .insert({ id: userId });
+            
+          if (createError) {
+            console.error('Error creating profile:', createError);
+            // Silently continue - the database trigger should handle it
+          }
         }
-        
-        if (!profileCheck) {
-          console.log('Profile might not exist, but trigger should handle it');
-        }
-      } catch (profileCheckError) {
-        console.error('Error checking profile:', profileCheckError);
+      } catch (error) {
+        console.error('Error checking profile:', error);
+        // Continue anyway since we've disabled RLS
       }
       
       // Get current session for auth

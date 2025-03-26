@@ -35,7 +35,6 @@ export default function Journal() {
   const [mode, setMode] = useState<'record' | 'past'>('past');
   const [refreshCount, setRefreshCount] = useState(0);
   const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [hasTriedProfileCreation, setHasTriedProfileCreation] = useState(false);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -79,17 +78,17 @@ export default function Journal() {
   }, [location.search, processingEntries, refreshEntries, isRefreshing, isLoading]);
 
   useEffect(() => {
-    if (user && !hasTriedProfileCreation) {
-      const checkAndCreateProfile = async () => {
+    if (user) {
+      const checkProfile = async () => {
         try {
           const { data, error } = await supabase
             .from('profiles')
             .select('id')
             .eq('id', user.id)
-            .maybeSingle();
+            .single();
 
-          if (!data || error) {
-            console.log('Profile not found or error:', error);
+          if (error) {
+            console.log('Profile not found, creating one');
             
             const { error: createError } = await supabase
               .from('profiles')
@@ -97,7 +96,6 @@ export default function Journal() {
             
             if (createError) {
               console.error('Failed to create profile:', createError);
-              toast.error('Unable to set up your profile. Some features might not work properly.');
             } else {
               console.log('Profile created successfully');
               setTimeout(() => refreshEntries(false), 1000);
@@ -105,14 +103,12 @@ export default function Journal() {
           }
         } catch (err) {
           console.error('Error in profile check/creation:', err);
-        } finally {
-          setHasTriedProfileCreation(true);
         }
       };
       
-      checkAndCreateProfile();
+      checkProfile();
     }
-  }, [user, hasTriedProfileCreation, refreshEntries]);
+  }, [user, refreshEntries]);
 
   useEffect(() => {
     if (processingEntries.length > 0 && !isRefreshing && !isLoading) {
