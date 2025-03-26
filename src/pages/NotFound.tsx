@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "sonner";
 
 const NotFound = () => {
   const location = useLocation();
@@ -28,7 +27,10 @@ const NotFound = () => {
       location.search.includes('code=') ||
       // Provider-specific parameters
       location.hash.includes('provider=google') ||
-      location.search.includes('provider=google');
+      location.search.includes('provider=google') ||
+      // Additional checks
+      location.search.includes('state=') ||  // OAuth state parameter
+      location.search.includes('session_id='); // Session related parameter
                           
     if (isFromAuthRedirect) {
       console.log("NotFound: Detected auth redirect, navigating to callback handler");

@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,19 +19,23 @@ const AuthStateListener = () => {
     console.log("Current hash:", location.hash ? "Present (contains tokens)" : "None");
     
     // Skip handling token redirects if we're already on callback or auth routes
+    // or if we're already in the process of handling an auth redirect
     if (location.pathname === '/callback' || location.pathname === '/auth') {
       console.log("Already on callback or auth route, not redirecting");
       return;
     }
     
     // Check if we have an auth token at any path (not just root)
-    if (location.hash && 
+    if ((location.hash && 
         (location.hash.includes('access_token') || 
          location.hash.includes('id_token') ||
-         location.hash.includes('type=recovery'))) {
-      console.log("AuthStateListener: Detected OAuth token in URL hash, redirecting to callback");
-      // Redirect to the callback route with the hash intact
-      navigate('/callback' + location.hash, { replace: true });
+         location.hash.includes('type=recovery'))) ||
+        (location.search && 
+        (location.search.includes('code=') || 
+         location.search.includes('state=')))) {
+      console.log("AuthStateListener: Detected OAuth token or code in URL, redirecting to callback");
+      // Redirect to the callback route with the hash and search params intact
+      navigate('/callback' + location.search + location.hash, { replace: true });
       return;
     }
     
@@ -104,7 +109,7 @@ const AuthStateListener = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [location.pathname, location.hash, navigate, user, processUnprocessedEntries, refreshSession]);
+  }, [location.pathname, location.hash, location.search, navigate, user, processUnprocessedEntries, refreshSession]);
 
   return null;
 };

@@ -21,30 +21,29 @@ const AuthCallback = () => {
         console.log("Search params:", location.search || "None");
         
         // Handle various authentication callback scenarios
-        if (location.hash) {
+        if (location.hash && (location.hash.includes('access_token') || location.hash.includes('id_token'))) {
           console.log("Processing hash-based auth callback");
           
           try {
-            // Use the correct method to exchange the code for a session
-            const { data, error } = await supabase.auth.getSessionFromUrl({
-              url: window.location.href,
-            });
+            // Handle the OAuth callback with the correct method
+            // For access_token in hash (implicit flow)
+            const { data, error } = await supabase.auth.getSession();
             
             if (error) {
-              console.error("Error getting session from URL:", error);
+              console.error("Error getting session:", error);
               toast.error("Authentication error: " + error.message);
               navigate("/auth", { replace: true });
               return;
             }
             
             if (data?.session) {
-              console.log("Successfully created session from URL");
+              console.log("Successfully created session from hash");
               await refreshSession();
               toast.success("Successfully signed in!");
               navigate("/journal", { replace: true });
               return;
             } else {
-              console.log("No session data returned from getSessionFromUrl");
+              console.log("No session data returned from hash processing");
             }
           } catch (hashProcessingError) {
             console.error("Error processing auth callback:", hashProcessingError);
@@ -64,24 +63,25 @@ const AuthCallback = () => {
           }
           
           try {
-            // Use getSessionFromUrl which works for both hash and query parameter flows
-            const { data, error } = await supabase.auth.getSessionFromUrl({
-              url: window.location.href,
-            });
-            
-            if (error) {
-              console.error("Error getting session from URL (query params):", error);
-              toast.error("Authentication error: " + error.message);
-              navigate("/auth", { replace: true });
-              return;
-            }
-            
-            if (data?.session) {
-              console.log("Successfully created session from URL (query params)");
-              await refreshSession();
-              toast.success("Successfully signed in!");
-              navigate("/journal", { replace: true });
-              return;
+            // Handle the authorization code (code=) flow
+            const code = new URLSearchParams(location.search).get('code');
+            if (code) {
+              const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+              
+              if (error) {
+                console.error("Error exchanging code for session:", error);
+                toast.error("Authentication error: " + error.message);
+                navigate("/auth", { replace: true });
+                return;
+              }
+              
+              if (data?.session) {
+                console.log("Successfully created session from code");
+                await refreshSession();
+                toast.success("Successfully signed in!");
+                navigate("/journal", { replace: true });
+                return;
+              }
             }
           } catch (queryProcessingError) {
             console.error("Error processing query params:", queryProcessingError);
