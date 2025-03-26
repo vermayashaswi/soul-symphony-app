@@ -35,7 +35,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const testDatabaseConnection = useCallback(async () => {
     console.log('Testing database connection...');
     try {
-      // Use a simple direct query instead of rpc to check database health
+      // Use a simple direct query to check database health
       const { data, error: healthError } = await supabase
         .from('profiles')
         .select('id')
@@ -60,6 +60,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   }, []);
 
+  // Check initial database connection
   useEffect(() => {
     const checkConnection = async () => {
       try {
@@ -95,6 +96,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     checkConnection();
   }, [testDatabaseConnection]);
 
+  // Main function to fetch entries
   const fetchEntries = useCallback(async () => {
     if (!userId) {
       console.log('No userId provided to useJournalEntries');
@@ -127,6 +129,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       console.log(`Fetching entries for user ${userId}`);
       
+      // Add a small delay to allow UI to update
       await new Promise(resolve => setTimeout(resolve, 200));
       
       if (fetchTimeout) {
@@ -471,6 +474,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     };
   }, [loadError, loading, fetchEntries, retryAttempt, isRetrying, MAX_RETRY_ATTEMPTS, fetchTimeout, connectionStatus]);
 
+  // Force complete loading state after timeout
   useEffect(() => {
     const forceCompleteTimeout = setTimeout(() => {
       if (loading) {
@@ -489,6 +493,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     };
   }, [loading, connectionStatus]);
 
+  // Initial data fetch when user is available
   useEffect(() => {
     if (userId && connectionStatus === 'connected') {
       setRetryAttempt(0);
