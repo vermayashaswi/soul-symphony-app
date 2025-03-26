@@ -41,8 +41,8 @@ export const checkSupabaseConnection = async () => {
       .from('profiles')
       .select('id')
       .limit(1)
-      .timeout(5000); // Add 5s timeout for the query
-    
+      // Remove the timeout method as it's not supported in the current version
+      
     const duration = Date.now() - start;
     
     if (error) {
