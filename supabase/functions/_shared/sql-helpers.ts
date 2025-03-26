@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS public.journal_embeddings (
 CREATE INDEX IF NOT EXISTS journal_embeddings_journal_entry_id_idx ON public.journal_embeddings (journal_entry_id);
 `;
 
+// This function definition matches what you manually created in Supabase
 export const matchJournalEntries = `
 CREATE OR REPLACE FUNCTION public.match_journal_entries(
   query_embedding VECTOR(1536),
@@ -39,6 +40,8 @@ RETURNS TABLE (
   similarity FLOAT
 )
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   user_id_text TEXT;
@@ -78,6 +81,8 @@ CREATE OR REPLACE FUNCTION public.store_user_query(
 )
 RETURNS UUID
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   new_id UUID;

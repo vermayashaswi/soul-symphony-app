@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -25,7 +25,7 @@ export function useSearch(userId: string | undefined): UseSearchReturn {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const search = async (query: string) => {
+  const search = useCallback(async (query: string) => {
     if (!query.trim()) {
       toast.error('Please enter a search query');
       return;
@@ -40,6 +40,8 @@ export function useSearch(userId: string | undefined): UseSearchReturn {
     setSearchQuery(query);
 
     try {
+      // Invoke the edge function which handles the database interactions
+      // This avoids direct interaction with the modified match_journal_entries function
       const response = await supabase.functions.invoke('search-journal', {
         body: {
           query: query.trim(),
@@ -52,6 +54,7 @@ export function useSearch(userId: string | undefined): UseSearchReturn {
       if (response.error) {
         console.error('Search error:', response.error);
         toast.error('Failed to search journal entries');
+        setIsSearching(false);
         return;
       }
 
@@ -70,12 +73,12 @@ export function useSearch(userId: string | undefined): UseSearchReturn {
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [userId]);
 
-  const clearResults = () => {
+  const clearResults = useCallback(() => {
     setSearchResults([]);
     setSearchQuery('');
-  };
+  }, []);
 
   return {
     searchResults,

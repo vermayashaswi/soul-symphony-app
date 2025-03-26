@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -18,7 +18,7 @@ export function useJournalHandler(userId: string | undefined) {
     navigate('/insights');
   };
 
-  const processUnprocessedEntries = async () => {
+  const processUnprocessedEntries = useCallback(async () => {
     if (!userId) {
       console.log('Cannot process entries: No user ID provided');
       return { success: false, processed: 0 };
@@ -126,7 +126,7 @@ export function useJournalHandler(userId: string | undefined) {
       setIsProcessing(false);
       return { success: false, processed: 0 };
     }
-  };
+  }, [userId, isProcessing]);
 
   return {
     handleCreateJournal,

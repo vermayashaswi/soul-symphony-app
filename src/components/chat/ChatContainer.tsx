@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import ChatArea from '@/components/chat/ChatArea';
@@ -14,44 +14,48 @@ export function ChatContainer() {
   const [profileChecked, setProfileChecked] = useState(false);
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
 
+  // Create a profile check function that can be safely retried
+  const checkAndCreateProfile = useCallback(async () => {
+    if (!user || isCheckingProfile) return;
+    
+    setIsCheckingProfile(true);
+    
+    try {
+      // Check if profile exists
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+        
+      if (profileError || !profile) {
+        console.log('Profile not found or error, trying to create one:', profileError);
+        
+        // Try to create profile
+        const { error: createError } = await supabase
+          .from('profiles')
+          .insert([{ id: user.id }]);
+          
+        if (createError) {
+          console.error('Failed to create profile:', createError);
+          // Don't show error toast here as it could appear multiple times
+          // Instead, we'll set profile checked to true anyway to prevent infinite retries
+        } else {
+          console.log('Profile created successfully');
+        }
+      }
+    } catch (error) {
+      console.error('Error in profile check/creation:', error);
+    } finally {
+      setProfileChecked(true);
+      setIsCheckingProfile(false);
+      setIsInitialized(true);
+    }
+  }, [user, isCheckingProfile]);
+
   useEffect(() => {
     // Check/create profile when user is available
     if (user && !isInitialized && !profileChecked && !isCheckingProfile) {
-      setIsCheckingProfile(true);
-      
-      const checkAndCreateProfile = async () => {
-        try {
-          // Check if profile exists
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', user.id)
-            .maybeSingle();
-            
-          if (profileError || !profile) {
-            console.log('Profile not found or error, trying to create one:', profileError);
-            
-            // Try to create profile
-            const { error: createError } = await supabase
-              .from('profiles')
-              .insert([{ id: user.id }]);
-              
-            if (createError) {
-              console.error('Failed to create profile:', createError);
-              toast.error('Failed to set up your profile. Some features may not work properly.');
-            } else {
-              console.log('Profile created successfully');
-            }
-          }
-        } catch (error) {
-          console.error('Error in profile check/creation:', error);
-        } finally {
-          setProfileChecked(true);
-          setIsCheckingProfile(false);
-          setIsInitialized(true);
-        }
-      };
-      
       checkAndCreateProfile();
     }
     
@@ -61,7 +65,7 @@ export function ChatContainer() {
       setIsInitialized(false);
       setProfileChecked(false);
     }
-  }, [user, isInitialized, profileChecked, isCheckingProfile]);
+  }, [user, isInitialized, profileChecked, isCheckingProfile, checkAndCreateProfile]);
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);

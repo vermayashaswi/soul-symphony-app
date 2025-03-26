@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,44 +17,53 @@ export default function Record() {
   const [recordingCompleted, setRecordingCompleted] = useState(false);
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
 
+  // Create a profile check function that can be safely retried
+  const checkUserProfile = useCallback(async () => {
+    if (!user || isCheckingProfile) return;
+    
+    setIsCheckingProfile(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+        
+      if (error || !data) {
+        console.log('Profile check error or not found:', error);
+        
+        // Try to create profile
+        const { error: createError } = await supabase
+          .from('profiles')
+          .insert([{ id: user.id }]);
+          
+        if (createError) {
+          console.error('Failed to create profile:', createError);
+          // Don't show error toast here as it could appear multiple times
+        } else {
+          console.log('Profile created successfully');
+        }
+      }
+    } catch (err) {
+      console.error('Error checking profile:', err);
+    } finally {
+      setIsCheckingProfile(false);
+    }
+  }, [user, isCheckingProfile]);
+
   useEffect(() => {
     // Check if user profile exists when component mounts
     if (user && !isCheckingProfile) {
-      setIsCheckingProfile(true);
-      
-      const checkUserProfile = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', user.id)
-            .maybeSingle();
-            
-          if (error || !data) {
-            console.log('Profile check error or not found:', error);
-            
-            // Try to create profile
-            const { error: createError } = await supabase
-              .from('profiles')
-              .insert([{ id: user.id }]);
-              
-            if (createError) {
-              console.error('Failed to create profile:', createError);
-              toast.error('Failed to set up your profile. Some features may not work properly.');
-            } else {
-              console.log('Profile created successfully');
-            }
-          }
-        } catch (err) {
-          console.error('Error checking profile:', err);
-        } finally {
-          setIsCheckingProfile(false);
-        }
-      };
-      
       checkUserProfile();
     }
-  }, [user, isCheckingProfile]);
+    
+    // Reset state when component unmounts
+    return () => {
+      setIsNavigating(false);
+      setRecordingCompleted(false);
+    };
+  }, [user, isCheckingProfile, checkUserProfile]);
 
   const handleRecordingComplete = async (audioBlob: Blob, tempId?: string) => {
     console.log('Recording completed, tempId:', tempId);
@@ -88,14 +97,6 @@ export default function Record() {
       toast.error('Error navigating after saving journal entry');
     }
   };
-
-  // Reset state when component unmounts
-  useEffect(() => {
-    return () => {
-      setIsNavigating(false);
-      setRecordingCompleted(false);
-    };
-  }, []);
 
   const handleToggleMode = (value: string) => {
     if (value === 'past' && !isNavigating) {
