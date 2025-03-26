@@ -55,8 +55,7 @@ const AuthCallback = () => {
           console.log("Processing hash-based auth callback");
           
           try {
-            // When we have a hash with access_token, Supabase has already processed this
-            // We just need to check if we have a valid session
+            // Explicitly exchange hash values for a session
             const { data, error } = await supabase.auth.getSession();
             
             if (error) {
@@ -68,6 +67,19 @@ const AuthCallback = () => {
             
             if (data?.session) {
               console.log("Successfully authenticated with hash");
+              console.log("Session details:", {
+                userId: data.session.user.id,
+                expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
+                tokenLength: data.session.access_token.length
+              });
+              
+              // Force storage sync after successful authentication
+              try {
+                localStorage.setItem('sb-last-auth-time', Date.now().toString());
+              } catch (e) {
+                console.warn('LocalStorage access error, but continuing:', e);
+              }
+              
               await refreshSession();
               toast.success("Successfully signed in!");
               navigate("/journal", { replace: true });
@@ -105,6 +117,8 @@ const AuthCallback = () => {
           try {
             const code = new URLSearchParams(location.search).get('code');
             if (code) {
+              // Code flow - exchange the code for a session
+              console.log("Exchanging code for session...");
               const { data, error } = await supabase.auth.exchangeCodeForSession(code);
               
               if (error) {
@@ -116,6 +130,19 @@ const AuthCallback = () => {
               
               if (data?.session) {
                 console.log("Successfully created session from code");
+                console.log("Session details:", {
+                  userId: data.session.user.id,
+                  expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
+                  tokenLength: data.session.access_token.length
+                });
+                
+                // Force storage sync after successful authentication
+                try {
+                  localStorage.setItem('sb-last-auth-time', Date.now().toString());
+                } catch (e) {
+                  console.warn('LocalStorage access error, but continuing:', e);
+                }
+                
                 await refreshSession();
                 toast.success("Successfully signed in!");
                 navigate("/journal", { replace: true });
@@ -143,6 +170,12 @@ const AuthCallback = () => {
           
           if (data.session) {
             console.log("Successfully retrieved existing session");
+            console.log("Session details:", {
+              userId: data.session.user.id,
+              expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
+              tokenLength: data.session.access_token.length
+            });
+            
             await refreshSession();
             toast.success("Successfully signed in!");
             navigate("/journal", { replace: true });

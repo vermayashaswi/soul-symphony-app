@@ -7,10 +7,10 @@ import { useAuth } from '@/contexts/auth';
 import ParticleBackground from '@/components/ParticleBackground';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { getOAuthRedirectUrl, hasAuthParams } from '@/utils/auth-utils';
+import { getOAuthRedirectUrl, hasAuthParams, clearAuthStorage } from '@/utils/auth-utils';
 
 export default function Auth() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refreshSession } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [redirecting, setRedirecting] = useState(false);
@@ -73,6 +73,11 @@ export default function Auth() {
             setAuthError(error.message);
             toast.error('Authentication error. Please try again.');
           }
+          
+          if (data?.session) {
+            console.log("Found session on auth page, refreshing...");
+            await refreshSession();
+          }
         } catch (e) {
           console.error('Exception during auth redirect handling:', e);
           setAuthError(e instanceof Error ? e.message : 'Unexpected error');
@@ -82,7 +87,7 @@ export default function Auth() {
     };
     
     handleHashRedirect();
-  }, [authAttemptMade]);
+  }, [authAttemptMade, refreshSession]);
 
   const handleSignIn = async () => {
     if (isAuthenticating) return;
@@ -93,12 +98,7 @@ export default function Auth() {
     
     try {
       // Clear any stored tokens to ensure a fresh login
-      try {
-        localStorage.removeItem('supabase.auth.token');
-        localStorage.removeItem('sb-' + window.location.hostname.split('.')[0] + '-auth-token');
-      } catch (e) {
-        console.warn('LocalStorage access error:', e);
-      }
+      clearAuthStorage();
       
       // Get the redirect URL from centralized utility
       const redirectUrl = getOAuthRedirectUrl();

@@ -1,3 +1,4 @@
+
 // This file handles session management functionality separated from auth-utils.ts
 import { supabase } from '@/integrations/supabase/client';
 
@@ -9,8 +10,9 @@ export const refreshAuthSession = async (showToasts = false) => {
     // Check if we have token in storage before attempting refresh
     let hasTokens = false;
     try {
+      const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
       hasTokens = !!localStorage.getItem('supabase.auth.token') || 
-                 !!localStorage.getItem('sb-' + window.location.hostname.split('.')[0] + '-auth-token');
+                 !!localStorage.getItem(`${storageKeyPrefix}-auth-token`);
                  
       if (!hasTokens) {
         console.log("No stored tokens found to refresh session from");
@@ -24,7 +26,9 @@ export const refreshAuthSession = async (showToasts = false) => {
     // Wrap in try/catch to handle potential storage errors
     let refreshResult;
     try {
+      console.log("Attempting to refresh session from storage");
       refreshResult = await supabase.auth.refreshSession();
+      console.log("Refresh result:", refreshResult.data ? "Success" : "Failed");
     } catch (storageError) {
       console.error("Storage error during refresh:", storageError);
       return false;
@@ -45,6 +49,12 @@ export const refreshAuthSession = async (showToasts = false) => {
     
     if (data.session) {
       console.log("Session refreshed successfully");
+      console.log("Session details:", {
+        userId: data.session.user.id,
+        expiresAt: new Date(data.session.expires_at * 1000).toISOString(),
+        tokenLength: data.session.access_token.length
+      });
+      
       // Update the session's last activity silently
       try {
         await updateSessionActivity(data.session.user.id).catch(e => {
@@ -67,6 +77,7 @@ export const refreshAuthSession = async (showToasts = false) => {
 // Function to check the current auth state
 export const checkAuth = async () => {
   try {
+    console.log("Checking authentication state");
     let sessionResult;
     try {
       sessionResult = await supabase.auth.getSession();
@@ -87,8 +98,15 @@ export const checkAuth = async () => {
     }
     
     if (!session) {
+      console.log("No active session found");
       return { isAuthenticated: false };
     }
+    
+    console.log("Found active session for user:", session.user.id);
+    console.log("Session details:", {
+      expiresAt: new Date(session.expires_at * 1000).toISOString(),
+      tokenLength: session.access_token.length
+    });
     
     // Update the session's last activity if authenticated - silently handle errors
     try {
