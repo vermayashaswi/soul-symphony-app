@@ -8,13 +8,12 @@ import { supabase } from '@/integrations/supabase/client';
 
 export default function Chat() {
   const [isLoading, setIsLoading] = useState(true);
+  const [profileChecked, setProfileChecked] = useState(false);
   const { user, session } = useAuth();
   const { sidebar, content } = ChatContainer();
   
   useEffect(() => {
     async function checkUserProfile() {
-      setIsLoading(true);
-      
       if (!user) {
         console.log('No authenticated user found');
         setIsLoading(false);
@@ -57,17 +56,45 @@ export default function Chat() {
       } catch (error) {
         console.error('Error in profile initialization:', error);
       } finally {
+        setProfileChecked(true);
         setIsLoading(false);
       }
     }
     
-    checkUserProfile();
-  }, [user]);
+    // Add a timeout to prevent endless loading state
+    const loadingTimeout = setTimeout(() => {
+      if (isLoading) {
+        console.log('Forcing loading state completion after timeout');
+        setIsLoading(false);
+      }
+    }, 5000);
+    
+    if (user && !profileChecked) {
+      checkUserProfile();
+    } else if (!user) {
+      // If no user, we can exit the loading state
+      setIsLoading(false);
+    }
+    
+    return () => clearTimeout(loadingTimeout);
+  }, [user, isLoading, profileChecked]);
   
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  // If no user, show a message
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <h2 className="text-2xl font-semibold mb-4">Sign In Required</h2>
+        <p className="text-muted-foreground text-center mb-6">
+          Please sign in to access the AI assistant chat feature.
+        </p>
       </div>
     );
   }

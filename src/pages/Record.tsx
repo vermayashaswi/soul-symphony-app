@@ -36,10 +36,10 @@ export default function Record() {
       // Navigate to the journal page with the temp ID as a query param
       if (tempId) {
         console.log('Navigating to journal with processing ID:', tempId);
-        navigate(`/journal?processing=${tempId}`, { replace: true });
+        navigate(`/journal?processing=${tempId}`);
       } else {
         console.log('Navigating to journal (no processing ID)');
-        navigate('/journal', { replace: true });
+        navigate('/journal');
       }
     } catch (error) {
       console.error('Navigation error:', error);

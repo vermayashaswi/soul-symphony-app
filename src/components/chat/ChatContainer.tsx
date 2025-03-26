@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import ChatArea from '@/components/chat/ChatArea';
@@ -8,6 +8,19 @@ import ChatThreadList from '@/components/chat/ChatThreadList';
 export function ChatContainer() {
   const { user } = useAuth();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    // Initialize component once user is available
+    if (user && !isInitialized) {
+      setIsInitialized(true);
+    }
+    
+    // Reset state if user changes
+    if (!user) {
+      setCurrentThreadId(null);
+    }
+  }, [user, isInitialized]);
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);

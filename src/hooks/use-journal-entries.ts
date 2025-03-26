@@ -54,6 +54,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         console.error('Error details:', JSON.stringify(error));
         setLoadError(error.message);
         
+        // Handle max retry attempts
         if (retryAttempt >= MAX_RETRY_ATTEMPTS) {
           toast.error('Failed to load journal entries. Please try again later.', {
             id: 'journal-fetch-error',
@@ -61,6 +62,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           });
           
           setTimeout(() => setRetryAttempt(0), 30000);
+          setLoading(false); // Make sure to exit loading state even on error
+          return;
         }
         
         throw error;
@@ -72,8 +75,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       console.log(`Fetched ${data?.length || 0} entries successfully`);
       
+      // Set entries even if empty array
       const typedEntries = (data || []) as JournalEntry[];
+      setEntries(typedEntries);
       
+      // Handle entries that need themes
       const entriesNeedingThemes = typedEntries.filter(
         entry => (!entry.master_themes || entry.master_themes.length === 0) && entry["refined text"]
       );
@@ -102,12 +108,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           if (refreshedData) {
             console.log(`Re-fetched ${refreshedData.length} entries after theme generation`);
             setEntries(refreshedData as JournalEntry[]);
-            return;
           }
         }
       }
       
-      setEntries(typedEntries);
     } catch (error: any) {
       console.error('Error fetching entries:', error);
       setLoadError(error.message || 'Failed to load journal entries');
@@ -304,13 +308,14 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
 
   useEffect(() => {
     if (userId) {
-      setEntries([]);
       setRetryAttempt(0);
       setLoadError(null);
       console.log(`Initial fetch triggered for user ${userId} with refreshKey ${refreshKey}`);
       fetchEntries();
     } else {
       console.log('No user ID available for fetching journal entries');
+      setLoading(false); // Important: ensure loading is set to false when no user ID
+      setEntries([]); // Clear entries when no user
     }
   }, [userId, refreshKey, fetchEntries]);
 

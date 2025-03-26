@@ -25,18 +25,32 @@ export function useJournalHandler(userId: string | undefined) {
     try {
       console.log('Processing unprocessed entries for user:', userId);
       
+      // Get current session for auth
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.log('No active session found, cannot process entries');
+        return { success: false, processed: 0 };
+      }
+      
       // Use the correct URL format for the edge function
       const response = await fetch('https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/embed-all-entries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           userId,
           processAll: false // Only process entries without embeddings
         })
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response from embed-all-entries:', errorText);
+        return { success: false, processed: 0 };
+      }
       
       const result = await response.json();
       

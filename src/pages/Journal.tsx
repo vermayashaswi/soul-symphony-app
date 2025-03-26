@@ -19,8 +19,8 @@ export default function Journal() {
   const location = useLocation();
   const { user } = useAuth();
   const { 
-    journalEntries, 
-    isLoading, 
+    entries: journalEntries, 
+    loading: isLoading, 
     refreshEntries, 
     loadError 
   } = useJournalEntries(user?.id);
@@ -39,7 +39,6 @@ export default function Journal() {
       if (isLoading) {
         console.log('Force completing loading state due to timeout');
         setIsRefreshing(false);
-        setProcessingEntries([]);
       }
     }, 10000);
     
@@ -84,7 +83,7 @@ export default function Journal() {
         clearInterval(refreshInterval);
       };
     }
-  }, [location.search, processingEntries]);
+  }, [location.search, processingEntries, refreshEntries]);
 
   const handleRefresh = async () => {
     if (isRefreshing) return;
@@ -168,13 +167,27 @@ export default function Journal() {
         </Alert>
       )}
       
-      {/* We don't want the whole page to show a loading state if we have entries */}
-      <JournalEntriesList 
-        entries={journalEntries} 
-        loading={isLoading}
-        processingEntries={processingEntries}
-        onStartRecording={() => navigate('/record')}
-      />
+      {/* Show a message when loading takes too long */}
+      {isLoading && (
+        <div className="text-center py-6">
+          <JournalEntriesList 
+            entries={[]} 
+            loading={true}
+            processingEntries={processingEntries}
+            onStartRecording={() => navigate('/record')}
+          />
+        </div>
+      )}
+      
+      {/* Show entries when not loading */}
+      {!isLoading && (
+        <JournalEntriesList 
+          entries={journalEntries || []} 
+          loading={false}
+          processingEntries={processingEntries}
+          onStartRecording={() => navigate('/record')}
+        />
+      )}
     </div>
   );
 }
