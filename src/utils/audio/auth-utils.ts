@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 // Safe storage access function that prevents crashes from storage access errors
