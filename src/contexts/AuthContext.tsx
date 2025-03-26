@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const result = await ensureUserProfile(userId);
       
-      if (!result.success && !result.isNonCritical) {
+      if (!result.success && result.error) {
         console.warn('Profile creation attempted but had issues:', result.error);
         
         // Show the error only once to prevent loops
