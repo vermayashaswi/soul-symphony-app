@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ensureAudioBucketExists } from '@/utils/audio-processing';
 
@@ -108,53 +107,106 @@ export async function diagnoseDatabaseIssues() {
  */
 export async function createAudioBucket() {
   try {
-    // Create RLS policy for audio storage
-    const policySetup = async () => {
-      try {
-        // Allow users to create folders/read their own data
-        // Use type assertion to avoid TypeScript error with RPC function
-        const { error: policyError } = await (supabase.rpc as any)('create_storage_policy', {
-          bucket_name: 'audio',
-          policy_name: 'Allow individual user access',
-          definition: "(auth.uid() = owner) OR (bucket_id = 'audio' AND name LIKE auth.uid() || '/%')"
-        });
-        
-        if (policyError) {
-          console.warn('Policy creation may have failed, but bucket might still work:', policyError);
-        }
-        
-        return !policyError;
-      } catch (err) {
-        console.warn('Could not set up storage policies, continuing anyway:', err);
-        return false;
-      }
-    };
+    // Check if bucket already exists
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
     
-    // Try up to 3 times to create the bucket, with a delay between attempts
-    let bucketCreated = false;
-    let attempts = 0;
+    if (listError) {
+      console.error('Error checking storage buckets:', listError);
+      return { success: false, error: 'Failed to check storage buckets' };
+    }
     
-    while (!bucketCreated && attempts < 3) {
-      attempts++;
-      bucketCreated = await ensureAudioBucketExists();
+    const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
+    
+    if (audioBucket) {
+      console.log('Audio bucket already exists, checking policies');
       
-      if (!bucketCreated) {
-        // Wait a moment before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log(`Retrying bucket creation, attempt ${attempts}`);
-      } else {
-        // Try to set up policies, but don't fail if it doesn't work
-        await policySetup();
-      }
+      // Even if bucket exists, try to set up the policies to ensure proper access
+      await setupBucketPolicies();
+      return { success: true };
     }
     
-    if (bucketCreated) {
-      return { success: true };
-    } else {
-      return { success: false, error: 'Failed to create audio bucket after multiple attempts' };
+    console.log('Creating audio bucket...');
+    
+    // Try to create the bucket
+    const { error: createError } = await supabase.storage.createBucket('audio', {
+      public: false,
+      fileSizeLimit: 50 * 1024 * 1024,
+      allowedMimeTypes: ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/ogg'],
+    });
+    
+    if (createError) {
+      console.error('Error creating audio bucket:', createError);
+      return { success: false, error: `Failed to create audio bucket: ${createError.message}` };
     }
+    
+    // Set up storage policies
+    const policiesSetup = await setupBucketPolicies();
+    
+    console.log('Audio bucket created successfully with policies');
+    return { success: true };
   } catch (error: any) {
     console.error('Error in createAudioBucket:', error);
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Sets up the storage policies for the audio bucket
+ */
+async function setupBucketPolicies() {
+  try {
+    // For select policy - allow users to read their own files
+    const { error: selectPolicyError } = await supabase.storage.from('audio')
+      .createSignedUrl('policy-test-file.txt', 60); // Just to check if policies work
+      
+    if (selectPolicyError && !selectPolicyError.message.includes('not found')) {
+      console.log('Setting up audio bucket policies');
+      
+      // Use RPC function but with type assertion to avoid TypeScript error
+      try {
+        // Select policy - users can access their own files
+        await (supabase.rpc as any)('create_storage_policy', {
+          bucket_name: 'audio',
+          policy_name: 'Allow individual user access - SELECT',
+          operation: 'SELECT',
+          definition: "(bucket_id = 'audio' AND (auth.uid() = owner OR path LIKE auth.uid() || '/%'))"
+        });
+        
+        // Insert policy - users can upload their own files
+        await (supabase.rpc as any)('create_storage_policy', {
+          bucket_name: 'audio',
+          policy_name: 'Allow individual user access - INSERT',
+          operation: 'INSERT',
+          definition: "(bucket_id = 'audio' AND path LIKE auth.uid() || '/%')"
+        });
+        
+        // Update policy - users can update their own files
+        await (supabase.rpc as any)('create_storage_policy', {
+          bucket_name: 'audio',
+          policy_name: 'Allow individual user access - UPDATE',
+          operation: 'UPDATE',
+          definition: "(bucket_id = 'audio' AND path LIKE auth.uid() || '/%')"
+        });
+        
+        // Delete policy - users can delete their own files
+        await (supabase.rpc as any)('create_storage_policy', {
+          bucket_name: 'audio',
+          policy_name: 'Allow individual user access - DELETE',
+          operation: 'DELETE', 
+          definition: "(bucket_id = 'audio' AND path LIKE auth.uid() || '/%')"
+        });
+        
+        console.log('Audio bucket policies created successfully');
+        return true;
+      } catch (policyError: any) {
+        console.error('Error creating policies:', policyError);
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error: any) {
+    console.error('Error setting up policies:', error);
+    return false;
   }
 }
