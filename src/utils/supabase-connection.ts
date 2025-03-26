@@ -71,13 +71,23 @@ export const safeInsert = async <T>(
   options?: { select?: boolean }
 ): Promise<T | null> => {
   try {
-    // Create the insert query
-    const insertQuery = supabase.from(tableName).insert(values);
+    let result;
     
-    // Determine whether to add select or not
-    const { data, error } = await (options?.select !== false 
-      ? insertQuery.select().single() 
-      : insertQuery);
+    if (options?.select !== false) {
+      // If select is requested (default)
+      result = await supabase
+        .from(tableName)
+        .insert(values)
+        .select()
+        .single();
+    } else {
+      // If no select is requested
+      result = await supabase
+        .from(tableName)
+        .insert(values);
+    }
+    
+    const { data, error } = result;
     
     if (error) {
       console.error(`Error inserting into ${tableName}:`, error);
@@ -100,16 +110,18 @@ export const safeUpdate = async <T>(
   condition: Record<string, any>
 ): Promise<T | null> => {
   try {
-    // Create the base update query
-    let query = supabase.from(tableName).update(values);
+    // Start the update query
+    let updateBuilder = supabase.from(tableName).update(values);
     
-    // Apply conditions using a simple loop to avoid deep type nesting
-    for (const [key, value] of Object.entries(condition)) {
-      query = query.eq(key, value);
+    // Apply each condition separately using traditional for loop to avoid type recursion
+    for (const key in condition) {
+      if (Object.prototype.hasOwnProperty.call(condition, key)) {
+        updateBuilder = updateBuilder.eq(key, condition[key]);
+      }
     }
     
-    // Execute with select
-    const { data, error } = await query.select();
+    // Execute the query
+    const { data, error } = await updateBuilder.select();
     
     if (error) {
       console.error(`Error updating ${tableName}:`, error);
@@ -133,24 +145,26 @@ export const safeSelect = async <T>(
   options?: { single?: boolean, limit?: number }
 ): Promise<T | null> => {
   try {
-    // Create the base select query
-    let query = supabase.from(tableName).select(columns);
+    // Create basic query
+    let selectBuilder = supabase.from(tableName).select(columns);
     
-    // Apply conditions if present
+    // Apply conditions if provided
     if (condition) {
-      for (const [key, value] of Object.entries(condition)) {
-        query = query.eq(key, value);
+      for (const key in condition) {
+        if (Object.prototype.hasOwnProperty.call(condition, key)) {
+          selectBuilder = selectBuilder.eq(key, condition[key]);
+        }
       }
     }
     
     // Apply limit if provided
     if (options?.limit) {
-      query = query.limit(options.limit);
+      selectBuilder = selectBuilder.limit(options.limit);
     }
     
-    // Execute query based on single or multiple records needed
+    // Execute query
     if (options?.single) {
-      const { data, error } = await query.maybeSingle();
+      const { data, error } = await selectBuilder.maybeSingle();
       
       if (error) {
         console.error(`Error selecting from ${tableName}:`, error);
@@ -159,7 +173,7 @@ export const safeSelect = async <T>(
       
       return data as unknown as T;
     } else {
-      const { data, error } = await query;
+      const { data, error } = await selectBuilder;
       
       if (error) {
         console.error(`Error selecting from ${tableName}:`, error);
