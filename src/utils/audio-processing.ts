@@ -168,17 +168,13 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       
       toast.error(`Failed to transcribe audio: ${errorMessage.substring(0, 100)}...`);
       
-      // Try to log the error to the database for debugging
-      try {
-        await supabase.from('error_logs').insert({
-          user_id: userId,
-          error_source: 'audio_processing',
-          error_message: errorMessage,
-          error_details: JSON.stringify(transcriptionError)
-        });
-      } catch (logError) {
-        console.error('Failed to log error to database:', logError);
-      }
+      // Log the error to console instead of trying to insert into a non-existent table
+      console.error('Audio processing error:', {
+        user_id: userId,
+        error_source: 'audio_processing',
+        error_message: errorMessage,
+        error_details: JSON.stringify(transcriptionError)
+      });
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
