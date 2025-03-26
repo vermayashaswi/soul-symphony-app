@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
 interface VoiceRecorderProps {
-  onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
+  onRecordingComplete?: (audioBlob: Blob, tempId?: string, entryId?: number) => void;
   onCancel?: () => void;
   className?: string;
 }
@@ -25,6 +25,7 @@ interface VoiceRecorderProps {
 export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
   const [noiseReduction, setNoiseReduction] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasCompletedProcessing, setHasCompletedProcessing] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
   
   const {
@@ -59,8 +60,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       return;
     }
     
-    if (isProcessing) {
-      console.log("Already processing, ignoring duplicate save attempt");
+    if (isProcessing || hasCompletedProcessing) {
+      console.log("Already processing or completed, ignoring duplicate save attempt");
       return;
     }
     
@@ -71,10 +72,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       
       // Add a timeout to prevent getting stuck in processing state
       const processingTimeout = setTimeout(() => {
-        if (isProcessing) {
+        if (isProcessing && !hasCompletedProcessing) {
           console.log("Processing timeout reached, continuing with flow");
           // If the actual processing is still ongoing, we'll just let the UI continue
           if (onRecordingComplete) {
+            setHasCompletedProcessing(true);
             onRecordingComplete(audioBlob, "timeout-" + Date.now());
           }
         }
@@ -86,9 +88,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       clearTimeout(processingTimeout);
       
       if (result.success && onRecordingComplete) {
-        console.log("Processing successful, tempId:", result.tempId);
-        // Call the completion handler with the temp ID
-        onRecordingComplete(audioBlob, result.tempId);
+        console.log("Processing successful, tempId:", result.tempId, "entryId:", result.entryId);
+        // Call the completion handler with the temp ID and entry ID if available
+        setHasCompletedProcessing(true);
+        onRecordingComplete(audioBlob, result.tempId, result.entryId);
       } else if (!result.success) {
         console.error("Processing failed:", result.error);
         setIsProcessing(false);
@@ -112,6 +115,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       return;
     }
     resetRecording();
+    setHasCompletedProcessing(false);
   };
 
   // Automatically request permissions on component mount

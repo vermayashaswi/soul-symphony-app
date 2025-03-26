@@ -1,6 +1,7 @@
 
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { blobToBase64 } from './blob-utils';
 
 /**
  * Handles sending audio data to the transcription service
@@ -97,6 +98,36 @@ export async function sendAudioForTranscription(base64String: string, userId: st
     return { 
       success: false, 
       error: `Error processing recording: ${error.message || 'Unknown error'}`
+    };
+  }
+}
+
+/**
+ * Processes audio blob directly for transcription
+ */
+export async function processAudioBlobForTranscription(audioBlob: Blob, userId: string): Promise<{
+  success: boolean;
+  data?: any;
+  error?: string;
+}> {
+  try {
+    if (!audioBlob) {
+      return { success: false, error: 'No audio recording found' };
+    }
+    
+    // Convert blob to base64
+    const base64Audio = await blobToBase64(audioBlob);
+    
+    // Extract the base64 data, removing the data URL prefix
+    const base64Data = base64Audio.split(',')[1] || base64Audio;
+    
+    // Send for transcription
+    return await sendAudioForTranscription(base64Data, userId);
+  } catch (error: any) {
+    console.error('Error processing audio blob:', error);
+    return {
+      success: false,
+      error: `Failed to process audio: ${error.message || 'Unknown error'}`
     };
   }
 }

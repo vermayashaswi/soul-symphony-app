@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { JournalHeader } from '@/components/journal/JournalHeader';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
-import EmptyJournalState from '@/components/journal/EmptyJournalState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useJournalHandler } from '@/hooks/use-journal-handler';
@@ -32,10 +31,52 @@ export default function Journal() {
   } = useJournalHandler(user?.id);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
+  const [directEntryId, setDirectEntryId] = useState<number | null>(null);
   const [mode, setMode] = useState<'record' | 'past'>('past');
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshCount, setRefreshCount] = useState(0);
   const [loadTimeout, setLoadTimeout] = useState<NodeJS.Timeout | null>(null);
   const [hasTriedProfileCreation, setHasTriedProfileCreation] = useState(false);
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const tempId = queryParams.get('processing');
+    const entryId = queryParams.get('entry');
+    
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, newUrl);
+    
+    if (tempId && !processingEntries.includes(tempId)) {
+      console.log('Adding processing entry from URL:', tempId);
+      setProcessingEntries(prev => [...prev, tempId]);
+      
+      const processingTimeout = setTimeout(() => {
+        console.log('Processing entry timeout reached, refreshing');
+        setProcessingEntries(prev => prev.filter(id => id !== tempId));
+        refreshEntries(false);
+      }, 30000);
+      
+      const refreshInterval = setInterval(() => {
+        console.log("Auto-refreshing to check for processed entry");
+        refreshEntries(false);
+      }, 5000);
+      
+      return () => {
+        clearTimeout(processingTimeout);
+        clearInterval(refreshInterval);
+      };
+    }
+    
+    if (entryId) {
+      const entryIdNumber = parseInt(entryId, 10);
+      if (!isNaN(entryIdNumber)) {
+        console.log('Setting direct entry view for ID:', entryIdNumber);
+        setDirectEntryId(entryIdNumber);
+        if (!isRefreshing && !isLoading) {
+          refreshEntries(false);
+        }
+      }
+    }
+  }, [location.search, processingEntries, refreshEntries, isRefreshing, isLoading]);
 
   useEffect(() => {
     if (user && !hasTriedProfileCreation) {
@@ -74,6 +115,18 @@ export default function Journal() {
   }, [user, hasTriedProfileCreation, refreshEntries]);
 
   useEffect(() => {
+    if (processingEntries.length > 0 && !isRefreshing && !isLoading) {
+      console.log('Setting up refresh interval for processing entries');
+      const interval = setInterval(() => {
+        console.log('Auto refreshing for processing entries');
+        refreshEntries(false);
+      }, 5000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [processingEntries, isRefreshing, isLoading, refreshEntries]);
+
+  useEffect(() => {
     const timeout = setTimeout(() => {
       if (isLoading) {
         console.log('Force completing loading state due to timeout');
@@ -84,9 +137,7 @@ export default function Journal() {
           setProcessingEntries([]);
         }
         
-        if (user?.id && !isProcessing) {
-          processUnprocessedEntries();
-        }
+        setRefreshCount(prev => prev + 1);
       }
     }, 15000);
     
@@ -97,39 +148,14 @@ export default function Journal() {
         clearTimeout(loadTimeout);
       }
     };
-  }, [isLoading, user?.id, processUnprocessedEntries, isProcessing, processingEntries.length]);
+  }, [isLoading, processingEntries.length]);
 
   useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
-    const tempId = queryParams.get('processing');
-    
-    if (tempId && !processingEntries.includes(tempId)) {
-      setProcessingEntries(prev => [...prev, tempId]);
-      
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-      
-      const processingTimeout = setTimeout(() => {
-        console.log('Processing entry timeout reached, removing from list:', tempId);
-        setProcessingEntries(prev => prev.filter(id => id !== tempId));
-        refreshEntries(false);
-      }, 30000);
-      
-      const refreshInterval = setInterval(() => {
-        console.log("Auto-refreshing entries to check for processed entry");
-        refreshEntries(false).then(() => {
-          if (processingEntries.length === 0) {
-            clearInterval(refreshInterval);
-          }
-        });
-      }, 5000);
-      
-      return () => {
-        clearTimeout(processingTimeout);
-        clearInterval(refreshInterval);
-      };
+    if (!isLoading && journalEntries && journalEntries.length > 0 && processingEntries.length > 0) {
+      console.log('Checking if processing entries are now available in journal entries');
+      setProcessingEntries([]);
     }
-  }, [location.search, processingEntries, refreshEntries]);
+  }, [isLoading, journalEntries, processingEntries.length]);
 
   const handleRefresh = async () => {
     if (isRefreshing) return;
@@ -146,9 +172,8 @@ export default function Journal() {
       }
       
       await refreshEntries(true);
-      
       setProcessingEntries([]);
-      setRefreshKey(prev => prev + 1);
+      
     } catch (error) {
       console.error('Error refreshing entries:', error);
     } finally {

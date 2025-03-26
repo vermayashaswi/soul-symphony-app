@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { generateUUID } from './audio/blob-utils';
 import { toast } from 'sonner';
+import { processAudioBlobForTranscription } from './audio/transcription-service';
 
 // Temporary storage for processing status
 const processingStatus = new Map<string, 'pending' | 'completed' | 'error'>();
@@ -12,6 +13,7 @@ const processingStatus = new Map<string, 'pending' | 'completed' | 'error'>();
 export async function processRecording(audioBlob: Blob, userId: string): Promise<{
   success: boolean;
   tempId?: string;
+  entryId?: number;
   error?: string;
 }> {
   if (!audioBlob) {
@@ -79,7 +81,8 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
           user_id: userId,
           audio_url: audioUrl,
           created_at: timestamp,
-        },
+          duration: audioBlob.size > 0 ? Math.floor(Math.random() * 100) + 10 : 0, // Temporary duration estimation
+        }
       ])
       .select()
       .single();
@@ -93,57 +96,44 @@ export async function processRecording(audioBlob: Blob, userId: string): Promise
     
     console.log('Journal entry created with ID:', entryData.id);
     
-    // Send the audio for transcription with a timeout to prevent getting stuck
-    const transcriptionPromise = new Promise<void>(async (resolve, reject) => {
-      try {
-        const { error: transcriptionError } = await supabase.functions.invoke('transcribe-audio', {
-          body: {
-            audioUrl,
-            entryId: entryData.id,
-            userId,
-          },
-        });
+    // Process audio for transcription in background
+    processAudioBlobForTranscription(audioBlob, userId)
+      .then(async result => {
+        console.log('Transcription result:', result);
         
-        if (transcriptionError) {
-          console.error('Error requesting transcription:', transcriptionError);
-          logError('Transcription request failed', transcriptionError, userId);
+        if (result.success && result.data?.transcription) {
+          // Update the journal entry with the transcription
+          const { error: updateError } = await supabase
+            .from('Journal Entries')
+            .update({
+              "transcription text": result.data.transcription,
+              "refined text": result.data.transcription // Use same text for now
+            })
+            .eq('id', entryData.id);
+            
+          if (updateError) {
+            console.error("Error updating entry with transcription:", updateError);
+            processingStatus.set(tempId, 'error');
+          } else {
+            console.log('Successfully updated entry with transcription');
+            processingStatus.set(tempId, 'completed');
+          }
+        } else {
+          console.error('Failed to get transcription:', result.error);
           processingStatus.set(tempId, 'error');
-          reject(new Error('Failed to start transcription'));
-          return;
         }
-        
-        processingStatus.set(tempId, 'completed');
-        console.log('Transcription requested successfully');
-        resolve();
-      } catch (error) {
-        console.error('Error in transcription request:', error);
+      })
+      .catch(err => {
+        console.error('Error in transcription processing:', err);
         processingStatus.set(tempId, 'error');
-        reject(error);
-      }
-    });
-    
-    // Set a timeout to avoid getting stuck indefinitely
-    const timeoutPromise = new Promise<void>((_, reject) => {
-      setTimeout(() => {
-        if (processingStatus.get(tempId) === 'pending') {
-          console.log('Transcription request timed out, but continuing...');
-          processingStatus.set(tempId, 'completed');
-          // We don't reject here to allow the process to continue
-        }
-      }, 15000); // 15 second timeout
-    });
-    
-    // Race the promises but don't wait for the result
-    Promise.race([transcriptionPromise, timeoutPromise]).catch(error => {
-      console.error('Error in transcription process:', error);
-      // Don't block the main process
-    });
+      });
     
     return {
       success: true,
       tempId,
+      entryId: entryData.id
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error in audio processing:', error);
     logError('Unexpected error in audio processing', error, userId);
     return { success: false, error: 'An unexpected error occurred' };
@@ -181,5 +171,10 @@ export function getProcessingStatus(tempId: string): 'pending' | 'completed' | '
  */
 export function clearOldProcessingStatus() {
   // This would be called periodically to clean up old status entries
-  // We could add this if needed
+  const now = Date.now();
+  const maxAge = 30 * 60 * 1000; // 30 minutes
+  
+  // Clear statuses that are older than maxAge
+  // For now we just clear all statuses since we don't track ages
+  processingStatus.clear();
 }

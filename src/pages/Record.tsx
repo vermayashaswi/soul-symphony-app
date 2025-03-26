@@ -65,8 +65,8 @@ export default function Record() {
     };
   }, [user, isCheckingProfile, checkUserProfile]);
 
-  const handleRecordingComplete = async (audioBlob: Blob, tempId?: string) => {
-    console.log('Recording completed, tempId:', tempId);
+  const handleRecordingComplete = async (audioBlob: Blob, tempId?: string, entryId?: number) => {
+    console.log('Recording completed, tempId:', tempId, 'entryId:', entryId);
     
     if (isNavigating || recordingCompleted) {
       console.log('Already navigating or completed, ignoring duplicate completion event');
@@ -84,7 +84,10 @@ export default function Record() {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Navigate to the journal page with the temp ID as a query param
-      if (tempId) {
+      if (entryId) {
+        console.log('Navigating to journal with entry ID:', entryId);
+        navigate(`/journal?entry=${entryId}`);
+      } else if (tempId) {
         console.log('Navigating to journal with processing ID:', tempId);
         navigate(`/journal?processing=${tempId}`);
       } else {
