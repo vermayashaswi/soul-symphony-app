@@ -17,7 +17,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [retryCount, setRetryCount] = useState(0);
   const [silentError, setSilentError] = useState(false);
   
-  // Force complete the loading state after a short timeout
+  // Force complete the loading state after a short timeout to prevent getting stuck
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!sessionChecked) {
@@ -25,53 +25,53 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         setSessionChecked(true);
         setRefreshAttempted(true);
       }
-    }, 800); // Reduced timeout for faster UI response
+    }, 1500); // Increased timeout for better reliability
     
     return () => clearTimeout(timeout);
   }, [sessionChecked]);
   
-  // Try to refresh the session if needed
+  // Try to refresh the session if needed - with error handling
   useEffect(() => {
     const handleSessionRefresh = async () => {
-      if (!user && !refreshAttempted && !isLoading && !silentError) {
-        console.log("Protected route: No user found, attempting to refresh session", {
-          path: location.pathname
-        });
+      // Skip if we already have user, already tried refreshing, or are still loading
+      if (user || refreshAttempted || isLoading || silentError) {
+        return;
+      }
+      
+      console.log("Protected route: No user found, attempting to refresh session", {
+        path: location.pathname
+      });
+      
+      try {
+        const success = await refreshSession();
+        console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
         
-        try {
-          const success = await refreshSession();
-          console.log("Session refresh attempt completed:", success ? "Success" : "Failed");
+        // If refresh failed but we haven't exceeded retry limit, try again
+        if (!success && retryCount < 1) { // Reduced retry count to minimize flickering
+          console.log(`Session refresh failed, retrying (${retryCount + 1}/1)...`);
+          setRetryCount(prev => prev + 1);
           
-          // If refresh failed but we haven't exceeded retry limit, try again
-          if (!success && retryCount < 2) {
-            console.log(`Session refresh failed, retrying (${retryCount + 1}/2)...`);
-            setRetryCount(prev => prev + 1);
-            
-            // Add a small delay before retrying
-            setTimeout(() => {
-              setRefreshAttempted(false);
-            }, 500);
-            
-            return;
-          }
+          // Add a small delay before retrying
+          setTimeout(() => {
+            setRefreshAttempted(false);
+          }, 500);
           
-          setRefreshAttempted(true);
-          setSessionChecked(true);
-        } catch (err) {
-          console.error("Error refreshing session but continuing:", err);
-          setSilentError(true);
-          setRefreshAttempted(true);
-          setSessionChecked(true);
+          return;
         }
-      } else if (!refreshAttempted || user) {
-        // We either have a user or we've completed loading
-        setSessionChecked(true);
+        
         setRefreshAttempted(true);
+        setSessionChecked(true);
+      } catch (err) {
+        console.error("Error refreshing session but continuing:", err);
+        setSilentError(true);
+        setRefreshAttempted(true);
+        setSessionChecked(true);
       }
     };
     
     handleSessionRefresh();
     
+    // If we have a user, track the session silently
     if (user) {
       console.log("Protected route: Tracking session for user", user.id, "on path", location.pathname);
       
@@ -80,8 +80,14 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         .catch(err => {
           console.error("Error tracking session but continuing:", err);
         });
+        
+      // Mark session as checked since we have a user
+      if (!sessionChecked) {
+        setSessionChecked(true);
+        setRefreshAttempted(true);
+      }
     }
-  }, [user, isLoading, location, refreshAttempted, refreshSession, retryCount, silentError]);
+  }, [user, isLoading, location, refreshAttempted, refreshSession, retryCount, silentError, sessionChecked]);
   
   // If we have a user, render the protected content immediately
   if (user) {

@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { createOrUpdateSession, endUserSession } from "@/utils/audio/auth-utils";
 import { useJournalHandler } from "@/hooks/use-journal-handler";
+import { toast } from "sonner";
 
 const AuthStateListener = () => {
   const { user, refreshSession } = useAuth();
@@ -12,53 +13,29 @@ const AuthStateListener = () => {
   const navigate = useNavigate();
   const { processUnprocessedEntries } = useJournalHandler(user?.id);
   const [storageAccessFailed, setStorageAccessFailed] = useState(false);
+  const [processAttempted, setProcessAttempted] = useState(false);
   
   // Create a function to process entries with retry logic
   const safelyProcessEntries = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || processAttempted) return;
     
+    setProcessAttempted(true);
+
     // Check if user profile exists before processing entries
     try {
-      const { data: profileCheck } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-        
-      if (profileCheck) {
-        console.log("Processing unprocessed journal entries");
-        
-        // Add retry logic for network failures
-        const maxRetries = 3;
-        let currentRetry = 0;
-        
-        while (currentRetry < maxRetries) {
-          try {
-            await processUnprocessedEntries();
-            console.log("Successfully processed entries");
-            return; // Success!
-          } catch (err) {
-            currentRetry++;
-            console.warn(`Entry processing attempt ${currentRetry} failed:`, err);
-            
-            if (currentRetry >= maxRetries) {
-              console.error("Failed to process entries after all retries");
-              break;
-            }
-            
-            // Wait before retrying with exponential backoff
-            await new Promise(resolve => 
-              setTimeout(resolve, 1000 * Math.pow(2, currentRetry - 1))
-            );
-          }
-        }
-      } else {
-        console.log("Skipping entry processing - user profile not fully set up yet");
+      // Skip the profile check and just try to process
+      console.log("Processing unprocessed journal entries");
+      
+      try {
+        await processUnprocessedEntries();
+        console.log("Successfully processed entries");
+      } catch (err) {
+        console.error("Error in processing entries but continuing:", err);
       }
     } catch (err) {
-      console.error("Error checking profile or processing entries:", err);
+      console.error("Error in safelyProcessEntries but continuing:", err);
     }
-  }, [user?.id, processUnprocessedEntries]);
+  }, [user?.id, processUnprocessedEntries, processAttempted]);
   
   // Handle OAuth redirects that come with tokens in the URL
   useEffect(() => {
@@ -89,21 +66,21 @@ const AuthStateListener = () => {
       }
     };
     
-    // Handle any auth redirects in the URL 
+    // Handle any auth redirects in the URL - with error catching
     try {
       handleAuthRedirection();
     } catch (error) {
       console.error("Error handling auth redirection:", error);
     }
     
-    // Set up auth state change listener
+    // Set up auth state change listener with error handling
     let subscription;
     
     try {
       const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log("Auth event:", event, "User:", session?.user?.email);
         
-        // Only handle SIGNED_IN event when needed - prevent duplicate notifications
+        // Only handle SIGNED_IN event when needed to avoid duplicate processing
         if (event === 'SIGNED_IN' && session?.user) {
           console.log("SIGNED_IN event detected for:", session.user.id);
           
@@ -111,23 +88,34 @@ const AuthStateListener = () => {
             // Only update session silently - no toast notifications here
             await createOrUpdateSession(session.user.id, window.location.pathname);
             
-            // Process unprocessed entries after sign in, but with delay and only if user is fully set up
+            // Reset process attempted flag on new login
+            setProcessAttempted(false);
+            
+            // Process unprocessed entries after sign in, with delay and only once
             if (user?.id !== session.user.id) {
               setTimeout(() => {
-                safelyProcessEntries();
+                safelyProcessEntries().catch(err => {
+                  console.error("Error in delayed entry processing but continuing:", err);
+                });
               }, 3000);
             }
           } catch (err) {
             console.error("Error creating session on sign in but continuing:", err);
           }
-        } else if (event === 'SIGNED_OUT' && user) {
-          console.log("SIGNED_OUT event detected for:", user.id);
-          
-          try {
-            await endUserSession(user.id);
-          } catch (err) {
-            console.error("Error ending session on sign out but continuing:", err);
+        } else if (event === 'SIGNED_OUT') {
+          if (user) {
+            console.log("SIGNED_OUT event detected for:", user.id);
+            toast.info('Signed out successfully');
+            
+            try {
+              await endUserSession(user.id);
+            } catch (err) {
+              console.error("Error ending session on sign out but continuing:", err);
+            }
           }
+          
+          // Reset flags on sign out
+          setProcessAttempted(false);
         }
       });
       
@@ -137,7 +125,7 @@ const AuthStateListener = () => {
       setStorageAccessFailed(true);
     }
     
-    // Check initial session
+    // Check initial session - with error handling
     const checkInitialSession = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
@@ -163,10 +151,15 @@ const AuthStateListener = () => {
           
           // Process unprocessed journal entries on initial load with delay
           setTimeout(() => {
-            safelyProcessEntries();
+            if (!processAttempted) {
+              safelyProcessEntries().catch(err => {
+                console.error("Error in delayed initial processing but continuing:", err);
+              });
+            }
           }, 3000);
         } else {
           console.log("No initial session found");
+          
           // Force a refresh of the session on initial load if no session is found
           refreshSession().catch(err => {
             console.error("Error refreshing session on initial load but continuing:", err);
@@ -178,13 +171,13 @@ const AuthStateListener = () => {
       }
     };
     
-    // Check initial session with a small delay
+    // Check initial session with a small delay to avoid rapid requests
     setTimeout(checkInitialSession, 500);
     
     return () => {
       if (subscription) subscription.unsubscribe();
     };
-  }, [location.pathname, location.hash, location.search, navigate, user, safelyProcessEntries, refreshSession]);
+  }, [location.pathname, location.hash, location.search, navigate, user, safelyProcessEntries, refreshSession, processAttempted]);
 
   return null;
 };
