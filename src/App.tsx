@@ -70,7 +70,6 @@ const AppRoutes = () => {
   
   return (
     <>
-      <ParticleBackground />
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
@@ -104,6 +103,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
+        <ParticleBackground />
         <Toaster />
         <Sonner position="top-center" />
         <BrowserRouter>
