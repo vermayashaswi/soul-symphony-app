@@ -1,12 +1,10 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { DebugLogEntry } from '@/contexts/debug/DebugContext';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  addLog?: (type: DebugLogEntry['type'], message: string, details?: any) => void;
 }
 
 interface State {
@@ -25,13 +23,9 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log the error to our debug system
-    if (this.props.addLog) {
-      this.props.addLog('error', `React Error: ${error.message}`, {
-        componentStack: errorInfo.componentStack,
-        stack: error.stack,
-      });
-    }
+    // Log the error to console
+    console.error("React Error Boundary caught an error:", error);
+    console.error("Component Stack:", errorInfo.componentStack);
 
     // Call the optional onError callback
     if (this.props.onError) {

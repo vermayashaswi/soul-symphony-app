@@ -6,8 +6,9 @@ import { hasAuthParams } from "@/utils/auth-utils";
 import { useDebugLogger } from "@/hooks/use-debug-logger";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import ErrorBoundary from "../debug/ErrorBoundary";
 
-const AuthStateListener = () => {
+const AuthStateListenerComponent = () => {
   const { user, refreshSession } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -110,6 +111,15 @@ const AuthStateListener = () => {
 
   // No rendering - this is just a background listener
   return null;
+};
+
+// Wrap the component with an error boundary to prevent the entire app from crashing
+const AuthStateListener = () => {
+  return (
+    <ErrorBoundary fallback={<div className="hidden">Auth listener error</div>}>
+      <AuthStateListenerComponent />
+    </ErrorBoundary>
+  );
 };
 
 export default AuthStateListener;
