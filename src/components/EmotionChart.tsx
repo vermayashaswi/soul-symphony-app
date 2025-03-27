@@ -185,7 +185,14 @@ export function EmotionChart({
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
             <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
-            <YAxis stroke="#888" fontSize={12} tickMargin={10} domain={[0, 10]} />
+            <YAxis 
+              stroke="#888" 
+              fontSize={12} 
+              tickMargin={10} 
+              domain={[0, 1]} 
+              ticks={[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}
+              tickFormatter={(value) => value.toFixed(1)}
+            />
             <Tooltip 
               contentStyle={{ 
                 backgroundColor: 'rgba(255, 255, 255, 0.8)', 
