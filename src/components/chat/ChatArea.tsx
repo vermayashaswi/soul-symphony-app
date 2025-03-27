@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -42,7 +41,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showWelcome, setShowWelcome] = useState(true);
   
-  // Demo questions to show to new users
   const demoQuestions = [
     "How can I manage my anxiety better?",
     "What are some good journaling prompts for self-reflection?",
@@ -51,7 +49,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     "What are some techniques to help with overthinking?"
   ];
 
-  // Fetch messages when threadId changes
   useEffect(() => {
     if (threadId) {
       fetchMessages(threadId);
@@ -62,7 +59,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     }
   }, [threadId]);
 
-  // Add initial assistant message
   useEffect(() => {
     if (messages.length === 0 && threadId === null) {
       setMessages([
@@ -76,7 +72,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     }
   }, [messages.length, threadId]);
 
-  // Scroll to bottom when messages update
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -98,10 +93,12 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
 
-      // Transform the data to ensure 'sender' is typed correctly
       const typedMessages: Message[] = data?.map(msg => ({
         ...msg,
-        sender: msg.sender === 'user' ? 'user' : 'assistant' as 'user' | 'assistant'
+        sender: msg.sender === 'user' ? 'user' : 'assistant' as 'user' | 'assistant',
+        reference_entries: msg.reference_entries ? 
+          (Array.isArray(msg.reference_entries) ? msg.reference_entries as MessageReference[] : null) 
+          : null
       })) || [];
 
       setMessages(typedMessages);
@@ -118,7 +115,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     
     const isNewThread = !threadId;
     
-    // Add user message to UI immediately
     const tempUserMessage: Message = {
       id: Date.now().toString(),
       content: content.trim(),
@@ -134,7 +130,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     try {
       console.log("Sending message to chat-with-rag function");
       
-      // Call the enhanced chat-with-rag edge function
       const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: { 
           message: content.trim(),
@@ -154,12 +149,10 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       console.log("Received response from chat-with-rag function:", data);
       
-      // If this was a new thread, notify parent component about the new threadId
       if (isNewThread && data.threadId) {
         onNewThreadCreated(data.threadId);
       }
       
-      // Add assistant response
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: data.response || "I'm sorry, I couldn't process your request at the moment.",
@@ -193,7 +186,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
           </div>
         ) : (
           <>
-            {/* Chat messages */}
             {messages.map((message) => (
               <motion.div
                 key={message.id}
@@ -259,7 +251,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
               </motion.div>
             ))}
             
-            {/* Loading indicator */}
             {isLoading && (
               <div className="flex justify-start">
                 <div className="flex gap-3 max-w-[85%]">
@@ -278,7 +269,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Sample questions */}
       <AnimatePresence>
         {showWelcome && messages.length <= 2 && (
           <motion.div 
@@ -306,7 +296,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         )}
       </AnimatePresence>
       
-      {/* Input area */}
       <div className="flex gap-2 items-end p-4 border-t">
         <Textarea
           placeholder="Type your message..."
@@ -327,4 +316,3 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     </div>
   );
 }
-
