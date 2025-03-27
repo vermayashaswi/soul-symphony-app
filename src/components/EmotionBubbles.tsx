@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -64,6 +63,25 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
     
     let newItems: Array<{ name: string; size: number; color: string; position: { x: number; y: number } }> = [];
     
+    // Calculate minimum bubble size based on text length
+    // This function determines the minimum size needed for a bubble to fit its text
+    const calculateMinBubbleSize = (text: string): number => {
+      // Base size depends on text length - longer text needs bigger bubbles
+      const textLength = text.length;
+      
+      // Baseline minimum sizing:
+      // - Very short text (1-5 chars): small bubble
+      // - Medium text (6-12 chars): medium bubble
+      // - Long text (13+ chars): larger bubble
+      if (textLength <= 5) {
+        return Math.min(availableWidth, availableHeight) * 0.15;
+      } else if (textLength <= 12) {
+        return Math.min(availableWidth, availableHeight) * 0.22;
+      } else {
+        return Math.min(availableWidth, availableHeight) * 0.28;
+      }
+    };
+    
     // Process emotions or themes
     if (emotions && Object.keys(emotions).length > 0) {
       // Get max and min values for normalization
@@ -72,26 +90,41 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
       const minValue = Math.min(...values);
       const valueRange = maxValue - minValue;
       
-      // Normalize sizes based on container dimensions
-      const minSize = Math.min(availableWidth, availableHeight) * 0.15;
-      const maxSize = Math.min(availableWidth, availableHeight) * 0.3;
+      // Calculate total available area for bubbles
+      const totalArea = availableWidth * availableHeight * 0.7; // Use 70% of the available area
       
       // Calculate how many items we have
       const itemCount = Object.keys(emotions).length;
-      // Adjust max size based on item count to prevent overcrowding
-      const adjustedMaxSize = Math.min(
-        maxSize,
-        Math.sqrt((availableWidth * availableHeight) / (itemCount * Math.PI)) * 1.2
+      
+      // First pass: calculate base sizes based on text length
+      const emotionEntries = Object.entries(emotions);
+      const baseMinSizes = emotionEntries.map(([emotion, _]) => ({
+        emotion,
+        minSize: calculateMinBubbleSize(emotion)
+      }));
+      
+      // Calculate max size based on container and item count
+      const maxBubbleSize = Math.min(
+        Math.min(availableWidth, availableHeight) * 0.4,
+        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.8
       );
       
-      // Create emotion bubbles
-      newItems = Object.entries(emotions).map(([emotion, value], index) => {
-        // Normalize the size between min and max size
-        const normalizedValue = valueRange === 0 
-          ? 0.5 
-          : (value - minValue) / valueRange;
+      // Create emotion bubbles - now with text-aware sizing
+      newItems = emotionEntries.map(([emotion, value], index) => {
+        const minSize = baseMinSizes.find(item => item.emotion === emotion)?.minSize || 
+                       Math.min(availableWidth, availableHeight) * 0.15;
         
-        const size = minSize + (normalizedValue * (adjustedMaxSize - minSize));
+        // Normalize the size between min and max size based on emotion value
+        // Text length determines min size, emotion value determines scaling between min and max
+        let size;
+        if (valueRange === 0) {
+          // If all emotions have the same value, just use the minimum size based on text
+          size = minSize;
+        } else {
+          // Otherwise scale between min size (based on text) and max size (based on container)
+          const normalizedValue = (value - minValue) / valueRange;
+          size = minSize + (normalizedValue * (maxBubbleSize - minSize));
+        }
         
         return {
           name: emotion,
@@ -101,39 +134,66 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
         };
       });
     } else if (themes && themes.length > 0) {
-      // For themes, use a more consistent size
-      const baseSize = Math.min(availableWidth, availableHeight) * 0.22;
+      // For themes, size based on text length
       const itemCount = themes.length;
       
-      // Adjust size based on item count
-      const adjustedSize = Math.min(
-        baseSize,
-        Math.sqrt((availableWidth * availableHeight) / (itemCount * Math.PI)) * 1.2
+      // Calculate appropriate bubble sizes for themes
+      const totalArea = availableWidth * availableHeight * 0.7;
+      const maxBubbleSize = Math.min(
+        Math.min(availableWidth, availableHeight) * 0.35,
+        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.5
       );
       
       // Create theme bubbles
-      newItems = themes.map((theme, index) => ({
-        name: theme,
-        size: adjustedSize,
-        color: colorPalette[index % colorPalette.length],
-        position: { x: 0, y: 0 } // Initial position, will be updated below
-      }));
+      newItems = themes.map((theme, index) => {
+        // Calculate minimum size based on theme text length
+        const minSize = calculateMinBubbleSize(theme);
+        
+        // For themes, use a more consistent size but still account for text length
+        const size = Math.min(maxBubbleSize, Math.max(minSize, maxBubbleSize * 0.7));
+        
+        return {
+          name: theme,
+          size,
+          color: colorPalette[index % colorPalette.length],
+          position: { x: 0, y: 0 } // Initial position, will be updated below
+        };
+      });
     }
     
-    // Position bubbles with overlap prevention
+    // Position bubbles with better overlap prevention and text visibility
     if (newItems.length > 0) {
       // Sort by size (larger first) to prioritize larger bubbles in positioning
       newItems.sort((a, b) => b.size - a.size);
       
+      // Position algorithm with more spread for visibility
       for (let i = 0; i < newItems.length; i++) {
         let isValidPosition = false;
         let attempts = 0;
-        const maxAttempts = 50;
+        const maxAttempts = 70; // Increased attempts for better positioning
+        
+        // Spiral placement - starts from center and spirals outward
+        const centerX = availableWidth / 2;
+        const centerY = availableHeight / 2;
+        let angle = 0;
+        let radius = 0;
+        const step = 0.5; // angular step
         
         while (!isValidPosition && attempts < maxAttempts) {
-          // Generate random position within boundaries
-          const x = padding + Math.random() * (availableWidth - newItems[i].size);
-          const y = padding + Math.random() * (availableHeight - newItems[i].size);
+          // Adjust radius based on attempt number to create spiral pattern
+          radius = (attempts / maxAttempts) * (Math.min(availableWidth, availableHeight) / 2 - newItems[i].size / 2);
+          
+          // Calculate position in spiral
+          const x = padding + centerX + radius * Math.cos(angle);
+          const y = padding + centerY + radius * Math.sin(angle);
+          
+          // Make sure bubble is within container bounds
+          if (x - newItems[i].size/2 < padding || x + newItems[i].size/2 > availableWidth + padding ||
+              y - newItems[i].size/2 < padding || y + newItems[i].size/2 > availableHeight + padding) {
+            angle += step;
+            attempts++;
+            continue;
+          }
           
           // Check for overlap with existing bubbles
           isValidPosition = true;
@@ -141,7 +201,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
             const dx = x - newItems[j].position.x;
             const dy = y - newItems[j].position.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const minDistance = (newItems[i].size + newItems[j].size) * 0.5;
+            // Increased minimum distance to prevent text overlap
+            const minDistance = (newItems[i].size + newItems[j].size) * 0.6;
             
             if (distance < minDistance) {
               isValidPosition = false;
@@ -151,18 +212,42 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
           
           if (isValidPosition) {
             newItems[i].position = { x, y };
+          } else {
+            angle += step;
+            attempts++;
           }
-          
-          attempts++;
         }
         
         // If we couldn't find a valid position after max attempts,
-        // just place it somewhere in the container
+        // use best effort placement with less strict overlap checking
         if (attempts >= maxAttempts) {
-          newItems[i].position = {
-            x: padding + Math.random() * (availableWidth - newItems[i].size),
-            y: padding + Math.random() * (availableHeight - newItems[i].size)
-          };
+          // Find position with minimal overlap
+          let bestPosition = { x: 0, y: 0 };
+          let minOverlap = Number.MAX_VALUE;
+          
+          for (let attempt = 0; attempt < 30; attempt++) {
+            const x = padding + Math.random() * (availableWidth - newItems[i].size);
+            const y = padding + Math.random() * (availableHeight - newItems[i].size);
+            
+            let totalOverlap = 0;
+            for (let j = 0; j < i; j++) {
+              const dx = x - newItems[j].position.x;
+              const dy = y - newItems[j].position.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              const minDistance = (newItems[i].size + newItems[j].size) * 0.5;
+              
+              if (distance < minDistance) {
+                totalOverlap += (minDistance - distance);
+              }
+            }
+            
+            if (totalOverlap < minOverlap) {
+              minOverlap = totalOverlap;
+              bestPosition = { x, y };
+            }
+          }
+          
+          newItems[i].position = bestPosition;
         }
       }
     }
@@ -204,13 +289,19 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
             transform: `translate(${item.position.x}px, ${item.position.y}px)`,
           }}
         >
-          <span className="text-xs font-medium px-1 text-center" style={{
-            fontSize: `${Math.max(8, item.size / 5)}px`,
+          <span className="font-medium px-1 text-center" style={{
+            fontSize: `${Math.max(10, item.size / 4.5)}px`,
             lineHeight: '1.2',
             maxWidth: '90%',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            wordBreak: 'break-word',
+            textAlign: 'center',
+            height: '100%',
+            padding: '12%'
           }}>
             {item.name}
           </span>
