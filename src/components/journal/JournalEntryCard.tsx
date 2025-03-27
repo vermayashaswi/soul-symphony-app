@@ -151,3 +151,6 @@ export function JournalEntryCard({
     </Card>
   );
 }
+
+// Add default export for compatibility with existing imports
+export default JournalEntryCard;

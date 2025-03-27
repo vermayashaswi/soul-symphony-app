@@ -9,8 +9,6 @@ import { AnimatePresence } from "framer-motion";
 import ParticleBackground from "./components/ParticleBackground";
 import { AuthProvider } from "./contexts/auth";
 import AppRoutes from "./components/routes/AppRoutes";
-import { DebugProvider } from "./contexts/debug/DebugContext";
-import { DebugPanel } from "./components/debug/DebugPanel";
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -29,15 +27,12 @@ const App = () => {
         <TooltipProvider>
           <AuthProvider>
             <BrowserRouter>
-              <DebugProvider>
-                <Toaster />
-                <Sonner position="top-center" closeButton />
-                <ParticleBackground />
-                <AnimatePresence mode="wait">
-                  <AppRoutes />
-                </AnimatePresence>
-                <DebugPanel />
-              </DebugProvider>
+              <Toaster />
+              <Sonner position="top-center" closeButton />
+              <ParticleBackground />
+              <AnimatePresence mode="wait">
+                <AppRoutes />
+              </AnimatePresence>
             </BrowserRouter>
           </AuthProvider>
         </TooltipProvider>
