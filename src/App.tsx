@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 
+// Define the query client outside the component to prevent recreating it on each render
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -99,25 +100,29 @@ const AppRoutes = () => {
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <div className="relative min-h-screen">
-          <ParticleBackground />
-          <div className="relative z-10">
-            <Toaster />
-            <Sonner position="top-center" />
-            <BrowserRouter>
-              <AnimatePresence mode="wait">
-                <AppRoutes />
-              </AnimatePresence>
-            </BrowserRouter>
+const App = () => {
+  console.log("App component rendering");
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <div className="relative min-h-screen">
+            <ParticleBackground />
+            <div className="relative z-10">
+              <Toaster />
+              <Sonner position="top-center" />
+              <BrowserRouter>
+                <AnimatePresence mode="wait">
+                  <AppRoutes />
+                </AnimatePresence>
+              </BrowserRouter>
+            </div>
           </div>
-        </div>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
