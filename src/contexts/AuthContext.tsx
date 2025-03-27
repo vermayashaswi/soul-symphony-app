@@ -10,6 +10,7 @@ type AuthContextType = {
   isLoading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 };
 
 // Export the AuthContext so it can be imported directly
@@ -94,6 +95,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Add a function to manually refresh the session
+  const refreshSession = async () => {
+    try {
+      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+      if (error) {
+        throw error;
+      }
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+    } catch (error: any) {
+      console.error('Error refreshing session:', error);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -102,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         signInWithGoogle,
         signOut,
+        refreshSession,
       }}
     >
       {children}
