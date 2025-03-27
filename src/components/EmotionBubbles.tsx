@@ -145,8 +145,9 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
     }, { passive: false });
     
     // Create world boundaries (invisible walls) with sufficient padding
+    // Increase padding to ensure bubbles don't touch the visible edge
+    const padding = 15; // Increased padding to keep bubbles away from edges
     const wallThickness = 50; // Thick enough to prevent bubbles from escaping
-    const padding = 5; // Small padding to ensure bubbles don't touch the visible edge
     
     // Create invisible walls around the container
     const topWall = Bodies.rectangle(
@@ -288,8 +289,17 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
     // Calculate available space
     const containerWidth = containerSize.width;
     const containerHeight = containerSize.height;
-    const maxSize = Math.min(containerWidth, containerHeight) * 0.3; // Max bubble size is 30% of container
-    const minSize = Math.max(40, maxSize * 0.2); // Min bubble size
+    
+    // Add padding to ensure bubbles don't touch edges
+    const safetyPadding = 25; // Increased safety padding for bubble positions
+    
+    // Calculate the usable area with padding
+    const usableWidth = containerWidth - (safetyPadding * 2);
+    const usableHeight = containerHeight - (safetyPadding * 2);
+    
+    // Make bubbles slightly smaller to ensure they fit within the container
+    const maxSize = Math.min(usableWidth, usableHeight) * 0.25; // Reduced max size from 30% to 25%
+    const minSize = Math.max(30, maxSize * 0.2); // Min bubble size with a minimum of 30px
     
     // Calculate positions to avoid overlaps
     const bubbles: Array<{ x: number, y: number, radius: number, label: string, color: string }> = [];
@@ -303,6 +313,9 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
       const score = usingEmotions ? item.value : 1;
       const radius = minSize + ((score / maxValue) * (maxSize - minSize)) / 2;
       
+      // Make sure the radius isn't too large for the container
+      const effectiveRadius = Math.min(radius, Math.min(usableWidth, usableHeight) / 3);
+      
       // Try to find a suitable position
       let attempts = 0;
       let validPosition = false;
@@ -310,9 +323,9 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
       
       // Keep trying positions until we find one that doesn't overlap
       while (!validPosition && attempts < 50) {
-        // Generate a position that ensures the bubble is fully within the container
-        x = radius + Math.random() * (containerWidth - 2 * radius);
-        y = radius + Math.random() * (containerHeight - 2 * radius);
+        // Generate a position that ensures the bubble is fully within the usable area
+        x = safetyPadding + effectiveRadius + Math.random() * (usableWidth - 2 * effectiveRadius);
+        y = safetyPadding + effectiveRadius + Math.random() * (usableHeight - 2 * effectiveRadius);
         
         // Check for overlaps with existing bubbles
         validPosition = true;
@@ -322,7 +335,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
           const distance = Math.sqrt(dx * dx + dy * dy);
           
           // If bubbles touch or overlap, position is invalid
-          if (distance < radius + bubble.radius + 5) { // Add a small gap between bubbles
+          if (distance < effectiveRadius + bubble.radius + 5) { // Add a small gap between bubbles
             validPosition = false;
             break;
           }
@@ -341,7 +354,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
       const color = getEmotionColor(item.label);
       
       // Store bubble data
-      bubbles.push({ x, y, radius, label: item.label, color });
+      bubbles.push({ x, y, radius: effectiveRadius, label: item.label, color });
     }
     
     // Create Matter.js bodies for each bubble
@@ -417,6 +430,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
     <div 
       ref={containerRef} 
       className="relative w-full h-full rounded-lg overflow-hidden"
+      style={{ padding: '10px' }} // Add padding to the container
     >
       <canvas ref={canvasRef} className="w-full h-full" />
       <div className="absolute top-2 right-2 text-xs text-muted-foreground">
