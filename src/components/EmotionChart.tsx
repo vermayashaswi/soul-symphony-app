@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   LineChart, 
@@ -12,17 +13,12 @@ import {
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
+import EmotionBubbles from './EmotionBubbles';
 
 // Type definitions for emotion data
 type EmotionData = {
   day: string;
   [key: string]: number | string;
-};
-
-type EmotionBubbleData = {
-  name: string;
-  value: number;
-  color: string;
 };
 
 type ChartType = 'line' | 'bubble';
@@ -70,46 +66,15 @@ export function EmotionChart({
   aggregatedData 
 }: EmotionChartProps) {
   const [chartType, setChartType] = useState<ChartType>('bubble');
-  const bubbleContainerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 320, height: 250 });
-
+  
   const chartTypes = [
     { id: 'line', label: 'Line' },
     { id: 'bubble', label: 'Emotion Bubbles' },
   ];
   
-  // Update container size when component mounts or window resizes
-  useEffect(() => {
-    const updateContainerSize = () => {
-      if (bubbleContainerRef.current) {
-        setContainerSize({
-          width: bubbleContainerRef.current.clientWidth,
-          height: bubbleContainerRef.current.clientHeight
-        });
-      }
-    };
-    
-    // Initial size calculation
-    updateContainerSize();
-    
-    // Set up resize observer
-    const resizeObserver = new ResizeObserver(updateContainerSize);
-    if (bubbleContainerRef.current) {
-      resizeObserver.observe(bubbleContainerRef.current);
-    }
-    
-    // Cleanup
-    return () => {
-      if (bubbleContainerRef.current) {
-        resizeObserver.unobserve(bubbleContainerRef.current);
-      }
-      resizeObserver.disconnect();
-    };
-  }, []);
-  
-  // Process emotion data for bubble chart - show all emotions
-  const getBubbleData = (): EmotionBubbleData[] => {
-    if (!aggregatedData) return [];
+  // Process emotion data for bubble chart
+  const getBubbleData = () => {
+    if (!aggregatedData) return {};
     
     // Combine all emotions from aggregatedData
     const emotionScores: Record<string, number> = {};
@@ -120,22 +85,16 @@ export function EmotionChart({
       emotionScores[emotion] = totalScore;
     });
     
-    return Object.entries(emotionScores)
-      .map(([name, value]) => ({
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        value: value,
-        color: getEmotionColor(name)
-      }))
-      .sort((a, b) => b.value - a.value);
+    return emotionScores;
   };
   
-  // Process aggregated data for line chart - show all emotions
+  // Process aggregated data for line chart
   const getLineChartData = (): EmotionData[] => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
       return [];
     }
     
-    // Get top 5 emotions based on total score (increased from 3)
+    // Get top 5 emotions based on total score
     const emotionTotals: Record<string, number> = {};
     const dateMap: Map<string, Record<string, number>> = new Map();
     
@@ -156,7 +115,7 @@ export function EmotionChart({
     // Get top 5 emotions by total score
     const topEmotions = Object.entries(emotionTotals)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)  // Increased to show more emotions
+      .slice(0, 5)
       .map(([emotion]) => emotion);
     
     // Convert the dateMap to an array of data points for the chart
@@ -215,7 +174,7 @@ export function EmotionChart({
               }} 
             />
             <Legend verticalAlign="bottom" height={36} />
-            {emotions.map((emotion, index) => (
+            {emotions.map((emotion) => (
               <Line
                 key={emotion}
                 type="monotone"
@@ -232,95 +191,6 @@ export function EmotionChart({
         
         <div className="mt-4 text-center text-xs text-muted-foreground">
           * Showing top 5 emotions by score
-        </div>
-      </div>
-    );
-  };
-
-  const renderBubbleChart = () => {
-    if (bubbleData.length === 0) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">No emotion data available</p>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="w-full h-[300px] flex flex-col items-center justify-center relative">
-        <div className="absolute top-0 right-0 text-xs text-muted-foreground">
-          * Size of bubble represents intensity
-        </div>
-        
-        {/* Container with boundary constraints - WIDER AREA */}
-        <div 
-          ref={bubbleContainerRef}
-          className="relative w-full h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden"
-        >
-          {bubbleData.map((item, index) => {
-            // Calculate base size proportionally to value
-            const maxSize = 100; // Reduced from 120 to ensure bubbles fit better
-            const minSize = 40;
-            const maxValue = Math.max(...bubbleData.map(b => b.value));
-            const size = minSize + ((item.value / maxValue) * (maxSize - minSize));
-            
-            // Generate position within container boundaries
-            // Ensure bubbles remain fully visible
-            const availableWidth = containerSize.width;
-            const availableHeight = containerSize.height;
-            
-            // Calculate position ensuring the bubble stays within bounds
-            // Use safe margins based on bubble size to ensure they stay fully visible
-            const x = Math.max(size/2, Math.min(availableWidth - size/2, 50 + Math.random() * (availableWidth - 100)));
-            const y = Math.max(size/2, Math.min(availableHeight - size/2, 50 + Math.random() * (availableHeight - 100)));
-            
-            // Calculate constraints for dragging - CRITICAL for keeping bubbles fully visible
-            const dragConstraints = {
-              top: 0,
-              right: availableWidth - size,
-              bottom: availableHeight - size,
-              left: 0
-            };
-
-            return (
-              <motion.div
-                key={item.name}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 0.9 }}
-                transition={{ 
-                  duration: 0.5, 
-                  delay: index * 0.1
-                }}
-                style={{
-                  width: `${size}px`,
-                  height: `${size}px`,
-                  backgroundColor: item.color,
-                  position: 'absolute',
-                  left: x - (size / 2),
-                  top: y - (size / 2),
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontSize: size > 70 ? '14px' : '12px',
-                  fontWeight: 'bold',
-                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                  zIndex: Math.floor(item.value)
-                }}
-                drag
-                dragConstraints={dragConstraints}
-                dragElastic={0.05} // Reduced elasticity to prevent overshooting boundaries
-                whileDrag={{ scale: 1.05 }}
-                dragTransition={{ 
-                  bounceStiffness: 600, 
-                  bounceDamping: 20 // Decreased damping for more responsive, physics-based bounce
-                }}
-              >
-                {item.name}
-              </motion.div>
-            );
-          })}
         </div>
       </div>
     );
@@ -350,7 +220,11 @@ export function EmotionChart({
       
       <div className="bg-white p-4 rounded-xl shadow-sm">
         {chartType === 'line' && renderLineChart()}
-        {chartType === 'bubble' && renderBubbleChart()}
+        {chartType === 'bubble' && (
+          <div className="w-full h-[350px]">
+            <EmotionBubbles emotions={bubbleData} />
+          </div>
+        )}
       </div>
       
       {chartType === 'line' && lineData.length > 0 && (

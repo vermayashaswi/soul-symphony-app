@@ -1,254 +1,403 @@
-
-import React, { useEffect, useState, useRef } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
+import { Engine, Render, World, Bodies, Body, Mouse, MouseConstraint, Events, Composite } from 'matter-js';
 
 interface EmotionBubblesProps {
-  themes?: string[];
   emotions?: Record<string, number>;
+  themes?: string[];
 }
 
-interface BubbleProps {
-  x: number;
-  y: number;
-  size: number;
-  delay: number;
-  children: React.ReactNode;
-  containerRef: React.RefObject<HTMLDivElement>;
-}
-
-// More accurate emotion to emoji mapping
-const EMOTION_EMOJIS: Record<string, string> = {
-  // Positive emotions
-  joy: '😄',
-  happiness: '😊',
-  love: '❤️',
-  gratitude: '🙏',
-  excitement: '🤩',
-  contentment: '😌',
-  calm: '😌',
-  peaceful: '😇',
-  hope: '🌱',
-  relief: '😮‍💨',
-  pride: '🦚',
-  satisfaction: '👍',
-  
-  // Negative emotions
-  sadness: '😢',
-  anger: '😠',
-  fear: '😨',
-  anxiety: '😰',
-  stress: '😖',
-  disappointment: '😞',
-  frustration: '😤',
-  grief: '😭',
-  shame: '😳',
-  guilt: '😔',
-  jealousy: '😒',
-  regret: '😕',
-  
-  // Neutral or mixed emotions
-  surprise: '😲',
-  confusion: '🤔',
-  curiosity: '🧐',
-  nostalgia: '🕰️',
-  boredom: '😴',
-  anticipation: '👀',
-  awe: '😮',
-  ambivalence: '😐'
+// Vibrant color mapping for emotions
+const EMOTION_COLORS: Record<string, string> = {
+  joy: '#4299E1',           // Bright Blue
+  happiness: '#48BB78',     // Bright Green
+  gratitude: '#0EA5E9',     // Ocean Blue
+  calm: '#8B5CF6',          // Vivid Purple
+  anxiety: '#F56565',       // Bright Red
+  sadness: '#3B82F6',       // Bright Blue
+  anger: '#F97316',         // Bright Orange
+  fear: '#EF4444',          // Bright Red
+  excitement: '#FBBF24',    // Vibrant Yellow
+  love: '#EC4899',          // Magenta Pink
+  stress: '#F97316',        // Bright Orange
+  surprise: '#F59E0B',      // Amber
+  confusion: '#8B5CF6',     // Vivid Purple
+  disappointment: '#6366F1', // Indigo
+  pride: '#3B82F6',         // Blue
+  shame: '#DC2626',         // Red
+  guilt: '#B45309',         // Amber
+  hope: '#2563EB',          // Blue
+  boredom: '#4B5563',       // Gray
+  disgust: '#65A30D',       // Lime
+  contentment: '#0D9488'    // Teal
 };
 
-const getRandomValue = (min: number, max: number) => {
-  return Math.random() * (max - min) + min;
+// Get color for an emotion, with fallback
+const getEmotionColor = (emotion: string): string => {
+  const normalized = emotion.toLowerCase();
+  return EMOTION_COLORS[normalized] || '#A3A3A3';
 };
 
-const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children, containerRef }) => {
-  // Calculate constraints to keep bubble fully visible
-  const [constraints, setConstraints] = useState({ top: 0, right: 0, bottom: 0, left: 0 });
-  
-  useEffect(() => {
-    if (containerRef.current) {
-      // Get the container dimensions
-      const containerWidth = containerRef.current.clientWidth;
-      const containerHeight = containerRef.current.clientHeight;
-      
-      // Set constraints to keep bubble completely within container
-      // Using size as the offset to ensure the bubble stays completely visible
-      setConstraints({
-        top: 0,
-        right: containerWidth - size,
-        bottom: containerHeight - size,
-        left: 0
-      });
-    }
-  }, [containerRef, size]);
-
-  return (
-    <motion.div
-      className="absolute flex items-center justify-center"
-      initial={{ x, y, opacity: 0, scale: 0 }}
-      animate={{ 
-        x: x,
-        y: [y, y - 5, y],
-        opacity: [0, 1, 0.95],
-        scale: [0, 1, 0.98]
-      }}
-      transition={{
-        duration: 12,
-        delay,
-        repeat: Infinity,
-        repeatType: "reverse",
-        ease: "easeInOut", 
-        times: [0, 0.5, 1]
-      }}
-      drag
-      dragConstraints={constraints}
-      dragElastic={0.05}
-      dragTransition={{ 
-        bounceStiffness: 600,  // Increased stiffness for more realistic bounce
-        bounceDamping: 20,     // Decreased damping for more responsive bounce
-        power: 0.5
-      }}
-      whileDrag={{ scale: 1.02 }}
-    >
-      <div 
-        className="rounded-full bg-gradient-to-br from-primary/30 to-primary/10 backdrop-blur-sm flex items-center justify-center p-2"
-        style={{ width: `${size}px`, height: `${size}px` }}
-      >
-        {children}
-      </div>
-    </motion.div>
-  );
-};
-
-// Define types for our emotion/theme data
-interface EmotionData {
-  label: string;
-  score?: number;
-}
-
-const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions = {} }) => {
-  const [bubbles, setBubbles] = useState<Array<{
-    id: number;
-    label: string;
-    x: number;
-    y: number;
-    size: number;
-    delay: number;
-    emoji: string;
-  }>>([]);
-  
+const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes = [] }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const engineRef = useRef<Matter.Engine | null>(null);
+  const renderRef = useRef<Matter.Render | null>(null);
+  const mouseConstraintRef = useRef<Matter.MouseConstraint | null>(null);
+  const bodiesRef = useRef<Map<string, Matter.Body>>(new Map());
+  const worldBoundaries = useRef<Matter.Body[]>([]);
   
+  // Track resize observer
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  // Initialize physics engine
   useEffect(() => {
-    // We'll prioritize emotions if they exist, otherwise fall back to themes
-    const usingEmotions = Object.keys(emotions).length > 0;
+    if (!containerRef.current || !canvasRef.current) return;
     
-    // Create properly typed data sources
-    const dataSource: EmotionData[] = usingEmotions 
-      ? Object.entries(emotions).map(([key, value]) => ({ label: key, score: value }))
-      : themes.map(theme => ({ label: theme }));
-    
-    // Limit to top emotions/themes (by score if available)
-    const limitedData = usingEmotions 
-      ? [...dataSource]
-          .sort((a, b) => ((b.score || 0) - (a.score || 0)))
-          .slice(0, 5)
-      : dataSource.slice(0, 5);
-    
-    // Wait for the container to be available and sized
-    if (!containerRef.current) return;
-    
-    // Get container dimensions
+    // Get the initial container size
     const containerWidth = containerRef.current.clientWidth;
     const containerHeight = containerRef.current.clientHeight;
+    setContainerSize({ width: containerWidth, height: containerHeight });
     
-    // More controlled layout configuration
-    const gridRows = 2;
-    const gridCols = 3;
-    const cellWidth = containerWidth / gridCols;
-    const cellHeight = containerHeight / gridRows;
+    // Create engine
+    const engine = Engine.create({
+      gravity: { x: 0, y: 0 }, // No gravity
+      positionIterations: 6,
+      velocityIterations: 4,
+    });
+    engineRef.current = engine;
     
-    // Calculate positions with fixed positioning
-    const newBubbles = limitedData.map((item, index) => {
-      // Calculate grid position
-      const col = index % gridCols;
-      const row = Math.floor(index / gridCols) % gridRows;
-      
-      // Calculate position within cell with minimal randomness
-      const maxSize = 80;
-      const bubblePadding = 10; // Added padding to ensure bubbles don't touch the edge
-      
-      // Create a fixed position with no randomness
-      const centerX = (col * cellWidth) + (cellWidth / 2);
-      const centerY = (row * cellHeight) + (cellHeight / 2);
-      
-      // Add very slight fixed offset based on index to avoid overlap
-      const fixedOffsetX = (index % 2) * 5;
-      const fixedOffsetY = (index % 3) * 5;
-      
-      // Limit the position to ensure bubbles are fully visible
-      // Adding extra safety margin to avoid any partial visibility issues
-      const safeMargin = maxSize / 2 + bubblePadding;
-      
-      // Final position with stronger constraints
-      const x = Math.max(safeMargin, Math.min(containerWidth - safeMargin, centerX + fixedOffsetX));
-      const y = Math.max(safeMargin, Math.min(containerHeight - safeMargin, centerY + fixedOffsetY));
-      
-      // Get the appropriate emoji based on the label
-      const normalizedLabel = item.label.toLowerCase().trim();
-      const emoji = EMOTION_EMOJIS[normalizedLabel] || '';
-      
-      // Size calculation with smoother scaling
-      let size;
-      if (usingEmotions && item.score !== undefined) {
-        // Scale based on score: min 40px, max 75px
-        const maxScore = Math.max(...Object.values(emotions));
-        const minSize = 40;
-        const maxSize = 75;
-        size = minSize + ((item.score / maxScore) * (maxSize - minSize));
-      } else {
-        // Fallback for themes (more consistent sizing)
-        size = 60 - (index * 3); // Reduced variation
+    // Create renderer
+    const render = Render.create({
+      canvas: canvasRef.current,
+      engine: engine,
+      options: {
+        width: containerWidth,
+        height: containerHeight,
+        wireframes: false,
+        background: 'transparent',
+        pixelRatio: window.devicePixelRatio || 1,
+      },
+    });
+    renderRef.current = render;
+    
+    // Add mouse control
+    const mouse = Mouse.create(render.canvas);
+    const mouseConstraint = MouseConstraint.create(engine, {
+      mouse: mouse,
+      constraint: {
+        stiffness: 0.2,
+        render: { visible: false }
       }
+    });
+    mouseConstraintRef.current = mouseConstraint;
+
+    // Adjust mouse position calculation
+    mouse.element.removeEventListener('mousewheel', mouse.mousewheel);
+    mouse.element.removeEventListener('DOMMouseScroll', mouse.mousewheel);
+    mouse.element.removeEventListener('touchstart', mouse.touchstart);
+    mouse.element.removeEventListener('touchmove', mouse.touchmove);
+    mouse.element.removeEventListener('touchend', mouse.touchend);
+    
+    // Add custom touch events to properly calculate the position
+    mouse.element.addEventListener('touchstart', (event) => {
+      const rect = mouse.element.getBoundingClientRect();
+      const touch = event.touches[0];
       
-      // Ensure size is within reasonable bounds
-      const cappedSize = Math.max(40, Math.min(75, size));
+      // Adjust touch position to be relative to canvas
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
       
-      return {
-        id: index,
-        label: item.label,
-        x,
-        y,
-        size: cappedSize,
-        delay: index * 0.7,
-        emoji
-      };
+      mouse.position.x = x;
+      mouse.position.y = y;
+      mouse.mousedown = true;
+      
+      event.preventDefault();
+    }, { passive: false });
+    
+    mouse.element.addEventListener('touchmove', (event) => {
+      const rect = mouse.element.getBoundingClientRect();
+      const touch = event.touches[0];
+      
+      // Adjust touch position to be relative to canvas
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+      
+      mouse.position.x = x;
+      mouse.position.y = y;
+      
+      event.preventDefault();
+    }, { passive: false });
+    
+    mouse.element.addEventListener('touchend', () => {
+      mouse.mousedown = false;
+    }, { passive: false });
+    
+    // Create world boundaries (invisible walls) with sufficient padding
+    const wallThickness = 50; // Thick enough to prevent bubbles from escaping
+    const padding = 5; // Small padding to ensure bubbles don't touch the visible edge
+    
+    // Create invisible walls around the container
+    const topWall = Bodies.rectangle(
+      containerWidth / 2, // x position
+      -wallThickness / 2 + padding, // y position (half above the container)
+      containerWidth, // width
+      wallThickness, // height
+      { isStatic: true, render: { visible: false }, friction: 0.1, restitution: 0.7 }
+    );
+    
+    const bottomWall = Bodies.rectangle(
+      containerWidth / 2,
+      containerHeight + wallThickness / 2 - padding,
+      containerWidth,
+      wallThickness,
+      { isStatic: true, render: { visible: false }, friction: 0.1, restitution: 0.7 }
+    );
+    
+    const leftWall = Bodies.rectangle(
+      -wallThickness / 2 + padding,
+      containerHeight / 2,
+      wallThickness,
+      containerHeight,
+      { isStatic: true, render: { visible: false }, friction: 0.1, restitution: 0.7 }
+    );
+    
+    const rightWall = Bodies.rectangle(
+      containerWidth + wallThickness / 2 - padding,
+      containerHeight / 2,
+      wallThickness,
+      containerHeight,
+      { isStatic: true, render: { visible: false }, friction: 0.1, restitution: 0.7 }
+    );
+    
+    worldBoundaries.current = [topWall, bottomWall, leftWall, rightWall];
+    
+    // Add boundaries to the world
+    World.add(engine.world, [
+      topWall, 
+      bottomWall, 
+      leftWall, 
+      rightWall,
+      mouseConstraint
+    ]);
+    
+    // Start the engine and renderer
+    Engine.run(engine);
+    Render.run(render);
+    
+    // Create resize observer to handle window resizing
+    const resizeObserver = new ResizeObserver(() => {
+      if (!containerRef.current || !renderRef.current || !engineRef.current) return;
+      
+      const newWidth = containerRef.current.clientWidth;
+      const newHeight = containerRef.current.clientHeight;
+      
+      // Update container size state
+      setContainerSize({ width: newWidth, height: newHeight });
+      
+      // Resize the renderer
+      Render.setPixelRatio(renderRef.current, window.devicePixelRatio || 1);
+      Render.setSize(renderRef.current, newWidth, newHeight);
+      
+      // Update wall positions
+      const [topWall, bottomWall, leftWall, rightWall] = worldBoundaries.current;
+      
+      Body.setPosition(topWall, { x: newWidth / 2, y: -wallThickness / 2 + padding });
+      Body.setPosition(bottomWall, { x: newWidth / 2, y: newHeight + wallThickness / 2 - padding });
+      Body.setPosition(leftWall, { x: -wallThickness / 2 + padding, y: newHeight / 2 });
+      Body.setPosition(rightWall, { x: newWidth + wallThickness / 2 - padding, y: newHeight / 2 });
+      
+      // Update wall sizes
+      Body.setVertices(topWall, Bodies.rectangle(newWidth / 2, -wallThickness / 2 + padding, newWidth, wallThickness, { isStatic: true }).vertices);
+      Body.setVertices(bottomWall, Bodies.rectangle(newWidth / 2, newHeight + wallThickness / 2 - padding, newWidth, wallThickness, { isStatic: true }).vertices);
+      Body.setVertices(leftWall, Bodies.rectangle(-wallThickness / 2 + padding, newHeight / 2, wallThickness, newHeight, { isStatic: true }).vertices);
+      Body.setVertices(rightWall, Bodies.rectangle(newWidth + wallThickness / 2 - padding, newHeight / 2, wallThickness, newHeight, { isStatic: true }).vertices);
     });
     
-    setBubbles(newBubbles);
-  }, [themes, emotions, containerRef.current?.clientWidth, containerRef.current?.clientHeight]);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+      resizeObserverRef.current = resizeObserver;
+    }
+    
+    // Cleanup function
+    return () => {
+      if (resizeObserverRef.current && containerRef.current) {
+        resizeObserverRef.current.unobserve(containerRef.current);
+      }
+      
+      if (renderRef.current) {
+        Render.stop(renderRef.current);
+        renderRef.current.canvas.remove();
+        renderRef.current = null;
+      }
+      
+      if (engineRef.current) {
+        World.clear(engineRef.current.world, false);
+        Engine.clear(engineRef.current);
+        engineRef.current = null;
+      }
+    };
+  }, []);
+  
+  // Update bubbles when emotions or themes change
+  useEffect(() => {
+    if (!engineRef.current || !containerRef.current) return;
+    
+    // Clear existing bubbles first
+    const existingBodies = Array.from(bodiesRef.current.values());
+    if (existingBodies.length > 0) {
+      World.remove(engineRef.current.world, existingBodies);
+      bodiesRef.current.clear();
+    }
+    
+    // Determine data source
+    const usingEmotions = Object.keys(emotions).length > 0;
+    const dataSource = usingEmotions 
+      ? Object.entries(emotions).map(([key, value]) => ({ label: key, value }))
+      : themes.map(theme => ({ label: theme, value: 1 }));
+    
+    // Find max value for scaling
+    const maxValue = usingEmotions 
+      ? Math.max(...Object.values(emotions))
+      : 1;
+    
+    // Calculate available space
+    const containerWidth = containerSize.width;
+    const containerHeight = containerSize.height;
+    const maxSize = Math.min(containerWidth, containerHeight) * 0.3; // Max bubble size is 30% of container
+    const minSize = Math.max(40, maxSize * 0.2); // Min bubble size
+    
+    // Calculate positions to avoid overlaps
+    const bubbles: Array<{ x: number, y: number, radius: number, label: string, color: string }> = [];
+    
+    // First sort by value to place larger bubbles first
+    const sortedData = [...dataSource].sort((a, b) => (b.value || 0) - (a.value || 0));
+    
+    // Process each emotion/theme
+    for (const item of sortedData) {
+      // Use score to determine size, with a minimum size
+      const score = usingEmotions ? item.value : 1;
+      const radius = minSize + ((score / maxValue) * (maxSize - minSize)) / 2;
+      
+      // Try to find a suitable position
+      let attempts = 0;
+      let validPosition = false;
+      let x = 0, y = 0;
+      
+      // Keep trying positions until we find one that doesn't overlap
+      while (!validPosition && attempts < 50) {
+        // Generate a position that ensures the bubble is fully within the container
+        x = radius + Math.random() * (containerWidth - 2 * radius);
+        y = radius + Math.random() * (containerHeight - 2 * radius);
+        
+        // Check for overlaps with existing bubbles
+        validPosition = true;
+        for (const bubble of bubbles) {
+          const dx = x - bubble.x;
+          const dy = y - bubble.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          // If bubbles touch or overlap, position is invalid
+          if (distance < radius + bubble.radius + 5) { // Add a small gap between bubbles
+            validPosition = false;
+            break;
+          }
+        }
+        
+        attempts++;
+      }
+      
+      // If we couldn't find a non-overlapping position, place it anyway (will adjust with physics)
+      if (!validPosition) {
+        x = containerWidth / 2;
+        y = containerHeight / 2;
+      }
+      
+      // Get color based on emotion label
+      const color = getEmotionColor(item.label);
+      
+      // Store bubble data
+      bubbles.push({ x, y, radius, label: item.label, color });
+    }
+    
+    // Create Matter.js bodies for each bubble
+    bubbles.forEach(bubble => {
+      // Create a circular body
+      const body = Bodies.circle(bubble.x, bubble.y, bubble.radius, {
+        restitution: 0.9, // Bounciness
+        friction: 0.001, // Low friction
+        frictionAir: 0.02, // Air resistance
+        frictionStatic: 0.1, // Low static friction
+        density: 0.02, // Low density to make bubbles feel light
+        // Custom render with label
+        render: {
+          fillStyle: bubble.color,
+          strokeStyle: 'rgba(255, 255, 255, 0.3)',
+          lineWidth: 1,
+        },
+        // Store label for reference
+        label: bubble.label
+      });
+      
+      // Add to world
+      World.add(engineRef.current!.world, body);
+      
+      // Store reference
+      bodiesRef.current.set(bubble.label, body);
+    });
+    
+    // Render text labels for each bubble after physics bodies are added
+    const renderLabels = () => {
+      const context = canvasRef.current?.getContext('2d');
+      if (!context || !canvasRef.current) return;
+      
+      // Clear any existing text (this is handled by Matter.js render)
+      
+      // Draw text on each bubble
+      for (const [label, body] of bodiesRef.current.entries()) {
+        const { x, y } = body.position;
+        const radius = body.circleRadius as number;
+        
+        // Setup text style
+        context.font = `bold ${Math.max(12, radius * 0.5)}px sans-serif`;
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillStyle = 'white';
+        
+        // Capitalize first letter
+        const displayLabel = label.charAt(0).toUpperCase() + label.slice(1);
+        
+        // Draw text
+        context.fillText(displayLabel, x, y);
+      }
+    };
+    
+    // Add after update event listener to draw labels
+    const afterUpdateEvent = () => {
+      if (renderRef.current) {
+        renderLabels();
+      }
+    };
+    
+    Events.on(renderRef.current!, 'afterRender', afterUpdateEvent);
+    
+    // Clean up event listener
+    return () => {
+      if (renderRef.current) {
+        Events.off(renderRef.current, 'afterRender', afterUpdateEvent);
+      }
+    };
+  }, [emotions, themes, containerSize]);
   
   return (
     <div 
       ref={containerRef} 
-      className="relative w-full h-full border-2 border-dashed border-muted/10 rounded-lg overflow-hidden"
+      className="relative w-full h-full rounded-lg overflow-hidden"
     >
-      {bubbles.map((bubble) => (
-        <Bubble
-          key={bubble.id}
-          x={bubble.x}
-          y={bubble.y}
-          size={bubble.size}
-          delay={bubble.delay}
-          containerRef={containerRef}
-        >
-          <div className="flex flex-col items-center text-center">
-            <span className="text-xs font-medium text-primary/90 max-w-[60px] line-clamp-2 capitalize">
-              {bubble.label}
-            </span>
-          </div>
-        </Bubble>
-      ))}
+      <canvas ref={canvasRef} className="w-full h-full" />
+      <div className="absolute top-2 right-2 text-xs text-muted-foreground">
+        * Size of bubble represents intensity
+      </div>
     </div>
   );
 };
