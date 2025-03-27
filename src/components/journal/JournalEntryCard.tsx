@@ -20,6 +20,7 @@ export type JournalEntry = {
   emotions?: Record<string, number>;
   duration?: number;
   master_themes?: string[];
+  sentiment?: string;
 };
 
 interface JournalEntryCardProps {
@@ -50,6 +51,28 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
     }
   };
 
+  // Helper function to determine sentiment color
+  const getSentimentColor = () => {
+    if (!entry.sentiment) return "text-gray-400";
+    
+    const score = parseFloat(entry.sentiment);
+    if (score > 0.25) return "text-green-500";
+    if (score < -0.25) return "text-red-500";
+    return "text-amber-500";
+  };
+
+  // Helper function to get sentiment label
+  const getSentimentLabel = () => {
+    if (!entry.sentiment) return "Neutral";
+    
+    const score = parseFloat(entry.sentiment);
+    if (score > 0.5) return "Very Positive";
+    if (score > 0.25) return "Positive";
+    if (score < -0.5) return "Very Negative";
+    if (score < -0.25) return "Negative";
+    return "Neutral";
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -63,11 +86,18 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
             <CardTitle className="text-xl">
               {format(new Date(entry.created_at), 'MMMM d, yyyy - h:mm a')}
             </CardTitle>
-            {entry.duration && (
-              <span className="text-sm text-muted-foreground">
-                {Math.floor(entry.duration / 60)}:{(entry.duration % 60).toString().padStart(2, '0')}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {entry.sentiment && (
+                <span className={`text-sm font-medium ${getSentimentColor()}`}>
+                  {getSentimentLabel()}
+                </span>
+              )}
+              {entry.duration && (
+                <span className="text-sm text-muted-foreground">
+                  {Math.floor(entry.duration / 60)}:{(entry.duration % 60).toString().padStart(2, '0')}
+                </span>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-6">

@@ -37,10 +37,19 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       // We need to ensure data matches our JournalEntry type
       const typedEntries = (data || []) as JournalEntry[];
       
-      // For any entry without master_themes, generate them
+      // For any entry that needs analysis, process it
       for (const entry of typedEntries) {
-        if (!entry.master_themes && entry["refined text"]) {
-          await generateThemesForEntry(entry);
+        // Process entries that have text but no sentiment or themes
+        if (entry["refined text"]) {
+          // Generate themes if needed
+          if (!entry.master_themes) {
+            await generateThemesForEntry(entry);
+          }
+          
+          // Analyze sentiment if needed
+          if (!entry.sentiment && entry["refined text"]) {
+            await analyzeSentimentForEntry(entry);
+          }
         }
       }
       
@@ -71,6 +80,44 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       }
     } catch (error) {
       console.error('Error invoking generate-themes function:', error);
+    }
+  };
+
+  const analyzeSentimentForEntry = async (entry: JournalEntry) => {
+    try {
+      // Call the existing Supabase Edge Function to analyze sentiment
+      const { data, error } = await supabase.functions.invoke('analyze-sentiment', {
+        body: { text: entry["refined text"] }
+      });
+      
+      if (error) {
+        console.error('Error analyzing sentiment:', error);
+        return;
+      }
+      
+      if (data) {
+        console.log('Sentiment analysis result:', data);
+        
+        // Extract the document sentiment score and magnitude
+        const sentimentScore = data.documentSentiment?.score;
+        
+        if (sentimentScore !== undefined) {
+          // Update the entry in the database with the sentiment score
+          const { error: updateError } = await supabase
+            .from('Journal Entries')
+            .update({ sentiment: sentimentScore.toString() })
+            .eq('id', entry.id);
+            
+          if (updateError) {
+            console.error('Error updating entry with sentiment:', updateError);
+          } else {
+            // Update the local entry object with the sentiment score
+            entry.sentiment = sentimentScore.toString();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error invoking analyze-sentiment function:', error);
     }
   };
 
