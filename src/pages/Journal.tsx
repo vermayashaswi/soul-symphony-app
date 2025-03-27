@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { JournalHeader } from '@/components/journal/JournalHeader';
@@ -65,7 +64,17 @@ export default function Journal() {
     const checkConnection = async () => {
       try {
         console.log('Checking Supabase connection...');
-        const { data, error } = await supabase.from('profiles').select('id').limit(1);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .limit(1)
+          .abortSignal(controller.signal);
+        
+        clearTimeout(timeoutId);
         
         if (error) {
           console.error('Supabase connection check failed:', error);
@@ -84,52 +93,33 @@ export default function Journal() {
     checkConnection();
   }, []);
 
-  // Check for and try to fix storage bucket issues
   useEffect(() => {
-    const checkAndFixStorage = async () => {
+    const checkAudioBucket = async () => {
       if (user?.id && !isFixingStorage) {
         setIsFixingStorage(true);
         
         try {
-          // Check if audio bucket exists
-          const { data: buckets, error } = await supabase.storage.listBuckets();
+          const bucketExists = await ensureAudioBucketExists();
           
-          if (error) {
-            console.error('Error checking storage buckets:', error);
-            setIsFixingStorage(false);
-            return;
-          }
-          
-          const audioBucket = buckets?.find(bucket => bucket.name === 'audio');
-          
-          if (!audioBucket) {
-            console.log('Audio bucket missing, attempting to create');
-            const bucketCreated = await ensureAudioBucketExists();
-            
-            if (bucketCreated) {
-              toast.success('Audio storage configured successfully', {
-                duration: 3000,
-              });
-              
-              // Refresh after storage is fixed
-              setTimeout(() => refreshEntries(false), 1000);
-            } else {
-              console.error('Failed to create audio bucket');
-              toast.error('Could not configure audio storage', {
-                duration: 5000,
-              });
-            }
+          if (!bucketExists) {
+            console.warn('Audio bucket not properly configured');
+            toast.error('Audio storage is not properly configured', {
+              id: 'audio-storage-issue',
+              duration: 5000,
+            });
           }
         } catch (err) {
-          console.error('Error in storage check/fix:', err);
+          console.error('Error in storage check:', err);
         } finally {
           setIsFixingStorage(false);
         }
       }
     };
     
-    checkAndFixStorage();
-  }, [user?.id, isFixingStorage, refreshEntries]);
+    if (user?.id && !isFixingStorage) {
+      checkAudioBucket();
+    }
+  }, [user?.id, isFixingStorage]);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -256,7 +246,33 @@ export default function Journal() {
     
     addLog('action', 'Manual refresh requested on Journal page');
     setIsRefreshing(true);
+    
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .select('id')
+          .limit(1)
+          .abortSignal(controller.signal);
+        
+        if (error) {
+          console.error('Database connection test failed:', error);
+          toast.error('Database connection failed');
+          setIsRefreshing(false);
+          return;
+        }
+      } catch (e) {
+        console.error('Connection test error:', e);
+        toast.error('Database connection test failed');
+        setIsRefreshing(false);
+        return;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      
       if (user?.id) {
         addLog('action', 'Processing unprocessed entries');
         const processingResult = await processUnprocessedEntries();
@@ -267,9 +283,6 @@ export default function Journal() {
           return;
         }
       }
-      
-      // Check/fix storage bucket issues before refreshing
-      await ensureAudioBucketExists();
       
       addLog('action', 'Refreshing journal entries');
       await refreshEntries(true);
@@ -307,11 +320,17 @@ export default function Journal() {
           id: 'test-connection',
         });
         
-        // Also check and fix storage bucket if needed
         const bucketExists = await ensureAudioBucketExists();
+        
         if (bucketExists) {
           toast.success('Audio storage is configured properly', {
+            id: 'test-connection',
             duration: 3000,
+          });
+        } else {
+          toast.error('Audio storage is not configured properly', {
+            id: 'test-connection',
+            duration: 5000,
           });
         }
         

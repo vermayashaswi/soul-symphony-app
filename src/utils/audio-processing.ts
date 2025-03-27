@@ -160,10 +160,23 @@ export const ensureAudioBucketExists = async (): Promise<boolean> => {
     
     if (audioBucket) {
       console.log('journal-audio-entries bucket exists');
-      return true;
+      
+      // Test basic access
+      try {
+        const { error: accessError } = await supabase.storage
+          .from('journal-audio-entries')
+          .list();
+          
+        if (!accessError) {
+          console.log('journal-audio-entries bucket is accessible');
+          return true;
+        }
+      } catch (e) {
+        console.error('Error testing bucket access:', e);
+      }
     }
     
-    console.log('journal-audio-entries bucket does not exist');
+    console.warn('journal-audio-entries bucket does not exist or is not accessible');
     toast.error('Audio storage is not properly configured. Please contact support.', {
       duration: 5000,
       id: 'audio-bucket-missing'
