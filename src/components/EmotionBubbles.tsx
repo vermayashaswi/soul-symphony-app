@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
 import Matter, { 
@@ -13,14 +13,22 @@ import Matter, {
   Composite,
   Events
 } from 'matter-js';
+import EmotionBubbleDetail from './EmotionBubbleDetail';
+import { useToast } from '@/components/ui/use-toast';
 
 interface EmotionBubblesProps {
   emotions?: Record<string, number>;
   themes?: string[];
   className?: string;
+  onEmotionClick?: (emotion: string) => void;
 }
 
-const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, className }) => {
+const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ 
+  emotions, 
+  themes, 
+  className,
+  onEmotionClick
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Matter.Engine | null>(null);
@@ -39,12 +47,15 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
     name: string; 
     size: number; 
     color: string; 
-    position: { x: number; y: number } 
+    position: { x: number; y: number };
+    value?: number;
   }>>([]);
+  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   
   const location = useLocation();
   const isInsightsPage = location.pathname.includes('insights');
   const isJournalPage = location.pathname.includes('journal');
+  const { toast } = useToast();
   
   const colorPalette = [
     'bg-blue-100 text-blue-800', 
@@ -235,7 +246,13 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
     const availableWidth = containerSize.width - padding * 2;
     const availableHeight = containerSize.height - padding * 2;
     
-    let newItems: Array<{ name: string; size: number; color: string; position: { x: number; y: number } }> = [];
+    let newItems: Array<{ 
+      name: string; 
+      size: number; 
+      color: string; 
+      position: { x: number; y: number };
+      value?: number;
+    }> = [];
     
     const calculateMinBubbleSize = (text: string): number => {
       const textLength = text.length;
@@ -287,7 +304,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
           name: emotion,
           size,
           color: colorPalette[index % colorPalette.length],
-          position: { x: 0, y: 0 }
+          position: { x: 0, y: 0 },
+          value: valueRange === 0 ? 0.5 : (value - minValue) / valueRange
         };
       });
     } else if (themes && themes.length > 0) {
@@ -395,6 +413,58 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
     setItems(newItems);
   }, [containerSize, emotions, themes]);
 
+  const handleEmotionClick = (emotion: string) => {
+    setSelectedEmotion(emotion);
+    toast({
+      title: `${emotion}`,
+      description: `You selected ${emotion}. This emotion appears in your journal entries.`,
+      duration: 3000,
+    });
+    
+    if (onEmotionClick) {
+      onEmotionClick(emotion);
+    }
+  };
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.3
+      }
+    }
+  };
+
+  const bubbleVariants = {
+    hidden: { 
+      opacity: 0, 
+      scale: 0,
+      x: containerSize.width / 2,
+      y: containerSize.height / 2
+    },
+    show: (item: { position: { x: number; y: number }; size: number }) => ({
+      opacity: 1, 
+      scale: 1,
+      x: item.position.x - item.size / 2,
+      y: item.position.y - item.size / 2,
+      transition: { 
+        type: "spring",
+        damping: 12,
+        stiffness: 100,
+        duration: 0.8
+      }
+    }),
+    exit: { 
+      opacity: 0, 
+      scale: 0,
+      x: containerSize.width / 2,
+      y: containerSize.height / 2,
+      transition: { duration: 0.5 }
+    }
+  };
+
   return (
     <div 
       ref={containerRef} 
@@ -412,90 +482,52 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
           {bubblesRef.current.map((bubble, index) => (
             <div
               key={bubble.name + index}
-              className={cn(
-                "absolute rounded-full flex items-center justify-center pointer-events-none",
-                items[index]?.color
-              )}
+              className="absolute pointer-events-none"
               style={{
                 width: bubble.size,
                 height: bubble.size,
                 transform: `translate(${bubble.body.position.x - bubble.size/2}px, ${bubble.body.position.y - bubble.size/2}px)`,
               }}
             >
-              <span className="font-medium px-1 text-center" style={{
-                fontSize: `${Math.max(10, bubble.size / 4.5)}px`,
-                lineHeight: '1.2',
-                maxWidth: '90%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                wordBreak: 'break-word',
-                textAlign: 'center',
-                height: '100%',
-                padding: '12%'
-              }}>
-                {bubble.name}
-              </span>
+              <EmotionBubbleDetail
+                name={bubble.name}
+                size={bubble.size}
+                color={items[index]?.color}
+                value={items[index]?.value}
+                onClick={handleEmotionClick}
+              />
             </div>
           ))}
         </>
       ) : (
-        items.map((item, index) => (
+        <AnimatePresence>
           <motion.div
-            key={item.name + index}
-            initial={{ 
-              opacity: 0, 
-              scale: 0,
-              x: containerSize.width / 2,
-              y: containerSize.height / 2
-            }}
-            animate={{ 
-              opacity: 1, 
-              scale: 1,
-              x: item.position.x - item.size / 2,
-              y: item.position.y - item.size / 2
-            }}
-            exit={{ 
-              opacity: 0, 
-              scale: 0,
-              x: containerSize.width / 2,
-              y: containerSize.height / 2 
-            }}
-            transition={{ 
-              duration: 0.8,
-              delay: index * 0.1,
-              type: "spring",
-              damping: 15
-            }}
-            className={cn(
-              "absolute rounded-full flex items-center justify-center",
-              item.color
-            )}
-            style={{
-              width: item.size,
-              height: item.size
-            }}
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="w-full h-full"
           >
-            <span className="font-medium px-1 text-center" style={{
-              fontSize: `${Math.max(10, item.size / 4.5)}px`,
-              lineHeight: '1.2',
-              maxWidth: '90%',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              wordBreak: 'break-word',
-              textAlign: 'center',
-              height: '100%',
-              padding: '12%'
-            }}>
-              {item.name}
-            </span>
+            {items.map((item, index) => (
+              <motion.div
+                key={item.name + index}
+                className="absolute"
+                custom={item}
+                variants={bubbleVariants}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+              >
+                <EmotionBubbleDetail
+                  name={item.name}
+                  size={item.size}
+                  color={item.color}
+                  value={item.value}
+                  onClick={handleEmotionClick}
+                />
+              </motion.div>
+            ))}
           </motion.div>
-        ))
+        </AnimatePresence>
       )}
     </div>
   );

@@ -13,6 +13,7 @@ export default function Insights() {
   const { user } = useAuth();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   const [isSticky, setIsSticky] = useState(false);
+  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const timeToggleRef = useRef<HTMLDivElement>(null);
   const stickyThreshold = useRef<number>(0);
   
@@ -40,6 +41,11 @@ export default function Insights() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleEmotionClick = (emotion: string) => {
+    setSelectedEmotion(emotion);
+    // Additional handling can be added here
+  };
 
   const renderTimeToggle = () => (
     <div className="flex items-center gap-3">
@@ -242,6 +248,7 @@ export default function Insights() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.3 }}
               className="bg-white p-6 md:p-8 rounded-xl shadow-sm mb-8"
+              whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
             >
               <EmotionChart 
                 timeframe={timeRange}

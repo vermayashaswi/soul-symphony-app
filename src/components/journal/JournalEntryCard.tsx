@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EmotionChart from '@/components/EmotionChart';
 import EmotionBubbles from '@/components/EmotionBubbles';
+import { useToast } from '@/components/ui/use-toast';
 
 // Type for JournalEntry matching Supabase table schema
 export type JournalEntry = {
@@ -26,6 +27,29 @@ interface JournalEntryCardProps {
 }
 
 const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
+  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const handleEmotionClick = (emotion: string) => {
+    setSelectedEmotion(emotion);
+    
+    // Find sentences in the journal entry that might contain this emotion
+    if (entry["refined text"]) {
+      const sentences = entry["refined text"].split(/[.!?]+/).filter(Boolean);
+      const relevantSentences = sentences.filter(sentence => 
+        sentence.toLowerCase().includes(emotion.toLowerCase())
+      );
+      
+      if (relevantSentences.length > 0) {
+        toast({
+          title: `${emotion} in your journal`,
+          description: relevantSentences[0].trim(),
+          duration: 5000,
+        });
+      }
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -63,7 +87,14 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
               
               <div>
                 <h3 className="font-medium mb-2">Journal Entry</h3>
-                <p className="whitespace-pre-line">{entry["refined text"] || "No refined text available"}</p>
+                <motion.p 
+                  className="whitespace-pre-line"
+                  initial={{ opacity: 1 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {entry["refined text"] || "No refined text available"}
+                </motion.p>
               </div>
             </div>
             
@@ -73,15 +104,27 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                 Soul-ubles
               </h3>
               
-              <div className="h-64 mb-4 flex items-center justify-center p-4 border border-muted rounded-lg shadow-sm bg-white">
+              <motion.div 
+                className="h-64 mb-4 flex items-center justify-center p-4 border border-muted rounded-lg shadow-sm bg-white"
+                whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
+                transition={{ duration: 0.2 }}
+              >
                 {entry.emotions && Object.keys(entry.emotions).length > 0 ? (
-                  <EmotionBubbles emotions={entry.emotions} className="w-full h-full" />
+                  <EmotionBubbles 
+                    emotions={entry.emotions} 
+                    className="w-full h-full"
+                    onEmotionClick={handleEmotionClick} 
+                  />
                 ) : entry.master_themes && entry.master_themes.length > 0 ? (
-                  <EmotionBubbles themes={entry.master_themes.slice(0, 5)} className="w-full h-full" />
+                  <EmotionBubbles 
+                    themes={entry.master_themes.slice(0, 5)} 
+                    className="w-full h-full"
+                    onEmotionClick={handleEmotionClick}
+                  />
                 ) : (
                   <p className="text-muted-foreground text-center">Analyzing emotions...</p>
                 )}
-              </div>
+              </motion.div>
             </div>
           </div>
         </CardContent>
