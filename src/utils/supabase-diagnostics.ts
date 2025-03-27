@@ -129,7 +129,7 @@ export const diagnoseDatabaseIssues = async () => {
 };
 
 /**
- * Check if journal-audio-entries bucket exists
+ * Verify audio bucket and policies are properly configured
  */
 export const createAudioBucket = async () => {
   try {

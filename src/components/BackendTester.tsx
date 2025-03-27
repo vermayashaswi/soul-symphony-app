@@ -72,7 +72,7 @@ export default function BackendTester() {
       } else {
         toast.error('Audio bucket does not exist, contact administrator...', { id: 'storage-check' });
         
-        // Attempt to check if the bucket can be created
+        // Attempt to verify the bucket status
         const result = await createAudioBucket();
         
         if (result.success) {
