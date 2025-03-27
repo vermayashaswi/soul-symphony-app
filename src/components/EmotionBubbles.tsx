@@ -3,7 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 interface EmotionBubblesProps {
-  themes: string[];
+  themes?: string[];
+  emotions?: Record<string, number>;
 }
 
 interface BubbleProps {
@@ -65,8 +66,8 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
       className="absolute flex items-center justify-center"
       initial={{ x, y, opacity: 0, scale: 0 }}
       animate={{ 
-        x: [x, x + getRandomValue(-10, 10)], 
-        y: [y, y - getRandomValue(5, 10)],
+        x: [x, x + getRandomValue(-5, 5)], 
+        y: [y, y - getRandomValue(3, 7)],
         opacity: [0, 1, 0.8],
         scale: [0, 1, 0.9]
       }}
@@ -87,56 +88,88 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
   );
 };
 
-const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
+const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions = {} }) => {
   const [bubbles, setBubbles] = useState<Array<{
     id: number;
-    theme: string;
+    label: string;
     x: number;
     y: number;
     size: number;
     delay: number;
     emoji: string;
+    score?: number;
   }>>([]);
   
   useEffect(() => {
-    // Generate bubbles with better distribution to avoid overlapping
-    const newBubbles = themes.slice(0, 5).map((theme, index) => {
-      // Get the appropriate emoji based on the theme
-      const normalizedTheme = theme.toLowerCase().trim();
-      const emoji = EMOTION_EMOJIS[normalizedTheme] || '';
+    // We'll prioritize emotions if they exist, otherwise fall back to themes
+    const usingEmotions = Object.keys(emotions).length > 0;
+    const dataSource = usingEmotions 
+      ? Object.entries(emotions).map(([key, value]) => ({ label: key, score: value }))
+      : themes.map(theme => ({ label: theme }));
+    
+    // Limit to top emotions/themes (by score if available)
+    const limitedData = usingEmotions 
+      ? dataSource
+          .sort((a, b) => (b.score || 0) - (a.score || 0))
+          .slice(0, 7) // Show more emotions since they're quantified
+      : dataSource.slice(0, 5);
+    
+    // Grid layout configuration
+    const gridRows = 3;
+    const gridCols = 3;
+    const cellWidth = 280 / gridCols;
+    const cellHeight = 220 / gridRows;
+    
+    // Calculate positions using a grid-based approach to minimize overlap
+    const newBubbles = limitedData.map((item, index) => {
+      // Calculate grid position (different cells for each bubble)
+      const col = index % gridCols;
+      const row = Math.floor(index / gridCols) % gridRows;
       
-      // Calculate positions using a more distributed approach
-      // Divide the container into sections for better distribution
-      const sectionWidth = 360 / Math.min(themes.length, 5);
-      const sectionCenter = index * sectionWidth + (sectionWidth / 2);
+      // Calculate base position within cell with some randomness
+      const baseX = (col * cellWidth) + (cellWidth / 2) + getRandomValue(-10, 10);
+      const baseY = (row * cellHeight) + (cellHeight / 2) + getRandomValue(-10, 10);
       
-      // Use angle-based positioning for a circular arrangement
-      const angle = (sectionCenter / 180) * Math.PI;
-      const radius = 80; // Smaller radius to ensure bubbles stay within container
+      // Center the grid in our container
+      const x = baseX + 20; // Offset from left
+      const y = baseY + 20; // Offset from top
       
-      // Calculate x,y based on the angle and add some minor randomness
-      const x = Math.cos(angle) * radius + 120 + getRandomValue(-10, 10); 
-      const y = Math.sin(angle) * radius + 80 + getRandomValue(-10, 10);
+      // Get the appropriate emoji based on the label
+      const normalizedLabel = item.label.toLowerCase().trim();
+      const emoji = EMOTION_EMOJIS[normalizedLabel] || '';
       
-      // Vary size based on index (first themes are more important)
-      const size = 70 - (index * 6);
+      // Size calculation based on score (if emotions) or position (if themes)
+      let size;
+      if (usingEmotions) {
+        const score = item.score || 0;
+        // Scale based on score: min 40px, max 90px
+        // We use a log scale to make differences more visible
+        const maxScore = Math.max(...Object.values(emotions));
+        const minSize = 40;
+        const maxSize = 90;
+        size = minSize + ((score / maxScore) * (maxSize - minSize));
+      } else {
+        // Fallback for themes (decreasing by position)
+        size = 70 - (index * 5);
+      }
       
       return {
         id: index,
-        theme,
+        label: item.label,
         x,
         y,
-        size,
+        size: Math.max(40, Math.min(90, size)), // Ensure size is within reasonable bounds
         delay: index * 0.2, // Stagger animations
-        emoji
+        emoji,
+        score: item.score
       };
     });
     
     setBubbles(newBubbles);
-  }, [themes]);
+  }, [themes, emotions]);
   
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full border-2 border-dashed border-muted/10 rounded-lg overflow-hidden">
       {bubbles.map((bubble) => (
         <Bubble
           key={bubble.id}
@@ -146,8 +179,14 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
           delay={bubble.delay}
         >
           <div className="flex flex-col items-center text-center">
-            {/* Removed emoji/icon display from bubbles as requested */}
-            <span className="text-xs font-medium text-primary/90 max-w-[60px] line-clamp-2">{bubble.theme}</span>
+            <span className="text-xs font-medium text-primary/90 max-w-[60px] line-clamp-2 capitalize">
+              {bubble.label}
+              {bubble.score !== undefined && (
+                <span className="ml-1 text-xs text-primary/70">
+                  ({Math.round(bubble.score * 10) / 10})
+                </span>
+              )}
+            </span>
           </div>
         </Bubble>
       ))}
