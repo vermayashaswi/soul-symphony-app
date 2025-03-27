@@ -88,6 +88,12 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
   );
 };
 
+// Define types for our emotion/theme data
+interface EmotionData {
+  label: string;
+  score?: number;
+}
+
 const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions = {} }) => {
   const [bubbles, setBubbles] = useState<Array<{
     id: number;
@@ -103,14 +109,16 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
   useEffect(() => {
     // We'll prioritize emotions if they exist, otherwise fall back to themes
     const usingEmotions = Object.keys(emotions).length > 0;
-    const dataSource = usingEmotions 
+    
+    // Create properly typed data sources
+    const dataSource: EmotionData[] = usingEmotions 
       ? Object.entries(emotions).map(([key, value]) => ({ label: key, score: value }))
       : themes.map(theme => ({ label: theme }));
     
     // Limit to top emotions/themes (by score if available)
     const limitedData = usingEmotions 
-      ? dataSource
-          .sort((a, b) => (b.score || 0) - (a.score || 0))
+      ? [...dataSource]
+          .sort((a, b) => ((b.score || 0) - (a.score || 0)))
           .slice(0, 7) // Show more emotions since they're quantified
       : dataSource.slice(0, 5);
     
@@ -140,14 +148,13 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
       
       // Size calculation based on score (if emotions) or position (if themes)
       let size;
-      if (usingEmotions) {
-        const score = item.score || 0;
+      if (usingEmotions && item.score !== undefined) {
         // Scale based on score: min 40px, max 90px
         // We use a log scale to make differences more visible
         const maxScore = Math.max(...Object.values(emotions));
         const minSize = 40;
         const maxSize = 90;
-        size = minSize + ((score / maxScore) * (maxSize - minSize));
+        size = minSize + ((item.score / maxScore) * (maxSize - minSize));
       } else {
         // Fallback for themes (decreasing by position)
         size = 70 - (index * 5);
@@ -195,3 +202,4 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
 };
 
 export default EmotionBubbles;
+
