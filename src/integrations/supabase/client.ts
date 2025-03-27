@@ -29,120 +29,18 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// For adding timeout capability to requests
-export const fetchWithTimeout = async (
-  url: string, 
-  options: RequestInit & { timeoutMs?: number } = {}
-) => {
-  const { timeoutMs = 15000, ...fetchOptions } = options;
+// Utility function to get the URL for a stored audio file
+export const getAudioFileUrl = (filePath: string): string => {
+  if (!filePath) return '';
   
-  // Use Promise.race for implementing timeout
-  const fetchPromise = fetch(url, fetchOptions);
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Request timed out')), timeoutMs);
-  });
-  
-  try {
-    const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-    return response;
-  } catch (error) {
-    console.error('Fetch with timeout error:', error);
-    throw error;
-  }
+  const { data } = supabase.storage
+    .from('journal-audio-entries')
+    .getPublicUrl(filePath);
+    
+  return data?.publicUrl || '';
 };
 
-// Simple function to check if Supabase is reachable
-export const checkSupabaseConnection = async () => {
-  try {
-    console.log('Testing Supabase connection...');
-    
-    // Use Promise.race for implementing timeout
-    const queryPromise = supabase
-      .from('profiles')
-      .select('id')
-      .limit(1);
-      
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Connection timed out')), 5000);
-    });
-    
-    // Race the promises
-    const { data, error } = await Promise.race([
-      queryPromise,
-      timeoutPromise.then(() => { throw new Error('Connection timed out'); })
-    ]) as any;
-    
-    if (error) {
-      console.error('Supabase connection test failed:', error);
-      return { success: false, error };
-    }
-    
-    console.log('Supabase connection successful');
-    return { success: true };
-  } catch (err) {
-    console.error('Supabase connection error:', err);
-    return { success: false, error: err };
-  }
-};
-
-// Check if the journal-audio-entries bucket exists and is accessible
-export const checkAudioStorage = async (userId?: string) => {
-  try {
-    if (!userId) {
-      const { data: session } = await supabase.auth.getSession();
-      userId = session.session?.user.id;
-    }
-    
-    if (!userId) {
-      return { success: false, error: 'Not authenticated' };
-    }
-    
-    console.log('Checking audio storage for user:', userId);
-    
-    // Check if bucket exists
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    
-    if (listError) {
-      console.error('Error checking storage buckets:', listError);
-      return { success: false, error: 'Could not list buckets' };
-    }
-    
-    const audioBucket = buckets?.find(bucket => bucket.name === 'journal-audio-entries');
-    
-    if (!audioBucket) {
-      console.log('Audio bucket does not exist');
-      return { success: false, error: 'Audio bucket does not exist' };
-    }
-    
-    console.log('Audio bucket exists, checking access...');
-    
-    // Test if we can access it by listing files - use Promise.race for timeout
-    const listPromise = supabase.storage
-      .from('journal-audio-entries')
-      .list(userId);
-      
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Listing timed out')), 5000);
-    });
-    
-    // Race the promises
-    const { error: listFilesError } = await Promise.race([
-      listPromise,
-      timeoutPromise.then(() => { throw new Error('Listing timed out'); })
-    ]) as any;
-      
-    if (listFilesError) {
-      console.error('Error listing files in audio bucket:', listFilesError);
-      return { 
-        success: false, 
-        error: 'Bucket exists but cannot be accessed: ' + listFilesError.message 
-      };
-    }
-    
-    console.log('Audio storage check successful');
-    return { success: true };
-  } catch (err: any) {
-    console.error('Error checking audio storage:', err);
-    return { success: false, error: err.message };
-  }
+// Utility function to create user-specific folder paths
+export const createUserStoragePath = (userId: string, filename: string): string => {
+  return `${userId}/recordings/${filename}`;
 };

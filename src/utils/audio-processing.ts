@@ -1,16 +1,6 @@
-
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, createUserStoragePath } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { processAudioBlobForTranscription } from './audio/transcription-service';
-
-/**
- * Creates a unique folder path for user audio recordings
- * @param userId User ID to create the folder for
- * @returns The folder path string
- */
-export const createUserAudioFolderPath = (userId: string): string => {
-  return `${userId}/recordings`;
-};
 
 /**
  * Uploads an audio blob to the storage bucket
@@ -31,43 +21,29 @@ export const uploadAudioToStorage = async (
   
   try {
     // Create file path with user ID as folder for isolation
-    const folderPath = createUserAudioFolderPath(userId);
-    const fileName = filename || `recording-${Date.now()}.webm`;
-    const filePath = `${folderPath}/${fileName}`;
+    const generatedFilename = filename || `recording-${Date.now()}.webm`;
+    const filePath = createUserStoragePath(userId, generatedFilename);
     
     console.log('Uploading audio to journal-audio-entries bucket, path:', filePath);
     
-    // Replace AbortController with a Promise.race approach for timeout
-    const uploadPromise = supabase.storage
+    const { data, error } = await supabase.storage
       .from('journal-audio-entries')
       .upload(filePath, audioBlob, {
         contentType: 'audio/webm',
         upsert: true
       });
       
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Upload timed out')), 15000);
-    });
-    
-    // Race the promises
-    const { data, error } = await Promise.race([
-      uploadPromise,
-      timeoutPromise.then(() => { throw new Error('Upload timed out'); })
-    ]) as any;
-      
     if (error) {
       console.error('Error uploading audio:', error);
+      toast.error('Failed to upload audio recording');
       return null;
     }
     
-    // Generate public URL if successful
-    const { data: { publicUrl } } = supabase.storage
-      .from('journal-audio-entries')
-      .getPublicUrl(data.path);
-      
-    return publicUrl;
+    console.log('Audio file uploaded successfully:', data.path);
+    return filePath;
   } catch (err) {
     console.error('Error in uploadAudioToStorage:', err);
+    toast.error('Error uploading audio file');
     return null;
   }
 };
@@ -101,9 +77,9 @@ export const processRecording = async (
     const tempId = `temp-${Date.now()}`;
     
     // Upload audio to storage
-    const audioUrl = await uploadAudioToStorage(audioBlob, userId);
+    const audioPath = await uploadAudioToStorage(audioBlob, userId);
     
-    if (!audioUrl) {
+    if (!audioPath) {
       return {
         success: false,
         tempId,
@@ -111,7 +87,7 @@ export const processRecording = async (
       };
     }
     
-    console.log('Audio uploaded successfully. URL:', audioUrl);
+    console.log('Audio uploaded successfully. Path:', audioPath);
     
     // Process audio for transcription
     const transcriptionResult = await processAudioBlobForTranscription(audioBlob, userId);
@@ -127,8 +103,21 @@ export const processRecording = async (
     
     console.log('Transcription successful:', transcriptionResult.data);
     
-    // If we have an entry ID from the transcription service, return it
-    if (transcriptionResult.data && transcriptionResult.data.entryId) {
+    // Update the journal entry with the audio path if needed
+    if (transcriptionResult.data?.entryId) {
+      try {
+        const { error: updateError } = await supabase
+          .from('Journal Entries')
+          .update({ audio_url: audioPath })
+          .eq('id', transcriptionResult.data.entryId);
+          
+        if (updateError) {
+          console.error('Error updating audio path in journal entry:', updateError);
+        }
+      } catch (updateErr) {
+        console.error('Error in update operation:', updateErr);
+      }
+      
       return {
         success: true,
         tempId,
@@ -151,65 +140,31 @@ export const processRecording = async (
 };
 
 /**
- * Check if the journal-audio-entries bucket exists on Supabase
- * @returns A promise resolving to true if the bucket exists, false otherwise
+ * Download an audio file from storage
+ * @param filePath Path to the audio file in storage
+ * @returns Promise resolving to a Blob or null if failed
  */
-export const ensureAudioBucketExists = async (): Promise<boolean> => {
+export const downloadAudioFromStorage = async (filePath: string): Promise<Blob | null> => {
+  if (!filePath) {
+    console.error('No file path provided for download');
+    return null;
+  }
+  
   try {
-    console.log('Checking if journal-audio-entries bucket exists');
+    console.log('Downloading audio file:', filePath);
     
-    // Check if the bucket exists
-    const { data: buckets, error } = await supabase.storage.listBuckets();
-    
-    if (error) {
-      console.error('Error checking buckets:', error);
-      return false;
-    }
-    
-    const audioBucket = buckets.find(bucket => bucket.name === 'journal-audio-entries');
-    
-    if (audioBucket) {
-      console.log('journal-audio-entries bucket exists');
+    const { data, error } = await supabase.storage
+      .from('journal-audio-entries')
+      .download(filePath);
       
-      // Test basic access with Promise.race for timeout
-      try {
-        const listPromise = supabase.storage
-          .from('journal-audio-entries')
-          .list('', {
-            limit: 1
-          });
-          
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Access check timed out')), 5000);
-        });
-        
-        const { error: accessError } = await Promise.race([
-          listPromise,
-          timeoutPromise.then(() => { throw new Error('Access check timed out'); })
-        ]) as any;
-          
-        if (!accessError) {
-          console.log('journal-audio-entries bucket is accessible');
-          return true;
-        } else {
-          console.error('Bucket exists but access error:', accessError);
-        }
-      } catch (e) {
-        console.error('Error testing bucket access:', e);
-      }
-    } else {
-      console.warn('journal-audio-entries bucket does not exist');
+    if (error) {
+      console.error('Error downloading audio:', error);
+      return null;
     }
     
-    // Show error notification only once by using an ID
-    toast.error('Audio storage is not properly configured. Please contact support.', {
-      duration: 5000,
-      id: 'audio-bucket-missing'
-    });
-    
-    return false;
+    return data;
   } catch (err) {
-    console.error('Error checking audio bucket:', err);
-    return false;
+    console.error('Error in downloadAudioFromStorage:', err);
+    return null;
   }
 };

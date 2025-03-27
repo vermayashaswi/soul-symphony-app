@@ -49,6 +49,7 @@ serve(async (req) => {
     let file: File | null = null;
     let userId: string | null = null;
     let audioBase64: string | null = null;
+    let audioUrl: string | null = null;  // Store audio URL if provided
 
     // Check if the request body is form data
     const contentType = req.headers.get("content-type") || "";
@@ -59,6 +60,7 @@ serve(async (req) => {
         const formData = await req.formData();
         file = formData.get("file") as File;
         userId = formData.get("userId") as string;
+        audioUrl = formData.get("audioUrl") as string;
       } catch (formError) {
         console.error("Error parsing form data:", formError);
         throw new Error("Failed to parse form data");
@@ -67,9 +69,10 @@ serve(async (req) => {
       // Assume JSON request
       try {
         console.log("Processing JSON request");
-        const { audio, userId: id } = await req.json();
+        const { audio, userId: id, audioUrl: url } = await req.json();
         audioBase64 = audio;
         userId = id;
+        audioUrl = url;
       } catch (jsonError) {
         console.error("Error parsing JSON data:", jsonError);
         throw new Error("Failed to parse JSON data");
@@ -101,25 +104,6 @@ serve(async (req) => {
     if (!allowedFileTypes.includes(file.type)) {
       throw new Error("Invalid file type. Only webm, ogg, mp3, and wav are allowed.");
     }
-    
-    // Try to upload the file to storage before transcription
-    try {
-      const folderPath = `${userId}/recordings`;
-      const fileName = `recording-${Date.now()}.webm`;
-      const filePath = `${folderPath}/${fileName}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('journal-audio-entries')
-        .upload(filePath, file, {
-          contentType: file.type,
-          upsert: true
-        });
-        
-      console.log("Uploaded audio file to storage:", uploadError ? "Failed" : "Success");
-    } catch (uploadError) {
-      console.log("Note: Could not upload to storage:", uploadError);
-      // Continue with transcription even if storage fails
-    }
 
     // Call the OpenAI transcription API
     console.log(`Transcribing audio file (${file.size} bytes) for user ${userId}`);
@@ -138,17 +122,23 @@ serve(async (req) => {
 
       // Create a new journal entry in Supabase
       console.log("Creating journal entry in database");
+      
+      // Prepare entry data object
+      const entryData: any = {
+        user_id: userId,
+        "transcription text": transcription,
+        "refined text": transcription, // Initialize refined text as the same as transcription
+        created_at: new Date().toISOString()
+      };
+      
+      // Add audio_url if provided
+      if (audioUrl) {
+        entryData.audio_url = audioUrl;
+      }
+      
       const { data: journalEntry, error: journalError } = await supabase
         .from("Journal Entries")
-        .insert([
-          {
-            user_id: userId,
-            "transcription text": transcription,
-            "refined text": transcription, // Initialize refined text as the same as transcription
-            created_at: new Date().toISOString(),
-            audio_url: `${userId}/recordings/recording-${Date.now()}.webm` // Store the audio path reference
-          }
-        ])
+        .insert([entryData])
         .select()
         .single();
 
@@ -223,7 +213,8 @@ serve(async (req) => {
         JSON.stringify({ 
           data: { 
             transcription, 
-            entryId: journalEntry.id 
+            entryId: journalEntry.id,
+            audioUrl: audioUrl || null
           }, 
           success: true 
         }),

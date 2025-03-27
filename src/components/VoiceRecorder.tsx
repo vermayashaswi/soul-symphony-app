@@ -124,15 +124,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       requestPermissions();
     }
   }, [hasPermission, requestPermissions]);
-  
-  // Clear any stuck processing state when the component is unmounted
-  useEffect(() => {
-    return () => {
-      if (isProcessing) {
-        console.log("Component unmounted while processing");
-      }
-    };
-  }, [isProcessing]);
 
   return (
     <div className={cn("flex flex-col items-center", className)}>

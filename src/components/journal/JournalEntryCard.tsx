@@ -1,109 +1,153 @@
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { format } from 'date-fns';
-import { Sparkles } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import EmotionBubbles from '@/components/EmotionBubbles';
-import { JournalEntry } from '@/types/journal';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import React, { useState } from 'react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { CalendarDays, MessageSquare, Clock, Volume } from 'lucide-react';
+import { formatDistanceToNow, format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { AudioPlayer } from '@/components/AudioPlayer';
+
+interface JournalEntry {
+  id: number;
+  'transcription text': string;
+  'refined text'?: string;
+  sentiment?: string;
+  emotions?: Record<string, number>;
+  master_themes?: string[];
+  created_at: string;
+  duration?: number;
+  audio_url?: string;
+}
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
+  isSelected?: boolean;
+  onClick?: () => void;
+  onChatClick?: () => void;
+  isProcessing?: boolean;
 }
 
-const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
-  // Get themes to display - first try master_themes, then fall back to emotions
-  const themesToDisplay = React.useMemo(() => {
-    if (entry.master_themes && Array.isArray(entry.master_themes) && entry.master_themes.length > 0) {
-      // Trim long theme names to prevent overflow
-      return entry.master_themes.slice(0, 10).map(theme => 
-        typeof theme === 'string' && theme.length > 12 ? theme.slice(0, 12) + '...' : theme
-      );
-    } else if (entry.emotions && Array.isArray(entry.emotions) && entry.emotions.length > 0) {
-      // Trim long emotion names to prevent overflow
-      return entry.emotions.slice(0, 10).map(emotion => 
-        typeof emotion === 'string' && emotion.length > 12 ? emotion.slice(0, 12) + '...' : emotion
-      );
-    }
-    return [];
-  }, [entry.master_themes, entry.emotions]);
+export function JournalEntryCard({ 
+  entry, 
+  isSelected = false,
+  onClick,
+  onChatClick,
+  isProcessing = false
+}: JournalEntryCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showAudio, setShowAudio] = useState(false);
 
-  // Get text to display - always use refined text if available, then fall back to transcription
-  const displayText = entry["refined text"] || entry["transcription text"] || '';
-
+  const formattedDate = format(new Date(entry.created_at), 'MMM d, yyyy');
+  const timeAgo = formatDistanceToNow(new Date(entry.created_at), { addSuffix: true });
+  
+  const displayText = entry['refined text'] || entry['transcription text'] || '';
+  const truncatedText = !isExpanded && displayText.length > 300 
+    ? displayText.substring(0, 300) + '...'
+    : displayText;
+    
+  const hasAudio = !!entry.audio_url;
+  
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
+    <Card 
+      className={cn(
+        "transition-all hover:shadow-md cursor-pointer",
+        isSelected && "border-primary ring-1 ring-primary"
+      )}
+      onClick={onClick}
     >
-      <Card className="overflow-hidden">
-        <CardHeader className="bg-muted/50">
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-xl">
-              {format(new Date(entry.created_at), 'MMMM d, yyyy - h:mm a')}
-            </CardTitle>
-            {entry.duration && (
-              <span className="text-sm text-muted-foreground">
-                {Math.floor(entry.duration / 60)}:{(entry.duration % 60).toString().padStart(2, '0')}
-              </span>
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-start">
+          <CardTitle className="text-lg font-medium">{formattedDate}</CardTitle>
+          <div className="flex gap-1">
+            {entry.sentiment && (
+              <Badge variant="outline" className="capitalize">
+                {entry.sentiment}
+              </Badge>
+            )}
+            {isProcessing && (
+              <Badge variant="secondary" className="animate-pulse">
+                Processing
+              </Badge>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2 space-y-4">
-              <div>
-                <h3 className="font-medium mb-2">Your Recording</h3>
-                {entry.audio_url ? (
-                  <audio controls className="w-full">
-                    <source src={entry.audio_url} type="audio/webm" />
-                    Your browser does not support the audio element.
-                  </audio>
-                ) : (
-                  <p className="text-muted-foreground">No audio recording available</p>
-                )}
-              </div>
-              
-              <div>
-                <h3 className="font-medium mb-2">Journal Entry</h3>
-                {displayText ? (
-                  <p className="whitespace-pre-line">{displayText}</p>
-                ) : (
-                  <Alert variant="default" className="bg-muted/50">
-                    <AlertDescription>
-                      Your entry is being processed... This may take a moment.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="font-medium mb-4 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-amber-500" />
-                Soul-ubles
-              </h3>
-              
-              <div className="h-60 mb-4 flex items-center justify-center relative bg-white/50 rounded-lg p-2 border border-border/30 overflow-hidden">
-                {themesToDisplay.length > 0 ? (
-                  <EmotionBubbles themes={themesToDisplay} />
-                ) : (
-                  <Alert variant="default" className="bg-muted/50">
-                    <AlertDescription className="text-center">
-                      Analyzing themes...
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            </div>
+        </div>
+        <div className="flex items-center text-sm text-muted-foreground">
+          <CalendarDays className="h-3.5 w-3.5 mr-1" />
+          <span>{timeAgo}</span>
+          
+          {entry.duration && (
+            <>
+              <Clock className="h-3.5 w-3.5 ml-3 mr-1" />
+              <span>{Math.round(entry.duration / 60)} mins</span>
+            </>
+          )}
+          
+          {hasAudio && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 ml-2" 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAudio(!showAudio);
+              }}
+            >
+              <Volume className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      
+      <CardContent className="pb-3">
+        <p className="text-sm whitespace-pre-wrap">
+          {truncatedText}
+        </p>
+        
+        {displayText.length > 300 && (
+          <Button
+            variant="link"
+            className="p-0 h-auto text-xs mt-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+          >
+            {isExpanded ? 'Show less' : 'Read more'}
+          </Button>
+        )}
+        
+        {showAudio && hasAudio && (
+          <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+            <AudioPlayer audioUrl={entry.audio_url} />
           </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+        )}
+        
+        {entry.master_themes && entry.master_themes.length > 0 && (
+          <div className="flex gap-1 flex-wrap mt-3">
+            {entry.master_themes.map(theme => (
+              <Badge key={theme} variant="secondary" className="text-xs">
+                {theme}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </CardContent>
+      
+      <CardFooter className="pt-0">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="ml-auto"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onChatClick) onChatClick();
+          }}
+        >
+          <MessageSquare className="h-3.5 w-3.5 mr-1" />
+          Chat about this
+        </Button>
+      </CardFooter>
+    </Card>
   );
-};
-
-export default JournalEntryCard;
+}
