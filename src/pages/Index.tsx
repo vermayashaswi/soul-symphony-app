@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useNavigate } from 'react-router-dom';
 import { Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import ParticleBackground from '@/components/ParticleBackground';
 import Navbar from '@/components/Navbar';
 
 const Index = () => {
@@ -226,7 +224,6 @@ const Index = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
-      <ParticleBackground />
       
       <motion.main
         className="flex-1 container mx-auto px-4 py-8 pt-24"

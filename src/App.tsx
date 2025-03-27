@@ -69,31 +69,34 @@ const AppRoutes = () => {
   }, []);
   
   return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/journal" element={
-        <ProtectedRoute>
-          <Journal />
-        </ProtectedRoute>
-      } />
-      <Route path="/insights" element={
-        <ProtectedRoute>
-          <Insights />
-        </ProtectedRoute>
-      } />
-      <Route path="/chat" element={
-        <ProtectedRoute>
-          <Chat />
-        </ProtectedRoute>
-      } />
-      <Route path="/settings" element={
-        <ProtectedRoute>
-          <Settings />
-        </ProtectedRoute>
-      } />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      <ParticleBackground />
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/journal" element={
+          <ProtectedRoute>
+            <Journal />
+          </ProtectedRoute>
+        } />
+        <Route path="/insights" element={
+          <ProtectedRoute>
+            <Insights />
+          </ProtectedRoute>
+        } />
+        <Route path="/chat" element={
+          <ProtectedRoute>
+            <Chat />
+          </ProtectedRoute>
+        } />
+        <Route path="/settings" element={
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        } />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 };
 
@@ -103,7 +106,6 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner position="top-center" />
-        <ParticleBackground />
         <BrowserRouter>
           <AnimatePresence mode="wait">
             <AppRoutes />
