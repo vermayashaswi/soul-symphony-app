@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
+import ParticleBackground from '@/components/ParticleBackground';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -224,6 +225,7 @@ const Index = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
+      <ParticleBackground />
       <Navbar />
       
       <motion.main
