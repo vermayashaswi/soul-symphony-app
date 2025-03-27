@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -53,6 +52,30 @@ function processBase64Chunks(base64String: string, chunkSize = 32768) {
   }
 }
 
+function detectFileType(data: Uint8Array): string {
+  if (data.length > 4 && data[0] === 0x1A && data[1] === 0x45 && data[2] === 0xDF && data[3] === 0xA3) {
+    return 'webm';
+  }
+  
+  if (data.length > 12) {
+    const possibleMP4 = new Uint8Array(data.buffer, 4, 4);
+    const ftypString = String.fromCharCode(...possibleMP4);
+    if (ftypString === 'ftyp') {
+      return 'mp4';
+    }
+  }
+  
+  if (data.length > 12) {
+    const possibleRIFF = String.fromCharCode(...new Uint8Array(data.buffer, 0, 4));
+    const possibleWAVE = String.fromCharCode(...new Uint8Array(data.buffer, 8, 4));
+    if (possibleRIFF === 'RIFF' && possibleWAVE === 'WAVE') {
+      return 'wav';
+    }
+  }
+  
+  return 'mp4';
+}
+
 async function generateEmbedding(text: string) {
   try {
     console.log('Generating embedding for text:', text.slice(0, 100) + '...');
@@ -92,7 +115,6 @@ async function analyzeEmotions(text: string) {
   try {
     console.log('Analyzing emotions for text:', text.slice(0, 100) + '...');
     
-    // First, fetch all emotions from our database
     const { data: emotions, error: emotionsError } = await supabase
       .from('emotions')
       .select('name, description')
@@ -103,7 +125,6 @@ async function analyzeEmotions(text: string) {
       throw new Error('Failed to fetch emotions data');
     }
     
-    // Create a prompt with all emotions
     const emotionsPrompt = emotions.map(e => `- ${e.name}: ${e.description}`).join('\n');
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -162,7 +183,6 @@ async function analyzeSentiment(text: string) {
   try {
     console.log('Analyzing sentiment for text:', text.slice(0, 100) + '...');
     
-    // Call the Google Natural Language API
     const response = await fetch('https://language.googleapis.com/v1/documents:analyzeSentiment', {
       method: 'POST',
       headers: {
@@ -186,7 +206,6 @@ async function analyzeSentiment(text: string) {
     const result = await response.json();
     console.log('Sentiment analysis complete:', JSON.stringify(result, null, 2));
     
-    // Return the document sentiment score
     return result.documentSentiment?.score?.toString() || "0";
   } catch (error) {
     console.error('Error in analyzeSentiment:', error);
@@ -244,8 +263,11 @@ serve(async (req) => {
       throw new Error('Failed to process audio data - empty result');
     }
     
+    const detectedFileType = detectFileType(binaryAudio);
+    console.log("Detected file type:", detectedFileType);
+    
     const timestamp = Date.now();
-    const filename = `journal-entry-${userId ? userId + '-' : ''}${timestamp}.webm`;
+    const filename = `journal-entry-${userId ? userId + '-' : ''}${timestamp}.${detectedFileType}`;
     
     let audioUrl = null;
     try {
@@ -259,11 +281,15 @@ serve(async (req) => {
         });
       }
       
+      let contentType = 'audio/webm';
+      if (detectedFileType === 'mp4') contentType = 'audio/mp4';
+      if (detectedFileType === 'wav') contentType = 'audio/wav';
+      
       const { data: storageData, error: storageError } = await supabase
         .storage
         .from('journal-audio-entries')
         .upload(filename, binaryAudio, {
-          contentType: 'audio/webm',
+          contentType,
           cacheControl: '3600'
         });
         
@@ -284,12 +310,18 @@ serve(async (req) => {
     }
     
     const formData = new FormData();
-    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
-    formData.append('file', blob, 'audio.webm');
+    
+    let mimeType = 'audio/webm';
+    if (detectedFileType === 'mp4') mimeType = 'audio/mp4';
+    if (detectedFileType === 'wav') mimeType = 'audio/wav';
+    
+    const blob = new Blob([binaryAudio], { type: mimeType });
+    formData.append('file', blob, `audio.${detectedFileType}`);
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'json');
 
     console.log("Sending to Whisper API for high-quality transcription using the latest model...");
+    console.log("Using file type:", detectedFileType, "with MIME type:", mimeType);
     
     try {
       const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -346,7 +378,6 @@ serve(async (req) => {
       const emotions = await analyzeEmotions(refinedText);
       console.log("Emotion analysis:", emotions);
       
-      // Analyze sentiment
       const sentimentScore = await analyzeSentiment(refinedText);
       console.log("Sentiment analysis:", sentimentScore);
 

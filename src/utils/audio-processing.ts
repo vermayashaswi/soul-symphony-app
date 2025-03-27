@@ -47,6 +47,9 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
  */
 async function processRecordingInBackground(audioBlob: Blob | null, userId: string | undefined, toastId: string): Promise<void> {
   try {
+    // Log the blob details for debugging
+    console.log('Audio blob details:', audioBlob?.type, audioBlob?.size);
+    
     // 1. Convert blob to base64
     const base64Audio = await blobToBase64(audioBlob!);
     

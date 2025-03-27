@@ -187,18 +187,21 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       // Set up audio processing
       setupAudioProcessing(stream);
       
-      // Try to use the best available codec
+      // Check the platform/browser to determine the optimal settings
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      
+      // Options for MediaRecorder, prioritizing iOS compatibility
       let options: MediaRecorderOptions = {};
       
-      // Check what MIME types are supported to get the best quality
-      const mimeTypes = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-        'audio/mp4',
-        'audio/wav'
-      ];
+      // iOS devices work better with specific MIME types
+      const mimeTypes = isIOS ? 
+        // Priority list for iOS
+        ['audio/mp4', 'audio/aac', 'audio/webm', 'audio/wav', 'audio/ogg'] :
+        // Priority list for other platforms
+        ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/wav'];
       
+      // Find the first supported MIME type
       for (const type of mimeTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
           options.mimeType = type;
@@ -207,8 +210,12 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
         }
       }
       
+      // If no supported type is found, proceed without specifying mimeType
+      if (!options.mimeType) {
+        console.log('No supported MIME type found, using browser default');
+      }
+      
       // Create MediaRecorder with best available options
-      // Add higher bitrate for better quality, when supported
       const mediaRecorder = new MediaRecorder(stream, {
         ...options,
         bitsPerSecond: 128000 // 128 kbps for better audio quality
@@ -231,8 +238,10 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
           return;
         }
         
-        const blob = new Blob(chunksRef.current, { type: options.mimeType || 'audio/webm' });
-        console.log('Recording stopped, blob size:', blob.size);
+        // Get the final MIME type being used
+        const blobType = options.mimeType || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: blobType });
+        console.log('Recording stopped, blob size:', blob.size, 'blob type:', blobType);
         setAudioBlob(blob);
         
         // Clean up resources
