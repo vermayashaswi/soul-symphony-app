@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 
@@ -86,28 +85,28 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children, containerR
       className="absolute flex items-center justify-center"
       initial={{ x, y, opacity: 0, scale: 0 }}
       animate={{ 
-        x: [x, x + getRandomValue(-1, 1) * 0.5], // Reduced movement range by 75%
-        y: [y, y - getRandomValue(0.5, 1.5) * 0.5], // Reduced movement range by 75%
-        opacity: [0, 1, 0.9],
-        scale: [0, 1, 0.95]
+        x: x,
+        y: [y, y - 5, y],
+        opacity: [0, 1, 0.95],
+        scale: [0, 1, 0.98]
       }}
       transition={{
-        duration: 8, // Increased from 6 to 8 for slower movement
+        duration: 12,
         delay,
         repeat: Infinity,
         repeatType: "reverse",
-        ease: "easeInOut", // Smoother easing function
-        times: [0, 0.5, 1] // More controlled timing for smooth transitions
+        ease: "easeInOut", 
+        times: [0, 0.5, 1]
       }}
       drag
       dragConstraints={constraints}
-      dragElastic={0.05} // Reduced from 0.1 for less elastic movement
+      dragElastic={0.05}
       dragTransition={{ 
-        bounceStiffness: 300, // Reduced from 600 for gentler bouncing
-        bounceDamping: 30,  // Increased from 20 for quicker settling
-        power: 0.5 // Added power parameter to make drag more controlled
+        bounceStiffness: 300,
+        bounceDamping: 30,
+        power: 0.5
       }}
-      whileDrag={{ scale: 1.02 }} // Reduced scale effect during drag
+      whileDrag={{ scale: 1.02 }}
     >
       <div 
         className="rounded-full bg-gradient-to-br from-primary/30 to-primary/10 backdrop-blur-sm flex items-center justify-center p-2"
@@ -152,7 +151,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
     const limitedData = usingEmotions 
       ? [...dataSource]
           .sort((a, b) => ((b.score || 0) - (a.score || 0)))
-          .slice(0, 5) // Reduced from 7 to 5 to prevent overcrowding
+          .slice(0, 5)
       : dataSource.slice(0, 5);
     
     // Wait for the container to be available and sized
@@ -163,32 +162,32 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
     const containerHeight = containerRef.current.clientHeight;
     
     // More controlled layout configuration
-    const gridRows = 2; // Reduced from 3 to 2 for better spacing
+    const gridRows = 2;
     const gridCols = 3;
     const cellWidth = containerWidth / gridCols;
     const cellHeight = containerHeight / gridRows;
     
-    // Calculate positions using a more stable grid-based approach
+    // Calculate positions with fixed positioning
     const newBubbles = limitedData.map((item, index) => {
-      // Calculate grid position (different cells for each bubble)
+      // Calculate grid position
       const col = index % gridCols;
       const row = Math.floor(index / gridCols) % gridRows;
       
       // Calculate position within cell with minimal randomness
-      const maxSize = 80; // Reduced maximum size from 90 to 80
+      const maxSize = 80;
       const safeMargin = maxSize / 2;
       
-      // More stable positioning with less randomness
+      // Create a fixed position with no randomness
       const centerX = (col * cellWidth) + (cellWidth / 2);
       const centerY = (row * cellHeight) + (cellHeight / 2);
       
-      // Add very slight randomness (±10% of cell size) to prevent perfect alignment
-      const randomOffsetX = getRandomValue(-0.1, 0.1) * cellWidth;
-      const randomOffsetY = getRandomValue(-0.1, 0.1) * cellHeight;
+      // Add very slight fixed offset based on index to avoid overlap
+      const fixedOffsetX = (index % 2) * 5;
+      const fixedOffsetY = (index % 3) * 5;
       
       // Final position with constraints
-      const x = Math.max(safeMargin, Math.min(containerWidth - safeMargin, centerX + randomOffsetX));
-      const y = Math.max(safeMargin, Math.min(containerHeight - safeMargin, centerY + randomOffsetY));
+      const x = Math.max(safeMargin, Math.min(containerWidth - safeMargin, centerX + fixedOffsetX));
+      const y = Math.max(safeMargin, Math.min(containerHeight - safeMargin, centerY + fixedOffsetY));
       
       // Get the appropriate emoji based on the label
       const normalizedLabel = item.label.toLowerCase().trim();
@@ -197,15 +196,14 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
       // Size calculation with smoother scaling
       let size;
       if (usingEmotions && item.score !== undefined) {
-        // Scale based on score: min 40px, max 75px (reduced from 80)
+        // Scale based on score: min 40px, max 75px
         const maxScore = Math.max(...Object.values(emotions));
         const minSize = 40;
         const maxSize = 75;
-        // More linear scaling to prevent dramatic size differences
         size = minSize + ((item.score / maxScore) * (maxSize - minSize));
       } else {
         // Fallback for themes (more consistent sizing)
-        size = 60 - (index * 4); // Reduced from 70-(index*5) for more consistent sizes
+        size = 60 - (index * 3); // Reduced variation
       }
       
       // Ensure size is within reasonable bounds
@@ -217,7 +215,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
         x,
         y,
         size: cappedSize,
-        delay: index * 0.4, // Increased from 0.2 to 0.4 for more staggered, stable animations
+        delay: index * 0.7,
         emoji,
         score: item.score
       };
@@ -243,11 +241,6 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
           <div className="flex flex-col items-center text-center">
             <span className="text-xs font-medium text-primary/90 max-w-[60px] line-clamp-2 capitalize">
               {bubble.label}
-              {bubble.score !== undefined && (
-                <span className="ml-1 text-xs text-primary/70">
-                  ({Math.round(bubble.score * 10) / 10})
-                </span>
-              )}
             </span>
           </div>
         </Bubble>
