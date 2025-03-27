@@ -225,6 +225,7 @@ const Index = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
+      {/* The particle background must be the first element inside the container */}
       <ParticleBackground />
       <Navbar />
       

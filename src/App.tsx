@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,7 +11,6 @@ import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
-import ParticleBackground from "./components/ParticleBackground";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
@@ -56,7 +54,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
-  // Listen for auth changes outside the React context
   useEffect(() => {
     console.log("Setting up Supabase auth debugging listener");
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -104,7 +101,6 @@ const App = () => (
     <TooltipProvider>
       <AuthProvider>
         <div className="relative min-h-screen">
-          <ParticleBackground />
           <div className="relative z-10">
             <Toaster />
             <Sonner position="top-center" />

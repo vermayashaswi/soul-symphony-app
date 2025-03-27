@@ -1,5 +1,5 @@
+
 import React, { useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
 
 interface Particle {
   x: number;
@@ -123,6 +123,7 @@ export function ParticleBackground() {
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
     
+    // Increase initial particles for more visible effect
     createFloatingParticles(canvas, 150);
     
     const handleMouseMove = (e: MouseEvent) => {
@@ -174,7 +175,8 @@ export function ParticleBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 w-full h-full -z-10 pointer-events-none"
+      className="fixed inset-0 w-full h-full pointer-events-none"
+      style={{ zIndex: 0 }} // Ensure it has a z-index of 0
     />
   );
 }
