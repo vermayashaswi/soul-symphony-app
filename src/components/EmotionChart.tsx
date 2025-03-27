@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -168,8 +169,8 @@ export function EmotionChart({
   }, [aggregatedData]);
 
   // Memoize chart data
-  const bubbleData = useMemo(() => getBubbleData(), [aggregatedData]);
-  const lineData = useMemo(() => getLineChartData(), [aggregatedData]);
+  const bubbleData = useMemo(() => getBubbleData, [getBubbleData]);
+  const lineData = useMemo(() => getLineChartData, [getLineChartData]);
   
   const renderLineChart = () => {
     if (lineData.length === 0) {
@@ -262,9 +263,9 @@ export function EmotionChart({
         )}
       </div>
       
-      {chartType === 'line' && getLineChartData.length > 0 && (
+      {chartType === 'line' && lineData.length > 0 && (
         <div className="flex flex-wrap justify-start gap-4 mt-4 text-sm">
-          {Object.keys(getLineChartData[0])
+          {Object.keys(lineData[0])
             .filter(key => key !== 'day')
             .map((emotion, index) => (
               <div key={emotion} className="flex items-center gap-2">
