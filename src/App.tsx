@@ -103,14 +103,18 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <ParticleBackground />
-        <Toaster />
-        <Sonner position="top-center" />
-        <BrowserRouter>
-          <AnimatePresence mode="wait">
-            <AppRoutes />
-          </AnimatePresence>
-        </BrowserRouter>
+        <div className="relative min-h-screen">
+          <ParticleBackground />
+          <div className="relative z-10">
+            <Toaster />
+            <Sonner position="top-center" />
+            <BrowserRouter>
+              <AnimatePresence mode="wait">
+                <AppRoutes />
+              </AnimatePresence>
+            </BrowserRouter>
+          </div>
+        </div>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

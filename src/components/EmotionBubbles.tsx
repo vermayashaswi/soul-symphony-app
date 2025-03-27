@@ -66,16 +66,17 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
       className="absolute flex items-center justify-center"
       initial={{ x, y, opacity: 0, scale: 0 }}
       animate={{ 
-        x: [x, x + getRandomValue(-5, 5)], 
-        y: [y, y - getRandomValue(3, 7)],
+        x: [x, x + getRandomValue(-2, 2)], 
+        y: [y, y - getRandomValue(1, 3)],
         opacity: [0, 1, 0.8],
         scale: [0, 1, 0.9]
       }}
       transition={{
-        duration: 4,
+        duration: 6,
         delay,
         repeat: Infinity,
-        repeatType: "reverse"
+        repeatType: "reverse",
+        ease: "easeInOut"
       }}
     >
       <div 
@@ -202,4 +203,3 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
 };
 
 export default EmotionBubbles;
-

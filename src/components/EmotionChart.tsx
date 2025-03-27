@@ -7,7 +7,8 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer
+  ResponsiveContainer,
+  Legend
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -76,7 +77,7 @@ export function EmotionChart({
     { id: 'bubble', label: 'Emotion Bubbles' },
   ];
   
-  // Process emotion data for bubble chart
+  // Process emotion data for bubble chart - show all emotions
   const getBubbleData = (): EmotionBubbleData[] => {
     if (!aggregatedData) return [];
     
@@ -98,13 +99,13 @@ export function EmotionChart({
       .sort((a, b) => b.value - a.value);
   };
   
-  // Process aggregated data for line chart
+  // Process aggregated data for line chart - show all emotions
   const getLineChartData = (): EmotionData[] => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
       return [];
     }
     
-    // Get top 3 emotions based on frequency and average score
+    // Get top 5 emotions based on total score (increased from 3)
     const emotionTotals: Record<string, number> = {};
     const dateMap: Map<string, Record<string, number>> = new Map();
     
@@ -112,7 +113,7 @@ export function EmotionChart({
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       emotionTotals[emotion] = dataPoints.reduce((sum, point) => sum + point.value, 0);
       
-      // Also populate the dateMap for creating the chart data
+      // Populate the dateMap for creating the chart data
       dataPoints.forEach(point => {
         if (!dateMap.has(point.date)) {
           dateMap.set(point.date, {});
@@ -122,10 +123,10 @@ export function EmotionChart({
       });
     });
     
-    // Get top 3 emotions by total score
+    // Get top 5 emotions by total score
     const topEmotions = Object.entries(emotionTotals)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
+      .slice(0, 5)  // Increased to show more emotions
       .map(([emotion]) => emotion);
     
     // Convert the dateMap to an array of data points for the chart
@@ -183,6 +184,7 @@ export function EmotionChart({
                 border: 'none' 
               }} 
             />
+            <Legend verticalAlign="bottom" height={36} />
             {emotions.map((emotion, index) => (
               <Line
                 key={emotion}
@@ -199,7 +201,7 @@ export function EmotionChart({
         </ResponsiveContainer>
         
         <div className="mt-4 text-center text-xs text-muted-foreground">
-          * Only primary emotions are shown
+          * Showing top 5 emotions by score
         </div>
       </div>
     );
@@ -214,37 +216,6 @@ export function EmotionChart({
       );
     }
     
-    // Calculate bubble positions to avoid overlap
-    const calculateBubblePositions = (bubbles: EmotionBubbleData[]) => {
-      // Canvas dimensions
-      const canvasWidth = 400;
-      const canvasHeight = 300;
-      const minDistance = 80; // Minimum distance between bubble centers
-      
-      // Calculate initial positions in a circular layout
-      const positions: {x: number, y: number, size: number}[] = [];
-      
-      bubbles.forEach((bubble, index) => {
-        // Scale bubble size proportionally to value - now more directly proportional
-        const maxSize = 120;
-        const minSize = 40;
-        const maxValue = Math.max(...bubbles.map(b => b.value));
-        const size = minSize + ((bubble.value / maxValue) * (maxSize - minSize));
-        
-        // Initial position in a circle
-        const angle = (index / bubbles.length) * 2 * Math.PI;
-        const radius = Math.min(canvasWidth, canvasHeight) * 0.35;
-        const x = (canvasWidth / 2) + Math.cos(angle) * radius;
-        const y = (canvasHeight / 2) + Math.sin(angle) * radius;
-        
-        positions.push({ x, y, size });
-      });
-      
-      return positions;
-    };
-    
-    const bubblePositions = calculateBubblePositions(bubbleData);
-    
     return (
       <div className="w-full h-[300px] flex flex-col items-center justify-center relative">
         <div className="absolute top-0 right-0 text-xs text-muted-foreground">
@@ -254,52 +225,55 @@ export function EmotionChart({
         {/* Container with boundary constraints */}
         <div className="relative w-[320px] h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden">
           {bubbleData.map((item, index) => {
-            const position = bubblePositions[index];
-            // Calculate constrained positions
-            const constrainedX = Math.max(position.size/2, Math.min(320 - position.size/2, position.x));
-            const constrainedY = Math.max(position.size/2, Math.min(250 - position.size/2, position.y));
+            // Calculate base size proportionally to value
+            const maxSize = 120;
+            const minSize = 40;
+            const maxValue = Math.max(...bubbleData.map(b => b.value));
+            const size = minSize + ((item.value / maxValue) * (maxSize - minSize));
             
+            // Generate random position within container boundaries
+            // Ensure bubbles remain fully visible
+            const maxX = 320 - size;
+            const maxY = 250 - size;
+            const x = Math.max(size/2, Math.min(maxX - size/2, 50 + Math.random() * 220));
+            const y = Math.max(size/2, Math.min(maxY - size/2, 50 + Math.random() * 150));
+
             return (
               <motion.div
                 key={item.name}
                 initial={{ scale: 0, opacity: 0 }}
-                animate={{ 
-                  scale: 1, 
-                  opacity: 1,
-                  x: [
-                    constrainedX - 5, 
-                    constrainedX + 5, 
-                    constrainedX
-                  ].map(x => Math.max(position.size/2, Math.min(320 - position.size/2, x))),
-                  y: [
-                    constrainedY - 5, 
-                    constrainedY + 5, 
-                    constrainedY
-                  ].map(y => Math.max(position.size/2, Math.min(250 - position.size/2, y)))
-                }}
+                animate={{ scale: 1, opacity: 0.9 }}
                 transition={{ 
                   duration: 0.5, 
-                  delay: index * 0.1,
-                  x: { repeat: Infinity, duration: 3 + index, repeatType: "reverse" },
-                  y: { repeat: Infinity, duration: 4 + index, repeatType: "reverse" }
+                  delay: index * 0.1
                 }}
                 style={{
-                  width: `${position.size}px`,
-                  height: `${position.size}px`,
+                  width: `${size}px`,
+                  height: `${size}px`,
                   backgroundColor: item.color,
                   position: 'absolute',
-                  left: constrainedX - (position.size / 2),
-                  top: constrainedY - (position.size / 2),
+                  left: x - (size / 2),
+                  top: y - (size / 2),
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'white',
-                  fontSize: position.size > 70 ? '14px' : '12px',
+                  fontSize: size > 70 ? '14px' : '12px',
                   fontWeight: 'bold',
                   boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
                   zIndex: Math.floor(item.value)
                 }}
+                drag
+                dragConstraints={{
+                  left: 0,
+                  right: 320 - size,
+                  top: 0,
+                  bottom: 250 - size
+                }}
+                dragElastic={0.1}
+                whileDrag={{ scale: 1.05 }}
+                dragTransition={{ bounceStiffness: 300, bounceDamping: 10 }}
               >
                 {item.name}
               </motion.div>
