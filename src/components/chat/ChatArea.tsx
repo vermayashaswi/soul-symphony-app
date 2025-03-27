@@ -93,13 +93,35 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
 
-      const typedMessages: Message[] = data?.map(msg => ({
-        ...msg,
-        sender: msg.sender === 'user' ? 'user' : 'assistant' as 'user' | 'assistant',
-        reference_entries: msg.reference_entries ? 
-          (Array.isArray(msg.reference_entries) ? msg.reference_entries as MessageReference[] : null) 
-          : null
-      })) || [];
+      const typedMessages: Message[] = data?.map(msg => {
+        let processedRefs: MessageReference[] | null = null;
+        
+        if (msg.reference_entries) {
+          if (Array.isArray(msg.reference_entries)) {
+            processedRefs = msg.reference_entries.map((ref: any) => ({
+              id: ref.id || 0,
+              date: ref.date || '',
+              snippet: ref.snippet || '',
+              similarity: ref.similarity,
+              type: ref.type
+            }));
+          } else if (typeof msg.reference_entries === 'object') {
+            processedRefs = [{
+              id: (msg.reference_entries as any).id || 0,
+              date: (msg.reference_entries as any).date || '',
+              snippet: (msg.reference_entries as any).snippet || '',
+              similarity: (msg.reference_entries as any).similarity,
+              type: (msg.reference_entries as any).type
+            }];
+          }
+        }
+        
+        return {
+          ...msg,
+          sender: msg.sender === 'user' ? 'user' : 'assistant' as 'user' | 'assistant',
+          reference_entries: processedRefs
+        };
+      }) || [];
 
       setMessages(typedMessages);
     } catch (error) {
