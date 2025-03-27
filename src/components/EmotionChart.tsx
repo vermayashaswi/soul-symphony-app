@@ -1,5 +1,4 @@
-
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   LineChart, 
   Line, 
@@ -71,11 +70,42 @@ export function EmotionChart({
   aggregatedData 
 }: EmotionChartProps) {
   const [chartType, setChartType] = useState<ChartType>('bubble');
+  const bubbleContainerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 320, height: 250 });
 
   const chartTypes = [
     { id: 'line', label: 'Line' },
     { id: 'bubble', label: 'Emotion Bubbles' },
   ];
+  
+  // Update container size when component mounts or window resizes
+  useEffect(() => {
+    const updateContainerSize = () => {
+      if (bubbleContainerRef.current) {
+        setContainerSize({
+          width: bubbleContainerRef.current.clientWidth,
+          height: bubbleContainerRef.current.clientHeight
+        });
+      }
+    };
+    
+    // Initial size calculation
+    updateContainerSize();
+    
+    // Set up resize observer
+    const resizeObserver = new ResizeObserver(updateContainerSize);
+    if (bubbleContainerRef.current) {
+      resizeObserver.observe(bubbleContainerRef.current);
+    }
+    
+    // Cleanup
+    return () => {
+      if (bubbleContainerRef.current) {
+        resizeObserver.unobserve(bubbleContainerRef.current);
+      }
+      resizeObserver.disconnect();
+    };
+  }, []);
   
   // Process emotion data for bubble chart - show all emotions
   const getBubbleData = (): EmotionBubbleData[] => {
@@ -223,20 +253,36 @@ export function EmotionChart({
         </div>
         
         {/* Container with boundary constraints */}
-        <div className="relative w-[320px] h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden">
+        <div 
+          ref={bubbleContainerRef}
+          className="relative w-[320px] h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden"
+        >
           {bubbleData.map((item, index) => {
             // Calculate base size proportionally to value
-            const maxSize = 120;
+            const maxSize = 100; // Reduced from 120 to ensure bubbles fit better
             const minSize = 40;
             const maxValue = Math.max(...bubbleData.map(b => b.value));
             const size = minSize + ((item.value / maxValue) * (maxSize - minSize));
             
-            // Generate random position within container boundaries
+            // Safe margins to ensure bubble is fully visible
+            const safeMargin = size / 2;
+            
+            // Generate position within container boundaries
             // Ensure bubbles remain fully visible
-            const maxX = 320 - size;
-            const maxY = 250 - size;
-            const x = Math.max(size/2, Math.min(maxX - size/2, 50 + Math.random() * 220));
-            const y = Math.max(size/2, Math.min(maxY - size/2, 50 + Math.random() * 150));
+            const availableWidth = containerSize.width;
+            const availableHeight = containerSize.height;
+            
+            // Calculate position ensuring the bubble stays within bounds
+            const x = Math.max(size/2, Math.min(availableWidth - size/2, 50 + Math.random() * (availableWidth - 100)));
+            const y = Math.max(size/2, Math.min(availableHeight - size/2, 50 + Math.random() * (availableHeight - 100)));
+
+            // Calculate constraints for dragging
+            const dragConstraints = {
+              top: 0,
+              right: availableWidth - size,
+              bottom: availableHeight - size,
+              left: 0
+            };
 
             return (
               <motion.div
@@ -265,15 +311,13 @@ export function EmotionChart({
                   zIndex: Math.floor(item.value)
                 }}
                 drag
-                dragConstraints={{
-                  left: 0,
-                  right: 320 - size,
-                  top: 0,
-                  bottom: 250 - size
-                }}
+                dragConstraints={dragConstraints}
                 dragElastic={0.1}
                 whileDrag={{ scale: 1.05 }}
-                dragTransition={{ bounceStiffness: 300, bounceDamping: 10 }}
+                dragTransition={{ 
+                  bounceStiffness: 600, 
+                  bounceDamping: 20 
+                }}
               >
                 {item.name}
               </motion.div>

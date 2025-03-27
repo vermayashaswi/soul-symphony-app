@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 interface EmotionBubblesProps {
@@ -13,6 +12,7 @@ interface BubbleProps {
   size: number;
   delay: number;
   children: React.ReactNode;
+  containerRef: React.RefObject<HTMLDivElement>;
 }
 
 // More accurate emotion to emoji mapping
@@ -60,7 +60,26 @@ const getRandomValue = (min: number, max: number) => {
   return Math.random() * (max - min) + min;
 };
 
-const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
+const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children, containerRef }) => {
+  // Calculate constraints to keep bubble fully visible
+  const [constraints, setConstraints] = useState({ top: 0, right: 0, bottom: 0, left: 0 });
+  
+  useEffect(() => {
+    if (containerRef.current) {
+      // Get the container dimensions
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight;
+      
+      // Set constraints to keep bubble completely within container
+      setConstraints({
+        top: 0,
+        right: containerWidth - size,
+        bottom: containerHeight - size,
+        left: 0
+      });
+    }
+  }, [containerRef, size]);
+
   return (
     <motion.div
       className="absolute flex items-center justify-center"
@@ -78,6 +97,14 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children }) => {
         repeatType: "reverse",
         ease: "easeInOut"
       }}
+      drag
+      dragConstraints={constraints}
+      dragElastic={0.1}
+      dragTransition={{ 
+        bounceStiffness: 600, 
+        bounceDamping: 20 
+      }}
+      whileDrag={{ scale: 1.05 }}
     >
       <div 
         className="rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center p-2"
@@ -107,6 +134,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
     score?: number;
   }>>([]);
   
+  const containerRef = useRef<HTMLDivElement>(null);
+  
   useEffect(() => {
     // We'll prioritize emotions if they exist, otherwise fall back to themes
     const usingEmotions = Object.keys(emotions).length > 0;
@@ -123,11 +152,18 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
           .slice(0, 7) // Show more emotions since they're quantified
       : dataSource.slice(0, 5);
     
-    // Grid layout configuration
+    // Wait for the container to be available and sized
+    if (!containerRef.current) return;
+    
+    // Get container dimensions
+    const containerWidth = containerRef.current.clientWidth;
+    const containerHeight = containerRef.current.clientHeight;
+    
+    // Grid layout configuration - adjust based on container size
     const gridRows = 3;
     const gridCols = 3;
-    const cellWidth = 280 / gridCols;
-    const cellHeight = 220 / gridRows;
+    const cellWidth = containerWidth / gridCols;
+    const cellHeight = containerHeight / gridRows;
     
     // Calculate positions using a grid-based approach to minimize overlap
     const newBubbles = limitedData.map((item, index) => {
@@ -136,12 +172,17 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
       const row = Math.floor(index / gridCols) % gridRows;
       
       // Calculate base position within cell with some randomness
-      const baseX = (col * cellWidth) + (cellWidth / 2) + getRandomValue(-10, 10);
-      const baseY = (row * cellHeight) + (cellHeight / 2) + getRandomValue(-10, 10);
+      // Ensure we leave enough margin for the bubble size
+      const maxSize = 90; // Maximum bubble size
+      const safeMargin = maxSize / 2; // Safe margin to prevent overflow
       
-      // Center the grid in our container
-      const x = baseX + 20; // Offset from left
-      const y = baseY + 20; // Offset from top
+      // Position bubbles with safe margins from the edges
+      const baseX = (col * cellWidth) + (cellWidth / 2);
+      const baseY = (row * cellHeight) + (cellHeight / 2);
+      
+      // Ensure x and y are within proper bounds
+      const x = Math.max(safeMargin, Math.min(containerWidth - safeMargin, baseX));
+      const y = Math.max(safeMargin, Math.min(containerHeight - safeMargin, baseY));
       
       // Get the appropriate emoji based on the label
       const normalizedLabel = item.label.toLowerCase().trim();
@@ -150,23 +191,26 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
       // Size calculation based on score (if emotions) or position (if themes)
       let size;
       if (usingEmotions && item.score !== undefined) {
-        // Scale based on score: min 40px, max 90px
+        // Scale based on score: min 40px, max 80px
         // We use a log scale to make differences more visible
         const maxScore = Math.max(...Object.values(emotions));
         const minSize = 40;
-        const maxSize = 90;
+        const maxSize = 80;
         size = minSize + ((item.score / maxScore) * (maxSize - minSize));
       } else {
         // Fallback for themes (decreasing by position)
         size = 70 - (index * 5);
       }
       
+      // Ensure size is within reasonable bounds and not too large for container
+      const cappedSize = Math.max(40, Math.min(80, size));
+      
       return {
         id: index,
         label: item.label,
         x,
         y,
-        size: Math.max(40, Math.min(90, size)), // Ensure size is within reasonable bounds
+        size: cappedSize,
         delay: index * 0.2, // Stagger animations
         emoji,
         score: item.score
@@ -174,10 +218,13 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
     });
     
     setBubbles(newBubbles);
-  }, [themes, emotions]);
+  }, [themes, emotions, containerRef.current?.clientWidth, containerRef.current?.clientHeight]);
   
   return (
-    <div className="relative w-full h-full border-2 border-dashed border-muted/10 rounded-lg overflow-hidden">
+    <div 
+      ref={containerRef} 
+      className="relative w-full h-full border-2 border-dashed border-muted/10 rounded-lg overflow-hidden"
+    >
       {bubbles.map((bubble) => (
         <Bubble
           key={bubble.id}
@@ -185,6 +232,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
           y={bubble.y}
           size={bubble.size}
           delay={bubble.delay}
+          containerRef={containerRef}
         >
           <div className="flex flex-col items-center text-center">
             <span className="text-xs font-medium text-primary/90 max-w-[60px] line-clamp-2 capitalize">
