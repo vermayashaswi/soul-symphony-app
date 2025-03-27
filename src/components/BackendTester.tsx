@@ -53,12 +53,12 @@ export default function BackendTester() {
             console.error('Access test failed:', uploadError);
             toast.error('Storage bucket exists but policies need to be fixed', { id: 'storage-check' });
             
-            // Fix policies using type assertion for edge function
+            // Verify bucket status
             const result = await createAudioBucket();
             if (result.success) {
-              toast.success('Audio bucket policies fixed successfully', { id: 'storage-check' });
+              toast.success('Audio bucket verified successfully', { id: 'storage-check' });
             } else {
-              toast.error(`Failed to fix audio policies: ${result.error}`, { id: 'storage-check' });
+              toast.error(`Failed to verify audio policies: ${result.error}`, { id: 'storage-check' });
             }
           } else {
             // Clean up the test file
@@ -97,7 +97,7 @@ export default function BackendTester() {
       <CardContent>
         <Alert>
           <AlertDescription>
-            If you're having issues with audio storage, you can run this diagnostic tool to check and fix it.
+            If you're having issues with audio storage, you can run this diagnostic tool to check it.
           </AlertDescription>
         </Alert>
         <Button 
@@ -105,7 +105,7 @@ export default function BackendTester() {
           disabled={isFixing}
           className="mt-4"
         >
-          {isFixing ? 'Checking...' : 'Check & Fix Audio Storage'}
+          {isFixing ? 'Checking...' : 'Check Audio Storage'}
         </Button>
       </CardContent>
     </Card>

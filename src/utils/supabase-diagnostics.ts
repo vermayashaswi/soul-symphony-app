@@ -152,5 +152,3 @@ export const createAudioBucket = async () => {
     return { success: false, error: error.message };
   }
 };
-
-// Add other diagnostic functions here
