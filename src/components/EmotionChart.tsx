@@ -1,5 +1,4 @@
-
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   LineChart, 
   Line, 
@@ -10,7 +9,6 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
-import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
