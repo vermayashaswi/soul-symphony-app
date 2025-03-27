@@ -145,7 +145,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         ))}
 
         {/* Actual entries - don't hide these while loading more entries */}
-        {entries.map((entry) => (
+        {entries.map((entry: JournalEntry) => (
           <JournalEntryCard 
             key={`entry-${entry.id}`} 
             entry={entry}
