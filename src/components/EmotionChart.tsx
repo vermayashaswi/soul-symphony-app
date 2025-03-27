@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+
+import { useState, useMemo } from 'react';
 import { 
   LineChart, 
   Line, 
@@ -12,7 +13,6 @@ import {
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 // Type definitions for emotion data
 type EmotionData = {
@@ -71,31 +71,6 @@ export function EmotionChart({
   aggregatedData 
 }: EmotionChartProps) {
   const [chartType, setChartType] = useState<ChartType>('bubble');
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 320, height: 250 });
-  const isMobile = useIsMobile();
-
-  // Update container dimensions on resize
-  useEffect(() => {
-    const updateContainerSize = () => {
-      if (containerRef.current) {
-        const { width, height } = containerRef.current.getBoundingClientRect();
-        setContainerSize({ 
-          width: Math.max(width, 280), // Ensure minimum width
-          height: Math.max(height, 220) // Ensure minimum height
-        });
-      }
-    };
-
-    // Initial update
-    updateContainerSize();
-    
-    // Add resize listener
-    window.addEventListener('resize', updateContainerSize);
-    
-    // Cleanup
-    return () => window.removeEventListener('resize', updateContainerSize);
-  }, []);
 
   const chartTypes = [
     { id: 'line', label: 'Line' },
@@ -241,45 +216,27 @@ export function EmotionChart({
       );
     }
     
-    // Calculate the maximum value for proper sizing
-    const maxValue = Math.max(...bubbleData.map(b => b.value));
-    
-    // Calculate max bubble size based on container dimensions and number of bubbles
-    // Smaller container or more bubbles = smaller max size
-    const bubbleCount = bubbleData.length;
-    const containerArea = containerSize.width * containerSize.height;
-    const maxSize = Math.min(
-      Math.sqrt(containerArea / (bubbleCount * Math.PI)) * 2.2, // Based on area
-      isMobile ? 90 : 120, // Maximum size cap, smaller on mobile
-      containerSize.width * 0.3, // No more than 30% of container width
-      containerSize.height * 0.3 // No more than 30% of container height
-    );
-    
-    const minSize = Math.max(30, maxSize * 0.3); // At least 30px or 30% of maxSize
-    
     return (
       <div className="w-full h-[300px] flex flex-col items-center justify-center relative">
         <div className="absolute top-0 right-0 text-xs text-muted-foreground">
-          * Size represents intensity, drag to move
+          * Size of bubble represents intensity
         </div>
         
-        {/* Container with boundary constraints - use ref to get actual dimensions */}
-        <div 
-          ref={containerRef}
-          className="relative w-full h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden"
-        >
+        {/* Container with boundary constraints */}
+        <div className="relative w-[320px] h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden">
           {bubbleData.map((item, index) => {
-            // Calculate size based on value relative to max
+            // Calculate base size proportionally to value
+            const maxSize = 120;
+            const minSize = 40;
+            const maxValue = Math.max(...bubbleData.map(b => b.value));
             const size = minSize + ((item.value / maxValue) * (maxSize - minSize));
             
-            // Calculate initial position ensuring bubbles are fully visible
-            // Give some buffer around edges equal to 1/4 of the bubble size
-            const buffer = size / 4;
-            const xRange = containerSize.width - size - buffer * 2;
-            const yRange = containerSize.height - size - buffer * 2;
-            
-            const x = buffer + (index % 3 * (xRange / 3)) + (Math.random() * (xRange / 4));
-            const y = buffer + (Math.floor(index / 3) % 3 * (yRange / 3)) + (Math.random() * (yRange / 4));
+            // Generate random position within container boundaries
+            // Ensure bubbles remain fully visible
+            const maxX = 320 - size;
+            const maxY = 250 - size;
+            const x = Math.max(size/2, Math.min(maxX - size/2, 50 + Math.random() * 220));
+            const y = Math.max(size/2, Math.min(maxY - size/2, 50 + Math.random() * 150));
 
             return (
               <motion.div
@@ -295,8 +252,8 @@ export function EmotionChart({
                   height: `${size}px`,
                   backgroundColor: item.color,
                   position: 'absolute',
-                  left: x,
-                  top: y,
+                  left: x - (size / 2),
+                  top: y - (size / 2),
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
@@ -304,25 +261,19 @@ export function EmotionChart({
                   color: 'white',
                   fontSize: size > 70 ? '14px' : '12px',
                   fontWeight: 'bold',
-                  textAlign: 'center',
                   boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
                   zIndex: Math.floor(item.value)
                 }}
                 drag
-                // Strict drag constraints to keep bubbles fully visible
                 dragConstraints={{
                   left: 0,
-                  right: containerSize.width - size,
+                  right: 320 - size,
                   top: 0,
-                  bottom: containerSize.height - size
+                  bottom: 250 - size
                 }}
-                // Less elasticity for more controlled movement
-                dragElastic={0.05}
-                whileDrag={{ scale: 1.02 }}
-                dragTransition={{ 
-                  bounceStiffness: 500, 
-                  bounceDamping: 20
-                }}
+                dragElastic={0.1}
+                whileDrag={{ scale: 1.05 }}
+                dragTransition={{ bounceStiffness: 300, bounceDamping: 10 }}
               >
                 {item.name}
               </motion.div>
