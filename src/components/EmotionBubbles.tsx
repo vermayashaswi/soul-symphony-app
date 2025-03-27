@@ -11,7 +11,8 @@ import Matter, {
   MouseConstraint,
   Body,
   Composite,
-  Events
+  Events,
+  Runner
 } from 'matter-js';
 import EmotionBubbleDetail from './EmotionBubbleDetail';
 import { useToast } from '@/components/ui/use-toast';
@@ -34,6 +35,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
   const engineRef = useRef<Matter.Engine | null>(null);
   const renderRef = useRef<Matter.Render | null>(null);
   const worldRef = useRef<Matter.World | null>(null);
+  const runnerRef = useRef<Matter.Runner | null>(null);
   const bubblesRef = useRef<{
     body: Matter.Body;
     name: string;
@@ -41,6 +43,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     color: string;
   }[]>([]);
   const mouseConstraintRef = useRef<Matter.MouseConstraint | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [items, setItems] = useState<Array<{ 
@@ -51,6 +54,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     value?: number;
   }>>([]);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
+  const [physicsInitialized, setPhysicsInitialized] = useState(false);
   
   const location = useLocation();
   const isInsightsPage = location.pathname.includes('insights');
@@ -93,18 +97,44 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     };
   }, []);
 
+  const applyRandomForces = () => {
+    if (!engineRef.current || !bubblesRef.current.length) return;
+    
+    bubblesRef.current.forEach((bubble) => {
+      if (Math.random() > 0.95) {
+        const forceX = (Math.random() - 0.5) * 0.001;
+        const forceY = (Math.random() - 0.5) * 0.001;
+        Body.applyForce(bubble.body, bubble.body.position, { x: forceX, y: forceY });
+      }
+    });
+    
+    animationFrameRef.current = requestAnimationFrame(applyRandomForces);
+  };
+
   useEffect(() => {
     if (isInsightsPage && containerSize.width > 0 && containerSize.height > 0 && canvasRef.current) {
       if (engineRef.current) {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        
+        if (runnerRef.current) {
+          Runner.stop(runnerRef.current);
+        }
+        
         World.clear(engineRef.current.world, false);
         Engine.clear(engineRef.current);
+        
         if (renderRef.current && renderRef.current.canvas) {
           Render.stop(renderRef.current);
           renderRef.current.canvas.remove();
         }
       }
       
-      const engine = Engine.create();
+      const engine = Engine.create({
+        enableSleeping: false,
+        gravity: { x: 0, y: 0, scale: 0 }
+      });
       engineRef.current = engine;
       worldRef.current = engine.world;
       
@@ -121,33 +151,34 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       renderRef.current = render;
       
       const wallThickness = 50;
+      const containerPadding = 20;
       const walls = [
         Bodies.rectangle(
           containerSize.width / 2, 
-          containerSize.height + wallThickness / 2, 
-          containerSize.width, 
+          containerSize.height + wallThickness / 2 + containerPadding, 
+          containerSize.width + containerPadding * 2, 
           wallThickness, 
           { isStatic: true, render: { visible: false } }
         ),
         Bodies.rectangle(
           containerSize.width / 2, 
-          -wallThickness / 2, 
-          containerSize.width, 
+          -wallThickness / 2 - containerPadding, 
+          containerSize.width + containerPadding * 2, 
           wallThickness, 
           { isStatic: true, render: { visible: false } }
         ),
         Bodies.rectangle(
-          -wallThickness / 2, 
+          -wallThickness / 2 - containerPadding, 
           containerSize.height / 2, 
           wallThickness, 
-          containerSize.height, 
+          containerSize.height + containerPadding * 2, 
           { isStatic: true, render: { visible: false } }
         ),
         Bodies.rectangle(
-          containerSize.width + wallThickness / 2, 
+          containerSize.width + wallThickness / 2 + containerPadding, 
           containerSize.height / 2, 
           wallThickness, 
-          containerSize.height, 
+          containerSize.height + containerPadding * 2, 
           { isStatic: true, render: { visible: false } }
         ),
       ];
@@ -163,19 +194,24 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       
       if (items.length > 0) {
         bubbleBodies = items.map((item) => {
+          const friction = 0.005 + Math.random() * 0.005;
+          const frictionAir = 0.01 + Math.random() * 0.01;
+          const restitution = 0.7 + Math.random() * 0.2; 
+          
           const body = Bodies.circle(
             item.position.x,
             item.position.y,
             item.size / 2,
             {
-              restitution: 0.7,
-              friction: 0.005,
-              frictionAir: 0.01,
+              restitution: restitution,
+              friction: friction,
+              frictionAir: frictionAir,
               render: {
                 fillStyle: 'transparent',
                 strokeStyle: 'transparent',
                 lineWidth: 0
-              }
+              },
+              density: 0.001 * (1 + Math.random() * 0.2)
             }
           );
           
@@ -204,24 +240,43 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       
       World.add(engine.world, mouseConstraint);
       mouseConstraintRef.current = mouseConstraint;
-      
       render.mouse = mouse;
       
-      Engine.run(engine);
+      const runner = Runner.create({
+        isFixed: true,
+      });
+      Runner.run(runner, engine);
+      runnerRef.current = runner;
+      
       Render.run(render);
       
+      animationFrameRef.current = requestAnimationFrame(applyRandomForces);
+      
+      setPhysicsInitialized(true);
+      
       return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        
+        if (runnerRef.current) {
+          Runner.stop(runnerRef.current);
+        }
+        
         if (engineRef.current) {
           World.clear(engineRef.current.world, false);
           Engine.clear(engineRef.current);
         }
+        
         if (renderRef.current) {
           Render.stop(renderRef.current);
           if (renderRef.current.canvas) {
             renderRef.current.canvas.remove();
           }
         }
+        
         bubblesRef.current = [];
+        setPhysicsInitialized(false);
       };
     }
   }, [isInsightsPage, containerSize, items]);
@@ -233,6 +288,11 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           Body.setPosition(bubble.body, {
             x: items[index].position.x,
             y: items[index].position.y
+          });
+          
+          Body.setVelocity(bubble.body, {
+            x: (Math.random() - 0.5) * 0.5,
+            y: (Math.random() - 0.5) * 0.5
           });
         }
       });
@@ -335,78 +395,43 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       newItems.sort((a, b) => b.size - a.size);
       
       for (let i = 0; i < newItems.length; i++) {
-        let isValidPosition = false;
-        let attempts = 0;
-        const maxAttempts = 70;
+        const spiralPlacement = (index: number, totalItems: number, item: any) => {
+          const maxRadius = Math.min(availableWidth, availableHeight) * 0.4;
+          const maxAngle = 2 * Math.PI * 3;
+          
+          const t = index / totalItems;
+          const angle = t * maxAngle;
+          const radius = t * maxRadius;
+          
+          const centerX = availableWidth / 2;
+          const centerY = availableHeight / 2;
+          
+          const randomOffset = Math.min(availableWidth, availableHeight) * 0.05;
+          const randomX = (Math.random() - 0.5) * randomOffset;
+          const randomY = (Math.random() - 0.5) * randomOffset;
+          
+          const x = padding + centerX + radius * Math.cos(angle) + randomX;
+          const y = padding + centerY + radius * Math.sin(angle) + randomY;
+          
+          return { x, y };
+        };
         
-        const centerX = availableWidth / 2;
-        const centerY = availableHeight / 2;
-        let angle = 0;
-        let radius = 0;
-        const step = 0.5;
+        const position = spiralPlacement(i, newItems.length, newItems[i]);
         
-        while (!isValidPosition && attempts < maxAttempts) {
-          radius = (attempts / maxAttempts) * (Math.min(availableWidth, availableHeight) / 2 - newItems[i].size / 2);
+        const safeBubblePlacement = (pos: {x: number, y: number}, size: number) => {
+          const halfSize = size / 2;
+          const minX = padding + halfSize;
+          const maxX = padding + availableWidth - halfSize;
+          const minY = padding + halfSize;
+          const maxY = padding + availableHeight - halfSize;
           
-          const x = padding + centerX + radius * Math.cos(angle);
-          const y = padding + centerY + radius * Math.sin(angle);
-          
-          if (x - newItems[i].size/2 < padding || x + newItems[i].size/2 > availableWidth + padding ||
-              y - newItems[i].size/2 < padding || y + newItems[i].size/2 > availableHeight + padding) {
-            angle += step;
-            attempts++;
-            continue;
-          }
-          
-          isValidPosition = true;
-          for (let j = 0; j < i; j++) {
-            const dx = x - newItems[j].position.x;
-            const dy = y - newItems[j].position.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const minDistance = (newItems[i].size + newItems[j].size) * 0.6;
-            
-            if (distance < minDistance) {
-              isValidPosition = false;
-              break;
-            }
-          }
-          
-          if (isValidPosition) {
-            newItems[i].position = { x, y };
-          } else {
-            angle += step;
-            attempts++;
-          }
-        }
+          return {
+            x: Math.min(maxX, Math.max(minX, pos.x)),
+            y: Math.min(maxY, Math.max(minY, pos.y))
+          };
+        };
         
-        if (attempts >= maxAttempts) {
-          let bestPosition = { x: 0, y: 0 };
-          let minOverlap = Number.MAX_VALUE;
-          
-          for (let attempt = 0; attempt < 30; attempt++) {
-            const x = padding + Math.random() * (availableWidth - newItems[i].size);
-            const y = padding + Math.random() * (availableHeight - newItems[i].size);
-            
-            let totalOverlap = 0;
-            for (let j = 0; j < i; j++) {
-              const dx = x - newItems[j].position.x;
-              const dy = y - newItems[j].position.y;
-              const distance = Math.sqrt(dx * dx + dy * dy);
-              const minDistance = (newItems[i].size + newItems[j].size) * 0.5;
-              
-              if (distance < minDistance) {
-                totalOverlap += (minDistance - distance);
-              }
-            }
-            
-            if (totalOverlap < minOverlap) {
-              minOverlap = totalOverlap;
-              bestPosition = { x, y };
-            }
-          }
-          
-          newItems[i].position = bestPosition;
-        }
+        newItems[i].position = safeBubblePlacement(position, newItems[i].size);
       }
     }
     
