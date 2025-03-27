@@ -147,8 +147,8 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
   };
 
   // Custom day renderer for the calendar
-  const renderDay = (day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
+  const renderDay = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
     const dayData = sentimentByDate[dateStr];
     
     if (!dayData) return null;
@@ -158,7 +158,7 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     return (
       <div className="relative w-full h-full flex items-center justify-center">
         <div className={`absolute top-0 left-0 right-0 bottom-0 ${sentimentColor} opacity-70 rounded-full`}></div>
-        <span className="relative text-white font-medium z-10">{format(day, 'd')}</span>
+        <span className="relative text-white font-medium z-10">{format(date, 'd')}</span>
       </div>
     );
   };
@@ -179,11 +179,16 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
               onSelect={() => {}}
               className="mx-auto max-w-md"
               components={{
-                Day: ({ day, ...props }) => (
-                  <div {...props}>
-                    {renderDay(day)}
-                  </div>
-                ),
+                Day: ({ date, ...props }) => {
+                  const dayContent = renderDay(date);
+                  return dayContent ? (
+                    <div {...props}>
+                      {dayContent}
+                    </div>
+                  ) : (
+                    <div {...props} />
+                  );
+                },
               }}
             />
             <div className="flex justify-center gap-6 mt-4">
