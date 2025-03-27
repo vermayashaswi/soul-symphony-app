@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Engine, Render, World, Bodies, Body, Mouse, MouseConstraint, Events, Composite } from 'matter-js';
 
@@ -92,12 +93,19 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
     });
     mouseConstraintRef.current = mouseConstraint;
 
-    // Adjust mouse position calculation
-    mouse.element.removeEventListener('mousewheel', mouse.mousewheel);
-    mouse.element.removeEventListener('DOMMouseScroll', mouse.mousewheel);
-    mouse.element.removeEventListener('touchstart', mouse.touchstart);
-    mouse.element.removeEventListener('touchmove', mouse.touchmove);
-    mouse.element.removeEventListener('touchend', mouse.touchend);
+    // Adjust mouse position calculation - fix TypeScript errors
+    // Use type assertion to access the event handlers that exist at runtime but not in types
+    const mouseAny = mouse as any;
+    if (mouseAny.element && mouseAny.mousewheel) {
+      mouseAny.element.removeEventListener('mousewheel', mouseAny.mousewheel);
+      mouseAny.element.removeEventListener('DOMMouseScroll', mouseAny.mousewheel);
+    }
+    
+    if (mouseAny.element && mouseAny.touchstart) {
+      mouseAny.element.removeEventListener('touchstart', mouseAny.touchstart);
+      mouseAny.element.removeEventListener('touchmove', mouseAny.touchmove);
+      mouseAny.element.removeEventListener('touchend', mouseAny.touchend);
+    }
     
     // Add custom touch events to properly calculate the position
     mouse.element.addEventListener('touchstart', (event) => {
@@ -110,7 +118,9 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
       
       mouse.position.x = x;
       mouse.position.y = y;
-      mouse.mousedown = true;
+      
+      // Use type assertion to set mousedown property
+      (mouse as any).mousedown = true;
       
       event.preventDefault();
     }, { passive: false });
@@ -130,7 +140,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
     }, { passive: false });
     
     mouse.element.addEventListener('touchend', () => {
-      mouse.mousedown = false;
+      // Use type assertion to set mousedown property
+      (mouse as any).mousedown = false;
     }, { passive: false });
     
     // Create world boundaries (invisible walls) with sufficient padding
@@ -195,9 +206,22 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
       // Update container size state
       setContainerSize({ width: newWidth, height: newHeight });
       
-      // Resize the renderer
+      // Resize the renderer - fix TypeScript error
       Render.setPixelRatio(renderRef.current, window.devicePixelRatio || 1);
-      Render.setSize(renderRef.current, newWidth, newHeight);
+      
+      // Use type assertion for setSize method that exists at runtime but not in types
+      const renderAny = Render as any;
+      if (renderAny.setSize && renderRef.current) {
+        renderAny.setSize(renderRef.current, newWidth, newHeight);
+      } else {
+        // Fallback: manually adjust canvas dimensions
+        if (renderRef.current.canvas) {
+          renderRef.current.canvas.width = newWidth;
+          renderRef.current.canvas.height = newHeight;
+          renderRef.current.options.width = newWidth;
+          renderRef.current.options.height = newHeight;
+        }
+      }
       
       // Update wall positions
       const [topWall, bottomWall, leftWall, rightWall] = worldBoundaries.current;
