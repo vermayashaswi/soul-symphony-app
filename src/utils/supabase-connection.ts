@@ -11,9 +11,9 @@ export async function testDatabaseConnection() {
     
     // Use a timeout to prevent hanging connections
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // Increase timeout to 10 seconds
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
     
-    // Use the type-safe approach with a known table name instead of variable string
+    // Use the type-safe approach with a known table name
     const { data, error } = await supabase
       .from('profiles')
       .select('id')
@@ -30,6 +30,11 @@ export async function testDatabaseConnection() {
     console.log('Database connection test successful');
     return { success: true, data };
   } catch (err: any) {
+    if (err.name === 'AbortError') {
+      console.error('Database connection test timed out');
+      return { success: false, error: 'Connection timed out' };
+    }
+    
     console.error('Database connection error:', err);
     return { success: false, error: err?.message || 'Unknown error' };
   }
@@ -54,7 +59,13 @@ export async function safeUpdate<T>(
       return acc.eq(key, value);
     }, query);
     
-    const { data, error } = await query.select();
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    const { data, error } = await query.select().abortSignal(controller.signal);
+    
+    clearTimeout(timeoutId);
     
     if (error) {
       console.error(`Error updating ${table}:`, error);
@@ -62,7 +73,12 @@ export async function safeUpdate<T>(
     }
     
     return { success: true, data };
-  } catch (err) {
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      console.error(`Update operation for ${table} timed out`);
+      return { success: false, error: { message: 'Operation timed out' } };
+    }
+    
     console.error(`Exception in safeUpdate for ${table}:`, err);
     return { success: false, error: err };
   }
@@ -81,6 +97,7 @@ export async function safeSelect<T>(
     ascending?: boolean;
     limit?: number;
     single?: boolean;
+    timeoutMs?: number;
   } = {}
 ) {
   try {
@@ -104,10 +121,17 @@ export async function safeSelect<T>(
       query = query.limit(options.limit);
     }
     
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutMs = options.timeoutMs || 10000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
     // Execute as single or multiple
     const { data, error } = options.single 
-      ? await query.maybeSingle() 
-      : await query;
+      ? await query.maybeSingle().abortSignal(controller.signal)
+      : await query.abortSignal(controller.signal);
+    
+    clearTimeout(timeoutId);
     
     if (error) {
       console.error(`Error selecting from ${table}:`, error);
@@ -115,7 +139,12 @@ export async function safeSelect<T>(
     }
     
     return { success: true, data };
-  } catch (err) {
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      console.error(`Select operation for ${table} timed out`);
+      return { success: false, error: { message: 'Operation timed out' } };
+    }
+    
     console.error(`Exception in safeSelect for ${table}:`, err);
     return { success: false, error: err };
   }

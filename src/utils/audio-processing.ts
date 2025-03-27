@@ -37,13 +37,19 @@ export const uploadAudioToStorage = async (
     
     console.log('Uploading audio to journal-audio-entries bucket, path:', filePath);
     
-    // Upload file to storage
+    // Upload file to storage with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
     const { data, error } = await supabase.storage
       .from('journal-audio-entries')
       .upload(filePath, audioBlob, {
         contentType: 'audio/webm',
-        upsert: true
+        upsert: true,
+        signal: controller.signal
       });
+    
+    clearTimeout(timeoutId);
       
     if (error) {
       console.error('Error uploading audio:', error);
@@ -161,22 +167,34 @@ export const ensureAudioBucketExists = async (): Promise<boolean> => {
     if (audioBucket) {
       console.log('journal-audio-entries bucket exists');
       
-      // Test basic access
+      // Test basic access with timeout
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
         const { error: accessError } = await supabase.storage
           .from('journal-audio-entries')
-          .list();
+          .list('', {
+            limit: 1,
+            signal: controller.signal
+          });
+          
+        clearTimeout(timeoutId);
           
         if (!accessError) {
           console.log('journal-audio-entries bucket is accessible');
           return true;
+        } else {
+          console.error('Bucket exists but access error:', accessError);
         }
       } catch (e) {
         console.error('Error testing bucket access:', e);
       }
+    } else {
+      console.warn('journal-audio-entries bucket does not exist');
     }
     
-    console.warn('journal-audio-entries bucket does not exist or is not accessible');
+    // Show error notification only once by using an ID
     toast.error('Audio storage is not properly configured. Please contact support.', {
       duration: 5000,
       id: 'audio-bucket-missing'

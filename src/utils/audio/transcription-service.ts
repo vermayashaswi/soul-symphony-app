@@ -140,8 +140,12 @@ export async function sendAudioForTranscription(base64String: string, userId: st
       return { success: false, error: 'Authentication required for transcription' };
     }
     
-    // Call the Supabase function with the access token
+    // Call the Supabase function with the access token and a timeout
     console.log("Calling transcribe-audio edge function with JSON payload...");
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64String,
@@ -149,8 +153,11 @@ export async function sendAudioForTranscription(base64String: string, userId: st
       },
       headers: {
         Authorization: `Bearer ${accessToken}`
-      }
+      },
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (error) {
       console.error('Transcription error:', error);
@@ -173,6 +180,14 @@ export async function sendAudioForTranscription(base64String: string, userId: st
       };
     }
   } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.error('Transcription request timed out');
+      return {
+        success: false,
+        error: 'Request timed out while processing recording'
+      };
+    }
+    
     console.error('Error sending audio for transcription:', error);
     return { 
       success: false, 
