@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from 'react';
 import { 
   LineChart, 
@@ -27,35 +28,57 @@ interface EmotionChartProps {
   aggregatedData?: AggregatedEmotionData;
 }
 
-// Vibrant color mapping for emotions
+// Enhanced color mapping for emotions with distinct colors
 const EMOTION_COLORS: Record<string, string> = {
-  joy: '#4299E1',           // Bright Blue
-  happiness: '#48BB78',     // Bright Green
-  gratitude: '#0EA5E9',     // Ocean Blue
-  calm: '#8B5CF6',          // Vivid Purple
-  anxiety: '#F56565',       // Bright Red
+  joy: '#4299E1',           // Blue
+  happiness: '#48BB78',     // Green
+  gratitude: '#0EA5E9',     // Light Blue
+  calm: '#8B5CF6',          // Purple
+  anxiety: '#F56565',       // Red
   sadness: '#3B82F6',       // Bright Blue
-  anger: '#F97316',         // Bright Orange
+  anger: '#F97316',         // Orange
   fear: '#EF4444',          // Bright Red
-  excitement: '#FBBF24',    // Vibrant Yellow
-  love: '#EC4899',          // Magenta Pink
-  stress: '#F97316',        // Bright Orange
+  excitement: '#FBBF24',    // Yellow
+  love: '#EC4899',          // Pink
+  stress: '#9333EA',        // Violet
   surprise: '#F59E0B',      // Amber
-  confusion: '#8B5CF6',     // Vivid Purple
-  disappointment: '#6366F1', // Indigo
-  pride: '#3B82F6',         // Blue
-  shame: '#DC2626',         // Red
-  guilt: '#B45309',         // Amber
-  hope: '#2563EB',          // Blue
+  confusion: '#6366F1',     // Indigo
+  disappointment: '#2563EB', // Blue
+  pride: '#06B6D4',         // Cyan
+  shame: '#DC2626',         // Dark Red
+  guilt: '#B45309',         // Brown
+  hope: '#2DD4BF',          // Teal
   boredom: '#4B5563',       // Gray
   disgust: '#65A30D',       // Lime
-  contentment: '#0D9488'    // Teal
+  contentment: '#0D9488',   // Dark Teal
+  // Additional distinct colors for more emotions
+  trust: '#A78BFA',         // Light Purple
+  anticipation: '#FB923C',  // Light Orange
+  pensiveness: '#93C5FD',   // Light Blue
+  serenity: '#A5F3FC',      // Light Cyan
+  annoyance: '#FCD34D',     // Light Yellow
+  vigilance: '#FCA5A5',     // Light Red
+  interest: '#86EFAC',      // Light Green
+  apprehension: '#FDA4AF',  // Light Pink
+  distraction: '#D8B4FE',   // Light Violet
+  admiration: '#C4B5FD'     // Lavender
 };
 
 // Get color for an emotion, with fallback
-const getEmotionColor = (emotion: string): string => {
+const getEmotionColor = (emotion: string, index: number): string => {
   const normalized = emotion.toLowerCase();
-  return EMOTION_COLORS[normalized] || '#A3A3A3';
+  if (EMOTION_COLORS[normalized]) {
+    return EMOTION_COLORS[normalized];
+  }
+  
+  // If we don't have a predefined color, use one of these fallback colors
+  const fallbackColors = [
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
+    '#EC4899', '#6366F1', '#D946EF', '#F97316', '#0EA5E9'
+  ];
+  
+  // Use modulo to cycle through the colors if we have more emotions than colors
+  return fallbackColors[index % fallbackColors.length];
 };
 
 export function EmotionChart({ 
@@ -172,12 +195,12 @@ export function EmotionChart({
               }} 
             />
             <Legend verticalAlign="bottom" height={36} />
-            {emotions.map((emotion) => (
+            {emotions.map((emotion, index) => (
               <Line
                 key={emotion}
                 type="monotone"
                 dataKey={emotion}
-                stroke={getEmotionColor(emotion)}
+                stroke={getEmotionColor(emotion, index)}
                 strokeWidth={3}
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
@@ -229,11 +252,11 @@ export function EmotionChart({
         <div className="flex flex-wrap justify-start gap-4 mt-4 text-sm">
           {Object.keys(lineData[0])
             .filter(key => key !== 'day')
-            .map(emotion => (
+            .map((emotion, index) => (
               <div key={emotion} className="flex items-center gap-2">
                 <div 
                   className="w-3 h-3 rounded-full" 
-                  style={{ backgroundColor: getEmotionColor(emotion) }}
+                  style={{ backgroundColor: getEmotionColor(emotion, index) }}
                 ></div>
                 <span className="font-medium">{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
               </div>
