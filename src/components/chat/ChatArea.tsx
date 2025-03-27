@@ -98,7 +98,13 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
 
-      setMessages(data || []);
+      // Transform the data to ensure 'sender' is typed correctly
+      const typedMessages: Message[] = data?.map(msg => ({
+        ...msg,
+        sender: msg.sender === 'user' ? 'user' : 'assistant' as 'user' | 'assistant'
+      })) || [];
+
+      setMessages(typedMessages);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Something went wrong');
@@ -321,3 +327,4 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     </div>
   );
 }
+
