@@ -86,7 +86,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
     if (isInsightsPage && containerSize.width > 0 && containerSize.height > 0 && canvasRef.current) {
       if (engineRef.current) {
         World.clear(engineRef.current.world, false);
-        Engine.clear(engineRef.current, false);
+        Engine.clear(engineRef.current);
         if (renderRef.current && renderRef.current.canvas) {
           Render.stop(renderRef.current);
           renderRef.current.canvas.remove();
@@ -202,7 +202,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, class
       return () => {
         if (engineRef.current) {
           World.clear(engineRef.current.world, false);
-          Engine.clear(engineRef.current, false);
+          Engine.clear(engineRef.current);
         }
         if (renderRef.current) {
           Render.stop(renderRef.current);
