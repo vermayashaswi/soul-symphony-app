@@ -37,19 +37,23 @@ export const uploadAudioToStorage = async (
     
     console.log('Uploading audio to journal-audio-entries bucket, path:', filePath);
     
-    // Upload file to storage with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-    
-    const { data, error } = await supabase.storage
+    // Replace AbortController with a Promise.race approach for timeout
+    const uploadPromise = supabase.storage
       .from('journal-audio-entries')
       .upload(filePath, audioBlob, {
         contentType: 'audio/webm',
-        upsert: true,
-        signal: controller.signal
+        upsert: true
       });
+      
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Upload timed out')), 15000);
+    });
     
-    clearTimeout(timeoutId);
+    // Race the promises
+    const { data, error } = await Promise.race([
+      uploadPromise,
+      timeoutPromise.then(() => { throw new Error('Upload timed out'); })
+    ]) as any;
       
     if (error) {
       console.error('Error uploading audio:', error);
@@ -167,19 +171,22 @@ export const ensureAudioBucketExists = async (): Promise<boolean> => {
     if (audioBucket) {
       console.log('journal-audio-entries bucket exists');
       
-      // Test basic access with timeout
+      // Test basic access with Promise.race for timeout
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        const { error: accessError } = await supabase.storage
+        const listPromise = supabase.storage
           .from('journal-audio-entries')
           .list('', {
-            limit: 1,
-            signal: controller.signal
+            limit: 1
           });
           
-        clearTimeout(timeoutId);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Access check timed out')), 5000);
+        });
+        
+        const { error: accessError } = await Promise.race([
+          listPromise,
+          timeoutPromise.then(() => { throw new Error('Access check timed out'); })
+        ]) as any;
           
         if (!accessError) {
           console.log('journal-audio-entries bucket is accessible');

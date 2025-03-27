@@ -9,18 +9,22 @@ export async function testDatabaseConnection() {
   try {
     console.log('Testing database connection...');
     
-    // Use a timeout to prevent hanging connections
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    // Use a timeout promise instead of AbortController
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Connection timed out')), 10000);
+    });
     
     // Use the type-safe approach with a known table name
-    const { data, error } = await supabase
+    const connectionPromise = supabase
       .from('profiles')
       .select('id')
-      .limit(1)
-      .abortSignal(controller.signal);
+      .limit(1);
     
-    clearTimeout(timeoutId);
+    // Race the promises to implement timeout
+    const { data, error } = await Promise.race([
+      connectionPromise,
+      timeoutPromise.then(() => { throw new Error('Connection timed out'); })
+    ]) as any;
     
     if (error) {
       console.error('Database connection test failed:', error);
@@ -30,7 +34,7 @@ export async function testDatabaseConnection() {
     console.log('Database connection test successful');
     return { success: true, data };
   } catch (err: any) {
-    if (err.name === 'AbortError') {
+    if (err.message === 'Connection timed out') {
       console.error('Database connection test timed out');
       return { success: false, error: 'Connection timed out' };
     }
@@ -59,13 +63,18 @@ export async function safeUpdate<T>(
       return acc.eq(key, value);
     }, query);
     
-    // Add timeout to prevent hanging requests
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    // Use Promise.race for timeout instead of AbortController
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), 10000);
+    });
     
-    const { data, error } = await query.select().abortSignal(controller.signal);
+    const queryPromise = query.select();
     
-    clearTimeout(timeoutId);
+    // Race the promises
+    const { data, error } = await Promise.race([
+      queryPromise,
+      timeoutPromise.then(() => { throw new Error('Operation timed out'); })
+    ]) as any;
     
     if (error) {
       console.error(`Error updating ${table}:`, error);
@@ -74,7 +83,7 @@ export async function safeUpdate<T>(
     
     return { success: true, data };
   } catch (err: any) {
-    if (err.name === 'AbortError') {
+    if (err.message === 'Operation timed out') {
       console.error(`Update operation for ${table} timed out`);
       return { success: false, error: { message: 'Operation timed out' } };
     }
@@ -121,17 +130,22 @@ export async function safeSelect<T>(
       query = query.limit(options.limit);
     }
     
-    // Add timeout to prevent hanging requests
-    const controller = new AbortController();
+    // Use Promise.race for timeout instead of AbortController
     const timeoutMs = options.timeoutMs || 10000;
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), timeoutMs);
+    });
     
     // Execute as single or multiple
-    const { data, error } = options.single 
-      ? await query.maybeSingle().abortSignal(controller.signal)
-      : await query.abortSignal(controller.signal);
+    const selectPromise = options.single 
+      ? query.maybeSingle()
+      : query;
     
-    clearTimeout(timeoutId);
+    // Race the promises
+    const { data, error } = await Promise.race([
+      selectPromise,
+      timeoutPromise.then(() => { throw new Error('Operation timed out'); })
+    ]) as any;
     
     if (error) {
       console.error(`Error selecting from ${table}:`, error);
@@ -140,7 +154,7 @@ export async function safeSelect<T>(
     
     return { success: true, data };
   } catch (err: any) {
-    if (err.name === 'AbortError') {
+    if (err.message === 'Operation timed out') {
       console.error(`Select operation for ${table} timed out`);
       return { success: false, error: { message: 'Operation timed out' } };
     }

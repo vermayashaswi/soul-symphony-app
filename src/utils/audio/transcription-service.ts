@@ -32,25 +32,29 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
     
     console.log('Preparing to send audio for transcription, blob size:', audioBlob.size);
     
-    // Set up a timeout to prevent the call from hanging indefinitely
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    // Replace AbortController with Promise.race for timeout
+    const functionUrl = 'https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/transcribe-audio';
+    
+    console.log(`Calling transcribe-audio edge function at: ${functionUrl}`);
     
     try {
-      // Direct function invocation with FormData
-      const functionUrl = 'https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/transcribe-audio';
-      
-      console.log(`Calling transcribe-audio edge function at: ${functionUrl}`);
-      const response = await fetch(functionUrl, {
+      const fetchPromise = fetch(functionUrl, {
         method: 'POST',
         body: formData,
-        signal: controller.signal,
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }
       });
       
-      clearTimeout(timeoutId);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timed out')), 30000);
+      });
+      
+      // Race the promises
+      const response = await Promise.race([
+        fetchPromise,
+        timeoutPromise.then(() => { throw new Error('Request timed out'); })
+      ]) as Response;
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -81,9 +85,7 @@ export async function processAudioBlobForTranscription(audioBlob: Blob, userId: 
         };
       }
     } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      
-      if (fetchError.name === 'AbortError') {
+      if (fetchError.message === 'Request timed out') {
         console.error('Transcription request timed out');
         return { 
           success: false, 
@@ -140,54 +142,66 @@ export async function sendAudioForTranscription(base64String: string, userId: st
       return { success: false, error: 'Authentication required for transcription' };
     }
     
-    // Call the Supabase function with the access token and a timeout
+    // Call the Supabase function with the access token and a timeout using Promise.race
     console.log("Calling transcribe-audio edge function with JSON payload...");
     
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-    
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-      body: {
-        audio: base64String,
-        userId
-      },
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      },
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (error) {
-      console.error('Transcription error:', error);
+    try {
+      const functionPromise = supabase.functions.invoke('transcribe-audio', {
+        body: {
+          audio: base64String,
+          userId
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timed out')), 30000);
+      });
+      
+      // Race the promises
+      const { data, error } = await Promise.race([
+        functionPromise,
+        timeoutPromise.then(() => { throw new Error('Request timed out'); })
+      ]) as any;
+      
+      if (error) {
+        console.error('Transcription error:', error);
+        return { 
+          success: false, 
+          error: `Failed to transcribe audio: ${error.message || 'Unknown error'}`
+        };
+      }
+      
+      console.log("Transcription response:", data);
+      
+      if (data && data.success) {
+        return { success: true, data };
+      } else {
+        const errorMsg = data?.error || data?.message || 'Failed to process recording';
+        console.error("Transcription failed:", errorMsg);
+        return { 
+          success: false, 
+          error: errorMsg 
+        };
+      }
+    } catch (error: any) {
+      if (error.message === 'Request timed out') {
+        console.error('Transcription request timed out');
+        return {
+          success: false,
+          error: 'Request timed out while processing recording'
+        };
+      }
+      
+      console.error('Error sending audio for transcription:', error);
       return { 
         success: false, 
-        error: `Failed to transcribe audio: ${error.message || 'Unknown error'}`
-      };
-    }
-    
-    console.log("Transcription response:", data);
-    
-    if (data && data.success) {
-      return { success: true, data };
-    } else {
-      const errorMsg = data?.error || data?.message || 'Failed to process recording';
-      console.error("Transcription failed:", errorMsg);
-      return { 
-        success: false, 
-        error: errorMsg 
+        error: `Error processing recording: ${error.message || 'Unknown error'}`
       };
     }
   } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.error('Transcription request timed out');
-      return {
-        success: false,
-        error: 'Request timed out while processing recording'
-      };
-    }
-    
     console.error('Error sending audio for transcription:', error);
     return { 
       success: false, 
