@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { JournalHeader } from '@/components/journal/JournalHeader';
@@ -334,6 +333,10 @@ export default function Journal() {
         isLoading={isLoading} 
         selectedEntryId={directEntryId}
         processingEntries={processingEntries}
+        onStartRecording={handleCreateJournal}
+        onRefresh={handleRefresh}
+        connectionStatus={connectionStatus}
+        loadError={loadError}
       />
     </div>
   );

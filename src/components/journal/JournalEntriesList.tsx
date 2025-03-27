@@ -10,23 +10,30 @@ import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
-  loading: boolean;
-  processingEntries?: string[]; // Entries that are currently being processed
-  onStartRecording: () => void;
+  loading?: boolean;
+  isLoading?: boolean;
+  processingEntries?: string[];
+  onStartRecording?: () => void;
   onRefresh?: () => void;
   connectionStatus?: 'connected' | 'checking' | 'error';
   loadError?: string | null;
+  selectedEntryId?: number | null;
 }
 
 const JournalEntriesList: React.FC<JournalEntriesListProps> = ({ 
   entries, 
   loading,
+  isLoading,
   processingEntries = [],
   onStartRecording,
   onRefresh,
   connectionStatus = 'connected',
-  loadError
+  loadError,
+  selectedEntryId
 }) => {
+  // Use either loading or isLoading prop (for backward compatibility)
+  const isLoadingState = loading || isLoading;
+  
   if (connectionStatus === 'checking') {
     return (
       <div className="flex flex-col items-center justify-center space-y-4 my-12">
@@ -58,7 +65,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     );
   }
 
-  if (loading) {
+  if (isLoadingState) {
     return (
       <div className="space-y-6">
         {[1, 2, 3].map((i) => (
@@ -79,7 +86,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     );
   }
   
-  if (loadError && !loading) {
+  if (loadError && !isLoadingState) {
     return (
       <div className="flex flex-col items-center justify-center space-y-4 my-12 p-6 border rounded-lg border-destructive bg-destructive/10">
         <p className="text-destructive font-medium">Error loading entries</p>
@@ -101,7 +108,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   }
 
   if (entries.length === 0 && processingEntries.length === 0) {
-    return <EmptyJournalState onStartRecording={onStartRecording} />;
+    return onStartRecording ? <EmptyJournalState onStartRecording={onStartRecording} /> : null;
   }
 
   return (
@@ -139,7 +146,11 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
 
         {/* Actual entries - don't hide these while loading more entries */}
         {entries.map((entry) => (
-          <JournalEntryCard key={`entry-${entry.id}`} entry={entry} />
+          <JournalEntryCard 
+            key={`entry-${entry.id}`} 
+            entry={entry}
+            isSelected={selectedEntryId === entry.id}
+          />
         ))}
       </AnimatePresence>
       {entries.length > 0 && connectionStatus === 'connected' && (

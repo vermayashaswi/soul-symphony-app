@@ -10,11 +10,12 @@ import { EmotionBadge } from '@/components/EmotionBadge';
 import { Badge } from '@/components/ui/badge';
 
 interface JournalSearchProps {
-  userId: string | undefined;
+  userId?: string;
   onSelectEntry?: (entryId: number) => void;
+  onSearch: (query: string) => void;
 }
 
-export function JournalSearch({ userId, onSelectEntry }: JournalSearchProps) {
+export function JournalSearch({ userId, onSelectEntry, onSearch }: JournalSearchProps) {
   const [inputValue, setInputValue] = useState('');
   const { searchResults, isSearching, searchQuery, search, clearResults } = useSearch(userId);
 
@@ -22,6 +23,7 @@ export function JournalSearch({ userId, onSelectEntry }: JournalSearchProps) {
     e.preventDefault();
     if (inputValue.trim()) {
       search(inputValue);
+      onSearch(inputValue);
     }
   };
 
