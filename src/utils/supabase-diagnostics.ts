@@ -47,21 +47,29 @@ export const diagnoseDatabaseIssues = async () => {
   const errorDetails: string[] = [];
   
   try {
-    // Check database connection with timeout guard
+    // Check database connection with timeout using Promise.race
     try {
-      const { data: dbCheck, error: dbError } = await supabase
+      const dbPromise = supabase
         .from('profiles')
         .select('id')
-        .limit(1)
-        .abortSignal(AbortSignal.timeout(8000)); // 8 second timeout
+        .limit(1);
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timed out')), 8000);
+      });
+      
+      const { data: dbCheck, error: dbError } = await Promise.race([
+        dbPromise,
+        timeoutPromise.then(() => { throw new Error('Database connection timed out'); })
+      ]) as any;
       
       if (dbError) {
         errorDetails.push(`Database connection: ${dbError.message}`);
       } else {
         results.database = true;
       }
-    } catch (timeoutErr) {
-      errorDetails.push('Database connection: Request timed out');
+    } catch (timeoutErr: any) {
+      errorDetails.push(`Database connection: ${timeoutErr.message || 'Request timed out'}`);
     }
     
     // Only continue checks if database is accessible
@@ -74,17 +82,29 @@ export const diagnoseDatabaseIssues = async () => {
         errorDetails.push(`Authentication: ${authError.message}`);
       }
       
-      // Check journal table
-      const { data: journalCheck, error: journalError } = await supabase
-        .from('Journal Entries')
-        .select('count')
-        .limit(1)
-        .abortSignal(AbortSignal.timeout(5000));
+      // Check journal table using Promise.race for timeout
+      try {
+        const journalPromise = supabase
+          .from('Journal Entries')
+          .select('count')
+          .limit(1);
+          
+        const journalTimeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timed out')), 5000);
+        });
         
-      if (journalError) {
-        errorDetails.push(`Journal table: ${journalError.message}`);
-      } else {
-        results.journalTable = true;
+        const { data: journalCheck, error: journalError } = await Promise.race([
+          journalPromise,
+          journalTimeoutPromise.then(() => { throw new Error('Journal table check timed out'); })
+        ]) as any;
+        
+        if (journalError) {
+          errorDetails.push(`Journal table: ${journalError.message}`);
+        } else {
+          results.journalTable = true;
+        }
+      } catch (journalErr: any) {
+        errorDetails.push(`Journal table: ${journalErr.message || 'Check timed out'}`);
       }
       
       // Check audio bucket
@@ -97,14 +117,20 @@ export const diagnoseDatabaseIssues = async () => {
       
       // Only check the following if previous checks pass
       if (results.auth && results.journalTable) {
-        // Check edge functions with reduced timeout
+        // Check edge functions with reduced timeout using Promise.race
         try {
-          const functionSignal = AbortSignal.timeout(5000);
-          
-          const { data: functionData, error: functionError } = await supabase.functions.invoke('transcribe-audio', {
-            body: { test: true },
-            signal: functionSignal
+          const functionPromise = supabase.functions.invoke('transcribe-audio', {
+            body: { test: true }
           });
+          
+          const functionTimeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Request timed out')), 5000);
+          });
+          
+          const { data: functionData, error: functionError } = await Promise.race([
+            functionPromise,
+            functionTimeoutPromise.then(() => { throw new Error('Edge functions check timed out'); })
+          ]) as any;
           
           if (functionError) {
             errorDetails.push(`Edge functions: ${functionError.message}`);
@@ -114,32 +140,32 @@ export const diagnoseDatabaseIssues = async () => {
             errorDetails.push('Edge functions: Unexpected response');
           }
         } catch (funcErr: any) {
-          if (funcErr.name === 'AbortError' || funcErr.name === 'TimeoutError') {
-            errorDetails.push('Edge functions: Request timed out');
-          } else {
-            errorDetails.push(`Edge functions: ${funcErr.message}`);
-          }
+          errorDetails.push(`Edge functions: ${funcErr.message || 'Check failed'}`);
         }
         
-        // Check embeddings table with reduced timeout
+        // Check embeddings table with reduced timeout using Promise.race
         try {
-          const embeddingsSignal = AbortSignal.timeout(5000);
-          
-          const { data: embeddingsCheck, error: embeddingsError } = await supabase
+          const embeddingsPromise = supabase
             .from('journal_embeddings')
             .select('count')
-            .limit(1)
-            .abortSignal(embeddingsSignal);
+            .limit(1);
             
+          const embeddingsTimeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Request timed out')), 5000);
+          });
+          
+          const { data: embeddingsCheck, error: embeddingsError } = await Promise.race([
+            embeddingsPromise,
+            embeddingsTimeoutPromise.then(() => { throw new Error('Embeddings check timed out'); })
+          ]) as any;
+          
           if (embeddingsError && !embeddingsError.message.includes('does not exist')) {
             errorDetails.push(`Embeddings table: ${embeddingsError.message}`);
           } else {
             results.embeddingsTable = !embeddingsError || embeddingsCheck !== null;
           }
         } catch (embedErr: any) {
-          if (embedErr.name === 'AbortError' || embedErr.name === 'TimeoutError') {
-            errorDetails.push('Embeddings check: Request timed out');
-          }
+          errorDetails.push(`Embeddings check: ${embedErr.message || 'Check failed'}`);
         }
       }
     }
