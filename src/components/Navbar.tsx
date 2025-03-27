@@ -1,14 +1,12 @@
+
 import { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, MessageCircle, BarChart2, Settings, Menu, X, LogOut, LogIn, BookOpen } from 'lucide-react';
+import { Home, MessageCircle, BarChart2, Settings, Menu, X, LogOut, LogIn } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth } from '@/contexts/auth';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { FeelsophyLogo } from '@/components/FeelsophyLogo';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,11 +20,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [scrolled, setScrolled] = useState(false);
   const { user, signOut } = useAuth();
-  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -41,6 +37,7 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Get user's initials for avatar
   const getUserInitials = () => {
     if (!user) return "?";
     
@@ -54,45 +51,13 @@ export function Navbar() {
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
-    { path: '/journal', label: 'Journal', icon: BookOpen },
+    { path: '/journal', label: 'Journal', icon: Home },
     { path: '/insights', label: 'Insights', icon: BarChart2 },
     { path: '/chat', label: 'AI Assistant', icon: MessageCircle },
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
   const closeMenu = () => setIsOpen(false);
-
-  const handleSignOut = async () => {
-    if (isSigningOut) return;
-    
-    try {
-      setIsSigningOut(true);
-      
-      console.log('Starting sign out process...');
-      
-      // First clear local storage to ensure no cached session data
-      try {
-        localStorage.removeItem('auth_success');
-        localStorage.removeItem('last_auth_time');
-        const storageKeyPrefix = 'sb-' + window.location.hostname.split('.')[0];
-        localStorage.removeItem(`${storageKeyPrefix}-auth-token`);
-      } catch (e) {
-        console.warn('Could not clear localStorage but continuing:', e);
-      }
-      
-      // Call the context's signOut first for state management
-      await signOut();
-      
-      toast.success('Successfully signed out');
-      closeMenu();
-      navigate('/');
-    } catch (error) {
-      console.error("Error signing out:", error);
-      toast.error("Error signing out. Please try again.");
-    } finally {
-      setIsSigningOut(false);
-    }
-  };
 
   return (
     <nav 
@@ -107,8 +72,9 @@ export function Navbar() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
+            className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center"
           >
-            <FeelsophyLogo size="md" withText={false} />
+            <span className="text-white font-bold text-lg">F</span>
           </motion.div>
           <motion.span 
             initial={{ opacity: 0, x: -10 }}
@@ -120,6 +86,7 @@ export function Navbar() {
           </motion.span>
         </Link>
 
+        {/* Desktop navigation */}
         <div className="hidden md:flex items-center gap-1">
           {navItems.map((item) => (
             <Link
@@ -163,9 +130,9 @@ export function Navbar() {
                     <span>Settings</span>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
+                <DropdownMenuItem onClick={signOut}>
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>{isSigningOut ? 'Signing out...' : 'Log out'}</span>
+                  <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -179,6 +146,7 @@ export function Navbar() {
           )}
         </div>
 
+        {/* Mobile menu button */}
         <div className="md:hidden flex items-center gap-2">
           {user ? (
             <DropdownMenu>
@@ -193,9 +161,9 @@ export function Navbar() {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}>
+                <DropdownMenuItem onClick={signOut}>
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>{isSigningOut ? 'Signing out...' : 'Log out'}</span>
+                  <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -222,6 +190,7 @@ export function Navbar() {
         </div>
       </div>
 
+      {/* Mobile menu */}
       {isMobile && (
         <motion.div
           initial={{ height: 0, opacity: 0 }}

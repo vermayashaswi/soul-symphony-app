@@ -1,38 +1,24 @@
 
 import { useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
-import { hasAuthParams } from "@/utils/auth-utils";
+import Navbar from "@/components/Navbar";
 
 const NotFound = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    console.log("NotFound: Current path:", location.pathname);
-    console.log("NotFound: Current hash:", location.hash ? "Present (length: " + location.hash.length + ")" : "None");
-    console.log("NotFound: Current search:", location.search || "None");
-    
-    // Check for auth-related parameters in URL using the utility function
-    if (hasAuthParams() || 
-        // Special cases
-        location.pathname.includes('google-callback') ||
-        location.pathname.includes('auth/callback')) {
-      console.log("NotFound: Detected auth redirect, navigating to callback handler");
-      
-      // Always redirect to the main callback route with the full hash/search intact
-      const callbackUrl = '/auth/callback' + location.search + location.hash;
-      console.log("Redirecting to:", callbackUrl);
-      navigate(callbackUrl, { replace: true });
-      return;
-    }
-  }, [location, navigate]);
+    console.error(
+      "404 Error: User attempted to access non-existent route:",
+      location.pathname
+    );
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen">
+      <Navbar />
+      
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center max-w-md px-4">
           <div className="mb-6 flex justify-center">

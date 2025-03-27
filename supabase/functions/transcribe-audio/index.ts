@@ -1,234 +1,412 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.22.0";
-import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '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';
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-// Setup CORS headers for browser requests
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function processBase64Chunks(base64String: string, chunkSize = 32768) {
+  if (!base64String || base64String.length === 0) {
+    console.error('Empty base64 string provided');
+    return new Uint8Array(0);
+  }
+
+  try {
+    const chunks: Uint8Array[] = [];
+    let position = 0;
+    
+    while (position < base64String.length) {
+      const chunk = base64String.slice(position, position + chunkSize);
+      const binaryChunk = atob(chunk);
+      const bytes = new Uint8Array(binaryChunk.length);
+      
+      for (let i = 0; i < binaryChunk.length; i++) {
+        bytes[i] = binaryChunk.charCodeAt(i);
+      }
+      
+      chunks.push(bytes);
+      position += chunkSize;
+    }
+
+    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error processing base64 chunks:', error);
+    throw new Error('Failed to process audio data');
+  }
+}
+
+async function generateEmbedding(text: string) {
+  try {
+    console.log('Generating embedding for text:', text.slice(0, 100) + '...');
+    
+    if (!openAIApiKey) {
+      console.error('OpenAI API key is missing or empty');
+      throw new Error('OpenAI API key is not configured');
+    }
+    
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: text
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error generating embedding:', error);
+      throw new Error('Failed to generate embedding');
+    }
+
+    const result = await response.json();
+    return result.data[0].embedding;
+  } catch (error) {
+    console.error('Error in generateEmbedding:', error);
+    throw error;
+  }
+}
+
+async function analyzeEmotions(text: string) {
+  try {
+    console.log('Analyzing emotions for text:', text.slice(0, 100) + '...');
+    
+    // First, fetch all emotions from our database
+    const { data: emotions, error: emotionsError } = await supabase
+      .from('emotions')
+      .select('name, description')
+      .order('id', { ascending: true });
+      
+    if (emotionsError) {
+      console.error('Error fetching emotions from database:', emotionsError);
+      throw new Error('Failed to fetch emotions data');
+    }
+    
+    // Create a prompt with all emotions
+    const emotionsPrompt = emotions.map(e => `- ${e.name}: ${e.description}`).join('\n');
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an emotional analysis expert. You will be given a journal entry text and a list of emotions. 
+            Analyze the text and identify which emotions from the provided list are present in the text. 
+            Rate each identified emotion with an intensity value from 0 to 1, where 0 means not present and 1 means strongly present.
+            Only include emotions that are actually expressed in the text with a score above 0.
+            Return ONLY a JSON object with emotion names as keys and intensity values as numbers.
+            
+            Here is the list of emotions to choose from:
+            ${emotionsPrompt}`
+          },
+          {
+            role: 'user',
+            content: `Analyze the emotions in this journal entry: "${text}"`
+          }
+        ],
+        temperature: 0.5,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error analyzing emotions:', error);
+      throw new Error('Failed to analyze emotions');
+    }
+
+    const result = await response.json();
+    const emotionsText = result.choices[0].message.content;
+    try {
+      const emotions = JSON.parse(emotionsText);
+      return emotions;
+    } catch (err) {
+      console.error('Error parsing emotions JSON:', err);
+      console.error('Raw emotions text:', emotionsText);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error in analyzeEmotions:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Create a Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseServiceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const openaiKey = Deno.env.get("OPENAI_API_KEY") || "";
-
-    if (!supabaseUrl || !supabaseServiceRole || !openaiKey) {
-      throw new Error("Missing environment variables");
+    const contentType = req.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      console.error('Invalid content type:', contentType);
+      throw new Error('Request must be JSON format');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRole);
+    const requestBody = await req.text();
+    if (!requestBody || requestBody.trim() === '') {
+      console.error('Empty request body');
+      throw new Error('Empty request body');
+    }
 
-    // Check if this is a test request and respond appropriately
+    let payload;
     try {
-      const testRequest = await req.clone().json();
-      if (testRequest && testRequest.test === true) {
-        console.log("Received test request, responding with success");
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: "Transcription service is functioning normally" 
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-        );
-      }
-    } catch (parseError) {
-      // Not a JSON request or not a test request, continue with normal processing
-      console.log("Not a test request, continuing with normal processing");
+      payload = JSON.parse(requestBody);
+    } catch (error) {
+      console.error('Error parsing JSON:', error, 'Body:', requestBody.slice(0, 100));
+      throw new Error('Invalid JSON payload');
     }
 
-    // Determine if this is a form data request or a JSON request
-    let file: File | null = null;
-    let userId: string | null = null;
-    let audioBase64: string | null = null;
-    let audioUrl: string | null = null;  // Store audio URL if provided
-
-    // Check if the request body is form data
-    const contentType = req.headers.get("content-type") || "";
+    const { audio, userId } = payload;
     
-    if (contentType.includes("multipart/form-data")) {
-      try {
-        console.log("Processing multipart form data request");
-        const formData = await req.formData();
-        file = formData.get("file") as File;
-        userId = formData.get("userId") as string;
-        audioUrl = formData.get("audioUrl") as string;
-      } catch (formError) {
-        console.error("Error parsing form data:", formError);
-        throw new Error("Failed to parse form data");
-      }
-    } else {
-      // Assume JSON request
-      try {
-        console.log("Processing JSON request");
-        const { audio, userId: id, audioUrl: url } = await req.json();
-        audioBase64 = audio;
-        userId = id;
-        audioUrl = url;
-      } catch (jsonError) {
-        console.error("Error parsing JSON data:", jsonError);
-        throw new Error("Failed to parse JSON data");
-      }
+    if (!audio) {
+      console.error('No audio data provided in payload');
+      throw new Error('No audio data provided');
     }
 
-    // Validate required data
-    if ((!file && !audioBase64) || !userId) {
-      throw new Error("Audio data and User ID are required");
+    if (!openAIApiKey) {
+      console.error('OpenAI API key is missing or empty in environment variables');
+      throw new Error('OpenAI API key is not configured. Please set the OPENAI_API_KEY secret in the Supabase dashboard.');
     }
 
-    // Convert base64 to file if needed
-    if (audioBase64 && !file) {
-      console.log("Converting base64 to file");
-      const binaryString = atob(audioBase64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      file = new File([bytes.buffer], "audio.webm", { type: "audio/webm" });
+    console.log("Received audio data, processing...");
+    console.log("User ID:", userId);
+    console.log("Audio data length:", audio.length);
+    console.log("OpenAI API Key available:", !!openAIApiKey);
+    
+    const binaryAudio = processBase64Chunks(audio);
+    console.log("Processed binary audio size:", binaryAudio.length);
+
+    if (binaryAudio.length === 0) {
+      throw new Error('Failed to process audio data - empty result');
     }
-
-    if (!file) {
-      throw new Error("Could not process audio data");
-    }
-
-    // Check file type
-    const allowedFileTypes = ["audio/webm", "audio/ogg", "audio/mpeg", "audio/wav"];
-    if (!allowedFileTypes.includes(file.type)) {
-      throw new Error("Invalid file type. Only webm, ogg, mp3, and wav are allowed.");
-    }
-
-    // Call the OpenAI transcription API
-    console.log(`Transcribing audio file (${file.size} bytes) for user ${userId}`);
-    const configuration = new Configuration({ apiKey: openaiKey });
-    const openai = new OpenAIApi(configuration);
-
+    
+    const timestamp = Date.now();
+    const filename = `journal-entry-${userId ? userId + '-' : ''}${timestamp}.webm`;
+    
+    let audioUrl = null;
     try {
-      console.log("Sending file to OpenAI for transcription");
-      const transcriptionResponse = await openai.createTranscription(
-        file,
-        "whisper-1"
-      );
-
-      const transcription = transcriptionResponse.data.text;
-      console.log("Received transcription from OpenAI");
-
-      // Create a new journal entry in Supabase
-      console.log("Creating journal entry in database");
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const journalBucket = buckets?.find(b => b.name === 'journal-audio-entries');
       
-      // Prepare entry data object
-      const entryData: any = {
-        user_id: userId,
-        "transcription text": transcription,
-        "refined text": transcription, // Initialize refined text as the same as transcription
-        created_at: new Date().toISOString()
-      };
-      
-      // Add audio_url if provided
-      if (audioUrl) {
-        entryData.audio_url = audioUrl;
-      }
-      
-      const { data: journalEntry, error: journalError } = await supabase
-        .from("Journal Entries")
-        .insert([entryData])
-        .select()
-        .single();
-
-      if (journalError) {
-        console.error("Error creating journal entry:", journalError);
-        throw new Error("Failed to create journal entry");
-      }
-
-      console.log(`Created journal entry with ID: ${journalEntry.id}`);
-
-      // Immediately generate embedding for the new journal entry
-      try {
-        console.log("Generating embedding for the transcription");
-        // Initialize OpenAI for embedding creation
-        const embeddingResponse = await openai.createEmbedding({
-          model: "text-embedding-ada-002",
-          input: transcription.trim(),
+      if (!journalBucket) {
+        console.log('Creating journal-audio-entries bucket');
+        await supabase.storage.createBucket('journal-audio-entries', {
+          public: true
         });
+      }
+      
+      const { data: storageData, error: storageError } = await supabase
+        .storage
+        .from('journal-audio-entries')
+        .upload(filename, binaryAudio, {
+          contentType: 'audio/webm',
+          cacheControl: '3600'
+        });
+        
+      if (storageError) {
+        console.error('Error uploading audio to storage:', storageError);
+        console.error('Storage error details:', JSON.stringify(storageError));
+      } else {
+        const { data: urlData } = await supabase
+          .storage
+          .from('journal-audio-entries')
+          .getPublicUrl(filename);
+          
+        audioUrl = urlData?.publicUrl;
+        console.log("Audio stored successfully:", audioUrl);
+      }
+    } catch (err) {
+      console.error("Storage error:", err);
+    }
+    
+    const formData = new FormData();
+    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
+    formData.append('file', blob, 'audio.webm');
+    formData.append('model', 'whisper-1');
+    formData.append('response_format', 'json');
 
-        if (!embeddingResponse.data || !embeddingResponse.data.data || embeddingResponse.data.data.length === 0) {
-          throw new Error(`OpenAI API returned an invalid response for embedding creation`);
-        }
+    console.log("Sending to Whisper API for high-quality transcription using the latest model...");
+    
+    try {
+      const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+        },
+        body: formData,
+      });
 
-        const [{ embedding }] = embeddingResponse.data.data;
+      if (!whisperResponse.ok) {
+        const errorText = await whisperResponse.text();
+        console.error("Whisper API error:", errorText);
+        throw new Error(`Whisper API error: ${errorText}`);
+      }
 
-        // Check if the journal_embeddings table exists
+      const whisperResult = await whisperResponse.json();
+      const transcribedText = whisperResult.text;
+      
+      console.log("Transcription successful:", transcribedText);
+
+      const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. Preserve the emotional tone and personal nature of the content.'
+            },
+            {
+              role: 'user',
+              content: `Here is a multilingual voice journal data of a user in their local language. Please translate it to English logically "${transcribedText}"`
+            }
+          ],
+        }),
+      });
+
+      if (!gptResponse.ok) {
+        const errorText = await gptResponse.text();
+        console.error("GPT API error:", errorText);
+        throw new Error(`GPT API error: ${errorText}`);
+      }
+
+      const gptResult = await gptResponse.json();
+      const refinedText = gptResult.choices[0].message.content;
+      
+      console.log("Refinement successful:", refinedText);
+
+      const emotions = await analyzeEmotions(refinedText);
+      console.log("Emotion analysis:", emotions);
+
+      const audioDuration = Math.floor(binaryAudio.length / 16000);
+
+      let entryId = null;
+      if (transcribedText) {
         try {
-          const { data: tableExists, error: tableError } = await supabase
-            .from('journal_embeddings')
-            .select('id')
-            .limit(1);
+          const { data: entryData, error: insertError } = await supabase
+            .from('Journal Entries')
+            .insert([{ 
+              "transcription text": transcribedText,
+              "refined text": refinedText,
+              "audio_url": audioUrl,
+              "user_id": userId || null,
+              "duration": audioDuration,
+              "emotions": emotions
+            }])
+            .select();
+              
+          if (insertError) {
+            console.error('Error creating entry in database:', insertError);
+            console.error('Error details:', JSON.stringify(insertError));
+            throw new Error(`Database insert error: ${insertError.message}`);
+          } else if (entryData && entryData.length > 0) {
+            console.log("Journal entry saved to database:", entryData[0].id);
+            entryId = entryData[0].id;
             
-          // If table doesn't exist, attempt to create it
-          if (tableError) {
-            console.log("Embedding table might not exist, attempting to create it");
-            
-            await supabase.rpc('create_embeddings_table', {
-              sql: `
-                CREATE TABLE IF NOT EXISTS journal_embeddings (
-                  id BIGSERIAL PRIMARY KEY,
-                  journal_entry_id BIGINT NOT NULL,
-                  content TEXT NOT NULL,
-                  embedding VECTOR(1536),
-                  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-                );
-              `
-            });
+            try {
+              const embedding = await generateEmbedding(refinedText);
+              
+              const { error: embeddingError } = await supabase
+                .from('journal_embeddings')
+                .insert([{ 
+                  journal_entry_id: entryId,
+                  content: refinedText,
+                  embedding: embedding
+                }]);
+                
+              if (embeddingError) {
+                console.error('Error storing embedding:', embeddingError);
+                console.error('Embedding error details:', JSON.stringify(embeddingError));
+              } else {
+                console.log("Embedding stored successfully for entry:", entryId);
+              }
+            } catch (embErr) {
+              console.error("Error generating embedding:", embErr);
+            }
+          } else {
+            console.error("No data returned from insert operation");
+            throw new Error("Failed to create journal entry in database");
           }
-        } catch (tableErr) {
-          console.error("Error checking/creating embedding table:", tableErr);
+        } catch (dbErr) {
+          console.error("Database error:", dbErr);
+          throw new Error(`Database error: ${dbErr.message}`);
         }
-
-        // Store the embedding in the database
-        const { error: embeddingError } = await supabase
-          .from('journal_embeddings')
-          .insert({
-            journal_entry_id: journalEntry.id,
-            embedding,
-            content: transcription
-          });
-
-        if (embeddingError) {
-          console.error("Error storing embedding:", embeddingError);
-        } else {
-          console.log(`Successfully stored embedding for journal entry ${journalEntry.id}`);
-        }
-      } catch (embeddingError) {
-        console.error("Error creating or storing embedding:", embeddingError);
+      } else {
+        throw new Error("Transcription failed - no text generated");
       }
 
       return new Response(
-        JSON.stringify({ 
-          data: { 
-            transcription, 
-            entryId: journalEntry.id,
-            audioUrl: audioUrl || null
-          }, 
-          success: true 
+        JSON.stringify({
+          transcription: transcribedText,
+          refinedText: refinedText,
+          audioUrl: audioUrl,
+          entryId: entryId,
+          emotions: emotions,
+          success: true
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       );
-    } catch (openaiError) {
-      console.error("OpenAI transcription error:", openaiError);
-      throw new Error(`Transcription failed: ${openaiError.message || "OpenAI API error"}`);
+    } catch (apiError) {
+      console.error("API error:", apiError);
+      
+      return new Response(
+        JSON.stringify({ 
+          error: apiError.message, 
+          success: false, 
+          message: "API error occurred, but edge function is returning 200 to avoid CORS issues" 
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
   } catch (error) {
     console.error("Error in transcribe-audio function:", error);
+    
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      JSON.stringify({ 
+        error: error.message, 
+        success: false,
+        message: "Error occurred, but edge function is returning 200 to avoid CORS issues"
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
     );
   }
 });

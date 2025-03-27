@@ -1,170 +1,87 @@
-import { supabase, createUserStoragePath } from '@/integrations/supabase/client';
+
 import { toast } from 'sonner';
-import { processAudioBlobForTranscription } from './audio/transcription-service';
+import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
+import { verifyUserAuthentication } from './audio/auth-utils';
+import { sendAudioForTranscription } from './audio/transcription-service';
 
 /**
- * Uploads an audio blob to the storage bucket
- * @param audioBlob Audio blob to upload
- * @param userId User ID for the owner of the audio
- * @param filename Optional filename override (default: generates timestamped name)
- * @returns Promise resolving to the URL of the uploaded file or null if failed
+ * Processes an audio recording for transcription and analysis
+ * Returns immediately with a temporary ID while processing continues in background
  */
-export const uploadAudioToStorage = async (
-  audioBlob: Blob,
-  userId: string,
-  filename?: string
-): Promise<string | null> => {
-  if (!audioBlob || !userId) {
-    console.error('Missing required parameters for audio upload');
-    return null;
-  }
-  
-  try {
-    // Create file path with user ID as folder for isolation
-    const generatedFilename = filename || `recording-${Date.now()}.webm`;
-    const filePath = createUserStoragePath(userId, generatedFilename);
-    
-    console.log('Uploading audio to journal-audio-entries bucket, path:', filePath);
-    
-    const { data, error } = await supabase.storage
-      .from('journal-audio-entries')
-      .upload(filePath, audioBlob, {
-        contentType: 'audio/webm',
-        upsert: true
-      });
-      
-    if (error) {
-      console.error('Error uploading audio:', error);
-      toast.error('Failed to upload audio recording');
-      return null;
-    }
-    
-    console.log('Audio file uploaded successfully:', data.path);
-    return filePath;
-  } catch (err) {
-    console.error('Error in uploadAudioToStorage:', err);
-    toast.error('Error uploading audio file');
-    return null;
-  }
-};
-
-/**
- * Process a recording for transcription and storage
- * @param audioBlob Audio blob to process
- * @param userId User ID for the owner of the audio
- * @returns Promise resolving to an object with success flag and data
- */
-export const processRecording = async (
-  audioBlob: Blob,
-  userId: string
-): Promise<{
+export async function processRecording(audioBlob: Blob | null, userId: string | undefined): Promise<{
   success: boolean;
   tempId?: string;
-  entryId?: number;
   error?: string;
-}> => {
-  if (!audioBlob || !userId) {
-    return {
-      success: false,
-      error: 'Missing audio data or user ID'
-    };
-  }
-
-  try {
-    console.log('Processing recording, blob size:', audioBlob.size, 'type:', audioBlob.type);
-    
-    // Generate a temporary ID for tracking this processing job
-    const tempId = `temp-${Date.now()}`;
-    
-    // Upload audio to storage
-    const audioPath = await uploadAudioToStorage(audioBlob, userId);
-    
-    if (!audioPath) {
-      return {
-        success: false,
-        tempId,
-        error: 'Failed to upload audio to storage'
-      };
-    }
-    
-    console.log('Audio uploaded successfully. Path:', audioPath);
-    
-    // Process audio for transcription
-    const transcriptionResult = await processAudioBlobForTranscription(audioBlob, userId);
-    
-    if (!transcriptionResult.success) {
-      console.error('Transcription failed:', transcriptionResult.error);
-      return {
-        success: false,
-        tempId,
-        error: transcriptionResult.error || 'Transcription failed'
-      };
-    }
-    
-    console.log('Transcription successful:', transcriptionResult.data);
-    
-    // Update the journal entry with the audio path if needed
-    if (transcriptionResult.data?.entryId) {
-      try {
-        const { error: updateError } = await supabase
-          .from('Journal Entries')
-          .update({ audio_url: audioPath })
-          .eq('id', transcriptionResult.data.entryId);
-          
-        if (updateError) {
-          console.error('Error updating audio path in journal entry:', updateError);
-        }
-      } catch (updateErr) {
-        console.error('Error in update operation:', updateErr);
-      }
-      
-      return {
-        success: true,
-        tempId,
-        entryId: transcriptionResult.data.entryId
-      };
-    }
-    
-    // Otherwise just return success with the temp ID
-    return {
-      success: true,
-      tempId
-    };
-  } catch (error: any) {
-    console.error('Error in processRecording:', error);
-    return {
-      success: false,
-      error: error.message || 'Unknown error processing recording'
-    };
-  }
-};
-
-/**
- * Download an audio file from storage
- * @param filePath Path to the audio file in storage
- * @returns Promise resolving to a Blob or null if failed
- */
-export const downloadAudioFromStorage = async (filePath: string): Promise<Blob | null> => {
-  if (!filePath) {
-    console.error('No file path provided for download');
-    return null;
+}> {
+  // 1. Validate the audio blob
+  const validation = validateAudioBlob(audioBlob);
+  if (!validation.isValid) {
+    toast.error(validation.errorMessage);
+    return { success: false, error: validation.errorMessage };
   }
   
   try {
-    console.log('Downloading audio file:', filePath);
+    // Generate a temporary ID for this recording
+    const tempId = `temp-${Date.now()}`;
     
-    const { data, error } = await supabase.storage
-      .from('journal-audio-entries')
-      .download(filePath);
-      
-    if (error) {
-      console.error('Error downloading audio:', error);
-      return null;
+    // Start processing in background
+    toast.loading('Processing your journal entry with advanced AI...', {
+      id: tempId,
+      duration: Infinity, // Toast remains until explicitly dismissed
+    });
+    
+    // Launch the processing without awaiting it
+    processRecordingInBackground(audioBlob, userId, tempId);
+    
+    // Return immediately with the temp ID
+    return { success: true, tempId };
+  } catch (error: any) {
+    console.error('Error initiating recording process:', error);
+    toast.error(`Error initiating recording process: ${error.message || 'Unknown error'}`);
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}
+
+/**
+ * Processes a recording in the background without blocking the UI
+ */
+async function processRecordingInBackground(audioBlob: Blob | null, userId: string | undefined, toastId: string): Promise<void> {
+  try {
+    // 1. Convert blob to base64
+    const base64Audio = await blobToBase64(audioBlob!);
+    
+    // Validate base64 data
+    if (!base64Audio || base64Audio.length < 100) {
+      console.error('Invalid base64 audio data');
+      toast.dismiss(toastId);
+      toast.error('Invalid audio data. Please try again.');
+      return;
     }
     
-    return data;
-  } catch (err) {
-    console.error('Error in downloadAudioFromStorage:', err);
-    return null;
+    // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
+    const base64String = base64Audio.split(',')[1]; 
+    
+    // 2. Verify user authentication
+    const authStatus = await verifyUserAuthentication();
+    if (!authStatus.isAuthenticated) {
+      toast.dismiss(toastId);
+      toast.error(authStatus.error);
+      return;
+    }
+
+    // 3. Send audio for transcription
+    const result = await sendAudioForTranscription(base64String, authStatus.userId!);
+    
+    toast.dismiss(toastId);
+    
+    if (result.success) {
+      toast.success('Journal entry saved successfully!');
+    } else {
+      toast.error(result.error || 'Failed to process recording');
+    }
+  } catch (error: any) {
+    console.error('Error processing recording in background:', error);
+    toast.dismiss(toastId);
+    toast.error(`Error processing recording: ${error.message || 'Unknown error'}`);
   }
-};
+}

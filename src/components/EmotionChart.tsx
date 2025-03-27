@@ -13,6 +13,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 
+// Type definitions for emotion data
 type EmotionData = {
   day: string;
   [key: string]: number | string;
@@ -32,30 +33,32 @@ interface EmotionChartProps {
   aggregatedData?: AggregatedEmotionData;
 }
 
+// Color mapping for emotions
 const EMOTION_COLORS: Record<string, string> = {
   joy: '#4299E1',
   happiness: '#48BB78',
-  gratitude: '#0EA5E9',
-  calm: '#8B5CF6',
+  gratitude: '#38B2AC',
+  calm: '#9F7AEA',
   anxiety: '#F56565',
-  sadness: '#3B82F6',
-  anger: '#F97316',
-  fear: '#EF4444',
-  excitement: '#FBBF24',
-  love: '#EC4899',
-  stress: '#F97316',
-  surprise: '#F59E0B',
-  confusion: '#8B5CF6',
-  disappointment: '#6366F1',
-  pride: '#3B82F6',
-  shame: '#DC2626',
-  guilt: '#B45309',
-  hope: '#2563EB',
-  boredom: '#4B5563',
-  disgust: '#65A30D',
-  contentment: '#0D9488'
+  sadness: '#718096',
+  anger: '#ED8936',
+  fear: '#E53E3E',
+  excitement: '#ECC94B',
+  love: '#F687B3',
+  stress: '#DD6B20',
+  surprise: '#D69E2E',
+  confusion: '#805AD5',
+  disappointment: '#A0AEC0',
+  pride: '#3182CE',
+  shame: '#822727',
+  guilt: '#744210',
+  hope: '#2B6CB0',
+  boredom: '#A0AEC0',
+  disgust: '#62783E',
+  contentment: '#319795'
 };
 
+// Get color for an emotion, with fallback
 const getEmotionColor = (emotion: string): string => {
   const normalized = emotion.toLowerCase();
   return EMOTION_COLORS[normalized] || '#A3A3A3';
@@ -73,12 +76,15 @@ export function EmotionChart({
     { id: 'bubble', label: 'Emotion Bubbles' },
   ];
   
+  // Process emotion data for bubble chart
   const getBubbleData = (): EmotionBubbleData[] => {
     if (!aggregatedData) return [];
     
+    // Combine all emotions from aggregatedData
     const emotionScores: Record<string, number> = {};
     
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
+      // Sum up all values for this emotion
       const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
       emotionScores[emotion] = totalScore;
     });
@@ -92,17 +98,21 @@ export function EmotionChart({
       .sort((a, b) => b.value - a.value);
   };
   
+  // Process aggregated data for line chart
   const getLineChartData = (): EmotionData[] => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
       return [];
     }
     
+    // Get top 3 emotions based on frequency and average score
     const emotionTotals: Record<string, number> = {};
     const dateMap: Map<string, Record<string, number>> = new Map();
     
+    // Calculate totals for each emotion to find top emotions
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       emotionTotals[emotion] = dataPoints.reduce((sum, point) => sum + point.value, 0);
       
+      // Also populate the dateMap for creating the chart data
       dataPoints.forEach(point => {
         if (!dateMap.has(point.date)) {
           dateMap.set(point.date, {});
@@ -112,17 +122,20 @@ export function EmotionChart({
       });
     });
     
+    // Get top 3 emotions by total score
     const topEmotions = Object.entries(emotionTotals)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+      .slice(0, 3)
       .map(([emotion]) => emotion);
     
+    // Convert the dateMap to an array of data points for the chart
     return Array.from(dateMap.entries())
       .map(([date, emotions]) => {
         const dataPoint: EmotionData = { 
           day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
         };
         
+        // Add the top emotions to the data point
         topEmotions.forEach(emotion => {
           dataPoint[emotion] = emotions[emotion] || 0;
         });
@@ -136,6 +149,7 @@ export function EmotionChart({
       });
   };
 
+  // Memoize chart data
   const bubbleData = useMemo(() => getBubbleData(), [aggregatedData]);
   const lineData = useMemo(() => getLineChartData(), [aggregatedData]);
   
@@ -148,45 +162,40 @@ export function EmotionChart({
       );
     }
     
+    // Get the emotion names that are present in the data
     const emotions = Object.keys(lineData[0]).filter(key => key !== 'day');
     
     return (
-      <div className="flex flex-col h-full">
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart
-            data={lineData}
-            margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-            <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
-            <YAxis stroke="#888" fontSize={12} tickMargin={10} domain={[0, 'auto']} />
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.8)', 
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
-                border: 'none' 
-              }} 
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart
+          data={lineData}
+          margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+          <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
+          <YAxis stroke="#888" fontSize={12} tickMargin={10} domain={[0, 10]} />
+          <Tooltip 
+            contentStyle={{ 
+              backgroundColor: 'rgba(255, 255, 255, 0.8)', 
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
+              border: 'none' 
+            }} 
+          />
+          {emotions.map((emotion, index) => (
+            <Line
+              key={emotion}
+              type="monotone"
+              dataKey={emotion}
+              stroke={getEmotionColor(emotion)}
+              strokeWidth={3}
+              dot={{ r: 4 }}
+              activeDot={{ r: 6 }}
+              name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
             />
-            {emotions.map((emotion, index) => (
-              <Line
-                key={emotion}
-                type="monotone"
-                dataKey={emotion}
-                stroke={getEmotionColor(emotion)}
-                strokeWidth={3}
-                dot={{ r: 4 }}
-                activeDot={{ r: 6 }}
-                name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
-        
-        <div className="mt-4 text-center text-xs text-muted-foreground">
-          * Only top 5 emotions are shown in line chart for readability
-        </div>
-      </div>
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
     );
   };
 
@@ -199,125 +208,50 @@ export function EmotionChart({
       );
     }
     
+    // Calculate bubble positions to avoid overlap
     const calculateBubblePositions = (bubbles: EmotionBubbleData[]) => {
-      const containerWidth = 600;
-      const containerHeight = 300;
+      // Canvas dimensions
+      const canvasWidth = 400;
+      const canvasHeight = 300;
+      const minDistance = 80; // Minimum distance between bubble centers
       
-      // Calculate size scaling based on total score range
-      const maxValue = Math.max(...bubbles.map(b => b.value));
-      const minValue = Math.min(...bubbles.map(b => b.value));
-      const maxSize = Math.min(containerWidth, containerHeight) * 0.25;
-      const minSize = 40;
-      
-      const nodes: {x: number, y: number, size: number, vx: number, vy: number, name: string, value: number}[] = [];
-      
-      const columns = Math.ceil(Math.sqrt(bubbles.length));
-      const rows = Math.ceil(bubbles.length / columns);
-      const cellWidth = containerWidth / columns;
-      const cellHeight = containerHeight / rows;
+      // Calculate initial positions in a circular layout
+      const positions: {x: number, y: number, size: number}[] = [];
       
       bubbles.forEach((bubble, index) => {
-        // Calculate size based on score relative to the maximum score
-        // Normalize between minSize and maxSize
-        const sizeScale = maxValue === minValue 
-          ? 0.5 // If all values are the same, use mid-range size
-          : (bubble.value - minValue) / (maxValue - minValue);
-        const size = minSize + sizeScale * (maxSize - minSize);
+        // Scale bubble size proportionally to value
+        const maxSize = 100;
+        const minSize = 50;
+        const maxValue = Math.max(...bubbles.map(b => b.value));
+        const size = minSize + ((bubble.value / maxValue) * (maxSize - minSize));
         
-        const row = Math.floor(index / columns);
-        const col = index % columns;
+        // Initial position in a circle
+        const angle = (index / bubbles.length) * 2 * Math.PI;
+        const radius = Math.min(canvasWidth, canvasHeight) * 0.35;
+        const x = (canvasWidth / 2) + Math.cos(angle) * radius;
+        const y = (canvasHeight / 2) + Math.sin(angle) * radius;
         
-        const x = (col + 0.5) * cellWidth + (Math.random() - 0.5) * 20;
-        const y = (row + 0.5) * cellHeight + (Math.random() - 0.5) * 20;
-        
-        nodes.push({
-          x: Math.max(size/2, Math.min(containerWidth - size/2, x)),
-          y: Math.max(size/2, Math.min(containerHeight - size/2, y)),
-          size,
-          vx: 0,
-          vy: 0,
-          name: bubble.name,
-          value: bubble.value
-        });
+        positions.push({ x, y, size });
       });
       
-      const iterations = 50;
-      const repulsionStrength = 0.8;
-      const centerAttraction = 0.01;
-      
-      for (let i = 0; i < iterations; i++) {
-        for (let a = 0; a < nodes.length; a++) {
-          const nodeA = nodes[a];
-          
-          const centerX = containerWidth / 2;
-          const centerY = containerHeight / 2;
-          const toCenterX = centerX - nodeA.x;
-          const toCenterY = centerY - nodeA.y;
-          const distanceToCenter = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY);
-          
-          if (distanceToCenter > 0) {
-            nodeA.vx += (toCenterX / distanceToCenter) * centerAttraction * distanceToCenter;
-            nodeA.vy += (toCenterY / distanceToCenter) * centerAttraction * distanceToCenter;
-          }
-          
-          for (let b = a + 1; b < nodes.length; b++) {
-            const nodeB = nodes[b];
-            
-            const dx = nodeB.x - nodeA.x;
-            const dy = nodeB.y - nodeA.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const minDistance = (nodeA.size + nodeB.size) / 2;
-            
-            if (distance < minDistance) {
-              const force = repulsionStrength * (minDistance - distance) / distance;
-              
-              if (distance > 0) {
-                nodeA.vx -= dx * force / distance;
-                nodeA.vy -= dy * force / distance;
-                nodeB.vx += dx * force / distance;
-                nodeB.vy += dy * force / distance;
-              } else {
-                const angle = Math.random() * Math.PI * 2;
-                nodeA.vx -= Math.cos(angle) * 0.5;
-                nodeA.vy -= Math.sin(angle) * 0.5;
-                nodeB.vx += Math.cos(angle) * 0.5;
-                nodeB.vy += Math.sin(angle) * 0.5;
-              }
-            }
-          }
-        }
-        
-        for (const node of nodes) {
-          node.x += node.vx;
-          node.y += node.vy;
-          
-          node.vx *= 0.5;
-          node.vy *= 0.5;
-          
-          node.x = Math.max(node.size/2, Math.min(containerWidth - node.size/2, node.x));
-          node.y = Math.max(node.size/2, Math.min(containerHeight - node.size/2, node.y));
-        }
-      }
-      
-      return nodes.map((node) => ({
-        x: node.x,
-        y: node.y,
-        size: node.size,
-        value: node.value
-      }));
+      return positions;
     };
     
     const bubblePositions = calculateBubblePositions(bubbleData);
     
     return (
-      <div className="w-full h-[340px] flex flex-col items-center justify-center relative">
+      <div className="w-full h-[300px] flex flex-col items-center justify-center relative">
         <div className="absolute top-0 right-0 text-xs text-muted-foreground">
-          * Size of bubble represents emotion intensity across entries
+          * Size of bubble represents intensity
         </div>
         
-        <div className="relative w-full h-[300px] overflow-hidden rounded-lg bg-background/50 border border-muted/20">
+        {/* Container with boundary constraints */}
+        <div className="relative w-[320px] h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden">
           {bubbleData.map((item, index) => {
             const position = bubblePositions[index];
+            // Calculate constrained positions
+            const constrainedX = Math.max(position.size/2, Math.min(320 - position.size/2, position.x));
+            const constrainedY = Math.max(position.size/2, Math.min(250 - position.size/2, position.y));
             
             return (
               <motion.div
@@ -325,46 +259,43 @@ export function EmotionChart({
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ 
                   scale: 1, 
-                  opacity: 0.9,
-                  x: position.x - (position.size / 2),
-                  y: position.y - (position.size / 2)
+                  opacity: 1,
+                  x: [
+                    constrainedX - 5, 
+                    constrainedX + 5, 
+                    constrainedX
+                  ].map(x => Math.max(position.size/2, Math.min(320 - position.size/2, x))),
+                  y: [
+                    constrainedY - 5, 
+                    constrainedY + 5, 
+                    constrainedY
+                  ].map(y => Math.max(position.size/2, Math.min(250 - position.size/2, y)))
                 }}
                 transition={{ 
                   duration: 0.5, 
-                  delay: index * 0.05,
-                  type: "spring",
-                  stiffness: 100,
-                  damping: 15
-                }}
-                whileHover={{ 
-                  scale: 1.05, 
-                  opacity: 1,
-                  zIndex: 10,
-                  boxShadow: "0px 5px 15px rgba(0, 0, 0, 0.1)" 
+                  delay: index * 0.1,
+                  x: { repeat: Infinity, duration: 3 + index, repeatType: "reverse" },
+                  y: { repeat: Infinity, duration: 4 + index, repeatType: "reverse" }
                 }}
                 style={{
                   width: `${position.size}px`,
                   height: `${position.size}px`,
-                  position: 'absolute',
                   backgroundColor: item.color,
+                  position: 'absolute',
+                  left: constrainedX - (position.size / 2),
+                  top: constrainedY - (position.size / 2),
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'white',
-                  fontSize: position.size > 60 ? '16px' : '12px',
+                  fontSize: position.size > 70 ? '14px' : '12px',
                   fontWeight: 'bold',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  padding: '5px',
-                  wordBreak: 'break-word',
-                  lineHeight: '1.1',
+                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
                   zIndex: Math.floor(item.value)
                 }}
-                title={`${item.name}: ${item.value.toFixed(1)}`}
               >
-                {position.size >= 45 ? item.name : ''}
+                {item.name}
               </motion.div>
             );
           })}
@@ -375,9 +306,9 @@ export function EmotionChart({
 
   return (
     <div className={cn("w-full", className)}>
-      <div className="flex flex-wrap justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold mb-2">Soul-ubles</h3>
-        <div className="flex gap-2">
+      <div className="flex flex-wrap justify-between items-center mb-6">
+        <h3 className="text-xl font-semibold">Soul-ubles</h3>
+        <div className="flex gap-2 mt-2 sm:mt-0">
           {chartTypes.map((type) => (
             <button
               key={type.id}
@@ -401,7 +332,7 @@ export function EmotionChart({
       </div>
       
       {chartType === 'line' && lineData.length > 0 && (
-        <div className="flex flex-wrap justify-start gap-4 mt-4 text-sm">
+        <div className="flex flex-wrap justify-start gap-4 mt-4 text-sm text-muted-foreground">
           {Object.keys(lineData[0])
             .filter(key => key !== 'day')
             .map(emotion => (
@@ -410,7 +341,7 @@ export function EmotionChart({
                   className="w-3 h-3 rounded-full" 
                   style={{ backgroundColor: getEmotionColor(emotion) }}
                 ></div>
-                <span className="font-medium">{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
+                <span>{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
               </div>
             ))}
         </div>

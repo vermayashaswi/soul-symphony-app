@@ -9,65 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      chat_messages: {
-        Row: {
-          content: string
-          created_at: string
-          id: string
-          reference_entries: Json | null
-          sender: string
-          thread_id: string
-        }
-        Insert: {
-          content: string
-          created_at?: string
-          id?: string
-          reference_entries?: Json | null
-          sender: string
-          thread_id: string
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          id?: string
-          reference_entries?: Json | null
-          sender?: string
-          thread_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chat_messages_thread_id_fkey"
-            columns: ["thread_id"]
-            isOneToOne: false
-            referencedRelation: "chat_threads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      chat_threads: {
-        Row: {
-          created_at: string
-          id: string
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          title: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       emotions: {
         Row: {
           created_at: string | null
@@ -132,37 +73,29 @@ export type Database = {
           "transcription text"?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "fk_journal_entries_profile"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       journal_embeddings: {
         Row: {
           content: string
-          created_at: string
+          created_at: string | null
           embedding: string
           id: number
-          journal_entry_id: number
+          journal_entry_id: number | null
         }
         Insert: {
           content: string
-          created_at?: string
+          created_at?: string | null
           embedding: string
-          id?: never
-          journal_entry_id: number
+          id?: number
+          journal_entry_id?: number | null
         }
         Update: {
           content?: string
-          created_at?: string
+          created_at?: string | null
           embedding?: string
-          id?: never
-          journal_entry_id?: number
+          id?: number
+          journal_entry_id?: number | null
         }
         Relationships: [
           {
@@ -222,102 +155,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_queries: {
-        Row: {
-          created_at: string
-          embedding: string | null
-          id: string
-          message_id: string | null
-          query_text: string
-          thread_id: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          embedding?: string | null
-          id?: string
-          message_id?: string | null
-          query_text: string
-          thread_id?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          embedding?: string | null
-          id?: string
-          message_id?: string | null
-          query_text?: string
-          thread_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_queries_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "chat_messages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_queries_thread_id_fkey"
-            columns: ["thread_id"]
-            isOneToOne: false
-            referencedRelation: "chat_threads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_sessions: {
-        Row: {
-          created_at: string
-          device_type: string | null
-          entry_page: string | null
-          id: string
-          ip_address: string | null
-          is_active: boolean | null
-          last_active_page: string | null
-          last_activity: string | null
-          location: string | null
-          referrer: string | null
-          session_end: string | null
-          session_start: string
-          user_agent: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          device_type?: string | null
-          entry_page?: string | null
-          id?: string
-          ip_address?: string | null
-          is_active?: boolean | null
-          last_active_page?: string | null
-          last_activity?: string | null
-          location?: string | null
-          referrer?: string | null
-          session_end?: string | null
-          session_start?: string
-          user_agent?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          device_type?: string | null
-          entry_page?: string | null
-          id?: string
-          ip_address?: string | null
-          is_active?: boolean | null
-          last_active_page?: string | null
-          last_activity?: string | null
-          location?: string | null
-          referrer?: string | null
-          session_end?: string | null
-          session_start?: string
-          user_agent?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_subscriptions: {
         Row: {
           created_at: string | null
@@ -347,43 +184,178 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      mark_inactive_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      match_journal_entries:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: undefined
-          }
+      binary_quantize:
         | {
             Args: {
-              query_embedding: string
-              match_threshold: number
-              match_count: number
-              user_id_filter: string
+              "": string
             }
-            Returns: {
-              id: number
-              content: string
-              similarity: number
-            }[]
-          }
-      store_user_query:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: undefined
+            Returns: unknown
           }
         | {
             Args: {
-              user_id: string
-              query_text: string
-              query_embedding: string
-              thread_id: string
-              message_id?: string
+              "": unknown
+            }
+            Returns: unknown
+          }
+      halfvec_avg: {
+        Args: {
+          "": number[]
+        }
+        Returns: unknown
+      }
+      halfvec_out: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      halfvec_send: {
+        Args: {
+          "": unknown
+        }
+        Returns: string
+      }
+      halfvec_typmod_in: {
+        Args: {
+          "": unknown[]
+        }
+        Returns: number
+      }
+      hnsw_bit_support: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      hnsw_halfvec_support: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      hnsw_sparsevec_support: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      hnswhandler: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      ivfflat_bit_support: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      ivfflat_halfvec_support: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      ivfflathandler: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      l2_norm:
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: number
+          }
+      l2_normalize:
+        | {
+            Args: {
+              "": string
             }
             Returns: string
           }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: unknown
+          }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: unknown
+          }
+      sparsevec_out: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      sparsevec_send: {
+        Args: {
+          "": unknown
+        }
+        Returns: string
+      }
+      sparsevec_typmod_in: {
+        Args: {
+          "": unknown[]
+        }
+        Returns: number
+      }
+      vector_avg: {
+        Args: {
+          "": number[]
+        }
+        Returns: string
+      }
+      vector_dims:
+        | {
+            Args: {
+              "": string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              "": unknown
+            }
+            Returns: number
+          }
+      vector_norm: {
+        Args: {
+          "": string
+        }
+        Returns: number
+      }
+      vector_out: {
+        Args: {
+          "": string
+        }
+        Returns: unknown
+      }
+      vector_send: {
+        Args: {
+          "": string
+        }
+        Returns: string
+      }
+      vector_typmod_in: {
+        Args: {
+          "": unknown[]
+        }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import ParticleBackground from '@/components/ParticleBackground';
+import Navbar from '@/components/Navbar';
 import EmotionChart from '@/components/EmotionChart';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -12,9 +13,6 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function Insights() {
   const { user } = useAuth();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
-  const [isSticky, setIsSticky] = useState(false);
-  const timeToggleRef = useRef<HTMLDivElement>(null);
-  const stickyThreshold = useRef<number>(0);
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
@@ -25,77 +23,41 @@ export default function Insights() {
     { value: 'year', label: 'Year' },
   ];
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!timeToggleRef.current) return;
-      
-      if (!stickyThreshold.current) {
-        const rect = timeToggleRef.current.getBoundingClientRect();
-        stickyThreshold.current = rect.top + window.scrollY - 16; // 16px buffer
-      }
-      
-      setIsSticky(window.scrollY > stickyThreshold.current);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const renderTimeToggle = () => (
-    <div className="flex items-center gap-3">
-      <span className="text-sm text-muted-foreground">View:</span>
-      <ToggleGroup 
-        type="single" 
-        value={timeRange}
-        onValueChange={(value) => {
-          if (value) {
-            const currentScrollPosition = window.scrollY;
-            setTimeRange(value as TimeRange);
-            setTimeout(() => window.scrollTo(0, currentScrollPosition), 0);
-          }
-        }}
-        variant="outline"
-        className="bg-secondary rounded-full p-1"
-      >
-        {timeRanges.map((range) => (
-          <ToggleGroupItem
-            key={range.value}
-            value={range.value}
-            className={cn(
-              "px-4 py-1.5 rounded-full text-sm font-medium transition-all",
-              timeRange === range.value
-                ? "bg-white text-primary shadow-sm"
-                : "text-muted-foreground hover:text-foreground bg-transparent"
-            )}
-          >
-            {range.label}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-    </div>
-  );
-
   return (
     <div className="min-h-screen pb-20">
-      <ParticleBackground />
+      <Navbar />
       
-      {isSticky && (
-        <div className="fixed top-16 left-0 right-0 z-10 py-3 px-4 bg-background border-b shadow-sm flex justify-center">
-          <div className="max-w-5xl w-full flex justify-end">
-            {renderTimeToggle()}
-          </div>
-        </div>
-      )}
-      
-      <div className="max-w-5xl mx-auto px-4 pt-8">
+      <div className="max-w-5xl mx-auto px-4 pt-28">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Insights</h1>
             <p className="text-muted-foreground">Discover patterns in your emotional journey</p>
           </div>
           
-          <div className="mt-4 md:mt-0" ref={timeToggleRef}>
-            {renderTimeToggle()}
+          <div className="flex items-center gap-3 mt-4 md:mt-0">
+            <span className="text-sm text-muted-foreground">View:</span>
+            <ToggleGroup 
+              type="single" 
+              value={timeRange}
+              onValueChange={(value) => value && setTimeRange(value as TimeRange)}
+              variant="outline"
+              className="bg-secondary rounded-full p-1"
+            >
+              {timeRanges.map((range) => (
+                <ToggleGroupItem
+                  key={range.value}
+                  value={range.value}
+                  className={cn(
+                    "px-4 py-1.5 rounded-full text-sm font-medium transition-all",
+                    timeRange === range.value
+                      ? "bg-white text-primary shadow-sm"
+                      : "text-muted-foreground hover:text-foreground bg-transparent"
+                  )}
+                >
+                  {range.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
         </div>
         
@@ -243,6 +205,16 @@ export default function Insights() {
               transition={{ duration: 0.4, delay: 0.3 }}
               className="bg-white p-6 md:p-8 rounded-xl shadow-sm mb-8"
             >
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                <h2 className="text-xl font-semibold">Emotional Trends</h2>
+                <div className="flex items-center mt-2 sm:mt-0">
+                  <Button variant="outline" size="sm" className="text-xs flex items-center gap-1.5 rounded-full">
+                    <Filter className="h-3 w-3" />
+                    <span>Customize</span>
+                  </Button>
+                </div>
+              </div>
+              
               <EmotionChart 
                 timeframe={timeRange}
                 aggregatedData={insightsData.aggregatedEmotionData}

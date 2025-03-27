@@ -1,255 +1,302 @@
-import { useNavigate } from 'react-router-dom';
+
+import React from 'react';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mic, MessageSquare, ChartBar, BookOpen } from 'lucide-react';
-import { useAuth } from '@/contexts/auth';
-import { useEffect, useState, useRef } from 'react';
-import { createOrUpdateSession } from '@/utils/audio/auth-profile';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
+import { Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import ParticleBackground from '@/components/ParticleBackground';
+import Navbar from '@/components/Navbar';
 
-export default function Index() {
+const Index = () => {
   const navigate = useNavigate();
-  const { user, isLoading, refreshSession } = useAuth();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [sessionTracked, setSessionTracked] = useState(false);
-  const sessionTrackingAttemptedRef = useRef(false);
-  const redirectAttemptedRef = useRef(false);
-  const sessionCheckAttemptedRef = useRef(false);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'checking' | 'error'>('checking');
-  const [connectionMessage, setConnectionMessage] = useState<string>('');
+  const { user } = useAuth();
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!authChecked) {
-        console.log("Force completing auth check on index page due to timeout");
-        setAuthChecked(true);
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        delayChildren: 0.3,
+        staggerChildren: 0.2
       }
-    }, 1500);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!isLoading) {
-      console.log("Auth loading complete on index page, setting authChecked to true");
-      setAuthChecked(true);
-    }
-  }, [isLoading]);
-
-  useEffect(() => {
-    if (authChecked && !isLoading && !user && !sessionCheckAttemptedRef.current) {
-      sessionCheckAttemptedRef.current = true;
-      
-      const authSuccess = localStorage.getItem('auth_success') === 'true';
-      if (authSuccess) {
-        console.log("Auth success flag is true but no user object exists, checking session");
-        
-        const checkSession = async () => {
-          try {
-            console.log("Performing manual session check");
-            const { data, error } = await supabase.auth.getSession();
-            
-            if (error) {
-              console.error("Error getting session during manual check:", error);
-              localStorage.removeItem('auth_success');
-              return;
-            }
-            
-            if (data.session) {
-              console.log("Found valid session during manual check, refreshing session");
-              const refreshResult = await refreshSession();
-              
-              if (refreshResult) {
-                console.log("Session refreshed successfully, redirecting to journal");
-                setTimeout(() => navigate('/journal'), 100);
-              }
-            } else {
-              console.log("No session found during manual check, clearing auth success flag");
-              localStorage.removeItem('auth_success');
-            }
-          } catch (e) {
-            console.error("Error in manual session check:", e);
-          }
-        };
-        
-        checkSession();
-      }
-    }
-  }, [authChecked, isLoading, user, navigate, refreshSession]);
-
-  useEffect(() => {
-    if (user && !redirectAttemptedRef.current && !isLoading) {
-      console.log("User is authenticated, redirecting to journal page");
-      redirectAttemptedRef.current = true;
-      
-      const redirectTimer = setTimeout(() => {
-        navigate('/journal');
-      }, 100);
-      
-      return () => clearTimeout(redirectTimer);
-    }
-  }, [user, isLoading, navigate]);
-
-  useEffect(() => {
-    if (user && !sessionTracked) {
-      sessionTrackingAttemptedRef.current = true;
-      console.log("Index page: Tracking session for user", user.id);
-      
-      createOrUpdateSession(user.id, '/')
-        .then(() => {
-          setSessionTracked(true);
-        })
-        .catch(error => {
-          console.error("Error tracking session on index page:", error);
-        });
-    }
-  }, [user, sessionTracked]);
-
-  useEffect(() => {
-    if (authChecked && !isLoading) {
-      try {
-        const authSuccess = localStorage.getItem('auth_success') === 'true';
-        const lastAuthTime = localStorage.getItem('last_auth_time');
-        
-        if (authSuccess && lastAuthTime && !user) {
-          const timeSinceAuth = Date.now() - parseInt(lastAuthTime, 10);
-          const isRecent = timeSinceAuth < 30 * 60 * 1000;
-          
-          if (isRecent) {
-            console.warn('Auth inconsistency detected: localStorage indicates recent auth but no user object');
-            toast.error('Session error detected. Please try signing in again.');
-            localStorage.removeItem('auth_success');
-            localStorage.removeItem('last_auth_time');
-          }
-        }
-      } catch (e) {
-        console.warn('Error checking auth state consistency:', e);
-      }
-    }
-  }, [authChecked, isLoading, user]);
-
-  const handleGetStarted = () => {
-    if (user) {
-      navigate('/journal');
-    } else {
-      navigate('/auth');
     }
   };
 
-  const featureCards = [
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { 
+      y: 0, 
+      opacity: 1,
+      transition: { duration: 0.5 }
+    }
+  };
+
+  const iconVariants = {
+    initial: { scale: 0.8, opacity: 0 },
+    animate: { 
+      scale: 1, 
+      opacity: 1,
+      transition: { 
+        duration: 0.5,
+        yoyo: Infinity,
+        repeatDelay: 2
+      }
+    }
+  };
+
+  const pulseVariants = {
+    pulse: {
+      scale: [1, 1.05, 1],
+      transition: {
+        duration: 2,
+        repeat: Infinity
+      }
+    }
+  };
+
+  const waveVariants = {
+    wave: {
+      y: [0, -10, 0],
+      transition: {
+        duration: 1.5,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    }
+  };
+
+  const features = [
     {
-      title: "Voice Journaling",
-      description: "Simply speak your thoughts and let AI transcribe them into meaningful journal entries",
-      icon: <Mic className="h-12 w-12 text-primary" />,
-      action: "Start Recording",
-      onClick: () => navigate('/journal')
+      title: "Record Your Thoughts",
+      description: "Capture your daily reflections with voice recordings that are automatically transcribed and analyzed.",
+      icon: <Mic className="h-10 w-10 text-primary" />,
+      animation: pulseVariants,
+      animationState: "pulse",
+      cta: "Start Journaling",
+      ctaAction: () => navigate('/journal'),
+      visualComponent: (
+        <motion.div 
+          className="relative flex items-center justify-center p-4 bg-primary/10 rounded-full"
+          variants={pulseVariants}
+          animate="pulse"
+        >
+          <motion.div
+            className="absolute inset-0 rounded-full bg-primary/5"
+            variants={pulseVariants}
+            animate={{
+              scale: [1, 1.5, 1],
+              opacity: [0.3, 0.1, 0.3]
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+          <Mic className="h-12 w-12 text-primary" />
+        </motion.div>
+      )
     },
     {
-      title: "AI Chat Companion",
-      description: "Have meaningful conversations about your journal entries with your AI companion",
-      icon: <MessageSquare className="h-12 w-12 text-indigo-500" />,
-      action: "Chat Now",
-      onClick: () => navigate('/chat')
+      title: "AI Analysis",
+      description: "Get insights into your emotional patterns and themes through advanced AI analysis of your journal entries.",
+      icon: <Brain className="h-10 w-10 text-primary" />,
+      animation: waveVariants,
+      animationState: "wave",
+      cta: "See Insights",
+      ctaAction: () => navigate('/insights'),
+      visualComponent: (
+        <motion.div 
+          className="flex flex-wrap gap-2 justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+        >
+          {['Happiness', 'Growth', 'Stress', 'Family', 'Work', 'Health'].map((theme, index) => (
+            <motion.div
+              key={theme}
+              className="px-3 py-1 bg-primary/20 rounded-full text-sm font-medium text-primary"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ 
+                scale: 1, 
+                opacity: 1,
+                y: [0, index % 2 === 0 ? -5 : 5, 0]
+              }}
+              transition={{ 
+                delay: index * 0.1 + 0.5,
+                y: {
+                  duration: 2,
+                  repeat: Infinity,
+                  repeatType: "reverse",
+                  ease: "easeInOut",
+                  delay: index * 0.2
+                }
+              }}
+            >
+              {theme}
+            </motion.div>
+          ))}
+        </motion.div>
+      )
     },
     {
-      title: "Emotional Insights",
-      description: "Gain valuable insights into your emotional patterns and wellbeing over time",
-      icon: <ChartBar className="h-12 w-12 text-green-500" />,
-      action: "View Insights",
-      onClick: () => navigate('/insights')
+      title: "Track Your Journey",
+      description: "Visualize your emotional progress over time with interactive charts and trend analysis.",
+      icon: <LineChart className="h-10 w-10 text-primary" />,
+      animation: itemVariants,
+      cta: "View Progress",
+      ctaAction: () => navigate('/insights'),
+      visualComponent: (
+        <motion.div 
+          className="relative h-32 w-full bg-background/80 rounded-lg overflow-hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+        >
+          <svg viewBox="0 0 500 100" className="w-full h-full">
+            <motion.path
+              d="M0,50 C150,20 200,80 500,40"
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth="3"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{ duration: 2, delay: 0.5 }}
+            />
+            <motion.path
+              d="M0,70 C100,60 300,20 500,60"
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth="2"
+              strokeOpacity="0.5"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 0.5 }}
+              transition={{ duration: 2, delay: 0.7 }}
+            />
+            <motion.circle
+              cx="450"
+              cy="45"
+              r="5"
+              fill="hsl(var(--primary))"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 2.5 }}
+            />
+          </svg>
+        </motion.div>
+      )
     },
     {
-      title: "Guided Reflection",
-      description: "Follow AI-generated prompts to reflect on your experiences more deeply",
-      icon: <BookOpen className="h-12 w-12 text-violet-500" />,
-      action: "Start Reflecting",
-      onClick: () => navigate('/journal')
+      title: "Chat With Your Journal",
+      description: "Ask questions and get personalized insights based on your past journal entries with AI-powered chat.",
+      icon: <MessageSquare className="h-10 w-10 text-primary" />,
+      animation: itemVariants,
+      cta: "Start Chatting",
+      ctaAction: () => navigate('/chat'),
+      visualComponent: (
+        <motion.div 
+          className="flex flex-col gap-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+        >
+          <motion.div 
+            className="self-start max-w-[80%] bg-muted p-2 rounded-lg text-xs text-left"
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.7 }}
+          >
+            How have I been feeling lately?
+          </motion.div>
+          <motion.div 
+            className="self-end max-w-[80%] bg-primary text-primary-foreground p-2 rounded-lg text-xs text-left"
+            initial={{ x: 20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 1.2 }}
+          >
+            Based on your recent entries, you've been feeling more positive and energetic this week...
+          </motion.div>
+        </motion.div>
+      )
     }
   ];
 
-  useEffect(() => {
-    const testConnection = async () => {
-      try {
-        const { testDatabaseConnection } = await import('@/utils/supabase-connection');
-        setConnectionStatus('checking');
-        setConnectionMessage('Testing connection to Supabase...');
-        
-        const result = await testDatabaseConnection();
-        
-        if (result.success) {
-          setConnectionStatus('connected');
-          setConnectionMessage('Successfully connected to Supabase!');
-          console.log('Connection test successful:', result);
-        } else {
-          setConnectionStatus('error');
-          setConnectionMessage(`Connection failed: ${result.error}`);
-          console.error('Connection test failed:', result);
-        }
-      } catch (error) {
-        console.error('Error testing connection:', error);
-        setConnectionStatus('error');
-        setConnectionMessage('Error testing connection');
-      }
-    };
-    
-    testConnection();
-  }, []);
-
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-md ${
-        connectionStatus === 'connected' ? 'bg-green-100 text-green-800' : 
-        connectionStatus === 'checking' ? 'bg-blue-100 text-blue-800' : 
-        'bg-red-100 text-red-800'
-      }`}>
-        {connectionStatus === 'connected' && '✓ '}
-        {connectionStatus === 'checking' && '⟳ '}
-        {connectionStatus === 'error' && '✗ '}
-        {connectionMessage}
-      </div>
+    <div className="flex flex-col min-h-screen bg-background">
+      <Navbar />
+      <ParticleBackground />
       
-      <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 py-12">
-        <div className="max-w-3xl w-full text-center mb-10">
-          <h1 className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-violet-500 mb-4">
-            Welcome to Feelosophy
-          </h1>
-          <p className="text-lg md:text-xl text-muted-foreground mb-8">
-            Explore your thoughts, track your emotions, and gain valuable insights with AI-powered VOICE journaling
+      <motion.main
+        className="flex-1 container mx-auto px-4 py-8 pt-24"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        <motion.div
+          className="text-center mb-12"
+          variants={itemVariants}
+        >
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome to Feelosophy</h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Your personal AI companion for emotional wellness and self-reflection
           </p>
           
-          {isLoading && !authChecked ? (
-            <Button size="lg" disabled className="text-lg px-8 py-6">
-              <span className="animate-pulse">Loading...</span>
-            </Button>
-          ) : (
-            <Button size="lg" onClick={handleGetStarted} className="text-lg px-8 py-6">
-              {user ? 'Go to Journal' : 'Get Started'}
-            </Button>
+          {!user && (
+            <motion.div 
+              className="mt-8"
+              variants={itemVariants}
+            >
+              <Button 
+                size="lg" 
+                onClick={() => navigate('/auth')}
+                className="animate-pulse"
+              >
+                Get Started
+              </Button>
+            </motion.div>
           )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl w-full mt-8">
-          {featureCards.map((card, index) => (
-            <Card key={index} className="border shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <CardHeader>
-                <div className="flex justify-center mb-4">
-                  {card.icon}
-                </div>
-                <CardTitle className="text-center">{card.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-center">{card.description}</CardDescription>
-              </CardContent>
-              <CardFooter className="flex justify-center">
-                <Button variant="outline" onClick={card.onClick}>
-                  {card.action}
-                </Button>
-              </CardFooter>
-            </Card>
+        </motion.div>
+        
+        <motion.div 
+          className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto"
+          variants={containerVariants}
+        >
+          {features.map((feature, index) => (
+            <motion.div key={feature.title} variants={itemVariants}>
+              <Card className="h-full border-primary/20 overflow-hidden">
+                <CardHeader>
+                  <motion.div 
+                    variants={iconVariants}
+                    initial="initial"
+                    animate="animate"
+                    className="mb-2"
+                  >
+                    {feature.icon}
+                  </motion.div>
+                  <CardTitle>{feature.title}</CardTitle>
+                  <CardDescription>{feature.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex justify-center">
+                  {feature.visualComponent}
+                </CardContent>
+                <CardFooter>
+                  <Button 
+                    className="w-full" 
+                    onClick={feature.ctaAction}
+                    disabled={!user}
+                  >
+                    {feature.cta}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </motion.div>
           ))}
-        </div>
-      </div>
+        </motion.div>
+      </motion.main>
     </div>
   );
-}
+};
+
+export default Index;
