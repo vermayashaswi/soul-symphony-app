@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 
@@ -103,8 +104,8 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children, containerR
       dragConstraints={constraints}
       dragElastic={0.05}
       dragTransition={{ 
-        bounceStiffness: 300,
-        bounceDamping: 30,
+        bounceStiffness: 600,  // Increased stiffness for more realistic bounce
+        bounceDamping: 20,     // Decreased damping for more responsive bounce
         power: 0.5
       }}
       whileDrag={{ scale: 1.02 }}
@@ -175,7 +176,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
       
       // Calculate position within cell with minimal randomness
       const maxSize = 80;
-      const safeMargin = maxSize / 2;
+      const bubblePadding = 10; // Added padding to ensure bubbles don't touch the edge
       
       // Create a fixed position with no randomness
       const centerX = (col * cellWidth) + (cellWidth / 2);
@@ -185,7 +186,11 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
       const fixedOffsetX = (index % 2) * 5;
       const fixedOffsetY = (index % 3) * 5;
       
-      // Final position with constraints
+      // Limit the position to ensure bubbles are fully visible
+      // Adding extra safety margin to avoid any partial visibility issues
+      const safeMargin = maxSize / 2 + bubblePadding;
+      
+      // Final position with stronger constraints
       const x = Math.max(safeMargin, Math.min(containerWidth - safeMargin, centerX + fixedOffsetX));
       const y = Math.max(safeMargin, Math.min(containerHeight - safeMargin, centerY + fixedOffsetY));
       

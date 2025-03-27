@@ -314,7 +314,7 @@ export function EmotionChart({
                 whileDrag={{ scale: 1.05 }}
                 dragTransition={{ 
                   bounceStiffness: 600, 
-                  bounceDamping: 20 
+                  bounceDamping: 20 // Decreased damping for more responsive, physics-based bounce
                 }}
               >
                 {item.name}
