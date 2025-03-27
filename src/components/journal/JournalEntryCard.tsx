@@ -73,7 +73,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                 Soul-ubles
               </h3>
               
-              <div className="h-64 mb-4 flex items-center justify-center p-2 border border-muted rounded-lg bg-white/50">
+              <div className="h-64 mb-4 flex items-center justify-center p-3 border border-muted rounded-lg shadow-sm bg-white/95">
                 {entry.emotions && Object.keys(entry.emotions).length > 0 ? (
                   <EmotionBubbles emotions={entry.emotions} />
                 ) : entry.master_themes && entry.master_themes.length > 0 ? (
