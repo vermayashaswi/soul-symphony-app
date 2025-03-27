@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 
@@ -85,29 +86,31 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children, containerR
       className="absolute flex items-center justify-center"
       initial={{ x, y, opacity: 0, scale: 0 }}
       animate={{ 
-        x: [x, x + getRandomValue(-2, 2)], 
-        y: [y, y - getRandomValue(1, 3)],
-        opacity: [0, 1, 0.8],
-        scale: [0, 1, 0.9]
+        x: [x, x + getRandomValue(-1, 1) * 0.5], // Reduced movement range by 75%
+        y: [y, y - getRandomValue(0.5, 1.5) * 0.5], // Reduced movement range by 75%
+        opacity: [0, 1, 0.9],
+        scale: [0, 1, 0.95]
       }}
       transition={{
-        duration: 6,
+        duration: 8, // Increased from 6 to 8 for slower movement
         delay,
         repeat: Infinity,
         repeatType: "reverse",
-        ease: "easeInOut"
+        ease: "easeInOut", // Smoother easing function
+        times: [0, 0.5, 1] // More controlled timing for smooth transitions
       }}
       drag
       dragConstraints={constraints}
-      dragElastic={0.1}
+      dragElastic={0.05} // Reduced from 0.1 for less elastic movement
       dragTransition={{ 
-        bounceStiffness: 600, 
-        bounceDamping: 20 
+        bounceStiffness: 300, // Reduced from 600 for gentler bouncing
+        bounceDamping: 30,  // Increased from 20 for quicker settling
+        power: 0.5 // Added power parameter to make drag more controlled
       }}
-      whileDrag={{ scale: 1.05 }}
+      whileDrag={{ scale: 1.02 }} // Reduced scale effect during drag
     >
       <div 
-        className="rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center p-2"
+        className="rounded-full bg-gradient-to-br from-primary/30 to-primary/10 backdrop-blur-sm flex items-center justify-center p-2"
         style={{ width: `${size}px`, height: `${size}px` }}
       >
         {children}
@@ -149,7 +152,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
     const limitedData = usingEmotions 
       ? [...dataSource]
           .sort((a, b) => ((b.score || 0) - (a.score || 0)))
-          .slice(0, 7) // Show more emotions since they're quantified
+          .slice(0, 5) // Reduced from 7 to 5 to prevent overcrowding
       : dataSource.slice(0, 5);
     
     // Wait for the container to be available and sized
@@ -159,51 +162,54 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
     const containerWidth = containerRef.current.clientWidth;
     const containerHeight = containerRef.current.clientHeight;
     
-    // Grid layout configuration - adjust based on container size
-    const gridRows = 3;
+    // More controlled layout configuration
+    const gridRows = 2; // Reduced from 3 to 2 for better spacing
     const gridCols = 3;
     const cellWidth = containerWidth / gridCols;
     const cellHeight = containerHeight / gridRows;
     
-    // Calculate positions using a grid-based approach to minimize overlap
+    // Calculate positions using a more stable grid-based approach
     const newBubbles = limitedData.map((item, index) => {
       // Calculate grid position (different cells for each bubble)
       const col = index % gridCols;
       const row = Math.floor(index / gridCols) % gridRows;
       
-      // Calculate base position within cell with some randomness
-      // Ensure we leave enough margin for the bubble size
-      const maxSize = 90; // Maximum bubble size
-      const safeMargin = maxSize / 2; // Safe margin to prevent overflow
+      // Calculate position within cell with minimal randomness
+      const maxSize = 80; // Reduced maximum size from 90 to 80
+      const safeMargin = maxSize / 2;
       
-      // Position bubbles with safe margins from the edges
-      const baseX = (col * cellWidth) + (cellWidth / 2);
-      const baseY = (row * cellHeight) + (cellHeight / 2);
+      // More stable positioning with less randomness
+      const centerX = (col * cellWidth) + (cellWidth / 2);
+      const centerY = (row * cellHeight) + (cellHeight / 2);
       
-      // Ensure x and y are within proper bounds
-      const x = Math.max(safeMargin, Math.min(containerWidth - safeMargin, baseX));
-      const y = Math.max(safeMargin, Math.min(containerHeight - safeMargin, baseY));
+      // Add very slight randomness (±10% of cell size) to prevent perfect alignment
+      const randomOffsetX = getRandomValue(-0.1, 0.1) * cellWidth;
+      const randomOffsetY = getRandomValue(-0.1, 0.1) * cellHeight;
+      
+      // Final position with constraints
+      const x = Math.max(safeMargin, Math.min(containerWidth - safeMargin, centerX + randomOffsetX));
+      const y = Math.max(safeMargin, Math.min(containerHeight - safeMargin, centerY + randomOffsetY));
       
       // Get the appropriate emoji based on the label
       const normalizedLabel = item.label.toLowerCase().trim();
       const emoji = EMOTION_EMOJIS[normalizedLabel] || '';
       
-      // Size calculation based on score (if emotions) or position (if themes)
+      // Size calculation with smoother scaling
       let size;
       if (usingEmotions && item.score !== undefined) {
-        // Scale based on score: min 40px, max 80px
-        // We use a log scale to make differences more visible
+        // Scale based on score: min 40px, max 75px (reduced from 80)
         const maxScore = Math.max(...Object.values(emotions));
         const minSize = 40;
-        const maxSize = 80;
+        const maxSize = 75;
+        // More linear scaling to prevent dramatic size differences
         size = minSize + ((item.score / maxScore) * (maxSize - minSize));
       } else {
-        // Fallback for themes (decreasing by position)
-        size = 70 - (index * 5);
+        // Fallback for themes (more consistent sizing)
+        size = 60 - (index * 4); // Reduced from 70-(index*5) for more consistent sizes
       }
       
-      // Ensure size is within reasonable bounds and not too large for container
-      const cappedSize = Math.max(40, Math.min(80, size));
+      // Ensure size is within reasonable bounds
+      const cappedSize = Math.max(40, Math.min(75, size));
       
       return {
         id: index,
@@ -211,7 +217,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
         x,
         y,
         size: cappedSize,
-        delay: index * 0.2, // Stagger animations
+        delay: index * 0.4, // Increased from 0.2 to 0.4 for more staggered, stable animations
         emoji,
         score: item.score
       };
