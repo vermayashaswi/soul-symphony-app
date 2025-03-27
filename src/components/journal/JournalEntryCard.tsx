@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Smile, Meh, Frown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EmotionChart from '@/components/EmotionChart';
 import EmotionBubbles from '@/components/EmotionBubbles';
@@ -73,6 +73,16 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
     return "Neutral";
   };
 
+  // Helper function to get sentiment emoji
+  const getSentimentEmoji = () => {
+    if (!entry.sentiment) return <Meh className="h-5 w-5 text-gray-400" />;
+    
+    const score = parseFloat(entry.sentiment);
+    if (score > 0.25) return <Smile className="h-5 w-5 text-green-500" />;
+    if (score < -0.25) return <Frown className="h-5 w-5 text-red-500" />;
+    return <Meh className="h-5 w-5 text-amber-500" />;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -88,9 +98,12 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
             </CardTitle>
             <div className="flex items-center gap-2">
               {entry.sentiment && (
-                <span className={`text-sm font-medium ${getSentimentColor()}`}>
-                  {getSentimentLabel()}
-                </span>
+                <div className="flex items-center gap-1">
+                  {getSentimentEmoji()}
+                  <span className={`text-sm font-medium ${getSentimentColor()}`}>
+                    {getSentimentLabel()}
+                  </span>
+                </div>
               )}
               {entry.duration && (
                 <span className="text-sm text-muted-foreground">

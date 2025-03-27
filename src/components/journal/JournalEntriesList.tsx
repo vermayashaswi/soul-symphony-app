@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryCard, { JournalEntry } from './JournalEntryCard';
 import EmptyJournalState from './EmptyJournalState';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Smile, Meh, Frown } from 'lucide-react';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -29,6 +30,16 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   if (entries.length === 0 && processingEntries.length === 0) {
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
+
+  // Helper function to get sentiment emoji based on score
+  const getSentimentEmoji = (sentiment?: string) => {
+    if (!sentiment) return <Meh className="h-6 w-6 text-gray-400" aria-label="Neutral sentiment" />;
+    
+    const score = parseFloat(sentiment);
+    if (score > 0.25) return <Smile className="h-6 w-6 text-green-500" aria-label="Positive sentiment" />;
+    if (score < -0.25) return <Frown className="h-6 w-6 text-red-500" aria-label="Negative sentiment" />;
+    return <Meh className="h-6 w-6 text-amber-500" aria-label="Neutral sentiment" />;
+  };
 
   return (
     <motion.div 

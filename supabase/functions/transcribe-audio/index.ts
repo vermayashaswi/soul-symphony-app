@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -157,6 +158,42 @@ async function analyzeEmotions(text: string) {
   }
 }
 
+async function analyzeSentiment(text: string) {
+  try {
+    console.log('Analyzing sentiment for text:', text.slice(0, 100) + '...');
+    
+    // Call the Google Natural Language API
+    const response = await fetch('https://language.googleapis.com/v1/documents:analyzeSentiment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': Deno.env.get('GOOGLE_API_KEY') || '',
+      },
+      body: JSON.stringify({
+        document: {
+          type: 'PLAIN_TEXT',
+          content: text,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error analyzing sentiment:', error);
+      return null;
+    }
+
+    const result = await response.json();
+    console.log('Sentiment analysis complete:', JSON.stringify(result, null, 2));
+    
+    // Return the document sentiment score
+    return result.documentSentiment?.score?.toString() || "0";
+  } catch (error) {
+    console.error('Error in analyzeSentiment:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -308,6 +345,10 @@ serve(async (req) => {
 
       const emotions = await analyzeEmotions(refinedText);
       console.log("Emotion analysis:", emotions);
+      
+      // Analyze sentiment
+      const sentimentScore = await analyzeSentiment(refinedText);
+      console.log("Sentiment analysis:", sentimentScore);
 
       const audioDuration = Math.floor(binaryAudio.length / 16000);
 
@@ -322,7 +363,8 @@ serve(async (req) => {
               "audio_url": audioUrl,
               "user_id": userId || null,
               "duration": audioDuration,
-              "emotions": emotions
+              "emotions": emotions,
+              "sentiment": sentimentScore
             }])
             .select();
               
@@ -373,6 +415,7 @@ serve(async (req) => {
           audioUrl: audioUrl,
           entryId: entryId,
           emotions: emotions,
+          sentiment: sentimentScore,
           success: true
         }),
         { 
