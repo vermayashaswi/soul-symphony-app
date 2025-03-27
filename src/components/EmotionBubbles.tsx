@@ -71,6 +71,7 @@ const Bubble: React.FC<BubbleProps> = ({ x, y, size, delay, children, containerR
       const containerHeight = containerRef.current.clientHeight;
       
       // Set constraints to keep bubble completely within container
+      // Using size as the offset to ensure the bubble stays completely visible
       setConstraints({
         top: 0,
         right: containerWidth - size,
@@ -133,7 +134,6 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
     size: number;
     delay: number;
     emoji: string;
-    score?: number;
   }>>([]);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -216,8 +216,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes = [], emotions =
         y,
         size: cappedSize,
         delay: index * 0.7,
-        emoji,
-        score: item.score
+        emoji
       };
     });
     

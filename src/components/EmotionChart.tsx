@@ -252,10 +252,10 @@ export function EmotionChart({
           * Size of bubble represents intensity
         </div>
         
-        {/* Container with boundary constraints */}
+        {/* Container with boundary constraints - WIDER AREA */}
         <div 
           ref={bubbleContainerRef}
-          className="relative w-[320px] h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden"
+          className="relative w-full h-[250px] border-2 border-dashed border-muted/20 rounded-lg overflow-hidden"
         >
           {bubbleData.map((item, index) => {
             // Calculate base size proportionally to value
@@ -264,19 +264,17 @@ export function EmotionChart({
             const maxValue = Math.max(...bubbleData.map(b => b.value));
             const size = minSize + ((item.value / maxValue) * (maxSize - minSize));
             
-            // Safe margins to ensure bubble is fully visible
-            const safeMargin = size / 2;
-            
             // Generate position within container boundaries
             // Ensure bubbles remain fully visible
             const availableWidth = containerSize.width;
             const availableHeight = containerSize.height;
             
             // Calculate position ensuring the bubble stays within bounds
+            // Use safe margins based on bubble size to ensure they stay fully visible
             const x = Math.max(size/2, Math.min(availableWidth - size/2, 50 + Math.random() * (availableWidth - 100)));
             const y = Math.max(size/2, Math.min(availableHeight - size/2, 50 + Math.random() * (availableHeight - 100)));
-
-            // Calculate constraints for dragging
+            
+            // Calculate constraints for dragging - CRITICAL for keeping bubbles fully visible
             const dragConstraints = {
               top: 0,
               right: availableWidth - size,
@@ -312,7 +310,7 @@ export function EmotionChart({
                 }}
                 drag
                 dragConstraints={dragConstraints}
-                dragElastic={0.1}
+                dragElastic={0.05} // Reduced elasticity to prevent overshooting boundaries
                 whileDrag={{ scale: 1.05 }}
                 dragTransition={{ 
                   bounceStiffness: 600, 
