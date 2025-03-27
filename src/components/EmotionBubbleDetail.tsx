@@ -31,7 +31,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     }
   };
 
-  const fontSizeStyle = {
+  const fontSizeStyle: React.CSSProperties = {
     fontSize: `${Math.max(10, size / 4.5)}px`,
     lineHeight: '1.2',
     maxWidth: '90%',
@@ -41,7 +41,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     alignItems: 'center',
     justifyContent: 'center',
     wordBreak: 'break-word',
-    textAlign: 'center',
+    textAlign: 'center' as const,
     height: '100%',
     padding: '12%'
   };
