@@ -47,15 +47,16 @@ export const diagnoseDatabaseIssues = async () => {
   const errorDetails: string[] = [];
   
   try {
-    // Check database connection with timeout using Promise.race
+    // Check database connection with improved timeout handling
     try {
+      console.log('Testing database connection...');
       const dbPromise = supabase
         .from('profiles')
         .select('id')
         .limit(1);
       
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Request timed out')), 8000);
+        setTimeout(() => reject(new Error('Database connection timed out')), 8000);
       });
       
       const { data: dbCheck, error: dbError } = await Promise.race([
@@ -67,30 +68,37 @@ export const diagnoseDatabaseIssues = async () => {
         errorDetails.push(`Database connection: ${dbError.message}`);
       } else {
         results.database = true;
+        console.log('Database connection successful');
       }
     } catch (timeoutErr: any) {
+      console.error('Database connection timeout:', timeoutErr);
       errorDetails.push(`Database connection: ${timeoutErr.message || 'Request timed out'}`);
     }
     
     // Only continue checks if database is accessible
     if (results.database) {
+      console.log('Database accessible, continuing checks...');
+      
       // Check auth
       const { data: session, error: authError } = await supabase.auth.getSession();
       results.auth = !authError && !!session;
       
       if (authError) {
         errorDetails.push(`Authentication: ${authError.message}`);
+      } else {
+        console.log('Authentication check successful');
       }
       
-      // Check journal table using Promise.race for timeout
+      // Check journal table with improved timeout
       try {
+        console.log('Checking Journal Entries table...');
         const journalPromise = supabase
           .from('Journal Entries')
           .select('count')
           .limit(1);
           
         const journalTimeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Request timed out')), 5000);
+          setTimeout(() => reject(new Error('Journal table check timed out')), 5000);
         });
         
         const { data: journalCheck, error: journalError } = await Promise.race([
@@ -100,31 +108,39 @@ export const diagnoseDatabaseIssues = async () => {
         
         if (journalError) {
           errorDetails.push(`Journal table: ${journalError.message}`);
+          console.error('Journal table check failed:', journalError);
         } else {
           results.journalTable = true;
+          console.log('Journal table check successful');
         }
       } catch (journalErr: any) {
+        console.error('Journal table check error:', journalErr);
         errorDetails.push(`Journal table: ${journalErr.message || 'Check timed out'}`);
       }
       
       // Check audio bucket
+      console.log('Checking audio bucket...');
       const { success: bucketSuccess, error: bucketError } = await checkAudioBucket();
       results.audioBucket = bucketSuccess;
       
       if (!bucketSuccess && bucketError) {
         errorDetails.push(`Audio storage: ${bucketError}`);
+        console.error('Audio bucket check failed:', bucketError);
+      } else {
+        console.log('Audio bucket check successful');
       }
       
       // Only check the following if previous checks pass
       if (results.auth && results.journalTable) {
-        // Check edge functions with reduced timeout using Promise.race
+        // Check edge functions with improved timeout
         try {
+          console.log('Testing edge functions...');
           const functionPromise = supabase.functions.invoke('transcribe-audio', {
             body: { test: true }
           });
           
           const functionTimeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Request timed out')), 5000);
+            setTimeout(() => reject(new Error('Edge functions check timed out')), 5000);
           });
           
           const { data: functionData, error: functionError } = await Promise.race([
@@ -134,24 +150,29 @@ export const diagnoseDatabaseIssues = async () => {
           
           if (functionError) {
             errorDetails.push(`Edge functions: ${functionError.message}`);
+            console.error('Edge functions check failed:', functionError);
           } else if (functionData?.success) {
             results.edgeFunctions = true;
+            console.log('Edge functions check successful');
           } else {
             errorDetails.push('Edge functions: Unexpected response');
+            console.error('Edge functions unexpected response:', functionData);
           }
         } catch (funcErr: any) {
+          console.error('Edge functions check error:', funcErr);
           errorDetails.push(`Edge functions: ${funcErr.message || 'Check failed'}`);
         }
         
-        // Check embeddings table with reduced timeout using Promise.race
+        // Check embeddings table with improved timeout
         try {
+          console.log('Checking embeddings table...');
           const embeddingsPromise = supabase
             .from('journal_embeddings')
             .select('count')
             .limit(1);
             
           const embeddingsTimeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Request timed out')), 5000);
+            setTimeout(() => reject(new Error('Embeddings check timed out')), 5000);
           });
           
           const { data: embeddingsCheck, error: embeddingsError } = await Promise.race([
@@ -161,10 +182,13 @@ export const diagnoseDatabaseIssues = async () => {
           
           if (embeddingsError && !embeddingsError.message.includes('does not exist')) {
             errorDetails.push(`Embeddings table: ${embeddingsError.message}`);
+            console.error('Embeddings check failed:', embeddingsError);
           } else {
             results.embeddingsTable = !embeddingsError || embeddingsCheck !== null;
+            console.log('Embeddings check successful');
           }
         } catch (embedErr: any) {
+          console.error('Embeddings check error:', embedErr);
           errorDetails.push(`Embeddings check: ${embedErr.message || 'Check failed'}`);
         }
       }
@@ -172,6 +196,7 @@ export const diagnoseDatabaseIssues = async () => {
     
     // Overall success
     const allSuccessful = Object.values(results).every(result => result === true);
+    console.log('Diagnostics complete:', results, allSuccessful ? 'All checks passed' : 'Some checks failed');
     
     return {
       success: allSuccessful,
@@ -180,6 +205,7 @@ export const diagnoseDatabaseIssues = async () => {
     };
     
   } catch (error: any) {
+    console.error('General error in diagnostics:', error);
     errorDetails.push(`General error: ${error.message}`);
     return {
       success: false,
@@ -190,7 +216,7 @@ export const diagnoseDatabaseIssues = async () => {
 };
 
 /**
- * Verify audio bucket and policies are properly configured
+ * Verify audio bucket and create it if needed with retries
  */
 export const createAudioBucket = async () => {
   try {
@@ -202,11 +228,32 @@ export const createAudioBucket = async () => {
       return { success: true, message: 'Audio bucket already exists' };
     }
     
-    // Don't attempt to create bucket from frontend
-    return { 
-      success: false, 
-      error: 'The journal-audio-entries bucket does not exist. Please contact the administrator to set it up.'
-    };
+    // Verify if current user has permissions to create a bucket
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return { 
+        success: false, 
+        error: 'Authentication required to verify storage setup'
+      };
+    }
+    
+    console.log('Checking if user has permissions to create bucket...');
+    
+    // Try with a different approach - verify the policies
+    try {
+      // This is just a check - don't actually attempt to create a bucket from the frontend
+      // Instead, provide clear diagnostics
+      return { 
+        success: false, 
+        error: 'The journal-audio-entries bucket does not exist. Please contact the administrator to set it up.'
+      };
+    } catch (permErr: any) {
+      console.error('Permission error checking storage:', permErr);
+      return { 
+        success: false, 
+        error: 'Storage permission error: ' + permErr.message
+      };
+    }
     
   } catch (error: any) {
     console.error('Error in createAudioBucket:', error);

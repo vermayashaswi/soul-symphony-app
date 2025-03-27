@@ -46,6 +46,7 @@ export const fetchWithTimeout = async (
     const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
     return response;
   } catch (error) {
+    console.error('Fetch with timeout error:', error);
     throw error;
   }
 };
@@ -72,15 +73,15 @@ export const checkSupabaseConnection = async () => {
     ]) as any;
     
     if (error) {
-      console.error('Supabase connection test failed');
-      return { success: false };
+      console.error('Supabase connection test failed:', error);
+      return { success: false, error };
     }
     
     console.log('Supabase connection successful');
     return { success: true };
   } catch (err) {
-    console.error('Supabase connection error');
-    return { success: false };
+    console.error('Supabase connection error:', err);
+    return { success: false, error: err };
   }
 };
 
@@ -96,6 +97,8 @@ export const checkAudioStorage = async (userId?: string) => {
       return { success: false, error: 'Not authenticated' };
     }
     
+    console.log('Checking audio storage for user:', userId);
+    
     // Check if bucket exists
     const { data: buckets, error: listError } = await supabase.storage.listBuckets();
     
@@ -107,8 +110,11 @@ export const checkAudioStorage = async (userId?: string) => {
     const audioBucket = buckets?.find(bucket => bucket.name === 'journal-audio-entries');
     
     if (!audioBucket) {
+      console.log('Audio bucket does not exist');
       return { success: false, error: 'Audio bucket does not exist' };
     }
+    
+    console.log('Audio bucket exists, checking access...');
     
     // Test if we can access it by listing files - use Promise.race for timeout
     const listPromise = supabase.storage
@@ -126,12 +132,14 @@ export const checkAudioStorage = async (userId?: string) => {
     ]) as any;
       
     if (listFilesError) {
+      console.error('Error listing files in audio bucket:', listFilesError);
       return { 
         success: false, 
         error: 'Bucket exists but cannot be accessed: ' + listFilesError.message 
       };
     }
     
+    console.log('Audio storage check successful');
     return { success: true };
   } catch (err: any) {
     console.error('Error checking audio storage:', err);

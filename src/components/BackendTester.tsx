@@ -3,13 +3,14 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { createAudioBucket } from '@/utils/supabase-diagnostics';
+import { createAudioBucket, diagnoseDatabaseIssues } from '@/utils/supabase-diagnostics';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function BackendTester() {
   const [isFixing, setIsFixing] = useState(false);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
   const { user } = useAuth();
   
   const checkAndFixAudioStorage = async () => {
@@ -89,24 +90,69 @@ export default function BackendTester() {
     }
   };
   
+  const runCompleteDiagnostics = async () => {
+    if (!user) {
+      toast.error('You need to be signed in to run diagnostics');
+      return;
+    }
+    
+    setIsDiagnosing(true);
+    toast.loading('Running database diagnostics...', { id: 'diagnostics' });
+    
+    try {
+      const results = await diagnoseDatabaseIssues();
+      
+      if (results.success) {
+        toast.success('All database checks passed!', { id: 'diagnostics' });
+      } else {
+        const failedChecks = Object.entries(results.results)
+          .filter(([_, passed]) => !passed)
+          .map(([name]) => name)
+          .join(', ');
+          
+        toast.error(`Diagnostics failed: ${failedChecks}`, { id: 'diagnostics' });
+        
+        if (results.errorDetails.length > 0) {
+          console.error('Diagnostic errors:', results.errorDetails);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error running diagnostics:', error);
+      toast.error(`Diagnostics error: ${error.message}`, { id: 'diagnostics' });
+    } finally {
+      setIsDiagnosing(false);
+    }
+  };
+  
   return (
     <Card className="mt-4">
       <CardHeader>
-        <CardTitle>Audio Storage Diagnostic</CardTitle>
+        <CardTitle>Database & Storage Diagnostics</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <Alert>
           <AlertDescription>
-            If you're having issues with audio storage, you can run this diagnostic tool to check it.
+            If you're having issues with database access or audio storage, you can run these diagnostic tools.
           </AlertDescription>
         </Alert>
-        <Button 
-          onClick={checkAndFixAudioStorage}
-          disabled={isFixing}
-          className="mt-4"
-        >
-          {isFixing ? 'Checking...' : 'Check Audio Storage'}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Button 
+            onClick={checkAndFixAudioStorage}
+            disabled={isFixing || isDiagnosing}
+            className="flex-1"
+          >
+            {isFixing ? 'Checking...' : 'Check Audio Storage'}
+          </Button>
+          
+          <Button 
+            onClick={runCompleteDiagnostics}
+            disabled={isFixing || isDiagnosing}
+            variant="outline" 
+            className="flex-1"
+          >
+            {isDiagnosing ? 'Running...' : 'Run Full Diagnostics'}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
