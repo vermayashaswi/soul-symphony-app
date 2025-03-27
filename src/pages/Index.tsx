@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -237,7 +238,7 @@ const Index = () => {
         >
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome to Feelosophy</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Your personal AI companion for emotional wellness and self-reflection
+            Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
           </p>
           
           {!user && (
