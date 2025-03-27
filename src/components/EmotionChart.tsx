@@ -1,5 +1,4 @@
-
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
   Line, 
@@ -87,6 +86,7 @@ export function EmotionChart({
   aggregatedData 
 }: EmotionChartProps) {
   const [chartType, setChartType] = useState<ChartType>('bubble');
+  const [bubbleKey, setBubbleKey] = useState(0); // Add key for forcing re-render
   
   const chartTypes = [
     { id: 'line', label: 'Line' },
@@ -94,7 +94,7 @@ export function EmotionChart({
   ];
   
   // Process emotion data for bubble chart
-  const getBubbleData = () => {
+  const getBubbleData = useMemo(() => {
     if (!aggregatedData) return {};
     
     // Combine all emotions from aggregatedData
@@ -107,10 +107,17 @@ export function EmotionChart({
     });
     
     return emotionScores;
-  };
+  }, [aggregatedData]);
+  
+  // This effect will re-render the bubble chart when switching back to it
+  useEffect(() => {
+    if (chartType === 'bubble') {
+      setBubbleKey(prev => prev + 1);
+    }
+  }, [chartType, timeframe]);
   
   // Process aggregated data for line chart
-  const getLineChartData = (): EmotionData[] => {
+  const getLineChartData = useMemo(() => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
       return [];
     }
@@ -158,7 +165,7 @@ export function EmotionChart({
         const dateB = new Date(b.day);
         return dateA.getTime() - dateB.getTime();
       });
-  };
+  }, [aggregatedData]);
 
   // Memoize chart data
   const bubbleData = useMemo(() => getBubbleData(), [aggregatedData]);
@@ -227,7 +234,7 @@ export function EmotionChart({
   return (
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold mb-2">Soul-ubles</h3>
+        <h3 className="text-xl font-semibold">Themes</h3>
         <div className="flex gap-2">
           {chartTypes.map((type) => (
             <button
@@ -249,15 +256,15 @@ export function EmotionChart({
       <div className="bg-white p-4 rounded-xl shadow-sm">
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && (
-          <div className="w-full h-[350px]">
-            <EmotionBubbles emotions={bubbleData} />
+          <div className="w-full h-[350px]" key={bubbleKey}>
+            <EmotionBubbles emotions={getBubbleData} preventOverlap={true} />
           </div>
         )}
       </div>
       
-      {chartType === 'line' && lineData.length > 0 && (
+      {chartType === 'line' && getLineChartData.length > 0 && (
         <div className="flex flex-wrap justify-start gap-4 mt-4 text-sm">
-          {Object.keys(lineData[0])
+          {Object.keys(getLineChartData[0])
             .filter(key => key !== 'day')
             .map((emotion, index) => (
               <div key={emotion} className="flex items-center gap-2">

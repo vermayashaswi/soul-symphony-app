@@ -144,7 +144,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
             <div>
               <h3 className="font-medium mb-4 flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-amber-500" />
-                Soul-ubles
+                Themes
               </h3>
               
               <motion.div 

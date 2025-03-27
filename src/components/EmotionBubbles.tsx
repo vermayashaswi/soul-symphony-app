@@ -22,13 +22,15 @@ interface EmotionBubblesProps {
   themes?: string[];
   className?: string;
   onEmotionClick?: (emotion: string) => void;
+  preventOverlap?: boolean;
 }
 
 const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ 
   emotions, 
   themes, 
   className,
-  onEmotionClick
+  onEmotionClick,
+  preventOverlap = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -395,11 +397,24 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       newItems.sort((a, b) => b.size - a.size);
       
       for (let i = 0; i < newItems.length; i++) {
-        const spiralPlacement = (index: number, totalItems: number, item: any) => {
+        const placeItem = (item: any, index: number, attempts = 0) => {
+          if (attempts > 50) {
+            const cols = Math.ceil(Math.sqrt(newItems.length));
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+            const cellWidth = availableWidth / cols;
+            const cellHeight = availableHeight / cols;
+            
+            return {
+              x: padding + cellWidth * (col + 0.5),
+              y: padding + cellHeight * (row + 0.5)
+            };
+          }
+          
           const maxRadius = Math.min(availableWidth, availableHeight) * 0.4;
           const maxAngle = 2 * Math.PI * 3;
           
-          const t = index / totalItems;
+          const t = index / newItems.length;
           const angle = t * maxAngle;
           const radius = t * maxRadius;
           
@@ -413,10 +428,23 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           const x = padding + centerX + radius * Math.cos(angle) + randomX;
           const y = padding + centerY + radius * Math.sin(angle) + randomY;
           
+          if (preventOverlap && attempts < 50) {
+            for (let j = 0; j < i; j++) {
+              const otherItem = newItems[j];
+              const dx = x - otherItem.position.x;
+              const dy = y - otherItem.position.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              
+              if (distance < (item.size / 2 + otherItem.size / 2) * 0.8) {
+                return placeItem(item, index, attempts + 1);
+              }
+            }
+          }
+          
           return { x, y };
         };
         
-        const position = spiralPlacement(i, newItems.length, newItems[i]);
+        const position = placeItem(newItems[i], i);
         
         const safeBubblePlacement = (pos: {x: number, y: number}, size: number) => {
           const halfSize = size / 2;
@@ -436,7 +464,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     }
     
     setItems(newItems);
-  }, [containerSize, emotions, themes]);
+  }, [containerSize, emotions, themes, preventOverlap]);
 
   const handleEmotionClick = (emotion: string) => {
     setSelectedEmotion(emotion);
@@ -487,6 +515,10 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       x: containerSize.width / 2,
       y: containerSize.height / 2,
       transition: { duration: 0.5 }
+    },
+    hover: {
+      scale: 1.05,
+      transition: { duration: 0.3 }
     }
   };
 
@@ -507,20 +539,25 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           {bubblesRef.current.map((bubble, index) => (
             <div
               key={bubble.name + index}
-              className="absolute pointer-events-none"
+              className="absolute pointer-events-auto"
               style={{
                 width: bubble.size,
                 height: bubble.size,
                 transform: `translate(${bubble.body.position.x - bubble.size/2}px, ${bubble.body.position.y - bubble.size/2}px)`,
               }}
             >
-              <EmotionBubbleDetail
-                name={bubble.name}
-                size={bubble.size}
-                color={items[index]?.color}
-                value={items[index]?.value}
-                onClick={handleEmotionClick}
-              />
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              >
+                <EmotionBubbleDetail
+                  name={bubble.name}
+                  size={bubble.size}
+                  color={items[index]?.color}
+                  value={items[index]?.value}
+                  onClick={handleEmotionClick}
+                />
+              </motion.div>
             </div>
           ))}
         </>
@@ -541,6 +578,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
                 initial="hidden"
                 animate="show"
                 exit="exit"
+                whileHover="hover"
               >
                 <EmotionBubbleDetail
                   name={item.name}

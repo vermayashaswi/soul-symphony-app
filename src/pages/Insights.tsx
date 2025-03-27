@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
@@ -18,6 +17,7 @@ export default function Insights() {
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const timeToggleRef = useRef<HTMLDivElement>(null);
   const stickyThreshold = useRef<number>(0);
+  const scrollPositionRef = useRef<number>(0);
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
@@ -30,6 +30,8 @@ export default function Insights() {
 
   useEffect(() => {
     const handleScroll = () => {
+      scrollPositionRef.current = window.scrollY;
+      
       if (!timeToggleRef.current) return;
       
       if (!stickyThreshold.current) {
@@ -49,19 +51,26 @@ export default function Insights() {
     // Additional handling can be added here
   };
 
+  const handleTimeRangeChange = (value: string) => {
+    if (value) {
+      const currentScrollPosition = window.scrollY;
+      scrollPositionRef.current = currentScrollPosition;
+      
+      setTimeRange(value as TimeRange);
+      
+      setTimeout(() => {
+        window.scrollTo({ top: currentScrollPosition });
+      }, 10);
+    }
+  };
+
   const renderTimeToggle = () => (
     <div className="flex items-center gap-3">
       <span className="text-sm text-muted-foreground">View:</span>
       <ToggleGroup 
         type="single" 
         value={timeRange}
-        onValueChange={(value) => {
-          if (value) {
-            const currentScrollPosition = window.scrollY;
-            setTimeRange(value as TimeRange);
-            setTimeout(() => window.scrollTo(0, currentScrollPosition), 0);
-          }
-        }}
+        onValueChange={handleTimeRangeChange}
         variant="outline"
         className="bg-secondary rounded-full p-1"
       >
@@ -82,6 +91,14 @@ export default function Insights() {
       </ToggleGroup>
     </div>
   );
+
+  useEffect(() => {
+    if (!loading) {
+      setTimeout(() => {
+        window.scrollTo({ top: scrollPositionRef.current });
+      }, 100);
+    }
+  }, [loading, insightsData]);
 
   return (
     <div className="min-h-screen pb-20">
