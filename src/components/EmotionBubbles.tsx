@@ -1,468 +1,221 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Engine, Render, World, Bodies, Body, Mouse, MouseConstraint, Events, Composite } from 'matter-js';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface EmotionBubblesProps {
   emotions?: Record<string, number>;
   themes?: string[];
+  className?: string;
 }
 
-// Vibrant color mapping for emotions
-const EMOTION_COLORS: Record<string, string> = {
-  joy: '#4299E1',           // Bright Blue
-  happiness: '#48BB78',     // Bright Green
-  gratitude: '#0EA5E9',     // Ocean Blue
-  calm: '#8B5CF6',          // Vivid Purple
-  anxiety: '#F56565',       // Bright Red
-  sadness: '#3B82F6',       // Bright Blue
-  anger: '#F97316',         // Bright Orange
-  fear: '#EF4444',          // Bright Red
-  excitement: '#FBBF24',    // Vibrant Yellow
-  love: '#EC4899',          // Magenta Pink
-  stress: '#F97316',        // Bright Orange
-  surprise: '#F59E0B',      // Amber
-  confusion: '#8B5CF6',     // Vivid Purple
-  disappointment: '#6366F1', // Indigo
-  pride: '#3B82F6',         // Blue
-  shame: '#DC2626',         // Red
-  guilt: '#B45309',         // Amber
-  hope: '#2563EB',          // Blue
-  boredom: '#4B5563',       // Gray
-  disgust: '#65A30D',       // Lime
-  contentment: '#0D9488'    // Teal
-};
-
-// Get color for an emotion, with fallback
-const getEmotionColor = (emotion: string): string => {
-  const normalized = emotion.toLowerCase();
-  return EMOTION_COLORS[normalized] || '#A3A3A3';
-};
-
-const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes = [] }) => {
+const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions, themes, className }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<Matter.Engine | null>(null);
-  const renderRef = useRef<Matter.Render | null>(null);
-  const mouseConstraintRef = useRef<Matter.MouseConstraint | null>(null);
-  const bodiesRef = useRef<Map<string, Matter.Body>>(new Map());
-  const worldBoundaries = useRef<Matter.Body[]>([]);
-  
-  // Track resize observer
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const [items, setItems] = useState<Array<{ name: string; size: number; color: string; position: { x: number; y: number } }>>([]);
+  
+  // Color palette for emotions and themes
+  const colorPalette = [
+    'bg-blue-100 text-blue-800', 
+    'bg-green-100 text-green-800',
+    'bg-yellow-100 text-yellow-800',
+    'bg-purple-100 text-purple-800',
+    'bg-pink-100 text-pink-800',
+    'bg-indigo-100 text-indigo-800',
+    'bg-red-100 text-red-800',
+    'bg-orange-100 text-orange-800',
+    'bg-teal-100 text-teal-800',
+  ];
 
-  // Initialize physics engine
+  // Resize observer to handle container size changes
   useEffect(() => {
-    if (!containerRef.current || !canvasRef.current) return;
+    if (!containerRef.current) return;
     
-    // Get the initial container size
-    const containerWidth = containerRef.current.clientWidth;
-    const containerHeight = containerRef.current.clientHeight;
-    setContainerSize({ width: containerWidth, height: containerHeight });
-    
-    // Create engine
-    const engine = Engine.create({
-      gravity: { x: 0, y: 0 }, // No gravity
-      positionIterations: 6,
-      velocityIterations: 4,
-    });
-    engineRef.current = engine;
-    
-    // Create renderer
-    const render = Render.create({
-      canvas: canvasRef.current,
-      engine: engine,
-      options: {
-        width: containerWidth,
-        height: containerHeight,
-        wireframes: false,
-        background: 'transparent',
-        pixelRatio: window.devicePixelRatio || 1,
-      },
-    });
-    renderRef.current = render;
-    
-    // Add mouse control
-    const mouse = Mouse.create(render.canvas);
-    const mouseConstraint = MouseConstraint.create(engine, {
-      mouse: mouse,
-      constraint: {
-        stiffness: 0.2,
-        render: { visible: false }
+    const updateSize = () => {
+      if (containerRef.current) {
+        setContainerSize({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight
+        });
       }
-    });
-    mouseConstraintRef.current = mouseConstraint;
+    };
 
-    // Adjust mouse position calculation - fix TypeScript errors
-    // Use type assertion to access the event handlers that exist at runtime but not in types
-    const mouseAny = mouse as any;
-    if (mouseAny.element && mouseAny.mousewheel) {
-      mouseAny.element.removeEventListener('mousewheel', mouseAny.mousewheel);
-      mouseAny.element.removeEventListener('DOMMouseScroll', mouseAny.mousewheel);
-    }
+    // Initialize size
+    updateSize();
     
-    if (mouseAny.element && mouseAny.touchstart) {
-      mouseAny.element.removeEventListener('touchstart', mouseAny.touchstart);
-      mouseAny.element.removeEventListener('touchmove', mouseAny.touchmove);
-      mouseAny.element.removeEventListener('touchend', mouseAny.touchend);
-    }
+    // Create observer for responsive sizing
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(containerRef.current);
     
-    // Add custom touch events to properly calculate the position
-    mouse.element.addEventListener('touchstart', (event) => {
-      const rect = mouse.element.getBoundingClientRect();
-      const touch = event.touches[0];
-      
-      // Adjust touch position to be relative to canvas
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-      
-      mouse.position.x = x;
-      mouse.position.y = y;
-      
-      // Use type assertion to set mousedown property
-      (mouse as any).mousedown = true;
-      
-      event.preventDefault();
-    }, { passive: false });
-    
-    mouse.element.addEventListener('touchmove', (event) => {
-      const rect = mouse.element.getBoundingClientRect();
-      const touch = event.touches[0];
-      
-      // Adjust touch position to be relative to canvas
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-      
-      mouse.position.x = x;
-      mouse.position.y = y;
-      
-      event.preventDefault();
-    }, { passive: false });
-    
-    mouse.element.addEventListener('touchend', () => {
-      // Use type assertion to set mousedown property
-      (mouse as any).mousedown = false;
-    }, { passive: false });
-    
-    // Create world boundaries (invisible walls) with sufficient padding
-    // Increase padding to ensure bubbles don't touch the visible edge
-    const padding = 40; // Significantly increased padding to keep bubbles away from edges
-    const wallThickness = 50; // Thick enough to prevent bubbles from escaping
-    
-    // Create invisible walls around the container
-    const topWall = Bodies.rectangle(
-      containerWidth / 2, // x position
-      -wallThickness / 2 + padding, // y position (half above the container)
-      containerWidth, // width
-      wallThickness, // height
-      { isStatic: true, render: { visible: false }, friction: 0.1, restitution: 0.7 }
-    );
-    
-    const bottomWall = Bodies.rectangle(
-      containerWidth / 2,
-      containerHeight + wallThickness / 2 - padding,
-      containerWidth,
-      wallThickness,
-      { isStatic: true, render: { visible: false }, friction: 0.1, restitution: 0.7 }
-    );
-    
-    const leftWall = Bodies.rectangle(
-      -wallThickness / 2 + padding,
-      containerHeight / 2,
-      wallThickness,
-      containerHeight,
-      { isStatic: true, render: { visible: false }, friction: 0.1, restitution: 0.7 }
-    );
-    
-    const rightWall = Bodies.rectangle(
-      containerWidth + wallThickness / 2 - padding,
-      containerHeight / 2,
-      wallThickness,
-      containerHeight,
-      { isStatic: true, render: { visible: false }, friction: 0.1, restitution: 0.7 }
-    );
-    
-    worldBoundaries.current = [topWall, bottomWall, leftWall, rightWall];
-    
-    // Add boundaries to the world
-    World.add(engine.world, [
-      topWall, 
-      bottomWall, 
-      leftWall, 
-      rightWall,
-      mouseConstraint
-    ]);
-    
-    // Start the engine and renderer
-    Engine.run(engine);
-    Render.run(render);
-    
-    // Create resize observer to handle window resizing
-    const resizeObserver = new ResizeObserver(() => {
-      if (!containerRef.current || !renderRef.current || !engineRef.current) return;
-      
-      const newWidth = containerRef.current.clientWidth;
-      const newHeight = containerRef.current.clientHeight;
-      
-      // Update container size state
-      setContainerSize({ width: newWidth, height: newHeight });
-      
-      // Resize the renderer - fix TypeScript error
-      Render.setPixelRatio(renderRef.current, window.devicePixelRatio || 1);
-      
-      // Use type assertion for setSize method that exists at runtime but not in types
-      const renderAny = Render as any;
-      if (renderAny.setSize && renderRef.current) {
-        renderAny.setSize(renderRef.current, newWidth, newHeight);
-      } else {
-        // Fallback: manually adjust canvas dimensions
-        if (renderRef.current.canvas) {
-          renderRef.current.canvas.width = newWidth;
-          renderRef.current.canvas.height = newHeight;
-          renderRef.current.options.width = newWidth;
-          renderRef.current.options.height = newHeight;
-        }
-      }
-      
-      // Update wall positions
-      const [topWall, bottomWall, leftWall, rightWall] = worldBoundaries.current;
-      
-      Body.setPosition(topWall, { x: newWidth / 2, y: -wallThickness / 2 + padding });
-      Body.setPosition(bottomWall, { x: newWidth / 2, y: newHeight + wallThickness / 2 - padding });
-      Body.setPosition(leftWall, { x: -wallThickness / 2 + padding, y: newHeight / 2 });
-      Body.setPosition(rightWall, { x: newWidth + wallThickness / 2 - padding, y: newHeight / 2 });
-      
-      // Update wall sizes
-      Body.setVertices(topWall, Bodies.rectangle(newWidth / 2, -wallThickness / 2 + padding, newWidth, wallThickness, { isStatic: true }).vertices);
-      Body.setVertices(bottomWall, Bodies.rectangle(newWidth / 2, newHeight + wallThickness / 2 - padding, newWidth, wallThickness, { isStatic: true }).vertices);
-      Body.setVertices(leftWall, Bodies.rectangle(-wallThickness / 2 + padding, newHeight / 2, wallThickness, newHeight, { isStatic: true }).vertices);
-      Body.setVertices(rightWall, Bodies.rectangle(newWidth + wallThickness / 2 - padding, newHeight / 2, wallThickness, newHeight, { isStatic: true }).vertices);
-    });
-    
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
-      resizeObserverRef.current = resizeObserver;
-    }
-    
-    // Cleanup function
     return () => {
-      if (resizeObserverRef.current && containerRef.current) {
-        resizeObserverRef.current.unobserve(containerRef.current);
-      }
-      
-      if (renderRef.current) {
-        Render.stop(renderRef.current);
-        renderRef.current.canvas.remove();
-        renderRef.current = null;
-      }
-      
-      if (engineRef.current) {
-        World.clear(engineRef.current.world, false);
-        Engine.clear(engineRef.current);
-        engineRef.current = null;
+      if (containerRef.current) {
+        resizeObserver.unobserve(containerRef.current);
       }
     };
   }, []);
-  
-  // Update bubbles when emotions or themes change
+
+  // Generate items when container size or data changes
   useEffect(() => {
-    if (!engineRef.current || !containerRef.current) return;
+    if (containerSize.width === 0 || containerSize.height === 0) return;
     
-    // Clear existing bubbles first
-    const existingBodies = Array.from(bodiesRef.current.values());
-    if (existingBodies.length > 0) {
-      World.remove(engineRef.current.world, existingBodies);
-      bodiesRef.current.clear();
-    }
+    const padding = Math.min(containerSize.width, containerSize.height) * 0.1;
+    const availableWidth = containerSize.width - padding * 2;
+    const availableHeight = containerSize.height - padding * 2;
     
-    // Determine data source
-    const usingEmotions = Object.keys(emotions).length > 0;
-    const dataSource = usingEmotions 
-      ? Object.entries(emotions).map(([key, value]) => ({ label: key, value }))
-      : themes.map(theme => ({ label: theme, value: 1 }));
+    let newItems: Array<{ name: string; size: number; color: string; position: { x: number; y: number } }> = [];
     
-    // Find max value for scaling
-    const maxValue = usingEmotions 
-      ? Math.max(...Object.values(emotions))
-      : 1;
-    
-    // Calculate available space
-    const containerWidth = containerSize.width;
-    const containerHeight = containerSize.height;
-    
-    // Add padding to ensure bubbles don't touch edges - significantly increased
-    const safetyPadding = 50; // Much larger safety padding for bubble positions
-    
-    // Calculate the usable area with padding
-    const usableWidth = containerWidth - (safetyPadding * 2);
-    const usableHeight = containerHeight - (safetyPadding * 2);
-    
-    // Calculate bubble sizing parameters based on number of items
-    const itemCount = dataSource.length;
-    
-    // More aggressive sizing reduction for items
-    // For mobile screens especially, we want to make sure bubbles are visible
-    // Use a more aggressive formula that scales down faster with more items
-    let sizeMultiplier = 0.12; // Start with a smaller base value
-    
-    // Adjust size based on item count and screen/container size
-    if (itemCount > 1) {
-      // Reduce size faster as item count increases
-      sizeMultiplier = Math.max(0.08, 0.12 - (itemCount * 0.015));
+    // Process emotions or themes
+    if (emotions && Object.keys(emotions).length > 0) {
+      // Get max and min values for normalization
+      const values = Object.values(emotions);
+      const maxValue = Math.max(...values);
+      const minValue = Math.min(...values);
+      const valueRange = maxValue - minValue;
       
-      // Further reduce size on small containers
-      if (usableWidth < 300 || usableHeight < 300) {
-        sizeMultiplier *= 0.8;
-      }
-    }
-    
-    // Calculate maximum bubble size with the new multiplier
-    const maxSize = Math.min(usableWidth, usableHeight) * sizeMultiplier;
-    
-    // Ensure minimum bubble size isn't too small but also not too big
-    const minSize = Math.max(15, Math.min(25, maxSize * 0.4));
-    
-    // Calculate positions to avoid overlaps
-    const bubbles: Array<{ x: number, y: number, radius: number, label: string, color: string }> = [];
-    
-    // First sort by value to place larger bubbles first
-    const sortedData = [...dataSource].sort((a, b) => (b.value || 0) - (a.value || 0));
-    
-    // Process each emotion/theme
-    for (const item of sortedData) {
-      // Use score to determine size, with a minimum size
-      const score = usingEmotions ? item.value : 1;
-      // Cap the normalized score more aggressively to prevent huge bubbles
-      const normalizedScore = Math.min(score, maxValue * 0.8);
+      // Normalize sizes based on container dimensions
+      const minSize = Math.min(availableWidth, availableHeight) * 0.15;
+      const maxSize = Math.min(availableWidth, availableHeight) * 0.3;
       
-      // Calculate radius with more moderate scaling and cap the maximum size
-      const radiusBase = minSize + ((normalizedScore / maxValue) * (maxSize - minSize)) * 0.7;
+      // Calculate how many items we have
+      const itemCount = Object.keys(emotions).length;
+      // Adjust max size based on item count to prevent overcrowding
+      const adjustedMaxSize = Math.min(
+        maxSize,
+        Math.sqrt((availableWidth * availableHeight) / (itemCount * Math.PI)) * 1.2
+      );
       
-      // Make sure the radius isn't too large for the container - apply stricter limit
-      const maxAllowedRadius = Math.min(usableWidth, usableHeight) / (2 * Math.sqrt(itemCount));
-      const effectiveRadius = Math.min(radiusBase, maxAllowedRadius);
-      
-      // Try to find a suitable position
-      let attempts = 0;
-      let validPosition = false;
-      let x = 0, y = 0;
-      
-      // Keep trying positions until we find one that doesn't overlap
-      while (!validPosition && attempts < 50) {
-        // Generate a position that ensures the bubble is fully within the usable area
-        x = safetyPadding + effectiveRadius + Math.random() * (usableWidth - 2 * effectiveRadius);
-        y = safetyPadding + effectiveRadius + Math.random() * (usableHeight - 2 * effectiveRadius);
+      // Create emotion bubbles
+      newItems = Object.entries(emotions).map(([emotion, value], index) => {
+        // Normalize the size between min and max size
+        const normalizedValue = valueRange === 0 
+          ? 0.5 
+          : (value - minValue) / valueRange;
         
-        // Check for overlaps with existing bubbles
-        validPosition = true;
-        for (const bubble of bubbles) {
-          const dx = x - bubble.x;
-          const dy = y - bubble.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+        const size = minSize + (normalizedValue * (adjustedMaxSize - minSize));
+        
+        return {
+          name: emotion,
+          size,
+          color: colorPalette[index % colorPalette.length],
+          position: { x: 0, y: 0 } // Initial position, will be updated below
+        };
+      });
+    } else if (themes && themes.length > 0) {
+      // For themes, use a more consistent size
+      const baseSize = Math.min(availableWidth, availableHeight) * 0.22;
+      const itemCount = themes.length;
+      
+      // Adjust size based on item count
+      const adjustedSize = Math.min(
+        baseSize,
+        Math.sqrt((availableWidth * availableHeight) / (itemCount * Math.PI)) * 1.2
+      );
+      
+      // Create theme bubbles
+      newItems = themes.map((theme, index) => ({
+        name: theme,
+        size: adjustedSize,
+        color: colorPalette[index % colorPalette.length],
+        position: { x: 0, y: 0 } // Initial position, will be updated below
+      }));
+    }
+    
+    // Position bubbles with overlap prevention
+    if (newItems.length > 0) {
+      // Sort by size (larger first) to prioritize larger bubbles in positioning
+      newItems.sort((a, b) => b.size - a.size);
+      
+      for (let i = 0; i < newItems.length; i++) {
+        let isValidPosition = false;
+        let attempts = 0;
+        const maxAttempts = 50;
+        
+        while (!isValidPosition && attempts < maxAttempts) {
+          // Generate random position within boundaries
+          const x = padding + Math.random() * (availableWidth - newItems[i].size);
+          const y = padding + Math.random() * (availableHeight - newItems[i].size);
           
-          // If bubbles touch or overlap, position is invalid
-          if (distance < effectiveRadius + bubble.radius + 8) { // Increased gap between bubbles
-            validPosition = false;
-            break;
+          // Check for overlap with existing bubbles
+          isValidPosition = true;
+          for (let j = 0; j < i; j++) {
+            const dx = x - newItems[j].position.x;
+            const dy = y - newItems[j].position.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = (newItems[i].size + newItems[j].size) * 0.5;
+            
+            if (distance < minDistance) {
+              isValidPosition = false;
+              break;
+            }
           }
+          
+          if (isValidPosition) {
+            newItems[i].position = { x, y };
+          }
+          
+          attempts++;
         }
         
-        attempts++;
+        // If we couldn't find a valid position after max attempts,
+        // just place it somewhere in the container
+        if (attempts >= maxAttempts) {
+          newItems[i].position = {
+            x: padding + Math.random() * (availableWidth - newItems[i].size),
+            y: padding + Math.random() * (availableHeight - newItems[i].size)
+          };
+        }
       }
-      
-      // If we couldn't find a non-overlapping position, place it away from the edges
-      if (!validPosition) {
-        // Place in center area with slight randomization
-        x = containerWidth / 2 + (Math.random() * 20 - 10);
-        y = containerHeight / 2 + (Math.random() * 20 - 10);
-      }
-      
-      // Get color based on emotion label
-      const color = getEmotionColor(item.label);
-      
-      // Store bubble data
-      bubbles.push({ x, y, radius: effectiveRadius, label: item.label, color });
     }
     
-    // Create Matter.js bodies for each bubble
-    bubbles.forEach(bubble => {
-      // Create a circular body
-      const body = Bodies.circle(bubble.x, bubble.y, bubble.radius, {
-        restitution: 0.9, // Bounciness
-        friction: 0.001, // Low friction
-        frictionAir: 0.02, // Air resistance
-        frictionStatic: 0.1, // Low static friction
-        density: 0.02, // Low density to make bubbles feel light
-        // Custom render with label
-        render: {
-          fillStyle: bubble.color,
-          strokeStyle: 'rgba(255, 255, 255, 0.3)',
-          lineWidth: 1,
-        },
-        // Store label for reference
-        label: bubble.label
-      });
-      
-      // Add to world
-      World.add(engineRef.current!.world, body);
-      
-      // Store reference
-      bodiesRef.current.set(bubble.label, body);
-    });
-    
-    // Render text labels for each bubble after physics bodies are added
-    const renderLabels = () => {
-      const context = canvasRef.current?.getContext('2d');
-      if (!context || !canvasRef.current) return;
-      
-      // Clear any existing text (this is handled by Matter.js render)
-      
-      // Draw text on each bubble
-      for (const [label, body] of bodiesRef.current.entries()) {
-        const { x, y } = body.position;
-        const radius = body.circleRadius as number;
-        
-        // Setup text style
-        context.font = `bold ${Math.max(12, Math.min(16, radius * 0.5))}px sans-serif`;
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillStyle = 'white';
-        
-        // Capitalize first letter
-        const displayLabel = label.charAt(0).toUpperCase() + label.slice(1);
-        
-        // Draw text
-        context.fillText(displayLabel, x, y);
-      }
-    };
-    
-    // Add after update event listener to draw labels
-    const afterUpdateEvent = () => {
-      if (renderRef.current) {
-        renderLabels();
-      }
-    };
-    
-    Events.on(renderRef.current!, 'afterRender', afterUpdateEvent);
-    
-    // Clean up event listener
-    return () => {
-      if (renderRef.current) {
-        Events.off(renderRef.current, 'afterRender', afterUpdateEvent);
-      }
-    };
-  }, [emotions, themes, containerSize]);
-  
+    setItems(newItems);
+  }, [containerSize, emotions, themes]);
+
   return (
     <div 
       ref={containerRef} 
-      className="relative w-full h-full rounded-lg overflow-hidden bg-white/90"
-      style={{ padding: '12px' }} // Add padding to the container
+      className={cn(
+        "relative w-full h-full overflow-hidden rounded-md",
+        className
+      )}
     >
-      <canvas ref={canvasRef} className="w-full h-full" />
-      <div className="absolute top-2 right-2 text-xs text-muted-foreground">
-        * Size of bubble represents intensity
-      </div>
+      {items.map((item, index) => (
+        <motion.div
+          key={item.name + index}
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ 
+            opacity: 1, 
+            scale: 1,
+            x: item.position.x,
+            y: item.position.y,
+          }}
+          transition={{ 
+            duration: 0.6,
+            delay: index * 0.1,
+            type: "spring",
+            damping: 10
+          }}
+          className={cn(
+            "absolute rounded-full flex items-center justify-center",
+            item.color
+          )}
+          style={{
+            width: item.size,
+            height: item.size,
+            transform: `translate(${item.position.x}px, ${item.position.y}px)`,
+          }}
+        >
+          <span className="text-xs font-medium px-1 text-center" style={{
+            fontSize: `${Math.max(8, item.size / 5)}px`,
+            lineHeight: '1.2',
+            maxWidth: '90%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {item.name}
+          </span>
+        </motion.div>
+      ))}
     </div>
   );
 };
