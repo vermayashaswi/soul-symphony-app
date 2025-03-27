@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,18 +6,7 @@ import { CalendarDays, MessageSquare, Clock, Volume } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { AudioPlayer } from '@/components/AudioPlayer';
-
-interface JournalEntry {
-  id: number;
-  'transcription text': string;
-  'refined text'?: string;
-  sentiment?: string;
-  emotions?: Record<string, number>;
-  master_themes?: string[];
-  created_at: string;
-  duration?: number;
-  audio_url?: string;
-}
+import { JournalEntry } from '@/types/journal';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
@@ -152,5 +140,4 @@ export function JournalEntryCard({
   );
 }
 
-// Add default export for compatibility with existing imports
 export default JournalEntryCard;

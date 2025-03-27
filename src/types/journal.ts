@@ -13,6 +13,7 @@ export interface JournalEntry {
   emotions?: string[] | null;
   master_themes?: string[] | null;
   duration?: number | null;
+  sentiment?: string | null;
 }
 
 export interface EmbeddingReference {
