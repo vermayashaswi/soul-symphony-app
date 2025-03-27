@@ -146,11 +146,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ themes }) => {
           delay={bubble.delay}
         >
           <div className="flex flex-col items-center text-center">
-            {bubble.emoji ? (
-              <span className="text-lg mb-1">{bubble.emoji}</span>
-            ) : (
-              <div className="h-5 w-5 bg-primary/30 rounded-full mb-1"></div>
-            )}
+            {/* Removed emoji/icon display from bubbles as requested */}
             <span className="text-xs font-medium text-primary/90 max-w-[60px] line-clamp-2">{bubble.theme}</span>
           </div>
         </Bubble>
