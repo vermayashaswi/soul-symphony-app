@@ -146,7 +146,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
     
     // Create world boundaries (invisible walls) with sufficient padding
     // Increase padding to ensure bubbles don't touch the visible edge
-    const padding = 15; // Increased padding to keep bubbles away from edges
+    const padding = 20; // Increased padding to keep bubbles away from edges
     const wallThickness = 50; // Thick enough to prevent bubbles from escaping
     
     // Create invisible walls around the container
@@ -291,15 +291,25 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
     const containerHeight = containerSize.height;
     
     // Add padding to ensure bubbles don't touch edges
-    const safetyPadding = 25; // Increased safety padding for bubble positions
+    const safetyPadding = 30; // Increased safety padding for bubble positions
     
     // Calculate the usable area with padding
     const usableWidth = containerWidth - (safetyPadding * 2);
     const usableHeight = containerHeight - (safetyPadding * 2);
     
-    // Make bubbles slightly smaller to ensure they fit within the container
-    const maxSize = Math.min(usableWidth, usableHeight) * 0.25; // Reduced max size from 30% to 25%
-    const minSize = Math.max(30, maxSize * 0.2); // Min bubble size with a minimum of 30px
+    // Calculate bubble sizing parameters based on number of items
+    const itemCount = dataSource.length;
+    
+    // Dynamic sizing formula:
+    // - For fewer items, allow larger bubbles
+    // - For many items, restrict maximum size
+    const sizeMultiplier = Math.max(0.15, 0.3 - (itemCount * 0.01)); // Decrease multiplier as items increase
+    
+    // Calculate maximum bubble size (responsive to container and item count)
+    const maxSize = Math.min(usableWidth, usableHeight) * sizeMultiplier;
+    
+    // Ensure minimum bubble size isn't too small
+    const minSize = Math.max(20, maxSize * 0.4);
     
     // Calculate positions to avoid overlaps
     const bubbles: Array<{ x: number, y: number, radius: number, label: string, color: string }> = [];
@@ -311,10 +321,13 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({ emotions = {}, themes =
     for (const item of sortedData) {
       // Use score to determine size, with a minimum size
       const score = usingEmotions ? item.value : 1;
-      const radius = minSize + ((score / maxValue) * (maxSize - minSize)) / 2;
+      const normalizedScore = Math.min(score, maxValue); // Cap at max value to prevent oversized bubbles
+      
+      // Calculate radius with more moderate scaling
+      const radius = minSize + ((normalizedScore / maxValue) * (maxSize - minSize)) * 0.8;
       
       // Make sure the radius isn't too large for the container
-      const effectiveRadius = Math.min(radius, Math.min(usableWidth, usableHeight) / 3);
+      const effectiveRadius = Math.min(radius, Math.min(usableWidth, usableHeight) / 4);
       
       // Try to find a suitable position
       let attempts = 0;
