@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -30,7 +31,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
   themes, 
   className,
   onEmotionClick,
-  preventOverlap = false
+  preventOverlap = true // Changed default to true to prevent overlapping
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -99,13 +100,14 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     };
   }, []);
 
+  // Enhanced random forces for better hover animation
   const applyRandomForces = () => {
     if (!engineRef.current || !bubblesRef.current.length) return;
     
     bubblesRef.current.forEach((bubble) => {
-      if (Math.random() > 0.95) {
-        const forceX = (Math.random() - 0.5) * 0.001;
-        const forceY = (Math.random() - 0.5) * 0.001;
+      if (Math.random() > 0.90) { // Increased probability for more movement
+        const forceX = (Math.random() - 0.5) * 0.0015; // Slightly stronger force
+        const forceY = (Math.random() - 0.5) * 0.0015;
         Body.applyForce(bubble.body, bubble.body.position, { x: forceX, y: forceY });
       }
     });
@@ -336,7 +338,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       const minValue = Math.min(...values);
       const valueRange = maxValue - minValue;
       
-      const totalArea = availableWidth * availableHeight * 0.7;
+      // Adjusted to use less total area to prevent overcrowding
+      const totalArea = availableWidth * availableHeight * 0.6;
       const itemCount = Object.keys(emotions).length;
       
       const emotionEntries = Object.entries(emotions);
@@ -345,9 +348,10 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         minSize: calculateMinBubbleSize(emotion)
       }));
       
+      // Smaller max bubble size to reduce overlap
       const maxBubbleSize = Math.min(
-        Math.min(availableWidth, availableHeight) * 0.4,
-        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.8
+        Math.min(availableWidth, availableHeight) * 0.35,
+        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.5
       );
       
       newItems = emotionEntries.map(([emotion, value], index) => {
@@ -359,7 +363,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           size = minSize;
         } else {
           const normalizedValue = (value - minValue) / valueRange;
-          size = minSize + (normalizedValue * (maxBubbleSize - minSize));
+          // Scale the size more conservatively
+          size = minSize + (normalizedValue * (maxBubbleSize - minSize) * 0.8);
         }
         
         return {
@@ -373,15 +378,18 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     } else if (themes && themes.length > 0) {
       const itemCount = themes.length;
       
-      const totalArea = availableWidth * availableHeight * 0.7;
+      // Adjusted to use less total area
+      const totalArea = availableWidth * availableHeight * 0.6;
+      // Smaller max bubble size
       const maxBubbleSize = Math.min(
-        Math.min(availableWidth, availableHeight) * 0.35,
-        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.5
+        Math.min(availableWidth, availableHeight) * 0.3,
+        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.3
       );
       
       newItems = themes.map((theme, index) => {
         const minSize = calculateMinBubbleSize(theme);
         
+        // Ensure more consistent sizing with less variation
         const size = Math.min(maxBubbleSize, Math.max(minSize, maxBubbleSize * 0.7));
         
         return {
@@ -397,8 +405,10 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       newItems.sort((a, b) => b.size - a.size);
       
       for (let i = 0; i < newItems.length; i++) {
+        // Enhanced placement algorithm to reduce overlaps
         const placeItem = (item: any, index: number, attempts = 0) => {
           if (attempts > 50) {
+            // Grid placement as fallback
             const cols = Math.ceil(Math.sqrt(newItems.length));
             const col = index % cols;
             const row = Math.floor(index / cols);
@@ -411,23 +421,27 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
             };
           }
           
+          // Use spiral placement with increasing radius
           const maxRadius = Math.min(availableWidth, availableHeight) * 0.4;
-          const maxAngle = 2 * Math.PI * 3;
+          const maxAngle = 2 * Math.PI * 4; // More revolutions for better distribution
           
           const t = index / newItems.length;
           const angle = t * maxAngle;
-          const radius = t * maxRadius;
+          // Square root for more even distribution
+          const radius = Math.sqrt(t) * maxRadius;
           
           const centerX = availableWidth / 2;
           const centerY = availableHeight / 2;
           
-          const randomOffset = Math.min(availableWidth, availableHeight) * 0.05;
+          // Reduced random offset to maintain pattern
+          const randomOffset = Math.min(availableWidth, availableHeight) * 0.03;
           const randomX = (Math.random() - 0.5) * randomOffset;
           const randomY = (Math.random() - 0.5) * randomOffset;
           
           const x = padding + centerX + radius * Math.cos(angle) + randomX;
           const y = padding + centerY + radius * Math.sin(angle) + randomY;
           
+          // Check for overlaps with more strict spacing
           if (preventOverlap && attempts < 50) {
             for (let j = 0; j < i; j++) {
               const otherItem = newItems[j];
@@ -435,7 +449,10 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
               const dy = y - otherItem.position.y;
               const distance = Math.sqrt(dx * dx + dy * dy);
               
-              if (distance < (item.size / 2 + otherItem.size / 2) * 0.8) {
+              // Increased spacing factor from 0.8 to 1.1 to ensure bubbles don't overlap
+              const minDistance = (item.size / 2 + otherItem.size / 2) * 1.1;
+              
+              if (distance < minDistance) {
                 return placeItem(item, index, attempts + 1);
               }
             }
@@ -479,6 +496,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     }
   };
 
+  // Enhanced animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -522,6 +540,16 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     }
   };
 
+  // Added floating animation for non-physics bubbles
+  const floatingAnimation = {
+    y: [0, -5, 0, 5, 0],
+    transition: {
+      duration: 3 + Math.random() * 2, // Random duration for variety
+      repeat: Infinity,
+      ease: "easeInOut"
+    }
+  };
+
   return (
     <div 
       ref={containerRef} 
@@ -547,7 +575,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
               }}
             >
               <motion.div
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.1 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >
                 <EmotionBubbleDetail
@@ -579,6 +607,11 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
                 animate="show"
                 exit="exit"
                 whileHover="hover"
+                whileInView={floatingAnimation} // Added floating animation
+                style={{
+                  // Add a slight delay to each bubble's animation
+                  transition: `all 0.3s ${index * 0.05}s`
+                }}
               >
                 <EmotionBubbleDetail
                   name={item.name}
