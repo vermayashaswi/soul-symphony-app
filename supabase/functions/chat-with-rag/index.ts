@@ -123,7 +123,7 @@ serve(async (req) => {
     const searchStartTime = Date.now();
     let similarEntries;
     try {
-      // FIX: Convert userId to UUID type for the match_journal_entries function
+      // Use the updated match_journal_entries function that properly handles UUID to text conversion
       const { data, error } = await supabase.rpc(
         'match_journal_entries',
         {
@@ -150,6 +150,10 @@ serve(async (req) => {
           id: entry.id,
           score: entry.similarity
         }));
+        
+        // Log the similarity scores to check the results
+        console.log("Found similar entries:", similarEntries.length);
+        console.log("Similarity scores:", JSON.stringify(similarityScores));
       }
     } catch (error) {
       console.error("Error in similarity search:", error);
@@ -167,9 +171,11 @@ serve(async (req) => {
         
         // Fetch full entries for context
         const entryIds = similarEntries.map(entry => entry.id);
+        
+        // Using column name with space "refined text" instead of "refinedtext"
         const { data: entries, error: entriesError } = await supabase
           .from('Journal Entries')
-          .select('id, refined text, created_at, emotions')
+          .select('id, "refined text", created_at, emotions')
           .in('id', entryIds);
         
         if (entriesError) {
@@ -202,7 +208,7 @@ serve(async (req) => {
         // Fallback to recent entries if no similar ones found
         const { data: recentEntries, error: recentError } = await supabase
           .from('Journal Entries')
-          .select('id, refined text, created_at, emotions')
+          .select('id, "refined text", created_at, emotions')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(3);
