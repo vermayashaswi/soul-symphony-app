@@ -3,13 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Bot, Loader2, Brain } from 'lucide-react';
+import { Send, Bot, Loader2, Brain, BrainCircuit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import ChatDiagnostics from './ChatDiagnostics';
 
 export interface MessageReference {
   id: number;
@@ -33,6 +34,14 @@ interface ChatAreaProps {
   onNewThreadCreated: (threadId: string) => void;
 }
 
+interface DiagnosticsStep {
+  id: number;
+  step: string;
+  status: 'pending' | 'success' | 'error' | 'loading';
+  details?: string;
+  timestamp?: string;
+}
+
 export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -40,7 +49,16 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showWelcome, setShowWelcome] = useState(true);
-  
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [ragSteps, setRagSteps] = useState<DiagnosticsStep[]>([
+    { id: 1, step: "Query Embedding Generation", status: 'pending' },
+    { id: 2, step: "Vector Similarity Search", status: 'pending' },
+    { id: 3, step: "Context Construction", status: 'pending' },
+    { id: 4, step: "LLM Response Generation", status: 'pending' },
+  ]);
+  const [similarityScores, setSimilarityScores] = useState<{id: number, score: number}[] | null>(null);
+  const [currentQuery, setCurrentQuery] = useState("");
+
   const demoQuestions = [
     "How can I manage my anxiety better?",
     "What are some good journaling prompts for self-reflection?",
@@ -132,10 +150,37 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     }
   };
 
+  const resetRagSteps = () => {
+    setRagSteps([
+      { id: 1, step: "Query Embedding Generation", status: 'pending' },
+      { id: 2, step: "Vector Similarity Search", status: 'pending' },
+      { id: 3, step: "Context Construction", status: 'pending' },
+      { id: 4, step: "LLM Response Generation", status: 'pending' },
+    ]);
+    setSimilarityScores(null);
+  };
+
+  const updateRagStep = (id: number, status: 'pending' | 'success' | 'error' | 'loading', details?: string) => {
+    setRagSteps(prev => 
+      prev.map(step => 
+        step.id === id 
+          ? { 
+              ...step, 
+              status, 
+              details, 
+              timestamp: new Date().toLocaleTimeString() 
+            } 
+          : step
+      )
+    );
+  };
+
   const handleSendMessage = async (content: string = inputValue) => {
     if (!content.trim() || !userId) return;
     
     const isNewThread = !threadId;
+    setCurrentQuery(content.trim());
+    resetRagSteps();
     
     const tempUserMessage: Message = {
       id: Date.now().toString(),
@@ -148,8 +193,11 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     setInputValue('');
     setIsLoading(true);
     setShowWelcome(false);
+    setShowDiagnostics(true);
     
     try {
+      updateRagStep(1, 'loading', 'Generating embedding for query...');
+      
       console.log("Sending message to chat-with-rag function");
       
       const { data, error } = await supabase.functions.invoke('chat-with-rag', {
@@ -158,18 +206,52 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
           userId: userId,
           threadId: threadId,
           isNewThread: isNewThread,
-          threadTitle: content.substring(0, 30) + (content.length > 30 ? "..." : "")
+          threadTitle: content.substring(0, 30) + (content.length > 30 ? "..." : ""),
+          includeDiagnostics: true
         }
       });
       
       if (error) {
         console.error('Error calling chat function:', error);
         toast.error('Failed to get a response. Please try again.');
+        updateRagStep(1, 'error', 'Failed to generate embedding: API error');
         setIsLoading(false);
         return;
       }
       
       console.log("Received response from chat-with-rag function:", data);
+      
+      if (data.diagnostics) {
+        if (data.diagnostics.embeddingGenerated) {
+          updateRagStep(1, 'success', 'Embedding generated successfully');
+        } else {
+          updateRagStep(1, 'error', data.diagnostics.embeddingError || 'Failed to generate embedding');
+        }
+        
+        if (data.diagnostics.similaritySearchComplete) {
+          updateRagStep(2, 'success', 
+            `Found ${data.references?.length || 0} relevant entries`);
+          
+          if (data.diagnostics.similarityScores) {
+            setSimilarityScores(data.diagnostics.similarityScores);
+          }
+        } else {
+          updateRagStep(2, 'error', data.diagnostics.searchError || 'Failed to perform similarity search');
+        }
+        
+        if (data.diagnostics.contextBuilt) {
+          updateRagStep(3, 'success', 
+            `Built context with ${data.diagnostics.contextSize || 0} characters`);
+        } else {
+          updateRagStep(3, 'error', data.diagnostics.contextError || 'Failed to build context');
+        }
+        
+        if (data.response) {
+          updateRagStep(4, 'success', `Generated response with ${data.diagnostics.tokenCount || 'unknown'} tokens`);
+        } else {
+          updateRagStep(4, 'error', data.diagnostics.llmError || 'Failed to generate response');
+        }
+      }
       
       if (isNewThread && data.threadId) {
         onNewThreadCreated(data.threadId);
@@ -187,6 +269,11 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     } catch (err) {
       console.error('Error in chat:', err);
       toast.error('Something went wrong. Please try again later.');
+      ragSteps.forEach(step => {
+        if (step.status === 'pending' || step.status === 'loading') {
+          updateRagStep(step.id, 'error', 'Process failed');
+        }
+      });
     } finally {
       setIsLoading(false);
     }
@@ -201,6 +288,18 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
 
   return (
     <div className="flex flex-col h-full">
+      <div className="flex justify-end px-4 pt-2">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => setShowDiagnostics(!showDiagnostics)}
+          className="flex items-center gap-1 text-xs"
+        >
+          <BrainCircuit className="h-3 w-3" />
+          {showDiagnostics ? "Hide Diagnostics" : "Show Diagnostics"}
+        </Button>
+      </div>
+      
       <div className="flex flex-col space-y-4 mb-4 flex-1 overflow-y-auto px-4 py-4">
         {isLoadingMessages ? (
           <div className="flex-1 flex items-center justify-center">
@@ -290,6 +389,17 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         
         <div ref={messagesEndRef} />
       </div>
+      
+      {showDiagnostics && (
+        <ChatDiagnostics 
+          queryText={currentQuery}
+          isVisible={showDiagnostics}
+          ragSteps={ragSteps}
+          references={messages.length > 0 ? 
+            messages[messages.length - 1].reference_entries : null}
+          similarityScores={similarityScores}
+        />
+      )}
       
       <AnimatePresence>
         {showWelcome && messages.length <= 2 && (
