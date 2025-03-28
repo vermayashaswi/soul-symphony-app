@@ -103,9 +103,9 @@ export default function ChatDiagnostics({
                     <TableRow key={ref.id}>
                       <TableCell>{ref.id}</TableCell>
                       <TableCell>
-                        {ref.similarity 
+                        {ref.similarity !== undefined 
                           ? `${(ref.similarity * 100).toFixed(2)}%` 
-                          : similarityScores?.find(s => s.id === ref.id)?.score 
+                          : similarityScores?.find(s => s.id === ref.id)?.score !== undefined
                             ? `${(similarityScores.find(s => s.id === ref.id)?.score || 0 * 100).toFixed(2)}%`
                             : "N/A"
                         }

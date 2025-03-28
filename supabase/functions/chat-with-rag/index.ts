@@ -123,7 +123,8 @@ serve(async (req) => {
     const searchStartTime = Date.now();
     let similarEntries;
     try {
-      // Use the updated match_journal_entries function that properly handles UUID to text conversion
+      // Ensure userId is properly formatted for the function call
+      // Our SQL function expects a UUID, and the user_id in Journal Entries is stored as text
       const { data, error } = await supabase.rpc(
         'match_journal_entries',
         {
@@ -145,7 +146,7 @@ serve(async (req) => {
       diagnostics.similaritySearchComplete = true;
       diagnostics.processingTime.search = Date.now() - searchStartTime;
       
-      if (similarEntries) {
+      if (similarEntries && similarEntries.length > 0) {
         similarityScores = similarEntries.map(entry => ({
           id: entry.id,
           score: entry.similarity
