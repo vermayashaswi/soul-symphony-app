@@ -214,7 +214,7 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Soul-days</h3>
+        <h3 className="text-xl font-semibold">Themes</h3>
       </div>
       
       <motion.div
