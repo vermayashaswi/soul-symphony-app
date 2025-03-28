@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -54,11 +53,17 @@ serve(async (req) => {
 
 async function extractThemes(text: string): Promise<string[]> {
   const prompt = `
-    Extract the 5 most important emotional themes or concepts from the following journal entry.
-    Return them as a JSON array of strings, with each string being a single word or very short phrase (max 2-3 words).
+    Extract exactly 5-7 important emotional themes or concepts from the following journal entry.
+    Return them as a JSON array of strings, with each string being a single word or very short phrase (max 2 words).
     Focus on emotional states, personal growth concepts, or psychological themes.
     
-    For example: ["gratitude", "work stress", "family connection", "personal growth", "anxiety"]
+    Examples of good themes: ["Happiness", "Growth", "Family", "Work", "Health", "Stress", "Gratitude"]
+    
+    Important: 
+    - Keep themes short (1-2 words)
+    - Capitalize the first letter of each theme
+    - Return only the most important themes from the journal entry
+    - Make sure the themes are universal concepts that many people experience
     
     Journal entry:
     ${text}
@@ -98,7 +103,7 @@ async function extractThemes(text: string): Promise<string[]> {
         return matches[0].split(/,\s*/).map(s => s.replace(/[\[\]"]/g, ''));
       }
       // Last resort fallback
-      return ["emotion", "feeling", "reflection", "thought", "insight"];
+      return ["Happiness", "Growth", "Reflection", "Insight", "Emotion"];
     }
   } catch (error) {
     console.error('Error calling OpenAI:', error);

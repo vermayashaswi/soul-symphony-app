@@ -6,6 +6,7 @@ import { Sparkles, Smile, Meh, Frown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EmotionChart from '@/components/EmotionChart';
 import EmotionBubbles from '@/components/EmotionBubbles';
+import ThemeBoxes from '@/components/journal/ThemeBoxes';
 import { useToast } from '@/components/ui/use-toast';
 
 // Type for JournalEntry matching Supabase table schema
@@ -152,6 +153,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                 whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
                 transition={{ duration: 0.2 }}
               >
+                {/* Replace the EmotionBubbles with our new ThemeBoxes component when showing themes */}
                 {entry.emotions && Object.keys(entry.emotions).length > 0 ? (
                   <EmotionBubbles 
                     emotions={entry.emotions} 
@@ -159,10 +161,9 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                     onEmotionClick={handleEmotionClick} 
                   />
                 ) : entry.master_themes && entry.master_themes.length > 0 ? (
-                  <EmotionBubbles 
-                    themes={entry.master_themes.slice(0, 5)} 
-                    className="w-full h-full"
-                    onEmotionClick={handleEmotionClick}
+                  <ThemeBoxes 
+                    themes={entry.master_themes} 
+                    className="w-full h-full items-center justify-center" 
                   />
                 ) : (
                   <p className="text-muted-foreground text-center">Analyzing emotions...</p>
