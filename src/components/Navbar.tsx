@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -71,17 +72,17 @@ export function Navbar() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
-            className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center"
+            className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse"
           >
-            <span className="text-white font-bold text-lg">F</span>
+            <span className="text-white font-bold text-lg">S</span>
           </motion.div>
           <motion.span 
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="font-semibold text-xl"
+            className="font-semibold text-xl text-gradient"
           >
-            Feelosophy
+            SoUlo
           </motion.span>
         </Link>
 

@@ -239,8 +239,8 @@ const Index = () => {
           className="text-center mb-12"
           variants={itemVariants}
         >
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome to Feelosophy</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome to SoUlo</h1>
+          <p className="text-xl max-w-2xl mx-auto bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent animate-pulse shadow-glow">
             Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
           </p>
           

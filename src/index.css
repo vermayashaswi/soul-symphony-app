@@ -114,10 +114,14 @@
   }
   
   .text-gradient {
-    @apply bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent;
   }
   
   .text-balance {
     text-wrap: balance;
+  }
+
+  .shadow-glow {
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
   }
 }
