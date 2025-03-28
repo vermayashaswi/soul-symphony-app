@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar } from '@/components/ui/calendar';
@@ -180,6 +181,7 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
               components={{
                 Day: ({ date, ...props }) => {
                   const dayContent = renderDay(date);
+                  // Fix: Remove the displayMonth prop and pass all other props correctly
                   return dayContent ? (
                     <div {...props}>
                       {dayContent}
