@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -37,7 +36,6 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Get user's initials for avatar
   const getUserInitials = () => {
     if (!user) return "?";
     
@@ -82,11 +80,10 @@ export function Navbar() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="font-semibold text-xl text-gradient"
           >
-            SoUlo
+            SOULo
           </motion.span>
         </Link>
 
-        {/* Desktop navigation */}
         <div className="hidden md:flex items-center gap-1">
           {navItems.map((item) => (
             <Link
@@ -146,7 +143,6 @@ export function Navbar() {
           )}
         </div>
 
-        {/* Mobile menu button */}
         <div className="md:hidden flex items-center gap-2">
           {user ? (
             <DropdownMenu>
@@ -190,7 +186,6 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {isMobile && (
         <motion.div
           initial={{ height: 0, opacity: 0 }}

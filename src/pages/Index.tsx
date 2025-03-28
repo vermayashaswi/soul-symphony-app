@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -225,7 +224,6 @@ const Index = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* The particle background must be the first element inside the container */}
       <ParticleBackground />
       <Navbar />
       
@@ -239,7 +237,7 @@ const Index = () => {
           className="text-center mb-12"
           variants={itemVariants}
         >
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome to SoUlo</h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome to SOULo</h1>
           <p className="text-xl max-w-2xl mx-auto bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent animate-pulse shadow-glow">
             Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
           </p>
