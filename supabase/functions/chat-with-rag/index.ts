@@ -64,218 +64,194 @@ function formatEmotions(emotions: Record<string, number> | null | undefined): st
     .join(", ");
 }
 
-// Retrieve and format thread history as context
-async function getThreadHistory(threadId: string) {
-  const { data: messages, error } = await supabase
-    .from('chat_messages')
-    .select('*')
-    .eq('thread_id', threadId)
-    .order('created_at', { ascending: true })
-    .limit(10); // Limit to most recent messages
-
-  if (error) {
-    console.error("Error retrieving thread history:", error);
-    return [];
-  }
-
-  return messages.map(msg => ({
-    role: msg.sender === 'user' ? 'user' : 'assistant',
-    content: msg.content
-  }));
-}
-
-// Store user query with its embedding
-async function storeUserQuery(userId: string, queryText: string, embedding: any) {
-  const { error } = await supabase
-    .from('user_queries')
-    .insert({
-      user_id: userId,
-      query_text: queryText,
-      embedding: embedding
-    });
-
-  if (error) {
-    console.error("Error storing user query:", error);
-  }
-}
-
-// Store assistant response in chat messages
-async function storeMessage(threadId: string, content: string, sender: 'user' | 'assistant', references = null) {
-  const { error } = await supabase
-    .from('chat_messages')
-    .insert({
-      thread_id: threadId,
-      content: content,
-      sender: sender,
-      reference_entries: references
-    });
-
-  if (error) {
-    console.error("Error storing message:", error);
-  }
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const diagnostics = {
+    embeddingGenerated: false,
+    embeddingError: null,
+    similaritySearchComplete: false,
+    searchError: null,
+    contextBuilt: false,
+    contextError: null,
+    contextSize: 0,
+    tokenCount: 0,
+    llmError: null,
+    processingTime: {
+      embedding: 0,
+      search: 0,
+      context: 0,
+      llm: 0,
+      total: 0
+    }
+  };
+  
+  const startTime = Date.now();
+
   try {
-    const { message, userId, threadId, isNewThread, threadTitle } = await req.json();
+    const { message, userId, threadId, isNewThread, threadTitle, includeDiagnostics } = await req.json();
     
-    if (!message || !userId) {
-      throw new Error('Message and userId are required');
+    if (!message) {
+      throw new Error('No message provided');
     }
 
-    let currentThreadId = threadId;
     console.log("Processing chat request for user:", userId);
-    console.log("Thread ID:", currentThreadId);
-    console.log("Is new thread:", isNewThread);
     console.log("Message:", message.substring(0, 50) + "...");
+    console.log("Include diagnostics:", includeDiagnostics ? "yes" : "no");
     
-    // Create a new thread if needed
-    if (isNewThread) {
-      const title = threadTitle || message.substring(0, 30) + (message.length > 30 ? "..." : "");
-      const { data: newThread, error } = await supabase
-        .from('chat_threads')
-        .insert({
-          user_id: userId,
-          title: title,
-        })
-        .select('id')
-        .single();
-        
-      if (error) {
-        console.error("Error creating new thread:", error);
-        throw error;
-      }
-      
-      currentThreadId = newThread.id;
-      console.log("Created new thread with ID:", currentThreadId);
-    }
-    
-    // Store user message
-    await storeMessage(currentThreadId, message, 'user');
+    let similarityScores = [];
     
     // Generate embedding for the user query
     console.log("Generating embedding for user query...");
-    const queryEmbedding = await generateEmbedding(message);
-    
-    // Store user query with embedding for future use
-    await storeUserQuery(userId, message, queryEmbedding);
+    const embeddingStartTime = Date.now();
+    let queryEmbedding;
+    try {
+      queryEmbedding = await generateEmbedding(message);
+      diagnostics.embeddingGenerated = true;
+      diagnostics.processingTime.embedding = Date.now() - embeddingStartTime;
+    } catch (error) {
+      console.error("Error generating embedding:", error);
+      diagnostics.embeddingError = error.message;
+      throw error;
+    }
     
     // Search for relevant journal entries using vector similarity
     console.log("Searching for relevant context using match_journal_entries function...");
-    const { data: similarEntries, error: searchError } = await supabase.rpc(
-      'match_journal_entries',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 5,
-        user_id_filter: userId
+    const searchStartTime = Date.now();
+    let similarEntries;
+    try {
+      // FIX: Convert userId to UUID type for the match_journal_entries function
+      const { data, error } = await supabase.rpc(
+        'match_journal_entries',
+        {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.5,
+          match_count: 5,
+          user_id_filter: userId
+        }
+      );
+      
+      if (error) {
+        console.error("Error searching for similar entries:", error);
+        console.error("Search error details:", JSON.stringify(error));
+        diagnostics.searchError = error.message || "Database search error";
+        throw error;
       }
-    );
-    
-    if (searchError) {
-      console.error("Error searching for similar entries:", searchError);
-      console.error("Search error details:", JSON.stringify(searchError));
+      
+      similarEntries = data;
+      diagnostics.similaritySearchComplete = true;
+      diagnostics.processingTime.search = Date.now() - searchStartTime;
+      
+      if (similarEntries) {
+        similarityScores = similarEntries.map(entry => ({
+          id: entry.id,
+          score: entry.similarity
+        }));
+      }
+    } catch (error) {
+      console.error("Error in similarity search:", error);
+      diagnostics.searchError = error.message || "Error in similarity search";
     }
     
     // Create RAG context from relevant entries
+    const contextStartTime = Date.now();
     let journalContext = "";
     let referenceEntries = [];
     
-    if (similarEntries && similarEntries.length > 0) {
-      console.log("Found similar entries:", similarEntries.length);
-      
-      // Fetch full entries for context
-      const entryIds = similarEntries.map(entry => entry.id);
-      const { data: entries, error: entriesError } = await supabase
-        .from('Journal Entries')
-        .select('id, refined text, created_at, emotions')
-        .in('id', entryIds);
-      
-      if (entriesError) {
-        console.error("Error retrieving journal entries:", entriesError);
-      } else if (entries && entries.length > 0) {
-        console.log("Retrieved full entries:", entries.length);
+    try {
+      if (similarEntries && similarEntries.length > 0) {
+        console.log("Found similar entries:", similarEntries.length);
         
-        // Store reference information
-        referenceEntries = entries.map(entry => ({
-          id: entry.id,
-          date: entry.created_at,
-          snippet: entry["refined text"]?.substring(0, 100) + "...",
-          similarity: similarEntries.find(se => se.id === entry.id)?.similarity || 0
-        }));
+        // Fetch full entries for context
+        const entryIds = similarEntries.map(entry => entry.id);
+        const { data: entries, error: entriesError } = await supabase
+          .from('Journal Entries')
+          .select('id, refined text, created_at, emotions')
+          .in('id', entryIds);
         
-        // Format entries as context with emotions data
-        journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
-          entries.map((entry, index) => {
-            const date = new Date(entry.created_at).toLocaleDateString();
-            const emotionsText = formatEmotions(entry.emotions);
-            return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
-          }).join('\n\n') + "\n\n";
+        if (entriesError) {
+          console.error("Error retrieving journal entries:", entriesError);
+          diagnostics.contextError = entriesError.message || "Error retrieving journal entries";
+        } else if (entries && entries.length > 0) {
+          console.log("Retrieved full entries:", entries.length);
+          
+          // Store reference information
+          referenceEntries = entries.map(entry => ({
+            id: entry.id,
+            date: entry.created_at,
+            snippet: entry["refined text"]?.substring(0, 100) + "...",
+            similarity: similarEntries.find(se => se.id === entry.id)?.similarity || 0
+          }));
+          
+          // Format entries as context with emotions data
+          journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
+            entries.map((entry, index) => {
+              const date = new Date(entry.created_at).toLocaleDateString();
+              const emotionsText = formatEmotions(entry.emotions);
+              return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
+            }).join('\n\n') + "\n\n";
+            
+          diagnostics.contextBuilt = true;
+          diagnostics.contextSize = journalContext.length;
+        }
+      } else {
+        console.log("No similar entries found, falling back to recent entries");
+        // Fallback to recent entries if no similar ones found
+        const { data: recentEntries, error: recentError } = await supabase
+          .from('Journal Entries')
+          .select('id, refined text, created_at, emotions')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(3);
+        
+        if (recentError) {
+          console.error("Error retrieving recent entries:", recentError);
+          diagnostics.contextError = recentError.message || "Error retrieving recent entries";
+        } else if (recentEntries && recentEntries.length > 0) {
+          console.log("Retrieved recent entries:", recentEntries.length);
+          
+          // Store reference information
+          referenceEntries = recentEntries.map(entry => ({
+            id: entry.id,
+            date: entry.created_at,
+            snippet: entry["refined text"]?.substring(0, 100) + "...",
+            type: "recent"
+          }));
+          
+          journalContext = "Here are some of your recent journal entries:\n\n" + 
+            recentEntries.map((entry, index) => {
+              const date = new Date(entry.created_at).toLocaleDateString();
+              const emotionsText = formatEmotions(entry.emotions);
+              return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
+            }).join('\n\n') + "\n\n";
+            
+          diagnostics.contextBuilt = true;
+          diagnostics.contextSize = journalContext.length;
+        }
       }
-    } else {
-      console.log("No similar entries found, falling back to recent entries");
-      // Fallback to recent entries if no similar ones found
-      const { data: recentEntries, error: recentError } = await supabase
-        .from('Journal Entries')
-        .select('id, refined text, created_at, emotions')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(3);
-      
-      if (recentError) {
-        console.error("Error retrieving recent entries:", recentError);
-      } else if (recentEntries && recentEntries.length > 0) {
-        console.log("Retrieved recent entries:", recentEntries.length);
-        
-        // Store reference information
-        referenceEntries = recentEntries.map(entry => ({
-          id: entry.id,
-          date: entry.created_at,
-          snippet: entry["refined text"]?.substring(0, 100) + "...",
-          type: "recent"
-        }));
-        
-        journalContext = "Here are some of your recent journal entries:\n\n" + 
-          recentEntries.map((entry, index) => {
-            const date = new Date(entry.created_at).toLocaleDateString();
-            const emotionsText = formatEmotions(entry.emotions);
-            return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
-          }).join('\n\n') + "\n\n";
-      }
+    } catch (contextError) {
+      console.error("Error building context:", contextError);
+      diagnostics.contextError = contextError.message || "Error building context";
     }
     
-    // Get conversation history for this thread
-    const previousMessages = await getThreadHistory(currentThreadId);
+    diagnostics.processingTime.context = Date.now() - contextStartTime;
     
     // Prepare system prompt with RAG context
     const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling. 
 ${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
-Based on the above context (if available) and the conversation history, provide a thoughtful, personalized response.
+Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
 Focus on being helpful rather than diagnostic.`;
 
-    console.log("Sending to GPT with RAG context and conversation history...");
+    console.log("Sending to GPT with RAG context...");
     
+    const llmStartTime = Date.now();
     try {
-      // Send to GPT with RAG context and conversation history
-      const messagesForGPT = [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        ...previousMessages,
-        {
-          role: 'user',
-          content: message
-        }
-      ];
-      
+      // Send to GPT with RAG context
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -284,29 +260,42 @@ Focus on being helpful rather than diagnostic.`;
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
-          messages: messagesForGPT,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: message
+            }
+          ],
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error("GPT API error:", errorText);
+        diagnostics.llmError = errorText || "Error from GPT API";
         throw new Error(`GPT API error: ${errorText}`);
       }
 
       const result = await response.json();
       const aiResponse = result.choices[0].message.content;
+      diagnostics.tokenCount = result.usage?.total_tokens || 0;
+      diagnostics.processingTime.llm = Date.now() - llmStartTime;
       
       console.log("AI response generated successfully");
       
-      // Store assistant response
-      await storeMessage(currentThreadId, aiResponse, 'assistant', referenceEntries.length > 0 ? referenceEntries : null);
+      diagnostics.processingTime.total = Date.now() - startTime;
       
       return new Response(
         JSON.stringify({ 
           response: aiResponse, 
-          threadId: currentThreadId, 
-          references: referenceEntries 
+          threadId: threadId,
+          references: referenceEntries,
+          diagnostics,
+          similarityScores
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -314,6 +303,8 @@ Focus on being helpful rather than diagnostic.`;
       );
     } catch (apiError) {
       console.error("API error:", apiError);
+      diagnostics.llmError = apiError.message || "API error";
+      diagnostics.processingTime.total = Date.now() - startTime;
       
       // Return a 200 status even for errors to avoid CORS issues
       return new Response(
@@ -321,7 +312,7 @@ Focus on being helpful rather than diagnostic.`;
           error: apiError.message, 
           response: "I'm having trouble connecting right now. Please try again later.",
           success: false,
-          threadId: currentThreadId
+          diagnostics
         }),
         { 
           status: 200,
@@ -330,14 +321,16 @@ Focus on being helpful rather than diagnostic.`;
       );
     }
   } catch (error) {
-    console.error("Error in chat-with-rag function:", error);
+    console.error("Error in chat-rag function:", error);
+    diagnostics.processingTime.total = Date.now() - startTime;
     
     // Return 200 status even for errors to avoid CORS issues
     return new Response(
       JSON.stringify({ 
         error: error.message, 
         response: "I'm having trouble processing your request. Please try again later.",
-        success: false 
+        success: false,
+        diagnostics
       }),
       {
         status: 200,

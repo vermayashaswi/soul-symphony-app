@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -232,8 +233,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
           updateRagStep(2, 'success', 
             `Found ${data.references?.length || 0} relevant entries`);
           
-          if (data.diagnostics.similarityScores) {
-            setSimilarityScores(data.diagnostics.similarityScores);
+          if (data.diagnostics.similarityScores || data.similarityScores) {
+            setSimilarityScores(data.diagnostics.similarityScores || data.similarityScores);
           }
         } else {
           updateRagStep(2, 'error', data.diagnostics.searchError || 'Failed to perform similarity search');
