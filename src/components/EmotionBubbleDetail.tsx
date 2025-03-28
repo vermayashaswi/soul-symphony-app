@@ -46,14 +46,21 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     padding: '12%'
   };
 
+  // Create a pulsing animation
+  const pulseAnimation = {
+    scale: [1, 1.03, 1],
+    transition: {
+      duration: 3,
+      repeat: Infinity,
+      ease: "easeInOut"
+    }
+  };
+
   return (
     <HoverCard openDelay={200} closeDelay={100}>
       <HoverCardTrigger asChild>
         <motion.div
-          whileHover={{ 
-            scale: 1.08, 
-            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" 
-          }}
+          animate={pulseAnimation}
           whileTap={{ scale: 0.95 }}
           className={cn(
             "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow",
@@ -63,10 +70,6 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
           style={{ width: size, height: size }}
           onClick={handleClick}
           initial={{ opacity: 0.9 }}
-          animate={{ 
-            opacity: 1,
-            transition: { duration: 0.3 }
-          }}
         >
           <span className="font-medium px-1 text-center" style={fontSizeStyle}>
             {name}

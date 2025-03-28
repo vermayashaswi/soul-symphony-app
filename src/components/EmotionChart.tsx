@@ -258,7 +258,10 @@ export function EmotionChart({
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && (
           <div className="w-full h-[350px]" key={bubbleKey}>
-            <EmotionBubbles emotions={getBubbleData} preventOverlap={true} />
+            <EmotionBubbles 
+              emotions={getBubbleData} 
+              preventOverlap={true} // Ensure bubbles don't overlap
+            />
           </div>
         )}
       </div>
