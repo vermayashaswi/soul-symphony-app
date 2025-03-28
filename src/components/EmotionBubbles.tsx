@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -378,23 +377,17 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     } else if (themes && themes.length > 0) {
       const itemCount = themes.length;
       
-      // Adjusted to use less total area
-      const totalArea = availableWidth * availableHeight * 0.6;
-      // Smaller max bubble size
-      const maxBubbleSize = Math.min(
-        Math.min(availableWidth, availableHeight) * 0.3,
-        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.3
+      // Determine bubble size - smaller for more bubbles, with a minimum size
+      const bubbleSize = Math.min(
+        Math.min(availableWidth, availableHeight) * 0.25,
+        Math.sqrt((availableWidth * availableHeight * 0.8) / itemCount) * 1.2
       );
       
+      // Create uniform sized bubbles for themes
       newItems = themes.map((theme, index) => {
-        const minSize = calculateMinBubbleSize(theme);
-        
-        // Ensure more consistent sizing with less variation
-        const size = Math.min(maxBubbleSize, Math.max(minSize, maxBubbleSize * 0.7));
-        
         return {
           name: theme,
-          size,
+          size: bubbleSize, // All bubbles same size
           color: colorPalette[index % colorPalette.length],
           position: { x: 0, y: 0 }
         };
@@ -402,7 +395,10 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     }
     
     if (newItems.length > 0) {
-      newItems.sort((a, b) => b.size - a.size);
+      // If it's themes, we don't need to sort by size since they're all the same size
+      if (!themes) {
+        newItems.sort((a, b) => b.size - a.size);
+      }
       
       for (let i = 0; i < newItems.length; i++) {
         // Enhanced placement algorithm to reduce overlaps
@@ -421,7 +417,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
             };
           }
           
-          // Use spiral placement with increasing radius
+          // Use spiral placement with increasing radius for better distribution
           const maxRadius = Math.min(availableWidth, availableHeight) * 0.4;
           const maxAngle = 2 * Math.PI * 4; // More revolutions for better distribution
           

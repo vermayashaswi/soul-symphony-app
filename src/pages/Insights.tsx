@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
@@ -141,6 +142,7 @@ export default function Insights() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {/* Dominant Mood Card */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -176,6 +178,7 @@ export default function Insights() {
                 )}
               </motion.div>
               
+              {/* Biggest Change Card - Updated title from "Biggest Improvement" to "Biggest Change" */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -183,7 +186,7 @@ export default function Insights() {
                 className="bg-white p-6 rounded-xl shadow-sm"
               >
                 <div className="flex justify-between items-start mb-4">
-                  <h2 className="font-semibold text-lg">Biggest Improvement</h2>
+                  <h2 className="font-semibold text-lg">Biggest Change</h2>
                   {insightsData.biggestImprovement && (
                     <span 
                       className={cn(
@@ -236,6 +239,7 @@ export default function Insights() {
                 )}
               </motion.div>
               
+              {/* Journal Activity Card */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
