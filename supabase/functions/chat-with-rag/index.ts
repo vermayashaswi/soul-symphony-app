@@ -123,14 +123,15 @@ serve(async (req) => {
     const searchStartTime = Date.now();
     let similarEntries;
     try {
-      // CRITICAL FIX: Pass userId directly without casting, let the SQL function handle the conversion
+      // Pass userId directly, the function will handle the proper type conversion
+      console.log(`Calling match_journal_entries with userId: ${userId} (${typeof userId})`);
       const { data, error } = await supabase.rpc(
         'match_journal_entries',
         {
           query_embedding: queryEmbedding,
           match_threshold: 0.5,
           match_count: 5,
-          user_id_filter: userId  // The SQL function will cast this to text internally
+          user_id_filter: userId
         }
       );
       
@@ -154,6 +155,8 @@ serve(async (req) => {
         // Log the similarity scores to check the results
         console.log("Found similar entries:", similarEntries.length);
         console.log("Similarity scores:", JSON.stringify(similarityScores));
+      } else {
+        console.log("No similar entries found in vector search");
       }
     } catch (error) {
       console.error("Error in similarity search:", error);
@@ -185,12 +188,16 @@ serve(async (req) => {
           console.log("Retrieved full entries:", entries.length);
           
           // Store reference information
-          referenceEntries = entries.map(entry => ({
-            id: entry.id,
-            date: entry.created_at,
-            snippet: entry["refined text"]?.substring(0, 100) + "...",
-            similarity: similarEntries.find(se => se.id === entry.id)?.similarity || 0
-          }));
+          referenceEntries = entries.map(entry => {
+            // Find the similarity score for this entry
+            const similarEntry = similarEntries.find(se => se.id === entry.id);
+            return {
+              id: entry.id,
+              date: entry.created_at,
+              snippet: entry["refined text"]?.substring(0, 100) + "...",
+              similarity: similarEntry ? similarEntry.similarity : 0
+            };
+          });
           
           // Format entries as context with emotions data
           journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
