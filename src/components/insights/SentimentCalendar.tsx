@@ -2,8 +2,8 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar } from '@/components/ui/calendar';
-import { Smile, Meh, Frown } from 'lucide-react';
-import { format, isSameDay } from 'date-fns';
+import { Smile, Meh, Frown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, isSameDay, isSameMonth, startOfYear, endOfYear, eachMonthOfInterval, getMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -58,12 +58,40 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
 
   // Helper function to get sentiment label
   const getSentimentLabel = (score: number) => {
-    if (score > 0.5) return "Very Positive";
     if (score > 0.25) return "Positive";
-    if (score < -0.5) return "Very Negative";
     if (score < -0.25) return "Negative";
     return "Neutral";
   };
+
+  // Render emotion legends
+  const renderLegends = () => (
+    <div className="flex justify-center gap-6 mt-4">
+      <div className="flex items-center gap-2">
+        <motion.div 
+          className="w-3 h-3 rounded-full bg-green-500"
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
+        <span className="text-sm">Positive</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <motion.div 
+          className="w-3 h-3 rounded-full bg-amber-500"
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
+        />
+        <span className="text-sm">Neutral</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <motion.div 
+          className="w-3 h-3 rounded-full bg-red-500"
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 2, repeat: Infinity, delay: 0.6 }}
+        />
+        <span className="text-sm">Negative</span>
+      </div>
+    </div>
+  );
 
   // Render today's sentiment for "today" timeRange
   const renderTodaySentiment = () => {
@@ -77,6 +105,7 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
             <Meh className="h-8 w-8 text-gray-500" />
           </div>
           <p className="mt-4 text-lg font-medium">No entries for today</p>
+          {renderLegends()}
         </div>
       );
     }
@@ -98,8 +127,8 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
           {getSentimentEmoji(todayData.avgScore)}
         </motion.div>
         <p className="mt-4 text-lg font-medium">{getSentimentLabel(todayData.avgScore)}</p>
-        <p className="text-sm text-muted-foreground">Score: {todayData.avgScore.toFixed(2)}</p>
         <p className="text-sm text-muted-foreground">Based on {todayData.count} entries</p>
+        {renderLegends()}
       </div>
     );
   };
@@ -113,87 +142,259 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     });
     
     return (
-      <div className="grid grid-cols-7 gap-2 p-4">
-        {weekDays.map((dateStr, i) => {
-          const dayData = sentimentByDate[dateStr];
-          const dayName = format(new Date(dateStr), 'E');
-          const dayNum = format(new Date(dateStr), 'd');
-          const isToday = isSameDay(new Date(dateStr), new Date());
-          
-          return (
-            <div key={dateStr} className="flex flex-col items-center">
-              <p className={cn(
-                "text-xs mb-1", 
-                isToday ? "font-bold" : "text-muted-foreground"
-              )}>
-                {dayName}
-              </p>
-              <p className={cn(
-                "text-sm mb-2",
-                isToday ? "font-bold" : ""
-              )}>
-                {dayNum}
-              </p>
-              
-              {dayData ? (
-                <motion.div 
-                  className={`h-10 w-10 ${getSentimentColor(dayData.avgScore)} rounded-full flex items-center justify-center`}
-                  animate={{ 
-                    scale: [1, 1.05, 1],
-                    rotate: [0, i % 2 === 0 ? 5 : -5, 0]
-                  }}
-                  transition={{ 
-                    duration: 2 + (i * 0.3),
-                    repeat: Infinity,
-                    repeatType: "reverse"
-                  }}
-                >
-                  {getSentimentEmoji(dayData.avgScore)}
-                </motion.div>
-              ) : (
-                <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
-                  <span className="text-gray-500 text-xs">N/A</span>
-                </div>
-              )}
-              
-              {dayData && (
-                <p className="text-xs mt-1 text-muted-foreground">
-                  {dayData.avgScore.toFixed(1)}
+      <div className="space-y-4">
+        <div className="grid grid-cols-7 gap-2 p-4">
+          {weekDays.map((dateStr, i) => {
+            const dayData = sentimentByDate[dateStr];
+            const dayName = format(new Date(dateStr), 'E');
+            const dayNum = format(new Date(dateStr), 'd');
+            const isToday = isSameDay(new Date(dateStr), new Date());
+            
+            return (
+              <div key={dateStr} className="flex flex-col items-center">
+                <p className={cn(
+                  "text-xs mb-1", 
+                  isToday ? "font-bold" : "text-muted-foreground"
+                )}>
+                  {dayName}
                 </p>
-              )}
-            </div>
-          );
-        })}
+                <p className={cn(
+                  "text-sm mb-2",
+                  isToday ? "font-bold" : ""
+                )}>
+                  {dayNum}
+                </p>
+                
+                {dayData ? (
+                  <motion.div 
+                    className={`h-10 w-10 ${getSentimentColor(dayData.avgScore)} rounded-full flex items-center justify-center`}
+                    animate={{ 
+                      scale: [1, 1.05, 1],
+                      rotate: [0, i % 2 === 0 ? 5 : -5, 0]
+                    }}
+                    transition={{ 
+                      duration: 2 + (i * 0.3),
+                      repeat: Infinity,
+                      repeatType: "reverse"
+                    }}
+                  >
+                    {getSentimentEmoji(dayData.avgScore)}
+                  </motion.div>
+                ) : (
+                  <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
+                    <span className="text-gray-500 text-xs">N/A</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {renderLegends()}
       </div>
     );
   };
 
-  // Custom day renderer for the calendar
-  const renderDay = (date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const dayData = sentimentByDate[dateStr];
-    
-    if (!dayData) return null;
-    
-    const sentimentColor = getSentimentColor(dayData.avgScore);
-    
+  // Custom month view calendar
+  const renderMonthCalendar = () => {
+    const [currentDate, setCurrentDate] = React.useState(new Date());
+    const monthStr = format(currentDate, 'MMMM yyyy');
+
+    // Go to previous month
+    const prevMonth = () => {
+      const newDate = new Date(currentDate);
+      newDate.setMonth(newDate.getMonth() - 1);
+      setCurrentDate(newDate);
+    };
+
+    // Go to next month
+    const nextMonth = () => {
+      const newDate = new Date(currentDate);
+      newDate.setMonth(newDate.getMonth() + 1);
+      setCurrentDate(newDate);
+    };
+
+    // Custom day renderer for the calendar
+    const renderDay = (date: Date) => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const dayData = sentimentByDate[dateStr];
+      const isCurrentMonth = isSameMonth(date, currentDate);
+      
+      if (!isCurrentMonth) {
+        return (
+          <div className="text-center py-2 opacity-30">
+            {format(date, 'd')}
+          </div>
+        );
+      }
+      
+      if (!dayData) {
+        return (
+          <div className="text-center py-2">
+            {format(date, 'd')}
+          </div>
+        );
+      }
+      
+      const sentimentColor = getSentimentColor(dayData.avgScore);
+      
+      return (
+        <div className="relative w-full h-full flex items-center justify-center p-2">
+          <motion.div 
+            className={`absolute inset-0 ${sentimentColor} opacity-70 rounded-full mx-auto my-auto`}
+            style={{ width: '80%', height: '80%' }}
+            animate={{
+              scale: [1, 1.05, 1]
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              repeatType: "reverse"
+            }}
+          />
+          <div className="relative z-10 flex flex-col items-center">
+            <span className="text-white font-medium">{format(date, 'd')}</span>
+            <span className="text-white">{getSentimentEmoji(dayData.avgScore)}</span>
+          </div>
+        </div>
+      );
+    };
+
     return (
-      <div className="relative w-full h-full flex items-center justify-center">
-        <motion.div 
-          className={`absolute top-0 left-0 right-0 bottom-0 ${sentimentColor} opacity-70 rounded-full`}
-          animate={{
-            scale: [1, 1.05, 1]
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            repeatType: "reverse"
-          }}
-        />
-        <span className="relative text-white font-medium z-10">{format(date, 'd')}</span>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between mb-4">
+          <button 
+            onClick={prevMonth}
+            className="p-1 rounded-full hover:bg-gray-100"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <h3 className="text-lg font-medium">{monthStr}</h3>
+          <button 
+            onClick={nextMonth}
+            className="p-1 rounded-full hover:bg-gray-100"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1">
+          {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+            <div key={day} className="text-center py-2 text-xs font-medium text-muted-foreground">
+              {day}
+            </div>
+          ))}
+          
+          {getDaysInMonth(currentDate).map((date, i) => (
+            <div 
+              key={i} 
+              className="aspect-square border border-gray-100"
+            >
+              {renderDay(date)}
+            </div>
+          ))}
+        </div>
+        
+        {renderLegends()}
       </div>
     );
   };
+
+  // Year view with one emoji per month
+  const renderYearView = () => {
+    const currentYear = new Date().getFullYear();
+    const yearStart = startOfYear(new Date(currentYear, 0, 1));
+    const yearEnd = endOfYear(new Date(currentYear, 0, 1));
+    const months = eachMonthOfInterval({ start: yearStart, end: yearEnd });
+
+    // Get average sentiment for a month
+    const getMonthSentiment = (month: Date) => {
+      const monthNumber = getMonth(month);
+      const entriesInMonth = entries.filter(entry => {
+        const entryDate = new Date(entry.created_at);
+        return getMonth(entryDate) === monthNumber && entryDate.getFullYear() === currentYear;
+      });
+      
+      if (entriesInMonth.length === 0) return null;
+      
+      const totalSentiment = entriesInMonth.reduce((sum, entry) => {
+        return sum + (entry.sentiment ? parseFloat(entry.sentiment) : 0);
+      }, 0);
+      
+      return totalSentiment / entriesInMonth.length;
+    };
+
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium text-center">{currentYear}</h3>
+        
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-4">
+          {months.map((month, i) => {
+            const sentiment = getMonthSentiment(month);
+            const monthName = format(month, 'MMM');
+            
+            return (
+              <div key={i} className="flex flex-col items-center">
+                <p className="mb-2 font-medium">{monthName}</p>
+                
+                {sentiment !== null ? (
+                  <motion.div 
+                    className={`h-16 w-16 ${getSentimentColor(sentiment)} rounded-full flex items-center justify-center`}
+                    animate={{ 
+                      scale: [1, 1.05, 1],
+                      rotate: [0, i % 2 === 0 ? 5 : -5, 0]
+                    }}
+                    transition={{ 
+                      duration: 2 + (i * 0.2),
+                      repeat: Infinity,
+                      repeatType: "reverse"
+                    }}
+                  >
+                    {getSentimentEmoji(sentiment)}
+                  </motion.div>
+                ) : (
+                  <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center">
+                    <span className="text-gray-500 text-xs">N/A</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        
+        {renderLegends()}
+      </div>
+    );
+  };
+
+  // Helper function to get all days in a month for the calendar
+  function getDaysInMonth(date: Date) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    
+    // Get the first day to display (might be from the previous month)
+    const firstDayToDisplay = new Date(firstDayOfMonth);
+    const dayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    firstDayToDisplay.setDate(firstDayToDisplay.getDate() - dayOfWeek);
+    
+    // Get all days to display (includes days from previous and next months)
+    const days: Date[] = [];
+    const totalDaysToShow = 42; // 6 rows of 7 days
+    
+    for (let i = 0; i < totalDaysToShow; i++) {
+      const day = new Date(firstDayToDisplay);
+      day.setDate(day.getDate() + i);
+      days.push(day);
+      
+      // Stop if we've gone past the end of the month and filled a complete week
+      if (day > lastDayOfMonth && day.getDay() === 6) {
+        break;
+      }
+    }
+    
+    return days;
+  }
 
   // Content based on timeRange
   const renderContent = () => {
@@ -203,54 +404,9 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
       case 'week':
         return renderWeekSentiment();
       case 'month':
+        return renderMonthCalendar();
       case 'year':
-        return (
-          <div className="px-4">
-            <Calendar
-              mode="single"
-              onSelect={() => {}}
-              className="mx-auto max-w-md"
-              components={{
-                Day: ({ date, ...props }) => {
-                  const dayContent = renderDay(date);
-                  // Using type assertion to handle the props correctly
-                  const htmlProps = props as React.HTMLAttributes<HTMLDivElement>;
-                  
-                  if (dayContent) {
-                    return <div {...htmlProps}>{dayContent}</div>;
-                  }
-                  return <div {...htmlProps} />;
-                },
-              }}
-            />
-            <div className="flex justify-center gap-6 mt-4">
-              <div className="flex items-center gap-2">
-                <motion.div 
-                  className="w-3 h-3 rounded-full bg-green-500"
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                />
-                <span className="text-sm">Positive</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <motion.div 
-                  className="w-3 h-3 rounded-full bg-amber-500"
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
-                />
-                <span className="text-sm">Neutral</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <motion.div 
-                  className="w-3 h-3 rounded-full bg-red-500"
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity, delay: 0.6 }}
-                />
-                <span className="text-sm">Negative</span>
-              </div>
-            </div>
-          </div>
-        );
+        return renderYearView();
       default:
         return null;
     }
@@ -259,7 +415,7 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Themes</h3>
+        <h3 className="text-xl font-semibold">Mood Calendar</h3>
       </div>
       
       <motion.div
