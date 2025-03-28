@@ -83,9 +83,20 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     
     return (
       <div className="flex flex-col items-center justify-center h-64">
-        <div className={`h-20 w-20 ${getSentimentColor(todayData.avgScore)} rounded-full flex items-center justify-center`}>
+        <motion.div 
+          className={`h-20 w-20 ${getSentimentColor(todayData.avgScore)} rounded-full flex items-center justify-center`}
+          animate={{ 
+            scale: [1, 1.05, 1],
+            y: [0, -5, 0]
+          }}
+          transition={{ 
+            duration: 3,
+            repeat: Infinity,
+            repeatType: "reverse"
+          }}
+        >
           {getSentimentEmoji(todayData.avgScore)}
-        </div>
+        </motion.div>
         <p className="mt-4 text-lg font-medium">{getSentimentLabel(todayData.avgScore)}</p>
         <p className="text-sm text-muted-foreground">Score: {todayData.avgScore.toFixed(2)}</p>
         <p className="text-sm text-muted-foreground">Based on {todayData.count} entries</p>
@@ -125,9 +136,20 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
               </p>
               
               {dayData ? (
-                <div className={`h-10 w-10 ${getSentimentColor(dayData.avgScore)} rounded-full flex items-center justify-center`}>
+                <motion.div 
+                  className={`h-10 w-10 ${getSentimentColor(dayData.avgScore)} rounded-full flex items-center justify-center`}
+                  animate={{ 
+                    scale: [1, 1.05, 1],
+                    rotate: [0, i % 2 === 0 ? 5 : -5, 0]
+                  }}
+                  transition={{ 
+                    duration: 2 + (i * 0.3),
+                    repeat: Infinity,
+                    repeatType: "reverse"
+                  }}
+                >
                   {getSentimentEmoji(dayData.avgScore)}
-                </div>
+                </motion.div>
               ) : (
                 <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
                   <span className="text-gray-500 text-xs">N/A</span>
@@ -157,7 +179,17 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     
     return (
       <div className="relative w-full h-full flex items-center justify-center">
-        <div className={`absolute top-0 left-0 right-0 bottom-0 ${sentimentColor} opacity-70 rounded-full`}></div>
+        <motion.div 
+          className={`absolute top-0 left-0 right-0 bottom-0 ${sentimentColor} opacity-70 rounded-full`}
+          animate={{
+            scale: [1, 1.05, 1]
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            repeatType: "reverse"
+          }}
+        />
         <span className="relative text-white font-medium z-10">{format(date, 'd')}</span>
       </div>
     );
@@ -180,9 +212,8 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
               className="mx-auto max-w-md"
               components={{
                 Day: ({ date, ...props }) => {
-                  // Fix: Properly handle the props by spreading them correctly
                   const dayContent = renderDay(date);
-                  // We need to cast props to any to avoid TypeScript issues with the calendar component's props
+                  // Using type assertion to handle the props correctly
                   const htmlProps = props as React.HTMLAttributes<HTMLDivElement>;
                   
                   if (dayContent) {
@@ -194,15 +225,27 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
             />
             <div className="flex justify-center gap-6 mt-4">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <motion.div 
+                  className="w-3 h-3 rounded-full bg-green-500"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
                 <span className="text-sm">Positive</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                <motion.div 
+                  className="w-3 h-3 rounded-full bg-amber-500"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
+                />
                 <span className="text-sm">Neutral</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <motion.div 
+                  className="w-3 h-3 rounded-full bg-red-500"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.6 }}
+                />
                 <span className="text-sm">Negative</span>
               </div>
             </div>
