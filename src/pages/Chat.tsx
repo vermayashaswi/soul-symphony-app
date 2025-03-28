@@ -33,10 +33,10 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col h-screen overflow-hidden bg-background">
       <Navbar />
       
-      <div className="flex-1 pt-16 flex">
+      <div className="flex-1 pt-16 flex w-full h-[calc(100vh-4rem)]">
         <ResizablePanelGroup direction="horizontal" className="w-full h-full">
           {showSidebar && (
             <>

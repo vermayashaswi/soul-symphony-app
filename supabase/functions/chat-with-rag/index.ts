@@ -64,6 +64,34 @@ function formatEmotions(emotions: Record<string, number> | null | undefined): st
     .join(", ");
 }
 
+// Function to get previous messages from a thread
+async function getPreviousMessages(threadId: string, messageLimit: number = 5) {
+  if (!threadId) return [];
+  
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('content, sender')
+      .eq('thread_id', threadId)
+      .order('created_at', { ascending: false })
+      .limit(messageLimit);
+      
+    if (error) {
+      console.error("Error fetching previous messages:", error);
+      return [];
+    }
+    
+    // Return in chronological order (oldest first)
+    return data.reverse().map(msg => ({
+      role: msg.sender === 'assistant' ? 'assistant' : 'user',
+      content: msg.content
+    }));
+  } catch (error) {
+    console.error("Error in getPreviousMessages:", error);
+    return [];
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -101,6 +129,7 @@ serve(async (req) => {
     console.log("Processing chat request for user:", userId);
     console.log("Message:", message.substring(0, 50) + "...");
     console.log("Include diagnostics:", includeDiagnostics ? "yes" : "no");
+    console.log("Thread ID:", threadId || "new thread");
     
     let similarityScores = [];
     
@@ -252,6 +281,11 @@ serve(async (req) => {
     
     diagnostics.processingTime.context = Date.now() - contextStartTime;
     
+    // Get previous messages for context
+    console.log("Fetching previous messages for conversation context...");
+    const previousMessages = await getPreviousMessages(threadId);
+    console.log(`Retrieved ${previousMessages.length} previous messages`);
+    
     // Prepare system prompt with RAG context
     const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling. 
 ${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
@@ -260,11 +294,25 @@ Keep your tone warm, supportive and conversational. If you notice patterns or in
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
 Focus on being helpful rather than diagnostic.`;
 
-    console.log("Sending to GPT with RAG context...");
+    console.log("Sending to GPT with RAG context and conversation history...");
+    
+    // Build message history for the LLM
+    const messages = [
+      { role: 'system', content: systemPrompt }
+    ];
+    
+    // Add previous messages if available
+    if (previousMessages.length > 0) {
+      console.log("Including previous conversation context");
+      messages.push(...previousMessages);
+    }
+    
+    // Add current message
+    messages.push({ role: 'user', content: message });
     
     const llmStartTime = Date.now();
     try {
-      // Send to GPT with RAG context
+      // Send to GPT with RAG context and conversation history
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -273,16 +321,7 @@ Focus on being helpful rather than diagnostic.`;
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt
-            },
-            {
-              role: 'user',
-              content: message
-            }
-          ],
+          messages: messages,
         }),
       });
 

@@ -21,12 +21,12 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className }) => {
   ];
 
   return (
-    <div className={cn("flex flex-wrap gap-2", className)}>
+    <div className={cn("flex flex-wrap gap-3", className)}>
       {themes.map((theme, index) => (
         <motion.div
           key={theme}
           className={cn(
-            "px-4 py-2 rounded-full font-medium text-sm",
+            "px-4 py-2 rounded-md font-medium text-sm",
             colorClasses[index % colorClasses.length]
           )}
           initial={{ scale: 0, opacity: 0 }}
