@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar } from '@/components/ui/calendar';
@@ -179,11 +180,15 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
               className="mx-auto max-w-md"
               components={{
                 Day: ({ date, ...props }) => {
+                  // Fix: Properly handle the props by spreading them correctly
                   const dayContent = renderDay(date);
+                  // We need to cast props to any to avoid TypeScript issues with the calendar component's props
+                  const htmlProps = props as React.HTMLAttributes<HTMLDivElement>;
+                  
                   if (dayContent) {
-                    return <div {...props}>{dayContent}</div>;
+                    return <div {...htmlProps}>{dayContent}</div>;
                   }
-                  return <div {...props} />;
+                  return <div {...htmlProps} />;
                 },
               }}
             />
