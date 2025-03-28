@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import VoiceRecorder from '@/components/VoiceRecorder';
@@ -8,14 +8,62 @@ import Navbar from '@/components/Navbar';
 import JournalHeader from '@/components/journal/JournalHeader';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
   const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
+  const [isProfileChecked, setIsProfileChecked] = useState(false);
   
-  const { entries, loading } = useJournalEntries(user?.id, refreshKey);
+  const { entries, loading } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
+
+  // Check if user profile exists and create if needed
+  useEffect(() => {
+    if (user?.id) {
+      checkUserProfile(user.id);
+    }
+  }, [user?.id]);
+
+  const checkUserProfile = async (userId: string) => {
+    try {
+      // Check if profile exists
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+      
+      if (error || !profile) {
+        console.log('Creating user profile...');
+        
+        // Get user data
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        
+        // Create profile
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: userId,
+            email: userData.user?.email,
+            full_name: userData.user?.user_metadata?.full_name || '',
+            avatar_url: userData.user?.user_metadata?.avatar_url || ''
+          }]);
+          
+        if (insertError) throw insertError;
+        console.log('Profile created successfully');
+      }
+      
+      // Mark profile as checked so we can load entries
+      setIsProfileChecked(true);
+    } catch (error: any) {
+      console.error('Error checking/creating user profile:', error);
+      toast.error('Error setting up profile. Please try again.');
+    }
+  };
 
   const onEntryRecorded = (audioBlob: Blob, tempId?: string) => {
     console.log('Entry recorded, adding to processing queue');
@@ -66,7 +114,7 @@ const Journal = () => {
           <TabsContent value="entries">
             <JournalEntriesList 
               entries={entries} 
-              loading={loading}
+              loading={loading || !isProfileChecked}
               processingEntries={processingEntries}
               onStartRecording={() => setActiveTab('record')}
             />

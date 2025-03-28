@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Processes an audio recording for transcription and analysis
@@ -72,7 +73,10 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       return;
     }
 
-    // 3. Send audio for transcription
+    // 3. Check if the user profile exists, and create one if it doesn't
+    await ensureUserProfileExists(authStatus.userId);
+
+    // 4. Send audio for transcription
     const result = await sendAudioForTranscription(base64String, authStatus.userId!);
     
     toast.dismiss(toastId);
@@ -86,5 +90,52 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     console.error('Error processing recording in background:', error);
     toast.dismiss(toastId);
     toast.error(`Error processing recording: ${error.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Ensures that a user profile exists for the given user ID
+ * Creates one if it doesn't exist
+ */
+async function ensureUserProfileExists(userId: string | undefined): Promise<void> {
+  if (!userId) return;
+  
+  try {
+    // Check if user profile exists
+    const { data: profile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+      
+    // If profile doesn't exist, create one
+    if (fetchError || !profile) {
+      console.log('User profile not found, creating one...');
+      
+      // Get user data from auth
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      
+      // Create profile
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert([{ 
+          id: userId,
+          email: userData.user?.email,
+          full_name: userData.user?.user_metadata?.full_name || '',
+          avatar_url: userData.user?.user_metadata?.avatar_url || ''
+        }]);
+        
+      if (insertError) {
+        console.error('Error creating user profile:', insertError);
+        throw insertError;
+      }
+      
+      console.log('User profile created successfully');
+    }
+  } catch (error) {
+    console.error('Error ensuring user profile exists:', error);
+    // We don't throw here to allow the process to continue
+    // The foreign key constraint will fail later if this fails
   }
 }

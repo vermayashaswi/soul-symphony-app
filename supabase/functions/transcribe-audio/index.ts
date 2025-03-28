@@ -213,6 +213,54 @@ async function analyzeSentiment(text: string) {
   }
 }
 
+async function createProfileIfNeeded(userId: string) {
+  if (!userId) return;
+  
+  try {
+    console.log("Checking if profile exists for user:", userId);
+    // Check if user profile exists
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+      
+    // If profile doesn't exist, create one
+    if (error || !profile) {
+      console.log("Profile not found, creating one");
+      
+      // Get user data from auth
+      const { data: userData, error: userError } = await supabase.auth.getUser(userId);
+      if (userError) {
+        console.error("Error getting user data:", userError);
+        return;
+      }
+      
+      if (userData?.user) {
+        // Create profile
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert([{ 
+            id: userId,
+            email: userData.user.email,
+            full_name: userData.user?.user_metadata?.full_name || '',
+            avatar_url: userData.user?.user_metadata?.avatar_url || ''
+          }]);
+          
+        if (insertError) {
+          console.error('Error creating user profile:', insertError);
+        } else {
+          console.log("Profile created successfully for user:", userId);
+        }
+      }
+    } else {
+      console.log("Profile exists for user:", userId);
+    }
+  } catch (err) {
+    console.error("Error checking/creating profile:", err);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -252,6 +300,13 @@ serve(async (req) => {
     }
 
     console.log("Received audio data, processing...");
+    console.log("User ID:", userId);
+    
+    // Ensure user profile exists before proceeding
+    if (userId) {
+      await createProfileIfNeeded(userId);
+    }
+    
     console.log("User ID:", userId);
     console.log("Audio data length:", audio.length);
     console.log("OpenAI API Key available:", !!openAIApiKey);

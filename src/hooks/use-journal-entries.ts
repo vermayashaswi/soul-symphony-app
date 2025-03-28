@@ -4,15 +4,17 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
-export function useJournalEntries(userId: string | undefined, refreshKey: number) {
+export function useJournalEntries(userId: string | undefined, refreshKey: number, isProfileChecked: boolean = false) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (userId) {
+    if (userId && isProfileChecked) {
       fetchEntries();
+    } else {
+      setLoading(true);
     }
-  }, [userId, refreshKey]);
+  }, [userId, refreshKey, isProfileChecked]);
 
   const fetchEntries = async () => {
     try {
