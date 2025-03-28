@@ -123,15 +123,14 @@ serve(async (req) => {
     const searchStartTime = Date.now();
     let similarEntries;
     try {
-      // Ensure userId is properly formatted for the function call
-      // Our SQL function expects a UUID, and the user_id in Journal Entries is stored as text
+      // CRITICAL FIX: Pass userId directly without casting, let the SQL function handle the conversion
       const { data, error } = await supabase.rpc(
         'match_journal_entries',
         {
           query_embedding: queryEmbedding,
           match_threshold: 0.5,
           match_count: 5,
-          user_id_filter: userId
+          user_id_filter: userId  // The SQL function will cast this to text internally
         }
       );
       

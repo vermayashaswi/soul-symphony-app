@@ -40,6 +40,28 @@ export default function ChatDiagnostics({
   
   if (!isVisible) return null;
   
+  // Helper function to format similarity score as percentage
+  const formatSimilarityScore = (score: number): string => {
+    return `${(score * 100).toFixed(2)}%`;
+  };
+
+  // Helper function to find similarity score for an entry
+  const findSimilarityScore = (entryId: number): string => {
+    // First check if the reference has a similarity property
+    const reference = references?.find(ref => ref.id === entryId);
+    if (reference?.similarity !== undefined) {
+      return formatSimilarityScore(reference.similarity);
+    }
+    
+    // Then check in similarityScores array
+    const scoreEntry = similarityScores?.find(s => s.id === entryId);
+    if (scoreEntry?.score !== undefined) {
+      return formatSimilarityScore(scoreEntry.score);
+    }
+    
+    return "N/A";
+  };
+  
   return (
     <div className="border rounded-md my-4 bg-background/50 backdrop-blur-sm text-sm">
       <div 
@@ -102,14 +124,7 @@ export default function ChatDiagnostics({
                   {references.map((ref) => (
                     <TableRow key={ref.id}>
                       <TableCell>{ref.id}</TableCell>
-                      <TableCell>
-                        {ref.similarity !== undefined 
-                          ? `${(ref.similarity * 100).toFixed(2)}%` 
-                          : similarityScores?.find(s => s.id === ref.id)?.score !== undefined
-                            ? `${(similarityScores.find(s => s.id === ref.id)?.score || 0 * 100).toFixed(2)}%`
-                            : "N/A"
-                        }
-                      </TableCell>
+                      <TableCell>{findSimilarityScore(ref.id)}</TableCell>
                       <TableCell>{new Date(ref.date).toLocaleDateString()}</TableCell>
                       <TableCell className="max-w-[300px] truncate">{ref.snippet || "No content"}</TableCell>
                     </TableRow>
