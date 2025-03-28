@@ -1,7 +1,6 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar } from '@/components/ui/calendar';
 import { Smile, Meh, Frown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isSameDay, isSameMonth, startOfYear, endOfYear, eachMonthOfInterval, getMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -21,6 +20,8 @@ type SentimentData = {
 };
 
 const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRange }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  
   // Process journal entries to get sentiment by date
   const sentimentByDate = useMemo(() => {
     const data: SentimentData = {};
@@ -194,70 +195,53 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     );
   };
 
+  // Go to previous month
+  const prevMonth = () => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() - 1);
+    setCurrentDate(newDate);
+  };
+
+  // Go to next month
+  const nextMonth = () => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() + 1);
+    setCurrentDate(newDate);
+  };
+
+  // Helper function to get all days in a month for the calendar
+  function getDaysInMonth(date: Date) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    
+    // Get the first day to display (might be from the previous month)
+    const firstDayToDisplay = new Date(firstDayOfMonth);
+    const dayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    firstDayToDisplay.setDate(firstDayToDisplay.getDate() - dayOfWeek);
+    
+    // Get all days to display (includes days from previous and next months)
+    const days: Date[] = [];
+    const totalDaysToShow = 42; // 6 rows of 7 days
+    
+    for (let i = 0; i < totalDaysToShow; i++) {
+      const day = new Date(firstDayToDisplay);
+      day.setDate(day.getDate() + i);
+      days.push(day);
+      
+      // Stop if we've gone past the end of the month and filled a complete week
+      if (day > lastDayOfMonth && day.getDay() === 6) {
+        break;
+      }
+    }
+    
+    return days;
+  }
+
   // Custom month view calendar
   const renderMonthCalendar = () => {
-    const [currentDate, setCurrentDate] = React.useState(new Date());
     const monthStr = format(currentDate, 'MMMM yyyy');
-
-    // Go to previous month
-    const prevMonth = () => {
-      const newDate = new Date(currentDate);
-      newDate.setMonth(newDate.getMonth() - 1);
-      setCurrentDate(newDate);
-    };
-
-    // Go to next month
-    const nextMonth = () => {
-      const newDate = new Date(currentDate);
-      newDate.setMonth(newDate.getMonth() + 1);
-      setCurrentDate(newDate);
-    };
-
-    // Custom day renderer for the calendar
-    const renderDay = (date: Date) => {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const dayData = sentimentByDate[dateStr];
-      const isCurrentMonth = isSameMonth(date, currentDate);
-      
-      if (!isCurrentMonth) {
-        return (
-          <div className="text-center py-2 opacity-30">
-            {format(date, 'd')}
-          </div>
-        );
-      }
-      
-      if (!dayData) {
-        return (
-          <div className="text-center py-2">
-            {format(date, 'd')}
-          </div>
-        );
-      }
-      
-      const sentimentColor = getSentimentColor(dayData.avgScore);
-      
-      return (
-        <div className="relative w-full h-full flex items-center justify-center p-2">
-          <motion.div 
-            className={`absolute inset-0 ${sentimentColor} opacity-70 rounded-full mx-auto my-auto`}
-            style={{ width: '80%', height: '80%' }}
-            animate={{
-              scale: [1, 1.05, 1]
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              repeatType: "reverse"
-            }}
-          />
-          <div className="relative z-10 flex flex-col items-center">
-            <span className="text-white font-medium">{format(date, 'd')}</span>
-            <span className="text-white">{getSentimentEmoji(dayData.avgScore)}</span>
-          </div>
-        </div>
-      );
-    };
 
     return (
       <div className="space-y-4">
@@ -284,14 +268,52 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
             </div>
           ))}
           
-          {getDaysInMonth(currentDate).map((date, i) => (
-            <div 
-              key={i} 
-              className="aspect-square border border-gray-100"
-            >
-              {renderDay(date)}
-            </div>
-          ))}
+          {getDaysInMonth(currentDate).map((date, i) => {
+            const dateStr = format(date, 'yyyy-MM-dd');
+            const dayData = sentimentByDate[dateStr];
+            const isCurrentMonth = isSameMonth(date, currentDate);
+            
+            return (
+              <div 
+                key={i} 
+                className={cn(
+                  "aspect-square border border-gray-100",
+                  !isCurrentMonth && "opacity-30"
+                )}
+              >
+                <div className="relative w-full h-full flex items-center justify-center p-2">
+                  <div className="text-center">
+                    <span className={cn(
+                      "text-sm",
+                      isCurrentMonth ? "font-medium" : "text-muted-foreground"
+                    )}>
+                      {format(date, 'd')}
+                    </span>
+                    
+                    {dayData ? (
+                      <motion.div 
+                        className={`mt-1 mx-auto h-8 w-8 ${getSentimentColor(dayData.avgScore)} rounded-full flex items-center justify-center`}
+                        animate={{
+                          scale: [1, 1.05, 1]
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          repeatType: "reverse"
+                        }}
+                      >
+                        {getSentimentEmoji(dayData.avgScore)}
+                      </motion.div>
+                    ) : isCurrentMonth ? (
+                      <div className="mt-1 mx-auto h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
+                        <span className="text-gray-500 text-xs">N/A</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
         
         {renderLegends()}
@@ -365,36 +387,6 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
       </div>
     );
   };
-
-  // Helper function to get all days in a month for the calendar
-  function getDaysInMonth(date: Date) {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDayOfMonth = new Date(year, month, 1);
-    const lastDayOfMonth = new Date(year, month + 1, 0);
-    
-    // Get the first day to display (might be from the previous month)
-    const firstDayToDisplay = new Date(firstDayOfMonth);
-    const dayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    firstDayToDisplay.setDate(firstDayToDisplay.getDate() - dayOfWeek);
-    
-    // Get all days to display (includes days from previous and next months)
-    const days: Date[] = [];
-    const totalDaysToShow = 42; // 6 rows of 7 days
-    
-    for (let i = 0; i < totalDaysToShow; i++) {
-      const day = new Date(firstDayToDisplay);
-      day.setDate(day.getDate() + i);
-      days.push(day);
-      
-      // Stop if we've gone past the end of the month and filled a complete week
-      if (day > lastDayOfMonth && day.getDay() === 6) {
-        break;
-      }
-    }
-    
-    return days;
-  }
 
   // Content based on timeRange
   const renderContent = () => {
