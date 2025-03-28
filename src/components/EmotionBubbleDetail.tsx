@@ -1,10 +1,5 @@
 
-import React from 'react';
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@/components/ui/hover-card';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +20,10 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   value,
   onClick,
 }) => {
+  const [isSelected, setIsSelected] = useState(false);
+
   const handleClick = () => {
+    setIsSelected(!isSelected);
     if (onClick) {
       onClick(name);
     }
@@ -56,56 +54,56 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     }
   };
 
+  // Enhanced glow animation when selected
+  const selectedAnimation = isSelected ? {
+    boxShadow: [
+      `0 0 10px 2px rgba(255, 255, 255, 0.7)`,
+      `0 0 20px 5px rgba(255, 255, 255, 0.8)`,
+      `0 0 10px 2px rgba(255, 255, 255, 0.7)`
+    ],
+    transition: {
+      boxShadow: {
+        duration: 1.5,
+        repeat: Infinity,
+        repeatType: "reverse" as const
+      }
+    }
+  } : {};
+
   return (
-    <HoverCard openDelay={200} closeDelay={100}>
-      <HoverCardTrigger asChild>
-        <motion.div
-          animate={pulseAnimation}
-          whileTap={{ scale: 0.95 }}
-          className={cn(
-            "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow",
-            color,
-            className
-          )}
-          style={{ width: size, height: size }}
-          onClick={handleClick}
-          initial={{ opacity: 0.9 }}
-        >
-          <span className="font-medium px-1 text-center" style={fontSizeStyle}>
-            {name}
-          </span>
-        </motion.div>
-      </HoverCardTrigger>
-      <HoverCardContent className="p-4 backdrop-blur-sm bg-white/90 border-none shadow-lg w-48">
-        <div className="space-y-2">
-          <h4 className="font-semibold capitalize">{name}</h4>
-          {value !== undefined && (
-            <div className="flex flex-col gap-1">
-              <span className="text-sm text-muted-foreground">Intensity</span>
-              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                <motion.div 
-                  className="h-full bg-primary rounded-full"
-                  style={{ width: '0%' }}
-                  animate={{ 
-                    width: `${Math.min(100, value * 100)}%` 
-                  }}
-                  transition={{ 
-                    duration: 0.8, 
-                    ease: "easeOut" 
-                  }}
-                ></motion.div>
-              </div>
-              <span className="text-xs text-right text-muted-foreground">
-                {Math.round(value * 100)}%
-              </span>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground mt-2">
-            Click to explore this emotion further
-          </p>
-        </div>
-      </HoverCardContent>
-    </HoverCard>
+    <div className="relative">
+      <motion.div
+        animate={{
+          ...pulseAnimation,
+          ...selectedAnimation
+        }}
+        whileTap={{ scale: 0.95 }}
+        className={cn(
+          "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow relative",
+          color,
+          className,
+          isSelected && "z-10"
+        )}
+        style={{ width: size, height: size }}
+        onClick={handleClick}
+        initial={{ opacity: 0.9 }}
+      >
+        <span className="font-medium px-1 text-center" style={fontSizeStyle}>
+          {name}
+        </span>
+
+        {/* Intensity indicator that appears when selected */}
+        {isSelected && value !== undefined && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="absolute -top-4 -right-2 bg-white text-primary font-medium text-xs px-2 py-1 rounded-full shadow-md"
+          >
+            {Math.round(value * 100)}%
+          </motion.div>
+        )}
+      </motion.div>
+    </div>
   );
 };
 
