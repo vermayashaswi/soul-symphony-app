@@ -19,8 +19,9 @@ interface DiagnosticsStep {
 }
 
 interface QueryAnalysis {
-  queryType: 'emotional' | 'temporal' | 'general';
+  queryType: 'emotional' | 'temporal' | 'thematic' | 'general';
   emotion: string | null;
+  theme: string | null;
   timeframe: {
     timeType: string | null;
     startDate: string | null;
@@ -96,6 +97,13 @@ export default function ChatDiagnostics({
                     <>
                       <div>Emotion:</div>
                       <div className="font-medium capitalize">{queryAnalysis.emotion}</div>
+                    </>
+                  )}
+                  
+                  {queryAnalysis.theme && (
+                    <>
+                      <div>Theme:</div>
+                      <div className="font-medium capitalize">{queryAnalysis.theme}</div>
                     </>
                   )}
                   
@@ -179,6 +187,16 @@ export default function ChatDiagnostics({
                               </span>
                             ))
                           }
+                        </div>
+                      )}
+                      {ref.themes && ref.themes.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <span className="text-xs text-muted-foreground">Themes: </span>
+                          {ref.themes.map((theme) => (
+                            <span key={theme} className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs">
+                              {theme}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </div>
