@@ -29,7 +29,7 @@ BEGIN
     "Journal Entries" entries ON je.journal_entry_id = entries.id
   WHERE 
     1 - (je.embedding <=> query_embedding) > match_threshold
-    AND entries.user_id = user_id_filter::text
+    AND entries.user_id = user_id_filter::text  -- Cast UUID to text to match column type
     AND (start_date IS NULL OR entries.created_at >= start_date)
     AND (end_date IS NULL OR entries.created_at <= end_date)
   ORDER BY
