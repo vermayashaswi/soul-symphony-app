@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import SouloLogo from '@/components/SouloLogo';
 
 const JournalHeader = () => {
   const { user } = useAuth();
@@ -21,7 +22,7 @@ const JournalHeader = () => {
               transition={{ duration: 0.5 }}
             >
               <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500 shrink-0" />
-              <span className="inline-block">Your Journal</span>
+              <span className="inline-block">Your <SouloLogo className="inline-flex" /> Journal</span>
             </motion.h1>
             <motion.p 
               className="text-muted-foreground mt-2 text-sm sm:text-base"

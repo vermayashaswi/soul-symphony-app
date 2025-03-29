@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -8,22 +7,7 @@ import { Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
-
-// Custom UShape component for the logo
-const UShape = ({ className = "", size = "normal" }: { className?: string, size?: "normal" | "large" }) => {
-  const sizeClasses = size === "large" 
-    ? "w-6 h-7 mx-0.5" 
-    : "w-4 h-5 mx-0.5";
-  
-  return (
-    <div className={`relative ${sizeClasses} ${className}`}>
-      <div className="absolute bottom-0 left-0 w-1 h-3/4 bg-current rounded-bl"></div>
-      <div className="absolute bottom-0 w-full h-1 bg-current rounded-b"></div>
-      <div className="absolute bottom-0 right-0 w-1 h-3/4 bg-current rounded-br"></div>
-      <div className="absolute top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-current animate-pulse"></div>
-    </div>
-  );
-};
+import SouloLogo from '@/components/SouloLogo';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -86,7 +70,6 @@ const Index = () => {
     }
   };
 
-  // Typing animation for chat feature
   useEffect(() => {
     if (isTyping) {
       const text = "How have I been feeling lately?";
@@ -100,7 +83,6 @@ const Index = () => {
           clearInterval(typingInterval);
           setIsTyping(false);
           
-          // Show response after typing finishes
           setTimeout(() => {
             setShowResponse(true);
           }, 800);
@@ -111,23 +93,18 @@ const Index = () => {
     }
   }, [isTyping]);
 
-  // Start typing animation every 8 seconds
   useEffect(() => {
     const animationCycle = () => {
-      // Reset state
       setTypingText("");
       setShowResponse(false);
       
-      // Start typing after a delay
       setTimeout(() => {
         setIsTyping(true);
       }, 1500);
     };
     
-    // Initial animation
     animationCycle();
     
-    // Set up interval for repeating the animation
     const intervalId = setInterval(animationCycle, 8000);
     
     return () => clearInterval(intervalId);
@@ -221,9 +198,7 @@ const Index = () => {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.5 }}
         >
-          {/* Enhanced animated chart */}
           <svg viewBox="0 0 500 100" className="w-full h-full">
-            {/* Background grid */}
             {[0, 25, 50, 75, 100].map((line) => (
               <motion.line
                 key={`grid-${line}`}
@@ -240,7 +215,6 @@ const Index = () => {
               />
             ))}
             
-            {/* Animated joy emotion line */}
             <motion.path
               d="M0,80 C50,70 100,60 150,40 C200,20 250,10 300,15 C350,20 400,10 500,5"
               fill="none"
@@ -251,7 +225,6 @@ const Index = () => {
               transition={{ duration: 3, delay: 0.5 }}
             />
             
-            {/* Animated data points */}
             {[
               { x: 50, y: 70, delay: 1.0 },
               { x: 150, y: 40, delay: 1.5 },
@@ -270,7 +243,6 @@ const Index = () => {
               />
             ))}
             
-            {/* Emotion label */}
             <motion.text
               x="450"
               y="20"
@@ -283,7 +255,6 @@ const Index = () => {
               Joy +95%
             </motion.text>
             
-            {/* Time labels */}
             <motion.text
               x="10"
               y="95"
@@ -324,7 +295,6 @@ const Index = () => {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.5 }}
         >
-          {/* User typing message with cursor */}
           <motion.div 
             className="self-start max-w-[80%] bg-muted p-2 rounded-lg text-xs text-left"
             initial={{ x: -20, opacity: 0 }}
@@ -343,7 +313,6 @@ const Index = () => {
             )}
           </motion.div>
           
-          {/* AI response with typing effect */}
           {showResponse && (
             <motion.div 
               className="self-end max-w-[80%] bg-primary text-primary-foreground p-2 rounded-lg text-xs text-left"
@@ -381,7 +350,7 @@ const Index = () => {
           variants={itemVariants}
         >
           <h1 className="text-4xl md:text-5xl font-bold mb-4 flex items-center justify-center">
-            Welcome to SO<UShape size="large" className="text-blue-600" />LO
+            Welcome to <SouloLogo size="large" className="ml-2 text-blue-600" />
           </h1>
           <p className="text-xl max-w-2xl mx-auto bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent animate-pulse shadow-glow">
             Your personal AI companion for emotional wellness and self-reflection using VOICE journaling

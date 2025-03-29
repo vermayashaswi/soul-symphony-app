@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -7,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import SouloLogo from '@/components/SouloLogo';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// Custom UShape component for the logo
 const UShape = ({ className = "" }: { className?: string }) => {
   return (
     <div className={cn("relative w-4 h-5 mx-0.5", className)}>
@@ -91,9 +90,9 @@ export function Navbar() {
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="font-semibold text-xl text-gradient flex items-center"
+            className="font-semibold text-xl text-gradient"
           >
-            SO<UShape />LO
+            <SouloLogo size="normal" />
           </motion.span>
         </Link>
 
