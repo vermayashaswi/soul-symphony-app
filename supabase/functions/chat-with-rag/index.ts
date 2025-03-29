@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -13,31 +12,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Common emotion mappings to standardize input
-const EMOTION_MAPPINGS = {
-  "sad": ["sad", "sadness", "unhappy", "upset", "down", "depressed", "blue", "gloomy", "miserable"],
-  "angry": ["angry", "anger", "mad", "furious", "irritated", "annoyed", "frustrated", "enraged"],
-  "happy": ["happy", "happiness", "joy", "joyful", "delighted", "pleased", "cheerful", "content"],
-  "anxious": ["anxious", "anxiety", "worried", "nervous", "stressed", "tense", "uneasy", "apprehensive"],
-  "fear": ["fear", "scared", "afraid", "terrified", "frightened", "panic", "dread", "horror"],
-  "surprise": ["surprise", "surprised", "shocked", "astonished", "amazed", "startled"],
-  "love": ["love", "loving", "affection", "fond", "tender", "caring", "adoration"],
-  "disgust": ["disgust", "disgusted", "repulsed", "aversion", "repugnance"]
-};
-
-// Common time mappings to standardize input
-const TIME_RANGES = {
-  "day": ["today", "yesterday", "day"],
-  "week": ["week", "this week", "last week", "past week", "recent days"],
-  "month": ["month", "this month", "last month", "past month", "recent weeks"],
-  "year": ["year", "this year", "last year", "past year"]
-};
-
-// Theme mapping to identify workplace-related themes
-const THEME_MAPPINGS = {
-  "workplace": ["work", "office", "workplace", "job", "career", "company", "business", "corporate", "enterprise", "employment", "profession", "occupation", "colleague", "coworker", "boss", "manager", "team", "project", "meeting", "deadline"]
 };
 
 // Add function execution tracking
@@ -106,63 +80,84 @@ async function generateEmbedding(text: string) {
   }
 }
 
-// Format emotions data into a readable string
-function formatEmotions(emotions: Record<string, number> | null | undefined): string {
-  if (!emotions) return "No emotion data available";
-  
-  // Sort emotions by intensity (highest first)
-  const sortedEmotions = Object.entries(emotions)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3); // Take top 3 emotions for brevity
-    
-  return sortedEmotions
-    .map(([emotion, intensity]) => {
-      // Convert intensity to percentage and format emotion name
-      const percentage = Math.round(intensity * 100);
-      const formattedEmotion = emotion.charAt(0).toUpperCase() + emotion.slice(1);
-      return `${formattedEmotion} (${percentage}%)`;
-    })
-    .join(", ");
-}
-
-// Function to get previous messages from a thread
-async function getPreviousMessages(threadId: string, messageLimit: number = 5) {
-  const tracker = trackFunctionExecution("getPreviousMessages", { threadId, messageLimit });
-  
-  if (!threadId) return tracker.succeed([]);
+// Function to search journal entries by theme
+async function searchJournalEntriesByTheme(
+  userId: string, 
+  themeQuery: string,
+  queryEmbedding: any,
+  matchThreshold: number = 0.5,
+  matchCount: number = 10, // Increased from 5 to get more results
+  startDate: string | null = null,
+  endDate: string | null = null
+) {
+  const tracker = trackFunctionExecution("searchJournalEntriesByTheme", { 
+    userId, 
+    themeQuery,
+    matchThreshold,
+    matchCount,
+    startDate,
+    endDate
+  });
   
   try {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('content, sender')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: false })
-      .limit(messageLimit);
-      
-    if (error) {
-      console.error("Error fetching previous messages:", error);
-      return tracker.fail(error);
-    }
+    console.log(`Searching for theme-related entries with userId: ${userId}, theme query: ${themeQuery}`);
     
-    // Return in chronological order (oldest first)
-    return tracker.succeed(data.reverse().map(msg => ({
-      role: msg.sender === 'assistant' ? 'assistant' : 'user',
-      content: msg.content
-    })));
+    // First try direct theme matching
+    const { data: themeResults, error: themeError } = await supabase
+      .from('Journal Entries')
+      .select('id, "refined text", created_at, master_themes')
+      .eq('user_id', userId)
+      .contains('master_themes', [themeQuery])
+      .order('created_at', { ascending: false })
+      .limit(matchCount);
+
+    if (themeError) {
+      console.error("Error in theme matching:", themeError);
+    } else if (themeResults && themeResults.length > 0) {
+      console.log(`Found ${themeResults.length} entries through direct theme matching`);
+      return tracker.succeed(themeResults.map(entry => ({
+        ...entry,
+        content: entry["refined text"],
+        similarity: 1.0 // High relevance for direct matches
+      })));
+    }
+
+    // If no direct matches, try vector similarity search
+    console.log("No direct theme matches, trying vector similarity search");
+    const { data: vectorResults, error: vectorError } = await supabase.rpc(
+      'match_journal_entries_with_date',
+      {
+        query_embedding: queryEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+        user_id_filter: userId,
+        start_date: startDate,
+        end_date: endDate
+      }
+    );
+
+    if (vectorError) {
+      console.error("Error in vector similarity search:", vectorError);
+      return tracker.fail(vectorError);
+    }
+
+    console.log(`Found ${vectorResults?.length || 0} entries through vector similarity`);
+    return tracker.succeed(vectorResults);
+
   } catch (error) {
-    console.error("Error in getPreviousMessages:", error);
+    console.error("Exception in searchJournalEntriesByTheme:", error);
     return tracker.fail(error);
   }
 }
 
-// Function to search journal entries with date range
+// Function to search journal entries with date range and higher default limit
 async function searchJournalEntriesWithDate(
   userId: string, 
   queryEmbedding: any,
   startDate: string | null = null,
   endDate: string | null = null,
   matchThreshold: number = 0.5,
-  matchCount: number = 5
+  matchCount: number = 10 // Increased from 5 to get more results
 ) {
   const tracker = trackFunctionExecution("searchJournalEntriesWithDate", { 
     userId, 
@@ -173,14 +168,10 @@ async function searchJournalEntriesWithDate(
   });
   
   try {
-    console.log(`Calling match_journal_entries_with_date with userId: ${userId}`);
-    console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}`);
+    console.log(`Searching entries with vector similarity for userId: ${userId}`);
     
-    // Convert queryEmbedding to the expected format if it's not already
-    const formattedEmbedding = Array.isArray(queryEmbedding) ? queryEmbedding : queryEmbedding;
-
     const { data, error } = await supabase.rpc('match_journal_entries_with_date', {
-      query_embedding: formattedEmbedding,
+      query_embedding: queryEmbedding,
       match_threshold: matchThreshold,
       match_count: matchCount,
       user_id_filter: userId,
@@ -189,11 +180,11 @@ async function searchJournalEntriesWithDate(
     });
     
     if (error) {
-      console.error("Error in date-filtered similarity search:", error);
+      console.error("Error in vector similarity search:", error);
       return tracker.fail(error);
     }
     
-    console.log(`Date-filtered search found ${data?.length || 0} entries`);
+    console.log(`Vector similarity search found ${data?.length || 0} entries`);
     return tracker.succeed(data);
   } catch (error) {
     console.error("Exception in searchJournalEntriesWithDate:", error);
@@ -201,227 +192,48 @@ async function searchJournalEntriesWithDate(
   }
 }
 
-// Function to search journal entries by emotion
-async function searchJournalEntriesByEmotion(
-  userId: string,
-  emotion: string,
-  minScore: number = 0.3,
-  startDate: string | null = null,
-  endDate: string | null = null,
-  limitCount: number = 5
-) {
-  const tracker = trackFunctionExecution("searchJournalEntriesByEmotion", { 
-    userId, 
-    emotion, 
-    minScore, 
-    startDate, 
-    endDate, 
-    limitCount 
-  });
+// Function to analyze query and determine search strategy
+function analyzeQuery(text: string): {
+  queryType: 'emotional' | 'temporal' | 'thematic' | 'general',
+  searchStrategy: string,
+  themeKeywords: string[],
+  timeframe: {timeType: string | null, startDate: string | null, endDate: string | null}
+} {
+  const lowerText = text.toLowerCase();
   
-  try {
-    console.log(`Calling match_journal_entries_by_emotion with userId: ${userId}, emotion: ${emotion}`);
-    console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}, min score: ${minScore}`);
-    
-    const { data, error } = await supabase.rpc('match_journal_entries_by_emotion', {
-      emotion_name: emotion,
-      min_score: minScore,
-      user_id_filter: userId,
-      start_date: startDate,
-      end_date: endDate,
-      limit_count: limitCount
-    });
-    
-    if (error) {
-      console.error("Error in emotion-filtered search:", error);
-      console.log("Search error details:", JSON.stringify(error));
-      
-      // Try a broader search with the new function
-      console.log("Trying broader emotion term search...");
-      return await searchJournalEntriesByEmotionTerm(userId, emotion, startDate, endDate, limitCount);
-    }
-    
-    console.log(`Emotion search found ${data?.length || 0} entries`);
-    return tracker.succeed(data);
-  } catch (error) {
-    console.error("Exception in searchJournalEntriesByEmotion:", error);
-    
-    // Try a broader search with the new function
-    try {
-      console.log("Trying broader emotion term search after exception...");
-      return await searchJournalEntriesByEmotionTerm(userId, emotion, startDate, endDate, limitCount);
-    } catch (fallbackError) {
-      return tracker.fail(error);
-    }
-  }
-}
+  // Define theme keywords for workplace context
+  const workplaceKeywords = [
+    'work', 'office', 'job', 'career', 'company', 'business', 'workplace',
+    'meeting', 'project', 'colleague', 'manager', 'boss', 'team',
+    'client', 'deadline', 'presentation', 'email', 'corporate'
+  ];
 
-// New function to search for emotion terms more broadly
-async function searchJournalEntriesByEmotionTerm(
-  userId: string,
-  emotionTerm: string,
-  startDate: string | null = null,
-  endDate: string | null = null,
-  limitCount: number = 5
-) {
-  const tracker = trackFunctionExecution("searchJournalEntriesByEmotionTerm", { 
-    userId, 
-    emotionTerm, 
-    startDate, 
-    endDate, 
-    limitCount 
-  });
-  
-  try {
-    console.log(`Calling get_entries_by_emotion_term with userId: ${userId}, emotion term: ${emotionTerm}`);
-    
-    const { data, error } = await supabase.rpc('get_entries_by_emotion_term', {
-      emotion_term: emotionTerm,
-      user_id_filter: userId,
-      start_date: startDate,
-      end_date: endDate,
-      limit_count: limitCount
-    });
-    
-    if (error) {
-      console.error("Error in emotion term search:", error);
-      console.log("Search error details:", JSON.stringify(error));
-      
-      // Fallback to standard search
-      console.log("Falling back to standard similarity search due to emotion term search error");
-      return await fallbackToStandardSearch(userId, await generateEmbedding(emotionTerm), 0.3, limitCount);
-    }
-    
-    console.log(`Emotion term search found ${data?.length || 0} entries`);
-    
-    // Add a placeholder similarity score for consistency with other search functions
-    const enhancedData = data?.map(entry => ({
-      ...entry,
-      similarity: 1.0, // High relevance since it matched by direct term search
-      emotion_score: 1.0
-    }));
-    
-    return tracker.succeed(enhancedData);
-  } catch (error) {
-    console.error("Exception in searchJournalEntriesByEmotionTerm:", error);
-    
-    // Fallback to standard search
-    try {
-      console.log("Exception occurred, falling back to standard similarity search");
-      return await fallbackToStandardSearch(userId, await generateEmbedding(emotionTerm), 0.3, limitCount);
-    } catch (fallbackError) {
-      return tracker.fail(error);
-    }
-  }
-}
+  // Check for workplace-related terms
+  const foundWorkplaceKeywords = workplaceKeywords.filter(keyword => 
+    lowerText.includes(keyword)
+  );
 
-// Function to search journal entries by theme
-async function searchJournalEntriesByTheme(
-  userId: string,
-  themeQuery: string,
-  matchThreshold: number = 0.5,
-  matchCount: number = 5,
-  startDate: string | null = null,
-  endDate: string | null = null
-) {
-  const tracker = trackFunctionExecution("searchJournalEntriesByTheme", { 
-    userId, 
-    themeQuery, 
-    matchThreshold, 
-    matchCount, 
-    startDate, 
-    endDate 
-  });
+  // Detect timeframe
+  const timeframe = detectTimeframe(text);
   
-  try {
-    console.log(`Calling match_journal_entries_by_theme with userId: ${userId}, theme query: ${themeQuery}`);
-    console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}, threshold: ${matchThreshold}`);
-    
-    // Generate embedding for theme query
-    const queryEmbedding = await generateEmbedding(themeQuery);
-    
-    const { data, error } = await supabase.rpc('match_journal_entries_by_theme', {
-      theme_query: themeQuery,
-      match_threshold: matchThreshold,
-      match_count: matchCount,
-      user_id_filter: userId,
-      start_date: startDate,
-      end_date: endDate
-    });
-    
-    if (error) {
-      console.error("Error in theme-filtered search:", error);
-      console.log("Search error details:", JSON.stringify(error));
-      
-      // Fallback to standard search
-      console.log("Falling back to standard similarity search due to theme search error");
-      return await fallbackToStandardSearch(userId, queryEmbedding, matchThreshold, matchCount);
-    }
-    
-    console.log(`Theme search found ${data?.length || 0} entries`);
-    return tracker.succeed(data);
-  } catch (error) {
-    console.error("Exception in searchJournalEntriesByTheme:", error);
-    
-    try {
-      // Generate embedding for theme query
-      const queryEmbedding = await generateEmbedding(themeQuery);
-      
-      // Fallback to standard search
-      console.log("Exception occurred, falling back to standard similarity search");
-      return await fallbackToStandardSearch(userId, queryEmbedding, 0.4, matchCount);
-    } catch (fallbackError) {
-      return tracker.fail(error);
-    }
-  }
-}
+  // Determine query type and search strategy
+  let queryType: 'emotional' | 'temporal' | 'thematic' | 'general' = 'general';
+  let searchStrategy = 'default';
 
-// Fallback function for standard similarity search
-async function fallbackToStandardSearch(
-  userId: string,
-  queryEmbedding: any,
-  matchThreshold: number = 0.5,
-  matchCount: number = 5
-) {
-  const tracker = trackFunctionExecution("fallbackToStandardSearch", {
-    userId,
-    matchThreshold,
-    matchCount
-  });
-  
-  try {
-    console.log(`Calling match_journal_entries with userId: ${userId} (string)`);
-    
-    // Convert queryEmbedding to the expected format if it's not already
-    const formattedEmbedding = Array.isArray(queryEmbedding) ? queryEmbedding : queryEmbedding;
-    
-    const { data, error } = await supabase.rpc(
-      'match_journal_entries',
-      {
-        query_embedding: formattedEmbedding,
-        match_threshold: matchThreshold,
-        match_count: matchCount,
-        user_id_filter: userId
-      }
-    );
-    
-    if (error) {
-      console.error("Error in standard similarity search:", error);
-      console.log("Search error details:", JSON.stringify(error));
-      return tracker.fail(error);
-    }
-    
-    if (data && data.length > 0) {
-      console.log(`Standard search found ${data.length} similar entries`);
-      return tracker.succeed(data);
-    } else {
-      console.log("No similar entries found in standard search");
-      return tracker.succeed([]);
-    }
-  } catch (error) {
-    console.error("Error in fallbackToStandardSearch:", error);
-    return tracker.fail(error);
+  if (foundWorkplaceKeywords.length > 0) {
+    queryType = 'thematic';
+    searchStrategy = 'workplace_context';
+  } else if (timeframe.timeType) {
+    queryType = 'temporal';
+    searchStrategy = 'time_based';
   }
+
+  return {
+    queryType,
+    searchStrategy,
+    themeKeywords: foundWorkplaceKeywords,
+    timeframe
+  };
 }
 
 // Function to detect timeframe from text
@@ -476,66 +288,6 @@ function detectTimeframe(text: string): {timeType: string | null, startDate: str
   return { timeType, startDate, endDate };
 }
 
-// Function to detect emotion from text
-function detectEmotion(text: string): string | null {
-  const lowerText = text.toLowerCase();
-  
-  for (const [emotion, keywords] of Object.entries(EMOTION_MAPPINGS)) {
-    if (keywords.some(keyword => lowerText.includes(keyword))) {
-      return emotion;
-    }
-  }
-  
-  return null;
-}
-
-// Function to detect theme from text
-function detectTheme(text: string): string | null {
-  const lowerText = text.toLowerCase();
-  
-  for (const [theme, keywords] of Object.entries(THEME_MAPPINGS)) {
-    if (keywords.some(keyword => lowerText.includes(keyword))) {
-      return theme;
-    }
-  }
-  
-  return null;
-}
-
-// Function to detect query type
-function analyzeQuery(text: string): {
-  queryType: 'emotional' | 'temporal' | 'thematic' | 'general',
-  emotion: string | null,
-  theme: string | null,
-  timeframe: {timeType: string | null, startDate: string | null, endDate: string | null},
-  isWhenQuestion: boolean
-} {
-  const lowerText = text.toLowerCase();
-  const emotion = detectEmotion(lowerText);
-  const theme = detectTheme(lowerText);
-  const timeframe = detectTimeframe(lowerText);
-  const isWhenQuestion = lowerText.startsWith('when') || lowerText.includes('what time') || lowerText.includes('which day');
-  
-  // Determine query type based on the presence of emotion, theme, and time indicators
-  let queryType: 'emotional' | 'temporal' | 'thematic' | 'general' = 'general';
-  
-  if (emotion) {
-    queryType = 'emotional';
-  } else if (theme) {
-    queryType = 'thematic';
-  } else if (timeframe.timeType) {
-    queryType = 'temporal';
-  }
-  
-  return {
-    queryType,
-    emotion,
-    theme,
-    timeframe,
-    isWhenQuestion
-  };
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -543,534 +295,218 @@ serve(async (req) => {
   }
 
   const diagnostics = {
-    embeddingGenerated: false,
-    embeddingError: null,
-    similaritySearchComplete: false,
-    searchError: null,
-    contextBuilt: false,
-    contextError: null,
-    contextSize: 0,
-    tokenCount: 0,
-    llmError: null,
-    processingTime: {
+    queryAnalysis: null,
+    searchStrategy: null,
+    searchAttempts: [],
+    resultsFound: 0,
+    timings: {
+      total: 0,
       embedding: 0,
       search: 0,
-      context: 0,
-      llm: 0,
-      total: 0
-    },
-    queryAnalysis: null
+      context: 0
+    }
   };
-  
+
   const startTime = Date.now();
 
   try {
-    const { message, userId, threadId, isNewThread, threadTitle, includeDiagnostics, includeExecutionData, timeframe } = await req.json();
+    const { message, userId, threadId = null } = await req.json();
     
-    if (!message) {
-      throw new Error('No message provided');
+    if (!message || !userId) {
+      throw new Error('Missing required parameters');
     }
 
     console.log("Processing chat request for user:", userId);
     console.log("Message:", message.substring(0, 50) + "...");
-    console.log("Include diagnostics:", includeDiagnostics ? "yes" : "no");
-    console.log("Thread ID:", threadId || "new thread");
-    console.log("Timeframe specified:", timeframe || "none");
     
-    // Analyze the query to determine approach
+    // Analyze query to determine search strategy
     const queryAnalysis = analyzeQuery(message);
     console.log("Query analysis:", JSON.stringify(queryAnalysis));
+    
     diagnostics.queryAnalysis = queryAnalysis;
-    
-    let similarityScores = [];
-    let similarEntries = null;
-    let queryEmbedding = null;
-    
-    // Generate embedding for the user query
-    console.log("Generating embedding for user query...");
+    diagnostics.searchStrategy = queryAnalysis.searchStrategy;
+
+    // Generate embedding for the query
+    console.log("Generating embedding for query...");
     const embeddingStartTime = Date.now();
-    try {
-      queryEmbedding = await generateEmbedding(message);
-      diagnostics.embeddingGenerated = true;
-      diagnostics.processingTime.embedding = Date.now() - embeddingStartTime;
-    } catch (error) {
-      console.error("Error generating embedding:", error);
-      diagnostics.embeddingError = error.message;
-      // We'll continue anyway
-    }
-    
-    // Search for relevant journal entries based on query type
-    console.log("Searching for relevant context based on query type:", queryAnalysis.queryType);
+    const queryEmbedding = await generateEmbedding(message);
+    diagnostics.timings.embedding = Date.now() - embeddingStartTime;
+
+    let similarEntries = [];
     const searchStartTime = Date.now();
-    
-    try {
-      if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
-        // Use emotion-based search with time filtering
-        console.log(`Using emotion-based search for ${queryAnalysis.emotion} with time filtering`);
-        try {
-          similarEntries = await searchJournalEntriesByEmotion(
-            userId, 
-            queryAnalysis.emotion,
-            0.3, // Minimum emotion score
-            queryAnalysis.timeframe.startDate,
-            queryAnalysis.timeframe.endDate
-          );
-          
-          if (similarEntries && similarEntries.length > 0) {
-            console.log(`Found ${similarEntries.length} entries for emotion: ${queryAnalysis.emotion}`);
-            similarityScores = similarEntries.map(entry => ({
-              id: entry.id,
-              score: entry.emotion_score || entry.similarity
-            }));
-          } else {
-            console.log(`No entries found with emotion: ${queryAnalysis.emotion}, trying broader emotion term search`);
-            // Try a broader search for emotion terms in text and themes
-            similarEntries = await searchJournalEntriesByEmotionTerm(
-              userId, 
-              queryAnalysis.emotion,
-              queryAnalysis.timeframe.startDate,
-              queryAnalysis.timeframe.endDate
-            );
-          }
-        } catch (emotionSearchError) {
-          console.error("Error in emotion search, falling back to standard:", emotionSearchError);
-          if (queryEmbedding) {
-            similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
-          }
-        }
-      } else if (queryAnalysis.queryType === 'thematic' && queryAnalysis.theme) {
-        // Use theme-based search with time filtering
-        console.log(`Using theme-based search for ${queryAnalysis.theme} with time filtering`);
-        try {
-          similarEntries = await searchJournalEntriesByTheme(
-            userId,
-            queryAnalysis.theme,
-            0.4, // Lower threshold for theme matching to be more inclusive
-            5,   // Return top 5 matches
-            queryAnalysis.timeframe.startDate,
-            queryAnalysis.timeframe.endDate
-          );
-          
-          if (similarEntries && similarEntries.length > 0) {
-            console.log(`Found ${similarEntries.length} entries for theme: ${queryAnalysis.theme}`);
-            similarityScores = similarEntries.map(entry => ({
-              id: entry.id,
-              score: entry.similarity
-            }));
-          } else if (queryEmbedding) {
-            console.log(`No entries found with theme: ${queryAnalysis.theme}, falling back to standard search`);
-            similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
-          }
-        } catch (themeSearchError) {
-          console.error("Error in theme search, falling back to standard:", themeSearchError);
-          if (queryEmbedding) {
-            similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
-          }
-        }
-      } else if (queryAnalysis.timeframe.timeType) {
-        // Use time-based similarity search
-        console.log("Using time-based similarity search");
-        try {
-          if (queryEmbedding) {
-            similarEntries = await searchJournalEntriesWithDate(
-              userId, 
-              queryEmbedding,
-              queryAnalysis.timeframe.startDate,
-              queryAnalysis.timeframe.endDate
-            );
-            
-            if (similarEntries && similarEntries.length > 0) {
-              console.log(`Found ${similarEntries.length} entries for timeframe: ${queryAnalysis.timeframe.timeType}`);
-              similarityScores = similarEntries.map(entry => ({
-                id: entry.id,
-                score: entry.similarity
-              }));
-            } else {
-              console.log("No entries found for specified timeframe, falling back to standard search");
-              similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
-            }
-          }
-        } catch (timeSearchError) {
-          console.error("Error in time-based search, falling back to standard:", timeSearchError);
-          if (queryEmbedding) {
-            similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
-          }
-        }
-      } else {
-        // Use standard similarity search
-        console.log("Using standard similarity search");
-        if (queryEmbedding) {
-          similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
-        }
-      }
-      
-      diagnostics.similaritySearchComplete = true;
-    } catch (searchError) {
-      console.error("Error in search process:", searchError);
-      diagnostics.searchError = searchError.message || "Error in search process";
-    }
-    
-    diagnostics.processingTime.search = Date.now() - searchStartTime;
-    
-    // Create RAG context from relevant entries
-    const contextStartTime = Date.now();
-    let journalContext = "";
-    let referenceEntries = [];
-    
-    try {
-      if (similarEntries && similarEntries.length > 0) {
-        console.log("Found similar entries:", similarEntries.length);
-        
-        // Fetch full entries for context
-        const entryIds = similarEntries.map(entry => entry.id);
-        
-        // Using column name with space "refined text" instead of "refinedtext"
-        const { data: entries, error: entriesError } = await supabase
-          .from('Journal Entries')
-          .select('id, "refined text", created_at, emotions, master_themes')
-          .in('id', entryIds);
-        
-        if (entriesError) {
-          console.error("Error retrieving journal entries:", entriesError);
-          diagnostics.contextError = entriesError.message || "Error retrieving journal entries";
-        } else if (entries && entries.length > 0) {
-          console.log("Retrieved full entries:", entries.length);
-          
-          // Store reference information
-          referenceEntries = entries.map(entry => {
-            // Find the similarity score for this entry
-            const similarEntry = similarEntries.find(se => se.id === entry.id);
-            const score = similarEntry?.similarity || similarEntry?.emotion_score || 0;
-            
-            return {
-              id: entry.id,
-              date: entry.created_at,
-              snippet: entry["refined text"]?.substring(0, 100) + "...",
-              similarity: score,
-              emotions: entry.emotions,
-              themes: entry.master_themes
-            };
-          });
-          
-          // Special formatting for thematic queries
-          if (queryAnalysis.queryType === 'thematic') {
-            journalContext = "Here are some of your journal entries related to '" + 
-              queryAnalysis.theme + "' " + 
-              (queryAnalysis.timeframe.timeType ? `from the ${queryAnalysis.timeframe.timeType} period` : "") + 
-              ":\n\n" + 
-              entries.map((entry, index) => {
-                const date = new Date(entry.created_at).toLocaleDateString();
-                const time = new Date(entry.created_at).toLocaleTimeString();
-                const emotionsText = formatEmotions(entry.emotions);
-                const themesText = entry.master_themes ? entry.master_themes.join(", ") : "No themes identified";
-                
-                return `Entry ${index+1} (${date} at ${time}):\n${entry["refined text"]}\nThemes: ${themesText}\nPrimary emotions: ${emotionsText}`;
-              }).join('\n\n') + "\n\n";
-          }
-          // Special formatting for emotional queries
-          else if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
-            journalContext = "Here are some of your journal entries showing the emotion '" + 
-              queryAnalysis.emotion + "' " + 
-              (queryAnalysis.timeframe.timeType ? `from the ${queryAnalysis.timeframe.timeType} period` : "") + 
-              ":\n\n" + 
-              entries.map((entry, index) => {
-                const date = new Date(entry.created_at).toLocaleDateString();
-                const time = new Date(entry.created_at).toLocaleTimeString();
-                const emotionsText = formatEmotions(entry.emotions);
-                const themesText = entry.master_themes ? entry.master_themes.join(", ") : "No themes identified";
-                const emotionScore = entry.emotions?.[queryAnalysis.emotion] 
-                  ? `${queryAnalysis.emotion} intensity: ${Math.round(entry.emotions[queryAnalysis.emotion] * 100)}%` 
-                  : '';
-                
-                return `Entry ${index+1} (${date} at ${time}):\n${entry["refined text"]}\n${emotionScore}\nThemes: ${themesText}\nPrimary emotions: ${emotionsText}`;
-              }).join('\n\n') + "\n\n";
-          } else {
-            // Standard formatting for other queries
-            journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
-              entries.map((entry, index) => {
-                const date = new Date(entry.created_at).toLocaleDateString();
-                const time = new Date(entry.created_at).toLocaleTimeString();
-                const emotionsText = formatEmotions(entry.emotions);
-                const themesText = entry.master_themes ? entry.master_themes.join(", ") : "No themes identified";
-                
-                return `Entry ${index+1} (${date} at ${time}):\n${entry["refined text"]}\nThemes: ${themesText}\nPrimary emotions: ${emotionsText}`;
-              }).join('\n\n') + "\n\n";
-          }
-            
-          diagnostics.contextBuilt = true;
-          diagnostics.contextSize = journalContext.length;
-        }
-      } else {
-        console.log("No similar entries found, falling back to recent entries");
-        // Fallback to recent entries if no similar ones found
-        const { data: recentEntries, error: recentError } = await supabase
-          .from('Journal Entries')
-          .select('id, "refined text", created_at, emotions, master_themes')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(3);
-        
-        if (recentError) {
-          console.error("Error retrieving recent entries:", recentError);
-          diagnostics.contextError = recentError.message || "Error retrieving recent entries";
-        } else if (recentEntries && recentEntries.length > 0) {
-          console.log("Retrieved recent entries:", recentEntries.length);
-          
-          // Store reference information
-          referenceEntries = recentEntries.map(entry => ({
-            id: entry.id,
-            date: entry.created_at,
-            snippet: entry["refined text"]?.substring(0, 100) + "...",
-            type: "recent",
-            themes: entry.master_themes
-          }));
-          
-          journalContext = "Here are some of your recent journal entries:\n\n" + 
-            recentEntries.map((entry, index) => {
-              const date = new Date(entry.created_at).toLocaleDateString();
-              const emotionsText = formatEmotions(entry.emotions);
-              const themesText = entry.master_themes ? entry.master_themes.join(", ") : "No themes identified";
-              
-              return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nThemes: ${themesText}\nPrimary emotions: ${emotionsText}`;
-            }).join('\n\n') + "\n\n";
-            
-          diagnostics.contextBuilt = true;
-          diagnostics.contextSize = journalContext.length;
-        }
-      }
-    } catch (contextError) {
-      console.error("Error building context:", contextError);
-      diagnostics.contextError = contextError.message || "Error building context";
-    }
-    
-    diagnostics.processingTime.context = Date.now() - contextStartTime;
-    
-    // Get previous messages for context
-    console.log("Fetching previous messages for conversation context...");
-    const previousMessages = await getPreviousMessages(threadId);
-    console.log(`Retrieved ${previousMessages.length} previous messages`);
-    
-    // Prepare system prompt with RAG context
-    let systemPrompt = `You are SOULo, an AI assistant specialized in emotional wellbeing and journaling. 
-${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
 
-Always maintain a warm, empathetic tone. If you notice concerning emotional patterns in the user's journal entries that might benefit from professional attention, 
-mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
-Focus on being helpful rather than diagnostic.`;
-
-    // Add special instructions for thematic queries
-    if (queryAnalysis.queryType === 'thematic') {
-      systemPrompt += `\n\nThe user is asking about the theme "${queryAnalysis.theme}" in their journal entries.
-Focus on what happened related to this theme based on the journal entries provided.
-Highlight specific events, patterns, and emotions connected to this theme.`;
-    }
-    // Add special instructions for emotional queries
-    else if (queryAnalysis.queryType === 'emotional') {
-      systemPrompt += `\n\nThe user is asking about the emotion "${queryAnalysis.emotion}" over a specific time period. 
-Focus on when and why this emotion was strongest based on the journal entries provided.
-If the user is asking "when" this emotion occurred, highlight the specific dates and times.`;
-    } else if (queryAnalysis.isWhenQuestion) {
-      systemPrompt += `\n\nThe user is asking about when something occurred. Be specific about dates and times in your answer, referring directly to the journal entries.`;
-    }
-
-    console.log("Sending to GPT with RAG context and conversation history...");
-    
-    // Build message history for the LLM
-    const messages = [
-      { role: 'system', content: systemPrompt }
-    ];
-    
-    // Add previous messages if available
-    if (previousMessages.length > 0) {
-      console.log("Including previous conversation context");
-      messages.push(...previousMessages);
-    }
-    
-    // Add current message
-    messages.push({ role: 'user', content: message });
-    
-    const llmStartTime = Date.now();
-    try {
-      // Send to GPT with RAG context and conversation history
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: messages,
-        }),
+    // Implement search based on query analysis
+    if (queryAnalysis.queryType === 'thematic' && queryAnalysis.themeKeywords.length > 0) {
+      // For workplace queries, use theme-based search with backup to vector similarity
+      diagnostics.searchAttempts.push({
+        type: 'theme_based',
+        keywords: queryAnalysis.themeKeywords
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("GPT API error:", errorText);
-        diagnostics.llmError = errorText || "Error from GPT API";
-        throw new Error(`GPT API error: ${errorText}`);
-      }
+      for (const keyword of queryAnalysis.themeKeywords) {
+        const themeResults = await searchJournalEntriesByTheme(
+          userId,
+          keyword,
+          queryEmbedding,
+          0.4, // Lower threshold for more results
+          10,  // Get more results
+          queryAnalysis.timeframe.startDate,
+          queryAnalysis.timeframe.endDate
+        );
 
-      const result = await response.json();
-      const aiResponse = result.choices[0].message.content;
-      diagnostics.tokenCount = result.usage?.total_tokens || 0;
-      diagnostics.processingTime.llm = Date.now() - llmStartTime;
-      
-      console.log("AI response generated successfully");
-      
-      diagnostics.processingTime.total = Date.now() - startTime;
-      
-      // Now store the chat messages and thread if needed
-      if (isNewThread) {
-        // Create a new thread
-        const { data: threadData, error: threadError } = await supabase
-          .from('chat_threads')
-          .insert([{ 
-            title: threadTitle || message.substring(0, 30) + "...",
-            user_id: userId
-          }])
-          .select('id')
-          .single();
-          
-        if (threadError) {
-          console.error("Error creating thread:", threadError);
-          // Continue anyway, we'll just use the temporary ID
+        if (themeResults && themeResults.length > 0) {
+          similarEntries = [...similarEntries, ...themeResults];
         }
-        
-        const newThreadId = threadData?.id || null;
-        
-        // Store user message
-        if (newThreadId) {
-          const { error: userMsgError } = await supabase
-            .from('chat_messages')
-            .insert([{
-              thread_id: newThreadId,
-              sender: 'user',
-              content: message
-            }]);
-            
-          if (userMsgError) {
-            console.error("Error storing user message:", userMsgError);
-          }
-          
-          // Store assistant message
-          const { error: aiMsgError } = await supabase
-            .from('chat_messages')
-            .insert([{
-              thread_id: newThreadId,
-              sender: 'assistant',
-              content: aiResponse,
-              reference_entries: referenceEntries
-            }]);
-            
-          if (aiMsgError) {
-            console.error("Error storing assistant message:", aiMsgError);
-          }
-        }
-        
-        return new Response(
-          JSON.stringify({ 
-            response: aiResponse, 
-            threadId: newThreadId,
-            references: referenceEntries,
-            diagnostics,
-            similarityScores,
-            queryAnalysis,
-            functionExecutions: includeExecutionData ? functionExecutions : null
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      } else {
-        // Store messages in existing thread
-        
-        // Store user message
-        const { error: userMsgError } = await supabase
-          .from('chat_messages')
-          .insert([{
-            thread_id: threadId,
-            sender: 'user',
-            content: message
-          }]);
-          
-        if (userMsgError) {
-          console.error("Error storing user message:", userMsgError);
-        }
-        
-        // Store assistant message
-        const { error: aiMsgError } = await supabase
-          .from('chat_messages')
-          .insert([{
-            thread_id: threadId,
-            sender: 'assistant',
-            content: aiResponse,
-            reference_entries: referenceEntries
-          }]);
-          
-        if (aiMsgError) {
-          console.error("Error storing assistant message:", aiMsgError);
-        }
-        
-        // Update thread's updated_at timestamp
-        const { error: updateError } = await supabase
-          .from('chat_threads')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', threadId);
-          
-        if (updateError) {
-          console.error("Error updating thread timestamp:", updateError);
-        }
-        
-        return new Response(
-          JSON.stringify({ 
-            response: aiResponse, 
-            threadId: threadId,
-            references: referenceEntries,
-            diagnostics,
-            similarityScores,
-            queryAnalysis,
-            functionExecutions: includeExecutionData ? functionExecutions : null
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
       }
-    } catch (apiError) {
-      console.error("API error:", apiError);
-      diagnostics.llmError = apiError.message || "API error";
-      diagnostics.processingTime.total = Date.now() - startTime;
-      
-      // Return a 200 status even for errors to avoid CORS issues
-      return new Response(
-        JSON.stringify({ 
-          error: apiError.message, 
-          response: "I'm having trouble connecting right now. Please try again later.",
-          success: false,
-          diagnostics
-        }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
     }
-  } catch (error) {
-    console.error("Error in chat-rag function:", error);
-    diagnostics.processingTime.total = Date.now() - startTime;
+
+    // If no theme results or not a theme query, try vector similarity
+    if (similarEntries.length === 0) {
+      diagnostics.searchAttempts.push({
+        type: 'vector_similarity',
+        threshold: 0.4
+      });
+
+      const vectorResults = await searchJournalEntriesWithDate(
+        userId,
+        queryEmbedding,
+        queryAnalysis.timeframe.startDate,
+        queryAnalysis.timeframe.endDate,
+        0.4, // Lower threshold for more results
+        10   // Get more results
+      );
+
+      if (vectorResults && vectorResults.length > 0) {
+        similarEntries = vectorResults;
+      }
+    }
+
+    diagnostics.timings.search = Date.now() - searchStartTime;
+    diagnostics.resultsFound = similarEntries.length;
+
+    // Build context from found entries
+    const contextStartTime = Date.now();
+    let journalContext = "";
+    let references = [];
+
+    if (similarEntries.length > 0) {
+      console.log(`Found ${similarEntries.length} relevant entries`);
+      
+      // Sort entries by relevance and date
+      similarEntries.sort((a, b) => {
+        // Prioritize similarity if available
+        if (a.similarity && b.similarity) {
+          return b.similarity - a.similarity;
+        }
+        // Fall back to date-based sorting
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+      // Prepare references and context
+      references = similarEntries.map(entry => ({
+        id: entry.id,
+        date: entry.created_at,
+        snippet: entry.content?.substring(0, 150) + "...",
+        similarity: entry.similarity || null,
+        type: entry.type || 'similarity_match'
+      }));
+
+      // Build context differently based on query type
+      if (queryAnalysis.queryType === 'thematic') {
+        journalContext = `Here are your journal entries related to ${queryAnalysis.themeKeywords.join(', ')}:\n\n` +
+          similarEntries.map((entry, i) => 
+            `Entry ${i+1} (${new Date(entry.created_at).toLocaleDateString()}):\n${entry.content}`
+          ).join('\n\n');
+      } else {
+        journalContext = `Here are some relevant entries from your journal:\n\n` +
+          similarEntries.map((entry, i) => 
+            `Entry ${i+1} (${new Date(entry.created_at).toLocaleDateString()}):\n${entry.content}`
+          ).join('\n\n');
+      }
+    } else {
+      console.log("No relevant entries found");
+      journalContext = "I couldn't find any relevant entries in your journal for this query.";
+    }
+
+    diagnostics.timings.context = Date.now() - contextStartTime;
+
+    // Prepare system prompt with context
+    const systemPrompt = `You are SOULo, an AI assistant that helps users understand their journal entries.
+${journalContext}
+
+Based on the above context (if available) and the user's question, provide a thoughtful, personalized response.
+Keep your tone warm and conversational. If you notice patterns or insights, mention them gently.`;
+
+    // Send to GPT with context
+    console.log("Sending to GPT with context...");
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ]
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get response from GPT');
+    }
+
+    const result = await response.json();
+    const aiResponse = result.choices[0].message.content;
     
-    // Return 200 status even for errors to avoid CORS issues
+    diagnostics.timings.total = Date.now() - startTime;
+
+    // Store the chat message if we have a thread
+    if (threadId) {
+      await supabase
+        .from('chat_messages')
+        .insert([
+          {
+            thread_id: threadId,
+            content: message,
+            sender: 'user'
+          },
+          {
+            thread_id: threadId,
+            content: aiResponse,
+            sender: 'assistant',
+            reference_entries: references
+          }
+        ]);
+    }
+
     return new Response(
-      JSON.stringify({ 
-        error: error.message, 
-        response: "I'm having trouble processing your request. Please try again later.",
-        success: false,
-        diagnostics
+      JSON.stringify({
+        response: aiResponse,
+        references,
+        diagnostics,
+        functionExecutions
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('Error:', error);
+    diagnostics.timings.total = Date.now() - startTime;
+    
+    return new Response(
+      JSON.stringify({
+        error: error.message,
+        diagnostics,
+        functionExecutions
       }),
       {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
