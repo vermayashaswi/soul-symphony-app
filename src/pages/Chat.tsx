@@ -7,6 +7,7 @@ import ChatArea from '@/components/chat/ChatArea';
 import ChatThreadList from '@/components/chat/ChatThreadList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useMobile } from '@/hooks/use-mobile';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export default function Chat() {
   const { user } = useAuth();
@@ -32,11 +33,21 @@ export default function Chat() {
     toast.success('New chat started');
   };
 
+  const toggleSidebar = () => {
+    setShowSidebar(!showSidebar);
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <Navbar />
       
       <div className="flex-1 pt-16 flex w-full h-[calc(100vh-4rem)]">
+        {isMobile && (
+          <div className="absolute top-20 left-4 z-10">
+            <SidebarTrigger onClick={toggleSidebar} />
+          </div>
+        )}
+        
         <ResizablePanelGroup direction="horizontal" className="w-full h-full">
           {showSidebar && (
             <>
@@ -62,6 +73,8 @@ export default function Chat() {
               userId={user?.id}
               threadId={currentThreadId}
               onNewThreadCreated={handleNewThreadCreated}
+              toggleSidebar={toggleSidebar}
+              showSidebar={showSidebar}
             />
           </ResizablePanel>
         </ResizablePanelGroup>

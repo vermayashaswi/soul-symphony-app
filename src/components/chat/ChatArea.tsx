@@ -1,10 +1,9 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Bot, Loader2, Brain, BrainCircuit, CalendarDays, HeartPulse, Briefcase } from 'lucide-react';
+import { Send, Bot, Loader2, Brain, BrainCircuit, CalendarDays, HeartPulse, Briefcase, MenuIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,6 +34,8 @@ interface ChatAreaProps {
   userId: string | undefined;
   threadId: string | null;
   onNewThreadCreated: (threadId: string) => void;
+  toggleSidebar: () => void;
+  showSidebar: boolean;
 }
 
 interface DiagnosticsStep {
@@ -57,7 +58,7 @@ interface QueryAnalysis {
   isWhenQuestion: boolean;
 }
 
-export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatAreaProps) {
+export default function ChatArea({ userId, threadId, onNewThreadCreated, toggleSidebar, showSidebar }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -85,6 +86,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
 
   useEffect(() => {
     if (threadId) {
+      console.log(`Loading thread: ${threadId}`);
       fetchMessages(threadId);
       setShowWelcome(false);
     } else {
@@ -115,6 +117,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   const fetchMessages = async (threadId: string) => {
     try {
       setIsLoadingMessages(true);
+      console.log(`Fetching messages for thread: ${threadId}`);
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
@@ -127,6 +130,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
         return;
       }
 
+      console.log(`Fetched ${data?.length || 0} messages`);
+      
       const typedMessages: Message[] = data?.map(msg => {
         let processedRefs: MessageReference[] | null = null;
         
@@ -316,6 +321,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       }
       
       if (isNewThread && data.threadId) {
+        console.log(`New thread created with ID: ${data.threadId}`);
         onNewThreadCreated(data.threadId);
       }
       
@@ -348,7 +354,6 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     }
   };
 
-  // Function to render a badge for the query type
   const renderQueryTypeBadge = () => {
     if (!queryAnalysis) return null;
     
@@ -385,12 +390,24 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   return (
     <div className="flex flex-col h-full">
       <div className="flex justify-between px-4 pt-2 items-center">
+        {!showSidebar && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleSidebar}
+            className="md:hidden"
+          >
+            <MenuIcon className="h-5 w-5" />
+          </Button>
+        )}
+        
         {queryAnalysis && renderQueryTypeBadge()}
+        
         <Button 
           variant="outline" 
           size="sm"
           onClick={() => setShowDiagnostics(!showDiagnostics)}
-          className="flex items-center gap-1 text-xs"
+          className="flex items-center gap-1 text-xs ml-auto"
         >
           <BrainCircuit className="h-3 w-3" />
           {showDiagnostics ? "Hide Diagnostics" : "Show Diagnostics"}
