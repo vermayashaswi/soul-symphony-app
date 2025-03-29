@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import SouloLogo from '@/components/SouloLogo';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -75,14 +74,6 @@ export function Navbar() {
           >
             <span className="text-white font-bold text-lg">S</span>
           </motion.div>
-          <motion.span 
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="font-semibold text-xl text-gradient"
-          >
-            <SouloLogo size="normal" />
-          </motion.span>
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
