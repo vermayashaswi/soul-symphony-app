@@ -55,6 +55,12 @@ async function generateEmbedding(text: string) {
   
   try {
     console.log("Generating embedding for query:", text.substring(0, 50) + "...");
+    
+    if (!openAIApiKey) {
+      console.error("OpenAI API key is not set");
+      return tracker.fail(new Error('OpenAI API key is not configured'));
+    }
+    
     const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -68,12 +74,17 @@ async function generateEmbedding(text: string) {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('Error generating embedding:', error);
-      return tracker.fail(new Error('Failed to generate embedding'));
+      const errorText = await response.text();
+      console.error('Error generating embedding:', errorText);
+      return tracker.fail(new Error(`Failed to generate embedding: ${errorText}`));
     }
 
     const result = await response.json();
+    if (!result.data || !result.data[0] || !result.data[0].embedding) {
+      console.error('Unexpected embedding response structure:', result);
+      return tracker.fail(new Error('Invalid embedding response structure'));
+    }
+    
     return tracker.succeed(result.data[0].embedding);
   } catch (error) {
     console.error('Error in generateEmbedding:', error);
@@ -125,16 +136,22 @@ async function searchJournalEntriesByTheme(
 
     // If no direct matches, try vector similarity search
     console.log("No direct theme matches, trying vector similarity search");
+    
+    // Cast user_id to UUID using ::uuid
+    const rpcParams = {
+      query_embedding: queryEmbedding,
+      match_threshold: matchThreshold,
+      match_count: matchCount,
+      user_id_filter: userId,
+      start_date: startDate,
+      end_date: endDate
+    };
+    
+    console.log("RPC params:", rpcParams);
+    
     const { data: vectorResults, error: vectorError } = await supabase.rpc(
       'match_journal_entries_with_date',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: matchThreshold,
-        match_count: matchCount,
-        user_id_filter: userId,
-        start_date: startDate,
-        end_date: endDate
-      }
+      rpcParams
     );
 
     if (vectorError) {
@@ -143,10 +160,55 @@ async function searchJournalEntriesByTheme(
     }
 
     console.log(`Found ${vectorResults?.length || 0} entries through vector similarity`);
-    return tracker.succeed(vectorResults);
+    return tracker.succeed(vectorResults || []);
 
   } catch (error) {
     console.error("Exception in searchJournalEntriesByTheme:", error);
+    return tracker.fail(error);
+  }
+}
+
+// Function to search journal entries using text search
+async function searchJournalEntriesByText(
+  userId: string,
+  searchTerm: string,
+  limit: number = 5
+) {
+  const tracker = trackFunctionExecution("searchJournalEntriesByText", {
+    userId,
+    searchTerm,
+    limit
+  });
+  
+  try {
+    console.log(`Searching for text matches with userId: ${userId}, search term: ${searchTerm}`);
+    
+    // Search in the refined text and transcription text
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('id, "refined text", created_at')
+      .eq('user_id', userId)
+      .or(`refined_text.ilike.%${searchTerm}%,transcription_text.ilike.%${searchTerm}%`)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error("Error in text search:", error);
+      return tracker.fail(error);
+    }
+    
+    console.log(`Text search found ${data?.length || 0} entries`);
+    
+    // Format the results similar to other search functions
+    return tracker.succeed((data || []).map(entry => ({
+      id: entry.id,
+      content: entry["refined text"],
+      created_at: entry.created_at,
+      similarity: 0.7, // Arbitrary similarity for text matches
+      type: 'text_match'
+    })));
+  } catch (error) {
+    console.error("Exception in searchJournalEntriesByText:", error);
     return tracker.fail(error);
   }
 }
@@ -171,14 +233,22 @@ async function searchJournalEntriesWithDate(
   try {
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
     
-    const { data, error } = await supabase.rpc('match_journal_entries_with_date', {
+    // Cast user_id to UUID using ::uuid
+    const rpcParams = {
       query_embedding: queryEmbedding,
       match_threshold: matchThreshold,
       match_count: matchCount,
       user_id_filter: userId,
       start_date: startDate,
       end_date: endDate
-    });
+    };
+    
+    console.log("RPC params for match_journal_entries_with_date:", JSON.stringify(rpcParams));
+    
+    const { data, error } = await supabase.rpc(
+      'match_journal_entries_with_date',
+      rpcParams
+    );
     
     if (error) {
       console.error("Error in vector similarity search:", error);
@@ -186,9 +256,64 @@ async function searchJournalEntriesWithDate(
     }
     
     console.log(`Vector similarity search found ${data?.length || 0} entries`);
-    return tracker.succeed(data);
+    return tracker.succeed(data || []);
   } catch (error) {
     console.error("Exception in searchJournalEntriesWithDate:", error);
+    return tracker.fail(error);
+  }
+}
+
+// Function to search by emotion terms
+async function searchEntriesByEmotionTerm(
+  userId: string,
+  emotionTerm: string,
+  startDate: string | null = null,
+  endDate: string | null = null,
+  limit: number = 5
+) {
+  const tracker = trackFunctionExecution("searchEntriesByEmotionTerm", {
+    userId,
+    emotionTerm,
+    startDate,
+    endDate,
+    limit
+  });
+  
+  try {
+    console.log(`Searching entries by emotion term: ${emotionTerm} for userId: ${userId}`);
+    
+    const rpcParams = {
+      emotion_term: emotionTerm,
+      user_id_filter: userId,
+      start_date: startDate,
+      end_date: endDate,
+      limit_count: limit
+    };
+    
+    console.log("RPC params for get_entries_by_emotion_term:", JSON.stringify(rpcParams));
+    
+    const { data, error } = await supabase.rpc(
+      'get_entries_by_emotion_term',
+      rpcParams
+    );
+    
+    if (error) {
+      console.error("Error in emotion term search:", error);
+      return tracker.fail(error);
+    }
+    
+    console.log(`Emotion term search found ${data?.length || 0} entries`);
+    
+    return tracker.succeed((data || []).map(entry => ({
+      id: entry.id,
+      content: entry.content,
+      created_at: entry.created_at,
+      similarity: 0.8, // Arbitrary similarity for emotion matches
+      type: 'emotion_match'
+    })));
+    
+  } catch (error) {
+    console.error("Exception in searchEntriesByEmotionTerm:", error);
     return tracker.fail(error);
   }
 }
@@ -196,11 +321,34 @@ async function searchJournalEntriesWithDate(
 // Function to analyze query and determine search strategy
 function analyzeQuery(text: string): {
   queryType: 'emotional' | 'temporal' | 'thematic' | 'general',
-  searchStrategy: string,
-  themeKeywords: string[],
-  timeframe: {timeType: string | null, startDate: string | null, endDate: string | null}
+  emotion: string | null,
+  theme: string | null,
+  timeframe: {timeType: string | null, startDate: string | null, endDate: string | null},
+  isWhenQuestion: boolean
 } {
   const lowerText = text.toLowerCase();
+  
+  // Check for "when" questions
+  const isWhenQuestion = lowerText.includes('when') && 
+                          (lowerText.endsWith('?') || lowerText.includes('when was') || 
+                           lowerText.includes('when did') || lowerText.includes('when were'));
+  
+  // Check for emotional keywords
+  const emotionKeywords = {
+    sad: ['sad', 'unhappy', 'depressed', 'upset', 'disappointed', 'down', 'miserable', 'gloomy'],
+    happy: ['happy', 'joy', 'glad', 'pleased', 'delighted', 'content', 'cheerful', 'joyful'],
+    angry: ['angry', 'mad', 'furious', 'irritated', 'annoyed', 'upset', 'frustrated'],
+    anxious: ['anxious', 'worried', 'nervous', 'stressed', 'uneasy', 'tense', 'fear', 'afraid'],
+    surprised: ['surprised', 'shocked', 'amazed', 'astonished', 'stunned']
+  };
+  
+  let emotionFound = null;
+  for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
+    if (keywords.some(keyword => lowerText.includes(keyword))) {
+      emotionFound = emotion;
+      break;
+    }
+  }
   
   // Define theme keywords for workplace context
   const workplaceKeywords = [
@@ -219,21 +367,23 @@ function analyzeQuery(text: string): {
   
   // Determine query type and search strategy
   let queryType: 'emotional' | 'temporal' | 'thematic' | 'general' = 'general';
-  let searchStrategy = 'default';
+  let theme = null;
 
-  if (foundWorkplaceKeywords.length > 0) {
+  if (emotionFound) {
+    queryType = 'emotional';
+  } else if (foundWorkplaceKeywords.length > 0) {
     queryType = 'thematic';
-    searchStrategy = 'workplace_context';
+    theme = 'workplace';
   } else if (timeframe.timeType) {
     queryType = 'temporal';
-    searchStrategy = 'time_based';
   }
 
   return {
     queryType,
-    searchStrategy,
-    themeKeywords: foundWorkplaceKeywords,
-    timeframe
+    emotion: emotionFound,
+    theme,
+    timeframe,
+    isWhenQuestion
   };
 }
 
@@ -387,54 +537,123 @@ serve(async (req) => {
     console.log("Query analysis:", JSON.stringify(queryAnalysis));
     
     diagnostics.queryAnalysis = queryAnalysis;
-    diagnostics.searchStrategy = queryAnalysis.searchStrategy;
+    
+    // Set search strategy based on query analysis
+    let searchStrategy = 'general_similarity';
+    
+    if (queryAnalysis.queryType === 'emotional') {
+      searchStrategy = 'emotion_based';
+    } else if (queryAnalysis.queryType === 'thematic') {
+      searchStrategy = 'theme_based';
+    } else if (queryAnalysis.queryType === 'temporal') {
+      searchStrategy = 'time_based';
+    } else if (queryAnalysis.isWhenQuestion) {
+      searchStrategy = 'temporal_question';
+    }
+    
+    diagnostics.searchStrategy = searchStrategy;
 
     // Generate embedding for the query
     console.log("Generating embedding for user query...");
+    let queryEmbedding;
+    let embeddingError = null;
     const embeddingStartTime = Date.now();
-    const queryEmbedding = await generateEmbedding(message);
-    diagnostics.timings.embedding = Date.now() - embeddingStartTime;
+    
+    try {
+      queryEmbedding = await generateEmbedding(message);
+      diagnostics.timings.embedding = Date.now() - embeddingStartTime;
+    } catch (error) {
+      console.error("Error generating embedding:", error);
+      embeddingError = error.message || "Failed to generate embedding";
+      diagnostics.timings.embedding = Date.now() - embeddingStartTime;
+    }
 
     let similarEntries = [];
     const searchStartTime = Date.now();
 
-    // Implement search based on query analysis
-    if (queryAnalysis.queryType === 'thematic' && queryAnalysis.themeKeywords.length > 0) {
-      // For workplace queries, use theme-based search with backup to vector similarity
-      console.log("Searching for relevant context based on query type:", queryAnalysis.queryType);
+    // If embedding failed, try alternative search methods
+    if (!queryEmbedding) {
+      console.log("Embedding generation failed, trying alternative search methods");
       
       diagnostics.searchAttempts.push({
-        type: 'theme_based',
-        keywords: queryAnalysis.themeKeywords
+        type: 'embedding_failed',
+        error: embeddingError,
+        fallback: 'emotion_text_search'
       });
-
-      for (const keyword of queryAnalysis.themeKeywords) {
-        console.log(`Using theme-based search for ${keyword} with time filtering`);
-        
-        console.log(`Calling match_journal_entries_by_theme with userId: ${userId}, theme query: ${keyword}`);
-        console.log(`Date range: ${queryAnalysis.timeframe.startDate || 'none'} to ${queryAnalysis.timeframe.endDate}, threshold: 0.4`);
+      
+      // Try emotion-based search if we detected an emotion
+      if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
+        console.log(`Using emotion term search for ${queryAnalysis.emotion}`);
         
         try {
-          const themeResults = await searchJournalEntriesByTheme(
+          const emotionResults = await searchEntriesByEmotionTerm(
             userId,
-            keyword,
-            queryEmbedding,
-            0.4, // Lower threshold for more results
-            10,  // Get more results
+            queryAnalysis.emotion,
             queryAnalysis.timeframe.startDate,
-            queryAnalysis.timeframe.endDate
+            queryAnalysis.timeframe.endDate,
+            10
           );
-
-          if (themeResults && themeResults.length > 0) {
-            similarEntries = [...similarEntries, ...themeResults];
+          
+          if (emotionResults && emotionResults.length > 0) {
+            similarEntries = emotionResults;
           }
         } catch (error) {
-          console.log("Exception occurred, falling back to standard similarity search");
-          console.error("Exception in searchJournalEntriesByTheme:", error);
+          console.error("Error in emotion term search:", error);
+        }
+      }
+      
+      // Try text-based search for workplace themes
+      if (similarEntries.length === 0 && queryAnalysis.queryType === 'thematic') {
+        console.log("Using text search for workplace terms");
+        
+        try {
+          const textResults = await searchJournalEntriesByText(
+            userId,
+            "work", // Use "work" as a fallback search term
+            10
+          );
           
-          try {
-            console.log(`Calling match_journal_entries with userId: ${userId} (string)`);
-            const fallbackResults = await searchJournalEntriesWithDate(
+          if (textResults && textResults.length > 0) {
+            similarEntries = textResults;
+          }
+        } catch (error) {
+          console.error("Error in text search:", error);
+        }
+      }
+    } else {
+      // If we have an embedding, use it for search
+      console.log("Using embedding for search");
+      
+      // Implement search based on query analysis
+      if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
+        console.log(`Using emotion-based search for ${queryAnalysis.emotion}`);
+        
+        diagnostics.searchAttempts.push({
+          type: 'emotion_based',
+          emotion: queryAnalysis.emotion
+        });
+        
+        try {
+          const emotionResults = await searchEntriesByEmotionTerm(
+            userId,
+            queryAnalysis.emotion,
+            queryAnalysis.timeframe.startDate,
+            queryAnalysis.timeframe.endDate,
+            10
+          );
+          
+          if (emotionResults && emotionResults.length > 0) {
+            similarEntries = emotionResults;
+          } else {
+            // Fallback to vector similarity
+            console.log("No emotion results, falling back to vector similarity");
+            
+            diagnostics.searchAttempts.push({
+              type: 'vector_similarity_fallback',
+              threshold: 0.4
+            });
+            
+            const vectorResults = await searchJournalEntriesWithDate(
               userId,
               queryEmbedding,
               queryAnalysis.timeframe.startDate,
@@ -443,61 +662,143 @@ serve(async (req) => {
               10
             );
             
+            if (vectorResults && vectorResults.length > 0) {
+              similarEntries = vectorResults;
+            }
+          }
+        } catch (error) {
+          console.error("Error in emotion search with fallback:", error);
+        }
+      } else if (queryAnalysis.queryType === 'thematic' && queryAnalysis.theme) {
+        // For workplace queries, use theme-based search with backup to vector similarity
+        console.log("Searching for relevant context based on query type:", queryAnalysis.queryType);
+        
+        diagnostics.searchAttempts.push({
+          type: 'theme_based',
+          theme: queryAnalysis.theme
+        });
+        
+        try {
+          console.log(`Using theme-based search for ${queryAnalysis.theme} with time filtering`);
+          
+          const themeResults = await searchJournalEntriesByTheme(
+            userId,
+            queryAnalysis.theme,
+            queryEmbedding,
+            0.4, // Lower threshold for more results
+            15,  // Get more results
+            queryAnalysis.timeframe.startDate,
+            queryAnalysis.timeframe.endDate
+          );
+          
+          if (themeResults && themeResults.length > 0) {
+            similarEntries = themeResults;
+          } else {
+            // Fallback to text search
+            console.log("No theme results, trying text search");
+            
+            diagnostics.searchAttempts.push({
+              type: 'text_search_fallback',
+              keywords: ['work', 'office', 'job']
+            });
+            
+            const textResults = await searchJournalEntriesByText(
+              userId,
+              "work", // Use "work" as a fallback search term
+              10
+            );
+            
+            if (textResults && textResults.length > 0) {
+              similarEntries = textResults;
+            }
+          }
+        } catch (error) {
+          console.log("Exception occurred, falling back to standard similarity search");
+          console.error("Exception in theme search:", error);
+          
+          try {
+            console.log(`Falling back to vector similarity search`);
+            
+            diagnostics.searchAttempts.push({
+              type: 'vector_similarity_fallback',
+              threshold: 0.35
+            });
+            
+            const fallbackResults = await searchJournalEntriesWithDate(
+              userId,
+              queryEmbedding,
+              queryAnalysis.timeframe.startDate,
+              queryAnalysis.timeframe.endDate,
+              0.35,
+              15
+            );
+            
             if (fallbackResults && fallbackResults.length > 0) {
               similarEntries = fallbackResults;
             }
           } catch (fallbackError) {
-            console.error("Error in fallbackToStandardSearch:", fallbackError);
+            console.error("Error in fallback search:", fallbackError);
           }
         }
-      }
-    }
-
-    // If no theme results or not a theme query, try vector similarity
-    if (similarEntries.length === 0) {
-      console.log("Using standard similarity search");
-      
-      diagnostics.searchAttempts.push({
-        type: 'vector_similarity',
-        threshold: 0.4
-      });
-
-      try {
-        console.log(`Calling match_journal_entries with userId: ${userId} (string)`);
-        const vectorResults = await searchJournalEntriesWithDate(
-          userId,
-          queryEmbedding,
-          queryAnalysis.timeframe.startDate,
-          queryAnalysis.timeframe.endDate,
-          0.4, // Lower threshold for more results
-          10   // Get more results
-        );
-
-        if (vectorResults && vectorResults.length > 0) {
-          similarEntries = vectorResults;
-        }
-      } catch (error) {
-        console.error("Error in standard similarity search:", error);
-        console.log("Search error details:", JSON.stringify(error));
+      } else {
+        // For general or temporal queries, use standard vector similarity
+        console.log("Using standard similarity search");
         
-        // Try another approach after an error
+        diagnostics.searchAttempts.push({
+          type: 'vector_similarity',
+          threshold: 0.4,
+          temporal: queryAnalysis.timeframe.timeType !== null
+        });
+        
         try {
-          console.log("Error in theme search, falling back to standard:", error);
-          const fallbackResults = await searchJournalEntriesWithDate(
+          console.log(`Calling vector similarity search with userId: ${userId}`);
+          
+          const vectorResults = await searchJournalEntriesWithDate(
             userId,
             queryEmbedding,
             queryAnalysis.timeframe.startDate,
             queryAnalysis.timeframe.endDate,
-            0.35,  // Even lower threshold
-            15     // Even more results
+            0.35, // Lower threshold for more results
+            15    // Get more results
           );
           
-          if (fallbackResults && fallbackResults.length > 0) {
-            similarEntries = fallbackResults;
+          if (vectorResults && vectorResults.length > 0) {
+            similarEntries = vectorResults;
           }
-        } catch (fallbackError) {
-          console.error("Error in fallbackToStandardSearch:", fallbackError);
-          console.log("Search error details:", JSON.stringify(fallbackError));
+        } catch (error) {
+          console.error("Error in standard similarity search:", error);
+          
+          // Try text search as a fallback
+          console.log("Trying text search as a fallback");
+          
+          diagnostics.searchAttempts.push({
+            type: 'text_search_fallback',
+            error: error.message
+          });
+          
+          try {
+            // Extract key terms from the query
+            const words = message.toLowerCase().split(/\s+/);
+            const keyTerms = words.filter(word => 
+              word.length > 3 && !['what', 'when', 'where', 'with', 'that', 'this', 'have', 'from', 'your'].includes(word)
+            ).slice(0, 2);
+            
+            if (keyTerms.length > 0) {
+              console.log(`Trying text search with key terms: ${keyTerms.join(', ')}`);
+              
+              const textResults = await searchJournalEntriesByText(
+                userId,
+                keyTerms[0],
+                10
+              );
+              
+              if (textResults && textResults.length > 0) {
+                similarEntries = textResults;
+              }
+            }
+          } catch (textError) {
+            console.error("Error in text search fallback:", textError);
+          }
         }
       }
     }
@@ -511,9 +812,13 @@ serve(async (req) => {
         count: 3
       });
       
-      const recentEntries = await getRecentEntries(userId, 3);
-      if (recentEntries && recentEntries.length > 0) {
-        similarEntries = recentEntries;
+      try {
+        const recentEntries = await getRecentEntries(userId, 3);
+        if (recentEntries && recentEntries.length > 0) {
+          similarEntries = recentEntries;
+        }
+      } catch (error) {
+        console.error("Error fetching recent entries:", error);
       }
     }
 
@@ -544,12 +849,19 @@ serve(async (req) => {
         date: entry.created_at,
         snippet: entry.content?.substring(0, 150) + "...",
         similarity: entry.similarity || null,
-        type: entry.type || 'similarity_match'
+        type: entry.type || 'similarity_match',
+        themes: entry.themes || null,
+        emotions: entry.emotions || null
       }));
 
       // Build context differently based on query type
-      if (queryAnalysis.queryType === 'thematic') {
-        journalContext = `Here are your journal entries related to ${queryAnalysis.themeKeywords.join(', ')}:\n\n` +
+      if (queryAnalysis.queryType === 'thematic' && queryAnalysis.theme) {
+        journalContext = `Here are your journal entries related to ${queryAnalysis.theme}:\n\n` +
+          similarEntries.map((entry, i) => 
+            `Entry ${i+1} (${new Date(entry.created_at).toLocaleDateString()}):\n${entry.content}`
+          ).join('\n\n');
+      } else if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
+        journalContext = `Here are your journal entries related to feeling ${queryAnalysis.emotion}:\n\n` +
           similarEntries.map((entry, i) => 
             `Entry ${i+1} (${new Date(entry.created_at).toLocaleDateString()}):\n${entry.content}`
           ).join('\n\n');
@@ -614,7 +926,9 @@ If I couldn't find any relevant entries in the journal, make sure to tell the us
     });
 
     if (!response.ok) {
-      throw new Error('Failed to get response from GPT');
+      const errorText = await response.text();
+      console.error('Error from GPT API:', errorText);
+      throw new Error(`Failed to get response from GPT: ${errorText}`);
     }
 
     const result = await response.json();
@@ -662,6 +976,7 @@ If I couldn't find any relevant entries in the journal, make sure to tell the us
     return new Response(
       JSON.stringify({
         error: error.message,
+        response: "Sorry, I encountered an error processing your request. Please try again.",
         diagnostics,
         functionExecutions
       }),
