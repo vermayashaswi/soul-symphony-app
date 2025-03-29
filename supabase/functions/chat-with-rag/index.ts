@@ -151,7 +151,7 @@ serve(async (req) => {
     const searchStartTime = Date.now();
     let similarEntries;
     try {
-      // Pass userId directly, the function will handle the proper type conversion
+      // Ensure the userId is properly cast as a UUID type when calling the function
       console.log(`Calling match_journal_entries with userId: ${userId} (${typeof userId})`);
       const { data, error } = await supabase.rpc(
         'match_journal_entries',
@@ -159,7 +159,7 @@ serve(async (req) => {
           query_embedding: queryEmbedding,
           match_threshold: 0.5,
           match_count: 5,
-          user_id_filter: userId
+          user_id_filter: userId // This is the correct parameter name
         }
       );
       
