@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -40,8 +39,44 @@ const THEME_MAPPINGS = {
   "workplace": ["work", "office", "workplace", "job", "career", "company", "business", "corporate", "enterprise", "employment", "profession", "occupation", "colleague", "coworker", "boss", "manager", "team", "project", "meeting", "deadline"]
 };
 
+// Add function execution tracking
+const functionExecutions = [];
+
+// Function to track function executions
+const trackFunctionExecution = (name: string, params?: Record<string, any>) => {
+  const execution = {
+    name,
+    params,
+    result: null,
+    executionTime: 0,
+    success: false
+  };
+  
+  const startTime = Date.now();
+  
+  return {
+    execution,
+    succeed: (result?: any) => {
+      execution.result = result;
+      execution.executionTime = Date.now() - startTime;
+      execution.success = true;
+      functionExecutions.push(execution);
+      return result;
+    },
+    fail: (error?: any) => {
+      execution.result = error?.message || "Failed";
+      execution.executionTime = Date.now() - startTime;
+      execution.success = false;
+      functionExecutions.push(execution);
+      throw error;
+    }
+  };
+};
+
 // Generate embeddings using OpenAI
 async function generateEmbedding(text: string) {
+  const tracker = trackFunctionExecution("generateEmbedding", { text: text.substring(0, 50) + "..." });
+  
   try {
     console.log("Generating embedding for query:", text.substring(0, 50) + "...");
     const response = await fetch('https://api.openai.com/v1/embeddings', {
@@ -59,14 +94,14 @@ async function generateEmbedding(text: string) {
     if (!response.ok) {
       const error = await response.text();
       console.error('Error generating embedding:', error);
-      throw new Error('Failed to generate embedding');
+      return tracker.fail(new Error('Failed to generate embedding'));
     }
 
     const result = await response.json();
-    return result.data[0].embedding;
+    return tracker.succeed(result.data[0].embedding);
   } catch (error) {
     console.error('Error in generateEmbedding:', error);
-    throw error;
+    return tracker.fail(error);
   }
 }
 
@@ -91,7 +126,9 @@ function formatEmotions(emotions: Record<string, number> | null | undefined): st
 
 // Function to get previous messages from a thread
 async function getPreviousMessages(threadId: string, messageLimit: number = 5) {
-  if (!threadId) return [];
+  const tracker = trackFunctionExecution("getPreviousMessages", { threadId, messageLimit });
+  
+  if (!threadId) return tracker.succeed([]);
   
   try {
     const { data, error } = await supabase
@@ -103,17 +140,17 @@ async function getPreviousMessages(threadId: string, messageLimit: number = 5) {
       
     if (error) {
       console.error("Error fetching previous messages:", error);
-      return [];
+      return tracker.fail(error);
     }
     
     // Return in chronological order (oldest first)
-    return data.reverse().map(msg => ({
+    return tracker.succeed(data.reverse().map(msg => ({
       role: msg.sender === 'assistant' ? 'assistant' : 'user',
       content: msg.content
-    }));
+    })));
   } catch (error) {
     console.error("Error in getPreviousMessages:", error);
-    return [];
+    return tracker.fail(error);
   }
 }
 
@@ -126,6 +163,14 @@ async function searchJournalEntriesWithDate(
   matchThreshold: number = 0.5,
   matchCount: number = 5
 ) {
+  const tracker = trackFunctionExecution("searchJournalEntriesWithDate", { 
+    userId, 
+    startDate, 
+    endDate, 
+    matchThreshold, 
+    matchCount 
+  });
+  
   try {
     console.log(`Calling match_journal_entries_with_date with userId: ${userId}`);
     console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}`);
@@ -141,13 +186,13 @@ async function searchJournalEntriesWithDate(
     
     if (error) {
       console.error("Error in date-filtered similarity search:", error);
-      return null;
+      return tracker.fail(error);
     }
     
-    return data;
+    return tracker.succeed(data);
   } catch (error) {
     console.error("Exception in searchJournalEntriesWithDate:", error);
-    return null;
+    return tracker.fail(error);
   }
 }
 
@@ -160,6 +205,15 @@ async function searchJournalEntriesByEmotion(
   endDate: string | null = null,
   limitCount: number = 5
 ) {
+  const tracker = trackFunctionExecution("searchJournalEntriesByEmotion", { 
+    userId, 
+    emotion, 
+    minScore, 
+    startDate, 
+    endDate, 
+    limitCount 
+  });
+  
   try {
     console.log(`Calling match_journal_entries_by_emotion with userId: ${userId}, emotion: ${emotion}`);
     console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}, min score: ${minScore}`);
@@ -175,13 +229,13 @@ async function searchJournalEntriesByEmotion(
     
     if (error) {
       console.error("Error in emotion-filtered search:", error);
-      return null;
+      return tracker.fail(error);
     }
     
-    return data;
+    return tracker.succeed(data);
   } catch (error) {
     console.error("Exception in searchJournalEntriesByEmotion:", error);
-    return null;
+    return tracker.fail(error);
   }
 }
 
@@ -194,6 +248,15 @@ async function searchJournalEntriesByTheme(
   startDate: string | null = null,
   endDate: string | null = null
 ) {
+  const tracker = trackFunctionExecution("searchJournalEntriesByTheme", { 
+    userId, 
+    themeQuery, 
+    matchThreshold, 
+    matchCount, 
+    startDate, 
+    endDate 
+  });
+  
   try {
     console.log(`Calling match_journal_entries_by_theme with userId: ${userId}, theme query: ${themeQuery}`);
     console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}, threshold: ${matchThreshold}`);
@@ -209,14 +272,14 @@ async function searchJournalEntriesByTheme(
     
     if (error) {
       console.error("Error in theme-filtered search:", error);
-      return null;
+      return tracker.fail(error);
     }
     
     console.log(`Theme search found ${data?.length || 0} entries`);
-    return data;
+    return tracker.succeed(data);
   } catch (error) {
     console.error("Exception in searchJournalEntriesByTheme:", error);
-    return null;
+    return tracker.fail(error);
   }
 }
 
@@ -361,7 +424,7 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const { message, userId, threadId, isNewThread, threadTitle, includeDiagnostics, timeframe } = await req.json();
+    const { message, userId, threadId, isNewThread, threadTitle, includeDiagnostics, includeExecutionData, timeframe } = await req.json();
     
     if (!message) {
       throw new Error('No message provided');
@@ -712,7 +775,8 @@ If the user is asking "when" this emotion occurred, highlight the specific dates
           references: referenceEntries,
           diagnostics,
           similarityScores,
-          queryAnalysis
+          queryAnalysis,
+          functionExecutions: includeExecutionData ? functionExecutions : null
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

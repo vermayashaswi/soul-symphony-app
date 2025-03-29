@@ -9,6 +9,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
 
+// Custom UShape component for the logo
+const UShape = ({ className = "", size = "normal" }: { className?: string, size?: "normal" | "large" }) => {
+  const sizeClasses = size === "large" 
+    ? "w-6 h-7 mx-0.5" 
+    : "w-4 h-5 mx-0.5";
+  
+  return (
+    <div className={`relative ${sizeClasses} ${className}`}>
+      <div className="absolute bottom-0 left-0 w-1 h-3/4 bg-current rounded-bl"></div>
+      <div className="absolute bottom-0 w-full h-1 bg-current rounded-b"></div>
+      <div className="absolute bottom-0 right-0 w-1 h-3/4 bg-current rounded-br"></div>
+      <div className="absolute top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-current animate-pulse"></div>
+    </div>
+  );
+};
+
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -364,7 +380,9 @@ const Index = () => {
           className="text-center mb-12"
           variants={itemVariants}
         >
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome to SOULo</h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 flex items-center justify-center">
+            Welcome to SO<UShape size="large" className="text-blue-600" />LO
+          </h1>
           <p className="text-xl max-w-2xl mx-auto bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent animate-pulse shadow-glow">
             Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
           </p>

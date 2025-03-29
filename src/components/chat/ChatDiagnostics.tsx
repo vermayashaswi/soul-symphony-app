@@ -5,10 +5,12 @@ import {
   CollapsibleContent, 
   CollapsibleTrigger 
 } from '@/components/ui/collapsible';
-import { Check, X, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
+import { Check, X, Loader2, ChevronRight, ChevronDown, Code } from 'lucide-react';
 import { MessageReference } from './ChatArea';
 import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface DiagnosticsStep {
   id: number;
@@ -30,6 +32,14 @@ interface QueryAnalysis {
   isWhenQuestion: boolean;
 }
 
+export interface FunctionExecution {
+  name: string;
+  params?: Record<string, any>;
+  result?: any;
+  executionTime?: number;
+  success: boolean;
+}
+
 interface ChatDiagnosticsProps {
   queryText: string;
   isVisible: boolean;
@@ -37,6 +47,7 @@ interface ChatDiagnosticsProps {
   references: MessageReference[] | null;
   similarityScores: {id: number, score: number}[] | null;
   queryAnalysis?: QueryAnalysis | null;
+  functionExecutions?: FunctionExecution[] | null;
 }
 
 export default function ChatDiagnostics({ 
@@ -45,9 +56,11 @@ export default function ChatDiagnostics({
   ragSteps, 
   references,
   similarityScores,
-  queryAnalysis
+  queryAnalysis,
+  functionExecutions
 }: ChatDiagnosticsProps) {
   const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState('process');
 
   if (!isVisible) return null;
 
@@ -131,9 +144,14 @@ export default function ChatDiagnostics({
             )}
           </div>
           
-          <div>
-            <div className="text-xs font-medium mb-2">Processing Steps:</div>
-            <div className="space-y-2">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-3 mb-2">
+              <TabsTrigger value="process">Process Steps</TabsTrigger>
+              <TabsTrigger value="functions">Supabase Functions</TabsTrigger>
+              <TabsTrigger value="entries">Retrieved Entries</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="process" className="space-y-2">
               {ragSteps.map((step) => (
                 <div 
                   key={step.id}
@@ -157,54 +175,115 @@ export default function ChatDiagnostics({
                   )}
                 </div>
               ))}
-            </div>
-          </div>
-          
-          {references && references.length > 0 && (
-            <div>
-              <div className="text-xs font-medium mb-2">Referenced Entries:</div>
-              <ScrollArea className="h-40 rounded border">
-                <div className="p-3 space-y-3">
-                  {references.map((ref, idx) => (
-                    <div key={idx} className="text-xs border-l-2 border-primary pl-2 py-1">
+            </TabsContent>
+            
+            <TabsContent value="functions">
+              <div className="space-y-2 text-xs">
+                {functionExecutions && functionExecutions.length > 0 ? (
+                  functionExecutions.map((func, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`border rounded p-2 ${func.success ? 'border-green-200' : 'border-red-200'}`}
+                    >
                       <div className="flex items-center justify-between">
-                        <div className="font-medium">{format(new Date(ref.date), 'MMM d, yyyy h:mm a')}</div>
-                        {ref.similarity !== undefined && (
-                          <div className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                            {ref.type === 'recent' ? 'Recent' : `Score: ${(ref.similarity * 100).toFixed(1)}%`}
-                          </div>
-                        )}
+                        <div className="font-medium flex items-center">
+                          <Code className="h-3 w-3 mr-1" />
+                          {func.name}
+                        </div>
+                        <Badge variant={func.success ? "success" : "destructive"} className="text-[10px] h-5">
+                          {func.success ? 'Success' : 'Failed'}
+                          {func.executionTime && ` (${func.executionTime}ms)`}
+                        </Badge>
                       </div>
-                      <div className="mt-1">{ref.snippet}</div>
-                      {ref.emotions && Object.keys(ref.emotions).length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {Object.entries(ref.emotions)
-                            .sort(([, a], [, b]) => b - a)
-                            .slice(0, 3)
-                            .map(([emotion, score]) => (
-                              <span key={emotion} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs">
-                                {emotion}: {Math.round(score * 100)}%
-                              </span>
-                            ))
-                          }
+                      
+                      {func.params && (
+                        <div className="mt-2">
+                          <div className="text-muted-foreground mb-1">Parameters:</div>
+                          <pre className="bg-slate-800 text-white p-1 rounded text-[10px] overflow-x-auto">
+                            {JSON.stringify(func.params, null, 2)}
+                          </pre>
                         </div>
                       )}
-                      {ref.themes && ref.themes.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          <span className="text-xs text-muted-foreground">Themes: </span>
-                          {ref.themes.map((theme) => (
-                            <span key={theme} className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs">
-                              {theme}
-                            </span>
-                          ))}
+                      
+                      {func.result && (
+                        <div className="mt-2">
+                          <div className="text-muted-foreground mb-1">Result:</div>
+                          <pre className="bg-slate-800 text-white p-1 rounded text-[10px] overflow-x-auto">
+                            {typeof func.result === 'object' 
+                              ? JSON.stringify(func.result, null, 2) 
+                              : func.result}
+                          </pre>
                         </div>
                       )}
                     </div>
-                  ))}
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No function execution data available
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="entries">
+              {references && references.length > 0 ? (
+                <ScrollArea className="h-52 rounded border">
+                  <div className="p-3 space-y-3">
+                    {references.map((ref, idx) => (
+                      <div key={idx} className="text-xs border-l-2 border-primary pl-2 py-1">
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium">{format(new Date(ref.date), 'MMM d, yyyy h:mm a')}</div>
+                          <div className="flex items-center gap-1">
+                            {ref.type && (
+                              <Badge variant="outline" className="text-[10px] h-5">
+                                {ref.type}
+                              </Badge>
+                            )}
+                            {ref.similarity !== undefined && (
+                              <Badge 
+                                variant="secondary" 
+                                className="text-[10px] h-5"
+                              >
+                                Score: {(ref.similarity * 100).toFixed(1)}%
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-1">{ref.snippet}</div>
+                        {ref.emotions && Object.keys(ref.emotions).length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {Object.entries(ref.emotions)
+                              .sort(([, a], [, b]) => b - a)
+                              .slice(0, 3)
+                              .map(([emotion, score]) => (
+                                <span key={emotion} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px]">
+                                  {emotion}: {Math.round(score * 100)}%
+                                </span>
+                              ))
+                            }
+                          </div>
+                        )}
+                        {ref.themes && ref.themes.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            <span className="text-[10px] text-muted-foreground">Themes: </span>
+                            {ref.themes.map((theme) => (
+                              <span key={theme} className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px]">
+                                {theme}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  No entries were retrieved for this query
                 </div>
-              </ScrollArea>
-            </div>
-          )}
+              )}
+            </TabsContent>
+          </Tabs>
         </CollapsibleContent>
       </Collapsible>
     </div>

@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import ChatDiagnostics from './ChatDiagnostics';
+import ChatDiagnostics, { FunctionExecution } from './ChatDiagnostics';
 
 export interface MessageReference {
   id: number;
@@ -75,6 +75,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated, toggleS
   const [similarityScores, setSimilarityScores] = useState<{id: number, score: number}[] | null>(null);
   const [currentQuery, setCurrentQuery] = useState("");
   const [queryAnalysis, setQueryAnalysis] = useState<QueryAnalysis | null>(null);
+  const [functionExecutions, setFunctionExecutions] = useState<FunctionExecution[] | null>(null);
 
   const demoQuestions = [
     "How can I manage my anxiety better?",
@@ -184,6 +185,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated, toggleS
     ]);
     setSimilarityScores(null);
     setQueryAnalysis(null);
+    setFunctionExecutions(null);
   };
 
   const updateRagStep = (id: number, status: 'pending' | 'success' | 'error' | 'loading', details?: string) => {
@@ -255,6 +257,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated, toggleS
           isNewThread: isNewThread,
           threadTitle: content.substring(0, 30) + (content.length > 30 ? "..." : ""),
           includeDiagnostics: true,
+          includeExecutionData: true,
           timeframe: timeframe
         }
       });
@@ -268,6 +271,11 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated, toggleS
       }
       
       console.log("Received response from chat-with-rag function:", data);
+      
+      if (data.functionExecutions) {
+        setFunctionExecutions(data.functionExecutions);
+        console.log("Function executions:", data.functionExecutions);
+      }
       
       if (data.queryAnalysis) {
         setQueryAnalysis(data.queryAnalysis);
@@ -536,6 +544,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated, toggleS
             messages[messages.length - 1].reference_entries : null}
           similarityScores={similarityScores}
           queryAnalysis={queryAnalysis}
+          functionExecutions={functionExecutions}
         />
       )}
       

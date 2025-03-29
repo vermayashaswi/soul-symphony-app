@@ -7,6 +7,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Custom UShape component for the logo
+const UShape = ({ className = "", size = "normal" }: { className?: string, size?: "normal" | "large" }) => {
+  const sizeClasses = size === "large" 
+    ? "w-6 h-7 mx-0.5" 
+    : "w-4 h-5 mx-0.5";
+  
+  return (
+    <div className={`relative ${sizeClasses} ${className} inline-block`}>
+      <div className="absolute bottom-0 left-0 w-1 h-3/4 bg-current rounded-bl"></div>
+      <div className="absolute bottom-0 w-full h-1 bg-current rounded-b"></div>
+      <div className="absolute bottom-0 right-0 w-1 h-3/4 bg-current rounded-br"></div>
+      <div className="absolute top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-current animate-pulse"></div>
+    </div>
+  );
+};
+
 export default function Auth() {
   const { user, isLoading, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
@@ -111,7 +127,9 @@ export default function Auth() {
           <div className="h-16 w-16 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center mx-auto mb-4">
             <span className="text-white font-bold text-2xl">S</span>
           </div>
-          <h1 className="text-3xl font-bold mb-2">Welcome to SOULo</h1>
+          <h1 className="text-3xl font-bold mb-2">
+            Welcome to SO<UShape className="text-blue-600" />LO
+          </h1>
           <p className="text-muted-foreground">
             Sign in to start your journaling journey and track your emotional wellbeing
           </p>
