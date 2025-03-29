@@ -350,11 +350,14 @@ const Index = () => {
           variants={itemVariants}
         >
           <h1 className="text-4xl md:text-5xl font-bold mb-4 flex items-center justify-center">
-            Welcome to <SouloLogo size="large" className="ml-2 text-blue-600" />
+            Welcome to 
+            <span className="ml-2 text-blue-600">
+              S<span>O</span>
+              <SouloLogo size="large" smileyClassName="inline-block" />
+              <span>L</span>
+              <span>O</span>
+            </span>
           </h1>
-          <p className="text-xl max-w-2xl mx-auto bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent animate-pulse shadow-glow">
-            Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
-          </p>
           
           {!user && (
             <motion.div 

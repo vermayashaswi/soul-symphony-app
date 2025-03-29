@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -81,7 +82,10 @@ export function Navbar() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="font-semibold text-xl text-gradient"
           >
-            <SouloLogo size="normal" />
+            S<span className="mx-[0.5px]">O</span>
+            <SouloLogo size="normal" smileyClassName="inline-block" />
+            <span className="mx-[0.5px]">L</span>
+            <span className="mx-[0.5px]">O</span>
           </motion.span>
         </Link>
 
