@@ -1,9 +1,10 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Bot, Loader2, Brain, BrainCircuit } from 'lucide-react';
+import { Send, Bot, Loader2, Brain, BrainCircuit, CalendarDays, HeartPulse } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,6 +19,7 @@ export interface MessageReference {
   snippet: string;
   similarity?: number;
   type?: string;
+  emotions?: Record<string, number> | null;
 }
 
 export interface Message {
@@ -42,6 +44,17 @@ interface DiagnosticsStep {
   timestamp?: string;
 }
 
+interface QueryAnalysis {
+  queryType: 'emotional' | 'temporal' | 'general';
+  emotion: string | null;
+  timeframe: {
+    timeType: string | null;
+    startDate: string | null;
+    endDate: string | null;
+  };
+  isWhenQuestion: boolean;
+}
+
 export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -58,13 +71,14 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
   ]);
   const [similarityScores, setSimilarityScores] = useState<{id: number, score: number}[] | null>(null);
   const [currentQuery, setCurrentQuery] = useState("");
+  const [queryAnalysis, setQueryAnalysis] = useState<QueryAnalysis | null>(null);
 
   const demoQuestions = [
     "How can I manage my anxiety better?",
     "What are some good journaling prompts for self-reflection?",
     "I've been feeling down lately. Any suggestions?",
-    "How can I improve my mindfulness practice?",
-    "What are some techniques to help with overthinking?"
+    "When was I most sad in the last week?",
+    "What made me happiest yesterday?"
   ];
 
   useEffect(() => {
@@ -121,7 +135,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
               date: ref.date || '',
               snippet: ref.snippet || '',
               similarity: ref.similarity,
-              type: ref.type
+              type: ref.type,
+              emotions: ref.emotions
             }));
           } else if (typeof msg.reference_entries === 'object') {
             processedRefs = [{
@@ -129,7 +144,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
               date: (msg.reference_entries as any).date || '',
               snippet: (msg.reference_entries as any).snippet || '',
               similarity: (msg.reference_entries as any).similarity,
-              type: (msg.reference_entries as any).type
+              type: (msg.reference_entries as any).type,
+              emotions: (msg.reference_entries as any).emotions
             }];
           }
         }
@@ -158,6 +174,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       { id: 4, step: "LLM Response Generation", status: 'pending' },
     ]);
     setSimilarityScores(null);
+    setQueryAnalysis(null);
   };
 
   const updateRagStep = (id: number, status: 'pending' | 'success' | 'error' | 'loading', details?: string) => {
@@ -187,6 +204,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     } else if (lowerText.includes('last year') || lowerText.includes('this year') || 
                lowerText.includes('past year')) {
       return 'year';
+    } else if (lowerText.includes('yesterday') || lowerText.includes('today')) {
+      return 'day';
     }
     
     return null;
@@ -241,9 +260,17 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       console.log("Received response from chat-with-rag function:", data);
       
+      if (data.queryAnalysis) {
+        setQueryAnalysis(data.queryAnalysis);
+        updateRagStep(1, 'success', `Query classified as ${data.queryAnalysis.queryType}` + 
+          (data.queryAnalysis.emotion ? ` related to '${data.queryAnalysis.emotion}'` : ''));
+      }
+      
       if (data.diagnostics) {
         if (data.diagnostics.embeddingGenerated) {
-          updateRagStep(1, 'success', 'Embedding generated successfully');
+          if (!data.queryAnalysis) {
+            updateRagStep(1, 'success', 'Embedding generated successfully');
+          }
         } else {
           updateRagStep(1, 'error', data.diagnostics.embeddingError || 'Failed to generate embedding');
         }
@@ -306,9 +333,40 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     }
   };
 
+  // Function to render a badge for the query type
+  const renderQueryTypeBadge = () => {
+    if (!queryAnalysis) return null;
+    
+    let icon = null;
+    let label = "";
+    let className = "flex items-center gap-1 text-xs px-2 py-1 rounded-full";
+    
+    if (queryAnalysis.queryType === 'emotional') {
+      icon = <HeartPulse className="h-3 w-3" />;
+      label = `Emotional Query: ${queryAnalysis.emotion || ''}`;
+      className += " bg-pink-100 text-pink-800";
+    } else if (queryAnalysis.queryType === 'temporal') {
+      icon = <CalendarDays className="h-3 w-3" />;
+      label = `Time-based Query: ${queryAnalysis.timeframe.timeType || ''}`;
+      className += " bg-blue-100 text-blue-800";
+    } else {
+      icon = <BrainCircuit className="h-3 w-3" />;
+      label = "General Query";
+      className += " bg-gray-100 text-gray-800";
+    }
+    
+    return (
+      <div className={className}>
+        {icon}
+        <span>{label}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex justify-end px-4 pt-2">
+      <div className="flex justify-between px-4 pt-2 items-center">
+        {queryAnalysis && renderQueryTypeBadge()}
         <Button 
           variant="outline" 
           size="sm"
@@ -372,13 +430,26 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
                                 <span>Based on {message.reference_entries.length} journal entries</span>
                               </div>
                             </TooltipTrigger>
-                            <TooltipContent className="w-64 p-2">
-                              <p className="font-medium mb-1">Referenced journal entries:</p>
-                              <ul className="space-y-1">
+                            <TooltipContent className="w-80 p-3">
+                              <p className="font-medium mb-2">Referenced journal entries:</p>
+                              <ul className="space-y-2 max-h-60 overflow-y-auto">
                                 {message.reference_entries.map((ref, idx) => (
-                                  <li key={idx} className="text-xs">
-                                    <span className="font-medium">{format(new Date(ref.date), 'MMM d, yyyy')}:</span>{' '}
-                                    {ref.snippet}
+                                  <li key={idx} className="text-xs border-l-2 border-primary pl-2 py-1">
+                                    <div className="font-medium">{format(new Date(ref.date), 'MMM d, yyyy h:mm a')}</div>
+                                    <div>{ref.snippet}</div>
+                                    {ref.emotions && Object.keys(ref.emotions).length > 0 && (
+                                      <div className="mt-1 flex flex-wrap gap-1">
+                                        {Object.entries(ref.emotions)
+                                          .sort(([, a], [, b]) => b - a)
+                                          .slice(0, 3)
+                                          .map(([emotion, score]) => (
+                                            <span key={emotion} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs">
+                                              {emotion}: {Math.round(score * 100)}%
+                                            </span>
+                                          ))
+                                        }
+                                      </div>
+                                    )}
                                   </li>
                                 ))}
                               </ul>
@@ -418,6 +489,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
           references={messages.length > 0 ? 
             messages[messages.length - 1].reference_entries : null}
           similarityScores={similarityScores}
+          queryAnalysis={queryAnalysis}
         />
       )}
       

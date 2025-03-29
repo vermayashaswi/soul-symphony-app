@@ -1,17 +1,14 @@
 
 import { useState } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, AlertCircle, CheckCircle } from 'lucide-react';
+import { 
+  Collapsible, 
+  CollapsibleContent, 
+  CollapsibleTrigger 
+} from '@/components/ui/collapsible';
+import { Check, X, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
 import { MessageReference } from './ChatArea';
+import { format } from 'date-fns';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface DiagnosticsStep {
   id: number;
@@ -21,120 +18,177 @@ interface DiagnosticsStep {
   timestamp?: string;
 }
 
+interface QueryAnalysis {
+  queryType: 'emotional' | 'temporal' | 'general';
+  emotion: string | null;
+  timeframe: {
+    timeType: string | null;
+    startDate: string | null;
+    endDate: string | null;
+  };
+  isWhenQuestion: boolean;
+}
+
 interface ChatDiagnosticsProps {
   queryText: string;
   isVisible: boolean;
   ragSteps: DiagnosticsStep[];
-  references: MessageReference[] | null | undefined;
-  similarityScores: { id: number, score: number }[] | null;
+  references: MessageReference[] | null;
+  similarityScores: {id: number, score: number}[] | null;
+  queryAnalysis?: QueryAnalysis | null;
 }
 
-export default function ChatDiagnostics({
-  queryText,
-  isVisible,
-  ragSteps,
+export default function ChatDiagnostics({ 
+  queryText, 
+  isVisible, 
+  ragSteps, 
   references,
-  similarityScores
+  similarityScores,
+  queryAnalysis
 }: ChatDiagnosticsProps) {
   const [expanded, setExpanded] = useState(false);
-  
+
   if (!isVisible) return null;
-  
-  // Helper function to format similarity score as percentage
-  const formatSimilarityScore = (score: number): string => {
-    return `${(score * 100).toFixed(2)}%`;
+
+  const getStepIcon = (status: string) => {
+    switch (status) {
+      case 'success':
+        return <Check className="h-4 w-4 text-green-500" />;
+      case 'error':
+        return <X className="h-4 w-4 text-red-500" />;
+      case 'loading':
+        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+      default:
+        return <div className="h-4 w-4 rounded-full bg-gray-200"></div>;
+    }
   };
 
-  // Helper function to find similarity score for an entry
-  const findSimilarityScore = (entryId: number): string => {
-    // First check if the reference has a similarity property
-    const reference = references?.find(ref => ref.id === entryId);
-    if (reference?.similarity !== undefined) {
-      return formatSimilarityScore(reference.similarity);
-    }
-    
-    // Then check in similarityScores array
-    const scoreEntry = similarityScores?.find(s => s.id === entryId);
-    if (scoreEntry?.score !== undefined) {
-      return formatSimilarityScore(scoreEntry.score);
-    }
-    
-    return "N/A";
-  };
-  
   return (
-    <div className="border rounded-md my-4 bg-background/50 backdrop-blur-sm text-sm">
-      <div 
-        className="p-3 border-b flex justify-between items-center cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
+    <div className="px-4 pb-4 border-t bg-gray-50/50 space-y-2">
+      <Collapsible 
+        open={expanded} 
+        onOpenChange={setExpanded}
+        className="w-full"
       >
-        <h3 className="font-medium">RAG Diagnostics</h3>
-        <Button variant="ghost" size="sm">
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </Button>
-      </div>
-      
-      {expanded && (
-        <div className="p-3">
-          <h4 className="font-medium mb-2">Query</h4>
-          <pre className="bg-muted p-2 rounded text-xs mb-4 whitespace-pre-wrap">{queryText}</pre>
+        <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-2 text-sm font-medium text-left">
+          <div className="flex items-center">
+            {expanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+            <span>RAG Process Diagnostics</span>
+          </div>
+          <div className="text-xs text-gray-500">
+            {ragSteps.filter(step => step.status === 'success').length} / {ragSteps.length} steps completed
+          </div>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent className="space-y-4 mt-2">
+          <div className="rounded border p-3 text-xs">
+            <div className="font-medium mb-1">Query:</div>
+            <div className="italic">{queryText}</div>
+            
+            {queryAnalysis && (
+              <div className="mt-3 space-y-1">
+                <div className="font-medium">Query Analysis:</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  <div>Query Type:</div>
+                  <div className="font-medium capitalize">{queryAnalysis.queryType}</div>
+                  
+                  {queryAnalysis.emotion && (
+                    <>
+                      <div>Emotion:</div>
+                      <div className="font-medium capitalize">{queryAnalysis.emotion}</div>
+                    </>
+                  )}
+                  
+                  {queryAnalysis.timeframe.timeType && (
+                    <>
+                      <div>Time Range:</div>
+                      <div className="font-medium capitalize">{queryAnalysis.timeframe.timeType}</div>
+                      
+                      <div>Start Date:</div>
+                      <div>{queryAnalysis.timeframe.startDate ? 
+                        format(new Date(queryAnalysis.timeframe.startDate), 'MMM d, yyyy h:mm a') : 
+                        'Not specified'}</div>
+                      
+                      <div>End Date:</div>
+                      <div>{queryAnalysis.timeframe.endDate ? 
+                        format(new Date(queryAnalysis.timeframe.endDate), 'MMM d, yyyy h:mm a') : 
+                        'Not specified'}</div>
+                    </>
+                  )}
+                  
+                  <div>Question Type:</div>
+                  <div>{queryAnalysis.isWhenQuestion ? 'Temporal (When)' : 'General'}</div>
+                </div>
+              </div>
+            )}
+          </div>
           
-          <h4 className="font-medium mb-2">RAG Pipeline Steps</h4>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Step</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Details</TableHead>
-                <TableHead>Time</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <div>
+            <div className="text-xs font-medium mb-2">Processing Steps:</div>
+            <div className="space-y-2">
               {ragSteps.map((step) => (
-                <TableRow key={step.id}>
-                  <TableCell>{step.step}</TableCell>
-                  <TableCell>
-                    {step.status === 'success' && <CheckCircle className="h-4 w-4 text-green-500" />}
-                    {step.status === 'error' && <AlertCircle className="h-4 w-4 text-red-500" />}
-                    {step.status === 'loading' && (
-                      <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <div 
+                  key={step.id}
+                  className={`flex items-start p-2 rounded ${
+                    step.status === 'error' 
+                      ? 'bg-red-50' 
+                      : step.status === 'success' 
+                        ? 'bg-green-50' 
+                        : 'bg-gray-50'
+                  }`}
+                >
+                  <div className="mt-0.5 mr-2">{getStepIcon(step.status)}</div>
+                  <div className="flex-1">
+                    <div className="text-xs font-medium">{step.step}</div>
+                    {step.details && (
+                      <div className="text-xs mt-1 text-gray-600">{step.details}</div>
                     )}
-                    {step.status === 'pending' && <span className="text-muted-foreground">Pending</span>}
-                  </TableCell>
-                  <TableCell className="max-w-[300px] truncate">{step.details || "-"}</TableCell>
-                  <TableCell>{step.timestamp || "-"}</TableCell>
-                </TableRow>
+                  </div>
+                  {step.timestamp && (
+                    <div className="text-xs text-gray-500">{step.timestamp}</div>
+                  )}
+                </div>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+          </div>
           
           {references && references.length > 0 && (
-            <>
-              <h4 className="font-medium mt-4 mb-2">Retrieved References</h4>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Entry ID</TableHead>
-                    <TableHead>Similarity Score</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Content Preview</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {references.map((ref) => (
-                    <TableRow key={ref.id}>
-                      <TableCell>{ref.id}</TableCell>
-                      <TableCell>{findSimilarityScore(ref.id)}</TableCell>
-                      <TableCell>{new Date(ref.date).toLocaleDateString()}</TableCell>
-                      <TableCell className="max-w-[300px] truncate">{ref.snippet || "No content"}</TableCell>
-                    </TableRow>
+            <div>
+              <div className="text-xs font-medium mb-2">Referenced Entries:</div>
+              <ScrollArea className="h-40 rounded border">
+                <div className="p-3 space-y-3">
+                  {references.map((ref, idx) => (
+                    <div key={idx} className="text-xs border-l-2 border-primary pl-2 py-1">
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{format(new Date(ref.date), 'MMM d, yyyy h:mm a')}</div>
+                        {ref.similarity !== undefined && (
+                          <div className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                            {ref.type === 'recent' ? 'Recent' : `Score: ${(ref.similarity * 100).toFixed(1)}%`}
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-1">{ref.snippet}</div>
+                      {ref.emotions && Object.keys(ref.emotions).length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {Object.entries(ref.emotions)
+                            .sort(([, a], [, b]) => b - a)
+                            .slice(0, 3)
+                            .map(([emotion, score]) => (
+                              <span key={emotion} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs">
+                                {emotion}: {Math.round(score * 100)}%
+                              </span>
+                            ))
+                          }
+                        </div>
+                      )}
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
-            </>
+                </div>
+              </ScrollArea>
+            </div>
           )}
-        </div>
-      )}
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

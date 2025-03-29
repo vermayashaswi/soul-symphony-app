@@ -15,6 +15,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Common emotion mappings to standardize input
+const EMOTION_MAPPINGS = {
+  "sad": ["sad", "sadness", "unhappy", "upset", "down", "depressed", "blue", "gloomy"],
+  "angry": ["angry", "anger", "mad", "furious", "irritated", "annoyed", "frustrated"],
+  "happy": ["happy", "happiness", "joy", "joyful", "delighted", "pleased", "cheerful", "content"],
+  "anxious": ["anxious", "anxiety", "worried", "nervous", "stressed", "tense", "uneasy"],
+  "fear": ["fear", "scared", "afraid", "terrified", "frightened", "panic"],
+  "surprise": ["surprise", "surprised", "shocked", "astonished", "amazed"],
+  "love": ["love", "loving", "affection", "fond", "tender", "caring", "adoration"],
+  "disgust": ["disgust", "disgusted", "repulsed", "aversion"]
+};
+
+// Common time mappings to standardize input
+const TIME_RANGES = {
+  "day": ["today", "yesterday", "day"],
+  "week": ["week", "this week", "last week", "past week", "recent days"],
+  "month": ["month", "this month", "last month", "past month", "recent weeks"],
+  "year": ["year", "this year", "last year", "past year"]
+};
+
 // Generate embeddings using OpenAI
 async function generateEmbedding(text: string) {
   try {
@@ -105,17 +125,14 @@ async function searchJournalEntriesWithDate(
     console.log(`Calling match_journal_entries_with_date with userId: ${userId}`);
     console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}`);
     
-    let params: any = {
+    const { data, error } = await supabase.rpc('match_journal_entries_with_date', {
       query_embedding: queryEmbedding,
       match_threshold: matchThreshold,
       match_count: matchCount,
-      user_id_filter: userId
-    };
-    
-    if (startDate) params.start_date = startDate;
-    if (endDate) params.end_date = endDate;
-    
-    const { data, error } = await supabase.rpc('match_journal_entries_with_date', params);
+      user_id_filter: userId,
+      start_date: startDate,
+      end_date: endDate
+    });
     
     if (error) {
       console.error("Error in date-filtered similarity search:", error);
@@ -127,6 +144,134 @@ async function searchJournalEntriesWithDate(
     console.error("Exception in searchJournalEntriesWithDate:", error);
     return null;
   }
+}
+
+// New function to search journal entries by emotion
+async function searchJournalEntriesByEmotion(
+  userId: string,
+  emotion: string,
+  minScore: number = 0.3,
+  startDate: string | null = null,
+  endDate: string | null = null,
+  limitCount: number = 5
+) {
+  try {
+    console.log(`Calling match_journal_entries_by_emotion with userId: ${userId}, emotion: ${emotion}`);
+    console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}, min score: ${minScore}`);
+    
+    const { data, error } = await supabase.rpc('match_journal_entries_by_emotion', {
+      emotion_name: emotion,
+      min_score: minScore,
+      user_id_filter: userId,
+      start_date: startDate,
+      end_date: endDate,
+      limit_count: limitCount
+    });
+    
+    if (error) {
+      console.error("Error in emotion-filtered search:", error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Exception in searchJournalEntriesByEmotion:", error);
+    return null;
+  }
+}
+
+// Function to detect timeframe from text
+function detectTimeframe(text: string): {timeType: string | null, startDate: string | null, endDate: string | null} {
+  const lowerText = text.toLowerCase();
+  const now = new Date();
+  let timeType = null;
+  let startDate = null;
+  let endDate = now.toISOString();
+  
+  // Check for each time range
+  for (const [range, keywords] of Object.entries(TIME_RANGES)) {
+    if (keywords.some(keyword => lowerText.includes(keyword))) {
+      timeType = range;
+      
+      // Calculate start date based on range
+      if (range === 'day') {
+        if (lowerText.includes('yesterday')) {
+          const yesterday = new Date(now);
+          yesterday.setDate(now.getDate() - 1);
+          yesterday.setHours(0, 0, 0, 0);
+          startDate = yesterday.toISOString();
+          
+          const endOfYesterday = new Date(now);
+          endOfYesterday.setDate(now.getDate() - 1);
+          endOfYesterday.setHours(23, 59, 59, 999);
+          endDate = endOfYesterday.toISOString();
+        } else {
+          // Today
+          const today = new Date(now);
+          today.setHours(0, 0, 0, 0);
+          startDate = today.toISOString();
+        }
+      } else if (range === 'week') {
+        const lastWeek = new Date(now);
+        lastWeek.setDate(now.getDate() - 7);
+        startDate = lastWeek.toISOString();
+      } else if (range === 'month') {
+        const lastMonth = new Date(now);
+        lastMonth.setMonth(now.getMonth() - 1);
+        startDate = lastMonth.toISOString();
+      } else if (range === 'year') {
+        const lastYear = new Date(now);
+        lastYear.setFullYear(now.getFullYear() - 1);
+        startDate = lastYear.toISOString();
+      }
+      
+      break;
+    }
+  }
+  
+  return { timeType, startDate, endDate };
+}
+
+// Function to detect emotion from text
+function detectEmotion(text: string): string | null {
+  const lowerText = text.toLowerCase();
+  
+  for (const [emotion, keywords] of Object.entries(EMOTION_MAPPINGS)) {
+    if (keywords.some(keyword => lowerText.includes(keyword))) {
+      return emotion;
+    }
+  }
+  
+  return null;
+}
+
+// Function to detect query type
+function analyzeQuery(text: string): {
+  queryType: 'emotional' | 'temporal' | 'general',
+  emotion: string | null,
+  timeframe: {timeType: string | null, startDate: string | null, endDate: string | null},
+  isWhenQuestion: boolean
+} {
+  const lowerText = text.toLowerCase();
+  const emotion = detectEmotion(lowerText);
+  const timeframe = detectTimeframe(lowerText);
+  const isWhenQuestion = lowerText.startsWith('when') || lowerText.includes('what time') || lowerText.includes('which day');
+  
+  // Determine query type based on the presence of emotion and time indicators
+  let queryType: 'emotional' | 'temporal' | 'general' = 'general';
+  
+  if (emotion && timeframe.timeType) {
+    queryType = 'emotional';
+  } else if (timeframe.timeType) {
+    queryType = 'temporal';
+  }
+  
+  return {
+    queryType,
+    emotion,
+    timeframe,
+    isWhenQuestion
+  };
 }
 
 serve(async (req) => {
@@ -151,7 +296,8 @@ serve(async (req) => {
       context: 0,
       llm: 0,
       total: 0
-    }
+    },
+    queryAnalysis: null
   };
   
   const startTime = Date.now();
@@ -169,7 +315,13 @@ serve(async (req) => {
     console.log("Thread ID:", threadId || "new thread");
     console.log("Timeframe specified:", timeframe || "none");
     
+    // Analyze the query to determine approach
+    const queryAnalysis = analyzeQuery(message);
+    console.log("Query analysis:", JSON.stringify(queryAnalysis));
+    diagnostics.queryAnalysis = queryAnalysis;
+    
     let similarityScores = [];
+    let similarEntries = null;
     
     // Generate embedding for the user query
     console.log("Generating embedding for user query...");
@@ -185,71 +337,78 @@ serve(async (req) => {
       throw error;
     }
     
-    // Determine if we need time-based search
-    const needsTimeSearch = timeframe && (
-      message.toLowerCase().includes("last week") || 
-      message.toLowerCase().includes("last month") || 
-      message.toLowerCase().includes("last year") ||
-      message.toLowerCase().includes("this week") || 
-      message.toLowerCase().includes("this month") ||
-      message.toLowerCase().includes("recent") ||
-      message.toLowerCase().includes("yesterday") ||
-      message.toLowerCase().includes("today")
-    );
-    
-    // Search for relevant journal entries using vector similarity
-    console.log("Searching for relevant context...");
+    // Search for relevant journal entries based on query type
+    console.log("Searching for relevant context based on query type:", queryAnalysis.queryType);
     const searchStartTime = Date.now();
-    let similarEntries;
     
-    if (needsTimeSearch) {
-      // Calculate date range based on timeframe
-      let startDate = null;
-      let endDate = new Date().toISOString();
+    if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
+      // Use emotion-based search with time filtering
+      console.log(`Using emotion-based search for ${queryAnalysis.emotion} with time filtering`);
+      similarEntries = await searchJournalEntriesByEmotion(
+        userId, 
+        queryAnalysis.emotion,
+        0.3, // Minimum emotion score
+        queryAnalysis.timeframe.startDate,
+        queryAnalysis.timeframe.endDate
+      );
       
-      if (timeframe === 'week') {
-        const lastWeek = new Date();
-        lastWeek.setDate(lastWeek.getDate() - 7);
-        startDate = lastWeek.toISOString();
-      } else if (timeframe === 'month') {
-        const lastMonth = new Date();
-        lastMonth.setMonth(lastMonth.getMonth() - 1);
-        startDate = lastMonth.toISOString();
-      } else if (timeframe === 'year') {
-        const lastYear = new Date();
-        lastYear.setFullYear(lastYear.getFullYear() - 1);
-        startDate = lastYear.toISOString();
+      if (similarEntries && similarEntries.length > 0) {
+        console.log(`Found ${similarEntries.length} entries for emotion: ${queryAnalysis.emotion}`);
+        similarityScores = similarEntries.map(entry => ({
+          id: entry.id,
+          score: entry.emotion_score
+        }));
+      } else {
+        console.log(`No entries found with emotion: ${queryAnalysis.emotion}`);
       }
-      
-      console.log(`Using date range search from ${startDate} to ${endDate}`);
+    } else if (queryAnalysis.timeframe.timeType) {
+      // Use time-based similarity search
+      console.log("Using time-based similarity search");
       similarEntries = await searchJournalEntriesWithDate(
         userId, 
         queryEmbedding,
-        startDate,
-        endDate
+        queryAnalysis.timeframe.startDate,
+        queryAnalysis.timeframe.endDate
       );
+      
+      if (similarEntries && similarEntries.length > 0) {
+        console.log(`Found ${similarEntries.length} entries for timeframe: ${queryAnalysis.timeframe.timeType}`);
+        similarityScores = similarEntries.map(entry => ({
+          id: entry.id,
+          score: entry.similarity
+        }));
+      } else {
+        console.log("No entries found for specified timeframe");
+      }
     } else {
+      // Use standard similarity search
+      console.log("Using standard similarity search");
       try {
-        // Ensure the userId is properly cast as a UUID type when calling the function
-        console.log(`Calling match_journal_entries with userId: ${userId} (${typeof userId})`);
         const { data, error } = await supabase.rpc(
           'match_journal_entries',
           {
             query_embedding: queryEmbedding,
             match_threshold: 0.5,
             match_count: 5,
-            user_id_filter: userId // This is the correct parameter name
+            user_id_filter: userId
           }
         );
         
         if (error) {
           console.error("Error searching for similar entries:", error);
-          console.error("Search error details:", JSON.stringify(error));
           diagnostics.searchError = error.message || "Database search error";
-          throw error;
+        } else {
+          similarEntries = data;
+          if (similarEntries && similarEntries.length > 0) {
+            console.log(`Found ${similarEntries.length} similar entries`);
+            similarityScores = similarEntries.map(entry => ({
+              id: entry.id,
+              score: entry.similarity
+            }));
+          } else {
+            console.log("No similar entries found");
+          }
         }
-        
-        similarEntries = data;
       } catch (error) {
         console.error("Error in standard similarity search:", error);
         diagnostics.searchError = error.message || "Error in similarity search";
@@ -258,19 +417,6 @@ serve(async (req) => {
     
     diagnostics.similaritySearchComplete = true;
     diagnostics.processingTime.search = Date.now() - searchStartTime;
-    
-    if (similarEntries && similarEntries.length > 0) {
-      similarityScores = similarEntries.map(entry => ({
-        id: entry.id,
-        score: entry.similarity
-      }));
-      
-      // Log the similarity scores to check the results
-      console.log("Found similar entries:", similarEntries.length);
-      console.log("Similarity scores:", JSON.stringify(similarityScores));
-    } else {
-      console.log("No similar entries found in vector search");
-    }
     
     // Create RAG context from relevant entries
     const contextStartTime = Date.now();
@@ -300,21 +446,43 @@ serve(async (req) => {
           referenceEntries = entries.map(entry => {
             // Find the similarity score for this entry
             const similarEntry = similarEntries.find(se => se.id === entry.id);
+            const score = similarEntry?.similarity || similarEntry?.emotion_score || 0;
+            
             return {
               id: entry.id,
               date: entry.created_at,
               snippet: entry["refined text"]?.substring(0, 100) + "...",
-              similarity: similarEntry ? similarEntry.similarity : 0
+              similarity: score,
+              emotions: entry.emotions
             };
           });
           
-          // Format entries as context with emotions data
-          journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
-            entries.map((entry, index) => {
-              const date = new Date(entry.created_at).toLocaleDateString();
-              const emotionsText = formatEmotions(entry.emotions);
-              return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
-            }).join('\n\n') + "\n\n";
+          // Special formatting for emotional queries
+          if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
+            journalContext = "Here are some of your journal entries showing the emotion '" + 
+              queryAnalysis.emotion + "' " + 
+              (queryAnalysis.timeframe.timeType ? `from the ${queryAnalysis.timeframe.timeType} period` : "") + 
+              ":\n\n" + 
+              entries.map((entry, index) => {
+                const date = new Date(entry.created_at).toLocaleDateString();
+                const time = new Date(entry.created_at).toLocaleTimeString();
+                const emotionsText = formatEmotions(entry.emotions);
+                const emotionScore = entry.emotions?.[queryAnalysis.emotion] 
+                  ? `${queryAnalysis.emotion} intensity: ${Math.round(entry.emotions[queryAnalysis.emotion] * 100)}%` 
+                  : '';
+                
+                return `Entry ${index+1} (${date} at ${time}):\n${entry["refined text"]}\n${emotionScore}\nPrimary emotions: ${emotionsText}`;
+              }).join('\n\n') + "\n\n";
+          } else {
+            // Standard formatting for other queries
+            journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
+              entries.map((entry, index) => {
+                const date = new Date(entry.created_at).toLocaleDateString();
+                const time = new Date(entry.created_at).toLocaleTimeString();
+                const emotionsText = formatEmotions(entry.emotions);
+                return `Entry ${index+1} (${date} at ${time}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
+              }).join('\n\n') + "\n\n";
+          }
             
           diagnostics.contextBuilt = true;
           diagnostics.contextSize = journalContext.length;
@@ -367,12 +535,21 @@ serve(async (req) => {
     console.log(`Retrieved ${previousMessages.length} previous messages`);
     
     // Prepare system prompt with RAG context
-    const systemPrompt = `You are SOULo, an AI assistant specialized in emotional wellbeing and journaling. 
+    let systemPrompt = `You are SOULo, an AI assistant specialized in emotional wellbeing and journaling. 
 ${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
 
 Always maintain a warm, empathetic tone. If you notice concerning emotional patterns in the user's journal entries that might benefit from professional attention, 
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
 Focus on being helpful rather than diagnostic.`;
+
+    // Add special instructions for emotional queries
+    if (queryAnalysis.queryType === 'emotional') {
+      systemPrompt += `\n\nThe user is asking about the emotion "${queryAnalysis.emotion}" over a specific time period. 
+Focus on when and why this emotion was strongest based on the journal entries provided.
+If the user is asking "when" this emotion occurred, highlight the specific dates and times.`;
+    } else if (queryAnalysis.isWhenQuestion) {
+      systemPrompt += `\n\nThe user is asking about when something occurred. Be specific about dates and times in your answer, referring directly to the journal entries.`;
+    }
 
     console.log("Sending to GPT with RAG context and conversation history...");
     
@@ -427,7 +604,8 @@ Focus on being helpful rather than diagnostic.`;
           threadId: threadId,
           references: referenceEntries,
           diagnostics,
-          similarityScores
+          similarityScores,
+          queryAnalysis
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
