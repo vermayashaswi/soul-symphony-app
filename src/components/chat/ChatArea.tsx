@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -176,6 +175,23 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     );
   };
 
+  const detectTimeframe = (text: string): string | null => {
+    const lowerText = text.toLowerCase();
+    
+    if (lowerText.includes('last week') || lowerText.includes('this week') || 
+        lowerText.includes('past week') || lowerText.includes('recent days')) {
+      return 'week';
+    } else if (lowerText.includes('last month') || lowerText.includes('this month') || 
+               lowerText.includes('past month') || lowerText.includes('recent weeks')) {
+      return 'month';
+    } else if (lowerText.includes('last year') || lowerText.includes('this year') || 
+               lowerText.includes('past year')) {
+      return 'year';
+    }
+    
+    return null;
+  };
+
   const handleSendMessage = async (content: string = inputValue) => {
     if (!content.trim() || !userId) return;
     
@@ -196,6 +212,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     setShowWelcome(false);
     setShowDiagnostics(true);
     
+    const timeframe = detectTimeframe(content);
+    
     try {
       updateRagStep(1, 'loading', 'Generating embedding for query...');
       
@@ -208,7 +226,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
           threadId: threadId,
           isNewThread: isNewThread,
           threadTitle: content.substring(0, 30) + (content.length > 30 ? "..." : ""),
-          includeDiagnostics: true
+          includeDiagnostics: true,
+          timeframe: timeframe
         }
       });
       

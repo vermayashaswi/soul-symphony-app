@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -91,6 +92,43 @@ async function getPreviousMessages(threadId: string, messageLimit: number = 5) {
   }
 }
 
+// Function to search journal entries with date range
+async function searchJournalEntriesWithDate(
+  userId: string, 
+  queryEmbedding: any,
+  startDate: string | null = null,
+  endDate: string | null = null,
+  matchThreshold: number = 0.5,
+  matchCount: number = 5
+) {
+  try {
+    console.log(`Calling match_journal_entries_with_date with userId: ${userId}`);
+    console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}`);
+    
+    let params: any = {
+      query_embedding: queryEmbedding,
+      match_threshold: matchThreshold,
+      match_count: matchCount,
+      user_id_filter: userId
+    };
+    
+    if (startDate) params.start_date = startDate;
+    if (endDate) params.end_date = endDate;
+    
+    const { data, error } = await supabase.rpc('match_journal_entries_with_date', params);
+    
+    if (error) {
+      console.error("Error in date-filtered similarity search:", error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Exception in searchJournalEntriesWithDate:", error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -119,7 +157,7 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const { message, userId, threadId, isNewThread, threadTitle, includeDiagnostics } = await req.json();
+    const { message, userId, threadId, isNewThread, threadTitle, includeDiagnostics, timeframe } = await req.json();
     
     if (!message) {
       throw new Error('No message provided');
@@ -129,6 +167,7 @@ serve(async (req) => {
     console.log("Message:", message.substring(0, 50) + "...");
     console.log("Include diagnostics:", includeDiagnostics ? "yes" : "no");
     console.log("Thread ID:", threadId || "new thread");
+    console.log("Timeframe specified:", timeframe || "none");
     
     let similarityScores = [];
     
@@ -146,49 +185,91 @@ serve(async (req) => {
       throw error;
     }
     
+    // Determine if we need time-based search
+    const needsTimeSearch = timeframe && (
+      message.toLowerCase().includes("last week") || 
+      message.toLowerCase().includes("last month") || 
+      message.toLowerCase().includes("last year") ||
+      message.toLowerCase().includes("this week") || 
+      message.toLowerCase().includes("this month") ||
+      message.toLowerCase().includes("recent") ||
+      message.toLowerCase().includes("yesterday") ||
+      message.toLowerCase().includes("today")
+    );
+    
     // Search for relevant journal entries using vector similarity
-    console.log("Searching for relevant context using match_journal_entries function...");
+    console.log("Searching for relevant context...");
     const searchStartTime = Date.now();
     let similarEntries;
-    try {
-      // Ensure the userId is properly cast as a UUID type when calling the function
-      console.log(`Calling match_journal_entries with userId: ${userId} (${typeof userId})`);
-      const { data, error } = await supabase.rpc(
-        'match_journal_entries',
-        {
-          query_embedding: queryEmbedding,
-          match_threshold: 0.5,
-          match_count: 5,
-          user_id_filter: userId // This is the correct parameter name
-        }
+    
+    if (needsTimeSearch) {
+      // Calculate date range based on timeframe
+      let startDate = null;
+      let endDate = new Date().toISOString();
+      
+      if (timeframe === 'week') {
+        const lastWeek = new Date();
+        lastWeek.setDate(lastWeek.getDate() - 7);
+        startDate = lastWeek.toISOString();
+      } else if (timeframe === 'month') {
+        const lastMonth = new Date();
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        startDate = lastMonth.toISOString();
+      } else if (timeframe === 'year') {
+        const lastYear = new Date();
+        lastYear.setFullYear(lastYear.getFullYear() - 1);
+        startDate = lastYear.toISOString();
+      }
+      
+      console.log(`Using date range search from ${startDate} to ${endDate}`);
+      similarEntries = await searchJournalEntriesWithDate(
+        userId, 
+        queryEmbedding,
+        startDate,
+        endDate
       );
-      
-      if (error) {
-        console.error("Error searching for similar entries:", error);
-        console.error("Search error details:", JSON.stringify(error));
-        diagnostics.searchError = error.message || "Database search error";
-        throw error;
-      }
-      
-      similarEntries = data;
-      diagnostics.similaritySearchComplete = true;
-      diagnostics.processingTime.search = Date.now() - searchStartTime;
-      
-      if (similarEntries && similarEntries.length > 0) {
-        similarityScores = similarEntries.map(entry => ({
-          id: entry.id,
-          score: entry.similarity
-        }));
+    } else {
+      try {
+        // Ensure the userId is properly cast as a UUID type when calling the function
+        console.log(`Calling match_journal_entries with userId: ${userId} (${typeof userId})`);
+        const { data, error } = await supabase.rpc(
+          'match_journal_entries',
+          {
+            query_embedding: queryEmbedding,
+            match_threshold: 0.5,
+            match_count: 5,
+            user_id_filter: userId // This is the correct parameter name
+          }
+        );
         
-        // Log the similarity scores to check the results
-        console.log("Found similar entries:", similarEntries.length);
-        console.log("Similarity scores:", JSON.stringify(similarityScores));
-      } else {
-        console.log("No similar entries found in vector search");
+        if (error) {
+          console.error("Error searching for similar entries:", error);
+          console.error("Search error details:", JSON.stringify(error));
+          diagnostics.searchError = error.message || "Database search error";
+          throw error;
+        }
+        
+        similarEntries = data;
+      } catch (error) {
+        console.error("Error in standard similarity search:", error);
+        diagnostics.searchError = error.message || "Error in similarity search";
       }
-    } catch (error) {
-      console.error("Error in similarity search:", error);
-      diagnostics.searchError = error.message || "Error in similarity search";
+    }
+    
+    diagnostics.similaritySearchComplete = true;
+    diagnostics.processingTime.search = Date.now() - searchStartTime;
+    
+    if (similarEntries && similarEntries.length > 0) {
+      similarityScores = similarEntries.map(entry => ({
+        id: entry.id,
+        score: entry.similarity
+      }));
+      
+      // Log the similarity scores to check the results
+      console.log("Found similar entries:", similarEntries.length);
+      console.log("Similarity scores:", JSON.stringify(similarityScores));
+    } else {
+      console.log("No similar entries found in vector search");
     }
     
     // Create RAG context from relevant entries
