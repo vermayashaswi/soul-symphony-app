@@ -386,6 +386,23 @@ export type Database = {
           embedding: string
         }[]
       }
+      match_journal_entries_by_theme: {
+        Args: {
+          theme_query: string
+          user_id_filter: string
+          match_threshold?: number
+          match_count?: number
+          start_date?: string
+          end_date?: string
+        }
+        Returns: {
+          id: number
+          content: string
+          created_at: string
+          themes: string[]
+          similarity: number
+        }[]
+      }
       store_user_query:
         | {
             Args: Record<PropertyKey, never>

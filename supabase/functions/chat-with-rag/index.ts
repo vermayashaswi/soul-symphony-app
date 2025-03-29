@@ -35,6 +35,11 @@ const TIME_RANGES = {
   "year": ["year", "this year", "last year", "past year"]
 };
 
+// Theme mapping to identify workplace-related themes
+const THEME_MAPPINGS = {
+  "workplace": ["work", "office", "workplace", "job", "career", "company", "business", "corporate", "enterprise", "employment", "profession", "occupation", "colleague", "coworker", "boss", "manager", "team", "project", "meeting", "deadline"]
+};
+
 // Generate embeddings using OpenAI
 async function generateEmbedding(text: string) {
   try {
@@ -146,7 +151,7 @@ async function searchJournalEntriesWithDate(
   }
 }
 
-// New function to search journal entries by emotion
+// Function to search journal entries by emotion
 async function searchJournalEntriesByEmotion(
   userId: string,
   emotion: string,
@@ -176,6 +181,41 @@ async function searchJournalEntriesByEmotion(
     return data;
   } catch (error) {
     console.error("Exception in searchJournalEntriesByEmotion:", error);
+    return null;
+  }
+}
+
+// Function to search journal entries by theme
+async function searchJournalEntriesByTheme(
+  userId: string,
+  themeQuery: string,
+  matchThreshold: number = 0.5,
+  matchCount: number = 5,
+  startDate: string | null = null,
+  endDate: string | null = null
+) {
+  try {
+    console.log(`Calling match_journal_entries_by_theme with userId: ${userId}, theme query: ${themeQuery}`);
+    console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}, threshold: ${matchThreshold}`);
+    
+    const { data, error } = await supabase.rpc('match_journal_entries_by_theme', {
+      theme_query: themeQuery,
+      match_threshold: matchThreshold,
+      match_count: matchCount,
+      user_id_filter: userId,
+      start_date: startDate,
+      end_date: endDate
+    });
+    
+    if (error) {
+      console.error("Error in theme-filtered search:", error);
+      return null;
+    }
+    
+    console.log(`Theme search found ${data?.length || 0} entries`);
+    return data;
+  } catch (error) {
+    console.error("Exception in searchJournalEntriesByTheme:", error);
     return null;
   }
 }
@@ -245,23 +285,40 @@ function detectEmotion(text: string): string | null {
   return null;
 }
 
+// Function to detect theme from text
+function detectTheme(text: string): string | null {
+  const lowerText = text.toLowerCase();
+  
+  for (const [theme, keywords] of Object.entries(THEME_MAPPINGS)) {
+    if (keywords.some(keyword => lowerText.includes(keyword))) {
+      return theme;
+    }
+  }
+  
+  return null;
+}
+
 // Function to detect query type
 function analyzeQuery(text: string): {
-  queryType: 'emotional' | 'temporal' | 'general',
+  queryType: 'emotional' | 'temporal' | 'thematic' | 'general',
   emotion: string | null,
+  theme: string | null,
   timeframe: {timeType: string | null, startDate: string | null, endDate: string | null},
   isWhenQuestion: boolean
 } {
   const lowerText = text.toLowerCase();
   const emotion = detectEmotion(lowerText);
+  const theme = detectTheme(lowerText);
   const timeframe = detectTimeframe(lowerText);
   const isWhenQuestion = lowerText.startsWith('when') || lowerText.includes('what time') || lowerText.includes('which day');
   
-  // Determine query type based on the presence of emotion and time indicators
-  let queryType: 'emotional' | 'temporal' | 'general' = 'general';
+  // Determine query type based on the presence of emotion, theme, and time indicators
+  let queryType: 'emotional' | 'temporal' | 'thematic' | 'general' = 'general';
   
-  if (emotion && timeframe.timeType) {
+  if (emotion) {
     queryType = 'emotional';
+  } else if (theme) {
+    queryType = 'thematic';
   } else if (timeframe.timeType) {
     queryType = 'temporal';
   }
@@ -269,6 +326,7 @@ function analyzeQuery(text: string): {
   return {
     queryType,
     emotion,
+    theme,
     timeframe,
     isWhenQuestion
   };
@@ -361,6 +419,27 @@ serve(async (req) => {
       } else {
         console.log(`No entries found with emotion: ${queryAnalysis.emotion}`);
       }
+    } else if (queryAnalysis.queryType === 'thematic' && queryAnalysis.theme) {
+      // Use theme-based search with time filtering
+      console.log(`Using theme-based search for ${queryAnalysis.theme} with time filtering`);
+      similarEntries = await searchJournalEntriesByTheme(
+        userId,
+        queryAnalysis.theme,
+        0.4, // Lower threshold for theme matching to be more inclusive
+        5,   // Return top 5 matches
+        queryAnalysis.timeframe.startDate,
+        queryAnalysis.timeframe.endDate
+      );
+      
+      if (similarEntries && similarEntries.length > 0) {
+        console.log(`Found ${similarEntries.length} entries for theme: ${queryAnalysis.theme}`);
+        similarityScores = similarEntries.map(entry => ({
+          id: entry.id,
+          score: entry.similarity
+        }));
+      } else {
+        console.log(`No entries found with theme: ${queryAnalysis.theme}`);
+      }
     } else if (queryAnalysis.timeframe.timeType) {
       // Use time-based similarity search
       console.log("Using time-based similarity search");
@@ -433,7 +512,7 @@ serve(async (req) => {
         // Using column name with space "refined text" instead of "refinedtext"
         const { data: entries, error: entriesError } = await supabase
           .from('Journal Entries')
-          .select('id, "refined text", created_at, emotions')
+          .select('id, "refined text", created_at, emotions, master_themes')
           .in('id', entryIds);
         
         if (entriesError) {
@@ -453,12 +532,28 @@ serve(async (req) => {
               date: entry.created_at,
               snippet: entry["refined text"]?.substring(0, 100) + "...",
               similarity: score,
-              emotions: entry.emotions
+              emotions: entry.emotions,
+              themes: entry.master_themes
             };
           });
           
+          // Special formatting for thematic queries
+          if (queryAnalysis.queryType === 'thematic' && queryAnalysis.theme) {
+            journalContext = "Here are some of your journal entries related to '" + 
+              queryAnalysis.theme + "' " + 
+              (queryAnalysis.timeframe.timeType ? `from the ${queryAnalysis.timeframe.timeType} period` : "") + 
+              ":\n\n" + 
+              entries.map((entry, index) => {
+                const date = new Date(entry.created_at).toLocaleDateString();
+                const time = new Date(entry.created_at).toLocaleTimeString();
+                const emotionsText = formatEmotions(entry.emotions);
+                const themesText = entry.master_themes ? entry.master_themes.join(", ") : "No themes identified";
+                
+                return `Entry ${index+1} (${date} at ${time}):\n${entry["refined text"]}\nThemes: ${themesText}\nPrimary emotions: ${emotionsText}`;
+              }).join('\n\n') + "\n\n";
+          }
           // Special formatting for emotional queries
-          if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
+          else if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
             journalContext = "Here are some of your journal entries showing the emotion '" + 
               queryAnalysis.emotion + "' " + 
               (queryAnalysis.timeframe.timeType ? `from the ${queryAnalysis.timeframe.timeType} period` : "") + 
@@ -467,11 +562,12 @@ serve(async (req) => {
                 const date = new Date(entry.created_at).toLocaleDateString();
                 const time = new Date(entry.created_at).toLocaleTimeString();
                 const emotionsText = formatEmotions(entry.emotions);
+                const themesText = entry.master_themes ? entry.master_themes.join(", ") : "No themes identified";
                 const emotionScore = entry.emotions?.[queryAnalysis.emotion] 
                   ? `${queryAnalysis.emotion} intensity: ${Math.round(entry.emotions[queryAnalysis.emotion] * 100)}%` 
                   : '';
                 
-                return `Entry ${index+1} (${date} at ${time}):\n${entry["refined text"]}\n${emotionScore}\nPrimary emotions: ${emotionsText}`;
+                return `Entry ${index+1} (${date} at ${time}):\n${entry["refined text"]}\n${emotionScore}\nThemes: ${themesText}\nPrimary emotions: ${emotionsText}`;
               }).join('\n\n') + "\n\n";
           } else {
             // Standard formatting for other queries
@@ -480,7 +576,9 @@ serve(async (req) => {
                 const date = new Date(entry.created_at).toLocaleDateString();
                 const time = new Date(entry.created_at).toLocaleTimeString();
                 const emotionsText = formatEmotions(entry.emotions);
-                return `Entry ${index+1} (${date} at ${time}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
+                const themesText = entry.master_themes ? entry.master_themes.join(", ") : "No themes identified";
+                
+                return `Entry ${index+1} (${date} at ${time}):\n${entry["refined text"]}\nThemes: ${themesText}\nPrimary emotions: ${emotionsText}`;
               }).join('\n\n') + "\n\n";
           }
             
@@ -492,7 +590,7 @@ serve(async (req) => {
         // Fallback to recent entries if no similar ones found
         const { data: recentEntries, error: recentError } = await supabase
           .from('Journal Entries')
-          .select('id, "refined text", created_at, emotions')
+          .select('id, "refined text", created_at, emotions, master_themes')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(3);
@@ -508,14 +606,17 @@ serve(async (req) => {
             id: entry.id,
             date: entry.created_at,
             snippet: entry["refined text"]?.substring(0, 100) + "...",
-            type: "recent"
+            type: "recent",
+            themes: entry.master_themes
           }));
           
           journalContext = "Here are some of your recent journal entries:\n\n" + 
             recentEntries.map((entry, index) => {
               const date = new Date(entry.created_at).toLocaleDateString();
               const emotionsText = formatEmotions(entry.emotions);
-              return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
+              const themesText = entry.master_themes ? entry.master_themes.join(", ") : "No themes identified";
+              
+              return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nThemes: ${themesText}\nPrimary emotions: ${emotionsText}`;
             }).join('\n\n') + "\n\n";
             
           diagnostics.contextBuilt = true;
@@ -542,8 +643,14 @@ Always maintain a warm, empathetic tone. If you notice concerning emotional patt
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
 Focus on being helpful rather than diagnostic.`;
 
+    // Add special instructions for thematic queries
+    if (queryAnalysis.queryType === 'thematic') {
+      systemPrompt += `\n\nThe user is asking about the theme "${queryAnalysis.theme}" in their journal entries.
+Focus on what happened related to this theme based on the journal entries provided.
+Highlight specific events, patterns, and emotions connected to this theme.`;
+    }
     // Add special instructions for emotional queries
-    if (queryAnalysis.queryType === 'emotional') {
+    else if (queryAnalysis.queryType === 'emotional') {
       systemPrompt += `\n\nThe user is asking about the emotion "${queryAnalysis.emotion}" over a specific time period. 
 Focus on when and why this emotion was strongest based on the journal entries provided.
 If the user is asking "when" this emotion occurred, highlight the specific dates and times.`;

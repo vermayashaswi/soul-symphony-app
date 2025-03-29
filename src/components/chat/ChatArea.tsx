@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Bot, Loader2, Brain, BrainCircuit, CalendarDays, HeartPulse } from 'lucide-react';
+import { Send, Bot, Loader2, Brain, BrainCircuit, CalendarDays, HeartPulse, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,6 +20,7 @@ export interface MessageReference {
   similarity?: number;
   type?: string;
   emotions?: Record<string, number> | null;
+  themes?: string[] | null;
 }
 
 export interface Message {
@@ -45,8 +46,9 @@ interface DiagnosticsStep {
 }
 
 interface QueryAnalysis {
-  queryType: 'emotional' | 'temporal' | 'general';
+  queryType: 'emotional' | 'temporal' | 'thematic' | 'general';
   emotion: string | null;
+  theme: string | null;
   timeframe: {
     timeType: string | null;
     startDate: string | null;
@@ -78,7 +80,7 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
     "What are some good journaling prompts for self-reflection?",
     "I've been feeling down lately. Any suggestions?",
     "When was I most sad in the last week?",
-    "What made me happiest yesterday?"
+    "What happened at my workplace yesterday?"
   ];
 
   useEffect(() => {
@@ -136,7 +138,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
               snippet: ref.snippet || '',
               similarity: ref.similarity,
               type: ref.type,
-              emotions: ref.emotions
+              emotions: ref.emotions,
+              themes: ref.themes
             }));
           } else if (typeof msg.reference_entries === 'object') {
             processedRefs = [{
@@ -145,7 +148,8 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
               snippet: (msg.reference_entries as any).snippet || '',
               similarity: (msg.reference_entries as any).similarity,
               type: (msg.reference_entries as any).type,
-              emotions: (msg.reference_entries as any).emotions
+              emotions: (msg.reference_entries as any).emotions,
+              themes: (msg.reference_entries as any).themes
             }];
           }
         }
@@ -262,8 +266,19 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       
       if (data.queryAnalysis) {
         setQueryAnalysis(data.queryAnalysis);
-        updateRagStep(1, 'success', `Query classified as ${data.queryAnalysis.queryType}` + 
-          (data.queryAnalysis.emotion ? ` related to '${data.queryAnalysis.emotion}'` : ''));
+        let analysisDescription = `Query classified as ${data.queryAnalysis.queryType}`;
+        
+        if (data.queryAnalysis.emotion) {
+          analysisDescription += ` related to '${data.queryAnalysis.emotion}' emotion`;
+        }
+        if (data.queryAnalysis.theme) {
+          analysisDescription += ` related to '${data.queryAnalysis.theme}' theme`;
+        }
+        if (data.queryAnalysis.timeframe.timeType) {
+          analysisDescription += ` within ${data.queryAnalysis.timeframe.timeType} timeframe`;
+        }
+        
+        updateRagStep(1, 'success', analysisDescription);
       }
       
       if (data.diagnostics) {
@@ -349,6 +364,10 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
       icon = <CalendarDays className="h-3 w-3" />;
       label = `Time-based Query: ${queryAnalysis.timeframe.timeType || ''}`;
       className += " bg-blue-100 text-blue-800";
+    } else if (queryAnalysis.queryType === 'thematic') {
+      icon = <Briefcase className="h-3 w-3" />;
+      label = `Theme-based Query: ${queryAnalysis.theme || ''}`;
+      className += " bg-amber-100 text-amber-800";
     } else {
       icon = <BrainCircuit className="h-3 w-3" />;
       label = "General Query";
@@ -437,6 +456,16 @@ export default function ChatArea({ userId, threadId, onNewThreadCreated }: ChatA
                                   <li key={idx} className="text-xs border-l-2 border-primary pl-2 py-1">
                                     <div className="font-medium">{format(new Date(ref.date), 'MMM d, yyyy h:mm a')}</div>
                                     <div>{ref.snippet}</div>
+                                    {ref.themes && ref.themes.length > 0 && (
+                                      <div className="mt-1 flex flex-wrap gap-1">
+                                        <span className="text-xs text-muted-foreground">Themes: </span>
+                                        {ref.themes.map((theme) => (
+                                          <span key={theme} className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs">
+                                            {theme}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
                                     {ref.emotions && Object.keys(ref.emotions).length > 0 && (
                                       <div className="mt-1 flex flex-wrap gap-1">
                                         {Object.entries(ref.emotions)
