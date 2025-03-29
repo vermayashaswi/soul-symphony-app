@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -32,24 +31,9 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Remove the click handler functions
   const handleEmotionClick = (emotion: string) => {
-    setSelectedEmotion(emotion);
-    
-    // Find sentences in the journal entry that might contain this emotion
-    if (entry["refined text"]) {
-      const sentences = entry["refined text"].split(/[.!?]+/).filter(Boolean);
-      const relevantSentences = sentences.filter(sentence => 
-        sentence.toLowerCase().includes(emotion.toLowerCase())
-      );
-      
-      if (relevantSentences.length > 0) {
-        toast({
-          title: `${emotion} in your journal`,
-          description: relevantSentences[0].trim(),
-          duration: 5000,
-        });
-      }
-    }
+    // No-op - intentionally empty to remove all click behavior
   };
 
   // Helper function to determine sentiment color
@@ -114,6 +98,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
             </div>
           </div>
         </CardHeader>
+        
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-4">
@@ -153,12 +138,11 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                 whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
                 transition={{ duration: 0.2 }}
               >
-                {/* Replace the EmotionBubbles with our new ThemeBoxes component when showing themes */}
                 {entry.emotions && Object.keys(entry.emotions).length > 0 ? (
                   <EmotionBubbles 
                     emotions={entry.emotions} 
                     className="w-full h-full"
-                    onEmotionClick={handleEmotionClick} 
+                    preventOverlap={true} // Ensure no overlap
                   />
                 ) : entry.master_themes && entry.master_themes.length > 0 ? (
                   <ThemeBoxes 
