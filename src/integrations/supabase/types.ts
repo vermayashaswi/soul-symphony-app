@@ -347,6 +347,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_entries_by_emotion_term: {
+        Args: {
+          emotion_term: string
+          user_id_filter: string
+          start_date?: string
+          end_date?: string
+          limit_count?: number
+        }
+        Returns: {
+          id: number
+          content: string
+          created_at: string
+        }[]
+      }
       mark_inactive_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined

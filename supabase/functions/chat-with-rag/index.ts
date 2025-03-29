@@ -17,14 +17,14 @@ const corsHeaders = {
 
 // Common emotion mappings to standardize input
 const EMOTION_MAPPINGS = {
-  "sad": ["sad", "sadness", "unhappy", "upset", "down", "depressed", "blue", "gloomy"],
-  "angry": ["angry", "anger", "mad", "furious", "irritated", "annoyed", "frustrated"],
+  "sad": ["sad", "sadness", "unhappy", "upset", "down", "depressed", "blue", "gloomy", "miserable"],
+  "angry": ["angry", "anger", "mad", "furious", "irritated", "annoyed", "frustrated", "enraged"],
   "happy": ["happy", "happiness", "joy", "joyful", "delighted", "pleased", "cheerful", "content"],
-  "anxious": ["anxious", "anxiety", "worried", "nervous", "stressed", "tense", "uneasy"],
-  "fear": ["fear", "scared", "afraid", "terrified", "frightened", "panic"],
-  "surprise": ["surprise", "surprised", "shocked", "astonished", "amazed"],
+  "anxious": ["anxious", "anxiety", "worried", "nervous", "stressed", "tense", "uneasy", "apprehensive"],
+  "fear": ["fear", "scared", "afraid", "terrified", "frightened", "panic", "dread", "horror"],
+  "surprise": ["surprise", "surprised", "shocked", "astonished", "amazed", "startled"],
   "love": ["love", "loving", "affection", "fond", "tender", "caring", "adoration"],
-  "disgust": ["disgust", "disgusted", "repulsed", "aversion"]
+  "disgust": ["disgust", "disgusted", "repulsed", "aversion", "repugnance"]
 };
 
 // Common time mappings to standardize input
@@ -236,9 +236,9 @@ async function searchJournalEntriesByEmotion(
       console.error("Error in emotion-filtered search:", error);
       console.log("Search error details:", JSON.stringify(error));
       
-      // Fallback to standard search if emotion-specific search fails
-      console.log("Falling back to standard similarity search...");
-      return await fallbackToStandardSearch(userId, queryEmbedding, matchThreshold, matchCount);
+      // Try a broader search with the new function
+      console.log("Trying broader emotion term search...");
+      return await searchJournalEntriesByEmotionTerm(userId, emotion, startDate, endDate, limitCount);
     }
     
     console.log(`Emotion search found ${data?.length || 0} entries`);
@@ -246,10 +246,69 @@ async function searchJournalEntriesByEmotion(
   } catch (error) {
     console.error("Exception in searchJournalEntriesByEmotion:", error);
     
-    // Fallback to standard search
-    console.log("Exception occurred, falling back to standard similarity search");
+    // Try a broader search with the new function
     try {
-      return await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+      console.log("Trying broader emotion term search after exception...");
+      return await searchJournalEntriesByEmotionTerm(userId, emotion, startDate, endDate, limitCount);
+    } catch (fallbackError) {
+      return tracker.fail(error);
+    }
+  }
+}
+
+// New function to search for emotion terms more broadly
+async function searchJournalEntriesByEmotionTerm(
+  userId: string,
+  emotionTerm: string,
+  startDate: string | null = null,
+  endDate: string | null = null,
+  limitCount: number = 5
+) {
+  const tracker = trackFunctionExecution("searchJournalEntriesByEmotionTerm", { 
+    userId, 
+    emotionTerm, 
+    startDate, 
+    endDate, 
+    limitCount 
+  });
+  
+  try {
+    console.log(`Calling get_entries_by_emotion_term with userId: ${userId}, emotion term: ${emotionTerm}`);
+    
+    const { data, error } = await supabase.rpc('get_entries_by_emotion_term', {
+      emotion_term: emotionTerm,
+      user_id_filter: userId,
+      start_date: startDate,
+      end_date: endDate,
+      limit_count: limitCount
+    });
+    
+    if (error) {
+      console.error("Error in emotion term search:", error);
+      console.log("Search error details:", JSON.stringify(error));
+      
+      // Fallback to standard search
+      console.log("Falling back to standard similarity search due to emotion term search error");
+      return await fallbackToStandardSearch(userId, await generateEmbedding(emotionTerm), 0.3, limitCount);
+    }
+    
+    console.log(`Emotion term search found ${data?.length || 0} entries`);
+    
+    // Add a placeholder similarity score for consistency with other search functions
+    const enhancedData = data?.map(entry => ({
+      ...entry,
+      similarity: 1.0, // High relevance since it matched by direct term search
+      emotion_score: 1.0
+    }));
+    
+    return tracker.succeed(enhancedData);
+  } catch (error) {
+    console.error("Exception in searchJournalEntriesByEmotionTerm:", error);
+    
+    // Fallback to standard search
+    try {
+      console.log("Exception occurred, falling back to standard similarity search");
+      return await fallbackToStandardSearch(userId, await generateEmbedding(emotionTerm), 0.3, limitCount);
     } catch (fallbackError) {
       return tracker.fail(error);
     }
@@ -278,6 +337,9 @@ async function searchJournalEntriesByTheme(
     console.log(`Calling match_journal_entries_by_theme with userId: ${userId}, theme query: ${themeQuery}`);
     console.log(`Date range: ${startDate || 'none'} to ${endDate || 'none'}, threshold: ${matchThreshold}`);
     
+    // Generate embedding for theme query
+    const queryEmbedding = await generateEmbedding(themeQuery);
+    
     const { data, error } = await supabase.rpc('match_journal_entries_by_theme', {
       theme_query: themeQuery,
       match_threshold: matchThreshold,
@@ -301,10 +363,13 @@ async function searchJournalEntriesByTheme(
   } catch (error) {
     console.error("Exception in searchJournalEntriesByTheme:", error);
     
-    // Fallback to standard search
-    console.log("Exception occurred, falling back to standard similarity search");
     try {
-      return await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+      // Generate embedding for theme query
+      const queryEmbedding = await generateEmbedding(themeQuery);
+      
+      // Fallback to standard search
+      console.log("Exception occurred, falling back to standard similarity search");
+      return await fallbackToStandardSearch(userId, queryEmbedding, 0.4, matchCount);
     } catch (fallbackError) {
       return tracker.fail(error);
     }
@@ -471,9 +536,6 @@ function analyzeQuery(text: string): {
   };
 }
 
-// Global variable to hold the query embedding
-let queryEmbedding: any = null;
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -522,6 +584,7 @@ serve(async (req) => {
     
     let similarityScores = [];
     let similarEntries = null;
+    let queryEmbedding = null;
     
     // Generate embedding for the user query
     console.log("Generating embedding for user query...");
@@ -533,7 +596,7 @@ serve(async (req) => {
     } catch (error) {
       console.error("Error generating embedding:", error);
       diagnostics.embeddingError = error.message;
-      throw error;
+      // We'll continue anyway
     }
     
     // Search for relevant journal entries based on query type
@@ -557,15 +620,23 @@ serve(async (req) => {
             console.log(`Found ${similarEntries.length} entries for emotion: ${queryAnalysis.emotion}`);
             similarityScores = similarEntries.map(entry => ({
               id: entry.id,
-              score: entry.emotion_score
+              score: entry.emotion_score || entry.similarity
             }));
           } else {
-            console.log(`No entries found with emotion: ${queryAnalysis.emotion}, falling back to standard search`);
-            similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+            console.log(`No entries found with emotion: ${queryAnalysis.emotion}, trying broader emotion term search`);
+            // Try a broader search for emotion terms in text and themes
+            similarEntries = await searchJournalEntriesByEmotionTerm(
+              userId, 
+              queryAnalysis.emotion,
+              queryAnalysis.timeframe.startDate,
+              queryAnalysis.timeframe.endDate
+            );
           }
         } catch (emotionSearchError) {
           console.error("Error in emotion search, falling back to standard:", emotionSearchError);
-          similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+          if (queryEmbedding) {
+            similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+          }
         }
       } else if (queryAnalysis.queryType === 'thematic' && queryAnalysis.theme) {
         // Use theme-based search with time filtering
@@ -586,43 +657,51 @@ serve(async (req) => {
               id: entry.id,
               score: entry.similarity
             }));
-          } else {
+          } else if (queryEmbedding) {
             console.log(`No entries found with theme: ${queryAnalysis.theme}, falling back to standard search`);
             similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
           }
         } catch (themeSearchError) {
           console.error("Error in theme search, falling back to standard:", themeSearchError);
-          similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+          if (queryEmbedding) {
+            similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+          }
         }
       } else if (queryAnalysis.timeframe.timeType) {
         // Use time-based similarity search
         console.log("Using time-based similarity search");
         try {
-          similarEntries = await searchJournalEntriesWithDate(
-            userId, 
-            queryEmbedding,
-            queryAnalysis.timeframe.startDate,
-            queryAnalysis.timeframe.endDate
-          );
-          
-          if (similarEntries && similarEntries.length > 0) {
-            console.log(`Found ${similarEntries.length} entries for timeframe: ${queryAnalysis.timeframe.timeType}`);
-            similarityScores = similarEntries.map(entry => ({
-              id: entry.id,
-              score: entry.similarity
-            }));
-          } else {
-            console.log("No entries found for specified timeframe, falling back to standard search");
-            similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+          if (queryEmbedding) {
+            similarEntries = await searchJournalEntriesWithDate(
+              userId, 
+              queryEmbedding,
+              queryAnalysis.timeframe.startDate,
+              queryAnalysis.timeframe.endDate
+            );
+            
+            if (similarEntries && similarEntries.length > 0) {
+              console.log(`Found ${similarEntries.length} entries for timeframe: ${queryAnalysis.timeframe.timeType}`);
+              similarityScores = similarEntries.map(entry => ({
+                id: entry.id,
+                score: entry.similarity
+              }));
+            } else {
+              console.log("No entries found for specified timeframe, falling back to standard search");
+              similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+            }
           }
         } catch (timeSearchError) {
           console.error("Error in time-based search, falling back to standard:", timeSearchError);
-          similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+          if (queryEmbedding) {
+            similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+          }
         }
       } else {
         // Use standard similarity search
         console.log("Using standard similarity search");
-        similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+        if (queryEmbedding) {
+          similarEntries = await fallbackToStandardSearch(userId, queryEmbedding, 0.5, 5);
+        }
       }
       
       diagnostics.similaritySearchComplete = true;
