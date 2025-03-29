@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +12,9 @@ import ParticleBackground from '@/components/ParticleBackground';
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [typingText, setTypingText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [showResponse, setShowResponse] = useState(false);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -65,6 +69,53 @@ const Index = () => {
       }
     }
   };
+
+  // Typing animation for chat feature
+  useEffect(() => {
+    if (isTyping) {
+      const text = "How have I been feeling lately?";
+      let currentIndex = 0;
+      
+      const typingInterval = setInterval(() => {
+        if (currentIndex <= text.length) {
+          setTypingText(text.substring(0, currentIndex));
+          currentIndex++;
+        } else {
+          clearInterval(typingInterval);
+          setIsTyping(false);
+          
+          // Show response after typing finishes
+          setTimeout(() => {
+            setShowResponse(true);
+          }, 800);
+        }
+      }, 100);
+      
+      return () => clearInterval(typingInterval);
+    }
+  }, [isTyping]);
+
+  // Start typing animation every 8 seconds
+  useEffect(() => {
+    const animationCycle = () => {
+      // Reset state
+      setTypingText("");
+      setShowResponse(false);
+      
+      // Start typing after a delay
+      setTimeout(() => {
+        setIsTyping(true);
+      }, 1500);
+    };
+    
+    // Initial animation
+    animationCycle();
+    
+    // Set up interval for repeating the animation
+    const intervalId = setInterval(animationCycle, 8000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
 
   const features = [
     {
@@ -154,35 +205,91 @@ const Index = () => {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.5 }}
         >
+          {/* Enhanced animated chart */}
           <svg viewBox="0 0 500 100" className="w-full h-full">
+            {/* Background grid */}
+            {[0, 25, 50, 75, 100].map((line) => (
+              <motion.line
+                key={`grid-${line}`}
+                x1="0"
+                y1={line}
+                x2="500"
+                y2={line}
+                stroke="hsl(var(--muted))"
+                strokeWidth="0.5"
+                strokeDasharray="5,5"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.3 }}
+                transition={{ delay: 0.8, duration: 1 }}
+              />
+            ))}
+            
+            {/* Animated joy emotion line */}
             <motion.path
-              d="M0,50 C150,20 200,80 500,40"
+              d="M0,80 C50,70 100,60 150,40 C200,20 250,10 300,15 C350,20 400,10 500,5"
               fill="none"
               stroke="hsl(var(--primary))"
               strokeWidth="3"
               initial={{ pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 1 }}
-              transition={{ duration: 2, delay: 0.5 }}
+              transition={{ duration: 3, delay: 0.5 }}
             />
-            <motion.path
-              d="M0,70 C100,60 300,20 500,60"
-              fill="none"
-              stroke="hsl(var(--primary))"
-              strokeWidth="2"
-              strokeOpacity="0.5"
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 0.5 }}
-              transition={{ duration: 2, delay: 0.7 }}
-            />
-            <motion.circle
-              cx="450"
-              cy="45"
-              r="5"
+            
+            {/* Animated data points */}
+            {[
+              { x: 50, y: 70, delay: 1.0 },
+              { x: 150, y: 40, delay: 1.5 },
+              { x: 300, y: 15, delay: 2.0 },
+              { x: 450, y: 5, delay: 2.5 }
+            ].map((point, i) => (
+              <motion.circle
+                key={`point-${i}`}
+                cx={point.x}
+                cy={point.y}
+                r="4"
+                fill="hsl(var(--primary))"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: point.delay }}
+              />
+            ))}
+            
+            {/* Emotion label */}
+            <motion.text
+              x="450"
+              y="20"
+              fontSize="12"
               fill="hsl(var(--primary))"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 2.5 }}
-            />
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 3 }}
+            >
+              Joy +95%
+            </motion.text>
+            
+            {/* Time labels */}
+            <motion.text
+              x="10"
+              y="95"
+              fontSize="10"
+              fill="hsl(var(--muted-foreground))"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.7 }}
+              transition={{ delay: 3.2 }}
+            >
+              Jan
+            </motion.text>
+            <motion.text
+              x="480"
+              y="95"
+              fontSize="10"
+              fill="hsl(var(--muted-foreground))"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.7 }}
+              transition={{ delay: 3.4 }}
+            >
+              Now
+            </motion.text>
           </svg>
         </motion.div>
       )
@@ -196,27 +303,47 @@ const Index = () => {
       ctaAction: () => navigate('/chat'),
       visualComponent: (
         <motion.div 
-          className="flex flex-col gap-2"
+          className="flex flex-col gap-2 min-h-[120px]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.5 }}
         >
+          {/* User typing message with cursor */}
           <motion.div 
             className="self-start max-w-[80%] bg-muted p-2 rounded-lg text-xs text-left"
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.7 }}
           >
-            How have I been feeling lately?
+            {typingText}
+            {isTyping && (
+              <motion.span
+                animate={{ opacity: [1, 0, 1] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+                className="inline-block"
+              >
+                |
+              </motion.span>
+            )}
           </motion.div>
-          <motion.div 
-            className="self-end max-w-[80%] bg-primary text-primary-foreground p-2 rounded-lg text-xs text-left"
-            initial={{ x: 20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 1.2 }}
-          >
-            Based on your recent entries, you've been feeling more positive and energetic this week...
-          </motion.div>
+          
+          {/* AI response with typing effect */}
+          {showResponse && (
+            <motion.div 
+              className="self-end max-w-[80%] bg-primary text-primary-foreground p-2 rounded-lg text-xs text-left"
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+            >
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ staggerChildren: 0.05 }}
+              >
+                Based on your recent entries, you've been feeling more positive and energetic this week...
+              </motion.span>
+            </motion.div>
+          )}
         </motion.div>
       )
     }

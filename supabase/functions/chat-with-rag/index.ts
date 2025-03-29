@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -287,10 +286,10 @@ serve(async (req) => {
     console.log(`Retrieved ${previousMessages.length} previous messages`);
     
     // Prepare system prompt with RAG context
-    const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling. 
+    const systemPrompt = `You are SOULo, an AI assistant specialized in emotional wellbeing and journaling. 
 ${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
-Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
-Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
+
+Always maintain a warm, empathetic tone. If you notice concerning emotional patterns in the user's journal entries that might benefit from professional attention, 
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
 Focus on being helpful rather than diagnostic.`;
 

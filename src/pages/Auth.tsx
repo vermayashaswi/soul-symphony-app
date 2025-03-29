@@ -109,9 +109,9 @@ export default function Auth() {
       >
         <div className="text-center mb-8">
           <div className="h-16 w-16 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-2xl">F</span>
+            <span className="text-white font-bold text-2xl">S</span>
           </div>
-          <h1 className="text-3xl font-bold mb-2">Welcome to Feelosophy</h1>
+          <h1 className="text-3xl font-bold mb-2">Welcome to SOULo</h1>
           <p className="text-muted-foreground">
             Sign in to start your journaling journey and track your emotional wellbeing
           </p>
