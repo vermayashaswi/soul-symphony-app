@@ -403,6 +403,22 @@ export type Database = {
           similarity: number
         }[]
       }
+      match_journal_entries_with_date: {
+        Args: {
+          query_embedding: string
+          match_threshold: number
+          match_count: number
+          user_id_filter: string
+          start_date?: string
+          end_date?: string
+        }
+        Returns: {
+          id: number
+          content: string
+          created_at: string
+          similarity: number
+        }[]
+      }
       store_user_query:
         | {
             Args: Record<PropertyKey, never>
