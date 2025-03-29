@@ -369,6 +369,23 @@ export type Database = {
               similarity: number
             }[]
           }
+      match_journal_entries_by_emotion: {
+        Args: {
+          emotion_name: string
+          user_id_filter: string
+          min_score?: number
+          start_date?: string
+          end_date?: string
+          limit_count?: number
+        }
+        Returns: {
+          id: number
+          content: string
+          created_at: string
+          emotion_score: number
+          embedding: string
+        }[]
+      }
       store_user_query:
         | {
             Args: Record<PropertyKey, never>
