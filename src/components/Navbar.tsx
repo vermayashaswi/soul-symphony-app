@@ -17,17 +17,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const UShape = ({ className = "" }: { className?: string }) => {
-  return (
-    <div className={cn("relative w-4 h-5 mx-0.5", className)}>
-      <div className="absolute bottom-0 left-0 w-1 h-3 bg-current rounded-bl"></div>
-      <div className="absolute bottom-0 w-4 h-1 bg-current rounded-b"></div>
-      <div className="absolute bottom-0 right-0 w-1 h-3 bg-current rounded-br"></div>
-      <div className="absolute top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-current"></div>
-    </div>
-  );
-};
-
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
