@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,39 +66,45 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  // Keep only the analyzeSentimentForEntry function for legacy entries that might need it
-  const analyzeSentimentForEntry = async (entry: JournalEntry) => {
+  // Add a function to trigger the batch entity extraction
+  const batchExtractEntities = async (processAll: boolean = false) => {
+    if (!userId) {
+      toast.error('You must be logged in to process entries');
+      return;
+    }
+    
     try {
-      // Call the existing Supabase Edge Function to analyze sentiment and extract entities
-      const { data, error } = await supabase.functions.invoke('analyze-sentiment', {
-        body: { text: entry["refined text"], entryId: entry.id }
+      toast.loading('Processing entries for entity extraction...');
+      
+      const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
+        body: { userId, processAll }
       });
       
       if (error) {
-        console.error('Error analyzing sentiment and entities:', error);
+        console.error('Error calling batch-extract-entities function:', error);
+        toast.error('Failed to process entries');
         return;
       }
       
-      if (data) {
-        console.log('Analysis result:', data);
-        
-        // The entry will be updated in the database by the edge function
-        // Let's update our local entry object for UI refresh
-        if (data.sentiment?.score !== undefined) {
-          entry.sentiment = data.sentiment.score.toString();
-        }
-        
-        if (data.entities) {
-          entry.entities = data.entities;
-        }
-        
-        // Refresh the entries list
+      console.log('Batch entity extraction result:', data);
+      
+      if (data.success) {
+        toast.success(`Processed ${data.processed} of ${data.total} entries in ${data.processingTime}`);
+        // Refresh entries to show the updated data
         fetchEntries();
+      } else {
+        toast.error(`Failed to process entries: ${data.error}`);
       }
     } catch (error) {
-      console.error('Error invoking analyze-sentiment function:', error);
+      console.error('Error processing entries:', error);
+      toast.error('Failed to process entries');
     }
   };
 
-  return { entries, loading, fetchEntries, analyzeSentimentForEntry };
+  return { 
+    entries, 
+    loading, 
+    fetchEntries, 
+    batchExtractEntities 
+  };
 }
