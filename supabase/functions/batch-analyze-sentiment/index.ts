@@ -17,12 +17,18 @@ async function analyzeSentiment(text: string) {
   try {
     console.log('Analyzing sentiment for text:', text.slice(0, 100) + '...');
     
+    const googleNLApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+    
+    if (!googleNLApiKey) {
+      console.error('Google NL API key not found in environment');
+      throw new Error('Google Natural Language API key is not configured');
+    }
+    
     // Call the Google Natural Language API
-    const response = await fetch('https://language.googleapis.com/v1/documents:analyzeSentiment', {
+    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${googleNLApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Goog-Api-Key': Deno.env.get('GOOGLE_API_KEY') || '',
       },
       body: JSON.stringify({
         document: {
@@ -39,7 +45,7 @@ async function analyzeSentiment(text: string) {
     }
 
     const result = await response.json();
-    console.log('Sentiment analysis complete:', JSON.stringify(result, null, 2));
+    console.log('Sentiment analysis complete:', JSON.stringify(result.documentSentiment, null, 2));
     
     // Return the document sentiment score
     return result.documentSentiment?.score;

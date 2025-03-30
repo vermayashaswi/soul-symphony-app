@@ -25,6 +25,8 @@ async function analyzeWithGoogleNL(text: string) {
       return [];
     }
     
+    console.log('Google NL API key found, length:', googleNLApiKey.length);
+    
     const response = await fetch(`https://language.googleapis.com/v1/documents:annotateText?key=${googleNLApiKey}`, {
       method: 'POST',
       headers: {
@@ -119,6 +121,8 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
         total: 0
       };
     }
+    
+    console.log('Google NL API key found, length:', googleNLApiKey.length);
     
     // Diagnostic information to return
     const diagnosticInfo: any = {
