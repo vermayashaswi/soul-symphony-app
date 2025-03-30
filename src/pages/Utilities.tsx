@@ -116,7 +116,7 @@ export default function Utilities() {
                 Processing journal entries for user: {user.email || user.id}
               </p>
             ) : (
-              <Alert variant="warning" className="mb-4">
+              <Alert variant="default" className="mb-4">
                 <AlertTitle>Not signed in</AlertTitle>
                 <AlertDescription>
                   You need to be signed in to process your journal entries.
