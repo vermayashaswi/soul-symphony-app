@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
@@ -99,35 +98,24 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     // 3. Check if the user profile exists, and create one if it doesn't
     await ensureUserProfileExists(authStatus.userId);
 
-    // 4. First try a direct transcription to verify the audio is valid
-    console.log('Testing audio with direct transcription...');
-    toast.loading('Testing your audio quality...', { id: toastId });
+    // Proceed directly with processing - skipping the quality test step
+    toast.loading('Processing with AI...', { id: toastId });
     
-    const directTranscriptionResult = await sendAudioForTranscription(base64String, authStatus.userId!, true);
-    if (!directTranscriptionResult.success || !directTranscriptionResult.data?.transcription) {
-      console.error('Direct transcription test failed:', directTranscriptionResult.error);
-      toast.dismiss(toastId);
-      toast.error('Audio recording test failed. Please try again with clearer speech.');
-      return;
-    }
-    
-    console.log('Direct transcription successful:', directTranscriptionResult.data.transcription);
-    toast.loading('Audio quality verified! Processing with AI...', { id: toastId });
-    
-    // 5. Process the full journal entry
+    // 4. Process the full journal entry
     let result;
     let retries = 0;
-    const maxRetries = 3; // Increased from 2
+    const maxRetries = 3;
     
     while (retries <= maxRetries) {
       try {
+        // Set directTranscription to false to get full journal entry processing
         result = await sendAudioForTranscription(base64String, authStatus.userId!, false);
         if (result.success) break;
         retries++;
         if (retries <= maxRetries) {
           console.log(`Transcription attempt ${retries} failed, retrying...`);
           // Wait a bit before retrying
-          await new Promise(r => setTimeout(r, 2000)); // Increased wait time between retries
+          await new Promise(r => setTimeout(r, 2000));
         }
       } catch (err) {
         console.error(`Transcription attempt ${retries + 1} error:`, err);

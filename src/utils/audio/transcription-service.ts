@@ -27,12 +27,12 @@ export async function sendAudioForTranscription(
     console.log(`Audio data size: ${base64Audio.length} characters`);
     
     // Call the Supabase edge function with a longer timeout
-    // Note: Removed the 'options' property as it's not in the FunctionInvokeOptions type
     const response = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64Audio,
         userId: userId || null,
-        directTranscription: directTranscription
+        directTranscription: directTranscription,
+        highQuality: true // Add flag to indicate this is a high-quality recording
       }
     });
 

@@ -1,10 +1,9 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 
 interface UseVoiceRecorderOptions {
   noiseReduction?: boolean;
-  maxDuration?: number; // Add option for max recording duration
+  maxDuration?: number;
 }
 
 interface UseVoiceRecorderReturn {
@@ -20,8 +19,8 @@ interface UseVoiceRecorderReturn {
 }
 
 export function useVoiceRecorder({ 
-  noiseReduction = false, // Changed default from true to false
-  maxDuration = 300 // 5 minutes maximum by default
+  noiseReduction = false,
+  maxDuration = 300
 }: UseVoiceRecorderOptions = {}): UseVoiceRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -39,12 +38,10 @@ export function useVoiceRecorder({
   const audioLevelTimerRef = useRef<number | null>(null);
   const maxDurationTimerRef = useRef<number | null>(null);
   
-  // Check for microphone permission on component mount
   useEffect(() => {
     const checkMicPermission = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Stop the stream immediately after checking permission
         stream.getTracks().forEach(track => track.stop());
         setHasPermission(true);
       } catch (error) {
@@ -55,7 +52,6 @@ export function useVoiceRecorder({
     
     checkMicPermission();
     
-    // Cleanup function
     return () => {
       cleanupResources();
     };
@@ -86,36 +82,28 @@ export function useVoiceRecorder({
     }
   };
 
-  // Function to create audio processing setup for visualizations and noise reduction
   const setupAudioProcessing = (stream: MediaStream) => {
     try {
-      // Create audio context
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = audioContext;
       
-      // Create analyzer node for visualization
       const analyzerNode = audioContext.createAnalyser();
-      analyzerNode.fftSize = 1024; // Increased for better frequency resolution
+      analyzerNode.fftSize = 1024;
       analyzerRef.current = analyzerNode;
       
-      // Create source from stream
       const source = audioContext.createMediaStreamSource(stream);
       
-      // If noise reduction is enabled, add filtering
       if (noiseReduction) {
-        // High-pass filter to remove low-frequency noise
         const highpassFilter = audioContext.createBiquadFilter();
         highpassFilter.type = 'highpass';
-        highpassFilter.frequency.value = 100; // Increased from 80 for better voice clarity
+        highpassFilter.frequency.value = 100;
         highpassFilter.Q.value = 0.7;
         
-        // Low-pass filter to remove high-frequency noise
         const lowpassFilter = audioContext.createBiquadFilter();
         lowpassFilter.type = 'lowpass';
-        lowpassFilter.frequency.value = 12000; // Increased to capture more vocal details
+        lowpassFilter.frequency.value = 12000;
         lowpassFilter.Q.value = 0.7;
         
-        // Compressor to normalize volume
         const compressor = audioContext.createDynamicsCompressor();
         compressor.threshold.value = -24;
         compressor.knee.value = 30;
@@ -123,39 +111,33 @@ export function useVoiceRecorder({
         compressor.attack.value = 0.003;
         compressor.release.value = 0.25;
         
-        // Connect the nodes
         source.connect(highpassFilter);
         highpassFilter.connect(lowpassFilter);
         lowpassFilter.connect(compressor);
         compressor.connect(analyzerNode);
       } else {
-        // Simple connection without filtering
         source.connect(analyzerNode);
       }
       
-      // Start monitoring audio levels
       const dataArray = new Uint8Array(analyzerNode.frequencyBinCount);
       
       audioLevelTimerRef.current = window.setInterval(() => {
         if (analyzerRef.current) {
           analyzerRef.current.getByteFrequencyData(dataArray);
           
-          // Calculate average volume level
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) {
             sum += dataArray[i];
           }
           const avg = sum / dataArray.length;
-          const scaledLevel = Math.min(100, Math.max(0, avg * 1.5)); // Scale 0-255 to 0-100
+          const scaledLevel = Math.min(100, Math.max(0, avg * 1.5));
           
           setAudioLevel(scaledLevel);
           
-          // Add ripple based on audio level
           if (isRecording && avg > 50 && Math.random() > 0.7) {
             setRipples(prev => [...prev, Date.now()]);
           }
           
-          // Detect silence (potentially paused recording)
           if (isRecording && avg < 5) {
             console.log('Low audio level detected: ' + avg);
           }
@@ -171,25 +153,19 @@ export function useVoiceRecorder({
   
   const startRecording = async () => {
     try {
-      // Reset state
       setAudioBlob(null);
       setRecordingTime(0);
       chunksRef.current = [];
       
-      // Request microphone permission with user interaction
       toast.loading('Accessing microphone...');
       
-      // Enhanced media constraints for better recording quality
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          // Use higher sample rate for better quality
-          sampleRate: 48000,
-          // Try to use higher bit depth
-          sampleSize: 24, // Increased from 16 for better audio quality
-          // Use stereo if available
+          sampleRate: 96000,
+          sampleSize: 24,
           channelCount: 2,
         } 
       });
@@ -197,26 +173,18 @@ export function useVoiceRecorder({
       toast.dismiss();
       toast.success('Microphone accessed. Recording started!');
       
-      // Save stream reference for cleanup
       streamRef.current = stream;
       
-      // Set up audio processing
       setupAudioProcessing(stream);
       
-      // Check the platform/browser to determine the optimal settings
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      
-      // Options for MediaRecorder, prioritizing compatibility
       const mimeTypes = [
+        'audio/wav',
         'audio/webm;codecs=opus',
         'audio/webm',
         'audio/ogg;codecs=opus',
-        'audio/mp4',
-        'audio/wav'
+        'audio/mp4'
       ];
       
-      // Find the first supported MIME type
       let selectedMimeType = '';
       for (const type of mimeTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
@@ -226,15 +194,8 @@ export function useVoiceRecorder({
         }
       }
       
-      // Fall back to audio/webm if no supported type is found
-      if (!selectedMimeType) {
-        console.log('No supported MIME type found, using browser default');
-        selectedMimeType = '';
-      }
-      
-      // Create MediaRecorder with best available options and higher bitrate
       const options: MediaRecorderOptions = {
-        bitsPerSecond: 256000 // 256 kbps for much better audio quality (increased from 128)
+        bitsPerSecond: 320000
       };
       
       if (selectedMimeType) {
@@ -244,7 +205,6 @@ export function useVoiceRecorder({
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       
-      // Set up data handling with more frequent data collection
       mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
           chunksRef.current.push(e.data);
@@ -252,7 +212,6 @@ export function useVoiceRecorder({
         }
       };
       
-      // Set up stop handler
       mediaRecorder.onstop = () => {
         if (chunksRef.current.length === 0) {
           toast.error('No audio data recorded. Please try again.');
@@ -260,7 +219,6 @@ export function useVoiceRecorder({
           return;
         }
         
-        // Log chunk information
         console.log(`Recording stopped, got ${chunksRef.current.length} chunks`);
         let totalSize = 0;
         chunksRef.current.forEach((chunk, i) => {
@@ -269,27 +227,22 @@ export function useVoiceRecorder({
         });
         console.log(`Total audio size: ${totalSize} bytes`);
         
-        // Create a blob with the correct mime type
-        const blob = new Blob(chunksRef.current, { type: selectedMimeType || 'audio/webm' });
+        const blob = new Blob(chunksRef.current, { type: selectedMimeType || 'audio/wav' });
         console.log('Recording stopped, blob size:', blob.size, 'blob type:', blob.type);
         setAudioBlob(blob);
         
-        // Clean up resources
         cleanupResources();
         
         toast.success('Recording saved!');
       };
       
-      // Start recording with more frequent data collection (every 100ms for better chunking)
       setIsRecording(true);
-      mediaRecorder.start(100); // Reduced from 250ms to capture more detail
+      mediaRecorder.start(50);
       
-      // Start timer
       timerRef.current = window.setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
       
-      // Set up max duration timeout
       if (maxDuration > 0) {
         maxDurationTimerRef.current = window.setTimeout(() => {
           if (isRecording && mediaRecorderRef.current) {
@@ -299,9 +252,7 @@ export function useVoiceRecorder({
         }, maxDuration * 1000);
       }
       
-      // Initial ripple
       setRipples([Date.now()]);
-      
     } catch (error) {
       console.error('Error accessing microphone:', error);
       toast.dismiss();
@@ -317,10 +268,8 @@ export function useVoiceRecorder({
         mediaRecorderRef.current.stop();
         setIsRecording(false);
         
-        // Clear ripples
         setRipples([]);
         
-        // Clear max duration timer if it exists
         if (maxDurationTimerRef.current) {
           clearTimeout(maxDurationTimerRef.current);
           maxDurationTimerRef.current = null;
@@ -347,7 +296,6 @@ export function useVoiceRecorder({
     }
   };
 
-  // Manage ripples lifecycle
   useEffect(() => {
     if (ripples.length > 0) {
       const timer = setTimeout(() => {

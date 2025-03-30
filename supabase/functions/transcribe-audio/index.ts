@@ -1,6 +1,3 @@
-
-// Only updating the relevant parts of the file to handle directTranscription better
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -41,7 +38,7 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload');
     }
 
-    const { audio, userId, directTranscription } = payload;
+    const { audio, userId, directTranscription, highQuality } = payload;
     
     if (!audio) {
       console.error('No audio data provided in payload');
@@ -56,6 +53,7 @@ serve(async (req) => {
     console.log("Received audio data, processing...");
     console.log("User ID:", userId);
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
+    console.log("High quality mode:", highQuality ? "YES" : "NO");
     
     // Ensure user profile exists before proceeding
     if (userId) {
@@ -126,8 +124,15 @@ serve(async (req) => {
     
     const blob = new Blob([binaryAudio], { type: mimeType });
     formData.append('file', blob, `audio.${detectedFileType}`);
+    
+    // Use the best Whisper model available 
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'json');
+    
+    // Specify that we want high-fidelity transcription
+    if (highQuality) {
+      formData.append('language', 'en'); // Specify language to help with accuracy
+    }
 
     console.log("Sending to Whisper API for high-quality transcription using the latest model...");
     console.log("Using file type:", detectedFileType, "with MIME type:", mimeType);

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,11 +23,9 @@ export default function SmartChatInterface() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // RecordRTC related refs
   const [recorder, setRecorder] = useState<RecordRTC | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
-  // Function to handle voice input with RecordRTC
   const handleVoiceInput = async () => {
     if (!user) {
       toast({
@@ -40,7 +37,6 @@ export default function SmartChatInterface() {
     }
 
     try {
-      // If already recording, stop recording
       if (isRecording) {
         setIsRecording(false);
         
@@ -48,12 +44,10 @@ export default function SmartChatInterface() {
           recorder.stopRecording(() => {
             const blob = recorder.getBlob();
             
-            // Convert to base64 for processing
             const reader = new FileReader();
             reader.readAsDataURL(blob);
             reader.onloadend = async () => {
               const base64String = reader.result as string;
-              // Remove the data URL prefix
               const base64Data = base64String.split(',')[1];
               
               setIsLoading(true);
@@ -63,7 +57,6 @@ export default function SmartChatInterface() {
                 const transcription = result.data.transcription;
                 setMessage(transcription);
                 
-                // Auto-submit the transcribed message
                 handleSubmitTranscription(transcription);
               } else {
                 toast({
@@ -75,13 +68,11 @@ export default function SmartChatInterface() {
               }
             };
             
-            // Stop the stream
             if (stream) {
               stream.getTracks().forEach(track => track.stop());
               setStream(null);
             }
             
-            // Clear recorder
             setRecorder(null);
           });
         }
@@ -89,16 +80,14 @@ export default function SmartChatInterface() {
         return;
       }
 
-      // Start new recording
       setIsRecording(true);
       
-      // Request microphone access with optimal settings for mobile
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 48000,
+          sampleRate: 96000,
           sampleSize: 24,
           channelCount: 2,
         } 
@@ -106,18 +95,17 @@ export default function SmartChatInterface() {
       
       setStream(mediaStream);
       
-      // Configure RecordRTC
       const options = {
         type: 'audio',
-        mimeType: 'audio/webm;codecs=opus',
+        mimeType: 'audio/wav',
         recorderType: StereoAudioRecorder,
         numberOfAudioChannels: 2,
-        desiredSampRate: 48000,
+        desiredSampRate: 96000,
         checkForInactiveTracks: true,
-        timeSlice: 1000, // More frequent data handling for mobile
+        timeSlice: 50,
+        audioBitsPerSecond: 320000,
       };
       
-      // Create and start recorder
       const rtcRecorder = new RecordRTC(mediaStream, options);
       rtcRecorder.startRecording();
       setRecorder(rtcRecorder);
@@ -127,10 +115,9 @@ export default function SmartChatInterface() {
         description: "Recording for up to 15 seconds. Speak clearly.",
       });
       
-      // Auto-stop after 15 seconds
       setTimeout(() => {
         if (isRecording) {
-          handleVoiceInput(); // This will trigger the stop recording flow
+          handleVoiceInput();
         }
       }, 15000);
       
@@ -147,13 +134,11 @@ export default function SmartChatInterface() {
   };
 
   const handleSubmitTranscription = async (transcription: string) => {
-    // Reuse the existing submit function but with the transcription as input
     if (!transcription.trim()) {
       setIsLoading(false);
       return;
     }
     
-    // Add user message to chat history
     setChatHistory(prev => [...prev, { role: 'user', content: transcription }]);
     setIsLoading(true);
     
@@ -179,7 +164,6 @@ export default function SmartChatInterface() {
       return;
     }
     
-    // Add user message to chat history
     setChatHistory(prev => [...prev, { role: 'user', content: message }]);
     const userMessage = message;
     setMessage("");
@@ -203,13 +187,12 @@ export default function SmartChatInterface() {
           message: userMessage,
           userId: user!.id,
           includeDiagnostics: true,
-          isQuantitativeQuery // Pass this flag to the function
+          isQuantitativeQuery
         }
       });
       
       if (error) throw error;
       
-      // Add assistant response to chat history
       setChatHistory(prev => [
         ...prev, 
         { 
@@ -219,16 +202,14 @@ export default function SmartChatInterface() {
         }
       ]);
       
-      // Log diagnostics in console for debugging
       if (data.diagnostics) {
         console.log("Chat diagnostics:", data.diagnostics);
       }
     } catch (error) {
-      throw error; // Rethrow for the main handler
+      throw error;
     }
   };
 
-  // Helper function to check if the query is quantitative
   const checkForQuantitativeQuery = (query: string): boolean => {
     const quantitativePatterns = [
       /score/i, 
@@ -260,7 +241,6 @@ export default function SmartChatInterface() {
       variant: "destructive"
     });
     
-    // Add error message to chat history
     setChatHistory(prev => [
       ...prev, 
       { 
