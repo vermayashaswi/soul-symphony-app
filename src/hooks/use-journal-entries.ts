@@ -132,5 +132,38 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  return { entries, loading };
+  const batchProcessEntities = async (processAll: boolean = false) => {
+    try {
+      toast.info('Starting batch entity processing...');
+      
+      const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
+        body: { 
+          userId: userId,
+          processAll: processAll 
+        }
+      });
+      
+      if (error) {
+        console.error('Error in batch entity processing:', error);
+        toast.error('Failed to process entities');
+        return false;
+      }
+      
+      if (data && data.success) {
+        toast.success(`Successfully processed ${data.processed} entries in ${data.processingTime}`);
+        // Refresh entries after batch processing
+        fetchEntries();
+        return true;
+      } else {
+        toast.error('Entity processing failed');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error invoking batch-extract-entities function:', error);
+      toast.error('Failed to start entity processing');
+      return false;
+    }
+  };
+
+  return { entries, loading, batchProcessEntities };
 }

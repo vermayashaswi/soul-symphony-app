@@ -102,22 +102,28 @@ async function extractEntities(text: string) {
   }
 }
 
-async function processEntries(userId?: string) {
+async function processEntries(userId?: string, processAll: boolean = false) {
   try {
     console.log('Starting batch entity extraction process');
     
     // Build the query
     let query = supabase
       .from('Journal Entries')
-      .select('id, "refined text"')
-      .is('entities', null)
-      .order('created_at', { ascending: false });
-      
+      .select('id, "refined text"');
+    
+    // If processAll is false, only process entries with null entities
+    if (!processAll) {
+      query = query.is('entities', null);
+    }
+    
     // Add user filter if provided
     if (userId) {
       console.log(`Filtering entries for user ID: ${userId}`);
       query = query.eq('user_id', userId);
     }
+    
+    // Order by most recent first
+    query = query.order('created_at', { ascending: false });
     
     // Execute the query
     const { data: entries, error } = await query;
@@ -195,16 +201,19 @@ serve(async (req) => {
     
     // Get the request body if any
     let userId = undefined;
+    let processAll = false;
+    
     try {
       if (req.method === 'POST') {
         const body = await req.json();
         userId = body.userId;
+        processAll = body.processAll === true;
       }
     } catch (e) {
       console.log('No request body or invalid JSON');
     }
     
-    const result = await processEntries(userId);
+    const result = await processEntries(userId, processAll);
     
     const endTime = Date.now();
     const processingTime = (endTime - startTime) / 1000;
