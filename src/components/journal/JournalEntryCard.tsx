@@ -32,12 +32,8 @@ interface JournalEntryCardProps {
 
 const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
+  const [bubbleDisturbance, setBubbleDisturbance] = useState(false);
   const { toast } = useToast();
-
-  // Remove the click handler functions
-  const handleEmotionClick = (emotion: string) => {
-    // No-op - intentionally empty to remove all click behavior
-  };
 
   // Helper function to determine sentiment color
   const getSentimentColor = () => {
@@ -105,6 +101,12 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
       default:
         return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
     }
+  };
+
+  // Handle the bubble box click to create disturbance
+  const handleBubbleBoxClick = () => {
+    setBubbleDisturbance(true);
+    setTimeout(() => setBubbleDisturbance(false), 3000); // Reset after 3 seconds
   };
 
   return (
@@ -203,20 +205,23 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
               </h3>
               
               <motion.div 
-                className="h-64 mb-4 flex items-center justify-center p-4 border border-muted rounded-lg shadow-sm bg-white"
+                className="h-80 mb-4 flex items-center justify-center p-4 border border-muted rounded-lg shadow-sm bg-white cursor-pointer"
                 whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
                 transition={{ duration: 0.2 }}
+                onClick={handleBubbleBoxClick}
               >
                 {entry.emotions && Object.keys(entry.emotions).length > 0 ? (
                   <EmotionBubbles 
                     emotions={entry.emotions} 
                     className="w-full h-full"
-                    preventOverlap={true} // Ensure no overlap
+                    preventOverlap={true}
+                    isDisturbed={bubbleDisturbance}
                   />
                 ) : entry.master_themes && entry.master_themes.length > 0 ? (
                   <ThemeBoxes 
                     themes={entry.master_themes} 
                     className="w-full h-full items-center justify-center" 
+                    isDisturbed={bubbleDisturbance}
                   />
                 ) : (
                   <p className="text-muted-foreground text-center">Analyzing emotions...</p>

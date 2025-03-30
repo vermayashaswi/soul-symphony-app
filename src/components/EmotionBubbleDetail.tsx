@@ -10,6 +10,7 @@ interface EmotionBubbleDetailProps {
   className?: string;
   value?: number;
   onClick?: (name: string) => void;
+  isDisturbed?: boolean;
 }
 
 const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
@@ -17,9 +18,11 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   size,
   color,
   className,
+  isDisturbed = false
 }) => {
+  // Increased font size for better readability
   const fontSizeStyle: React.CSSProperties = {
-    fontSize: `${Math.max(10, size / 4.5)}px`,
+    fontSize: `${Math.max(12, size / 4)}px`, // Increased from 10, 4.5
     lineHeight: '1.2',
     maxWidth: '90%',
     overflow: 'hidden',
@@ -30,23 +33,37 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     wordBreak: 'break-word',
     textAlign: 'center' as const,
     height: '100%',
-    padding: '12%'
+    padding: '12%',
+    fontWeight: name.length <= 1 ? 'normal' : 'medium' // Only apply font-medium to actual words
   };
 
-  // Create a pulsing animation
-  const pulseAnimation = {
-    scale: [1, 1.03, 1],
-    transition: {
-      duration: 3,
-      repeat: Infinity,
-      ease: "easeInOut"
+  // Create different animations based on disturbed state
+  const getAnimation = () => {
+    if (isDisturbed) {
+      return {
+        scale: [1, 1.1, 0.95, 1.05, 1],
+        rotate: [0, 5, -5, 3, 0],
+        transition: {
+          duration: 1.5,
+          ease: "easeInOut"
+        }
+      };
     }
+    
+    return {
+      scale: [1, 1.03, 1],
+      transition: {
+        duration: 3,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    };
   };
 
   return (
     <div className="relative">
       <motion.div
-        animate={pulseAnimation}
+        animate={getAnimation()}
         whileTap={{ scale: 0.95 }}
         className={cn(
           "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow relative",
