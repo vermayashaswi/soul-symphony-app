@@ -76,7 +76,20 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     // 3. Check if the user profile exists, and create one if it doesn't
     await ensureUserProfileExists(authStatus.userId);
 
-    // 4. Send audio for transcription with multiple retries
+    // 4. First try a direct transcription to verify the audio is valid
+    console.log('Testing audio with direct transcription...');
+    
+    const directTranscriptionResult = await sendAudioForTranscription(base64String, authStatus.userId!);
+    if (!directTranscriptionResult.success || !directTranscriptionResult.data?.transcription) {
+      console.error('Direct transcription test failed:', directTranscriptionResult.error);
+      toast.dismiss(toastId);
+      toast.error('Audio recording test failed. Please try again with clearer speech.');
+      return;
+    }
+    
+    console.log('Direct transcription successful:', directTranscriptionResult.data.transcription);
+    
+    // 5. Process the full journal entry
     let result;
     let retries = 0;
     const maxRetries = 2;

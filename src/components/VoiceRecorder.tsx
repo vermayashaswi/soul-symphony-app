@@ -12,6 +12,7 @@ import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -23,6 +24,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [noiseReduction, setNoiseReduction] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
+  const { user } = useAuth();
   
   const {
     isRecording,
@@ -83,16 +85,19 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         duration: audioDuration
       });
       
-      const result = await processRecording(normalizedBlob, "user_id");
+      const result = await processRecording(normalizedBlob, user?.id);
       
       if (result.success && onRecordingComplete) {
         onRecordingComplete(normalizedBlob, result.tempId);
+        toast.success("Recording saved and processing began!");
       } else if (!result.success) {
         setRecordingError(result.error || "Failed to process recording");
+        toast.error(result.error || "Failed to process recording");
       }
     } catch (error: any) {
       console.error('Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
+      toast.error("Error saving recording: " + (error?.message || "An unexpected error occurred"));
     } finally {
       setIsProcessing(false);
     }

@@ -70,7 +70,9 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       audioLevelTimerRef.current = null;
     }
     if (audioContextRef.current) {
-      audioContextRef.current.close().catch(console.error);
+      if (audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+      }
       audioContextRef.current = null;
     }
   };
@@ -213,15 +215,19 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       // Fall back to audio/webm if no supported type is found
       if (!selectedMimeType) {
         console.log('No supported MIME type found, using browser default');
-        selectedMimeType = 'audio/webm';
+        selectedMimeType = '';
       }
       
       // Create MediaRecorder with best available options and higher bitrate
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: selectedMimeType,
+      const options: MediaRecorderOptions = {
         bitsPerSecond: 128000 // 128 kbps for better audio quality
-      });
+      };
       
+      if (selectedMimeType) {
+        options.mimeType = selectedMimeType;
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       
       // Set up data handling with more frequent data collection
@@ -239,9 +245,15 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
           return;
         }
         
+        // Log chunk information
+        console.log(`Recording stopped, got ${chunksRef.current.length} chunks`);
+        chunksRef.current.forEach((chunk, i) => {
+          console.log(`Chunk ${i}: size=${chunk.size}, type=${chunk.type}`);
+        });
+        
         // Create a blob with the correct mime type
-        const blob = new Blob(chunksRef.current, { type: selectedMimeType });
-        console.log('Recording stopped, blob size:', blob.size, 'blob type:', selectedMimeType);
+        const blob = new Blob(chunksRef.current, { type: selectedMimeType || 'audio/webm' });
+        console.log('Recording stopped, blob size:', blob.size, 'blob type:', blob.type);
         setAudioBlob(blob);
         
         // Clean up resources
@@ -272,11 +284,17 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      
-      // Clear ripples
-      setRipples([]);
+      console.log("Stopping recording...");
+      try {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+        
+        // Clear ripples
+        setRipples([]);
+      } catch (error) {
+        console.error("Error stopping recording:", error);
+        toast.error("Error stopping recording. Please refresh and try again.");
+      }
     }
   };
   

@@ -35,7 +35,8 @@ export async function sendAudioForTranscription(base64String: string, userId: st
     const functionPromise = supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64String,
-        userId
+        userId,
+        directTranscription: true // Add a flag to indicate we want direct transcription
       }
     });
     

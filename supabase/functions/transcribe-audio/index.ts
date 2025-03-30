@@ -38,7 +38,7 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload');
     }
 
-    const { audio, userId } = payload;
+    const { audio, userId, directTranscription } = payload;
     
     if (!audio) {
       console.error('No audio data provided in payload');
@@ -52,13 +52,13 @@ serve(async (req) => {
 
     console.log("Received audio data, processing...");
     console.log("User ID:", userId);
+    console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
     
     // Ensure user profile exists before proceeding
     if (userId) {
       await createProfileIfNeeded(userId);
     }
     
-    console.log("User ID:", userId);
     console.log("Audio data length:", audio.length);
     console.log("OpenAI API Key available:", !!openAIApiKey);
     
@@ -149,6 +149,20 @@ serve(async (req) => {
       
       console.log("Transcription successful:", transcribedText);
 
+      // If we're in direct transcription mode, simply return the transcribed text
+      if (directTranscription) {
+        return new Response(
+          JSON.stringify({
+            transcription: transcribedText,
+            success: true
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      // Continue with the standard processing flow for journal entries
       const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
