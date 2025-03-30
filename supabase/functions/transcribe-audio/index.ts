@@ -184,8 +184,10 @@ serve(async (req) => {
       const emotions = await analyzeEmotions(refinedText);
       console.log("Emotion analysis:", emotions);
       
-      const sentimentScore = await analyzeSentiment(refinedText);
+      // Use the analyze-sentiment endpoint to get both sentiment and entities
+      const { sentiment: sentimentScore, entities } = await analyzeWithGoogleNL(refinedText);
       console.log("Sentiment analysis:", sentimentScore);
+      console.log("Entity extraction:", entities);
 
       const audioDuration = Math.floor(binaryAudio.length / 16000);
 
@@ -201,7 +203,8 @@ serve(async (req) => {
               "user_id": userId || null,
               "duration": audioDuration,
               "emotions": emotions,
-              "sentiment": sentimentScore
+              "sentiment": sentimentScore,
+              "entities": entities
             }])
             .select();
               
@@ -213,10 +216,10 @@ serve(async (req) => {
             console.log("Journal entry saved to database:", entryData[0].id);
             entryId = entryData[0].id;
           
-            // Automatically extract themes and entities right after saving the entry
+            // Extract themes right after saving the entry
             if (refinedText && entryId) {
-              EdgeRuntime.waitUntil(extractThemesAndEntities(refinedText, entryId));
-              console.log("Started background task to extract themes and entities");
+              EdgeRuntime.waitUntil(extractThemes(refinedText, entryId));
+              console.log("Started background task to extract themes");
             }
           
             try {
@@ -259,6 +262,7 @@ serve(async (req) => {
           entryId: entryId,
           emotions: emotions,
           sentiment: sentimentScore,
+          entities: entities,
           success: true
         }),
         { 
@@ -463,38 +467,92 @@ async function analyzeEmotions(text: string) {
   }
 }
 
-async function analyzeSentiment(text: string) {
+async function analyzeWithGoogleNL(text: string) {
   try {
-    console.log('Analyzing sentiment for text:', text.slice(0, 100) + '...');
+    console.log('Analyzing text with Google NL API for sentiment and entities:', text.slice(0, 100) + '...');
     
-    const response = await fetch('https://language.googleapis.com/v1/documents:analyzeSentiment', {
+    const response = await fetch(`https://language.googleapis.com/v1/documents:annotateText?key=${Deno.env.get('GOOGLE_NL_API_KEY') || ''}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Goog-Api-Key': Deno.env.get('GOOGLE_API_KEY') || '',
       },
       body: JSON.stringify({
         document: {
           type: 'PLAIN_TEXT',
           content: text,
         },
+        features: {
+          extractSyntax: false,
+          extractEntities: true,
+          extractDocumentSentiment: true,
+          extractEntitySentiment: false,
+          classifyText: false
+        },
       }),
     });
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('Error analyzing sentiment:', error);
-      return null;
+      console.error('Error analyzing with Google NL API:', error);
+      return { sentiment: "0", entities: [] };
     }
 
     const result = await response.json();
-    console.log('Sentiment analysis complete:', JSON.stringify(result, null, 2));
+    console.log('Google NL API analysis complete');
     
-    return result.documentSentiment?.score?.toString() || "0";
+    // Extract sentiment score
+    const sentimentScore = result.documentSentiment?.score?.toString() || "0";
+    
+    // Process and format entities
+    const formattedEntities = result.entities?.map(entity => ({
+      type: mapEntityType(entity.type),
+      name: entity.name
+    })) || [];
+    
+    // Remove duplicate entities
+    const uniqueEntities = removeDuplicateEntities(formattedEntities);
+    
+    console.log(`Extracted ${uniqueEntities.length} entities and sentiment score: ${sentimentScore}`);
+    
+    return { 
+      sentiment: sentimentScore, 
+      entities: uniqueEntities
+    };
   } catch (error) {
-    console.error('Error in analyzeSentiment:', error);
-    return null;
+    console.error('Error in analyzeWithGoogleNL:', error);
+    return { sentiment: "0", entities: [] };
   }
+}
+
+function mapEntityType(googleEntityType: string): string {
+  switch (googleEntityType) {
+    case 'PERSON':
+      return 'person';
+    case 'LOCATION':
+    case 'ADDRESS':
+      return 'place';
+    case 'ORGANIZATION':
+    case 'CONSUMER_GOOD':
+    case 'WORK_OF_ART':
+      return 'organization';
+    case 'EVENT':
+      return 'event';
+    case 'OTHER':
+    default:
+      return 'other';
+  }
+}
+
+function removeDuplicateEntities(entities: Array<{type: string, name: string}>): Array<{type: string, name: string}> {
+  const seen = new Set();
+  return entities.filter(entity => {
+    const key = `${entity.type}:${entity.name.toLowerCase()}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 async function createProfileIfNeeded(userId: string) {
@@ -545,11 +603,11 @@ async function createProfileIfNeeded(userId: string) {
   }
 }
 
-async function extractThemesAndEntities(text: string, entryId: number): Promise<void> {
+async function extractThemes(text: string, entryId: number): Promise<void> {
   try {
-    console.log(`Automatically extracting themes and entities for entry ${entryId}`);
+    console.log(`Automatically extracting themes for entry ${entryId}`);
     
-    // Call the generate-themes function
+    // Call the generate-themes function (we keep this for theme extraction only)
     const { data, error } = await supabase.functions.invoke('generate-themes', {
       body: { text, entryId }
     });
@@ -559,44 +617,9 @@ async function extractThemesAndEntities(text: string, entryId: number): Promise<
       return;
     }
     
-    console.log('Themes and entities generated successfully:', data);
-    
-    // If needed, we can also directly extract entities
-    // This ensures entities are extracted even if the generate-themes function doesn't do it
-    try {
-      console.log('Additional entity extraction to ensure we have entities extracted');
-      const { data: entityData, error: entityError } = await supabase.functions.invoke('batch-extract-entities', {
-        body: { 
-          testText: text,
-          testExtraction: true 
-        }
-      });
-      
-      if (entityError) {
-        console.error('Error in direct entity extraction:', entityError);
-        return;
-      }
-      
-      if (entityData?.entities && entityData.entities.length > 0) {
-        console.log(`Extracted ${entityData.entities.length} entities directly:`, entityData.entities);
-        
-        // Update the entry with the extracted entities if needed
-        const { error: updateError } = await supabase
-          .from('Journal Entries')
-          .update({ entities: entityData.entities })
-          .eq('id', entryId);
-          
-        if (updateError) {
-          console.error('Error updating entry with entities:', updateError);
-        } else {
-          console.log(`Updated entry ${entryId} with ${entityData.entities.length} entities`);
-        }
-      }
-    } catch (entityExtractionError) {
-      console.error('Error in additional entity extraction:', entityExtractionError);
-    }
+    console.log('Themes generated successfully:', data);
   } catch (error) {
-    console.error('Error in extractThemesAndEntities:', error);
+    console.error('Error in extractThemes:', error);
   }
 }
 

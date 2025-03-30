@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,122 +65,39 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  const generateThemesAndEntitiesForEntry = async (entry: JournalEntry) => {
+  // Keep only the analyzeSentimentForEntry function for legacy entries that might need it
+  const analyzeSentimentForEntry = async (entry: JournalEntry) => {
     try {
-      // Call the Supabase Edge Function to generate themes and entities
-      const { data, error } = await supabase.functions.invoke('generate-themes', {
+      // Call the existing Supabase Edge Function to analyze sentiment and extract entities
+      const { data, error } = await supabase.functions.invoke('analyze-sentiment', {
         body: { text: entry["refined text"], entryId: entry.id }
       });
       
       if (error) {
-        console.error('Error generating themes and entities:', error);
+        console.error('Error analyzing sentiment and entities:', error);
         return;
       }
       
       if (data) {
-        // Update the entry with the new themes
-        if (data.themes) {
-          entry.master_themes = data.themes;
+        console.log('Analysis result:', data);
+        
+        // The entry will be updated in the database by the edge function
+        // Let's update our local entry object for UI refresh
+        if (data.sentiment?.score !== undefined) {
+          entry.sentiment = data.sentiment.score.toString();
         }
         
-        // Update the entry with the new entities
         if (data.entities) {
           entry.entities = data.entities;
         }
-      }
-    } catch (error) {
-      console.error('Error invoking generate-themes function:', error);
-    }
-  };
-
-  const analyzeSentimentForEntry = async (entry: JournalEntry) => {
-    try {
-      // Call the existing Supabase Edge Function to analyze sentiment
-      const { data, error } = await supabase.functions.invoke('analyze-sentiment', {
-        body: { text: entry["refined text"] }
-      });
-      
-      if (error) {
-        console.error('Error analyzing sentiment:', error);
-        return;
-      }
-      
-      if (data) {
-        console.log('Sentiment analysis result:', data);
         
-        // Extract the document sentiment score and magnitude
-        const sentimentScore = data.documentSentiment?.score;
-        
-        if (sentimentScore !== undefined) {
-          // Update the entry in the database with the sentiment score
-          const { error: updateError } = await supabase
-            .from('Journal Entries')
-            .update({ sentiment: sentimentScore.toString() })
-            .eq('id', entry.id);
-            
-          if (updateError) {
-            console.error('Error updating entry with sentiment:', updateError);
-          } else {
-            // Update the local entry object with the sentiment score
-            entry.sentiment = sentimentScore.toString();
-          }
-        }
+        // Refresh the entries list
+        fetchEntries();
       }
     } catch (error) {
       console.error('Error invoking analyze-sentiment function:', error);
     }
   };
 
-  const batchProcessEntities = async (processAll: boolean = false) => {
-    try {
-      toast.info('Starting batch entity processing...');
-      
-      const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
-        body: { 
-          userId: userId,
-          processAll: processAll 
-        }
-      });
-      
-      if (error) {
-        console.error('Error in batch entity processing:', error);
-        toast.error('Failed to process entities');
-        return false;
-      }
-      
-      if (data && data.success) {
-        toast.success(`Successfully processed ${data.processed} entries in ${data.processingTime}`);
-        // Refresh entries after batch processing
-        fetchEntries();
-        return true;
-      } else {
-        toast.error('Entity processing failed');
-        return false;
-      }
-    } catch (error) {
-      console.error('Error invoking batch-extract-entities function:', error);
-      toast.error('Failed to start entity processing');
-      return false;
-    }
-  };
-
-  const debugEnvironment = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
-        body: { debugEnv: true }
-      });
-      
-      if (error) {
-        console.error('Error checking environment:', error);
-        return { success: false, error: error.message };
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Error invoking debug environment:', error);
-      return { success: false, error: error.message };
-    }
-  };
-
-  return { entries, loading, batchProcessEntities, fetchEntries, debugEnvironment };
+  return { entries, loading, fetchEntries, analyzeSentimentForEntry };
 }

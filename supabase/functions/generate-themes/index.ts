@@ -14,9 +14,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function extract_themes_and_entities(text: string) {
+async function extract_themes(text: string) {
   try {
-    console.log(`Starting theme and entity extraction for text: "${text.substring(0, 100)}..."`);
+    console.log(`Starting theme extraction for text: "${text.substring(0, 100)}..."`);
     
     if (!openAIApiKey) {
       console.error('OpenAI API key is missing or empty');
@@ -24,32 +24,17 @@ async function extract_themes_and_entities(text: string) {
     }
     
     const prompt = `
-      Analyze the following journal entry and extract:
-      
-      1. The main themes or topics discussed (maximum 5 themes)
-      2. Named entities mentioned in the text
+      Analyze the following journal entry and extract the main themes or topics discussed (maximum 5 themes).
       
       For themes, return simple phrases or keywords that capture the essence of what the journal entry is about.
       
-      For entities, identify:
-      - "type": One of: person, organization, place, product, event
-      - "name": The entity name exactly as mentioned in the text
-      
-      Return the results as a JSON object with two properties:
+      Return the results as a JSON object with one property:
       - "themes": An array of strings representing the main themes
-      - "entities": An array of objects, each with "type" and "name" properties
       
       Example response format:
       {
-        "themes": ["work stress", "family time", "personal growth"],
-        "entities": [
-          {"type": "person", "name": "John"},
-          {"type": "organization", "name": "Microsoft"},
-          {"type": "place", "name": "New York"}
-        ]
+        "themes": ["work stress", "family time", "personal growth"]
       }
-      
-      Only include clearly mentioned entities. If no entities are found, return an empty array.
       
       Journal entry:
       ${text}
@@ -68,7 +53,7 @@ async function extract_themes_and_entities(text: string) {
         messages: [
           {
             role: 'system',
-            content: 'You are a theme extraction and entity recognition assistant. Extract themes and named entities from journal entries following the exact format requested.'
+            content: 'You are a theme extraction assistant. Extract themes from journal entries following the exact format requested.'
           },
           {
             role: 'user',
@@ -83,7 +68,7 @@ async function extract_themes_and_entities(text: string) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`OpenAI API error: ${response.status} ${response.statusText}`, errorText);
-      throw new Error(`Failed to extract themes and entities: ${errorText}`);
+      throw new Error(`Failed to extract themes: ${errorText}`);
     }
 
     const result = await response.json();
@@ -92,7 +77,7 @@ async function extract_themes_and_entities(text: string) {
     // Extract the content from the response
     if (!result.choices || !result.choices[0] || !result.choices[0].message) {
       console.error('Invalid response structure from OpenAI');
-      return { themes: [], entities: [] };
+      return { themes: [] };
     }
     
     const contentText = result.choices[0].message.content;
@@ -106,22 +91,17 @@ async function extract_themes_and_entities(text: string) {
       const themes = parsedContent.themes || [];
       console.log(`Extracted themes:`, themes);
       
-      // Extract entities
-      const entities = parsedContent.entities || [];
-      console.log(`Extracted entities:`, entities);
-      
       return {
-        themes,
-        entities
+        themes
       };
     } catch (err) {
       console.error('Error parsing JSON:', err);
       console.error('Raw content text:', contentText);
-      return { themes: [], entities: [] };
+      return { themes: [] };
     }
   } catch (error) {
-    console.error('Error in extract_themes_and_entities:', error);
-    return { themes: [], entities: [] };
+    console.error('Error in extract_themes:', error);
+    return { themes: [] };
   }
 }
 
@@ -140,20 +120,16 @@ serve(async (req) => {
     
     console.log(`Received request to extract themes for entry ${entryId || 'unknown'}`);
     
-    const { themes, entities } = await extract_themes_and_entities(text);
+    const { themes } = await extract_themes(text);
     
     // If an entry ID was provided, update the database
     if (entryId) {
-      console.log(`Updating entry ${entryId} with themes and entities`);
+      console.log(`Updating entry ${entryId} with themes`);
       
       const updates: any = {};
       
       if (themes && themes.length > 0) {
         updates.master_themes = themes;
-      }
-      
-      if (entities && entities.length > 0) {
-        updates.entities = entities;
       }
       
       if (Object.keys(updates).length > 0) {
@@ -165,7 +141,7 @@ serve(async (req) => {
         if (error) {
           console.error(`Error updating entry ${entryId}:`, error);
         } else {
-          console.log(`Successfully updated entry ${entryId} with themes and entities`);
+          console.log(`Successfully updated entry ${entryId} with themes`);
         }
       }
     }
@@ -173,8 +149,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        themes,
-        entities
+        themes
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
