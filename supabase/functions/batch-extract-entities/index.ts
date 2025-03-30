@@ -35,10 +35,10 @@ async function extractEntities(text: string) {
           {
             role: 'system',
             content: `You are an entity extraction system. Extract named entities from the provided text.
-            Return a JSON array of objects with "type" and "name" properties.
+            Return a JSON object with an "entities" property containing an array of objects with "type" and "name" properties.
             Entity types include: "person", "organization", "location", "project", "event", "product", "company", "technology".
             Only include clearly mentioned entities, do not infer or generate entities not explicitly in the text.
-            Return only the JSON array, with no additional text.`
+            Return only the JSON with the format: {"entities": [{"type": "person", "name": "John Doe"}, ...]}`
           },
           {
             role: 'user',

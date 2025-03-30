@@ -1,12 +1,14 @@
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { Sparkles, Smile, Meh, Frown } from 'lucide-react';
+import { Sparkles, Smile, Meh, Frown, Tag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EmotionChart from '@/components/EmotionChart';
 import EmotionBubbles from '@/components/EmotionBubbles';
 import ThemeBoxes from '@/components/journal/ThemeBoxes';
 import { useToast } from '@/components/ui/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 // Type for JournalEntry matching Supabase table schema
 export type JournalEntry = {
@@ -69,6 +71,42 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
     return <Meh className="h-5 w-5 text-amber-500" />;
   };
 
+  // Group entities by type
+  const groupedEntities = React.useMemo(() => {
+    if (!entry.entities || entry.entities.length === 0) return {};
+    
+    return entry.entities.reduce((acc, entity) => {
+      if (!acc[entity.type]) {
+        acc[entity.type] = [];
+      }
+      acc[entity.type].push(entity.name);
+      return acc;
+    }, {} as Record<string, string[]>);
+  }, [entry.entities]);
+
+  // Get the badge color based on entity type
+  const getEntityBadgeColor = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'person':
+        return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
+      case 'organization':
+      case 'company':
+        return 'bg-purple-100 text-purple-800 hover:bg-purple-200';
+      case 'location':
+        return 'bg-green-100 text-green-800 hover:bg-green-200';
+      case 'project':
+        return 'bg-amber-100 text-amber-800 hover:bg-amber-200';
+      case 'event':
+        return 'bg-pink-100 text-pink-800 hover:bg-pink-200';
+      case 'product':
+        return 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200';
+      case 'technology':
+        return 'bg-cyan-100 text-cyan-800 hover:bg-cyan-200';
+      default:
+        return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -126,6 +164,36 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                   {entry["refined text"] || "No refined text available"}
                 </motion.p>
               </div>
+
+              {/* Entities section */}
+              {entry.entities && entry.entities.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="font-medium mb-2 flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-blue-500" />
+                    Entities
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(groupedEntities).map(([type, names]) => (
+                      <div key={type} className="mb-2 w-full">
+                        <span className="text-sm font-medium capitalize text-muted-foreground mb-1 block">
+                          {type}s:
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {names.map((name, idx) => (
+                            <Badge 
+                              key={`${name}-${idx}`} 
+                              variant="outline"
+                              className={`${getEntityBadgeColor(type)}`}
+                            >
+                              {name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             
             <div>
