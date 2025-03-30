@@ -3,7 +3,6 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const googleNLApiKey = Deno.env.get('GOOGLE_NL_API_KEY') || '';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -17,6 +16,14 @@ const corsHeaders = {
 async function analyzeWithGoogleNL(text: string) {
   try {
     console.log('Analyzing text with Google NL API for entities:', text.slice(0, 100) + '...');
+    
+    // Get the Google Natural Language API key directly
+    const googleNLApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+    
+    if (!googleNLApiKey) {
+      console.error('Google NL API key not found in environment');
+      return [];
+    }
     
     const response = await fetch(`https://language.googleapis.com/v1/documents:annotateText?key=${googleNLApiKey}`, {
       method: 'POST',
@@ -101,14 +108,26 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     console.log('Starting batch entity extraction process');
     const startTime = Date.now();
     
+    // Check if Google NL API key is available
+    const googleNLApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+    if (!googleNLApiKey) {
+      console.error('Google NL API key not found in environment');
+      return { 
+        success: false, 
+        error: "Google Natural Language API key is not configured", 
+        processed: 0, 
+        total: 0
+      };
+    }
+    
     // Diagnostic information to return
     const diagnosticInfo: any = {
       startTime: new Date().toISOString(),
       processAll: processAll,
       userId: userId || 'not provided',
       supabaseClientInitialized: !!supabase,
-      openAIKeyConfigured: !!googleNLApiKey,
-      openAIKeyLength: googleNLApiKey ? googleNLApiKey.length : 0,
+      googleNLApiKeyConfigured: !!googleNLApiKey,
+      googleNLApiKeyLength: googleNLApiKey ? googleNLApiKey.length : 0,
       userIdFilter: !!userId
     };
     

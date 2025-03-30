@@ -1,7 +1,6 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,26 +32,10 @@ serve(async (req) => {
     // For security, we don't log the actual value
     console.log(`Secret value length: ${value.length} characters`);
 
-    // Get Supabase URL and service key from environment
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // Set the environment variable directly
+    Deno.env.set(key, value);
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase configuration missing');
-    }
-
-    // Create Supabase admin client
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Update the secret using Supabase's secrets API
-    const { error } = await supabase.functions.updateSecret(key, value);
-    
-    if (error) {
-      console.error('Error updating secret:', error);
-      throw new Error(`Failed to set secret: ${error.message}`);
-    }
-    
-    console.log(`Secret ${key} set successfully`);
+    console.log(`Secret ${key} set successfully via Deno.env.set`);
     
     return new Response(
       JSON.stringify({ 
