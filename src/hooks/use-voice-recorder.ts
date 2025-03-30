@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 
@@ -191,8 +190,6 @@ export function useVoiceRecorder({
           sampleSize: 24, // Increased from 16 for better audio quality
           // Use stereo if available
           channelCount: 2,
-          // Specify other audio constraints for quality
-          latency: 0.01 // Low latency
         } 
       });
       
