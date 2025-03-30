@@ -568,7 +568,7 @@ async function extractThemesAndEntities(text: string, entryId: number): Promise<
       const { data: entityData, error: entityError } = await supabase.functions.invoke('batch-extract-entities', {
         body: { 
           testText: text,
-          testExtraction: true
+          testExtraction: true 
         }
       });
       

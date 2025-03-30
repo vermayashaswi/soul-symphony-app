@@ -175,7 +175,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     // Build the query
     let query = supabase
       .from('Journal Entries')
-      .select('id, "refined text"');  // Using "refined text" instead of "transcription text"
+      .select('id, "refined text"');
     
     // If processAll is false, only process entries with null entities
     if (!processAll) {
