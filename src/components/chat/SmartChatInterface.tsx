@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from 'react-markdown';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function SmartChatInterface() {
   const [message, setMessage] = useState("");
@@ -21,9 +21,19 @@ export default function SmartChatInterface() {
     analysis?: any;
   }[]>([]);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [isRequestActive, setIsRequestActive] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check that we're on the correct page
+  useEffect(() => {
+    if (location.pathname !== "/smart-chat" && isRequestActive) {
+      console.log("Detected navigation away from smart-chat while request is active, returning");
+      window.history.pushState(null, "", "/smart-chat");
+    }
+  }, [location.pathname, isRequestActive]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,13 +56,18 @@ export default function SmartChatInterface() {
     const userMessage = message;
     setMessage("");
     setIsLoading(true);
+    setIsRequestActive(true);
+    
+    let timeoutId: number | null = null;
     
     try {
       console.log("Invoking chat-with-rag edge function");
       
       // Set a timeout to handle stuck requests
-      const timeoutId = setTimeout(() => {
+      timeoutId = window.setTimeout(() => {
+        console.log("Request timed out after 30 seconds");
         setIsLoading(false);
+        setIsRequestActive(false);
         setApiError("Request timed out after 30 seconds. Please try again.");
         setChatHistory(prev => [
           ...prev, 
@@ -69,7 +84,9 @@ export default function SmartChatInterface() {
         });
       }, 30000);
       
-      // Using the chat-with-rag edge function with proper error handling
+      console.log("Sending request to edge function");
+      
+      // Using the edge function with proper error handling
       const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: {
           message: userMessage,
@@ -79,7 +96,11 @@ export default function SmartChatInterface() {
       });
       
       // Clear the timeout since we got a response
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        console.log("Clearing timeout, received response");
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
       
       console.log("Response received:", data);
       
@@ -106,6 +127,12 @@ export default function SmartChatInterface() {
     } catch (error: any) {
       console.error("Error sending message:", error);
       
+      // Ensure timeout is cleared if there's an error
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      
       // Set specific error message based on the type of error
       let errorMessage = "Failed to get a response. Please try again.";
       
@@ -115,14 +142,17 @@ export default function SmartChatInterface() {
         errorMessage = "Network error. Please check your connection and try again.";
       } else if (error.message?.includes("authenticate")) {
         errorMessage = "Authentication error. Please sign in again.";
+        // Don't redirect immediately, just show the error
       } else if (error.message?.includes("redirected") || error.name === "TypeError") {
         errorMessage = "Connection error. Please stay on this page while we process your request.";
-        // This prevents the redirect issue
-        setTimeout(() => {
-          window.history.replaceState(null, "", window.location.pathname);
-        }, 0);
+        // Ensure we stay on this page and don't get redirected
+        if (location.pathname !== "/smart-chat") {
+          console.log("Detected unwanted redirect, returning to smart-chat");
+          navigate("/smart-chat", { replace: true });
+        }
       }
       
+      console.log("Setting error message:", errorMessage);
       setApiError(errorMessage);
       
       toast({
@@ -141,17 +171,43 @@ export default function SmartChatInterface() {
       ]);
     } finally {
       setIsLoading(false);
+      setIsRequestActive(false);
     }
   };
 
-  // Prevent accidental navigation away from this page
-  window.onbeforeunload = (e) => {
-    if (isLoading) {
-      e.preventDefault();
-      e.returnValue = '';
-      return '';
-    }
-  };
+  // Prevent accidental navigation away from this page during request
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isRequestActive) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isRequestActive]);
+
+  // Intercept history changes to prevent navigation during active requests
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (isRequestActive) {
+        console.log("Preventing navigation during active request");
+        window.history.pushState(null, "", "/smart-chat");
+        e.preventDefault();
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isRequestActive]);
 
   return (
     <Card className="w-full max-w-3xl mx-auto h-[80vh] flex flex-col">
