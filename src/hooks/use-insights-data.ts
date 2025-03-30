@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 
@@ -51,74 +51,89 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
     aggregatedEmotionData: {}
   });
   const [loading, setLoading] = useState(true);
+  const [lastTimeRange, setLastTimeRange] = useState<TimeRange>(timeRange);
 
-  useEffect(() => {
+  // Make the fetchInsightsData function with useCallback to prevent unnecessary recreations
+  const fetchInsightsData = useCallback(async () => {
     if (!userId) {
       setLoading(false);
       return;
     }
 
-    const fetchInsightsData = async () => {
-      setLoading(true);
-      try {
-        // Get date range based on timeRange
-        const { startDate, endDate } = getDateRange(timeRange);
-        
-        console.log(`Fetching entries for ${timeRange}:`, {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString()
-        });
+    setLoading(true);
+    try {
+      // Get date range based on timeRange
+      const { startDate, endDate } = getDateRange(timeRange);
+      
+      console.log(`Fetching entries for ${timeRange}:`, {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      });
 
-        // Fetch journal entries for the specified time range
-        const { data: entries, error } = await supabase
-          .from('Journal Entries')
-          .select('*')
-          .eq('user_id', userId)
-          .gte('created_at', startDate.toISOString())
-          .lte('created_at', endDate.toISOString())
-          .order('created_at', { ascending: false });
+      // Fetch journal entries for the specified time range
+      const { data: entries, error } = await supabase
+        .from('Journal Entries')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+        .order('created_at', { ascending: false });
 
-        if (error) {
-          console.error('Error fetching insights data:', error);
-          throw error;
-        }
-
-        console.log(`Found ${entries?.length || 0} entries for ${timeRange}`);
-
-        if (!entries || entries.length === 0) {
-          setInsightsData({
-            entries: [],
-            dominantMood: null,
-            biggestImprovement: null,
-            journalActivity: { entryCount: 0, streak: 0 },
-            aggregatedEmotionData: {}
-          });
-          setLoading(false);
-          return;
-        }
-
-        // Process the data
-        const dominantMood = calculateDominantMood(entries);
-        const biggestImprovement = calculateBiggestImprovement(entries);
-        const journalActivity = calculateJournalActivity(entries.length);
-        const aggregatedEmotionData = processEmotionData(entries, timeRange);
-
-        setInsightsData({
-          entries,
-          dominantMood,
-          biggestImprovement,
-          journalActivity,
-          aggregatedEmotionData
-        });
-      } catch (error) {
+      if (error) {
         console.error('Error fetching insights data:', error);
-      } finally {
-        setLoading(false);
+        throw error;
       }
-    };
 
-    fetchInsightsData();
+      console.log(`Found ${entries?.length || 0} entries for ${timeRange}`);
+
+      if (!entries || entries.length === 0) {
+        setInsightsData({
+          entries: [],
+          dominantMood: null,
+          biggestImprovement: null,
+          journalActivity: { entryCount: 0, streak: 0 },
+          aggregatedEmotionData: {}
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Process the data
+      const dominantMood = calculateDominantMood(entries);
+      const biggestImprovement = calculateBiggestImprovement(entries);
+      const journalActivity = calculateJournalActivity(entries.length);
+      const aggregatedEmotionData = processEmotionData(entries, timeRange);
+
+      // Log the processed data for debugging
+      console.log(`[useInsightsData] Processed for ${timeRange}:`, {
+        entryCount: entries.length,
+        emotionCount: Object.keys(aggregatedEmotionData).length,
+        timeRange
+      });
+
+      setInsightsData({
+        entries,
+        dominantMood,
+        biggestImprovement,
+        journalActivity,
+        aggregatedEmotionData
+      });
+    } catch (error) {
+      console.error('Error fetching insights data:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [userId, timeRange]);
+
+  // Fetch data when userId or timeRange changes
+  useEffect(() => {
+    if (timeRange !== lastTimeRange) {
+      console.log(`[useInsightsData] TimeRange changed from ${lastTimeRange} to ${timeRange}, refetching data`);
+      setLastTimeRange(timeRange);
+    }
+    
+    fetchInsightsData();
+  }, [userId, timeRange, fetchInsightsData]);
 
   return { insightsData, loading };
 };

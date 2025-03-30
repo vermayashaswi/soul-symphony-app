@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
@@ -11,6 +11,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
   const [fetchCount, setFetchCount] = useState(0);
   const [lastRefreshKey, setLastRefreshKey] = useState(refreshKey);
+  
+  // Add ref to track if a fetch is in progress to prevent duplicate calls
+  const isFetchingRef = useRef(false);
+  // Add ref to track if we've already done the initial fetch
+  const initialFetchDoneRef = useRef(false);
 
   // Use useCallback to make fetchEntries reusable
   const fetchEntries = useCallback(async () => {
@@ -20,13 +25,14 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       return;
     }
     
-    // Don't fetch if we're already loading to prevent multiple simultaneous requests
-    if (loading && fetchCount > 0) {
+    // Don't fetch if we're already fetching to prevent multiple simultaneous requests
+    if (isFetchingRef.current) {
       console.log('[useJournalEntries] Skipping fetch as one is already in progress');
       return;
     }
     
     try {
+      isFetchingRef.current = true;
       setLoading(true);
       const fetchStartTime = Date.now();
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
@@ -82,19 +88,21 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setEntries(typedEntries);
       setLastFetchTime(new Date());
       setFetchCount(prev => prev + 1);
+      initialFetchDoneRef.current = true;
     } catch (error) {
       console.error('[useJournalEntries] Error fetching entries:', error);
       toast.error('Failed to load journal entries');
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [userId, fetchCount, loading]);
+  }, [userId, fetchCount]);
 
   // Only fetch when userId changes, refreshKey changes, or isProfileChecked becomes true
   useEffect(() => {
     if (userId && isProfileChecked) {
       // Only fetch if this is the initial load or if refreshKey has changed
-      const isInitialLoad = fetchCount === 0;
+      const isInitialLoad = !initialFetchDoneRef.current;
       const hasRefreshKeyChanged = refreshKey !== lastRefreshKey;
       
       if (isInitialLoad || hasRefreshKeyChanged) {
@@ -108,7 +116,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.log(`[useJournalEntries] Waiting for prerequisites: userId=${!!userId}, isProfileChecked=${isProfileChecked}`);
       setLoading(userId !== undefined); // Only show loading if we have a userId but aren't fully ready
     }
-  }, [userId, refreshKey, isProfileChecked, fetchEntries, fetchCount, lastRefreshKey]);
+  }, [userId, refreshKey, isProfileChecked, fetchEntries, lastRefreshKey]);
 
   return { 
     entries, 

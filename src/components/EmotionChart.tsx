@@ -93,28 +93,42 @@ export function EmotionChart({
     { id: 'bubble', label: 'Emotion Bubbles' },
   ];
   
-  // Process emotion data for bubble chart
+  // Process emotion data for bubble chart - properly tied to aggregatedData and timeframe
   const bubbleData = useMemo(() => {
-    if (!aggregatedData) return {};
+    if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
+      console.log('[EmotionChart] No aggregated data available for timeframe:', timeframe);
+      return {};
+    }
     
-    // Combine all emotions from aggregatedData
+    // Combine all emotions from aggregatedData for the current timeframe
     const emotionScores: Record<string, number> = {};
     
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
-      // Sum up all values for this emotion
-      const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
-      emotionScores[emotion] = totalScore;
+      // Only include emotions that have data points in the current timeframe
+      if (dataPoints.length > 0) {
+        // Sum up all values for this emotion
+        const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
+        emotionScores[emotion] = totalScore;
+      }
     });
     
-    console.log('Bubble data updated for timeframe:', timeframe, emotionScores);
+    console.log(`[EmotionChart] Bubble data updated for timeframe: ${timeframe}`, {
+      emotionCount: Object.keys(emotionScores).length,
+      firstFewEmotions: Object.entries(emotionScores).slice(0, 3)
+    });
+    
     return emotionScores;
   }, [aggregatedData, timeframe]);
   
   // This effect will re-render the bubble chart when data or timeframe changes
   useEffect(() => {
-    console.log('Timeframe or aggregatedData changed, updating bubble chart', timeframe);
+    console.log('[EmotionChart] Timeframe or aggregatedData changed, updating bubble chart', {
+      timeframe,
+      hasData: aggregatedData ? Object.keys(aggregatedData).length > 0 : false,
+      bubbleDataSize: Object.keys(bubbleData).length
+    });
     setBubbleKey(prev => prev + 1);
-  }, [timeframe, aggregatedData]);
+  }, [timeframe, aggregatedData, bubbleData]);
   
   // Process aggregated data for line chart
   const lineData = useMemo(() => {
@@ -165,7 +179,7 @@ export function EmotionChart({
         const dateB = new Date(b.day);
         return dateA.getTime() - dateB.getTime();
       });
-  }, [aggregatedData, timeframe]);
+  }, [aggregatedData]);
 
   const renderLineChart = () => {
     if (lineData.length === 0) {
