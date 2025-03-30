@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,7 +20,6 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
-  const [noiseReduction, setNoiseReduction] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const { user } = useAuth();
@@ -37,8 +35,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     stopRecording,
     requestPermissions
   } = useRecordRTCRecorder({ 
-    noiseReduction,
-    maxDuration: 300 // 5 minutes maximum
+    noiseReduction: false,
+    maxDuration: 300
   });
   
   const {
@@ -49,14 +47,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     audioRef
   } = useAudioPlayback({ audioBlob });
 
-  // Clear recording error when starting a new recording
   useEffect(() => {
     if (isRecording) {
       setRecordingError(null);
     }
   }, [isRecording]);
   
-  // Minimum recording time check
   useEffect(() => {
     if (isRecording && recordingTime >= 120) {
       toast.warning("Your recording is quite long. Consider stopping now for better processing.");
@@ -78,10 +74,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       setIsProcessing(true);
       setRecordingError(null);
       
-      // Normalize the audio blob to ensure proper MIME type
       const normalizedBlob = normalizeAudioBlob(audioBlob);
       
-      // Log detailed info about the audio
       console.log('Processing audio:', {
         type: normalizedBlob.type,
         size: normalizedBlob.size,
@@ -110,22 +104,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   return (
     <div className={cn("flex flex-col items-center", className)}>
       <audio ref={audioRef} className="hidden" />
-      
-      <div className="flex items-center justify-center mb-4">
-        <label className="flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            className="sr-only"
-            checked={noiseReduction}
-            onChange={() => setNoiseReduction(!noiseReduction)}
-            disabled={isRecording}
-          />
-          <div className={`h-5 w-10 rounded-full transition-colors ${noiseReduction ? 'bg-primary' : 'bg-gray-300'} relative`}>
-            <div className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${noiseReduction ? 'translate-x-5' : ''}`} />
-          </div>
-          <span className="ml-2 text-sm">Noise Reduction</span>
-        </label>
-      </div>
       
       <RecordingVisualizer 
         isRecording={isRecording}
