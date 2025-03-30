@@ -41,7 +41,7 @@ export default function SmartChatInterface() {
     setIsLoading(true);
     
     try {
-      // Use chat-with-rag edge function instead of smart-chat
+      // Using the chat-with-rag edge function
       const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: {
           message: userMessage,
@@ -104,6 +104,7 @@ export default function SmartChatInterface() {
                 <li>When was I feeling jovial?</li>
                 <li>What has been my top reason for happiness?</li>
                 <li>What workplace issues make me feel sad?</li>
+                <li>Out of all the times when I was extremely happy, when did I still fight with my partner?</li>
                 <li>How have my emotions changed over the past month?</li>
               </ul>
             </p>

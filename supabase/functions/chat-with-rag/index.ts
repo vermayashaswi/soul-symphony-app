@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -90,16 +89,20 @@ async function analyzeQuery(query: string) {
             You are a query analyzer for a journaling app. Extract structured information from user queries about their journal entries.
             
             Identify:
-            1. The query type (emotion, theme, entity, general, etc.)
+            1. The query type (emotion, theme, entity, sentiment, general, etc.)
             2. Any specific emotions mentioned (directly or indirectly)
             3. Any themes mentioned
             4. Any entity types and names (e.g., workplace, person, location)
             5. Timeframe hints (today, last week, etc.)
             6. Whether this is a "when" question (asking about timing of events)
+            7. Sentiment filtering requirements (positive/negative/neutral sentiment or specific score range)
+            8. Relationship terms (e.g., "wife", "partner", "friend", "boss") that would need entity-based search
             
             Return a JSON object with these fields. For emotion field, identify both the explicit emotion term used by the user AND the standard emotion categories it might map to (joy, sadness, anger, fear, surprise, etc.).
             
             For emotion synonyms, provide an array of possible emotion terms that could match database categories.
+            
+            For sentiment, identify if the user is asking for entries with positive sentiment (happy moments), negative sentiment (sad/angry moments), or a specific sentiment intensity (extremely happy, slightly negative, etc.).
             `
           },
           { role: 'user', content: query }
@@ -128,6 +131,8 @@ async function analyzeQuery(query: string) {
       theme: null,
       entityType: null,
       entityName: null,
+      relationship: null,
+      sentiment: null,
       timeframe: {
         timeType: null,
         startDate: null,
@@ -199,6 +204,64 @@ async function getEmotionMappings(emotionTerm: string) {
     
   } catch (error) {
     console.error('Error in getEmotionMappings:', error);
+    return [];
+  }
+}
+
+// New function to search journal entries based on sentiment scores
+async function searchEntriesBySentiment(
+  userId: string,
+  sentimentFilter: any,
+  timeframe: any
+) {
+  try {
+    if (!sentimentFilter) return [];
+    
+    console.log(`Searching for entries with sentiment filter:`, sentimentFilter);
+    
+    let sentimentQuery = supabase
+      .from('Journal Entries')
+      .select('id, "refined text", created_at, sentiment, emotions, entities')
+      .eq('user_id', userId);
+    
+    // Add timeframe filters if provided
+    if (timeframe?.startDate) {
+      sentimentQuery = sentimentQuery.gte('created_at', timeframe.startDate);
+    }
+    if (timeframe?.endDate) {
+      sentimentQuery = sentimentQuery.lte('created_at', timeframe.endDate);
+    }
+    
+    // Handle different sentiment filter types
+    if (sentimentFilter.type === "positive") {
+      // Positive sentiment is generally > 0
+      sentimentQuery = sentimentQuery.gt('sentiment', '0');
+    } else if (sentimentFilter.type === "negative") {
+      // Negative sentiment is generally < 0
+      sentimentQuery = sentimentQuery.lt('sentiment', '0');
+    } else if (sentimentFilter.type === "neutral") {
+      // Neutral sentiment is close to 0
+      sentimentQuery = sentimentQuery.gte('sentiment', '-0.2').lte('sentiment', '0.2');
+    } else if (sentimentFilter.type === "high_positive") {
+      // High positive sentiment is generally > 0.5
+      sentimentQuery = sentimentQuery.gt('sentiment', '0.5');
+    } else if (sentimentFilter.type === "high_negative") {
+      // High negative sentiment is generally < -0.5
+      sentimentQuery = sentimentQuery.lt('sentiment', '-0.5');
+    }
+    
+    const { data, error } = await sentimentQuery;
+    
+    if (error) {
+      console.error("Error in sentiment search:", error);
+      return [];
+    }
+    
+    console.log(`Found ${data?.length || 0} entries matching sentiment criteria`);
+    return data || [];
+    
+  } catch (error) {
+    console.error("Error in searchEntriesBySentiment:", error);
     return [];
   }
 }
@@ -428,6 +491,53 @@ async function searchEntriesByEntityAndEmotion(
   }
 }
 
+// New function to search by entity and sentiment
+async function searchEntriesByEntityAndSentiment(
+  userId: string,
+  entityType: string,
+  sentimentFilter: any,
+  entityName: string | null = null,
+  timeframe: any
+) {
+  try {
+    console.log(`Searching for entries with entity type: ${entityType} and sentiment filter:`, sentimentFilter);
+    
+    // Get entries matching the sentiment criteria
+    const sentimentEntries = await searchEntriesBySentiment(
+      userId, 
+      sentimentFilter, 
+      timeframe
+    );
+    
+    if (sentimentEntries.length === 0) {
+      console.log("No sentiment entries found, cannot combine with entity");
+      return [];
+    }
+    
+    // Filter sentiment entries to only include those matching the entity criteria
+    const filteredEntries = sentimentEntries.filter(entry => {
+      // Skip entries without entities
+      if (!entry.entities || !Array.isArray(entry.entities)) return false;
+      
+      // Check if any entity matches the criteria
+      return entry.entities.some((entity: any) => {
+        const matchesType = entity.type && entity.type.toLowerCase() === entityType.toLowerCase();
+        const matchesName = !entityName || 
+                           (entity.name && 
+                            entity.name.toLowerCase().includes(entityName.toLowerCase()));
+        return matchesType && matchesName;
+      });
+    });
+    
+    console.log(`Found ${filteredEntries.length} entries with matching entity and sentiment criteria`);
+    return filteredEntries;
+    
+  } catch (error) {
+    console.error("Error in searchEntriesByEntityAndSentiment:", error);
+    return [];
+  }
+}
+
 // Enhanced function to search for relevant context based on query analysis
 async function searchRelevantContext(userId: string, queryText: string, queryAnalysis: any) {
   try {
@@ -435,7 +545,60 @@ async function searchRelevantContext(userId: string, queryText: string, queryAna
     
     let relevantEntries = [];
     
-    // Case 1: Entity + Emotion combination (most specific)
+    // Case 1: Entity + Sentiment + Emotion (most specific)
+    if (queryAnalysis.entityType && queryAnalysis.sentiment && queryAnalysis.emotion) {
+      console.log("Using entity + sentiment + emotion combined search");
+      
+      // First get entries matching entity and sentiment
+      const entitySentimentEntries = await searchEntriesByEntityAndSentiment(
+        userId,
+        queryAnalysis.entityType,
+        queryAnalysis.sentiment,
+        queryAnalysis.entityName,
+        queryAnalysis.timeframe
+      );
+      
+      // Then filter by emotion from those entries
+      if (entitySentimentEntries.length > 0) {
+        console.log("Filtering entity + sentiment results by emotion");
+        
+        // Get emotion mappings
+        const mappedEmotions = await getEmotionMappings(queryAnalysis.emotion);
+        
+        // Filter entries that have the required emotions
+        relevantEntries = entitySentimentEntries.filter(entry => {
+          if (!entry.emotions) return false;
+          
+          return mappedEmotions.some(emotion => {
+            return entry.emotions[emotion] && entry.emotions[emotion] > 0.3;
+          });
+        });
+        
+        if (relevantEntries.length > 0) {
+          console.log(`Found ${relevantEntries.length} entries matching entity + sentiment + emotion`);
+          return relevantEntries;
+        }
+      }
+    }
+    
+    // Case 2: Entity + Sentiment combination
+    if (queryAnalysis.entityType && queryAnalysis.sentiment) {
+      console.log("Using entity + sentiment combined search");
+      relevantEntries = await searchEntriesByEntityAndSentiment(
+        userId,
+        queryAnalysis.entityType,
+        queryAnalysis.sentiment,
+        queryAnalysis.entityName,
+        queryAnalysis.timeframe
+      );
+      
+      if (relevantEntries.length > 0) {
+        console.log(`Found ${relevantEntries.length} entries through entity + sentiment search`);
+        return relevantEntries;
+      }
+    }
+    
+    // Case 3: Entity + Emotion combination
     if (queryAnalysis.entityType && queryAnalysis.emotion) {
       console.log("Using entity + emotion combined search");
       relevantEntries = await searchEntriesByEntityAndEmotion(
@@ -445,9 +608,30 @@ async function searchRelevantContext(userId: string, queryText: string, queryAna
         queryAnalysis.entityName,
         queryAnalysis.timeframe
       );
+      
+      if (relevantEntries.length > 0) {
+        console.log(`Found ${relevantEntries.length} entries through entity + emotion search`);
+        return relevantEntries;
+      }
     }
-    // Case 2: Entity-specific search
-    else if (queryAnalysis.entityType) {
+    
+    // Case 4: Sentiment-specific search
+    if (queryAnalysis.sentiment) {
+      console.log("Using sentiment-based search");
+      relevantEntries = await searchEntriesBySentiment(
+        userId,
+        queryAnalysis.sentiment,
+        queryAnalysis.timeframe
+      );
+      
+      if (relevantEntries.length > 0) {
+        console.log(`Found ${relevantEntries.length} entries through sentiment search`);
+        return relevantEntries;
+      }
+    }
+    
+    // Case 5: Entity-specific search
+    if (queryAnalysis.entityType) {
       console.log("Using entity-based search");
       relevantEntries = await searchEntriesByEntity(
         userId,
@@ -455,24 +639,29 @@ async function searchRelevantContext(userId: string, queryText: string, queryAna
         queryAnalysis.entityName,
         queryAnalysis.timeframe
       );
+      
+      if (relevantEntries.length > 0) {
+        console.log(`Found ${relevantEntries.length} entries through entity search`);
+        return relevantEntries;
+      }
     } 
-    // Case 3: Emotion-specific search
-    else if (queryAnalysis.emotion) {
+    
+    // Case 6: Emotion-specific search
+    if (queryAnalysis.emotion) {
       console.log("Using emotion-based search");
       relevantEntries = await searchEntriesByEmotion(
         userId,
         queryAnalysis.emotion,
         queryAnalysis.timeframe
       );
+      
+      if (relevantEntries.length > 0) {
+        console.log(`Found ${relevantEntries.length} entries through emotion search`);
+        return relevantEntries;
+      }
     }
     
-    // If targeted searches yielded results, use them
-    if (relevantEntries.length > 0) {
-      console.log(`Found ${relevantEntries.length} entries through targeted search`);
-      return relevantEntries;
-    }
-    
-    // Case 4: Fallback to vector similarity search
+    // Case 7: Fallback to vector similarity search
     console.log("Using embedding for search");
     const queryEmbedding = await generateEmbedding(queryText);
     
@@ -498,11 +687,11 @@ async function searchRelevantContext(userId: string, queryText: string, queryAna
       return vectorResults;
     }
     
-    // Case 5: Last resort - fetch recent entries
+    // Case 8: Last resort - fetch recent entries
     console.log("No similar entries found, falling back to recent entries");
     const { data: recentEntries, error: recentError } = await supabase
       .from('Journal Entries')
-      .select('id, "refined text", created_at, emotions')
+      .select('id, "refined text", created_at, emotions, sentiment')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(3);
@@ -612,7 +801,8 @@ serve(async (req) => {
         relevantEntries.map((entry, index) => {
           const date = new Date(entry.created_at).toLocaleDateString();
           const emotionsText = entry.emotions ? formatEmotions(entry.emotions) : "No emotion data";
-          return `Entry ${index+1} (${date}):\n${entry["refined text"] || entry.content}\nPrimary emotions: ${emotionsText}`;
+          const sentimentText = entry.sentiment ? `Sentiment score: ${entry.sentiment}` : "No sentiment data";
+          return `Entry ${index+1} (${date}):\n${entry["refined text"] || entry.content}\nPrimary emotions: ${emotionsText}\n${sentimentText}`;
         }).join('\n\n') + "\n\n";
     } else {
       console.log("No relevant entries found");
@@ -638,8 +828,10 @@ ${conversationContext}
 
 Based on the context above and the user's message, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
-mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
-Focus on being helpful rather than diagnostic.`;
+mention them, but do so gently and constructively. Pay special attention to the emotional patterns and sentiment scores revealed in the entries.
+Focus on being helpful rather than diagnostic.
+
+When responding to queries about specific emotions, entities, or sentiment levels, try to reference the specific journal entries that match those criteria.`;
 
     console.log("Sending to GPT with RAG context and conversation history...");
     
@@ -717,7 +909,8 @@ Focus on being helpful rather than diagnostic.`;
             id: entry.id,
             created_at: entry.created_at,
             excerpt: (entry["refined text"] || entry.content || '').substring(0, 100) + '...',
-            emotions: entry.emotions
+            emotions: entry.emotions,
+            sentiment: entry.sentiment
           }));
         }
       }
