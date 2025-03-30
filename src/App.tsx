@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +9,7 @@ import Index from "./pages/Index";
 import Journal from "./pages/Journal";
 import Insights from "./pages/Insights";
 import Chat from "./pages/Chat";
+import SmartChat from "./pages/SmartChat";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -83,6 +85,11 @@ const AppRoutes = () => {
         <Route path="/chat" element={
           <ProtectedRoute>
             <Chat />
+          </ProtectedRoute>
+        } />
+        <Route path="/smart-chat" element={
+          <ProtectedRoute>
+            <SmartChat />
           </ProtectedRoute>
         } />
         <Route path="/settings" element={
