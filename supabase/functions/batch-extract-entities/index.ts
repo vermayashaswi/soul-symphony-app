@@ -102,9 +102,25 @@ async function extractEntities(text: string) {
   }
 }
 
-async function processEntries(userId?: string, processAll: boolean = false) {
+async function processEntries(userId?: string, processAll: boolean = false, diagnosticMode: boolean = false) {
   try {
     console.log('Starting batch entity extraction process');
+    
+    // Diagnostic information to return
+    const diagnosticInfo: any = {
+      startTime: new Date().toISOString(),
+      processAll: processAll,
+      userId: userId || 'not provided',
+      supabaseClientInitialized: !!supabase,
+      openAIKeyConfigured: !!openAIApiKey,
+      userIdFilter: !!userId,
+      queryParams: {
+        table: 'Journal Entries',
+        isNullFilter: !processAll,
+        orderBy: 'created_at',
+        limit: diagnosticMode ? 2 : undefined // Limit to 2 entries in diagnostic mode
+      }
+    };
     
     // Build the query
     let query = supabase
@@ -124,33 +140,77 @@ async function processEntries(userId?: string, processAll: boolean = false) {
     
     // Order by most recent first
     query = query.order('created_at', { ascending: false });
+
+    // In diagnostic mode, limit to 2 entries to avoid unnecessary processing
+    if (diagnosticMode) {
+      query = query.limit(2);
+    }
     
     // Execute the query
     const { data: entries, error } = await query;
-      
+    
+    diagnosticInfo.querySuccess = !error;
+    diagnosticInfo.queryError = error ? error.message : null;
+    diagnosticInfo.entriesFound = entries?.length || 0;
+    
     if (error) {
       console.error('Error fetching entries:', error);
-      return { success: false, error: error.message, processed: 0, total: 0 };
+      return { 
+        success: false, 
+        error: error.message, 
+        processed: 0, 
+        total: 0,
+        diagnosticInfo
+      };
     }
     
     console.log(`Found ${entries?.length || 0} entries to process`);
     
     let processed = 0;
+    const processingDetails: any[] = [];
     
     // Exit early if no entries to process
     if (!entries || entries.length === 0) {
-      return { success: true, processed: 0, total: 0, processingTime: "0 seconds" };
+      diagnosticInfo.noEntriesFound = true;
+      return { 
+        success: true, 
+        processed: 0, 
+        total: 0, 
+        processingTime: "0 seconds",
+        diagnosticInfo
+      };
     }
     
     for (const entry of entries || []) {
       if (!entry["refined text"]) {
         console.log(`Skipping entry ${entry.id} - no refined text`);
+        processingDetails.push({
+          entryId: entry.id,
+          skipped: true,
+          reason: 'No refined text'
+        });
         continue;
       }
       
       try {
         console.log(`Processing entry ${entry.id}`);
-        const entities = await extractEntities(entry["refined text"]);
+        
+        // For diagnostic mode, don't actually call OpenAI API
+        let entities = [];
+        if (!diagnosticMode) {
+          entities = await extractEntities(entry["refined text"]);
+        } else {
+          // In diagnostic mode, simulate entity extraction
+          entities = [{ type: "diagnostic", name: "test entity" }];
+        }
+        
+        const entryDetails = {
+          entryId: entry.id,
+          hasRefinedText: true,
+          textLength: entry["refined text"].length,
+          entitiesExtracted: entities.length
+        };
+        processingDetails.push(entryDetails);
         
         if (entities && entities.length > 0) {
           console.log(`Extracted ${entities.length} entities for entry ${entry.id}:`, JSON.stringify(entities));
@@ -158,34 +218,61 @@ async function processEntries(userId?: string, processAll: boolean = false) {
           console.log(`No entities found for entry ${entry.id}`);
         }
         
-        // Always update the entry, even with an empty array
-        const { error: updateError } = await supabase
-          .from('Journal Entries')
-          .update({ entities: entities })
-          .eq('id', entry.id);
-          
-        if (updateError) {
-          console.error(`Error updating entry ${entry.id}:`, updateError);
-        } else {
-          processed++;
-          if (entities && entities.length > 0) {
-            console.log(`Updated entry ${entry.id} with ${entities.length} entities`);
+        // Don't update the database in diagnostic mode
+        if (!diagnosticMode) {
+          // Always update the entry, even with an empty array
+          const { error: updateError } = await supabase
+            .from('Journal Entries')
+            .update({ entities: entities })
+            .eq('id', entry.id);
+            
+          if (updateError) {
+            console.error(`Error updating entry ${entry.id}:`, updateError);
+            entryDetails.updateError = updateError.message;
           } else {
-            console.log(`Updated entry ${entry.id} with empty entities array`);
+            processed++;
+            if (entities && entities.length > 0) {
+              console.log(`Updated entry ${entry.id} with ${entities.length} entities`);
+            } else {
+              console.log(`Updated entry ${entry.id} with empty entities array`);
+            }
           }
+        } else {
+          // In diagnostic mode, simulate success
+          processed++;
         }
       } catch (entryError) {
         console.error(`Error processing entry ${entry.id}:`, entryError);
+        processingDetails.push({
+          entryId: entry.id,
+          error: entryError.message
+        });
       }
       
       // Add a small delay to prevent rate limiting
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    return { success: true, processed, total: entries?.length || 0 };
+    diagnosticInfo.processingDetails = processingDetails;
+    
+    return { 
+      success: true, 
+      processed, 
+      total: entries?.length || 0,
+      diagnosticInfo
+    };
   } catch (error) {
     console.error('Error in processEntries:', error);
-    return { success: false, error: error.message, processed: 0, total: 0 };
+    return { 
+      success: false, 
+      error: error.message, 
+      processed: 0, 
+      total: 0,
+      diagnosticInfo: {
+        error: error.message,
+        stack: error.stack
+      }
+    };
   }
 }
 
@@ -202,18 +289,20 @@ serve(async (req) => {
     // Get the request body if any
     let userId = undefined;
     let processAll = false;
+    let diagnosticMode = false;
     
     try {
       if (req.method === 'POST') {
         const body = await req.json();
         userId = body.userId;
         processAll = body.processAll === true;
+        diagnosticMode = body.diagnosticMode === true;
       }
     } catch (e) {
       console.log('No request body or invalid JSON');
     }
     
-    const result = await processEntries(userId, processAll);
+    const result = await processEntries(userId, processAll, diagnosticMode);
     
     const endTime = Date.now();
     const processingTime = (endTime - startTime) / 1000;
