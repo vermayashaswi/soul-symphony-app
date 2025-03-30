@@ -41,7 +41,8 @@ export default function SmartChatInterface() {
     setIsLoading(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('smart-chat', {
+      // Use chat-with-rag edge function instead of smart-chat
+      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: {
           message: userMessage,
           userId: user.id,
@@ -97,6 +98,15 @@ export default function SmartChatInterface() {
         {chatHistory.length === 0 ? (
           <div className="text-center text-muted-foreground p-8">
             Start a conversation with your journal by asking a question.
+            <p className="mt-4 text-sm">
+              Try asking things like:
+              <ul className="mt-2 space-y-1 list-disc list-inside">
+                <li>When was I feeling jovial?</li>
+                <li>What has been my top reason for happiness?</li>
+                <li>What workplace issues make me feel sad?</li>
+                <li>How have my emotions changed over the past month?</li>
+              </ul>
+            </p>
           </div>
         ) : (
           chatHistory.map((msg, idx) => (
@@ -120,15 +130,7 @@ export default function SmartChatInterface() {
                   <div className="mt-2 text-xs opacity-70">
                     <Separator className="my-2" />
                     <div className="font-semibold">Analysis:</div>
-                    <p>{msg.analysis.analysis}</p>
-                    {msg.analysis.requiresSql && (
-                      <>
-                        <div className="font-semibold mt-1">SQL Query:</div>
-                        <pre className="text-xs bg-black/10 p-1 rounded overflow-x-auto">
-                          {msg.analysis.sqlQuery}
-                        </pre>
-                      </>
-                    )}
+                    <p>{JSON.stringify(msg.analysis)}</p>
                   </div>
                 )}
               </div>
