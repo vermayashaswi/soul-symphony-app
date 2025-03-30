@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Database, Loader2 } from "lucide-react";
+import { Database, Loader2, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import { useToast } from "@/hooks/use-toast";
@@ -40,7 +40,7 @@ export default function Utilities() {
       const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
         body: { 
           userId: user.id,
-          processAll: true
+          processAll: true  // Always process all entries
         }
       });
       
@@ -60,7 +60,7 @@ export default function Utilities() {
       if (data.success) {
         toast({
           title: "Processing complete",
-          description: `Processed ${data.processed} of ${data.total} entries in ${data.processingTime}.`
+          description: `Processed ${data.processed} of ${data.total} entries in ${data.processingTime}.`,
         });
       } else {
         toast({
@@ -124,9 +124,9 @@ export default function Utilities() {
                     </h3>
                     
                     <Alert variant="default" className="mb-4">
-                      <AlertTitle>API Key Configured</AlertTitle>
+                      <AlertTitle>Google Natural Language API</AlertTitle>
                       <AlertDescription>
-                        Google Natural Language API key is already configured. You can process your journal entries.
+                        This utility will extract entities (people, places, organizations) from all your journal entries.
                       </AlertDescription>
                     </Alert>
                     
@@ -165,6 +165,23 @@ export default function Utilities() {
                                 {processingStats.processingTime}
                               </Badge>
                             </div>
+
+                            {processingStats.failed > 0 && (
+                              <div className="mt-2">
+                                <Alert variant="destructive">
+                                  <AlertCircle className="h-4 w-4" />
+                                  <AlertTitle>Processing Warnings</AlertTitle>
+                                  <AlertDescription>
+                                    {processingStats.failed} entries could not be processed correctly.
+                                    {processingStats.errors && processingStats.errors.length > 0 && (
+                                      <div className="mt-2 text-sm">
+                                        <p>First error: {processingStats.errors[0].error}</p>
+                                      </div>
+                                    )}
+                                  </AlertDescription>
+                                </Alert>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <Alert variant="destructive">

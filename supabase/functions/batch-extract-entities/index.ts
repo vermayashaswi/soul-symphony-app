@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -36,9 +37,20 @@ async function analyzeWithGoogleNL(text: string) {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('Error analyzing with Google NL API:', error);
-      return [];
+      const errorText = await response.text();
+      console.error('Error analyzing with Google NL API:', errorText);
+      
+      // Try to parse the error to check if it's a permission/quota error
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error && errorJson.error.status === "PERMISSION_DENIED") {
+          return { error: "API access denied. The API key may not have access to the Natural Language API or has reached its quota." };
+        }
+      } catch (e) {
+        // Ignore parsing error
+      }
+      
+      return { error: `API error (${response.status}): ${errorText.substring(0, 100)}...` };
     }
 
     const result = await response.json();
@@ -55,10 +67,10 @@ async function analyzeWithGoogleNL(text: string) {
     
     console.log(`Extracted ${uniqueEntities.length} entities`);
     
-    return uniqueEntities;
+    return { entities: uniqueEntities };
   } catch (error) {
     console.error('Error in analyzeWithGoogleNL:', error);
-    return [];
+    return { error: error.message };
   }
 }
 
@@ -156,7 +168,9 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     console.log(`Found ${entries?.length || 0} entries to process`);
     
     let processed = 0;
+    let failed = 0;
     const processingDetails: any[] = [];
+    const errors: any[] = [];
     
     // Exit early if no entries to process
     if (!entries || entries.length === 0) {
@@ -185,18 +199,34 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
         console.log(`Processing entry ${entry.id}`);
         
         // Extract entities using Google NL API
-        const entities = await analyzeWithGoogleNL(entry["refined text"]);
+        const result = await analyzeWithGoogleNL(entry["refined text"]);
         
-        const entryDetails = {
+        const entryDetails: any = {
           entryId: entry.id,
           hasRefinedText: true,
           textLength: entry["refined text"].length,
-          textSample: entry["refined text"].substring(0, 100) + '...',
-          entitiesExtracted: entities.length,
-          entities: entities,
-          entityTypes: entities.map(e => e.type),
-          entityNames: entities.map(e => e.name)
+          textSample: entry["refined text"].substring(0, 100) + '...'
         };
+        
+        // Handle API error
+        if (result.error) {
+          console.error(`API error for entry ${entry.id}:`, result.error);
+          entryDetails.error = result.error;
+          errors.push({
+            entryId: entry.id,
+            error: result.error
+          });
+          failed++;
+          processingDetails.push(entryDetails);
+          continue;
+        }
+        
+        const entities = result.entities || [];
+        
+        entryDetails.entitiesExtracted = entities.length;
+        entryDetails.entities = entities;
+        entryDetails.entityTypes = entities.map(e => e.type);
+        entryDetails.entityNames = entities.map(e => e.name);
         processingDetails.push(entryDetails);
         
         if (entities && entities.length > 0) {
@@ -215,6 +245,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
           if (updateError) {
             console.error(`Error updating entry ${entry.id}:`, updateError);
             entryDetails.updateError = updateError.message;
+            failed++;
           } else {
             processed++;
             if (entities && entities.length > 0) {
@@ -233,6 +264,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
           entryId: entry.id,
           error: entryError.message
         });
+        failed++;
       }
       
       // Add a small delay to prevent rate limiting
@@ -240,6 +272,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     }
     
     diagnosticInfo.processingDetails = processingDetails;
+    diagnosticInfo.errors = errors;
     const endTime = Date.now();
     const processingTime = (endTime - startTime) / 1000;
     
@@ -248,9 +281,11 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     return { 
       success: true, 
       processed, 
+      failed,
       total: entries?.length || 0,
       processingTime: `${processingTime.toFixed(3)} seconds`,
-      diagnosticInfo
+      diagnosticInfo,
+      errors: errors.length > 0 ? errors.slice(0, 5) : []
     };
   } catch (error) {
     console.error('Fatal error in processEntries:', error);
