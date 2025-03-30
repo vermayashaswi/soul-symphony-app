@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from 'react-markdown';
 import { sendAudioForTranscription } from "@/utils/audio/transcription-service";
+import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
 
 export default function SmartChatInterface() {
   const [message, setMessage] = useState("");
@@ -22,8 +23,12 @@ export default function SmartChatInterface() {
   }[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
+  
+  // RecordRTC related refs
+  const [recorder, setRecorder] = useState<RecordRTC | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
-  // Function to handle voice input
+  // Function to handle voice input with RecordRTC
   const handleVoiceInput = async () => {
     if (!user) {
       toast({
@@ -35,82 +40,99 @@ export default function SmartChatInterface() {
     }
 
     try {
+      // If already recording, stop recording
       if (isRecording) {
         setIsRecording(false);
+        
+        if (recorder) {
+          recorder.stopRecording(() => {
+            const blob = recorder.getBlob();
+            
+            // Convert to base64 for processing
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+              const base64String = reader.result as string;
+              // Remove the data URL prefix
+              const base64Data = base64String.split(',')[1];
+              
+              setIsLoading(true);
+              const result = await sendAudioForTranscription(base64Data, user.id);
+              
+              if (result.success && result.data?.transcription) {
+                const transcription = result.data.transcription;
+                setMessage(transcription);
+                
+                // Auto-submit the transcribed message
+                handleSubmitTranscription(transcription);
+              } else {
+                toast({
+                  title: "Transcription failed",
+                  description: result.error || "Failed to transcribe audio. Try speaking clearly and try again.",
+                  variant: "destructive"
+                });
+                setIsLoading(false);
+              }
+            };
+            
+            // Stop the stream
+            if (stream) {
+              stream.getTracks().forEach(track => track.stop());
+              setStream(null);
+            }
+            
+            // Clear recorder
+            setRecorder(null);
+          });
+        }
+        
         return;
       }
 
+      // Start new recording
       setIsRecording(true);
       
-      // Start recording
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      // Request microphone access with optimal settings for mobile
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
-          echoCancellation: false, // Changed from true to false
-          noiseSuppression: false, // Changed from true to false
+          echoCancellation: true,
+          noiseSuppression: true,
           autoGainControl: true,
-          // Use higher sample rate for better quality
           sampleRate: 48000,
-          // Try to use higher bit depth
           sampleSize: 24,
-          // Use stereo if available
           channelCount: 2,
         } 
       });
       
-      const mediaRecorder = new MediaRecorder(stream);
-      const audioChunks: BlobPart[] = [];
+      setStream(mediaStream);
       
-      mediaRecorder.addEventListener("dataavailable", (event) => {
-        audioChunks.push(event.data);
-      });
+      // Configure RecordRTC
+      const options = {
+        type: 'audio',
+        mimeType: 'audio/webm;codecs=opus',
+        recorderType: StereoAudioRecorder,
+        numberOfAudioChannels: 2,
+        desiredSampRate: 48000,
+        checkForInactiveTracks: true,
+        timeSlice: 1000, // More frequent data handling for mobile
+      };
       
-      mediaRecorder.addEventListener("stop", async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        
-        // Convert to base64
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          const base64String = reader.result as string;
-          // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
-          const base64Data = base64String.split(',')[1];
-          
-          setIsLoading(true);
-          const result = await sendAudioForTranscription(base64Data, user.id);
-          
-          if (result.success && result.data?.transcription) {
-            const transcription = result.data.transcription;
-            setMessage(transcription);
-            
-            // Auto-submit the transcribed message
-            handleSubmitTranscription(transcription);
-          } else {
-            toast({
-              title: "Transcription failed",
-              description: result.error || "Failed to transcribe audio. Try speaking clearly and try again.",
-              variant: "destructive"
-            });
-            setIsLoading(false);
-          }
-          
-          setIsRecording(false);
-        };
-      });
-      
-      // Start recording for 15 seconds maximum
-      mediaRecorder.start();
-      
-      setTimeout(() => {
-        if (mediaRecorder.state !== 'inactive') {
-          mediaRecorder.stop();
-          stream.getTracks().forEach(track => track.stop());
-        }
-      }, 15000);
+      // Create and start recorder
+      const rtcRecorder = new RecordRTC(mediaStream, options);
+      rtcRecorder.startRecording();
+      setRecorder(rtcRecorder);
       
       toast({
         title: "Recording started",
         description: "Recording for up to 15 seconds. Speak clearly.",
       });
+      
+      // Auto-stop after 15 seconds
+      setTimeout(() => {
+        if (isRecording) {
+          handleVoiceInput(); // This will trigger the stop recording flow
+        }
+      }, 15000);
       
     } catch (error) {
       console.error("Error recording audio:", error);

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
+import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
 import { processRecording } from '@/utils/audio-processing';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
@@ -21,7 +21,7 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
-  const [noiseReduction, setNoiseReduction] = useState(false); // Changed from true to false
+  const [noiseReduction, setNoiseReduction] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const { user } = useAuth();
@@ -36,7 +36,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     startRecording,
     stopRecording,
     requestPermissions
-  } = useVoiceRecorder({ 
+  } = useRecordRTCRecorder({ 
     noiseReduction,
     maxDuration: 300 // 5 minutes maximum
   });
