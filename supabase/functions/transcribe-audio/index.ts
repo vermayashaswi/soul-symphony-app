@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -561,6 +560,41 @@ async function extractThemesAndEntities(text: string, entryId: number): Promise<
     }
     
     console.log('Themes and entities generated successfully:', data);
+    
+    // If needed, we can also directly extract entities
+    // This ensures entities are extracted even if the generate-themes function doesn't do it
+    try {
+      console.log('Additional entity extraction to ensure we have entities extracted');
+      const { data: entityData, error: entityError } = await supabase.functions.invoke('batch-extract-entities', {
+        body: { 
+          testText: text,
+          testExtraction: true
+        }
+      });
+      
+      if (entityError) {
+        console.error('Error in direct entity extraction:', entityError);
+        return;
+      }
+      
+      if (entityData?.entities && entityData.entities.length > 0) {
+        console.log(`Extracted ${entityData.entities.length} entities directly:`, entityData.entities);
+        
+        // Update the entry with the extracted entities if needed
+        const { error: updateError } = await supabase
+          .from('Journal Entries')
+          .update({ entities: entityData.entities })
+          .eq('id', entryId);
+          
+        if (updateError) {
+          console.error('Error updating entry with entities:', updateError);
+        } else {
+          console.log(`Updated entry ${entryId} with ${entityData.entities.length} entities`);
+        }
+      }
+    } catch (entityExtractionError) {
+      console.error('Error in additional entity extraction:', entityExtractionError);
+    }
   } catch (error) {
     console.error('Error in extractThemesAndEntities:', error);
   }

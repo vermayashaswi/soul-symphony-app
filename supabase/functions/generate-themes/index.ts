@@ -1,95 +1,61 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-  
+async function extract_themes_and_entities(text: string) {
   try {
-    const { text, entryId } = await req.json();
+    console.log(`Starting theme and entity extraction for text: "${text.substring(0, 100)}..."`);
     
-    if (!text) {
-      return new Response(
-        JSON.stringify({ error: 'No text provided' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!openAIApiKey) {
+      console.error('OpenAI API key is missing or empty');
+      throw new Error('OpenAI API key is not configured');
     }
     
-    console.log(`Generating themes and entities for entry ${entryId}`);
+    const prompt = `
+      Analyze the following journal entry and extract:
+      
+      1. The main themes or topics discussed (maximum 5 themes)
+      2. Named entities mentioned in the text
+      
+      For themes, return simple phrases or keywords that capture the essence of what the journal entry is about.
+      
+      For entities, identify:
+      - "type": One of: person, organization, place, product, event
+      - "name": The entity name exactly as mentioned in the text
+      
+      Return the results as a JSON object with two properties:
+      - "themes": An array of strings representing the main themes
+      - "entities": An array of objects, each with "type" and "name" properties
+      
+      Example response format:
+      {
+        "themes": ["work stress", "family time", "personal growth"],
+        "entities": [
+          {"type": "person", "name": "John"},
+          {"type": "organization", "name": "Microsoft"},
+          {"type": "place", "name": "New York"}
+        ]
+      }
+      
+      Only include clearly mentioned entities. If no entities are found, return an empty array.
+      
+      Journal entry:
+      ${text}
+    `;
     
-    // Extract themes and entities using OpenAI
-    const { themes, entities } = await extractThemesAndEntities(text);
-    console.log('Generated themes:', themes);
-    console.log('Extracted entities:', entities);
+    console.log(`Sending request to OpenAI with model: gpt-4o-mini`);
     
-    // If entryId is provided, update the database
-    if (entryId) {
-      await updateEntryThemesAndEntities(entryId, themes, entities);
-    }
-    
-    return new Response(
-      JSON.stringify({ themes, entities }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
-    console.error('Error in generate-themes function:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-});
-
-async function extractThemesAndEntities(text: string): Promise<{ themes: string[], entities: { type: string, name: string }[] }> {
-  const prompt = `
-    Analyze the following journal entry and:
-    
-    1. Extract exactly 5-7 important emotional themes or concepts.
-    2. Identify entities mentioned (people, organizations, places, etc.).
-    
-    Return the results as a JSON object with two properties:
-    - "themes": An array of strings, with each theme being a single word or very short phrase (max 2 words).
-    - "entities": An array of objects, each with "type" and "name" properties.
-    
-    For themes:
-    - Keep themes short (1-2 words)
-    - Capitalize the first letter of each theme
-    - Return only the most important themes from the journal entry
-    - Focus on emotional states, personal growth concepts, or psychological themes
-    
-    For entities:
-    - Entity types should be one of: person, organization, place, product, event
-    - Entity names should be the exact name mentioned in the text
-    - Only include clearly mentioned entities
-    
-    Example response format:
-    {
-      "themes": ["Happiness", "Growth", "Family", "Work", "Health"],
-      "entities": [
-        {"type": "person", "name": "John"},
-        {"type": "organization", "name": "Microsoft"},
-        {"type": "place", "name": "Central Park"}
-      ]
-    }
-    
-    Journal entry:
-    ${text}
-  `;
-  
-  try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -99,68 +65,132 @@ async function extractThemesAndEntities(text: string): Promise<{ themes: string[
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'You analyze journal entries to extract themes and entities. Always respond with a valid JSON object.' },
-          { role: 'user', content: prompt }
+          {
+            role: 'system',
+            content: 'You are a theme extraction and entity recognition assistant. Extract themes and named entities from journal entries following the exact format requested.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
         ],
-        temperature: 0.3,
+        temperature: 0.3,  // Lower temperature for more consistent results
         response_format: { type: "json_object" }
       }),
     });
 
-    const data = await response.json();
-    console.log("OpenAI response:", data);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI API error: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`Failed to extract themes and entities: ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log(`Raw response from OpenAI:`, JSON.stringify(result, null, 2));
     
-    const content = data.choices?.[0]?.message?.content || '';
+    // Extract the content from the response
+    if (!result.choices || !result.choices[0] || !result.choices[0].message) {
+      console.error('Invalid response structure from OpenAI');
+      return { themes: [], entities: [] };
+    }
+    
+    const contentText = result.choices[0].message.content;
+    console.log(`Content response text:`, contentText);
     
     try {
       // Parse the JSON response
-      const parsed = JSON.parse(content);
+      const parsedContent = JSON.parse(contentText);
+      
+      // Extract themes
+      const themes = parsedContent.themes || [];
+      console.log(`Extracted themes:`, themes);
+      
+      // Extract entities
+      const entities = parsedContent.entities || [];
+      console.log(`Extracted entities:`, entities);
       
       return {
-        themes: Array.isArray(parsed.themes) ? parsed.themes : [],
-        entities: Array.isArray(parsed.entities) ? parsed.entities : []
+        themes,
+        entities
       };
-    } catch (parseError) {
-      console.error('Error parsing themes and entities:', parseError);
-      console.error('Raw content:', content);
-      // Fallback for themes if JSON parsing fails
-      const themesMatches = content.match(/\["([^"]+)"(?:,\s*"([^"]+)")*\]/);
-      const themes = themesMatches 
-        ? themesMatches[0].split(/,\s*/).map(s => s.replace(/[\[\]"]/g, ''))
-        : ["Reflection", "Insight", "Emotion"];
-        
-      return { themes, entities: [] };
+    } catch (err) {
+      console.error('Error parsing JSON:', err);
+      console.error('Raw content text:', contentText);
+      return { themes: [], entities: [] };
     }
   } catch (error) {
-    console.error('Error calling OpenAI:', error);
-    throw error;
+    console.error('Error in extract_themes_and_entities:', error);
+    return { themes: [], entities: [] };
   }
 }
 
-async function updateEntryThemesAndEntities(
-  entryId: number, 
-  themes: string[], 
-  entities: { type: string, name: string }[]
-): Promise<void> {
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { text, entryId } = await req.json();
     
-    const { error } = await supabase
-      .from('Journal Entries')
-      .update({ 
-        master_themes: themes,
-        entities: entities
-      })
-      .eq('id', entryId);
-      
-    if (error) {
-      console.error('Error updating entry themes and entities:', error);
-      throw error;
+    if (!text) {
+      throw new Error('No text provided for theme extraction');
     }
     
-    console.log(`Updated themes and entities for entry ${entryId}`);
+    console.log(`Received request to extract themes for entry ${entryId || 'unknown'}`);
+    
+    const { themes, entities } = await extract_themes_and_entities(text);
+    
+    // If an entry ID was provided, update the database
+    if (entryId) {
+      console.log(`Updating entry ${entryId} with themes and entities`);
+      
+      const updates: any = {};
+      
+      if (themes && themes.length > 0) {
+        updates.master_themes = themes;
+      }
+      
+      if (entities && entities.length > 0) {
+        updates.entities = entities;
+      }
+      
+      if (Object.keys(updates).length > 0) {
+        const { error } = await supabase
+          .from('Journal Entries')
+          .update(updates)
+          .eq('id', entryId);
+          
+        if (error) {
+          console.error(`Error updating entry ${entryId}:`, error);
+        } else {
+          console.log(`Successfully updated entry ${entryId} with themes and entities`);
+        }
+      }
+    }
+    
+    return new Response(
+      JSON.stringify({
+        success: true,
+        themes,
+        entities
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
   } catch (error) {
-    console.error('Error in updateEntryThemesAndEntities:', error);
-    throw error;
+    console.error('Error in generate-themes function:', error);
+    
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
-}
+});
