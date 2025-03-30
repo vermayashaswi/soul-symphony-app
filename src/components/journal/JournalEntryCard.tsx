@@ -21,6 +21,7 @@ export type JournalEntry = {
   duration?: number;
   master_themes?: string[];
   sentiment?: string;
+  entities?: { type: string, name: string }[];
 };
 
 interface JournalEntryCardProps {
