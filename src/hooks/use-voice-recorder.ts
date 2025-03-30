@@ -101,7 +101,7 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
         // Low-pass filter to remove high-frequency noise
         const lowpassFilter = audioContext.createBiquadFilter();
         lowpassFilter.type = 'lowpass';
-        lowpassFilter.frequency.value = 8000;
+        lowpassFilter.frequency.value = 10000; // Increased from 8000 to capture more voice frequencies
         lowpassFilter.Q.value = 0.7;
         
         // Compressor to normalize volume
@@ -191,33 +191,34 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       
-      // Options for MediaRecorder, prioritizing iOS compatibility
-      let options: MediaRecorderOptions = {};
-      
-      // iOS devices work better with specific MIME types
-      const mimeTypes = isIOS ? 
-        // Priority list for iOS
-        ['audio/mp4', 'audio/aac', 'audio/webm', 'audio/wav', 'audio/ogg'] :
-        // Priority list for other platforms
-        ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/wav'];
+      // Options for MediaRecorder, prioritizing compatibility
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/wav'
+      ];
       
       // Find the first supported MIME type
+      let selectedMimeType = '';
       for (const type of mimeTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
-          options.mimeType = type;
+          selectedMimeType = type;
           console.log(`Using media recorder MIME type: ${type}`);
           break;
         }
       }
       
-      // If no supported type is found, proceed without specifying mimeType
-      if (!options.mimeType) {
+      // Fall back to audio/webm if no supported type is found
+      if (!selectedMimeType) {
         console.log('No supported MIME type found, using browser default');
+        selectedMimeType = 'audio/webm';
       }
       
-      // Create MediaRecorder with best available options
+      // Create MediaRecorder with best available options and higher bitrate
       const mediaRecorder = new MediaRecorder(stream, {
-        ...options,
+        mimeType: selectedMimeType,
         bitsPerSecond: 128000 // 128 kbps for better audio quality
       });
       
@@ -225,7 +226,7 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
       
       // Set up data handling with more frequent data collection
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
+        if (e.data && e.data.size > 0) {
           chunksRef.current.push(e.data);
         }
       };
@@ -238,10 +239,9 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
           return;
         }
         
-        // Get the final MIME type being used
-        const blobType = options.mimeType || 'audio/webm';
-        const blob = new Blob(chunksRef.current, { type: blobType });
-        console.log('Recording stopped, blob size:', blob.size, 'blob type:', blobType);
+        // Create a blob with the correct mime type
+        const blob = new Blob(chunksRef.current, { type: selectedMimeType });
+        console.log('Recording stopped, blob size:', blob.size, 'blob type:', selectedMimeType);
         setAudioBlob(blob);
         
         // Clean up resources
@@ -250,9 +250,9 @@ export function useVoiceRecorder({ noiseReduction = true }: UseVoiceRecorderOpti
         toast.success('Recording saved!');
       };
       
-      // Start recording with more frequent data collection (every 500ms)
+      // Start recording with more frequent data collection (every 250ms for better chunking)
       setIsRecording(true);
-      mediaRecorder.start(500);
+      mediaRecorder.start(250);
       
       // Start timer
       timerRef.current = window.setInterval(() => {

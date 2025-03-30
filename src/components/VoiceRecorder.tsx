@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Loader2, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Loader2, ChevronRight, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
@@ -10,6 +10,8 @@ import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingVisualizer } from '@/components/voice-recorder/RecordingVisualizer';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
+import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
+import { toast } from 'sonner';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -20,6 +22,7 @@ interface VoiceRecorderProps {
 export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
   const [noiseReduction, setNoiseReduction] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
   
   const {
     isRecording,
@@ -40,18 +43,59 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     togglePlayback,
     audioRef
   } = useAudioPlayback({ audioBlob });
+
+  // Clear recording error when starting a new recording
+  useEffect(() => {
+    if (isRecording) {
+      setRecordingError(null);
+    }
+  }, [isRecording]);
+  
+  // Minimum recording time check
+  useEffect(() => {
+    if (isRecording && recordingTime >= 120) {
+      toast.warning("Your recording is quite long. Consider stopping now for better processing.");
+    }
+  }, [isRecording, recordingTime]);
   
   const handleSaveEntry = async () => {
-    if (!audioBlob) return;
-    
-    setIsProcessing(true);
-    const result = await processRecording(audioBlob, "user_id");
-    
-    if (result.success && onRecordingComplete) {
-      onRecordingComplete(audioBlob, result.tempId);
+    if (!audioBlob) {
+      setRecordingError("No audio recording available");
+      return;
     }
     
-    setIsProcessing(false);
+    if (audioDuration < 0.5) {
+      setRecordingError("Recording is too short. Please try again.");
+      return;
+    }
+    
+    try {
+      setIsProcessing(true);
+      setRecordingError(null);
+      
+      // Normalize the audio blob to ensure proper MIME type
+      const normalizedBlob = normalizeAudioBlob(audioBlob);
+      
+      // Log detailed info about the audio
+      console.log('Processing audio:', {
+        type: normalizedBlob.type,
+        size: normalizedBlob.size,
+        duration: audioDuration
+      });
+      
+      const result = await processRecording(normalizedBlob, "user_id");
+      
+      if (result.success && onRecordingComplete) {
+        onRecordingComplete(normalizedBlob, result.tempId);
+      } else if (!result.success) {
+        setRecordingError(result.error || "Failed to process recording");
+      }
+    } catch (error: any) {
+      console.error('Error in save entry:', error);
+      setRecordingError(error?.message || "An unexpected error occurred");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -127,6 +171,17 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           </motion.p>
         )}
       </AnimatePresence>
+      
+      {recordingError && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div>{recordingError}</div>
+        </motion.div>
+      )}
       
       {isProcessing && (
         <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">

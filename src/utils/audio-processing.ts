@@ -76,15 +76,36 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     // 3. Check if the user profile exists, and create one if it doesn't
     await ensureUserProfileExists(authStatus.userId);
 
-    // 4. Send audio for transcription
-    const result = await sendAudioForTranscription(base64String, authStatus.userId!);
+    // 4. Send audio for transcription with multiple retries
+    let result;
+    let retries = 0;
+    const maxRetries = 2;
+    
+    while (retries <= maxRetries) {
+      try {
+        result = await sendAudioForTranscription(base64String, authStatus.userId!);
+        if (result.success) break;
+        retries++;
+        if (retries <= maxRetries) {
+          console.log(`Transcription attempt ${retries} failed, retrying...`);
+          // Wait a bit before retrying
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      } catch (err) {
+        console.error(`Transcription attempt ${retries + 1} error:`, err);
+        retries++;
+        if (retries <= maxRetries) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+    }
     
     toast.dismiss(toastId);
     
-    if (result.success) {
+    if (result?.success) {
       toast.success('Journal entry saved successfully!');
     } else {
-      toast.error(result.error || 'Failed to process recording');
+      toast.error(result?.error || 'Failed to process recording after multiple attempts');
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
