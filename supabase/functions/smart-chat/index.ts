@@ -46,10 +46,6 @@ async function generateEmbedding(text: string) {
       throw new Error('OpenAI API key is not configured');
     }
     
-    // Add a timeout to the fetch request
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
     const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -60,10 +56,7 @@ async function generateEmbedding(text: string) {
         model: 'text-embedding-ada-002',
         input: text
       }),
-      signal: controller.signal
     });
-    
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -80,9 +73,6 @@ async function generateEmbedding(text: string) {
     return result.data[0].embedding;
   } catch (error) {
     console.error('Error in generateEmbedding:', error);
-    if (error.name === 'AbortError') {
-      throw new Error('Embedding generation timed out after 15 seconds');
-    }
     throw error;
   }
 }
@@ -134,10 +124,6 @@ Special attention to entity and emotion filtering:
 - For emotion filters (e.g., "when was I happy?"), check if the emotions jsonb field contains the emotion key with significant value (e.g., WHERE emotions->>'happy' > '0.5')
 - For entity filters (e.g., "what did I write about my workplace?"), check if any of the entities match the type or name mentioned (e.g., WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(entities) e WHERE e->>'type' = 'organization'))`;
 
-    // Add a timeout to the fetch request
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
-
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -152,10 +138,7 @@ Special attention to entity and emotion filtering:
         ],
         response_format: { type: "json_object" }
       }),
-      signal: controller.signal
     });
-    
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -176,9 +159,6 @@ Special attention to entity and emotion filtering:
     }
   } catch (error) {
     console.error("Error in analyzeQueryWithGPT:", error);
-    if (error.name === 'AbortError') {
-      throw new Error('GPT analysis timed out after 20 seconds');
-    }
     throw error;
   }
 }
@@ -324,10 +304,6 @@ ${combinedContext}`;
 
     console.log("Sending context to GPT for final response");
     
-    // Add a timeout to the fetch request
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
-    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -341,10 +317,7 @@ ${combinedContext}`;
           { role: 'user', content: userQuery }
         ],
       }),
-      signal: controller.signal
     });
-    
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -356,9 +329,6 @@ ${combinedContext}`;
     return result.choices[0].message.content;
   } catch (error) {
     console.error("Error in generateFinalResponse:", error);
-    if (error.name === 'AbortError') {
-      throw new Error('GPT response generation timed out after 20 seconds');
-    }
     throw error;
   }
 }

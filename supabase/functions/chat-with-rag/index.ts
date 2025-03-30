@@ -14,17 +14,52 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Define known emotion categories for better querying
-const EMOTION_CATEGORIES = {
-  positive: ['happiness', 'joy', 'excitement', 'love', 'gratitude', 'contentment', 'pride', 'amusement', 'optimism'],
-  negative: ['sadness', 'anger', 'fear', 'anxiety', 'disgust', 'shame', 'guilt', 'regret', 'disappointment'],
-  neutral: ['surprise', 'curiosity', 'confusion', 'contemplation', 'nostalgia']
+// Add function execution tracking
+const functionExecutions = [];
+
+// Function to track function executions
+const trackFunctionExecution = (name: string, params?: Record<string, any>) => {
+  const execution = {
+    name,
+    params,
+    result: null,
+    executionTime: 0,
+    success: false
+  };
+  
+  const startTime = Date.now();
+  
+  return {
+    execution,
+    succeed: (result?: any) => {
+      execution.result = result;
+      execution.executionTime = Date.now() - startTime;
+      execution.success = true;
+      functionExecutions.push(execution);
+      return result;
+    },
+    fail: (error?: any) => {
+      execution.result = error?.message || "Failed";
+      execution.executionTime = Date.now() - startTime;
+      execution.success = false;
+      functionExecutions.push(execution);
+      throw error;
+    }
+  };
 };
 
 // Generate embeddings using OpenAI
 async function generateEmbedding(text: string) {
+  const tracker = trackFunctionExecution("generateEmbedding", { text: text.substring(0, 50) + "..." });
+  
   try {
     console.log("Generating embedding for query:", text.substring(0, 50) + "...");
+    
+    if (!openAIApiKey) {
+      console.error("OpenAI API key is not set");
+      return tracker.fail(new Error('OpenAI API key is not configured'));
+    }
+    
     const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -38,708 +73,773 @@ async function generateEmbedding(text: string) {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('Error generating embedding:', error);
-      throw new Error('Failed to generate embedding');
+      const errorText = await response.text();
+      console.error('Error generating embedding:', errorText);
+      return tracker.fail(new Error(`Failed to generate embedding: ${errorText}`));
     }
 
     const result = await response.json();
-    return result.data[0].embedding;
+    if (!result.data || !result.data[0] || !result.data[0].embedding) {
+      console.error('Unexpected embedding response structure:', result);
+      return tracker.fail(new Error('Invalid embedding response structure'));
+    }
+    
+    return tracker.succeed(result.data[0].embedding);
   } catch (error) {
     console.error('Error in generateEmbedding:', error);
-    throw error;
+    return tracker.fail(error);
   }
 }
 
-// Format emotions data into a readable string
-function formatEmotions(emotions: Record<string, number> | null | undefined): string {
-  if (!emotions) return "No emotion data available";
-  
-  // Sort emotions by intensity (highest first)
-  const sortedEmotions = Object.entries(emotions)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3); // Take top 3 emotions for brevity
-    
-  return sortedEmotions
-    .map(([emotion, intensity]) => {
-      // Convert intensity to percentage and format emotion name
-      const percentage = Math.round(intensity * 100);
-      const formattedEmotion = emotion.charAt(0).toUpperCase() + emotion.slice(1);
-      return `${formattedEmotion} (${percentage}%)`;
-    })
-    .join(", ");
-}
-
-// New function to analyze the query and extract relevant parts
-async function analyzeQuery(query: string) {
-  try {
-    console.log("Analyzing query:", query);
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `
-            You are a query analyzer for a journaling app. Extract structured information from user queries about their journal entries.
-            
-            Identify:
-            1. The query type (emotion, theme, entity, sentiment, general, etc.)
-            2. Any specific emotions mentioned (directly or indirectly)
-            3. Any themes mentioned
-            4. Any entity types and names (e.g., workplace, person, location)
-            5. Timeframe hints (today, last week, etc.)
-            6. Whether this is a "when" question (asking about timing of events)
-            7. Sentiment filtering requirements (positive/negative/neutral sentiment or specific score range)
-            8. Relationship terms (e.g., "wife", "partner", "friend", "boss") that would need entity-based search
-            
-            Return a JSON object with these fields. For emotion field, identify both the explicit emotion term used by the user AND the standard emotion categories it might map to (joy, sadness, anger, fear, surprise, etc.).
-            
-            For emotion synonyms, provide an array of possible emotion terms that could match database categories.
-            
-            For sentiment, identify if the user is asking for entries with positive sentiment (happy moments), negative sentiment (sad/angry moments), or a specific sentiment intensity (extremely happy, slightly negative, etc.).
-            `
-          },
-          { role: 'user', content: query }
-        ],
-        response_format: { type: "json_object" }
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Error analyzing query:', error);
-      throw new Error('Failed to analyze query');
-    }
-
-    const result = await response.json();
-    const analysis = JSON.parse(result.choices[0].message.content);
-    
-    console.log("Query analysis:", JSON.stringify(analysis));
-    return analysis;
-  } catch (error) {
-    console.error('Error in analyzeQuery:', error);
-    // Return a default analysis to continue execution
-    return {
-      queryType: "general",
-      emotion: null,
-      theme: null,
-      entityType: null,
-      entityName: null,
-      relationship: null,
-      sentiment: null,
-      timeframe: {
-        timeType: null,
-        startDate: null,
-        endDate: new Date().toISOString()
-      },
-      isWhenQuestion: false
-    };
-  }
-}
-
-// New function to get emotion mappings from the emotions table
-async function getEmotionMappings(emotionTerm: string) {
-  if (!emotionTerm) return [];
-  
-  try {
-    console.log("Looking up emotion mappings for:", emotionTerm);
-    
-    // First attempt to find direct matches
-    const { data: directMatches, error: directError } = await supabase
-      .from('emotions')
-      .select('name, description')
-      .ilike('name', `%${emotionTerm}%`);
-    
-    if (directError) {
-      console.error("Error querying emotions table:", directError);
-      return [];
-    }
-    
-    if (directMatches && directMatches.length > 0) {
-      console.log(`Found ${directMatches.length} direct emotion matches`);
-      return directMatches.map(match => match.name.toLowerCase());
-    }
-    
-    // If no direct matches, use GPT to find relevant emotions
-    console.log("No direct matches found, using GPT to find related emotions");
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an emotion classification specialist. Given a term that might express an emotional state, map it to the most closely related standard emotions from this list: 
-            joy, happiness, excitement, love, gratitude, contentment, pride, amusement, optimism, sadness, anger, fear, anxiety, disgust, shame, guilt, regret, disappointment, surprise, curiosity, confusion, contemplation, nostalgia.
-            
-            Return a JSON array with the top 3 most relevant standard emotions.`
-          },
-          { role: 'user', content: emotionTerm }
-        ],
-        response_format: { type: "json_object" }
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Error mapping emotions with GPT:', error);
-      return [];
-    }
-
-    const result = await response.json();
-    const mappedEmotions = JSON.parse(result.choices[0].message.content);
-    console.log("GPT mapped emotions:", mappedEmotions);
-    
-    return Array.isArray(mappedEmotions) ? mappedEmotions.map(e => e.toLowerCase()) : [];
-    
-  } catch (error) {
-    console.error('Error in getEmotionMappings:', error);
-    return [];
-  }
-}
-
-// New function to search journal entries based on sentiment scores
-async function searchEntriesBySentiment(
-  userId: string,
-  sentimentFilter: any,
-  timeframe: any
+// Function to search journal entries by theme
+async function searchJournalEntriesByTheme(
+  userId: string, 
+  themeQuery: string,
+  queryEmbedding: any,
+  matchThreshold: number = 0.5,
+  matchCount: number = 10, 
+  startDate: string | null = null,
+  endDate: string | null = null
 ) {
+  const tracker = trackFunctionExecution("searchJournalEntriesByTheme", { 
+    userId, 
+    themeQuery,
+    matchThreshold,
+    matchCount,
+    startDate,
+    endDate
+  });
+  
   try {
-    if (!sentimentFilter) return [];
+    console.log(`Searching for theme-related entries with userId: ${userId}, theme query: ${themeQuery}`);
     
-    console.log(`Searching for entries with sentiment filter:`, sentimentFilter);
-    
-    let sentimentQuery = supabase
+    // First try direct theme matching
+    const { data: themeResults, error: themeError } = await supabase
       .from('Journal Entries')
-      .select('id, "refined text", created_at, sentiment, emotions, entities')
-      .eq('user_id', userId);
-    
-    // Add timeframe filters if provided
-    if (timeframe?.startDate) {
-      sentimentQuery = sentimentQuery.gte('created_at', timeframe.startDate);
+      .select('id, "refined text", created_at, master_themes')
+      .eq('user_id', userId)
+      .contains('master_themes', [themeQuery])
+      .order('created_at', { ascending: false })
+      .limit(matchCount);
+
+    if (themeError) {
+      console.error("Error in theme matching:", themeError);
+    } else if (themeResults && themeResults.length > 0) {
+      console.log(`Found ${themeResults.length} entries through direct theme matching`);
+      return tracker.succeed(themeResults.map(entry => ({
+        ...entry,
+        content: entry["refined text"],
+        similarity: 1.0 // High relevance for direct matches
+      })));
     }
-    if (timeframe?.endDate) {
-      sentimentQuery = sentimentQuery.lte('created_at', timeframe.endDate);
-    }
+
+    // If no direct matches, try vector similarity search
+    console.log("No direct theme matches, trying vector similarity search");
     
-    // Handle different sentiment filter types
-    if (sentimentFilter.type === "positive") {
-      // Positive sentiment is generally > 0
-      sentimentQuery = sentimentQuery.gt('sentiment', '0');
-    } else if (sentimentFilter.type === "negative") {
-      // Negative sentiment is generally < 0
-      sentimentQuery = sentimentQuery.lt('sentiment', '0');
-    } else if (sentimentFilter.type === "neutral") {
-      // Neutral sentiment is close to 0
-      sentimentQuery = sentimentQuery.gte('sentiment', '-0.2').lte('sentiment', '0.2');
-    } else if (sentimentFilter.type === "high_positive") {
-      // High positive sentiment is generally > 0.5
-      sentimentQuery = sentimentQuery.gt('sentiment', '0.5');
-    } else if (sentimentFilter.type === "high_negative") {
-      // High negative sentiment is generally < -0.5
-      sentimentQuery = sentimentQuery.lt('sentiment', '-0.5');
+    try {
+      // Directly use vector similarity search
+      const rpcParams = {
+        query_embedding: queryEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+        user_id_filter: userId,
+        start_date: startDate,
+        end_date: endDate
+      };
+      
+      console.log("RPC params:", JSON.stringify(rpcParams).substring(0, 100) + "...");
+      
+      const { data: vectorResults, error: vectorError } = await supabase.rpc(
+        'match_journal_entries_with_date',
+        rpcParams
+      );
+
+      if (vectorError) {
+        console.error("Error in vector similarity search:", vectorError);
+        
+        // Try text search as fallback
+        console.log("Falling back to text-based search for theme");
+        const textSearchTerms = themeQuery.split(/\s+/).filter(w => w.length > 3);
+        const searchTerm = textSearchTerms.length > 0 ? textSearchTerms[0] : themeQuery;
+        
+        const { data: textResults, error: textError } = await supabase
+          .from('Journal Entries')
+          .select('id, "refined text", created_at')
+          .eq('user_id', userId)
+          .ilike('refined text', `%${searchTerm}%`)
+          .order('created_at', { ascending: false })
+          .limit(matchCount);
+          
+        if (textError) {
+          console.error("Error in text search fallback:", textError);
+          throw vectorError; // Throw original error if text search also fails
+        }
+        
+        if (textResults && textResults.length > 0) {
+          console.log(`Found ${textResults.length} entries through text search fallback`);
+          return tracker.succeed(textResults.map(entry => ({
+            id: entry.id,
+            content: entry["refined text"],
+            created_at: entry.created_at,
+            similarity: 0.7 // Arbitrary score for text matches
+          })));
+        }
+        
+        throw vectorError;
+      }
+
+      console.log(`Found ${vectorResults?.length || 0} entries through vector similarity`);
+      return tracker.succeed(vectorResults || []);
+    } catch (error) {
+      console.error("Error in vector similarity search:", error);
+      
+      // Last resort fallback - get recent entries
+      console.log("All searches failed, retrieving recent entries as fallback");
+      const { data: recentEntries, error: recentError } = await supabase
+        .from('Journal Entries')
+        .select('id, "refined text", created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(matchCount);
+        
+      if (recentError) {
+        console.error("Error retrieving recent entries:", recentError);
+        return tracker.fail(error);
+      }
+      
+      if (recentEntries && recentEntries.length > 0) {
+        console.log(`Retrieved ${recentEntries.length} recent entries as fallback`);
+        return tracker.succeed(recentEntries.map(entry => ({
+          id: entry.id,
+          content: entry["refined text"],
+          created_at: entry.created_at,
+          similarity: 0.4, // Lower score for fallback results
+          type: 'recent'
+        })));
+      }
+      
+      return tracker.fail(error);
     }
+  } catch (error) {
+    console.error("Exception in searchJournalEntriesByTheme:", error);
+    return tracker.fail(error);
+  }
+}
+
+// Function to search journal entries using text search
+async function searchJournalEntriesByText(
+  userId: string,
+  searchTerm: string,
+  limit: number = 5
+) {
+  const tracker = trackFunctionExecution("searchJournalEntriesByText", {
+    userId,
+    searchTerm,
+    limit
+  });
+  
+  try {
+    console.log(`Searching for text matches with userId: ${userId}, search term: ${searchTerm}`);
     
-    const { data, error } = await sentimentQuery;
+    // Search in the refined text and transcription text
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('id, "refined text", created_at')
+      .eq('user_id', userId)
+      .or(`refined_text.ilike.%${searchTerm}%,transcription_text.ilike.%${searchTerm}%`)
+      .order('created_at', { ascending: false })
+      .limit(limit);
     
     if (error) {
-      console.error("Error in sentiment search:", error);
-      return [];
+      console.error("Error in text search:", error);
+      return tracker.fail(error);
     }
     
-    console.log(`Found ${data?.length || 0} entries matching sentiment criteria`);
-    return data || [];
+    console.log(`Text search found ${data?.length || 0} entries`);
     
+    // Format the results similar to other search functions
+    return tracker.succeed((data || []).map(entry => ({
+      id: entry.id,
+      content: entry["refined text"],
+      created_at: entry.created_at,
+      similarity: 0.7, // Arbitrary similarity for text matches
+      type: 'text_match'
+    })));
   } catch (error) {
-    console.error("Error in searchEntriesBySentiment:", error);
-    return [];
+    console.error("Exception in searchJournalEntriesByText:", error);
+    return tracker.fail(error);
   }
 }
 
-// Search for journal entries based on an emotion
-async function searchEntriesByEmotion(
+// Function to search journal entries with date range and higher default limit
+async function searchJournalEntriesWithDate(
   userId: string, 
-  emotionTerm: string,
-  timeframe: any
+  queryEmbedding: any,
+  startDate: string | null = null,
+  endDate: string | null = null,
+  matchThreshold: number = 0.5,
+  matchCount: number = 10
 ) {
+  const tracker = trackFunctionExecution("searchJournalEntriesWithDate", { 
+    userId, 
+    startDate, 
+    endDate, 
+    matchThreshold, 
+    matchCount 
+  });
+  
   try {
-    if (!emotionTerm) return [];
+    console.log(`Searching entries with vector similarity for userId: ${userId}`);
     
-    console.log(`Searching for entries with emotion: ${emotionTerm}`);
+    // Prepare RPC parameters
+    const rpcParams = {
+      query_embedding: queryEmbedding,
+      match_threshold: matchThreshold,
+      match_count: matchCount,
+      user_id_filter: userId,
+      start_date: startDate,
+      end_date: endDate
+    };
     
-    // Get emotion mappings from the emotions table
-    const mappedEmotions = await getEmotionMappings(emotionTerm);
-    console.log("Mapped emotions:", mappedEmotions);
+    console.log("RPC params for match_journal_entries_with_date:", JSON.stringify(rpcParams).substring(0, 100) + "...");
     
-    if (mappedEmotions.length === 0) {
-      console.log("No emotion mappings found, using original term");
-      mappedEmotions.push(emotionTerm.toLowerCase());
-    }
-    
-    let allResults = [];
-    const minScore = 0.3; // Minimum score threshold for emotions
-    
-    // Search for each mapped emotion
-    for (const emotion of mappedEmotions) {
-      console.log(`Querying for emotion: ${emotion}`);
-      
+    try {
       const { data, error } = await supabase.rpc(
-        'match_journal_entries_by_emotion',
-        {
-          emotion_name: emotion,
-          user_id_filter: userId,
-          min_score: minScore,
-          start_date: timeframe?.startDate || null,
-          end_date: timeframe?.endDate || null,
-          limit_count: 10
-        }
+        'match_journal_entries_with_date',
+        rpcParams
       );
       
       if (error) {
-        console.error(`Error in emotion search for ${emotion}:`, error);
-        continue;
+        console.error("Error in vector similarity search:", error);
+        throw error;
       }
       
-      if (data && data.length > 0) {
-        console.log(`Found ${data.length} entries for emotion: ${emotion}`);
-        allResults = [...allResults, ...data];
+      console.log(`Vector similarity search found ${data?.length || 0} entries`);
+      return tracker.succeed(data || []);
+    } catch (vectorError) {
+      console.error("Exception in vector similarity search:", vectorError);
+      
+      // Fall back to text search if vector search fails
+      console.log("Vector search failed, falling back to basic query");
+      
+      // Try to get entries directly from the Journal Entries table
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('Journal Entries')
+        .select('id, "refined text", created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(matchCount);
+      
+      if (fallbackError) {
+        console.error("Error in fallback query:", fallbackError);
+        return tracker.fail(vectorError); // Return original error
       }
+      
+      console.log(`Fallback query found ${fallbackData?.length || 0} entries`);
+      
+      return tracker.succeed((fallbackData || []).map(entry => ({
+        id: entry.id,
+        content: entry["refined text"],
+        created_at: entry.created_at,
+        similarity: 0.4, // Lower arbitrary score for fallback results
+        type: 'fallback_match'
+      })));
     }
+  } catch (error) {
+    console.error("Exception in searchJournalEntriesWithDate:", error);
+    return tracker.fail(error);
+  }
+}
+
+// Function to search by emotion terms
+async function searchEntriesByEmotionTerm(
+  userId: string,
+  emotionTerm: string,
+  startDate: string | null = null,
+  endDate: string | null = null,
+  limit: number = 5
+) {
+  const tracker = trackFunctionExecution("searchEntriesByEmotionTerm", {
+    userId,
+    emotionTerm,
+    startDate,
+    endDate,
+    limit
+  });
+  
+  try {
+    console.log(`Searching entries by emotion term: ${emotionTerm} for userId: ${userId}`);
     
-    // If we still don't have results, try a more generic search
-    if (allResults.length === 0) {
-      console.log("No entries found with specific emotions, trying text search");
+    try {
+      // Try using the emotion term RPC function
+      const rpcParams = {
+        emotion_term: emotionTerm,
+        user_id_filter: userId,
+        start_date: startDate,
+        end_date: endDate,
+        limit_count: limit
+      };
+      
+      console.log("RPC params for get_entries_by_emotion_term:", JSON.stringify(rpcParams));
       
       const { data, error } = await supabase.rpc(
         'get_entries_by_emotion_term',
-        {
-          emotion_term: emotionTerm,
-          user_id_filter: userId,
-          start_date: timeframe?.startDate || null,
-          end_date: timeframe?.endDate || null
-        }
+        rpcParams
       );
       
       if (error) {
-        console.error("Error in text-based emotion search:", error);
-      } else if (data && data.length > 0) {
-        console.log(`Found ${data.length} entries through text search`);
-        allResults = [...allResults, ...data];
+        console.error("Error in emotion term search:", error);
+        throw error;
       }
+      
+      console.log(`Emotion term search found ${data?.length || 0} entries`);
+      
+      return tracker.succeed((data || []).map(entry => ({
+        id: entry.id,
+        content: entry.content,
+        created_at: entry.created_at,
+        similarity: 0.8, // Arbitrary similarity for emotion matches
+        type: 'emotion_match'
+      })));
+    } catch (rpcError) {
+      console.error("RPC function error:", rpcError);
+      
+      // Fallback: query emotions directly in the Journal Entries table
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('Journal Entries')
+        .select('id, "refined text", created_at, emotions')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit * 3); // Get more entries to filter
+      
+      if (fallbackError) {
+        console.error("Error in fallback emotion query:", fallbackError);
+        return tracker.fail(rpcError);
+      }
+      
+      // Filter entries that have the emotion in their emotions JSON field
+      const filteredEntries = (fallbackData || []).filter(entry => {
+        if (!entry.emotions) return false;
+        
+        try {
+          const emotions = typeof entry.emotions === 'string' 
+            ? JSON.parse(entry.emotions) 
+            : entry.emotions;
+          
+          return Object.keys(emotions).some(key => 
+            key.toLowerCase().includes(emotionTerm.toLowerCase())
+          );
+        } catch (e) {
+          return false;
+        }
+      }).slice(0, limit);
+      
+      console.log(`Fallback emotion search found ${filteredEntries.length} entries`);
+      
+      return tracker.succeed(filteredEntries.map(entry => ({
+        id: entry.id,
+        content: entry["refined text"],
+        created_at: entry.created_at,
+        similarity: 0.7,
+        type: 'emotion_fallback_match'
+      })));
     }
-    
-    // Remove duplicates by ID
-    const uniqueResults = Array.from(
-      new Map(allResults.map(item => [item.id, item])).values()
-    );
-    
-    console.log(`Returning ${uniqueResults.length} unique emotion-related entries`);
-    return uniqueResults;
-    
   } catch (error) {
-    console.error("Error in searchEntriesByEmotion:", error);
-    return [];
+    console.error("Exception in searchEntriesByEmotionTerm:", error);
+    return tracker.fail(error);
   }
 }
 
-// Search for journal entries based on an entity
+// New function to search by entity type and name
 async function searchEntriesByEntity(
-  userId: string, 
-  entityType: string,
-  entityName: string | null = null,
-  timeframe: any
+  userId: string,
+  entityType: string | null,
+  entityName: string | null,
+  startDate: string | null = null,
+  endDate: string | null = null,
+  limit: number = 5
 ) {
+  const tracker = trackFunctionExecution("searchEntriesByEntity", {
+    userId,
+    entityType,
+    entityName,
+    startDate,
+    endDate,
+    limit
+  });
+  
   try {
-    if (!entityType) return [];
+    console.log(`Searching for entries with entity. Type: ${entityType}, Name: ${entityName}`);
     
-    console.log(`Searching for entries with entity type: ${entityType}, name: ${entityName || 'any'}`);
-    
-    const { data, error } = await supabase
+    // Define the basic query conditions
+    let query = supabase
       .from('Journal Entries')
       .select('id, "refined text", created_at, entities')
       .eq('user_id', userId)
-      .not('entities', 'is', null)
-      .gte('created_at', timeframe?.startDate || '1970-01-01')
-      .lte('created_at', timeframe?.endDate || new Date().toISOString());
+      .is('entities', 'not.null');
+      
+    // Apply date filters if provided
+    if (startDate) {
+      query = query.gte('created_at', startDate);
+    }
+    if (endDate) {
+      query = query.lte('created_at', endDate);
+    }
+    
+    // Execute the query
+    const { data, error } = await query.order('created_at', { ascending: false });
     
     if (error) {
       console.error("Error in entity search:", error);
-      return [];
+      return tracker.fail(error);
     }
     
-    if (!data || data.length === 0) {
-      console.log("No entries with entities found");
-      return [];
-    }
+    console.log(`Found ${data?.length || 0} entries with entities`);
     
-    // Filter entries containing the specified entity type and optional name
-    const filteredEntries = data.filter(entry => {
-      // Skip entries without entities
-      if (!entry.entities || !Array.isArray(entry.entities)) return false;
+    // Filter entries that have matching entities
+    const filteredEntries = data?.filter(entry => {
+      if (!entry.entities) return false;
       
-      // Check if any entity matches the criteria
-      return entry.entities.some(entity => {
-        const matchesType = entity.type && entity.type.toLowerCase() === entityType.toLowerCase();
-        const matchesName = !entityName || 
-                           (entity.name && 
-                            entity.name.toLowerCase().includes(entityName.toLowerCase()));
-        return matchesType && matchesName;
-      });
-    });
+      try {
+        const entities = Array.isArray(entry.entities) ? entry.entities : [];
+        
+        return entities.some(entity => {
+          // Match by entity type if provided
+          const typeMatches = !entityType || entity.type?.toLowerCase().includes(entityType.toLowerCase());
+          
+          // Match by entity name if provided
+          const nameMatches = !entityName || entity.name?.toLowerCase().includes(entityName.toLowerCase());
+          
+          // Return true if both conditions match or if only checking for one condition
+          return typeMatches && nameMatches;
+        });
+      } catch (e) {
+        console.error("Error parsing entities for entry", entry.id, e);
+        return false;
+      }
+    }) || [];
     
-    console.log(`Found ${filteredEntries.length} entries with matching entities`);
-    return filteredEntries;
+    console.log(`Filtered to ${filteredEntries.length} entries with matching entities`);
     
+    // Format the results similar to other search functions
+    return tracker.succeed(filteredEntries.slice(0, limit).map(entry => ({
+      id: entry.id,
+      content: entry["refined text"],
+      created_at: entry.created_at,
+      similarity: 0.85, // High arbitrary similarity for explicit entity matches
+      type: 'entity_match',
+      entities: entry.entities
+    })));
   } catch (error) {
-    console.error("Error in searchEntriesByEntity:", error);
-    return [];
+    console.error("Exception in searchEntriesByEntity:", error);
+    return tracker.fail(error);
   }
 }
 
-// Search for journal entries based on both entity and emotion
+// New function to search by both entity and emotion
 async function searchEntriesByEntityAndEmotion(
   userId: string,
-  entityType: string,
-  emotionTerm: string,
-  entityName: string | null = null,
-  timeframe: any
+  entityType: string | null,
+  entityName: string | null,
+  emotionTerm: string | null,
+  startDate: string | null = null,
+  endDate: string | null = null,
+  limit: number = 5
 ) {
-  try {
-    console.log(`Searching for entries with entity type: ${entityType} and emotion: ${emotionTerm}`);
-    
-    // Get entries matching the entity criteria
-    const entityEntries = await searchEntriesByEntity(
-      userId, 
-      entityType, 
-      entityName, 
-      timeframe
-    );
-    
-    if (entityEntries.length === 0) {
-      console.log("No entity entries found, cannot combine with emotions");
-      return [];
-    }
-    
-    // Get emotion mappings
-    const mappedEmotions = await getEmotionMappings(emotionTerm);
-    console.log("Mapped emotions for combined search:", mappedEmotions);
-    
-    if (mappedEmotions.length === 0) {
-      console.log("No emotion mappings found, using original term");
-      mappedEmotions.push(emotionTerm.toLowerCase());
-    }
-    
-    // Get the IDs of entity entries to filter emotion results
-    const entityEntryIds = entityEntries.map(entry => entry.id);
-    
-    let allResults = [];
-    const minScore = 0.3;
-    
-    // Search for each mapped emotion
-    for (const emotion of mappedEmotions) {
-      console.log(`Querying for emotion: ${emotion} within entity results`);
-      
-      const { data, error } = await supabase.rpc(
-        'match_journal_entries_by_emotion',
-        {
-          emotion_name: emotion,
-          user_id_filter: userId,
-          min_score: minScore,
-          start_date: timeframe?.startDate || null,
-          end_date: timeframe?.endDate || null,
-          limit_count: 50  // Get more results to filter down
-        }
-      );
-      
-      if (error) {
-        console.error(`Error in emotion search for ${emotion}:`, error);
-        continue;
-      }
-      
-      if (data && data.length > 0) {
-        // Filter to only include entries that are also in entityEntryIds
-        const filteredResults = data.filter(entry => 
-          entityEntryIds.includes(entry.id)
-        );
-        
-        console.log(`Found ${filteredResults.length} entries for emotion: ${emotion} after entity filtering`);
-        allResults = [...allResults, ...filteredResults];
-      }
-    }
-    
-    // Remove duplicates by ID
-    const uniqueResults = Array.from(
-      new Map(allResults.map(item => [item.id, item])).values()
-    );
-    
-    console.log(`Returning ${uniqueResults.length} unique entries matching both entity and emotion criteria`);
-    return uniqueResults;
-    
-  } catch (error) {
-    console.error("Error in searchEntriesByEntityAndEmotion:", error);
-    return [];
-  }
-}
-
-// New function to search by entity and sentiment
-async function searchEntriesByEntityAndSentiment(
-  userId: string,
-  entityType: string,
-  sentimentFilter: any,
-  entityName: string | null = null,
-  timeframe: any
-) {
-  try {
-    console.log(`Searching for entries with entity type: ${entityType} and sentiment filter:`, sentimentFilter);
-    
-    // Get entries matching the sentiment criteria
-    const sentimentEntries = await searchEntriesBySentiment(
-      userId, 
-      sentimentFilter, 
-      timeframe
-    );
-    
-    if (sentimentEntries.length === 0) {
-      console.log("No sentiment entries found, cannot combine with entity");
-      return [];
-    }
-    
-    // Filter sentiment entries to only include those matching the entity criteria
-    const filteredEntries = sentimentEntries.filter(entry => {
-      // Skip entries without entities
-      if (!entry.entities || !Array.isArray(entry.entities)) return false;
-      
-      // Check if any entity matches the criteria
-      return entry.entities.some((entity: any) => {
-        const matchesType = entity.type && entity.type.toLowerCase() === entityType.toLowerCase();
-        const matchesName = !entityName || 
-                           (entity.name && 
-                            entity.name.toLowerCase().includes(entityName.toLowerCase()));
-        return matchesType && matchesName;
-      });
-    });
-    
-    console.log(`Found ${filteredEntries.length} entries with matching entity and sentiment criteria`);
-    return filteredEntries;
-    
-  } catch (error) {
-    console.error("Error in searchEntriesByEntityAndSentiment:", error);
-    return [];
-  }
-}
-
-// Enhanced function to search for relevant context based on query analysis
-async function searchRelevantContext(userId: string, queryText: string, queryAnalysis: any) {
-  try {
-    console.log("Searching for relevant context based on query analysis");
-    
-    let relevantEntries = [];
-    
-    // Case 1: Entity + Sentiment + Emotion (most specific)
-    if (queryAnalysis.entityType && queryAnalysis.sentiment && queryAnalysis.emotion) {
-      console.log("Using entity + sentiment + emotion combined search");
-      
-      // First get entries matching entity and sentiment
-      const entitySentimentEntries = await searchEntriesByEntityAndSentiment(
-        userId,
-        queryAnalysis.entityType,
-        queryAnalysis.sentiment,
-        queryAnalysis.entityName,
-        queryAnalysis.timeframe
-      );
-      
-      // Then filter by emotion from those entries
-      if (entitySentimentEntries.length > 0) {
-        console.log("Filtering entity + sentiment results by emotion");
-        
-        // Get emotion mappings
-        const mappedEmotions = await getEmotionMappings(queryAnalysis.emotion);
-        
-        // Filter entries that have the required emotions
-        relevantEntries = entitySentimentEntries.filter(entry => {
-          if (!entry.emotions) return false;
-          
-          return mappedEmotions.some(emotion => {
-            return entry.emotions[emotion] && entry.emotions[emotion] > 0.3;
-          });
-        });
-        
-        if (relevantEntries.length > 0) {
-          console.log(`Found ${relevantEntries.length} entries matching entity + sentiment + emotion`);
-          return relevantEntries;
-        }
-      }
-    }
-    
-    // Case 2: Entity + Sentiment combination
-    if (queryAnalysis.entityType && queryAnalysis.sentiment) {
-      console.log("Using entity + sentiment combined search");
-      relevantEntries = await searchEntriesByEntityAndSentiment(
-        userId,
-        queryAnalysis.entityType,
-        queryAnalysis.sentiment,
-        queryAnalysis.entityName,
-        queryAnalysis.timeframe
-      );
-      
-      if (relevantEntries.length > 0) {
-        console.log(`Found ${relevantEntries.length} entries through entity + sentiment search`);
-        return relevantEntries;
-      }
-    }
-    
-    // Case 3: Entity + Emotion combination
-    if (queryAnalysis.entityType && queryAnalysis.emotion) {
-      console.log("Using entity + emotion combined search");
-      relevantEntries = await searchEntriesByEntityAndEmotion(
-        userId,
-        queryAnalysis.entityType,
-        queryAnalysis.emotion,
-        queryAnalysis.entityName,
-        queryAnalysis.timeframe
-      );
-      
-      if (relevantEntries.length > 0) {
-        console.log(`Found ${relevantEntries.length} entries through entity + emotion search`);
-        return relevantEntries;
-      }
-    }
-    
-    // Case 4: Sentiment-specific search
-    if (queryAnalysis.sentiment) {
-      console.log("Using sentiment-based search");
-      relevantEntries = await searchEntriesBySentiment(
-        userId,
-        queryAnalysis.sentiment,
-        queryAnalysis.timeframe
-      );
-      
-      if (relevantEntries.length > 0) {
-        console.log(`Found ${relevantEntries.length} entries through sentiment search`);
-        return relevantEntries;
-      }
-    }
-    
-    // Case 5: Entity-specific search
-    if (queryAnalysis.entityType) {
-      console.log("Using entity-based search");
-      relevantEntries = await searchEntriesByEntity(
-        userId,
-        queryAnalysis.entityType,
-        queryAnalysis.entityName,
-        queryAnalysis.timeframe
-      );
-      
-      if (relevantEntries.length > 0) {
-        console.log(`Found ${relevantEntries.length} entries through entity search`);
-        return relevantEntries;
-      }
-    } 
-    
-    // Case 6: Emotion-specific search
-    if (queryAnalysis.emotion) {
-      console.log("Using emotion-based search");
-      relevantEntries = await searchEntriesByEmotion(
-        userId,
-        queryAnalysis.emotion,
-        queryAnalysis.timeframe
-      );
-      
-      if (relevantEntries.length > 0) {
-        console.log(`Found ${relevantEntries.length} entries through emotion search`);
-        return relevantEntries;
-      }
-    }
-    
-    // Case 7: Fallback to vector similarity search
-    console.log("Using embedding for search");
-    const queryEmbedding = await generateEmbedding(queryText);
-    
-    const { data: vectorResults, error: vectorError } = await supabase.rpc(
-      'match_journal_entries_with_date',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 5,
-        user_id_filter: userId,
-        start_date: queryAnalysis.timeframe?.startDate || null,
-        end_date: queryAnalysis.timeframe?.endDate || null
-      }
-    );
-    
-    if (vectorError) {
-      console.error("Error in vector similarity search:", vectorError);
-      return [];
-    }
-    
-    if (vectorResults && vectorResults.length > 0) {
-      console.log(`Vector similarity search found ${vectorResults.length} entries`);
-      return vectorResults;
-    }
-    
-    // Case 8: Last resort - fetch recent entries
-    console.log("No similar entries found, falling back to recent entries");
-    const { data: recentEntries, error: recentError } = await supabase
-      .from('Journal Entries')
-      .select('id, "refined text", created_at, emotions, sentiment')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(3);
-    
-    if (recentError) {
-      console.error("Error retrieving recent entries:", recentError);
-      return [];
-    }
-    
-    if (recentEntries && recentEntries.length > 0) {
-      console.log(`Retrieved ${recentEntries.length} recent entries as fallback`);
-      return recentEntries;
-    }
-    
-    return [];
-    
-  } catch (error) {
-    console.error("Error in searchRelevantContext:", error);
-    return [];
-  }
-}
-
-// Function to fetch messages from a thread for conversation context
-async function fetchPreviousMessages(threadId: string, limit = 10) {
-  if (!threadId || threadId === 'new thread') {
-    console.log("No thread ID provided");
-    return [];
-  }
+  const tracker = trackFunctionExecution("searchEntriesByEntityAndEmotion", {
+    userId,
+    entityType,
+    entityName,
+    emotionTerm,
+    startDate,
+    endDate,
+    limit
+  });
   
   try {
+    console.log(`Searching for entries with entity (${entityType}/${entityName}) and emotion (${emotionTerm})`);
+    
+    // First, get entries matching the entity criteria
+    let entityResults = [];
+    if (entityType || entityName) {
+      entityResults = await searchEntriesByEntity(
+        userId,
+        entityType,
+        entityName,
+        startDate,
+        endDate,
+        limit * 2 // Get more results to filter by emotion
+      );
+    }
+    
+    // If we have emotion term and entity results, filter by emotion
+    if (emotionTerm && entityResults.length > 0) {
+      // Get the IDs of entity-matching entries
+      const entityMatchIds = entityResults.map(entry => entry.id);
+      
+      // Get entries matching the emotion criteria
+      const emotionResults = await searchEntriesByEmotionTerm(
+        userId,
+        emotionTerm,
+        startDate,
+        endDate,
+        limit * 2
+      );
+      
+      // Find entries that match both criteria by ID
+      const matchingIds = new Set(emotionResults.map(entry => entry.id));
+      const combinedResults = entityResults.filter(entry => matchingIds.has(entry.id));
+      
+      console.log(`Found ${combinedResults.length} entries matching both entity and emotion criteria`);
+      
+      if (combinedResults.length > 0) {
+        // Enhance the similarity score for dual matches
+        return tracker.succeed(combinedResults.slice(0, limit).map(entry => ({
+          ...entry,
+          similarity: 0.95, // Very high relevance for dual matches
+          type: 'entity_emotion_match'
+        })));
+      }
+    }
+    
+    // If no combined results or no emotion term, return entity results
+    if (entityResults.length > 0) {
+      return tracker.succeed(entityResults.slice(0, limit));
+    }
+    
+    // If no entity results but have emotion term, get emotion-only results
+    if (emotionTerm) {
+      const emotionResults = await searchEntriesByEmotionTerm(
+        userId,
+        emotionTerm,
+        startDate,
+        endDate,
+        limit
+      );
+      
+      if (emotionResults.length > 0) {
+        return tracker.succeed(emotionResults);
+      }
+    }
+    
+    // As a fallback, get recent entries
+    console.log("No matching entries found, falling back to recent entries");
+    const recentEntries = await getRecentEntries(userId, limit);
+    return tracker.succeed(recentEntries);
+    
+  } catch (error) {
+    console.error("Exception in searchEntriesByEntityAndEmotion:", error);
+    return tracker.fail(error);
+  }
+}
+
+// Function to analyze query and determine search strategy
+function analyzeQuery(text: string): {
+  queryType: 'emotional' | 'temporal' | 'thematic' | 'entity' | 'entity_emotion' | 'general',
+  emotion: string | null,
+  theme: string | null,
+  entityType: string | null,
+  entityName: string | null,
+  timeframe: {timeType: string | null, startDate: string | null, endDate: string | null},
+  isWhenQuestion: boolean
+} {
+  const lowerText = text.toLowerCase();
+  
+  // Check for "when" questions
+  const isWhenQuestion = lowerText.includes('when') && 
+                          (lowerText.endsWith('?') || lowerText.includes('when was') || 
+                           lowerText.includes('when did') || lowerText.includes('when were'));
+  
+  // Check for emotional keywords
+  const emotionKeywords = {
+    sad: ['sad', 'unhappy', 'depressed', 'upset', 'disappointed', 'down', 'miserable', 'gloomy'],
+    happy: ['happy', 'joy', 'glad', 'pleased', 'delighted', 'content', 'cheerful', 'joyful'],
+    angry: ['angry', 'mad', 'furious', 'irritated', 'annoyed', 'upset', 'frustrated'],
+    anxious: ['anxious', 'worried', 'nervous', 'stressed', 'uneasy', 'tense', 'fear', 'afraid'],
+    surprised: ['surprised', 'shocked', 'amazed', 'astonished', 'stunned']
+  };
+  
+  let emotionFound = null;
+  for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
+    if (keywords.some(keyword => lowerText.includes(keyword))) {
+      emotionFound = emotion;
+      break;
+    }
+  }
+  
+  // Define entity keywords
+  const entityTypeMap = {
+    workplace: ['work', 'office', 'job', 'career', 'company', 'business', 'workplace', 'organization'],
+    person: ['friend', 'colleague', 'coworker', 'boss', 'manager', 'partner', 'spouse', 'husband', 'wife', 'boyfriend', 'girlfriend'],
+    location: ['place', 'city', 'country', 'location', 'home', 'house', 'apartment', 'building'],
+    event: ['meeting', 'conference', 'gathering', 'party', 'celebration', 'appointment', 'session'],
+    project: ['project', 'task', 'assignment', 'initiative', 'development']
+  };
+  
+  // Check for entity type
+  let entityType = null;
+  let entityName = null;
+  
+  for (const [type, keywords] of Object.entries(entityTypeMap)) {
+    if (keywords.some(keyword => lowerText.includes(keyword))) {
+      entityType = type;
+      break;
+    }
+  }
+  
+  // Define theme keywords for workplace context
+  const workplaceKeywords = [
+    'work', 'office', 'job', 'career', 'company', 'business', 'workplace',
+    'meeting', 'project', 'colleague', 'manager', 'boss', 'team',
+    'client', 'deadline', 'presentation', 'email', 'corporate'
+  ];
+
+  // Check for workplace-related terms
+  const foundWorkplaceKeywords = workplaceKeywords.filter(keyword => 
+    lowerText.includes(keyword)
+  );
+
+  // Detect timeframe
+  const timeframe = detectTimeframe(text);
+  
+  // Determine query type and search strategy
+  let queryType: 'emotional' | 'temporal' | 'thematic' | 'entity' | 'entity_emotion' | 'general' = 'general';
+  let theme = null;
+
+  // Determine if query combines entity and emotion
+  if (entityType && emotionFound) {
+    queryType = 'entity_emotion';
+  } else if (emotionFound) {
+    queryType = 'emotional';
+  } else if (entityType) {
+    queryType = 'entity';
+  } else if (foundWorkplaceKeywords.length > 0) {
+    queryType = 'thematic';
+    theme = 'workplace';
+  } else if (timeframe.timeType) {
+    queryType = 'temporal';
+  }
+
+  return {
+    queryType,
+    emotion: emotionFound,
+    theme,
+    entityType,
+    entityName,
+    timeframe,
+    isWhenQuestion
+  };
+}
+
+// Function to detect timeframe from text
+function detectTimeframe(text: string): {timeType: string | null, startDate: string | null, endDate: string | null} {
+  const lowerText = text.toLowerCase();
+  const now = new Date();
+  let timeType = null;
+  let startDate = null;
+  let endDate = now.toISOString();
+  
+  // Check for each time range
+  if (lowerText.includes('yesterday')) {
+    timeType = 'day';
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    startDate = yesterday.toISOString();
+    
+    const endOfYesterday = new Date(now);
+    endOfYesterday.setDate(now.getDate() - 1);
+    endOfYesterday.setHours(23, 59, 59, 999);
+    endDate = endOfYesterday.toISOString();
+  } else if (lowerText.includes('today')) {
+    timeType = 'day';
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    startDate = today.toISOString();
+  } else if (lowerText.includes('last week') || lowerText.includes('this week') || 
+      lowerText.includes('past week') || lowerText.includes('recent days')) {
+    timeType = 'week';
+    const lastWeek = new Date(now);
+    lastWeek.setDate(now.getDate() - 7);
+    startDate = lastWeek.toISOString();
+  } else if (lowerText.includes('last month') || lowerText.includes('this month') || 
+      lowerText.includes('past month') || lowerText.includes('recent weeks')) {
+    timeType = 'month';
+    const lastMonth = new Date(now);
+    lastMonth.setMonth(now.getMonth() - 1);
+    startDate = lastMonth.toISOString();
+  } else if (lowerText.includes('last year') || lowerText.includes('this year') || 
+      lowerText.includes('past year')) {
+    timeType = 'year';
+    const lastYear = new Date(now);
+    lastYear.setFullYear(now.getFullYear() - 1);
+    startDate = lastYear.toISOString();
+  }
+  
+  return { timeType, startDate, endDate };
+}
+
+// Function to get recent entries when search fails
+async function getRecentEntries(userId: string, limit: number = 3) {
+  const tracker = trackFunctionExecution("getRecentEntries", { userId, limit });
+  
+  try {
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('id, "refined text", created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error("Error fetching recent entries:", error);
+      return tracker.fail(error);
+    }
+    
+    console.log(`Retrieved recent entries: ${data?.length || 0}`);
+    
+    return tracker.succeed(data?.map(entry => ({
+      id: entry.id,
+      content: entry["refined text"],
+      created_at: entry.created_at,
+      similarity: 0.5,  // Arbitrary similarity score for recent entries
+      type: 'recent'
+    })) || []);
+    
+  } catch (error) {
+    console.error("Exception in getRecentEntries:", error);
+    return tracker.fail(error);
+  }
+}
+
+// Function to get previous messages from a thread
+async function getPreviousMessages(threadId: string, limit: number = 10) {
+  const tracker = trackFunctionExecution("getPreviousMessages", { threadId, limit });
+  
+  try {
+    if (!threadId) {
+      console.log("No thread ID provided");
+      return tracker.succeed([]);
+    }
+    
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('thread_id', threadId)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(limit);
-      
+    
     if (error) {
       console.error("Error fetching previous messages:", error);
-      return [];
+      return tracker.fail(error);
     }
     
     console.log(`Retrieved ${data?.length || 0} previous messages`);
-    return data || [];
+    return tracker.succeed(data || []);
     
   } catch (error) {
-    console.error("Error in fetchPreviousMessages:", error);
-    return [];
+    console.error("Exception in getPreviousMessages:", error);
+    return tracker.fail(error);
   }
 }
 
@@ -749,11 +849,31 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const diagnostics = {
+    embeddingGenerated: false,
+    embeddingError: null,
+    similaritySearchComplete: false,
+    searchError: null,
+    contextBuilt: false,
+    contextError: null,
+    contextSize: 0,
+    tokenCount: 0,
+    llmError: null,
+    timings: {
+      total: 0,
+      embedding: 0,
+      search: 0,
+      context: 0
+    }
+  };
+
+  const startTime = Date.now();
+
   try {
-    const { message, userId, threadId = null, includeDiagnostics = false } = await req.json();
+    const { message, userId, threadId = null, isNewThread = false, threadTitle = null, includeDiagnostics = false, timeframe = null } = await req.json();
     
-    if (!message) {
-      throw new Error('No message provided');
+    if (!message || !userId) {
+      throw new Error('Missing required parameters');
     }
 
     console.log("Processing chat request for user:", userId);
@@ -761,82 +881,314 @@ serve(async (req) => {
     console.log("Thread ID:", threadId || "new thread");
     console.log("Include diagnostics:", includeDiagnostics ? "yes" : "no");
     
-    // Analyze the query to understand what the user is asking about
-    const queryAnalysis = await analyzeQuery(message);
+    // Analyze query to determine search strategy
+    const queryAnalysis = analyzeQuery(message);
+    console.log("Query analysis:", JSON.stringify(queryAnalysis));
     
-    // Search for relevant journal entries based on query analysis
-    const relevantEntries = await searchRelevantContext(userId, message, queryAnalysis);
-    console.log(`Found ${relevantEntries.length} relevant entries`);
-    
-    // Fetch previous conversation messages for context if a thread ID is provided
-    const previousMessages = await fetchPreviousMessages(threadId);
-    console.log(`Fetching previous messages for conversation context...`);
-    
-    // Create a new thread if none was provided
-    let currentThreadId = threadId;
-    if (!currentThreadId) {
-      const { data: newThread, error: threadError } = await supabase
-        .from('chat_threads')
-        .insert([{ 
-          user_id: userId,
-          title: message.substring(0, 50) + (message.length > 50 ? '...' : '')
-        }])
-        .select('id')
-        .single();
-        
-      if (threadError) {
-        console.error("Error creating new thread:", threadError);
-      } else {
-        currentThreadId = newThread.id;
-        console.log(`Created new thread with ID: ${currentThreadId}`);
-      }
-    }
-    
-    // Create RAG context from relevant entries
-    let journalContext = "";
-    if (relevantEntries.length > 0) {
-      console.log(`Found ${relevantEntries.length} relevant entries`);
-      
-      journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
-        relevantEntries.map((entry, index) => {
-          const date = new Date(entry.created_at).toLocaleDateString();
-          const emotionsText = entry.emotions ? formatEmotions(entry.emotions) : "No emotion data";
-          const sentimentText = entry.sentiment ? `Sentiment score: ${entry.sentiment}` : "No sentiment data";
-          return `Entry ${index+1} (${date}):\n${entry["refined text"] || entry.content}\nPrimary emotions: ${emotionsText}\n${sentimentText}`;
-        }).join('\n\n') + "\n\n";
-    } else {
-      console.log("No relevant entries found");
-      journalContext = "I don't have access to any journal entries that are relevant to your question.";
-    }
-    
-    // Build conversation history context
-    let conversationContext = "";
-    if (previousMessages.length > 0) {
-      console.log("Including previous conversation context");
-      conversationContext = "Here's your recent conversation history:\n\n" +
-        previousMessages
-          .reverse() // Display in chronological order
-          .map(msg => `${msg.sender === 'user' ? 'You' : 'Assistant'}: ${msg.content}`)
-          .join('\n\n') + "\n\n";
-    }
-    
-    // Prepare system prompt with RAG context and conversation history
-    const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling. 
-${journalContext}
-
-${conversationContext}
-
-Based on the context above and the user's message, provide a thoughtful, personalized response.
-Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
-mention them, but do so gently and constructively. Pay special attention to the emotional patterns and sentiment scores revealed in the entries.
-Focus on being helpful rather than diagnostic.
-
-When responding to queries about specific emotions, entities, or sentiment levels, try to reference the specific journal entries that match those criteria.`;
-
-    console.log("Sending to GPT with RAG context and conversation history...");
+    // Generate embedding for the query
+    console.log("Generating embedding for user query...");
+    let queryEmbedding;
+    const embeddingStartTime = Date.now();
     
     try {
-      // Send to GPT with RAG context
+      queryEmbedding = await generateEmbedding(message);
+      diagnostics.embeddingGenerated = true;
+      diagnostics.timings.embedding = Date.now() - embeddingStartTime;
+    } catch (error) {
+      console.error("Error generating embedding:", error);
+      diagnostics.embeddingError = error.message || "Failed to generate embedding";
+      diagnostics.timings.embedding = Date.now() - embeddingStartTime;
+    }
+
+    let similarEntries = [];
+    const searchStartTime = Date.now();
+    let similarityScores = [];
+
+    // If embedding failed, try alternative search methods
+    if (!queryEmbedding) {
+      // ... keep existing code (handling for when embedding generation fails)
+    } else {
+      // If we have an embedding, use it for search based on query analysis
+      console.log("Using embedding for search");
+      
+      // Search strategy based on query analysis
+      if (queryAnalysis.queryType === 'entity_emotion') {
+        console.log(`Using combined entity and emotion search for ${queryAnalysis.entityType} and ${queryAnalysis.emotion}`);
+        
+        try {
+          const combinedResults = await searchEntriesByEntityAndEmotion(
+            userId,
+            queryAnalysis.entityType,
+            queryAnalysis.entityName,
+            queryAnalysis.emotion,
+            queryAnalysis.timeframe.startDate,
+            queryAnalysis.timeframe.endDate,
+            10 // Get more results
+          );
+          
+          if (combinedResults && combinedResults.length > 0) {
+            similarEntries = combinedResults;
+            diagnostics.similaritySearchComplete = true;
+          } else {
+            // Fallback to vector similarity
+            console.log("No combined entity-emotion results, falling back to vector similarity");
+            
+            const vectorResults = await searchJournalEntriesWithDate(
+              userId,
+              queryEmbedding,
+              queryAnalysis.timeframe.startDate,
+              queryAnalysis.timeframe.endDate,
+              0.35, // Lower threshold for more results
+              15
+            );
+            
+            if (vectorResults && vectorResults.length > 0) {
+              similarEntries = vectorResults;
+              diagnostics.similaritySearchComplete = true;
+            }
+          }
+        } catch (error) {
+          console.error("Error in combined entity-emotion search:", error);
+          diagnostics.searchError = error.message;
+          
+          // Try vector search as a fallback
+          try {
+            const vectorResults = await searchJournalEntriesWithDate(
+              userId,
+              queryEmbedding,
+              queryAnalysis.timeframe.startDate,
+              queryAnalysis.timeframe.endDate,
+              0.35,
+              15
+            );
+            
+            if (vectorResults && vectorResults.length > 0) {
+              similarEntries = vectorResults;
+              diagnostics.similaritySearchComplete = true;
+            }
+          } catch (vectorError) {
+            console.error("Error in fallback vector search:", vectorError);
+            // Continue to final fallback
+          }
+        }
+      } else if (queryAnalysis.queryType === 'entity') {
+        console.log(`Using entity-based search for ${queryAnalysis.entityType}`);
+        
+        try {
+          const entityResults = await searchEntriesByEntity(
+            userId,
+            queryAnalysis.entityType,
+            queryAnalysis.entityName,
+            queryAnalysis.timeframe.startDate,
+            queryAnalysis.timeframe.endDate,
+            10
+          );
+          
+          if (entityResults && entityResults.length > 0) {
+            similarEntries = entityResults;
+            diagnostics.similaritySearchComplete = true;
+          } else {
+            // Fallback to vector similarity
+            console.log("No entity results, falling back to vector similarity");
+            
+            const vectorResults = await searchJournalEntriesWithDate(
+              userId,
+              queryEmbedding,
+              queryAnalysis.timeframe.startDate,
+              queryAnalysis.timeframe.endDate,
+              0.35,
+              15
+            );
+            
+            if (vectorResults && vectorResults.length > 0) {
+              similarEntries = vectorResults;
+              diagnostics.similaritySearchComplete = true;
+            }
+          }
+        } catch (error) {
+          console.error("Error in entity search:", error);
+          diagnostics.searchError = error.message;
+          
+          // Fallback to vector similarity
+          try {
+            const vectorResults = await searchJournalEntriesWithDate(
+              userId,
+              queryEmbedding,
+              queryAnalysis.timeframe.startDate,
+              queryAnalysis.timeframe.endDate,
+              0.35,
+              15
+            );
+            
+            if (vectorResults && vectorResults.length > 0) {
+              similarEntries = vectorResults;
+              diagnostics.similaritySearchComplete = true;
+            }
+          } catch (vectorError) {
+            console.error("Error in fallback vector search:", vectorError);
+            // Continue to final fallback
+          }
+        }
+      } else if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
+        // ... keep existing code (emotion-based search)
+      } else if (queryAnalysis.queryType === 'thematic' && queryAnalysis.theme) {
+        // ... keep existing code (theme-based search)
+      } else {
+        // ... keep existing code (standard vector similarity search)
+      }
+    }
+
+    diagnostics.timings.search = Date.now() - searchStartTime;
+    diagnostics.similarityScores = similarityScores;
+
+    // If we still have no entries, get recent entries as a fallback
+    if (similarEntries.length === 0) {
+      console.log("No similar entries found, falling back to recent entries");
+      
+      try {
+        const recentEntries = await getRecentEntries(userId, 3);
+        if (recentEntries && recentEntries.length > 0) {
+          similarEntries = recentEntries;
+          diagnostics.similaritySearchComplete = true;
+        }
+      } catch (error) {
+        console.error("Error fetching recent entries:", error);
+        diagnostics.searchError = (diagnostics.searchError || '') + ` Recent fallback: ${error.message}`;
+      }
+    }
+
+    // Build context from found entries
+    const contextStartTime = Date.now();
+    let journalContext = "";
+    let references = [];
+
+    try {
+      if (similarEntries.length > 0) {
+        console.log(`Found ${similarEntries.length} relevant entries`);
+        
+        // Sort entries by relevance and date
+        similarEntries.sort((a, b) => {
+          // Prioritize similarity if available
+          if (a.similarity && b.similarity) {
+            return b.similarity - a.similarity;
+          }
+          // Fall back to date-based sorting
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+
+        // Prepare references and context
+        references = similarEntries.map(entry => ({
+          id: entry.id,
+          date: entry.created_at,
+          snippet: entry.content?.substring(0, 150) + "...",
+          similarity: entry.similarity || null,
+          type: entry.type || 'similarity_match',
+          themes: entry.themes || null,
+          emotions: entry.emotions || null,
+          entities: entry.entities || null
+        }));
+
+        // Build context based on query type
+        if (queryAnalysis.queryType === 'entity_emotion') {
+          journalContext = `Here are your journal entries related to "${queryAnalysis.entityType}" where you felt "${queryAnalysis.emotion}":\n\n` +
+            similarEntries.map((entry, i) => 
+              `Entry ${i+1} (${new Date(entry.created_at).toLocaleDateString()}):\n${entry.content}`
+            ).join('\n\n');
+        } else if (queryAnalysis.queryType === 'entity') {
+          journalContext = `Here are your journal entries related to "${queryAnalysis.entityType}":\n\n` +
+            similarEntries.map((entry, i) => 
+              `Entry ${i+1} (${new Date(entry.created_at).toLocaleDateString()}):\n${entry.content}`
+            ).join('\n\n');
+        } else if (queryAnalysis.queryType === 'thematic' && queryAnalysis.theme) {
+          // ... keep existing code (thematic context format)
+        } else if (queryAnalysis.queryType === 'emotional' && queryAnalysis.emotion) {
+          // ... keep existing code (emotional context format)
+        } else {
+          // ... keep existing code (general context format)
+        }
+        
+        diagnostics.contextBuilt = true;
+        diagnostics.contextSize = journalContext.length;
+      } else {
+        console.log("No relevant entries found");
+        journalContext = "I couldn't find any relevant entries in your journal for this query.";
+        diagnostics.contextBuilt = true;
+        diagnostics.contextSize = journalContext.length;
+      }
+    } catch (contextError) {
+      console.error("Error building context:", contextError);
+      journalContext = "I encountered an error while searching for relevant entries in your journal.";
+      diagnostics.contextError = contextError.message;
+    }
+
+    diagnostics.timings.context = Date.now() - contextStartTime;
+
+    // Get previous messages for context preservation
+    let conversationHistory = [];
+    try {
+      const previousMessages = await getPreviousMessages(threadId);
+      conversationHistory = previousMessages.map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
+
+      console.log("Fetching previous messages for conversation context...");
+      console.log(`Retrieved ${previousMessages.length} previous messages`);
+    } catch (historyError) {
+      console.error("Error fetching conversation history:", historyError);
+    }
+
+    // Prepare system prompt with context
+    const systemPrompt = `You are SOULo, an AI assistant that helps users understand their journal entries.
+${journalContext}
+
+Based on the above context (if available) and the user's question, provide a thoughtful, personalized response.
+Keep your tone warm and conversational. If you notice patterns or insights, mention them gently.
+
+If I couldn't find any relevant entries in the journal, make sure to tell the user "Sorry, looks like we couldn't find any such reference in your journal entries."`;
+
+    // Prepare messages array with conversation history
+    const messages = [
+      { role: 'system', content: systemPrompt }
+    ];
+
+    // Add conversation history if available
+    if (conversationHistory.length > 0) {
+      console.log("Including previous conversation context");
+      messages.push(...conversationHistory);
+    }
+
+    // Add the current user message
+    messages.push({ role: 'user', content: message });
+
+    // Create a new chat thread if needed
+    let activeThreadId = threadId;
+    if (isNewThread) {
+      try {
+        const { data: newThread, error: threadError } = await supabase
+          .from('chat_threads')
+          .insert({
+            user_id: userId,
+            title: threadTitle || message.substring(0, 30) + (message.length > 30 ? "..." : "")
+          })
+          .select('id')
+          .single();
+        
+        if (threadError) {
+          console.error("Error creating new thread:", threadError);
+        } else if (newThread) {
+          console.log(`Created new thread with ID: ${newThread.id}`);
+          activeThreadId = newThread.id;
+        }
+      } catch (threadCreationError) {
+        console.error("Exception creating thread:", threadCreationError);
+      }
+    }
+
+    // Send to GPT with context and conversation history
+    console.log("Sending to GPT with RAG context and conversation history...");
+    let aiResponse;
+    try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -845,111 +1197,87 @@ When responding to queries about specific emotions, entities, or sentiment level
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt
-            },
-            {
-              role: 'user',
-              content: message
-            }
-          ],
+          messages: messages
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("GPT API error:", errorText);
-        throw new Error(`GPT API error: ${errorText}`);
+        console.error('Error from GPT API:', errorText);
+        throw new Error(`Failed to get response from GPT: ${errorText}`);
       }
 
       const result = await response.json();
-      const aiResponse = result.choices[0].message.content;
+      aiResponse = result.choices[0].message.content;
+      diagnostics.tokenCount = result.usage ? result.usage.total_tokens : 'unknown';
       
       console.log("AI response generated successfully");
+    } catch (llmError) {
+      console.error("Error generating LLM response:", llmError);
+      diagnostics.llmError = llmError.message;
       
-      // Save the messages to the database if we have a thread ID
-      if (currentThreadId) {
-        // Save user message
-        await supabase
-          .from('chat_messages')
-          .insert([{
-            thread_id: currentThreadId,
-            sender: 'user',
-            content: message
-          }]);
-          
-        // Save assistant response with reference to entries used
-        await supabase
-          .from('chat_messages')
-          .insert([{
-            thread_id: currentThreadId,
-            sender: 'assistant',
-            content: aiResponse,
-            reference_entries: relevantEntries.length > 0 
-              ? { entries: relevantEntries.map(e => e.id) } 
-              : null
-          }]);
+      // Provide a fallback response if LLM fails
+      if (similarEntries.length > 0) {
+        aiResponse = "I found some potentially relevant entries in your journal, but I'm having trouble analyzing them right now. Please try again in a moment.";
+      } else {
+        aiResponse = "Sorry, looks like we couldn't find any such reference in your journal entries, and I'm having trouble generating a response. Please try again in a moment.";
       }
-      
-      // Prepare response
-      const responseBody: any = { 
-        response: aiResponse,
-        threadId: currentThreadId,
-      };
-      
-      // Include additional debugging data if requested
-      if (includeDiagnostics) {
-        responseBody.analysis = queryAnalysis;
-        responseBody.entryCount = relevantEntries.length;
-        
-        if (relevantEntries.length > 0) {
-          responseBody.sampleEntries = relevantEntries.slice(0, 2).map(entry => ({
-            id: entry.id,
-            created_at: entry.created_at,
-            excerpt: (entry["refined text"] || entry.content || '').substring(0, 100) + '...',
-            emotions: entry.emotions,
-            sentiment: entry.sentiment
-          }));
-        }
-      }
-      
-      return new Response(
-        JSON.stringify(responseBody),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    } catch (apiError) {
-      console.error("API error:", apiError);
-      
-      // Return a 200 status even for errors to avoid CORS issues
-      return new Response(
-        JSON.stringify({ 
-          error: apiError.message, 
-          response: "I'm having trouble connecting right now. Please try again later.",
-          success: false 
-        }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
     }
-  } catch (error) {
-    console.error("Error in chat-with-rag function:", error);
     
-    // Return 200 status even for errors to avoid CORS issues
+    diagnostics.timings.total = Date.now() - startTime;
+
+    // Store the chat message if we have a thread
+    if (activeThreadId) {
+      try {
+        await supabase
+          .from('chat_messages')
+          .insert([
+            {
+              thread_id: activeThreadId,
+              content: message,
+              sender: 'user'
+            },
+            {
+              thread_id: activeThreadId,
+              content: aiResponse,
+              sender: 'assistant',
+              reference_entries: references
+            }
+          ]);
+      } catch (storageError) {
+        console.error("Error storing chat messages:", storageError);
+      }
+    }
+
     return new Response(
-      JSON.stringify({ 
-        error: error.message, 
-        response: "I'm having trouble processing your request. Please try again later.",
-        success: false 
+      JSON.stringify({
+        response: aiResponse,
+        references,
+        threadId: activeThreadId,
+        queryAnalysis,
+        diagnostics,
+        similarityScores,
+        functionExecutions
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('Error:', error);
+    diagnostics.timings.total = Date.now() - startTime;
+    
+    return new Response(
+      JSON.stringify({
+        error: error.message,
+        response: "Sorry, I encountered an error processing your request. Please try again.",
+        diagnostics,
+        functionExecutions
       }),
       {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
