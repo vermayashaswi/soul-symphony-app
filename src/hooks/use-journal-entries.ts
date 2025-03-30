@@ -165,5 +165,23 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  return { entries, loading, batchProcessEntities, fetchEntries };
+  const debugEnvironment = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
+        body: { debugEnv: true }
+      });
+      
+      if (error) {
+        console.error('Error checking environment:', error);
+        return { success: false, error: error.message };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error invoking debug environment:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  return { entries, loading, batchProcessEntities, fetchEntries, debugEnvironment };
 }
