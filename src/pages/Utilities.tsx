@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,10 +15,20 @@ export default function Utilities() {
   const [result, setResult] = useState<any>(null);
   const { toast } = useToast();
   
+  useEffect(() => {
+    // Automatically run the entity extraction process when the component mounts
+    extractEntities();
+  }, []);
+  
   const extractEntities = async () => {
     try {
       setIsProcessing(true);
       setResult(null);
+      
+      toast({
+        title: "Processing started",
+        description: "Entity extraction process has started automatically. This may take a few minutes.",
+      });
       
       const { data, error } = await supabase.functions.invoke('batch-extract-entities');
       
@@ -67,8 +77,10 @@ export default function Utilities() {
           
           <CardContent>
             <p className="text-muted-foreground mb-4">
-              This utility will process all journal entries without entities and extract named entities like people, organizations, 
-              locations, etc. using OpenAI. This is a one-time activity to populate existing entries.
+              {isProcessing ? 
+                "Entity extraction is currently running automatically. This may take several minutes depending on the number of entries..." :
+                "This utility processes all journal entries without entities and extracts named entities like people, organizations, locations, etc. using OpenAI."
+              }
             </p>
             
             {result && (
@@ -91,7 +103,7 @@ export default function Utilities() {
               className="w-full"
             >
               {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isProcessing ? 'Processing...' : 'Extract Entities'}
+              {isProcessing ? 'Processing...' : 'Run Again'}
             </Button>
           </CardFooter>
         </Card>
