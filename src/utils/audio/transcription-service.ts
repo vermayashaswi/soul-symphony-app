@@ -3,110 +3,77 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface TranscriptionResult {
   success: boolean;
-  data?: {
-    transcription?: string;
-    refinedText?: string;
-    audioUrl?: string;
-    entryId?: number;
-    emotions?: Record<string, number>;
-    sentiment?: string;
-    entities?: any[];
-    tempId?: string;
-  };
+  data?: any;
   error?: string;
-  requestDetails?: {
-    url?: string;
-    statusCode?: number; // Changed from status to statusCode
-    responseDetails?: any;
-  };
 }
 
 /**
- * Sends audio data to Supabase Edge Function for transcription and analysis
+ * Sends audio data to the transcribe-audio edge function
+ * @param base64Audio - Base64 encoded audio data
+ * @param userId - User ID for association with the transcription
+ * @param directTranscription - If true, just returns the transcription without processing
  */
 export async function sendAudioForTranscription(
-  base64Audio: string, 
-  userId: string,
+  base64Audio: string,
+  userId: string | undefined,
   directTranscription: boolean = false
 ): Promise<TranscriptionResult> {
   try {
-    console.log('Sending audio for transcription...');
-    console.log('Direct transcription mode:', directTranscription);
-    console.log('Audio data length:', base64Audio.length);
+    if (!base64Audio) {
+      throw new Error('No audio data provided');
+    }
+
+    console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
+    console.log(`Audio data size: ${base64Audio.length} characters`);
     
-    // Add a unique ID for tracking this specific request
-    const requestId = `req_${Math.random().toString(36).substring(2, 9)}`;
-    console.log('Request ID:', requestId);
-    
-    const startTime = Date.now();
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-      body: { 
+    // Call the Supabase edge function
+    const response = await supabase.functions.invoke('transcribe-audio', {
+      body: {
         audio: base64Audio,
-        userId,
-        directTranscription,
-        requestId
+        userId: userId || null,
+        directTranscription: directTranscription
+      },
+      // Set longer timeout for large audio files
+      options: {
+        timeout: 120000 // 2 minutes timeout (increased from default)
       }
     });
-    const endTime = Date.now();
 
-    console.log(`Transcribe API call completed in ${endTime - startTime}ms`);
+    // Response handling using statusCode
+    const statusCode = response.error ? 500 : 200;
     
-    if (error) {
-      console.error('Error from transcribe-audio function:', error);
+    if (statusCode !== 200) {
+      console.error('Edge function error:', response.error);
       return {
         success: false,
-        error: `Function error: ${error.message || 'Unknown error'}`,
-        requestDetails: {
-          url: 'supabase.functions.invoke("transcribe-audio")',
-          statusCode: error.code,
-          responseDetails: error
-        }
+        error: response.error?.message || 'Failed to process audio'
       };
     }
 
-    console.log('Transcription result:', data);
-
-    if (!data.success) {
-      // Enhanced error logging
-      console.error('Transcription failed with server response:', data);
-      
+    // Check if the response has a success field
+    if (response.data?.success === false) {
+      console.error('Processing error:', response.data.error || response.data.message);
       return {
         success: false,
-        error: data.error || data.message || 'Failed to transcribe audio',
-        requestDetails: {
-          url: 'supabase.functions.invoke("transcribe-audio")',
-          statusCode: 400, // Default error status code
-          responseDetails: data
-        }
+        error: response.data.error || response.data.message || 'Unknown error in audio processing'
       };
     }
+
+    console.log('Transcription successful:', {
+      directMode: directTranscription,
+      transcriptionLength: response.data?.transcription?.length || 0,
+      hasEntryId: !!response.data?.entryId
+    });
 
     return {
       success: true,
-      data: {
-        transcription: data.transcription,
-        refinedText: data.refinedText,
-        audioUrl: data.audioUrl,
-        entryId: data.entryId,
-        emotions: data.emotions,
-        sentiment: data.sentiment,
-        entities: data.entities,
-        tempId: data.tempId || requestId
-      },
-      requestDetails: {
-        url: 'supabase.functions.invoke("transcribe-audio")',
-        statusCode: 200 // Successful status code
-      }
+      data: response.data
     };
   } catch (error: any) {
-    console.error('Error sending audio for transcription:', error);
+    console.error('Error in sendAudioForTranscription:', error);
     return {
       success: false,
-      error: error.message || 'Failed to send audio for transcription',
-      requestDetails: {
-        url: 'supabase.functions.invoke("transcribe-audio")',
-        responseDetails: error
-      }
+      error: error.message || 'Unknown error occurred'
     };
   }
 }

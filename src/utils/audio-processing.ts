@@ -25,6 +25,13 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     // Generate a temporary ID for this recording
     const tempId = `temp-${Date.now()}`;
     
+    // Log the audio details
+    console.log('Processing audio:', {
+      size: audioBlob?.size || 0,
+      type: audioBlob?.type || 'unknown',
+      userId: userId || 'anonymous'
+    });
+    
     // Start processing in background
     toast.loading('Processing your journal entry with advanced AI...', {
       id: tempId,
@@ -51,8 +58,21 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     // Log the blob details for debugging
     console.log('Audio blob details:', audioBlob?.type, audioBlob?.size);
     
+    if (!audioBlob) {
+      toast.dismiss(toastId);
+      toast.error('No audio data to process');
+      return;
+    }
+    
+    // Check if audio blob is too small to be useful
+    if (audioBlob.size < 1000) {
+      toast.dismiss(toastId);
+      toast.error('Audio recording is too small to process. Please try recording again with more speech.');
+      return;
+    }
+    
     // 1. Convert blob to base64
-    const base64Audio = await blobToBase64(audioBlob!);
+    const base64Audio = await blobToBase64(audioBlob);
     
     // Validate base64 data
     if (!base64Audio || base64Audio.length < 100) {
@@ -61,6 +81,9 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       toast.error('Invalid audio data. Please try again.');
       return;
     }
+    
+    // Log the base64 length for debugging
+    console.log(`Base64 audio data length: ${base64Audio.length}`);
     
     // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
     const base64String = base64Audio.split(',')[1]; 
@@ -78,6 +101,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
 
     // 4. First try a direct transcription to verify the audio is valid
     console.log('Testing audio with direct transcription...');
+    toast.loading('Testing your audio quality...', { id: toastId });
     
     const directTranscriptionResult = await sendAudioForTranscription(base64String, authStatus.userId!, true);
     if (!directTranscriptionResult.success || !directTranscriptionResult.data?.transcription) {
@@ -88,11 +112,12 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     }
     
     console.log('Direct transcription successful:', directTranscriptionResult.data.transcription);
+    toast.loading('Audio quality verified! Processing with AI...', { id: toastId });
     
     // 5. Process the full journal entry
     let result;
     let retries = 0;
-    const maxRetries = 2;
+    const maxRetries = 3; // Increased from 2
     
     while (retries <= maxRetries) {
       try {
@@ -102,13 +127,13 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         if (retries <= maxRetries) {
           console.log(`Transcription attempt ${retries} failed, retrying...`);
           // Wait a bit before retrying
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, 2000)); // Increased wait time between retries
         }
       } catch (err) {
         console.error(`Transcription attempt ${retries + 1} error:`, err);
         retries++;
         if (retries <= maxRetries) {
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, 2000));
         }
       }
     }
@@ -122,7 +147,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       if (result.data?.entryId) {
         const { data: savedEntry, error: fetchError } = await supabase
           .from('Journal Entries')
-          .select('id')
+          .select('id, "refined text", duration')
           .eq('id', result.data.entryId)
           .single();
           
@@ -131,7 +156,11 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
           toast.error('Journal entry processing completed but verification failed. Please check your entries.');
         } else {
           console.log('Journal entry verified in database:', savedEntry);
-          toast.success('Journal entry saved successfully!');
+          const duration = savedEntry.duration || 'unknown';
+          const text = savedEntry['refined text'] || '';
+          const snippet = text.length > 40 ? text.substring(0, 37) + '...' : text;
+          
+          toast.success(`Journal entry saved successfully! (${duration}s) "${snippet}"`);
         }
       } else {
         toast.success('Journal entry processed, but no entry ID returned.');

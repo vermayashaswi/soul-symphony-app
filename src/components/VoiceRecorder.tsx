@@ -36,7 +36,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     startRecording,
     stopRecording,
     requestPermissions
-  } = useVoiceRecorder({ noiseReduction });
+  } = useVoiceRecorder({ 
+    noiseReduction,
+    maxDuration: 300 // 5 minutes maximum
+  });
   
   const {
     isPlaying,
@@ -82,7 +85,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       console.log('Processing audio:', {
         type: normalizedBlob.type,
         size: normalizedBlob.size,
-        duration: audioDuration
+        duration: audioDuration,
+        recordingTime: recordingTime
       });
       
       const result = await processRecording(normalizedBlob, user?.id);

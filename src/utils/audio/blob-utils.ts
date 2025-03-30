@@ -30,8 +30,8 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
     return { isValid: false, errorMessage: 'No recording to process.' };
   }
   
-  // Minimum size check (adjusted to 500 bytes)
-  if (audioBlob.size < 500) {
+  // Minimum size check (increased to 1000 bytes for better validation)
+  if (audioBlob.size < 1000) {
     return { isValid: false, errorMessage: 'Recording is too short. Please try again.' };
   }
   
@@ -41,7 +41,8 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
     'audio/mp4', 
     'audio/ogg', 
     'audio/wav', 
-    'audio/mpeg'
+    'audio/mpeg',
+    'audio/webm;codecs=opus'
   ];
   
   // Use a fuzzy match to check for audio MIME type
@@ -70,6 +71,11 @@ export function normalizeAudioBlob(audioBlob: Blob): Blob {
       // Smaller files are likely Opus in WebM container
       return new Blob([audioBlob], { type: 'audio/webm;codecs=opus' });
     }
+  }
+  
+  // If audio blob is webm but doesn't specify codec, add it
+  if (audioBlob.type === 'audio/webm') {
+    return new Blob([audioBlob], { type: 'audio/webm;codecs=opus' });
   }
   
   return audioBlob;
