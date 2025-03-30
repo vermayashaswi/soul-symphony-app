@@ -17,17 +17,8 @@ export default function Utilities() {
   const [isProcessingEntities, setIsProcessingEntities] = useState(false);
   const [processingStats, setProcessingStats] = useState<any>(null);
   
-  // Process all journal entries for entity extraction
+  // Process all journal entries for entity extraction (for all users)
   const processAllEntries = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "You must be signed in to process entries.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setIsProcessingEntities(true);
     setProcessingStats(null);
     
@@ -37,9 +28,9 @@ export default function Utilities() {
         description: "Extracting entities from all journal entries...",
       });
       
+      // No longer passing userId to process entries from ALL users
       const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
         body: { 
-          userId: user.id,
           processAll: true  // Always process all entries
         }
       });
@@ -100,7 +91,7 @@ export default function Utilities() {
               Journal Entry Processing
             </CardTitle>
             <CardDescription>
-              Process your journal entries to extract entities using Google Natural Language API.
+              Process journal entries to extract entities using Google Natural Language API.
             </CardDescription>
           </CardHeader>
           
@@ -114,87 +105,85 @@ export default function Utilities() {
               </Alert>
             )}
             
-            {user && (
-              <div className="space-y-6">
-                <div className="bg-muted p-4 rounded-lg">                
-                  <div className="mt-6">
-                    <h3 className="text-lg font-medium flex items-center gap-2 mb-4">
-                      <Database className="h-4 w-4" />
-                      Entity Extraction
-                    </h3>
-                    
-                    <Alert variant="default" className="mb-4">
-                      <AlertTitle>Google Natural Language API</AlertTitle>
-                      <AlertDescription>
-                        This utility will extract entities (people, places, organizations) from all your journal entries.
-                      </AlertDescription>
-                    </Alert>
-                    
-                    <Button 
-                      onClick={processAllEntries} 
-                      disabled={isProcessingEntities}
-                      variant="default"
-                      className="w-full"
-                    >
-                      {isProcessingEntities ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Processing Journal Entries...
-                        </>
-                      ) : (
-                        "Process All Journal Entries"
-                      )}
-                    </Button>
-
-                    {processingStats && (
-                      <div className="mt-4 p-3 bg-background rounded-md">
-                        <h4 className="font-medium mb-2">Processing Results:</h4>
-                        
-                        {processingStats.success ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center">
-                              <span className="font-medium mr-2">Entries Processed:</span>
-                              <Badge variant="outline" className="bg-green-100 text-green-800">
-                                {processingStats.processed} of {processingStats.total}
-                              </Badge>
-                            </div>
-                            
-                            <div className="flex items-center">
-                              <span className="font-medium mr-2">Processing Time:</span>
-                              <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                                {processingStats.processingTime}
-                              </Badge>
-                            </div>
-
-                            {processingStats.failed > 0 && (
-                              <div className="mt-2">
-                                <Alert variant="destructive">
-                                  <AlertCircle className="h-4 w-4" />
-                                  <AlertTitle>Processing Warnings</AlertTitle>
-                                  <AlertDescription>
-                                    {processingStats.failed} entries could not be processed correctly.
-                                    {processingStats.errors && processingStats.errors.length > 0 && (
-                                      <div className="mt-2 text-sm">
-                                        <p>First error: {processingStats.errors[0].error}</p>
-                                      </div>
-                                    )}
-                                  </AlertDescription>
-                                </Alert>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <Alert variant="destructive">
-                            <AlertTitle>Error processing entries</AlertTitle>
-                            <AlertDescription>{processingStats.error || "Unknown error"}</AlertDescription>
-                          </Alert>
-                        )}
-                      </div>
+            <div className="space-y-6">
+              <div className="bg-muted p-4 rounded-lg">                
+                <div className="mt-6">
+                  <h3 className="text-lg font-medium flex items-center gap-2 mb-4">
+                    <Database className="h-4 w-4" />
+                    Entity Extraction
+                  </h3>
+                  
+                  <Alert variant="default" className="mb-4">
+                    <AlertTitle>Google Natural Language API</AlertTitle>
+                    <AlertDescription>
+                      This utility will extract entities (people, places, organizations) from all journal entries across all users.
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <Button 
+                    onClick={processAllEntries} 
+                    disabled={isProcessingEntities || !user}
+                    variant="default"
+                    className="w-full"
+                  >
+                    {isProcessingEntities ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing Journal Entries...
+                      </>
+                    ) : (
+                      "Process All Journal Entries (All Users)"
                     )}
-                  </div>
+                  </Button>
+
+                  {processingStats && (
+                    <div className="mt-4 p-3 bg-background rounded-md">
+                      <h4 className="font-medium mb-2">Processing Results:</h4>
+                      
+                      {processingStats.success ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <span className="font-medium mr-2">Entries Processed:</span>
+                            <Badge variant="outline" className="bg-green-100 text-green-800">
+                              {processingStats.processed} of {processingStats.total}
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex items-center">
+                            <span className="font-medium mr-2">Processing Time:</span>
+                            <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                              {processingStats.processingTime}
+                            </Badge>
+                          </div>
+
+                          {processingStats.failed > 0 && (
+                            <div className="mt-2">
+                              <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Processing Warnings</AlertTitle>
+                                <AlertDescription>
+                                  {processingStats.failed} entries could not be processed correctly.
+                                  {processingStats.errors && processingStats.errors.length > 0 && (
+                                    <div className="mt-2 text-sm">
+                                      <p>First error: {processingStats.errors[0].error}</p>
+                                    </div>
+                                  )}
+                                </AlertDescription>
+                              </Alert>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <Alert variant="destructive">
+                          <AlertTitle>Error processing entries</AlertTitle>
+                          <AlertDescription>{processingStats.error || "Unknown error"}</AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
       </motion.div>

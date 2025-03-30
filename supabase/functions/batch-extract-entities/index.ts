@@ -133,10 +133,12 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
       query = query.is('entities', null);
     }
     
-    // Add user filter if provided
+    // Add user filter if provided and requested - now optional
     if (userId) {
       console.log(`Filtering entries for user ID: ${userId}`);
       query = query.eq('user_id', userId);
+    } else {
+      console.log('Processing entries for ALL users');
     }
     
     // Order by most recent first
@@ -311,14 +313,14 @@ serve(async (req) => {
   try {
     // Get the request body if any
     let userId = undefined;
-    let processAll = false;
+    let processAll = true; // Default to processing all entries
     let diagnosticMode = false;
     
     try {
       if (req.method === 'POST') {
         const body = await req.json();
-        userId = body.userId;
-        processAll = body.processAll === true;
+        userId = body.userId; // Make userId optional
+        processAll = body.processAll === true || body.processAll === undefined; // Default to true
         diagnosticMode = body.diagnosticMode === true;
       }
     } catch (e) {
