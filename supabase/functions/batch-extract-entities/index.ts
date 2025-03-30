@@ -12,22 +12,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Hardcoded API key
+const GOOGLE_NL_API_KEY = 'AIzaSyAwEtfHQl3N69phsxfkwuhmRKelNQfd_qs';
+
 async function analyzeWithGoogleNL(text: string) {
   try {
     console.log('Analyzing text with Google NL API for entities:', text.slice(0, 100) + '...');
     
-    // Get the Google Natural Language API key directly
-    const googleNLApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
-    
-    if (!googleNLApiKey) {
-      console.error('Google NL API key not found in environment');
-      return [];
-    }
-    
-    console.log('Google NL API key found, length:', googleNLApiKey.length);
+    console.log('Using hardcoded Google NL API key');
     
     // Using the correct endpoint for entity extraction
-    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${googleNLApiKey}`, {
+    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${GOOGLE_NL_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -103,19 +98,8 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     console.log('Starting batch entity extraction process');
     const startTime = Date.now();
     
-    // Check if Google NL API key is available
-    const googleNLApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
-    if (!googleNLApiKey) {
-      console.error('Google NL API key not found in environment');
-      return { 
-        success: false, 
-        error: "Google Natural Language API key is not configured", 
-        processed: 0, 
-        total: 0
-      };
-    }
-    
-    console.log('Google NL API key found, length:', googleNLApiKey.length);
+    // We're using the hardcoded API key so no need to check environment
+    console.log('Using hardcoded Google NL API key');
     
     // Diagnostic information to return
     const diagnosticInfo: any = {
@@ -123,8 +107,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
       processAll: processAll,
       userId: userId || 'not provided',
       supabaseClientInitialized: !!supabase,
-      googleNLApiKeyConfigured: !!googleNLApiKey,
-      googleNLApiKeyLength: googleNLApiKey ? googleNLApiKey.length : 0,
+      googleNLApiKeyConfigured: true,
       userIdFilter: !!userId
     };
     
