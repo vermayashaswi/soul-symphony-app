@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -27,19 +28,20 @@ serve(async (req) => {
       );
     }
     
-    console.log(`Generating themes for entry ${entryId}`);
+    console.log(`Generating themes and entities for entry ${entryId}`);
     
-    // Extract themes using OpenAI
-    const themes = await extractThemes(text);
+    // Extract themes and entities using OpenAI
+    const { themes, entities } = await extractThemesAndEntities(text);
     console.log('Generated themes:', themes);
+    console.log('Extracted entities:', entities);
     
     // If entryId is provided, update the database
     if (entryId) {
-      await updateEntryThemes(entryId, themes);
+      await updateEntryThemesAndEntities(entryId, themes, entities);
     }
     
     return new Response(
-      JSON.stringify({ themes }),
+      JSON.stringify({ themes, entities }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
@@ -51,19 +53,37 @@ serve(async (req) => {
   }
 });
 
-async function extractThemes(text: string): Promise<string[]> {
+async function extractThemesAndEntities(text: string): Promise<{ themes: string[], entities: { type: string, name: string }[] }> {
   const prompt = `
-    Extract exactly 5-7 important emotional themes or concepts from the following journal entry.
-    Return them as a JSON array of strings, with each string being a single word or very short phrase (max 2 words).
-    Focus on emotional states, personal growth concepts, or psychological themes.
+    Analyze the following journal entry and:
     
-    Examples of good themes: ["Happiness", "Growth", "Family", "Work", "Health", "Stress", "Gratitude"]
+    1. Extract exactly 5-7 important emotional themes or concepts.
+    2. Identify entities mentioned (people, organizations, places, etc.).
     
-    Important: 
+    Return the results as a JSON object with two properties:
+    - "themes": An array of strings, with each theme being a single word or very short phrase (max 2 words).
+    - "entities": An array of objects, each with "type" and "name" properties.
+    
+    For themes:
     - Keep themes short (1-2 words)
     - Capitalize the first letter of each theme
     - Return only the most important themes from the journal entry
-    - Make sure the themes are universal concepts that many people experience
+    - Focus on emotional states, personal growth concepts, or psychological themes
+    
+    For entities:
+    - Entity types should be one of: person, organization, place, product, event
+    - Entity names should be the exact name mentioned in the text
+    - Only include clearly mentioned entities
+    
+    Example response format:
+    {
+      "themes": ["Happiness", "Growth", "Family", "Work", "Health"],
+      "entities": [
+        {"type": "person", "name": "John"},
+        {"type": "organization", "name": "Microsoft"},
+        {"type": "place", "name": "Central Park"}
+      ]
+    }
     
     Journal entry:
     ${text}
@@ -79,7 +99,7 @@ async function extractThemes(text: string): Promise<string[]> {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'You analyze journal entries and extract key emotional themes. Always respond with a valid JSON array of strings.' },
+          { role: 'system', content: 'You analyze journal entries to extract themes and entities. Always respond with a valid JSON object.' },
           { role: 'user', content: prompt }
         ],
         temperature: 0.3,
@@ -94,16 +114,21 @@ async function extractThemes(text: string): Promise<string[]> {
     try {
       // Attempt to clean and parse JSON from the response
       const cleanedContent = content.replace(/```json|```/g, '').trim();
-      return JSON.parse(cleanedContent);
+      const parsed = JSON.parse(cleanedContent);
+      
+      return {
+        themes: Array.isArray(parsed.themes) ? parsed.themes : [],
+        entities: Array.isArray(parsed.entities) ? parsed.entities : []
+      };
     } catch (parseError) {
-      console.error('Error parsing themes:', parseError);
-      // Fallback: try to extract using regex if JSON parsing fails
-      const matches = content.match(/\["([^"]+)"(?:,\s*"([^"]+)")*\]/);
-      if (matches) {
-        return matches[0].split(/,\s*/).map(s => s.replace(/[\[\]"]/g, ''));
-      }
-      // Last resort fallback
-      return ["Happiness", "Growth", "Reflection", "Insight", "Emotion"];
+      console.error('Error parsing themes and entities:', parseError);
+      // Fallback for themes if JSON parsing fails
+      const themesMatches = content.match(/\["([^"]+)"(?:,\s*"([^"]+)")*\]/);
+      const themes = themesMatches 
+        ? themesMatches[0].split(/,\s*/).map(s => s.replace(/[\[\]"]/g, ''))
+        : ["Reflection", "Insight", "Emotion"];
+        
+      return { themes, entities: [] };
     }
   } catch (error) {
     console.error('Error calling OpenAI:', error);
@@ -111,23 +136,30 @@ async function extractThemes(text: string): Promise<string[]> {
   }
 }
 
-async function updateEntryThemes(entryId: number, themes: string[]): Promise<void> {
+async function updateEntryThemesAndEntities(
+  entryId: number, 
+  themes: string[], 
+  entities: { type: string, name: string }[]
+): Promise<void> {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     const { error } = await supabase
       .from('Journal Entries')
-      .update({ master_themes: themes })
+      .update({ 
+        master_themes: themes,
+        entities: entities
+      })
       .eq('id', entryId);
       
     if (error) {
-      console.error('Error updating entry themes:', error);
+      console.error('Error updating entry themes and entities:', error);
       throw error;
     }
     
-    console.log(`Updated themes for entry ${entryId}`);
+    console.log(`Updated themes and entities for entry ${entryId}`);
   } catch (error) {
-    console.error('Error in updateEntryThemes:', error);
+    console.error('Error in updateEntryThemesAndEntities:', error);
     throw error;
   }
 }

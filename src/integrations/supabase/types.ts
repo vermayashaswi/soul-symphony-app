@@ -96,6 +96,7 @@ export type Database = {
           created_at: string
           duration: number | null
           emotions: Json | null
+          entities: Json | null
           "foreign key": string | null
           id: number
           master_themes: string[] | null
@@ -110,6 +111,7 @@ export type Database = {
           created_at?: string
           duration?: number | null
           emotions?: Json | null
+          entities?: Json | null
           "foreign key"?: string | null
           id?: number
           master_themes?: string[] | null
@@ -124,6 +126,7 @@ export type Database = {
           created_at?: string
           duration?: number | null
           emotions?: Json | null
+          entities?: Json | null
           "foreign key"?: string | null
           id?: number
           master_themes?: string[] | null

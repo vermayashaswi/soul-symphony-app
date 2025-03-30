@@ -43,9 +43,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       for (const entry of typedEntries) {
         // Process entries that have text but no sentiment or themes
         if (entry["refined text"]) {
-          // Generate themes if needed
-          if (!entry.master_themes) {
-            await generateThemesForEntry(entry);
+          // Generate themes and entities if needed
+          if (!entry.master_themes || !entry.entities) {
+            await generateThemesAndEntitiesForEntry(entry);
           }
           
           // Analyze sentiment if needed
@@ -64,21 +64,28 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  const generateThemesForEntry = async (entry: JournalEntry) => {
+  const generateThemesAndEntitiesForEntry = async (entry: JournalEntry) => {
     try {
-      // Call the Supabase Edge Function to generate themes
+      // Call the Supabase Edge Function to generate themes and entities
       const { data, error } = await supabase.functions.invoke('generate-themes', {
         body: { text: entry["refined text"], entryId: entry.id }
       });
       
       if (error) {
-        console.error('Error generating themes:', error);
+        console.error('Error generating themes and entities:', error);
         return;
       }
       
-      if (data?.themes) {
+      if (data) {
         // Update the entry with the new themes
-        entry.master_themes = data.themes;
+        if (data.themes) {
+          entry.master_themes = data.themes;
+        }
+        
+        // Update the entry with the new entities
+        if (data.entities) {
+          entry.entities = data.entities;
+        }
       }
     } catch (error) {
       console.error('Error invoking generate-themes function:', error);
