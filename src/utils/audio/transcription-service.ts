@@ -22,22 +22,30 @@ export async function sendAudioForTranscription(base64String: string, userId: st
       };
     }
     
-    // Send to edge function - note we've removed the options property
-    // and are specifying the timeout directly in the AbortSignal
-    const controller = new AbortController();
-    // Set a timeout of 60 seconds
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    // We need to implement a timeout but can't use AbortController directly
+    // with the Supabase function invoke as it doesn't accept the signal property
+    const timeoutPromise = new Promise((_, reject) => {
+      const id = setTimeout(() => {
+        clearTimeout(id);
+        reject(new Error('Request timed out after 60 seconds'));
+      }, 60000);
+    });
     
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+    // Create a promise for the actual function invocation
+    const functionPromise = supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64String,
         userId
-      },
-      signal: controller.signal
+      }
     });
-
-    // Clear the timeout
-    clearTimeout(timeoutId);
+    
+    // Race the function call against the timeout
+    const { data, error } = await Promise.race([
+      functionPromise, 
+      timeoutPromise.then(() => {
+        throw new Error('Request timed out after 60 seconds');
+      })
+    ]) as { data: any, error: any };
 
     if (error) {
       console.error('Transcription error:', error);
