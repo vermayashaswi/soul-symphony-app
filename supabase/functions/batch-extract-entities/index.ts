@@ -16,39 +16,40 @@ const corsHeaders = {
 
 async function extractEntities(text: string) {
   try {
-    console.log(`[DEBUG] Starting entity extraction for text: "${text.substring(0, 100)}..."`);
+    console.log(`Starting entity extraction for text: "${text.substring(0, 100)}..."`);
     
     if (!openAIApiKey) {
       console.error('OpenAI API key is missing or empty');
       throw new Error('OpenAI API key is not configured');
     }
     
-    // Using the exact same prompt format that worked for the transcribe-audio function
-    // This is the key to ensuring consistent results
+    // Use the exact same prompt format that worked successfully in generate-themes function
     const prompt = `
       Extract named entities from the following journal entry.
       
-      Journal entry:
-      ${text}
-      
       For each entity found, return:
-      - "type": One of: person, organization, location, event, product, technology
+      - "type": One of: person, organization, place, product, event
       - "name": The entity name exactly as mentioned in the text
       
-      Return only a simple JSON array of found entities like:
-      [
-        {"type": "person", "name": "John"},
-        {"type": "organization", "name": "Microsoft"},
-        {"type": "location", "name": "New York"}
-      ]
+      Return the results as a JSON object with one property:
+      - "entities": An array of objects, each with "type" and "name" properties.
       
-      If no entities are found, return an empty array: []
+      Example response format:
+      {
+        "entities": [
+          {"type": "person", "name": "John"},
+          {"type": "organization", "name": "Microsoft"},
+          {"type": "place", "name": "New York"}
+        ]
+      }
       
-      Focus on extracting real named entities only - people, places, organizations, specific products, etc.
-      Do not include common nouns, abstract concepts, or general terms.
+      Only include clearly mentioned entities. If no entities are found, return an empty array.
+      
+      Journal entry:
+      ${text}
     `;
     
-    console.log(`[DEBUG] Sending request to OpenAI with model: gpt-4o-mini`);
+    console.log(`Sending request to OpenAI with model: gpt-4o-mini`);
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -68,66 +69,55 @@ async function extractEntities(text: string) {
             content: prompt
           }
         ],
-        temperature: 0.1,  // Lower temperature for more consistent results
+        temperature: 0.3,  // Lower temperature for more consistent results
         response_format: { type: "json_object" }
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[ERROR] OpenAI API error: ${response.status} ${response.statusText}`, errorText);
+      console.error(`OpenAI API error: ${response.status} ${response.statusText}`, errorText);
       throw new Error(`Failed to extract entities: ${errorText}`);
     }
 
     const result = await response.json();
-    console.log(`[DEBUG] Raw response from OpenAI:`, JSON.stringify(result, null, 2));
+    console.log(`Raw response from OpenAI:`, JSON.stringify(result, null, 2));
     
     // Extract the content from the response
     if (!result.choices || !result.choices[0] || !result.choices[0].message) {
-      console.error('[ERROR] Invalid response structure from OpenAI');
+      console.error('Invalid response structure from OpenAI');
       return [];
     }
     
     const entitiesText = result.choices[0].message.content;
-    console.log(`[DEBUG] Entities response text:`, entitiesText);
+    console.log(`Entities response text:`, entitiesText);
     
     try {
       // Parse the JSON response
       const parsedContent = JSON.parse(entitiesText);
       
-      // Handle different possible formats
-      if (Array.isArray(parsedContent)) {
-        console.log(`[DEBUG] Successfully extracted ${parsedContent.length} entities:`, JSON.stringify(parsedContent));
-        return parsedContent;
-      } else if (parsedContent && typeof parsedContent === 'object') {
-        // If the response is an object with an entities property
-        if (Array.isArray(parsedContent.entities)) {
-          console.log(`[DEBUG] Successfully extracted ${parsedContent.entities.length} entities from .entities property:`, JSON.stringify(parsedContent.entities));
-          return parsedContent.entities;
-        }
-        // If we received a single entity
-        else if (parsedContent.type && parsedContent.name) {
-          console.log(`[DEBUG] Extracted single entity:`, JSON.stringify([parsedContent]));
-          return [parsedContent];
-        }
+      // Check if we have entities in the response
+      if (parsedContent && typeof parsedContent === 'object' && Array.isArray(parsedContent.entities)) {
+        console.log(`Successfully extracted ${parsedContent.entities.length} entities:`, JSON.stringify(parsedContent.entities));
+        return parsedContent.entities;
       }
       
-      console.log('[DEBUG] No recognized entity structure found, returning empty array');
+      console.log('No entities found in the response, returning empty array');
       return [];
     } catch (err) {
-      console.error('[ERROR] Error parsing entities JSON:', err);
-      console.error('[ERROR] Raw entities text:', entitiesText);
+      console.error('Error parsing entities JSON:', err);
+      console.error('Raw entities text:', entitiesText);
       return [];
     }
   } catch (error) {
-    console.error('[ERROR] Error in extractEntities:', error);
+    console.error('Error in extractEntities:', error);
     return [];
   }
 }
 
 async function processEntries(userId?: string, processAll: boolean = false, diagnosticMode: boolean = false, testText?: string, testExtraction: boolean = false) {
   try {
-    console.log('[DEBUG] processEntries function called with params:', { 
+    console.log('processEntries function called with params:', { 
       userId, 
       processAll, 
       diagnosticMode, 
@@ -136,7 +126,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     
     // Special case: If test extraction is requested, just process the test text
     if (testExtraction && testText) {
-      console.log('[DEBUG] Running test extraction on provided text:', testText.substring(0, 100) + '...');
+      console.log('Running test extraction on provided text:', testText.substring(0, 100) + '...');
       const entities = await extractEntities(testText);
       
       const diagnosticInfo = {
@@ -148,7 +138,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
         supabaseClientInitialized: !!supabase
       };
       
-      console.log('[DEBUG] Test extraction results:', JSON.stringify({
+      console.log('Test extraction results:', JSON.stringify({
         success: true,
         entitiesFound: entities.length,
         entities,
@@ -162,7 +152,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
       };
     }
     
-    console.log('[DEBUG] Starting batch entity extraction process');
+    console.log('Starting batch entity extraction process');
     const startTime = Date.now();
     
     // Diagnostic information to return
@@ -194,7 +184,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     
     // Add user filter if provided
     if (userId) {
-      console.log(`[DEBUG] Filtering entries for user ID: ${userId}`);
+      console.log(`Filtering entries for user ID: ${userId}`);
       query = query.eq('user_id', userId);
     }
     
@@ -214,7 +204,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     diagnosticInfo.entriesFound = entries?.length || 0;
     
     if (error) {
-      console.error('[ERROR] Error fetching entries:', error);
+      console.error('Error fetching entries:', error);
       return { 
         success: false, 
         error: error.message, 
@@ -224,14 +214,14 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
       };
     }
     
-    console.log(`[DEBUG] Found ${entries?.length || 0} entries to process`);
+    console.log(`Found ${entries?.length || 0} entries to process`);
     
     let processed = 0;
     const processingDetails: any[] = [];
     
     // Exit early if no entries to process
     if (!entries || entries.length === 0) {
-      console.log('[DEBUG] No entries to process');
+      console.log('No entries to process');
       return { 
         success: true, 
         processed: 0, 
@@ -243,7 +233,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     
     for (const entry of entries) {
       if (!entry["refined text"]) {
-        console.log(`[DEBUG] Skipping entry ${entry.id} - no refined text`);
+        console.log(`Skipping entry ${entry.id} - no refined text`);
         processingDetails.push({
           entryId: entry.id,
           skipped: true,
@@ -253,7 +243,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
       }
       
       try {
-        console.log(`[DEBUG] Processing entry ${entry.id}`);
+        console.log(`Processing entry ${entry.id}`);
         
         // For diagnostic mode, still call the actual API to test it
         const entities = await extractEntities(entry["refined text"]);
@@ -271,9 +261,9 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
         processingDetails.push(entryDetails);
         
         if (entities && entities.length > 0) {
-          console.log(`[DEBUG] Extracted ${entities.length} entities for entry ${entry.id}:`, JSON.stringify(entities));
+          console.log(`Extracted ${entities.length} entities for entry ${entry.id}:`, JSON.stringify(entities));
         } else {
-          console.log(`[DEBUG] No entities found for entry ${entry.id}`);
+          console.log(`No entities found for entry ${entry.id}`);
         }
         
         // Only update if not in diagnostic mode or explicitly requested
@@ -284,14 +274,14 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
             .eq('id', entry.id);
             
           if (updateError) {
-            console.error(`[ERROR] Error updating entry ${entry.id}:`, updateError);
+            console.error(`Error updating entry ${entry.id}:`, updateError);
             entryDetails.updateError = updateError.message;
           } else {
             processed++;
             if (entities && entities.length > 0) {
-              console.log(`[DEBUG] Updated entry ${entry.id} with ${entities.length} entities`);
+              console.log(`Updated entry ${entry.id} with ${entities.length} entities`);
             } else {
-              console.log(`[DEBUG] Updated entry ${entry.id} with empty entities array`);
+              console.log(`Updated entry ${entry.id} with empty entities array`);
             }
           }
         } else {
@@ -299,7 +289,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
           processed++;
         }
       } catch (entryError) {
-        console.error(`[ERROR] Error processing entry ${entry.id}:`, entryError);
+        console.error(`Error processing entry ${entry.id}:`, entryError);
         processingDetails.push({
           entryId: entry.id,
           error: entryError.message
@@ -314,7 +304,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     const endTime = Date.now();
     const processingTime = (endTime - startTime) / 1000;
     
-    console.log(`[DEBUG] Processed ${processed} entries in ${processingTime.toFixed(3)} seconds`);
+    console.log(`Processed ${processed} entries in ${processingTime.toFixed(3)} seconds`);
     
     return { 
       success: true, 
@@ -324,7 +314,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
       diagnosticInfo
     };
   } catch (error) {
-    console.error('[ERROR] Fatal error in processEntries:', error);
+    console.error('Fatal error in processEntries:', error);
     return { 
       success: false, 
       error: error.message, 
@@ -364,10 +354,10 @@ serve(async (req) => {
         debugEnv = body.debugEnv === true;
       }
     } catch (e) {
-      console.log('[DEBUG] No request body or invalid JSON:', e);
+      console.log('No request body or invalid JSON:', e);
     }
     
-    console.log('[DEBUG] Request parameters:', { 
+    console.log('Request parameters:', { 
       userId, 
       processAll, 
       diagnosticMode, 
@@ -405,7 +395,7 @@ serve(async (req) => {
     );
     
   } catch (error) {
-    console.error('[ERROR] Error in batch-extract-entities function:', error);
+    console.error('Error in batch-extract-entities function:', error);
     
     return new Response(
       JSON.stringify({ 

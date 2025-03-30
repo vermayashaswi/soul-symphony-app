@@ -134,7 +134,7 @@ export default function Utilities() {
         toast({
           title: "No entities found",
           description: "The extraction completed but no entities were found.",
-          // Change from "warning" to "default" as "warning" is not an allowed variant
+          // Changed from "warning" to "default" as "warning" is not an allowed variant
           variant: "default"
         });
       }
@@ -331,47 +331,6 @@ export default function Utilities() {
                   )}
                 </div>
                 
-                <div className="bg-muted p-4 rounded-lg">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-medium flex items-center gap-2">
-                        <Database className="h-4 w-4" />
-                        Entity Extraction
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Process journal entries to extract entities like people, places, and organizations mentioned in your journals.
-                      </p>
-                    </div>
-                    <Badge variant={processAll ? "destructive" : "secondary"}>
-                      {processAll ? "Process All Entries" : "Missing Entries Only"}
-                    </Badge>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Switch 
-                      id="process-all" 
-                      checked={processAll} 
-                      onCheckedChange={setProcessAll}
-                    />
-                    <Label htmlFor="process-all">Process all entries (including already processed ones)</Label>
-                  </div>
-                  
-                  <Button 
-                    onClick={handleProcessEntities} 
-                    disabled={isProcessing}
-                    className="w-full"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      "Extract Entities from Journal Entries"
-                    )}
-                  </Button>
-                </div>
-                
                 {/* Test Entity Extraction */}
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="flex items-start justify-between mb-4">
@@ -381,7 +340,7 @@ export default function Utilities() {
                         Test Entity Extraction
                       </h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Test the entity extraction on sample text to verify it's working correctly. This uses the same example that worked correctly from your recent journal entry.
+                        Test the entity extraction on sample text to verify it's working correctly. We recommend using the working example from the successful journal entry.
                       </p>
                     </div>
                   </div>
@@ -469,7 +428,7 @@ export default function Utilities() {
                                           <Badge className={
                                             entity.type === 'person' ? 'bg-blue-100 text-blue-800' :
                                             entity.type === 'organization' ? 'bg-purple-100 text-purple-800' :
-                                            entity.type === 'location' ? 'bg-green-100 text-green-800' :
+                                            entity.type === 'place' ? 'bg-green-100 text-green-800' :
                                             'bg-gray-100 text-gray-800'
                                           }>
                                             {entity.type}
@@ -495,6 +454,57 @@ export default function Utilities() {
                       </Accordion>
                     )}
                   </div>
+                </div>
+                
+                <div className="bg-muted p-4 rounded-lg">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        Entity Extraction
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Process journal entries to extract entities like people, places, and organizations mentioned in your journals.
+                      </p>
+                    </div>
+                    <Badge variant={processAll ? "destructive" : "secondary"}>
+                      {processAll ? "Process All Entries" : "Missing Entries Only"}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Switch 
+                      id="process-all" 
+                      checked={processAll} 
+                      onCheckedChange={setProcessAll}
+                    />
+                    <Label htmlFor="process-all">Process all entries (including already processed ones)</Label>
+                  </div>
+                  
+                  <Alert variant="default" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Recommended Workflow</AlertTitle>
+                    <AlertDescription>
+                      1. First check the environment with "Check Environment Configuration"<br />
+                      2. Then test extraction using the example text above<br />
+                      3. Only after confirming test extraction works, proceed with batch processing
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <Button 
+                    onClick={handleProcessEntities} 
+                    disabled={isProcessing}
+                    className="w-full"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      "Extract Entities from Journal Entries"
+                    )}
+                  </Button>
                 </div>
                 
                 {/* Diagnostics Section */}
@@ -615,7 +625,7 @@ export default function Utilities() {
                                                 className={
                                                   entity.type === 'person' ? 'bg-blue-50 text-blue-700' :
                                                   entity.type === 'organization' ? 'bg-purple-50 text-purple-700' :
-                                                  entity.type === 'location' ? 'bg-green-50 text-green-700' :
+                                                  entity.type === 'place' ? 'bg-green-50 text-green-700' :
                                                   'bg-gray-50 text-gray-700'
                                                 }
                                               >
@@ -689,7 +699,7 @@ export default function Utilities() {
                                                 className={
                                                   entity.type === 'person' ? 'bg-blue-50 text-blue-700' :
                                                   entity.type === 'organization' ? 'bg-purple-50 text-purple-700' :
-                                                  entity.type === 'location' ? 'bg-green-50 text-green-700' :
+                                                  entity.type === 'place' ? 'bg-green-50 text-green-700' :
                                                   'bg-gray-50 text-gray-700'
                                                 }
                                               >
