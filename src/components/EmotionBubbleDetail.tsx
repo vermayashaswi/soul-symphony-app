@@ -23,7 +23,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   // Set a minimum font size to ensure legibility
   // Increased minimum size for better readability
   const fontSizeStyle: React.CSSProperties = {
-    fontSize: `${Math.max(14, size / 3.5)}px`, // Increased minimum size from 12 to 14
+    fontSize: `${Math.max(16, size / 3)}px`, // Increased minimum font size to 16px
     lineHeight: '1.2',
     maxWidth: '90%',
     overflow: 'hidden',
@@ -37,6 +37,9 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     padding: '12%',
     fontWeight: name.length <= 1 ? 'normal' : 'medium' // Only apply font-medium to actual words
   };
+
+  // Set a minimum size for the bubble to ensure legibility
+  const bubbleSize = Math.max(70, size);
 
   // Create different animations based on disturbed state
   const getAnimation = () => {
@@ -52,7 +55,8 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     }
     
     return {
-      scale: [1, 1.03, 1],
+      scale: [1, 1.03, 1, 0.97, 1],
+      y: [0, -3, 0, 3, 0],
       transition: {
         duration: 3,
         repeat: Infinity,
@@ -71,8 +75,13 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
           color,
           className
         )}
-        style={{ width: size, height: size }}
+        style={{ width: bubbleSize, height: bubbleSize }}
         initial={{ opacity: 0.9 }}
+        whileHover={{ 
+          scale: 1.1, 
+          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
+          transition: { duration: 0.2 }
+        }}
       >
         <span className="font-medium px-1 text-center" style={fontSizeStyle}>
           {name}

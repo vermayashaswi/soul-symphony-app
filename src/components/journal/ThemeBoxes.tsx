@@ -10,15 +10,16 @@ interface ThemeBoxesProps {
 }
 
 const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed = false }) => {
-  // Color classes for theme boxes
+  // Color classes for theme boxes - enhancing with more visually distinct colors
   const colorClasses = [
-    'bg-blue-100 text-blue-800',
-    'bg-indigo-100 text-indigo-800',
-    'bg-purple-100 text-purple-800',
-    'bg-pink-100 text-pink-800',
-    'bg-green-100 text-green-800',
-    'bg-yellow-100 text-yellow-800',
-    'bg-orange-100 text-orange-800',
+    'bg-blue-100 text-blue-800 border border-blue-200',
+    'bg-indigo-100 text-indigo-800 border border-indigo-200',
+    'bg-purple-100 text-purple-800 border border-purple-200',
+    'bg-pink-100 text-pink-800 border border-pink-200',
+    'bg-green-100 text-green-800 border border-green-200',
+    'bg-yellow-100 text-yellow-800 border border-yellow-200',
+    'bg-orange-100 text-orange-800 border border-orange-200',
+    'bg-cyan-100 text-cyan-800 border border-cyan-200',
   ];
 
   // Filler themes to add small bubbles when there are few main themes
@@ -27,7 +28,7 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
   useEffect(() => {
     // Generate filler bubbles if we have fewer than 5 main themes
     if (themes.length < 5) {
-      const fillers = Array(8 - themes.length) // Reduced from 12 - themes.length * 2
+      const fillers = Array(8 - themes.length)
         .fill('')
         .map((_, i) => `•`); // Use bullet character for small bubbles
       setFillerThemes(fillers);
@@ -39,53 +40,29 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
   // All themes including fillers
   const allThemes = [...themes, ...fillerThemes];
 
-  // Calculate positions to prevent overlap
-  const getBoxPositions = (count: number) => {
-    const positions = [];
-    const rows = Math.ceil(count / 3);
-    const cols = Math.min(count, 3);
-    
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const index = row * cols + col;
-        if (index < count) {
-          positions.push({
-            x: col * 33.3, // Distribute across available width
-            y: row * 80    // Provide enough vertical space
-          });
-        }
-      }
-    }
-    
-    return positions;
-  };
-  
-  const positions = getBoxPositions(allThemes.length);
-
   return (
-    <div className={cn("flex flex-wrap gap-3 relative overflow-hidden", className)}>
+    <div className={cn("flex flex-wrap gap-4 relative p-2 h-full w-full justify-center items-center", className)}>
       {allThemes.map((theme, index) => {
         // Determine if this is a filler (small) bubble
         const isFiller = index >= themes.length;
         
-        // Different sizes for theme bubbles vs filler bubbles
-        // Increased the size of both main and filler bubbles
-        const bubbleSize = isFiller ? 
-          { minWidth: '40px', height: '40px', fontSize: '12px' } : // Increased from 30px/10px
-          { minWidth: '130px', height: '52px', fontSize: '16px' }; // Increased from 110px/44px
-        
-        // Ensure index is within bounds of positions array
-        const position = index < positions.length ? positions[index] : { x: 0, y: 0 };
+        // Generate a random offset for the animation
+        const randomOffset = Math.random() * 0.5 + 0.5; // Between 0.5 and 1
         
         return (
           <motion.div
             key={`${theme}-${index}`}
             className={cn(
-              "px-4 py-2 rounded-md font-medium flex items-center justify-center",
+              "rounded-lg shadow-sm font-medium flex items-center justify-center",
               colorClasses[index % colorClasses.length],
               isFiller ? "opacity-40" : "opacity-100"
             )}
-            style={bubbleSize}
+            style={{
+              minWidth: isFiller ? '50px' : '140px',
+              height: isFiller ? '50px' : '60px',
+              fontSize: isFiller ? '14px' : '16px',
+              padding: isFiller ? '8px' : '12px',
+            }}
             initial={{ scale: 0, opacity: 0 }}
             animate={isDisturbed ? {
               x: [0, (Math.random() - 0.5) * 40, 0],
@@ -97,7 +74,8 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
                 ease: "easeInOut"
               }
             } : {
-              y: [0, -5, 0, 5, 0],
+              y: [0, -5 * randomOffset, 0, 5 * randomOffset, 0],
+              scale: [1, 1.02, 1, 0.98, 1],
               transition: { 
                 duration: 3 + Math.random() * 2,
                 repeat: Infinity,
@@ -110,7 +88,11 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
               damping: 20,
               delay: index * 0.1
             }}
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ 
+              scale: 1.1, 
+              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
+              transition: { duration: 0.2 }
+            }}
           >
             {theme}
           </motion.div>
