@@ -12,6 +12,7 @@ import SmartChat from "./pages/SmartChat";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import Utilities from "./pages/Utilities";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
@@ -25,7 +26,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected route component with location preservation
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
