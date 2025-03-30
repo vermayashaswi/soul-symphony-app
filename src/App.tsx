@@ -97,7 +97,11 @@ const AppRoutes = () => {
             <Settings />
           </ProtectedRoute>
         } />
-        <Route path="/utilities" element={<Utilities />} />
+        <Route path="/utilities" element={
+          <ProtectedRoute>
+            <Utilities />
+          </ProtectedRoute>
+        } />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
