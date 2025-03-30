@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -86,15 +85,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
             )}
             style={bubbleSize}
             initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: isFiller ? 0.4 : 1 }}
-            transition={{ 
-              type: "spring",
-              stiffness: 260,
-              damping: 20,
-              delay: index * 0.1
-            }}
-            whileHover={{ scale: 1.1 }}
-            // Apply different animations based on disturbance state
             animate={isDisturbed ? {
               x: [0, (Math.random() - 0.5) * 40, 0],
               y: [0, (Math.random() - 0.5) * 40, 0],
@@ -112,6 +102,13 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
                 ease: "easeInOut"
               }
             }}
+            transition={{ 
+              type: "spring",
+              stiffness: 260,
+              damping: 20,
+              delay: index * 0.1
+            }}
+            whileHover={{ scale: 1.1 }}
           >
             {theme}
           </motion.div>
