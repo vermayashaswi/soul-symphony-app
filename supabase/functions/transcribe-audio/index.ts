@@ -1,3 +1,6 @@
+
+// Only updating the relevant parts of the file to handle directTranscription better
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -266,6 +269,25 @@ serve(async (req) => {
         }
       } else {
         throw new Error("Transcription failed - no text generated");
+      }
+
+      // After successful database insertion, verify the entry was added
+      try {
+        if (entryId) {
+          const { data: verifyEntry, error: verifyError } = await supabase
+            .from('Journal Entries')
+            .select('id')
+            .eq('id', entryId)
+            .single();
+            
+          if (verifyError || !verifyEntry) {
+            console.error('Failed to verify entry in database:', verifyError);
+          } else {
+            console.log('Entry successfully verified in database:', verifyEntry.id);
+          }
+        }
+      } catch (verifyErr) {
+        console.error('Error verifying entry in database:', verifyErr);
       }
 
       return new Response(

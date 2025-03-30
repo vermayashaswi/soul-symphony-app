@@ -20,7 +20,7 @@ const Journal = () => {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   
-  const { entries, loading } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
+  const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
   // Check if user profile exists and create if needed
   useEffect(() => {
@@ -28,6 +28,14 @@ const Journal = () => {
       checkUserProfile(user.id);
     }
   }, [user?.id]);
+  
+  // When tab changes to entries, refresh the entries list
+  useEffect(() => {
+    if (activeTab === 'entries' && isProfileChecked) {
+      console.log('Tab changed to entries, refreshing...');
+      fetchEntries();
+    }
+  }, [activeTab, isProfileChecked, fetchEntries]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -84,6 +92,7 @@ const Journal = () => {
     setTimeout(() => {
       setProcessingEntries(prev => prev.filter(id => id !== tempId));
       setRefreshKey(prev => prev + 1);
+      fetchEntries(); // Explicitly fetch entries after timeout
     }, 30000); // After 30 seconds, simulate completion and refresh list
   };
 

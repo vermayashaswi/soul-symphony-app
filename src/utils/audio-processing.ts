@@ -79,7 +79,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     // 4. First try a direct transcription to verify the audio is valid
     console.log('Testing audio with direct transcription...');
     
-    const directTranscriptionResult = await sendAudioForTranscription(base64String, authStatus.userId!);
+    const directTranscriptionResult = await sendAudioForTranscription(base64String, authStatus.userId!, true);
     if (!directTranscriptionResult.success || !directTranscriptionResult.data?.transcription) {
       console.error('Direct transcription test failed:', directTranscriptionResult.error);
       toast.dismiss(toastId);
@@ -96,7 +96,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     
     while (retries <= maxRetries) {
       try {
-        result = await sendAudioForTranscription(base64String, authStatus.userId!);
+        result = await sendAudioForTranscription(base64String, authStatus.userId!, false);
         if (result.success) break;
         retries++;
         if (retries <= maxRetries) {
@@ -116,8 +116,28 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     toast.dismiss(toastId);
     
     if (result?.success) {
-      toast.success('Journal entry saved successfully!');
+      console.log('Journal entry saved successfully:', result);
+      
+      // Verify the entry was saved by querying the database
+      if (result.data?.entryId) {
+        const { data: savedEntry, error: fetchError } = await supabase
+          .from('Journal Entries')
+          .select('id')
+          .eq('id', result.data.entryId)
+          .single();
+          
+        if (fetchError || !savedEntry) {
+          console.error('Failed to verify journal entry was saved:', fetchError);
+          toast.error('Journal entry processing completed but verification failed. Please check your entries.');
+        } else {
+          console.log('Journal entry verified in database:', savedEntry);
+          toast.success('Journal entry saved successfully!');
+        }
+      } else {
+        toast.success('Journal entry processed, but no entry ID returned.');
+      }
     } else {
+      console.error('Failed to process recording after multiple attempts:', result?.error);
       toast.error(result?.error || 'Failed to process recording after multiple attempts');
     }
   } catch (error: any) {

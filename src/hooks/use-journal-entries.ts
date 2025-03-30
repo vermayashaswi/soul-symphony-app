@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
@@ -9,15 +9,14 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (userId && isProfileChecked) {
-      fetchEntries();
-    } else {
-      setLoading(true);
+  // Use useCallback to make fetchEntries reusable
+  const fetchEntries = useCallback(async () => {
+    if (!userId) {
+      console.log('No user ID provided for fetching entries');
+      setLoading(false);
+      return;
     }
-  }, [userId, refreshKey, isProfileChecked]);
-
-  const fetchEntries = async () => {
+    
     try {
       setLoading(true);
       console.log('Fetching entries for user ID:', userId);
@@ -35,7 +34,17 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         throw error;
       }
       
-      console.log('Fetched entries:', data);
+      console.log('Fetched entries:', data?.length || 0);
+      
+      if (data && data.length > 0) {
+        console.log('First entry sample:', {
+          id: data[0].id,
+          text: data[0]["refined text"],
+          created: data[0].created_at
+        });
+      } else {
+        console.log('No entries found for this user');
+      }
       
       // Convert the data to match our JournalEntry type
       const typedEntries: JournalEntry[] = (data || []).map(item => ({
@@ -64,7 +73,15 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId && isProfileChecked) {
+      fetchEntries();
+    } else {
+      setLoading(true);
+    }
+  }, [userId, refreshKey, isProfileChecked, fetchEntries]);
 
   return { 
     entries, 
