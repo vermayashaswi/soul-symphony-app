@@ -63,6 +63,11 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       try {
         // Get date range based on timeRange
         const { startDate, endDate } = getDateRange(timeRange);
+        
+        console.log(`Fetching entries for ${timeRange}:`, {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString()
+        });
 
         // Fetch journal entries for the specified time range
         const { data: entries, error } = await supabase
@@ -73,7 +78,12 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
           .lte('created_at', endDate.toISOString())
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching insights data:', error);
+          throw error;
+        }
+
+        console.log(`Found ${entries?.length || 0} entries for ${timeRange}`);
 
         if (!entries || entries.length === 0) {
           setInsightsData({
@@ -120,10 +130,13 @@ const getDateRange = (timeRange: TimeRange) => {
 
   switch (timeRange) {
     case 'today':
+      // For 'today', include the entire day from start to end
       startDate = startOfDay(now);
       endDate = endOfDay(now);
       break;
     case 'week':
+      // For 'week', use start of week (Monday) to end of week (Sunday)
+      // Setting weekStartsOn to 1 makes Monday the first day of the week
       startDate = startOfWeek(now, { weekStartsOn: 1 });
       endDate = endOfWeek(now, { weekStartsOn: 1 });
       break;
@@ -136,6 +149,7 @@ const getDateRange = (timeRange: TimeRange) => {
       endDate = endOfYear(now);
       break;
     default:
+      // Default to week if invalid timeRange
       startDate = startOfWeek(now, { weekStartsOn: 1 });
       endDate = endOfWeek(now, { weekStartsOn: 1 });
   }
