@@ -20,6 +20,9 @@ const Journal = () => {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   
+  // Add a flag to prevent unnecessary fetches
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
+  
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
   // Check if user profile exists and create if needed
@@ -29,13 +32,14 @@ const Journal = () => {
     }
   }, [user?.id]);
   
-  // When tab changes to entries, refresh the entries list
+  // When tab changes to entries, refresh the entries list only once initially
   useEffect(() => {
-    if (activeTab === 'entries' && isProfileChecked) {
-      console.log('Tab changed to entries, refreshing...');
+    if (activeTab === 'entries' && isProfileChecked && !initialFetchDone) {
+      console.log('Tab changed to entries, doing initial fetch...');
       fetchEntries();
+      setInitialFetchDone(true);
     }
-  }, [activeTab, isProfileChecked, fetchEntries]);
+  }, [activeTab, isProfileChecked, fetchEntries, initialFetchDone]);
 
   const checkUserProfile = async (userId: string) => {
     try {

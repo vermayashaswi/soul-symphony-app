@@ -10,12 +10,19 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [loading, setLoading] = useState(true);
   const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
   const [fetchCount, setFetchCount] = useState(0);
+  const [lastRefreshKey, setLastRefreshKey] = useState(refreshKey);
 
   // Use useCallback to make fetchEntries reusable
   const fetchEntries = useCallback(async () => {
     if (!userId) {
       console.log('No user ID provided for fetching entries');
       setLoading(false);
+      return;
+    }
+    
+    // Don't fetch if we're already loading to prevent multiple simultaneous requests
+    if (loading && fetchCount > 0) {
+      console.log('[useJournalEntries] Skipping fetch as one is already in progress');
       return;
     }
     
@@ -81,17 +88,27 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     } finally {
       setLoading(false);
     }
-  }, [userId, fetchCount]);
+  }, [userId, fetchCount, loading]);
 
+  // Only fetch when userId changes, refreshKey changes, or isProfileChecked becomes true
   useEffect(() => {
     if (userId && isProfileChecked) {
-      console.log(`[useJournalEntries] Effect triggered: userId=${!!userId}, refreshKey=${refreshKey}, isProfileChecked=${isProfileChecked}`);
-      fetchEntries();
+      // Only fetch if this is the initial load or if refreshKey has changed
+      const isInitialLoad = fetchCount === 0;
+      const hasRefreshKeyChanged = refreshKey !== lastRefreshKey;
+      
+      if (isInitialLoad || hasRefreshKeyChanged) {
+        console.log(`[useJournalEntries] Effect triggered: initial=${isInitialLoad}, refreshKey changed=${hasRefreshKeyChanged}`);
+        fetchEntries();
+        setLastRefreshKey(refreshKey);
+      } else {
+        console.log(`[useJournalEntries] Skipping unnecessary fetch`);
+      }
     } else {
       console.log(`[useJournalEntries] Waiting for prerequisites: userId=${!!userId}, isProfileChecked=${isProfileChecked}`);
-      setLoading(true);
+      setLoading(userId !== undefined); // Only show loading if we have a userId but aren't fully ready
     }
-  }, [userId, refreshKey, isProfileChecked, fetchEntries]);
+  }, [userId, refreshKey, isProfileChecked, fetchEntries, fetchCount, lastRefreshKey]);
 
   return { 
     entries, 

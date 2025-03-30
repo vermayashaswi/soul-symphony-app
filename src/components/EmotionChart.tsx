@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -95,7 +94,7 @@ export function EmotionChart({
   ];
   
   // Process emotion data for bubble chart
-  const getBubbleData = useMemo(() => {
+  const bubbleData = useMemo(() => {
     if (!aggregatedData) return {};
     
     // Combine all emotions from aggregatedData
@@ -107,18 +106,18 @@ export function EmotionChart({
       emotionScores[emotion] = totalScore;
     });
     
+    console.log('Bubble data updated for timeframe:', timeframe, emotionScores);
     return emotionScores;
-  }, [aggregatedData]);
+  }, [aggregatedData, timeframe]);
   
-  // This effect will re-render the bubble chart when switching back to it
+  // This effect will re-render the bubble chart when data or timeframe changes
   useEffect(() => {
-    if (chartType === 'bubble') {
-      setBubbleKey(prev => prev + 1);
-    }
-  }, [chartType, timeframe]);
+    console.log('Timeframe or aggregatedData changed, updating bubble chart', timeframe);
+    setBubbleKey(prev => prev + 1);
+  }, [timeframe, aggregatedData]);
   
   // Process aggregated data for line chart
-  const getLineChartData = useMemo(() => {
+  const lineData = useMemo(() => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
       return [];
     }
@@ -166,12 +165,8 @@ export function EmotionChart({
         const dateB = new Date(b.day);
         return dateA.getTime() - dateB.getTime();
       });
-  }, [aggregatedData]);
+  }, [aggregatedData, timeframe]);
 
-  // Memoize chart data
-  const bubbleData = useMemo(() => getBubbleData, [getBubbleData]);
-  const lineData = useMemo(() => getLineChartData, [getLineChartData]);
-  
   const renderLineChart = () => {
     if (lineData.length === 0) {
       return (
@@ -259,7 +254,7 @@ export function EmotionChart({
         {chartType === 'bubble' && (
           <div className="w-full h-[350px]" key={bubbleKey}>
             <EmotionBubbles 
-              emotions={getBubbleData} 
+              emotions={bubbleData} 
               preventOverlap={true} // Ensure bubbles don't overlap
             />
           </div>
