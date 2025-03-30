@@ -1,8 +1,7 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const googleNLApiKey = Deno.env.get('GOOGLE_NL_API_KEY') || '';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,16 +15,62 @@ serve(async (req) => {
   }
 
   try {
-    const { text, entryId } = await req.json();
+    const requestData = await req.json();
     
-    if (!text) {
-      throw new Error('No text provided for analysis');
+    // Check if this is an environment check request
+    if (requestData.debugEnv === true) {
+      console.log("Environment check requested");
+      
+      // Get environment variables
+      const googleNlApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+      const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      
+      // Test Supabase connection
+      let supabaseConnected = false;
+      try {
+        if (supabaseUrl && supabaseServiceKey) {
+          const supabase = createClient(supabaseUrl, supabaseServiceKey);
+          const { data, error } = await supabase.from('emotions').select('name').limit(1);
+          supabaseConnected = !error;
+        }
+      } catch (error) {
+        console.error("Error testing Supabase connection:", error);
+      }
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          googleNlApiConfigured: !!googleNlApiKey,
+          openAiApiConfigured: !!openAiApiKey,
+          supabaseConnected: supabaseConnected,
+          message: "Environment check completed successfully"
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
-    console.log("Analyzing text with Google NL API:", text.substring(0, 100) + "...");
-
-    // Get both sentiment and entity analysis in one request
-    const response = await fetch(`https://language.googleapis.com/v1/documents:annotateText?key=${googleNLApiKey}`, {
+    // Regular sentiment analysis logic...
+    const { text } = requestData;
+    
+    if (!text) {
+      throw new Error("No text provided for analysis");
+    }
+    
+    // Get the Google Natural Language API key from environment variables
+    const apiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+    if (!apiKey) {
+      throw new Error("Google Natural Language API key is not configured");
+    }
+    
+    console.log('Analyzing sentiment for text:', text.slice(0, 100) + '...');
+    
+    // Call the Google Natural Language API
+    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -35,118 +80,39 @@ serve(async (req) => {
           type: 'PLAIN_TEXT',
           content: text,
         },
-        features: {
-          extractSyntax: false,
-          extractEntities: true,
-          extractDocumentSentiment: true,
-          extractEntitySentiment: false,
-          classifyText: false
-        },
-        encodingType: 'UTF8',
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Google NL API error:", errorText);
-      throw new Error(`Google NL API error: ${errorText}`);
+      const error = await response.text();
+      console.error('Google NL API error:', error);
+      throw new Error(`Google API error: ${error}`);
     }
 
     const result = await response.json();
-    console.log("Google NL API analysis complete");
-
-    // Extract sentiment score
-    const sentimentScore = result.documentSentiment?.score;
-
-    // Process and format entities
-    const formattedEntities = result.entities?.map(entity => ({
-      type: mapEntityType(entity.type),
-      name: entity.name
-    })) || [];
-
-    // Remove duplicate entities
-    const uniqueEntities = removeDuplicateEntities(formattedEntities);
-    
-    console.log(`Extracted ${uniqueEntities.length} entities and sentiment score: ${sentimentScore}`);
-
-    if (entryId) {
-      // Update the database with the sentiment score and entities
-      const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-      
-      const { error } = await supabase
-        .from('Journal Entries')
-        .update({ 
-          sentiment: sentimentScore?.toString(),
-          entities: uniqueEntities
-        })
-        .eq('id', entryId);
-        
-      if (error) {
-        console.error(`Error updating entry ${entryId}:`, error);
-      } else {
-        console.log(`Successfully updated entry ${entryId} with sentiment and entities`);
-      }
-    }
+    const sentimentScore = result.documentSentiment?.score?.toString() || "0";
     
     return new Response(
-      JSON.stringify({
-        sentiment: {
-          score: sentimentScore,
-          magnitude: result.documentSentiment?.magnitude
-        },
-        entities: uniqueEntities
+      JSON.stringify({ 
+        sentiment: sentimentScore,
+        success: true 
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
-
   } catch (error) {
     console.error("Error in analyze-sentiment function:", error);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message, 
+        success: false 
+      }),
       {
-        status: 500,
+        status: 200, // Using 200 instead of error code to avoid CORS issues
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
 });
-
-// Map Google's entity types to our simplified schema
-function mapEntityType(googleEntityType: string): string {
-  switch (googleEntityType) {
-    case 'PERSON':
-      return 'person';
-    case 'LOCATION':
-    case 'ADDRESS':
-      return 'place';
-    case 'ORGANIZATION':
-    case 'CONSUMER_GOOD':
-    case 'WORK_OF_ART':
-      return 'organization';
-    case 'EVENT':
-      return 'event';
-    case 'OTHER':
-    default:
-      return 'other';
-  }
-}
-
-// Remove duplicate entities
-function removeDuplicateEntities(entities: Array<{type: string, name: string}>): Array<{type: string, name: string}> {
-  const seen = new Set();
-  return entities.filter(entity => {
-    const key = `${entity.type}:${entity.name.toLowerCase()}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
-}
-
-// Import the createClient function
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";

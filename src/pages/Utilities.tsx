@@ -30,7 +30,18 @@ export default function Utilities() {
         }
       });
       
-      setEnvCheckResult(data || { success: false, error: error?.message });
+      if (error) {
+        console.error("Supabase function error:", error);
+        setEnvCheckResult({ success: false, error: error.message });
+        toast({
+          title: "Environment check failed",
+          description: error.message || "Unknown error occurred",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setEnvCheckResult(data || { success: false, error: "No data returned" });
       
       if (data?.success) {
         toast({
@@ -40,7 +51,7 @@ export default function Utilities() {
       } else {
         toast({
           title: "Environment check failed",
-          description: error?.message || "Unknown error occurred",
+          description: data?.error || "Unknown error occurred",
           variant: "destructive"
         });
       }
@@ -177,7 +188,10 @@ export default function Utilities() {
                     className="w-full"
                   >
                     {envCheckLoading ? (
-                      <span>Checking Environment...</span>
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Checking Environment...
+                      </>
                     ) : (
                       "Check Environment Configuration"
                     )}
