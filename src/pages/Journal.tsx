@@ -19,9 +19,8 @@ const Journal = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   
-  const { entries, loading, batchExtractEntities } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
+  const { entries, loading } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
   // Check if user profile exists and create if needed
   useEffect(() => {
@@ -88,15 +87,6 @@ const Journal = () => {
     }, 30000); // After 30 seconds, simulate completion and refresh list
   };
 
-  const handleProcessEntries = async () => {
-    setIsProcessing(true);
-    try {
-      await batchExtractEntities(true);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
@@ -124,23 +114,6 @@ const Journal = () => {
           </TabsContent>
           
           <TabsContent value="entries">
-            <div className="mb-4 flex justify-end">
-              <Button 
-                onClick={handleProcessEntries} 
-                disabled={isProcessing || !entries.length}
-                variant="outline"
-                size="sm"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing Entries
-                  </>
-                ) : (
-                  'Extract Entities for All Entries'
-                )}
-              </Button>
-            </div>
             <JournalEntriesList 
               entries={entries} 
               loading={loading || !isProfileChecked}

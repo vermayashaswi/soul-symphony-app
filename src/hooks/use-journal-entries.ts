@@ -66,45 +66,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  // Add a function to trigger the batch entity extraction
-  const batchExtractEntities = async (processAll: boolean = false) => {
-    if (!userId) {
-      toast.error('You must be logged in to process entries');
-      return;
-    }
-    
-    try {
-      toast.loading('Processing entries for entity extraction...');
-      
-      const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
-        body: { userId, processAll }
-      });
-      
-      if (error) {
-        console.error('Error calling batch-extract-entities function:', error);
-        toast.error('Failed to process entries');
-        return;
-      }
-      
-      console.log('Batch entity extraction result:', data);
-      
-      if (data.success) {
-        toast.success(`Processed ${data.processed} of ${data.total} entries in ${data.processingTime}`);
-        // Refresh entries to show the updated data
-        fetchEntries();
-      } else {
-        toast.error(`Failed to process entries: ${data.error}`);
-      }
-    } catch (error) {
-      console.error('Error processing entries:', error);
-      toast.error('Failed to process entries');
-    }
-  };
-
   return { 
     entries, 
     loading, 
-    fetchEntries, 
-    batchExtractEntities 
+    fetchEntries
   };
 }
