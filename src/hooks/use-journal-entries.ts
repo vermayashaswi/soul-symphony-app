@@ -8,6 +8,8 @@ import { Json } from '@/integrations/supabase/types';
 export function useJournalEntries(userId: string | undefined, refreshKey: number, isProfileChecked: boolean = false) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
+  const [fetchCount, setFetchCount] = useState(0);
 
   // Use useCallback to make fetchEntries reusable
   const fetchEntries = useCallback(async () => {
@@ -19,31 +21,35 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     
     try {
       setLoading(true);
-      console.log('Fetching entries for user ID:', userId);
+      const fetchStartTime = Date.now();
+      console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
       // Fetch entries from the Journal Entries table
-      const { data, error } = await supabase
+      const { data, error, status } = await supabase
         .from('Journal Entries')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
+      
+      const fetchEndTime = Date.now();
+      console.log(`[useJournalEntries] Fetch completed in ${fetchEndTime - fetchStartTime}ms with status: ${status}`);
         
       if (error) {
-        console.error('Error fetching entries:', error);
+        console.error('[useJournalEntries] Error fetching entries:', error);
         toast.error('Failed to load journal entries');
         throw error;
       }
       
-      console.log('Fetched entries:', data?.length || 0);
+      console.log(`[useJournalEntries] Fetched ${data?.length || 0} entries`);
       
       if (data && data.length > 0) {
-        console.log('First entry sample:', {
+        console.log('[useJournalEntries] First entry sample:', {
           id: data[0].id,
           text: data[0]["refined text"],
           created: data[0].created_at
         });
       } else {
-        console.log('No entries found for this user');
+        console.log('[useJournalEntries] No entries found for this user');
       }
       
       // Convert the data to match our JournalEntry type
@@ -67,18 +73,22 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       }));
       
       setEntries(typedEntries);
+      setLastFetchTime(new Date());
+      setFetchCount(prev => prev + 1);
     } catch (error) {
-      console.error('Error fetching entries:', error);
+      console.error('[useJournalEntries] Error fetching entries:', error);
       toast.error('Failed to load journal entries');
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, fetchCount]);
 
   useEffect(() => {
     if (userId && isProfileChecked) {
+      console.log(`[useJournalEntries] Effect triggered: userId=${!!userId}, refreshKey=${refreshKey}, isProfileChecked=${isProfileChecked}`);
       fetchEntries();
     } else {
+      console.log(`[useJournalEntries] Waiting for prerequisites: userId=${!!userId}, isProfileChecked=${isProfileChecked}`);
       setLoading(true);
     }
   }, [userId, refreshKey, isProfileChecked, fetchEntries]);
@@ -86,6 +96,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   return { 
     entries, 
     loading, 
-    fetchEntries
+    fetchEntries,
+    lastFetchTime,
+    fetchCount
   };
 }
