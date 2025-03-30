@@ -271,56 +271,57 @@ export default function Utilities() {
                     </Button>
                   </div>
                 
-                <div className="mt-6">
-                  <h3 className="text-lg font-medium flex items-center gap-2 mb-4">
-                    <Database className="h-4 w-4" />
-                    Entity Extraction
-                  </h3>
-                  
-                  <Button 
-                    onClick={processAllEntries} 
-                    disabled={isProcessingEntities}
-                    variant="default"
-                    className="w-full"
-                  >
-                    {isProcessingEntities ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing Journal Entries...
-                      </>
-                    ) : (
-                      "Process All Journal Entries"
-                    )}
-                  </Button>
-
-                  {processingStats && (
-                    <div className="mt-4 p-3 bg-background rounded-md">
-                      <h4 className="font-medium mb-2">Processing Results:</h4>
-                      
-                      {processingStats.success ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center">
-                            <span className="font-medium mr-2">Entries Processed:</span>
-                            <Badge variant="outline" className="bg-green-100 text-green-800">
-                              {processingStats.processed} of {processingStats.total}
-                            </Badge>
-                          </div>
-                          
-                          <div className="flex items-center">
-                            <span className="font-medium mr-2">Processing Time:</span>
-                            <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                              {processingStats.processingTime}
-                            </Badge>
-                          </div>
-                        </div>
+                  <div className="mt-6">
+                    <h3 className="text-lg font-medium flex items-center gap-2 mb-4">
+                      <Database className="h-4 w-4" />
+                      Entity Extraction
+                    </h3>
+                    
+                    <Button 
+                      onClick={processAllEntries} 
+                      disabled={isProcessingEntities}
+                      variant="default"
+                      className="w-full"
+                    >
+                      {isProcessingEntities ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing Journal Entries...
+                        </>
                       ) : (
-                        <Alert variant="destructive">
-                          <AlertTitle>Error processing entries</AlertTitle>
-                          <AlertDescription>{processingStats.error || "Unknown error"}</AlertDescription>
-                        </Alert>
+                        "Process All Journal Entries"
                       )}
-                    </div>
-                  )}
+                    </Button>
+
+                    {processingStats && (
+                      <div className="mt-4 p-3 bg-background rounded-md">
+                        <h4 className="font-medium mb-2">Processing Results:</h4>
+                        
+                        {processingStats.success ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center">
+                              <span className="font-medium mr-2">Entries Processed:</span>
+                              <Badge variant="outline" className="bg-green-100 text-green-800">
+                                {processingStats.processed} of {processingStats.total}
+                              </Badge>
+                            </div>
+                            
+                            <div className="flex items-center">
+                              <span className="font-medium mr-2">Processing Time:</span>
+                              <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                                {processingStats.processingTime}
+                              </Badge>
+                            </div>
+                          </div>
+                        ) : (
+                          <Alert variant="destructive">
+                            <AlertTitle>Error processing entries</AlertTitle>
+                            <AlertDescription>{processingStats.error || "Unknown error"}</AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
