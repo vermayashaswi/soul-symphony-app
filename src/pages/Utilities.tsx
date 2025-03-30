@@ -33,9 +33,11 @@ export default function Utilities() {
       const { data, error } = await supabase.functions.invoke('batch-extract-entities');
       
       if (error) {
+        console.error("Error invoking batch-extract-entities:", error);
         throw error;
       }
       
+      console.log("Batch extract entities result:", data);
       setResult(data);
       
       toast({

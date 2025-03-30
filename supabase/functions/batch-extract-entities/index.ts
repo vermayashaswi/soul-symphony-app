@@ -59,8 +59,14 @@ async function extractEntities(text: string) {
     const result = await response.json();
     const entitiesText = result.choices[0].message.content;
     try {
-      const entities = JSON.parse(entitiesText);
-      return entities.entities || [];
+      // Parse the JSON response
+      const parsedResponse = JSON.parse(entitiesText);
+      
+      // Log the parsed response to help with debugging
+      console.log('Parsed entities response:', JSON.stringify(parsedResponse));
+      
+      // Return the entities array, with a fallback to an empty array
+      return parsedResponse.entities || [];
     } catch (err) {
       console.error('Error parsing entities JSON:', err);
       console.error('Raw entities text:', entitiesText);
@@ -83,12 +89,18 @@ async function processEntries() {
       
     if (error) {
       console.error('Error fetching entries:', error);
-      return { success: false, error: error.message, processed: 0 };
+      return { success: false, error: error.message, processed: 0, total: 0 };
     }
     
     console.log(`Found ${entries?.length || 0} entries to process`);
     
     let processed = 0;
+    
+    // Exit early if no entries to process
+    if (!entries || entries.length === 0) {
+      return { success: true, processed: 0, total: 0, processingTime: "0 seconds" };
+    }
+    
     for (const entry of entries || []) {
       if (!entry["refined text"]) {
         console.log(`Skipping entry ${entry.id} - no refined text`);
@@ -113,6 +125,20 @@ async function processEntries() {
           }
         } else {
           console.log(`No entities found for entry ${entry.id}`);
+          
+          // Even if no entities were found, update the entry with an empty array
+          // to prevent reprocessing the same entry in the future
+          const { error: updateError } = await supabase
+            .from('Journal Entries')
+            .update({ entities: [] })
+            .eq('id', entry.id);
+            
+          if (updateError) {
+            console.error(`Error updating entry ${entry.id} with empty entities:`, updateError);
+          } else {
+            processed++;
+            console.log(`Updated entry ${entry.id} with empty entities array`);
+          }
         }
       } catch (entryError) {
         console.error(`Error processing entry ${entry.id}:`, entryError);
@@ -125,7 +151,7 @@ async function processEntries() {
     return { success: true, processed, total: entries?.length || 0 };
   } catch (error) {
     console.error('Error in processEntries:', error);
-    return { success: false, error: error.message, processed: 0 };
+    return { success: false, error: error.message, processed: 0, total: 0 };
   }
 }
 
