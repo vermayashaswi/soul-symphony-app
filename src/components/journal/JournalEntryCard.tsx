@@ -67,19 +67,6 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
     return <Meh className="h-5 w-5 text-amber-500" />;
   };
 
-  // Group entities by type
-  const groupedEntities = React.useMemo(() => {
-    if (!entry.entities || entry.entities.length === 0) return {};
-    
-    return entry.entities.reduce((acc, entity) => {
-      if (!acc[entity.type]) {
-        acc[entity.type] = [];
-      }
-      acc[entity.type].push(entity.name);
-      return acc;
-    }, {} as Record<string, string[]>);
-  }, [entry.entities]);
-
   // Get the badge color based on entity type
   const getEntityBadgeColor = (type: string) => {
     switch (type.toLowerCase()) {
@@ -108,6 +95,23 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
     setBubbleDisturbance(true);
     setTimeout(() => setBubbleDisturbance(false), 3000); // Reset after 3 seconds
   };
+
+  // Filter out empty entities and get unique names
+  const uniqueEntities = React.useMemo(() => {
+    if (!entry.entities || entry.entities.length === 0) return [];
+    
+    // Get unique entity names (case insensitive)
+    const uniqueNames = new Map<string, { type: string, name: string }>();
+    
+    entry.entities.forEach(entity => {
+      const lowerName = entity.name.toLowerCase();
+      if (!uniqueNames.has(lowerName)) {
+        uniqueNames.set(lowerName, entity);
+      }
+    });
+    
+    return Array.from(uniqueNames.values());
+  }, [entry.entities]);
 
   return (
     <motion.div
@@ -167,31 +171,22 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                 </motion.p>
               </div>
 
-              {/* Entities section */}
-              {entry.entities && entry.entities.length > 0 && (
+              {/* Entities section - now displayed as a flat list of badges without explicit type labels */}
+              {uniqueEntities.length > 0 && (
                 <div className="mt-4">
                   <h3 className="font-medium mb-2 flex items-center gap-2">
                     <Tag className="h-4 w-4 text-blue-500" />
-                    Entities
+                    Key Elements
                   </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(groupedEntities).map(([type, names]) => (
-                      <div key={type} className="mb-2 w-full">
-                        <span className="text-sm font-medium capitalize text-muted-foreground mb-1 block">
-                          {type}s:
-                        </span>
-                        <div className="flex flex-wrap gap-1">
-                          {names.map((name, idx) => (
-                            <Badge 
-                              key={`${name}-${idx}`} 
-                              variant="outline"
-                              className={`${getEntityBadgeColor(type)}`}
-                            >
-                              {name}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {uniqueEntities.map((entity, idx) => (
+                      <Badge 
+                        key={`${entity.name}-${idx}`} 
+                        variant="outline"
+                        className={`${getEntityBadgeColor(entity.type)}`}
+                      >
+                        {entity.name}
+                      </Badge>
                     ))}
                   </div>
                 </div>

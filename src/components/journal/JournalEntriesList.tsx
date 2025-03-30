@@ -1,6 +1,8 @@
-import React from 'react';
+
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryCard, { JournalEntry } from './JournalEntryCard';
+import JournalSearch from './JournalSearch';
 import EmptyJournalState from './EmptyJournalState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Smile, Meh, Frown } from 'lucide-react';
@@ -18,6 +20,51 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   processingEntries = [],
   onStartRecording
 }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter entries based on the search query
+  const filteredEntries = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return entries;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    
+    return entries.filter(entry => {
+      // Check in entity names
+      if (entry.entities && entry.entities.length > 0) {
+        const hasMatchingEntity = entry.entities.some(entity => 
+          entity.name.toLowerCase().includes(query)
+        );
+        if (hasMatchingEntity) return true;
+      }
+      
+      // Also check in the text content
+      if (entry["refined text"] && 
+          entry["refined text"].toLowerCase().includes(query)) {
+        return true;
+      }
+      
+      // Check themes if available
+      if (entry.master_themes && 
+          entry.master_themes.some(theme => theme.toLowerCase().includes(query))) {
+        return true;
+      }
+      
+      return false;
+    });
+  }, [entries, searchQuery]);
+
+  // Helper function to get sentiment emoji based on score
+  const getSentimentEmoji = (sentiment?: string) => {
+    if (!sentiment) return <Meh className="h-6 w-6 text-gray-400" aria-label="Neutral sentiment" />;
+    
+    const score = parseFloat(sentiment);
+    if (score > 0.25) return <Smile className="h-6 w-6 text-green-500" aria-label="Positive sentiment" />;
+    if (score < -0.25) return <Frown className="h-6 w-6 text-red-500" aria-label="Negative sentiment" />;
+    return <Meh className="h-6 w-6 text-amber-500" aria-label="Neutral sentiment" />;
+  };
+
   if (loading && entries.length === 0) {
     return (
       <div className="flex justify-center my-12">
@@ -30,23 +77,33 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
 
-  // Helper function to get sentiment emoji based on score
-  const getSentimentEmoji = (sentiment?: string) => {
-    if (!sentiment) return <Meh className="h-6 w-6 text-gray-400" aria-label="Neutral sentiment" />;
-    
-    const score = parseFloat(sentiment);
-    if (score > 0.25) return <Smile className="h-6 w-6 text-green-500" aria-label="Positive sentiment" />;
-    if (score < -0.25) return <Frown className="h-6 w-6 text-red-500" aria-label="Negative sentiment" />;
-    return <Meh className="h-6 w-6 text-amber-500" aria-label="Neutral sentiment" />;
-  };
+  const noSearchResults = searchQuery.trim() !== '' && filteredEntries.length === 0;
 
   return (
     <motion.div 
-      className="grid grid-cols-1 gap-6"
+      className="space-y-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ staggerChildren: 0.1 }}
     >
+      <JournalSearch onSearch={setSearchQuery} />
+      
+      {noSearchResults && (
+        <motion.div 
+          className="text-center py-8 bg-muted/30 rounded-lg"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <p className="text-muted-foreground">No entries found matching "{searchQuery}"</p>
+          <button 
+            onClick={() => setSearchQuery('')}
+            className="mt-2 text-sm text-primary hover:underline"
+          >
+            Clear search
+          </button>
+        </motion.div>
+      )}
+      
       <AnimatePresence>
         {/* Processing entry placeholders */}
         {processingEntries.map((tempId) => (
@@ -74,7 +131,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         ))}
 
         {/* Actual entries */}
-        {entries.map((entry) => (
+        {filteredEntries.map((entry) => (
           <JournalEntryCard key={entry.id} entry={entry} />
         ))}
       </AnimatePresence>
