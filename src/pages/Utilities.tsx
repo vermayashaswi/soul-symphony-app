@@ -1,16 +1,16 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { Info, Server, Database, Loader2 } from "lucide-react";
+import { Info, Server, Database, Loader2, Key } from "lucide-react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/integrations/supabase/client';
+import { Input } from "@/components/ui/input";
 
 export default function Utilities() {
   const { toast } = useToast();
@@ -19,6 +19,8 @@ export default function Utilities() {
   const [envCheckLoading, setEnvCheckLoading] = useState(false);
   const [isProcessingEntities, setIsProcessingEntities] = useState(false);
   const [processingStats, setProcessingStats] = useState<any>(null);
+  const [apiKey, setApiKey] = useState('');
+  const [isSettingApiKey, setIsSettingApiKey] = useState(false);
 
   // Check environment variables and configuration
   const checkEnvironment = async () => {
@@ -132,6 +134,56 @@ export default function Utilities() {
     }
   };
 
+  // Set Google NL API key
+  const setGoogleNlApiKey = async () => {
+    if (!apiKey.trim()) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter a Google Natural Language API key.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSettingApiKey(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('set-api-key', {
+        body: { 
+          key: "GOOGLE_NL_API_KEY",
+          value: apiKey
+        }
+      });
+      
+      if (error) {
+        console.error("Error setting API key:", error);
+        toast({
+          title: "Failed to set API key",
+          description: error.message || "Unknown error occurred",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      toast({
+        title: "API Key Set Successfully",
+        description: "Google Natural Language API key has been configured."
+      });
+      
+      // Refresh environment check
+      await checkEnvironment();
+      setApiKey('');
+    } catch (error: any) {
+      console.error("Error setting API key:", error);
+      toast({
+        title: "Failed to set API key",
+        description: error.message || "An unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSettingApiKey(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
@@ -167,6 +219,49 @@ export default function Utilities() {
             
             {user && (
               <div className="space-y-6">
+                {/* API Key Configuration Section */}
+                <div className="bg-muted p-4 rounded-lg">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <Key className="h-4 w-4" />
+                        Configure API Keys
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Set the Google Natural Language API key required for entity extraction.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Input
+                      type="password"
+                      placeholder="Enter Google Natural Language API Key"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={setGoogleNlApiKey}
+                      disabled={isSettingApiKey || !apiKey.trim()}
+                      variant="secondary"
+                    >
+                      {isSettingApiKey ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Setting...
+                        </>
+                      ) : (
+                        "Set API Key"
+                      )}
+                    </Button>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground mt-2">
+                    The API key is stored securely in the Supabase edge function secrets.
+                  </p>
+                </div>
+                
                 {/* Environment Check Section */}
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="flex items-start justify-between mb-4">
@@ -257,7 +352,7 @@ export default function Utilities() {
                   
                   <Button 
                     onClick={processAllEntities} 
-                    disabled={isProcessingEntities}
+                    disabled={isProcessingEntities || (envCheckResult && !envCheckResult.googleNlApiConfigured)}
                     variant="secondary"
                     className="w-full"
                   >
