@@ -26,6 +26,7 @@ Table: "Journal Entries"
 - master_themes: text[] (array of themes extracted from the journal)
 - emotions: jsonb (emotion analysis with scores, e.g. {"happy": 0.8, "sad": 0.2})
 - sentiment: text (overall sentiment classification)
+- entities: jsonb (array of entities detected in the text, e.g. [{"type": "organization", "name": "Acme Inc"}])
 
 Table: journal_embeddings
 - id: bigint (primary key)
@@ -101,6 +102,8 @@ Your task:
    - Uses appropriate aggregations if needed
    - Is secure and properly parameterized
    - Returns only the necessary columns
+   - If the question involves filtering by emotions, use the emotions jsonb field
+   - If the question involves filtering by entities, use the entities jsonb field (an array of objects with type and name)
 
 4. For vector similarity parts, specify what text should be used for the embedding search.
 
@@ -115,7 +118,11 @@ Return your response in the following JSON format:
   "explanation": "Explanation of your reasoning"
 }
 
-Important: For the SQL query, the user_id parameter will be passed separately, so use $1 as a parameter placeholder for the user_id in the SQL query.`;
+Important: For the SQL query, the user_id parameter will be passed separately, so use $1 as a parameter placeholder for the user_id in the SQL query.
+
+Special attention to entity and emotion filtering: 
+- For emotion filters (e.g., "when was I happy?"), check if the emotions jsonb field contains the emotion key with significant value (e.g., WHERE emotions->>'happy' > '0.5')
+- For entity filters (e.g., "what did I write about my workplace?"), check if any of the entities match the type or name mentioned (e.g., WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(entities) e WHERE e->>'type' = 'organization'))`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
