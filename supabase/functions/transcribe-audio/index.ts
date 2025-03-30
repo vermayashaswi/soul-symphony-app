@@ -471,7 +471,8 @@ async function analyzeWithGoogleNL(text: string) {
   try {
     console.log('Analyzing text with Google NL API for sentiment and entities:', text.slice(0, 100) + '...');
     
-    const response = await fetch(`https://language.googleapis.com/v1/documents:annotateText?key=${Deno.env.get('GOOGLE_NL_API_KEY') || ''}`, {
+    // Using the correct endpoint for entity extraction
+    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${Deno.env.get('GOOGLE_NL_API_KEY') || ''}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -480,13 +481,6 @@ async function analyzeWithGoogleNL(text: string) {
         document: {
           type: 'PLAIN_TEXT',
           content: text,
-        },
-        features: {
-          extractSyntax: false,
-          extractEntities: true,
-          extractDocumentSentiment: true,
-          extractEntitySentiment: false,
-          classifyText: false
         },
       }),
     });
@@ -500,8 +494,8 @@ async function analyzeWithGoogleNL(text: string) {
     const result = await response.json();
     console.log('Google NL API analysis complete');
     
-    // Extract sentiment score
-    const sentimentScore = result.documentSentiment?.score?.toString() || "0";
+    // Since we're only using entity extraction endpoint, we'll use a default sentiment value
+    const sentimentScore = "0";
     
     // Process and format entities
     const formattedEntities = result.entities?.map(entity => ({

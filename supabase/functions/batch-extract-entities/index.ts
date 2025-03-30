@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -27,7 +26,8 @@ async function analyzeWithGoogleNL(text: string) {
     
     console.log('Google NL API key found, length:', googleNLApiKey.length);
     
-    const response = await fetch(`https://language.googleapis.com/v1/documents:annotateText?key=${googleNLApiKey}`, {
+    // Using the correct endpoint for entity extraction
+    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${googleNLApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -36,13 +36,6 @@ async function analyzeWithGoogleNL(text: string) {
         document: {
           type: 'PLAIN_TEXT',
           content: text,
-        },
-        features: {
-          extractSyntax: false,
-          extractEntities: true,
-          extractDocumentSentiment: false,
-          extractEntitySentiment: false,
-          classifyText: false
         },
       }),
     });
