@@ -23,6 +23,7 @@ async function extractEntities(text: string) {
       throw new Error('OpenAI API key is not configured');
     }
     
+    // Using a more specific prompt to extract entities in the correct format
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -34,26 +35,24 @@ async function extractEntities(text: string) {
         messages: [
           {
             role: 'system',
-            content: `You are an entity extraction system. Your task is to extract named entities from the journal entry text.
+            content: `You are an entity extraction system. Extract entities from journal entries in JSON format.
             
-            Analyze the journal entry carefully to identify:
-            - People (specific individuals mentioned)
-            - Organizations (companies, institutions, groups)
-            - Locations (places, cities, countries)
-            - Projects (work tasks, assignments)
-            - Events (meetings, occasions, happenings)
-            - Products (specific items or services)
-            - Technologies (software, platforms, tools)
+            For each entity you identify, provide:
+            1. "type": The category (person, organization, location, project, event, product, technology)
+            2. "name": The specific entity name
             
-            Return ONLY a JSON object with this exact format: 
-            {"entities": [{"type": "person", "name": "John Doe"}, {"type": "location", "name": "New York"}, etc.]}
+            Return ONLY a valid JSON array of objects like:
+            [
+              {"type": "person", "name": "John Doe"},
+              {"type": "location", "name": "New York"}
+            ]
             
-            If no entities are found, return: {"entities": []}
-            Do not add any explanations or text outside the JSON.`
+            If no entities are found, return an empty array: []
+            Do not add any explanatory text - respond with a valid JSON array only.`
           },
           {
             role: 'user',
-            content: `Here is a journal entry of a person: "${text}". Extract all entities and return them in JSON format.`
+            content: `Here is a journal entry of a person: "${text}". Extract all entities and return them as a JSON array.`
           }
         ],
         temperature: 0.3,
@@ -68,19 +67,30 @@ async function extractEntities(text: string) {
     }
 
     const result = await response.json();
-    const entitiesText = result.choices[0].message.content;
+    console.log('Raw response from OpenAI:', result);
     
-    console.log('Raw entities response:', entitiesText);
+    const entitiesText = result.choices[0].message.content;
+    console.log('Entities response text:', entitiesText);
     
     try {
       // Parse the JSON response
       const parsedResponse = JSON.parse(entitiesText);
       
-      // Log the parsed response to help with debugging
-      console.log('Parsed entities response:', JSON.stringify(parsedResponse));
+      // If it's an object with an "entities" property, use that
+      if (parsedResponse.entities) {
+        console.log('Parsed entities from "entities" property:', JSON.stringify(parsedResponse.entities));
+        return parsedResponse.entities;
+      }
       
-      // Return the entities array, with a fallback to an empty array
-      return parsedResponse.entities || [];
+      // If it's an array directly, use that
+      if (Array.isArray(parsedResponse)) {
+        console.log('Parsed entities array:', JSON.stringify(parsedResponse));
+        return parsedResponse;
+      }
+      
+      // Fallback - should rarely happen with the improved prompt
+      console.log('No entities structure found, returning empty array');
+      return [];
     } catch (err) {
       console.error('Error parsing entities JSON:', err);
       console.error('Raw entities text:', entitiesText);
@@ -92,14 +102,25 @@ async function extractEntities(text: string) {
   }
 }
 
-async function processEntries() {
+async function processEntries(userId?: string) {
   try {
-    // Fetch all entries that don't have entities yet
-    const { data: entries, error } = await supabase
+    console.log('Starting batch entity extraction process');
+    
+    // Build the query
+    let query = supabase
       .from('Journal Entries')
       .select('id, "refined text"')
       .is('entities', null)
       .order('created_at', { ascending: false });
+      
+    // Add user filter if provided
+    if (userId) {
+      console.log(`Filtering entries for user ID: ${userId}`);
+      query = query.eq('user_id', userId);
+    }
+    
+    // Execute the query
+    const { data: entries, error } = await query;
       
     if (error) {
       console.error('Error fetching entries:', error);
@@ -125,9 +146,13 @@ async function processEntries() {
         console.log(`Processing entry ${entry.id}`);
         const entities = await extractEntities(entry["refined text"]);
         
-        console.log(`Extracted entities for entry ${entry.id}:`, JSON.stringify(entities));
+        if (entities && entities.length > 0) {
+          console.log(`Extracted ${entities.length} entities for entry ${entry.id}:`, JSON.stringify(entities));
+        } else {
+          console.log(`No entities found for entry ${entry.id}`);
+        }
         
-        // Update the entry with the entities, even if it's an empty array
+        // Always update the entry, even with an empty array
         const { error: updateError } = await supabase
           .from('Journal Entries')
           .update({ entities: entities })
@@ -137,7 +162,11 @@ async function processEntries() {
           console.error(`Error updating entry ${entry.id}:`, updateError);
         } else {
           processed++;
-          console.log(`Updated entry ${entry.id} with ${entities.length} entities`);
+          if (entities && entities.length > 0) {
+            console.log(`Updated entry ${entry.id} with ${entities.length} entities`);
+          } else {
+            console.log(`Updated entry ${entry.id} with empty entities array`);
+          }
         }
       } catch (entryError) {
         console.error(`Error processing entry ${entry.id}:`, entryError);
@@ -164,7 +193,18 @@ serve(async (req) => {
     const startTime = Date.now();
     console.log('Starting batch entity extraction process');
     
-    const result = await processEntries();
+    // Get the request body if any
+    let userId = undefined;
+    try {
+      if (req.method === 'POST') {
+        const body = await req.json();
+        userId = body.userId;
+      }
+    } catch (e) {
+      console.log('No request body or invalid JSON');
+    }
+    
+    const result = await processEntries(userId);
     
     const endTime = Date.now();
     const processingTime = (endTime - startTime) / 1000;
@@ -175,7 +215,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         ...result, 
-        processingTime: `${processingTime} seconds` 
+        processingTime: `${processingTime.toFixed(3)} seconds` 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

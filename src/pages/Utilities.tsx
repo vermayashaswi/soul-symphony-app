@@ -9,11 +9,13 @@ import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Utilities() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<any>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
   
   useEffect(() => {
     // Automatically run the entity extraction process when the component mounts
@@ -27,11 +29,15 @@ export default function Utilities() {
       
       toast({
         title: "Processing started",
-        description: "Entity extraction process has started automatically. This may take a few minutes.",
+        description: "Entity extraction process has started. This may take a few minutes.",
       });
       
       console.log("Invoking batch-extract-entities function...");
-      const { data, error } = await supabase.functions.invoke('batch-extract-entities');
+      console.log("Current user ID:", user?.id);
+      
+      const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
+        body: { userId: user?.id }
+      });
       
       if (error) {
         console.error("Error invoking batch-extract-entities:", error);
@@ -100,10 +106,23 @@ export default function Utilities() {
           <CardContent>
             <p className="text-muted-foreground mb-4">
               {isProcessing ? 
-                "Entity extraction is currently running automatically. This may take several minutes depending on the number of entries..." :
+                "Entity extraction is currently running. This may take several minutes depending on the number of entries..." :
                 "This utility processes all journal entries without entities and extracts named entities like people, organizations, locations, etc. using OpenAI."
               }
             </p>
+            
+            {user ? (
+              <p className="text-sm text-muted-foreground mb-4">
+                Processing journal entries for user: {user.email || user.id}
+              </p>
+            ) : (
+              <Alert variant="warning" className="mb-4">
+                <AlertTitle>Not signed in</AlertTitle>
+                <AlertDescription>
+                  You need to be signed in to process your journal entries.
+                </AlertDescription>
+              </Alert>
+            )}
             
             {result && (
               <Alert className="mt-4">
@@ -129,11 +148,11 @@ export default function Utilities() {
           <CardFooter>
             <Button 
               onClick={extractEntities} 
-              disabled={isProcessing}
+              disabled={isProcessing || !user}
               className="w-full"
             >
               {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isProcessing ? 'Processing...' : 'Run Again'}
+              {isProcessing ? 'Processing...' : 'Run Entity Extraction'}
             </Button>
           </CardFooter>
         </Card>
