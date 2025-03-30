@@ -33,7 +33,13 @@ const DebugPanel: React.FC = () => {
     
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const id = Math.random().toString(36).substring(2, 9);
-      const url = typeof input === 'string' ? input : input.url;
+      // Handle different types of input correctly
+      const url = typeof input === 'string' 
+        ? input 
+        : input instanceof URL 
+          ? input.href 
+          : input.url;
+          
       const method = init?.method || 'GET';
       const startTime = Date.now();
       

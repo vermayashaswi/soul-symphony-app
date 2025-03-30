@@ -16,7 +16,7 @@ interface TranscriptionResult {
   error?: string;
   requestDetails?: {
     url?: string;
-    status?: number;
+    statusCode?: number; // Changed from status to statusCode
     responseDetails?: any;
   };
 }
@@ -39,7 +39,7 @@ export async function sendAudioForTranscription(
     console.log('Request ID:', requestId);
     
     const startTime = Date.now();
-    const { data, error, status } = await supabase.functions.invoke('transcribe-audio', {
+    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: { 
         audio: base64Audio,
         userId,
@@ -49,7 +49,7 @@ export async function sendAudioForTranscription(
     });
     const endTime = Date.now();
 
-    console.log(`Transcribe API call completed in ${endTime - startTime}ms with status: ${status}`);
+    console.log(`Transcribe API call completed in ${endTime - startTime}ms`);
     
     if (error) {
       console.error('Error from transcribe-audio function:', error);
@@ -58,7 +58,7 @@ export async function sendAudioForTranscription(
         error: `Function error: ${error.message || 'Unknown error'}`,
         requestDetails: {
           url: 'supabase.functions.invoke("transcribe-audio")',
-          status: status,
+          statusCode: error.code,
           responseDetails: error
         }
       };
@@ -75,7 +75,7 @@ export async function sendAudioForTranscription(
         error: data.error || data.message || 'Failed to transcribe audio',
         requestDetails: {
           url: 'supabase.functions.invoke("transcribe-audio")',
-          status: status,
+          statusCode: 400, // Default error status code
           responseDetails: data
         }
       };
@@ -95,7 +95,7 @@ export async function sendAudioForTranscription(
       },
       requestDetails: {
         url: 'supabase.functions.invoke("transcribe-audio")',
-        status: status
+        statusCode: 200 // Successful status code
       }
     };
   } catch (error: any) {
