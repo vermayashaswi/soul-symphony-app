@@ -165,5 +165,5 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   };
 
-  return { entries, loading, batchProcessEntities };
+  return { entries, loading, batchProcessEntities, fetchEntries };
 }

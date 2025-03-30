@@ -32,8 +32,7 @@ export default function Utilities() {
   const [testExtractionResult, setTestExtractionResult] = useState<any>(null);
   const [testExtractionLoading, setTestExtractionLoading] = useState(false);
   const [testText, setTestText] = useState(
-    "Today I had a meeting with John Smith from Microsoft about the new project. " +
-    "We discussed visiting their New York office next month to finalize the partnership."
+    "Today was a good day. At the workplace, I had a conflict with my colleague, but afterwards, my boss managed to reconcile things. The highlight of the week was that I gave a presentation which many people appreciated. However, when I got home, I ended up having an argument with my wife."
   );
   
   const handleProcessEntities = async () => {
@@ -81,9 +80,7 @@ export default function Utilities() {
     setTestExtractionLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
-        method: 'POST',
         body: { 
-          diagnosticMode: true,
           testText: testText,
           testExtraction: true 
         }
@@ -126,7 +123,6 @@ export default function Utilities() {
     try {
       // Call the edge function in diagnostic mode
       const { data: functionData, error: functionError } = await supabase.functions.invoke('batch-extract-entities', {
-        method: 'POST',
         body: { 
           diagnosticMode: true,
           userId: user.id 
@@ -249,7 +245,7 @@ export default function Utilities() {
                         Test Entity Extraction
                       </h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Test the entity extraction on sample text to verify it's working correctly.
+                        Test the entity extraction on sample text to verify it's working correctly. This uses the same example that worked correctly from your recent journal entry.
                       </p>
                     </div>
                   </div>
