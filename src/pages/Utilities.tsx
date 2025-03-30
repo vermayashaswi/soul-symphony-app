@@ -8,7 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Info, RefreshCw, Database, Bug, AlertCircle, CheckCircle, Server, FileCode, Code } from "lucide-react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useJournalEntries } from "@/hooks/use-journal-entries";
 import { Badge } from "@/components/ui/badge";
@@ -134,7 +134,8 @@ export default function Utilities() {
         toast({
           title: "No entities found",
           description: "The extraction completed but no entities were found.",
-          variant: "warning"
+          // Change from "warning" to "default" as "warning" is not an allowed variant
+          variant: "default"
         });
       }
     } catch (error) {
