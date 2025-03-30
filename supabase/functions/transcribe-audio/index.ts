@@ -1,17 +1,302 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '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';
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+  
+  try {
+    const contentType = req.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      console.error('Invalid content type:', contentType);
+      throw new Error('Request must be JSON format');
+    }
+
+    const requestBody = await req.text();
+    if (!requestBody || requestBody.trim() === '') {
+      console.error('Empty request body');
+      throw new Error('Empty request body');
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(requestBody);
+    } catch (error) {
+      console.error('Error parsing JSON:', error, 'Body:', requestBody.slice(0, 100));
+      throw new Error('Invalid JSON payload');
+    }
+
+    const { audio, userId } = payload;
+    
+    if (!audio) {
+      console.error('No audio data provided in payload');
+      throw new Error('No audio data provided');
+    }
+
+    if (!openAIApiKey) {
+      console.error('OpenAI API key is missing or empty in environment variables');
+      throw new Error('OpenAI API key is not configured. Please set the OPENAI_API_KEY secret in the Supabase dashboard.');
+    }
+
+    console.log("Received audio data, processing...");
+    console.log("User ID:", userId);
+    
+    // Ensure user profile exists before proceeding
+    if (userId) {
+      await createProfileIfNeeded(userId);
+    }
+    
+    console.log("User ID:", userId);
+    console.log("Audio data length:", audio.length);
+    console.log("OpenAI API Key available:", !!openAIApiKey);
+    
+    const binaryAudio = processBase64Chunks(audio);
+    console.log("Processed binary audio size:", binaryAudio.length);
+
+    if (binaryAudio.length === 0) {
+      throw new Error('Failed to process audio data - empty result');
+    }
+    
+    const detectedFileType = detectFileType(binaryAudio);
+    console.log("Detected file type:", detectedFileType);
+    
+    const timestamp = Date.now();
+    const filename = `journal-entry-${userId ? userId + '-' : ''}${timestamp}.${detectedFileType}`;
+    
+    let audioUrl = null;
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const journalBucket = buckets?.find(b => b.name === 'journal-audio-entries');
+      
+      if (!journalBucket) {
+        console.log('Creating journal-audio-entries bucket');
+        await supabase.storage.createBucket('journal-audio-entries', {
+          public: true
+        });
+      }
+      
+      let contentType = 'audio/webm';
+      if (detectedFileType === 'mp4') contentType = 'audio/mp4';
+      if (detectedFileType === 'wav') contentType = 'audio/wav';
+      
+      const { data: storageData, error: storageError } = await supabase
+        .storage
+        .from('journal-audio-entries')
+        .upload(filename, binaryAudio, {
+          contentType,
+          cacheControl: '3600'
+        });
+        
+      if (storageError) {
+        console.error('Error uploading audio to storage:', storageError);
+        console.error('Storage error details:', JSON.stringify(storageError));
+      } else {
+        const { data: urlData } = await supabase
+          .storage
+          .from('journal-audio-entries')
+          .getPublicUrl(filename);
+          
+        audioUrl = urlData?.publicUrl;
+        console.log("Audio stored successfully:", audioUrl);
+      }
+    } catch (err) {
+      console.error("Storage error:", err);
+    }
+    
+    const formData = new FormData();
+    
+    let mimeType = 'audio/webm';
+    if (detectedFileType === 'mp4') mimeType = 'audio/mp4';
+    if (detectedFileType === 'wav') mimeType = 'audio/wav';
+    
+    const blob = new Blob([binaryAudio], { type: mimeType });
+    formData.append('file', blob, `audio.${detectedFileType}`);
+    formData.append('model', 'whisper-1');
+    formData.append('response_format', 'json');
+
+    console.log("Sending to Whisper API for high-quality transcription using the latest model...");
+    console.log("Using file type:", detectedFileType, "with MIME type:", mimeType);
+    
+    try {
+      const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+        },
+        body: formData,
+      });
+
+      if (!whisperResponse.ok) {
+        const errorText = await whisperResponse.text();
+        console.error("Whisper API error:", errorText);
+        throw new Error(`Whisper API error: ${errorText}`);
+      }
+
+      const whisperResult = await whisperResponse.json();
+      const transcribedText = whisperResult.text;
+      
+      console.log("Transcription successful:", transcribedText);
+
+      const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. Preserve the emotional tone and personal nature of the content.'
+            },
+            {
+              role: 'user',
+              content: `Here is a multilingual voice journal data of a user in their local language. Please translate it to English logically "${transcribedText}"`
+            }
+          ],
+        }),
+      });
+
+      if (!gptResponse.ok) {
+        const errorText = await gptResponse.text();
+        console.error("GPT API error:", errorText);
+        throw new Error(`GPT API error: ${errorText}`);
+      }
+
+      const gptResult = await gptResponse.json();
+      const refinedText = gptResult.choices[0].message.content;
+      
+      console.log("Refinement successful:", refinedText);
+
+      const emotions = await analyzeEmotions(refinedText);
+      console.log("Emotion analysis:", emotions);
+      
+      const sentimentScore = await analyzeSentiment(refinedText);
+      console.log("Sentiment analysis:", sentimentScore);
+
+      const audioDuration = Math.floor(binaryAudio.length / 16000);
+
+      let entryId = null;
+      if (transcribedText) {
+        try {
+          const { data: entryData, error: insertError } = await supabase
+            .from('Journal Entries')
+            .insert([{ 
+              "transcription text": transcribedText,
+              "refined text": refinedText,
+              "audio_url": audioUrl,
+              "user_id": userId || null,
+              "duration": audioDuration,
+              "emotions": emotions,
+              "sentiment": sentimentScore
+            }])
+            .select();
+              
+          if (insertError) {
+            console.error('Error creating entry in database:', insertError);
+            console.error('Error details:', JSON.stringify(insertError));
+            throw new Error(`Database insert error: ${insertError.message}`);
+          } else if (entryData && entryData.length > 0) {
+            console.log("Journal entry saved to database:", entryData[0].id);
+            entryId = entryData[0].id;
+          
+            // Automatically extract themes and entities right after saving the entry
+            if (refinedText && entryId) {
+              EdgeRuntime.waitUntil(extractThemesAndEntities(refinedText, entryId));
+              console.log("Started background task to extract themes and entities");
+            }
+          
+            try {
+              const embedding = await generateEmbedding(refinedText);
+              
+              const { error: embeddingError } = await supabase
+                .from('journal_embeddings')
+                .insert([{ 
+                  journal_entry_id: entryId,
+                  content: refinedText,
+                  embedding: embedding
+                }]);
+                
+              if (embeddingError) {
+                console.error('Error storing embedding:', embeddingError);
+                console.error('Embedding error details:', JSON.stringify(embeddingError));
+              } else {
+                console.log("Embedding stored successfully for entry:", entryId);
+              }
+            } catch (embErr) {
+              console.error("Error generating embedding:", embErr);
+            }
+          } else {
+            console.error("No data returned from insert operation");
+            throw new Error("Failed to create journal entry in database");
+          }
+        } catch (dbErr) {
+          console.error("Database error:", dbErr);
+          throw new Error(`Database error: ${dbErr.message}`);
+        }
+      } else {
+        throw new Error("Transcription failed - no text generated");
+      }
+
+      return new Response(
+        JSON.stringify({
+          transcription: transcribedText,
+          refinedText: refinedText,
+          audioUrl: audioUrl,
+          entryId: entryId,
+          emotions: emotions,
+          sentiment: sentimentScore,
+          success: true
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    } catch (error) {
+      console.error("Error in transcribe-audio function:", error);
+    
+      return new Response(
+        JSON.stringify({ 
+          error: error.message, 
+          success: false,
+          message: "Error occurred, but edge function is returning 200 to avoid CORS issues"
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+  } catch (error) {
+    console.error("Error in transcribe-audio function:", error);
+    
+    return new Response(
+      JSON.stringify({ 
+        error: error.message, 
+        success: false,
+        message: "Error occurred, but edge function is returning 200 to avoid CORS issues"
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+});
 
 function processBase64Chunks(base64String: string, chunkSize = 32768) {
   if (!base64String || base64String.length === 0) {
@@ -281,272 +566,4 @@ async function extractThemesAndEntities(text: string, entryId: number): Promise<
   }
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const contentType = req.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-      console.error('Invalid content type:', contentType);
-      throw new Error('Request must be JSON format');
-    }
-
-    const requestBody = await req.text();
-    if (!requestBody || requestBody.trim() === '') {
-      console.error('Empty request body');
-      throw new Error('Empty request body');
-    }
-
-    let payload;
-    try {
-      payload = JSON.parse(requestBody);
-    } catch (error) {
-      console.error('Error parsing JSON:', error, 'Body:', requestBody.slice(0, 100));
-      throw new Error('Invalid JSON payload');
-    }
-
-    const { audio, userId } = payload;
-    
-    if (!audio) {
-      console.error('No audio data provided in payload');
-      throw new Error('No audio data provided');
-    }
-
-    if (!openAIApiKey) {
-      console.error('OpenAI API key is missing or empty in environment variables');
-      throw new Error('OpenAI API key is not configured. Please set the OPENAI_API_KEY secret in the Supabase dashboard.');
-    }
-
-    console.log("Received audio data, processing...");
-    console.log("User ID:", userId);
-    
-    // Ensure user profile exists before proceeding
-    if (userId) {
-      await createProfileIfNeeded(userId);
-    }
-    
-    console.log("User ID:", userId);
-    console.log("Audio data length:", audio.length);
-    console.log("OpenAI API Key available:", !!openAIApiKey);
-    
-    const binaryAudio = processBase64Chunks(audio);
-    console.log("Processed binary audio size:", binaryAudio.length);
-
-    if (binaryAudio.length === 0) {
-      throw new Error('Failed to process audio data - empty result');
-    }
-    
-    const detectedFileType = detectFileType(binaryAudio);
-    console.log("Detected file type:", detectedFileType);
-    
-    const timestamp = Date.now();
-    const filename = `journal-entry-${userId ? userId + '-' : ''}${timestamp}.${detectedFileType}`;
-    
-    let audioUrl = null;
-    try {
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const journalBucket = buckets?.find(b => b.name === 'journal-audio-entries');
-      
-      if (!journalBucket) {
-        console.log('Creating journal-audio-entries bucket');
-        await supabase.storage.createBucket('journal-audio-entries', {
-          public: true
-        });
-      }
-      
-      let contentType = 'audio/webm';
-      if (detectedFileType === 'mp4') contentType = 'audio/mp4';
-      if (detectedFileType === 'wav') contentType = 'audio/wav';
-      
-      const { data: storageData, error: storageError } = await supabase
-        .storage
-        .from('journal-audio-entries')
-        .upload(filename, binaryAudio, {
-          contentType,
-          cacheControl: '3600'
-        });
-        
-      if (storageError) {
-        console.error('Error uploading audio to storage:', storageError);
-        console.error('Storage error details:', JSON.stringify(storageError));
-      } else {
-        const { data: urlData } = await supabase
-          .storage
-          .from('journal-audio-entries')
-          .getPublicUrl(filename);
-          
-        audioUrl = urlData?.publicUrl;
-        console.log("Audio stored successfully:", audioUrl);
-      }
-    } catch (err) {
-      console.error("Storage error:", err);
-    }
-    
-    const formData = new FormData();
-    
-    let mimeType = 'audio/webm';
-    if (detectedFileType === 'mp4') mimeType = 'audio/mp4';
-    if (detectedFileType === 'wav') mimeType = 'audio/wav';
-    
-    const blob = new Blob([binaryAudio], { type: mimeType });
-    formData.append('file', blob, `audio.${detectedFileType}`);
-    formData.append('model', 'whisper-1');
-    formData.append('response_format', 'json');
-
-    console.log("Sending to Whisper API for high-quality transcription using the latest model...");
-    console.log("Using file type:", detectedFileType, "with MIME type:", mimeType);
-    
-    try {
-      const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-        },
-        body: formData,
-      });
-
-      if (!whisperResponse.ok) {
-        const errorText = await whisperResponse.text();
-        console.error("Whisper API error:", errorText);
-        throw new Error(`Whisper API error: ${errorText}`);
-      }
-
-      const whisperResult = await whisperResponse.json();
-      const transcribedText = whisperResult.text;
-      
-      console.log("Transcription successful:", transcribedText);
-
-      const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. Preserve the emotional tone and personal nature of the content.'
-            },
-            {
-              role: 'user',
-              content: `Here is a multilingual voice journal data of a user in their local language. Please translate it to English logically "${transcribedText}"`
-            }
-          ],
-        }),
-      });
-
-      if (!gptResponse.ok) {
-        const errorText = await gptResponse.text();
-        console.error("GPT API error:", errorText);
-        throw new Error(`GPT API error: ${errorText}`);
-      }
-
-      const gptResult = await gptResponse.json();
-      const refinedText = gptResult.choices[0].message.content;
-      
-      console.log("Refinement successful:", refinedText);
-
-      const emotions = await analyzeEmotions(refinedText);
-      console.log("Emotion analysis:", emotions);
-      
-      const sentimentScore = await analyzeSentiment(refinedText);
-      console.log("Sentiment analysis:", sentimentScore);
-
-      const audioDuration = Math.floor(binaryAudio.length / 16000);
-
-      let entryId = null;
-      if (transcribedText) {
-        try {
-          const { data: entryData, error: insertError } = await supabase
-            .from('Journal Entries')
-            .insert([{ 
-              "transcription text": transcribedText,
-              "refined text": refinedText,
-              "audio_url": audioUrl,
-              "user_id": userId || null,
-              "duration": audioDuration,
-              "emotions": emotions,
-              "sentiment": sentimentScore
-            }])
-            .select();
-              
-          if (insertError) {
-            console.error('Error creating entry in database:', insertError);
-            console.error('Error details:', JSON.stringify(insertError));
-            throw new Error(`Database insert error: ${insertError.message}`);
-          } else if (entryData && entryData.length > 0) {
-            console.log("Journal entry saved to database:", entryData[0].id);
-            entryId = entryData[0].id;
-          
-          // Automatically extract themes and entities right after saving the entry
-          if (refinedText && entryId) {
-            EdgeRuntime.waitUntil(extractThemesAndEntities(refinedText, entryId));
-            console.log("Started background task to extract themes and entities");
-          }
-          
-          try {
-              const embedding = await generateEmbedding(refinedText);
-              
-              const { error: embeddingError } = await supabase
-                .from('journal_embeddings')
-                .insert([{ 
-                  journal_entry_id: entryId,
-                  content: refinedText,
-                  embedding: embedding
-                }]);
-                
-              if (embeddingError) {
-                console.error('Error storing embedding:', embeddingError);
-                console.error('Embedding error details:', JSON.stringify(embeddingError));
-              } else {
-                console.log("Embedding stored successfully for entry:", entryId);
-              }
-            } catch (embErr) {
-              console.error("Error generating embedding:", embErr);
-            }
-          } else {
-            console.error("No data returned from insert operation");
-            throw new Error("Failed to create journal entry in database");
-          }
-        } catch (dbErr) {
-          console.error("Database error:", dbErr);
-          throw new Error(`Database error: ${dbErr.message}`);
-        }
-      } else {
-        throw new Error("Transcription failed - no text generated");
-      }
-
-      return new Response(
-        JSON.stringify({
-          transcription: transcribedText,
-          refinedText: refinedText,
-          audioUrl: audioUrl,
-          entryId: entryId,
-          emotions: emotions,
-          sentiment: sentimentScore,
-          success: true
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    } catch (error) {
-    console.error("Error in transcribe-audio function:", error);
-    
-    return new Response(
-      JSON.stringify({ 
-        error: error.message, 
-        success: false,
-        message: "Error occurred, but edge function is returning 200 to avoid CORS issues"
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
-  }
-});
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
