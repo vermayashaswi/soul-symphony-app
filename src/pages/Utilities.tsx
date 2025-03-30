@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { Info, RefreshCw, Database, Bug } from "lucide-react";
+import { Info, RefreshCw, Database, Bug, AlertCircle, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import { useToast } from "@/components/ui/use-toast";
@@ -28,6 +28,13 @@ export default function Utilities() {
   const [diagnosticsResult, setDiagnosticsResult] = useState<any>(null);
   const [functionLogs, setFunctionLogs] = useState<string[]>([]);
   const [entryCheckResult, setEntryCheckResult] = useState<any>(null);
+  const [testExtraction, setTestExtraction] = useState(false);
+  const [testExtractionResult, setTestExtractionResult] = useState<any>(null);
+  const [testExtractionLoading, setTestExtractionLoading] = useState(false);
+  const [testText, setTestText] = useState(
+    "Today I had a meeting with John Smith from Microsoft about the new project. " +
+    "We discussed visiting their New York office next month to finalize the partnership."
+  );
   
   const handleProcessEntities = async () => {
     if (!user) {
@@ -60,6 +67,50 @@ export default function Utilities() {
     }
   };
   
+  // Test entity extraction directly
+  const testEntityExtraction = async () => {
+    if (!testText.trim()) {
+      toast({
+        title: "Empty text",
+        description: "Please enter some text to extract entities from.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setTestExtractionLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('batch-extract-entities', {
+        method: 'POST',
+        body: { 
+          diagnosticMode: true,
+          testText: testText,
+          testExtraction: true 
+        }
+      });
+      
+      if (error) throw error;
+      
+      setTestExtractionResult(data);
+      
+      toast({
+        title: "Test extraction complete",
+        description: `Extracted ${data?.entities?.length || 0} entities`,
+      });
+    } catch (error) {
+      console.error("Error in test extraction:", error);
+      setTestExtractionResult({ error: error.message });
+      
+      toast({
+        title: "Test extraction failed",
+        description: "An error occurred during test extraction.",
+        variant: "destructive"
+      });
+    } finally {
+      setTestExtractionLoading(false);
+    }
+  };
+  
   // Fetch diagnostic information
   const runDiagnostics = async () => {
     if (!user) {
@@ -73,7 +124,7 @@ export default function Utilities() {
     
     setDiagnosticsLoading(true);
     try {
-      // Check if function exists and is deployed
+      // Call the edge function in diagnostic mode
       const { data: functionData, error: functionError } = await supabase.functions.invoke('batch-extract-entities', {
         method: 'POST',
         body: { 
@@ -189,6 +240,65 @@ export default function Utilities() {
                   </Button>
                 </div>
                 
+                {/* Test Entity Extraction */}
+                <div className="bg-muted p-4 rounded-lg">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        Test Entity Extraction
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Test the entity extraction on sample text to verify it's working correctly.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <Textarea 
+                      value={testText}
+                      onChange={(e) => setTestText(e.target.value)}
+                      placeholder="Enter text to extract entities from..."
+                      className="min-h-[100px]"
+                    />
+                    
+                    <Button 
+                      onClick={testEntityExtraction} 
+                      disabled={testExtractionLoading || !testText.trim()}
+                      className="w-full"
+                    >
+                      {testExtractionLoading ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        "Test Entity Extraction"
+                      )}
+                    </Button>
+                    
+                    {testExtractionResult && (
+                      <div className="mt-4 space-y-2">
+                        <h4 className="font-medium">Test Results:</h4>
+                        <div className="bg-background p-3 rounded-md text-sm">
+                          {testExtractionResult.error ? (
+                            <div className="text-destructive">Error: {testExtractionResult.error}</div>
+                          ) : (
+                            <>
+                              <p>Extracted {testExtractionResult.entities?.length || 0} entities:</p>
+                              {testExtractionResult.entities && testExtractionResult.entities.map((entity: any, index: number) => (
+                                <div key={index} className="mt-1 p-1 bg-muted/50 rounded">
+                                  <strong>{entity.type}:</strong> {entity.name}
+                                </div>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
                 {/* Diagnostics Section */}
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="flex items-start justify-between mb-4">
@@ -248,7 +358,20 @@ export default function Utilities() {
                               <p><strong>Text sample:</strong> {entry['refined text']?.substring(0, 100)}...</p>
                               <p><strong>Has entities:</strong> {entry.entities ? 'Yes' : 'No'}</p>
                               {entry.entities && (
-                                <p><strong>Entities:</strong> {JSON.stringify(entry.entities)}</p>
+                                <div className="mt-2">
+                                  <p><strong>Entities:</strong></p>
+                                  {Array.isArray(entry.entities) && entry.entities.length > 0 ? (
+                                    <ul className="list-disc pl-5 space-y-1">
+                                      {entry.entities.map((entity: any, idx: number) => (
+                                        <li key={idx}>
+                                          <strong>{entity.type}:</strong> {entity.name}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-yellow-500 italic">Empty or invalid entities array</p>
+                                  )}
+                                </div>
                               )}
                             </div>
                           ))}
