@@ -34,15 +34,26 @@ async function extractEntities(text: string) {
         messages: [
           {
             role: 'system',
-            content: `You are an entity extraction system. Extract named entities from the provided text.
-            Return a JSON object with an "entities" property containing an array of objects with "type" and "name" properties.
-            Entity types include: "person", "organization", "location", "project", "event", "product", "company", "technology".
-            Only include clearly mentioned entities, do not infer or generate entities not explicitly in the text.
-            Return only the JSON with the format: {"entities": [{"type": "person", "name": "John Doe"}, ...]}`
+            content: `You are an entity extraction system. Your task is to extract named entities from the journal entry text.
+            
+            Analyze the journal entry carefully to identify:
+            - People (specific individuals mentioned)
+            - Organizations (companies, institutions, groups)
+            - Locations (places, cities, countries)
+            - Projects (work tasks, assignments)
+            - Events (meetings, occasions, happenings)
+            - Products (specific items or services)
+            - Technologies (software, platforms, tools)
+            
+            Return ONLY a JSON object with this exact format: 
+            {"entities": [{"type": "person", "name": "John Doe"}, {"type": "location", "name": "New York"}, etc.]}
+            
+            If no entities are found, return: {"entities": []}
+            Do not add any explanations or text outside the JSON.`
           },
           {
             role: 'user',
-            content: `Extract entities from this text: "${text}"`
+            content: `Here is a journal entry of a person: "${text}". Extract all entities and return them in JSON format.`
           }
         ],
         temperature: 0.3,
@@ -58,6 +69,9 @@ async function extractEntities(text: string) {
 
     const result = await response.json();
     const entitiesText = result.choices[0].message.content;
+    
+    console.log('Raw entities response:', entitiesText);
+    
     try {
       // Parse the JSON response
       const parsedResponse = JSON.parse(entitiesText);
@@ -111,34 +125,19 @@ async function processEntries() {
         console.log(`Processing entry ${entry.id}`);
         const entities = await extractEntities(entry["refined text"]);
         
-        if (entities && entities.length > 0) {
-          const { error: updateError } = await supabase
-            .from('Journal Entries')
-            .update({ entities })
-            .eq('id', entry.id);
-            
-          if (updateError) {
-            console.error(`Error updating entry ${entry.id}:`, updateError);
-          } else {
-            processed++;
-            console.log(`Updated entry ${entry.id} with ${entities.length} entities`);
-          }
-        } else {
-          console.log(`No entities found for entry ${entry.id}`);
+        console.log(`Extracted entities for entry ${entry.id}:`, JSON.stringify(entities));
+        
+        // Update the entry with the entities, even if it's an empty array
+        const { error: updateError } = await supabase
+          .from('Journal Entries')
+          .update({ entities: entities })
+          .eq('id', entry.id);
           
-          // Even if no entities were found, update the entry with an empty array
-          // to prevent reprocessing the same entry in the future
-          const { error: updateError } = await supabase
-            .from('Journal Entries')
-            .update({ entities: [] })
-            .eq('id', entry.id);
-            
-          if (updateError) {
-            console.error(`Error updating entry ${entry.id} with empty entities:`, updateError);
-          } else {
-            processed++;
-            console.log(`Updated entry ${entry.id} with empty entities array`);
-          }
+        if (updateError) {
+          console.error(`Error updating entry ${entry.id}:`, updateError);
+        } else {
+          processed++;
+          console.log(`Updated entry ${entry.id} with ${entities.length} entities`);
         }
       } catch (entryError) {
         console.error(`Error processing entry ${entry.id}:`, entryError);

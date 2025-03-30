@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
@@ -30,6 +30,7 @@ export default function Utilities() {
         description: "Entity extraction process has started automatically. This may take a few minutes.",
       });
       
+      console.log("Invoking batch-extract-entities function...");
       const { data, error } = await supabase.functions.invoke('batch-extract-entities');
       
       if (error) {
@@ -40,10 +41,26 @@ export default function Utilities() {
       console.log("Batch extract entities result:", data);
       setResult(data);
       
-      toast({
-        title: "Processing complete",
-        description: `Processed ${data.processed} out of ${data.total} entries in ${data.processingTime}`,
-      });
+      // Show appropriate toast based on the number of entries processed
+      if (data.processed > 0) {
+        toast({
+          title: "Processing complete",
+          description: `Successfully processed ${data.processed} out of ${data.total} entries in ${data.processingTime}`,
+          variant: "default"
+        });
+      } else if (data.total === 0) {
+        toast({
+          title: "No entries to process",
+          description: "All journal entries already have entities extracted.",
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Processing complete",
+          description: `Processed ${data.processed} out of ${data.total} entries in ${data.processingTime}, but no entities were found.`,
+          variant: "default"
+        });
+      }
       
     } catch (error) {
       console.error("Error extracting entities:", error);
@@ -71,9 +88,12 @@ export default function Utilities() {
         
         <Card className="w-full mb-8">
           <CardHeader>
-            <CardTitle>Batch Entity Extraction</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5" /> 
+              Batch Entity Extraction
+            </CardTitle>
             <CardDescription>
-              Extract entities from all journal entries that don't have entities yet.
+              Extract named entities (people, organizations, locations, etc.) from journal entries that don't have entities yet.
             </CardDescription>
           </CardHeader>
           
@@ -87,12 +107,20 @@ export default function Utilities() {
             
             {result && (
               <Alert className="mt-4">
-                <AlertTitle>Processing Result</AlertTitle>
+                <AlertTitle className="flex items-center gap-2">
+                  {result.success ? 
+                    <Check className="h-4 w-4 text-green-500" /> : 
+                    <Info className="h-4 w-4 text-amber-500" />
+                  }
+                  Processing Result
+                </AlertTitle>
                 <AlertDescription>
-                  <p>Success: {result.success ? 'Yes' : 'No'}</p>
-                  <p>Processed: {result.processed} out of {result.total} entries</p>
-                  <p>Processing Time: {result.processingTime}</p>
-                  {result.error && <p>Error: {result.error}</p>}
+                  <div className="space-y-2 mt-2">
+                    <p><strong>Status:</strong> {result.success ? 'Success' : 'Failed'}</p>
+                    <p><strong>Entries Processed:</strong> {result.processed} out of {result.total} entries</p>
+                    <p><strong>Processing Time:</strong> {result.processingTime}</p>
+                    {result.error && <p className="text-red-500"><strong>Error:</strong> {result.error}</p>}
+                  </div>
                 </AlertDescription>
               </Alert>
             )}
