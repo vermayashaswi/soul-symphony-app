@@ -16,7 +16,8 @@ export default function SmartChat() {
   useEffect(() => {
     // Check if the user is authenticated, if not redirect to login
     if (!isLoading && !user) {
-      navigate("/auth", { replace: true });
+      console.log("User not authenticated, redirecting to auth page");
+      navigate("/auth", { state: { from: "/smart-chat" }, replace: true });
     }
   }, [user, isLoading, navigate]);
 

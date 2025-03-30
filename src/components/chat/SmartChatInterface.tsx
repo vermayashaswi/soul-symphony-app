@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from 'react-markdown';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useNavigate } from "react-router-dom";
 
 export default function SmartChatInterface() {
   const [message, setMessage] = useState("");
@@ -22,6 +23,7 @@ export default function SmartChatInterface() {
   const [apiError, setApiError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,12 +51,26 @@ export default function SmartChatInterface() {
       console.log("Invoking chat-with-rag edge function");
       
       // Set a timeout to handle stuck requests
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Request timed out after 30 seconds")), 30000);
-      });
+      const timeoutId = setTimeout(() => {
+        setIsLoading(false);
+        setApiError("Request timed out after 30 seconds. Please try again.");
+        setChatHistory(prev => [
+          ...prev, 
+          { 
+            role: 'error', 
+            content: "I'm having trouble connecting to the AI service. This might be due to high traffic or a temporary issue. Please try again in a moment."
+          }
+        ]);
+        
+        toast({
+          title: "Request timed out",
+          description: "The AI service is taking too long to respond. Please try again.",
+          variant: "destructive"
+        });
+      }, 30000);
       
-      // Using the chat-with-rag edge function with timeout
-      const responsePromise = supabase.functions.invoke('chat-with-rag', {
+      // Using the chat-with-rag edge function with proper error handling
+      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: {
           message: userMessage,
           userId: user.id,
@@ -62,13 +78,8 @@ export default function SmartChatInterface() {
         }
       });
       
-      // Race between the API call and the timeout
-      const { data, error } = await Promise.race([
-        responsePromise,
-        timeoutPromise.then(() => {
-          throw new Error("Request timed out");
-        })
-      ]) as any;
+      // Clear the timeout since we got a response
+      clearTimeout(timeoutId);
       
       console.log("Response received:", data);
       
@@ -104,6 +115,12 @@ export default function SmartChatInterface() {
         errorMessage = "Network error. Please check your connection and try again.";
       } else if (error.message?.includes("authenticate")) {
         errorMessage = "Authentication error. Please sign in again.";
+      } else if (error.message?.includes("redirected") || error.name === "TypeError") {
+        errorMessage = "Connection error. Please stay on this page while we process your request.";
+        // This prevents the redirect issue
+        setTimeout(() => {
+          window.history.replaceState(null, "", window.location.pathname);
+        }, 0);
       }
       
       setApiError(errorMessage);
@@ -124,6 +141,15 @@ export default function SmartChatInterface() {
       ]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Prevent accidental navigation away from this page
+  window.onbeforeunload = (e) => {
+    if (isLoading) {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
     }
   };
 
@@ -193,6 +219,7 @@ export default function SmartChatInterface() {
           <div className="flex flex-col items-center justify-center p-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
             <p className="text-sm text-muted-foreground">Processing your request...</p>
+            <p className="text-xs text-muted-foreground mt-1">Please don't leave this page</p>
           </div>
         )}
       </CardContent>
