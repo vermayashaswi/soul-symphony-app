@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -53,7 +54,6 @@ export function Navbar() {
     { path: '/insights', label: 'Insights', icon: BarChart2 },
     { path: '/chat', label: 'AI Assistant', icon: MessageCircle },
     { path: '/settings', label: 'Settings', icon: Settings },
-    { path: '/utilities', label: 'Utilities', icon: Home },
   ];
 
   const closeMenu = () => setIsOpen(false);

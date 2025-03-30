@@ -13,7 +13,6 @@ import SmartChat from "./pages/SmartChat";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
-import Utilities from "./pages/Utilities";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
@@ -95,11 +94,6 @@ const AppRoutes = () => {
         <Route path="/settings" element={
           <ProtectedRoute>
             <Settings />
-          </ProtectedRoute>
-        } />
-        <Route path="/utilities" element={
-          <ProtectedRoute>
-            <Utilities />
           </ProtectedRoute>
         } />
         <Route path="*" element={<NotFound />} />
