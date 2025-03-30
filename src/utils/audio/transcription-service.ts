@@ -22,17 +22,22 @@ export async function sendAudioForTranscription(base64String: string, userId: st
       };
     }
     
-    // Send to edge function with increased timeout
+    // Send to edge function - note we've removed the options property
+    // and are specifying the timeout directly in the AbortSignal
+    const controller = new AbortController();
+    // Set a timeout of 60 seconds
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64String,
         userId
       },
-      // Add longer timeout for processing longer audio
-      options: {
-        timeout: 60000 // 60 seconds timeout
-      }
+      signal: controller.signal
     });
+
+    // Clear the timeout
+    clearTimeout(timeoutId);
 
     if (error) {
       console.error('Transcription error:', error);
