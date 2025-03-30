@@ -41,6 +41,7 @@ export default function SmartChatInterface() {
     setIsLoading(true);
     
     try {
+      console.log("Invoking chat-with-rag edge function");
       // Using the chat-with-rag edge function
       const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: {
@@ -50,7 +51,12 @@ export default function SmartChatInterface() {
         }
       });
       
-      if (error) throw error;
+      console.log("Response received:", data);
+      
+      if (error) {
+        console.error("Error from edge function:", error);
+        throw error;
+      }
       
       // Add assistant response to chat history
       setChatHistory(prev => [
