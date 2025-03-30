@@ -261,6 +261,26 @@ async function createProfileIfNeeded(userId: string) {
   }
 }
 
+async function extractThemesAndEntities(text: string, entryId: number): Promise<void> {
+  try {
+    console.log(`Automatically extracting themes and entities for entry ${entryId}`);
+    
+    // Call the generate-themes function
+    const { data, error } = await supabase.functions.invoke('generate-themes', {
+      body: { text, entryId }
+    });
+    
+    if (error) {
+      console.error('Error calling generate-themes function:', error);
+      return;
+    }
+    
+    console.log('Themes and entities generated successfully:', data);
+  } catch (error) {
+    console.error('Error in extractThemesAndEntities:', error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -461,8 +481,14 @@ serve(async (req) => {
           } else if (entryData && entryData.length > 0) {
             console.log("Journal entry saved to database:", entryData[0].id);
             entryId = entryData[0].id;
-            
-            try {
+          
+          // Automatically extract themes and entities right after saving the entry
+          if (refinedText && entryId) {
+            EdgeRuntime.waitUntil(extractThemesAndEntities(refinedText, entryId));
+            console.log("Started background task to extract themes and entities");
+          }
+          
+          try {
               const embedding = await generateEmbedding(refinedText);
               
               const { error: embeddingError } = await supabase
@@ -508,22 +534,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
-    } catch (apiError) {
-      console.error("API error:", apiError);
-      
-      return new Response(
-        JSON.stringify({ 
-          error: apiError.message, 
-          success: false, 
-          message: "API error occurred, but edge function is returning 200 to avoid CORS issues" 
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-  } catch (error) {
+    } catch (error) {
     console.error("Error in transcribe-audio function:", error);
     
     return new Response(

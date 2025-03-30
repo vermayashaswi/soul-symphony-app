@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -102,6 +103,7 @@ async function extractThemesAndEntities(text: string): Promise<{ themes: string[
           { role: 'user', content: prompt }
         ],
         temperature: 0.3,
+        response_format: { type: "json_object" }
       }),
     });
 
@@ -111,9 +113,8 @@ async function extractThemesAndEntities(text: string): Promise<{ themes: string[
     const content = data.choices?.[0]?.message?.content || '';
     
     try {
-      // Attempt to clean and parse JSON from the response
-      const cleanedContent = content.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(cleanedContent);
+      // Parse the JSON response
+      const parsed = JSON.parse(content);
       
       return {
         themes: Array.isArray(parsed.themes) ? parsed.themes : [],
@@ -121,6 +122,7 @@ async function extractThemesAndEntities(text: string): Promise<{ themes: string[
       };
     } catch (parseError) {
       console.error('Error parsing themes and entities:', parseError);
+      console.error('Raw content:', content);
       // Fallback for themes if JSON parsing fails
       const themesMatches = content.match(/\["([^"]+)"(?:,\s*"([^"]+)")*\]/);
       const themes = themesMatches 
