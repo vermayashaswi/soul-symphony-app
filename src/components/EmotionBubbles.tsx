@@ -373,7 +373,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
   useEffect(() => {
     if (containerSize.width === 0 || containerSize.height === 0) return;
     
-    const padding = Math.min(containerSize.width, containerSize.height) * 0.15;
+    const padding = Math.min(containerSize.width, containerSize.height) * 0.10;
     const availableWidth = containerSize.width - padding * 2;
     const availableHeight = containerSize.height - padding * 2;
     
@@ -389,13 +389,13 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       const textLength = text.length;
       
       if (textLength <= 5) {
-        return Math.min(availableWidth, availableHeight) * 0.20;
+        return Math.min(availableWidth, availableHeight) * 0.22;
       } else if (textLength <= 10) {
-        return Math.min(availableWidth, availableHeight) * 0.25;
+        return Math.min(availableWidth, availableHeight) * 0.28;
       } else if (textLength <= 15) {
-        return Math.min(availableWidth, availableHeight) * 0.30;
+        return Math.min(availableWidth, availableHeight) * 0.32;
       } else {
-        return Math.min(availableWidth, availableHeight) * 0.35;
+        return Math.min(availableWidth, availableHeight) * 0.38;
       }
     };
     
@@ -420,7 +420,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       const minValue = Math.min(...values);
       const valueRange = maxValue - minValue;
       
-      const totalArea = availableWidth * availableHeight * 0.6;
+      const totalArea = availableWidth * availableHeight * 0.7;
       const itemCount = Object.keys(emotions).length;
       
       const emotionEntries = Object.entries(emotions);
@@ -430,13 +430,13 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       }));
       
       const maxBubbleSize = Math.min(
-        Math.min(availableWidth, availableHeight) * 0.30,
-        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.3
+        Math.min(availableWidth, availableHeight) * 0.35,
+        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.4
       );
       
       newItems = emotionEntries.map(([emotion, value], index) => {
         const minSize = baseMinSizes.find(item => item.emotion === emotion)?.minSize || 
-                       Math.min(availableWidth, availableHeight) * 0.20;
+                       Math.min(availableWidth, availableHeight) * 0.22;
         
         let size;
         if (valueRange === 0) {
@@ -461,8 +461,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       const itemCount = themes.length;
       
       const bubbleSize = Math.min(
-        Math.min(availableWidth, availableHeight) * 0.25,
-        Math.sqrt((availableWidth * availableHeight * 0.7) / itemCount) * 1.2
+        Math.min(availableWidth, availableHeight) * 0.28,
+        Math.sqrt((availableWidth * availableHeight * 0.8) / itemCount) * 1.3
       );
       
       newItems = themes.map((theme, index) => {

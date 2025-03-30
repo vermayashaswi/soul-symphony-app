@@ -20,9 +20,10 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   className,
   isDisturbed = false
 }) => {
-  // Increased font size for better readability
+  // Set a minimum font size to ensure legibility
+  // Increased minimum size for better readability
   const fontSizeStyle: React.CSSProperties = {
-    fontSize: `${Math.max(12, size / 4)}px`, // Increased from 10, 4.5
+    fontSize: `${Math.max(14, size / 3.5)}px`, // Increased minimum size from 12 to 14
     lineHeight: '1.2',
     maxWidth: '90%',
     overflow: 'hidden',

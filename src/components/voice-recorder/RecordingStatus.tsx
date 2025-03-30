@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle } from 'lucide-react';
 import { formatTime } from '@/utils/format-time';
 
 interface RecordingStatusProps {
@@ -10,24 +9,26 @@ interface RecordingStatusProps {
 }
 
 export function RecordingStatus({ isRecording, recordingTime }: RecordingStatusProps) {
-  if (!isRecording) return null;
-  
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="text-center"
+      className="flex items-center gap-2 mt-4"
     >
-      <div className="flex items-center gap-2 text-red-500 font-medium">
-        <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-        <span>Recording</span>
-      </div>
-      <p className="text-lg font-mono mt-1">{formatTime(recordingTime)}</p>
-      <p className="text-xs text-muted-foreground mt-1">
-        <AlertCircle className="h-3 w-3 inline-block mr-1" />
-        Speak clearly for best results
-      </p>
+      <motion.div 
+        className="w-3 h-3 rounded-full bg-red-500"
+        animate={{ 
+          opacity: [1, 0.4, 1],
+          scale: [1, 1.1, 1]
+        }}
+        transition={{ 
+          repeat: Infinity, 
+          duration: 1.2,
+          ease: "easeInOut"
+        }}
+      />
+      <span className="text-lg font-medium">{formatTime(recordingTime)}</span>
     </motion.div>
   );
 }

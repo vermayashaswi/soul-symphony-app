@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -26,7 +27,7 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
   useEffect(() => {
     // Generate filler bubbles if we have fewer than 5 main themes
     if (themes.length < 5) {
-      const fillers = Array(12 - themes.length * 2)
+      const fillers = Array(8 - themes.length) // Reduced from 12 - themes.length * 2
         .fill('')
         .map((_, i) => `•`); // Use bullet character for small bubbles
       setFillerThemes(fillers);
@@ -68,9 +69,10 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
         const isFiller = index >= themes.length;
         
         // Different sizes for theme bubbles vs filler bubbles
+        // Increased the size of both main and filler bubbles
         const bubbleSize = isFiller ? 
-          { minWidth: '30px', height: '30px', fontSize: '10px' } : 
-          { minWidth: '110px', height: '44px', fontSize: '16px' };
+          { minWidth: '40px', height: '40px', fontSize: '12px' } : // Increased from 30px/10px
+          { minWidth: '130px', height: '52px', fontSize: '16px' }; // Increased from 110px/44px
         
         // Ensure index is within bounds of positions array
         const position = index < positions.length ? positions[index] : { x: 0, y: 0 };
