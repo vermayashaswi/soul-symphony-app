@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,9 +17,16 @@ export default function Utilities() {
   const { user } = useAuth();
   const [isProcessingEntities, setIsProcessingEntities] = useState(false);
   const [processingStats, setProcessingStats] = useState<any>(null);
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState('AIzaSyAwEtfHQl3N69phsxfkwuhmRKelNQfd_qs');
   const [isSavingKey, setIsSavingKey] = useState(false);
   const [envStatus, setEnvStatus] = useState<any>(null);
+  
+  // Save the Google NL API key on component mount
+  useEffect(() => {
+    if (apiKey) {
+      saveApiKey();
+    }
+  }, []);
 
   // Check if API key is configured
   const checkApiKeyStatus = async () => {
@@ -92,7 +99,7 @@ export default function Utilities() {
           title: "API Key Saved",
           description: "Google Natural Language API key has been configured successfully."
         });
-        setApiKey('');
+        // Don't clear the API key for improved UX
         // Check the status after saving
         await checkApiKeyStatus();
       } else {
@@ -115,7 +122,7 @@ export default function Utilities() {
   };
 
   // Process all journal entries for entity extraction
-  const processAllEntities = async () => {
+  const processAllEntries = async () => {
     if (!user) {
       toast({
         title: "Authentication required",
@@ -208,11 +215,11 @@ export default function Utilities() {
         <Card className="w-full mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5" /> 
-              API Configuration
+              <Database className="h-5 w-5" /> 
+              Journal Entry Processing
             </CardTitle>
             <CardDescription>
-              Configure the Google Natural Language API key required for entity extraction.
+              Process your journal entries to extract entities using Google Natural Language API.
             </CardDescription>
           </CardHeader>
           
@@ -236,7 +243,7 @@ export default function Utilities() {
                         Google Natural Language API Key
                       </h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Set your Google Natural Language API key for sentiment analysis and entity extraction.
+                        Your Google Natural Language API key for entity extraction.
                       </p>
                     </div>
                   </div>
@@ -262,80 +269,16 @@ export default function Utilities() {
                         "Save Key"
                       )}
                     </Button>
-                    <Button 
-                      onClick={checkApiKeyStatus} 
-                      variant="secondary"
-                    >
-                      Check Status
-                    </Button>
                   </div>
-                  
-                  {envStatus && (
-                    <Alert variant={envStatus.googleNlApiConfigured ? "default" : "destructive"} className="mb-4">
-                      <AlertTitle>{envStatus.googleNlApiConfigured ? "API Key Configured" : "API Key Not Configured"}</AlertTitle>
-                      <AlertDescription>
-                        {envStatus.googleNlApiConfigured 
-                          ? "Google Natural Language API key is set up correctly."
-                          : "Please set your Google Natural Language API key to use entity extraction features."}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  
-                  <div className="text-sm text-muted-foreground mt-2">
-                    <p>To get a Google Natural Language API key:</p>
-                    <ol className="list-decimal list-inside pl-2 mt-1 space-y-1">
-                      <li>Go to the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Google Cloud Console</a></li>
-                      <li>Create a new project or select an existing one</li>
-                      <li>Enable the "Natural Language API"</li>
-                      <li>Go to "APIs & Services" → "Credentials"</li>
-                      <li>Click "Create credentials" → "API key"</li>
-                      <li>Copy and paste the key above</li>
-                    </ol>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        
-        <Card className="w-full mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5" /> 
-              Journal Entry Processing
-            </CardTitle>
-            <CardDescription>
-              Process your journal entries to extract entities using Google Natural Language API.
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            {!user && (
-              <Alert variant="default" className="mb-4">
-                <AlertTitle>Not signed in</AlertTitle>
-                <AlertDescription>
-                  You need to be signed in to use utilities.
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {user && (
-              <div className="space-y-6">
-                <div className="bg-muted p-4 rounded-lg">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-medium flex items-center gap-2">
-                        <Database className="h-4 w-4" />
-                        Entity Extraction
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Extract entities from all journal entries using Google Natural Language API.
-                      </p>
-                    </div>
-                  </div>
+                
+                <div className="mt-6">
+                  <h3 className="text-lg font-medium flex items-center gap-2 mb-4">
+                    <Database className="h-4 w-4" />
+                    Entity Extraction
+                  </h3>
                   
                   <Button 
-                    onClick={processAllEntities} 
+                    onClick={processAllEntries} 
                     disabled={isProcessingEntities}
                     variant="default"
                     className="w-full"
