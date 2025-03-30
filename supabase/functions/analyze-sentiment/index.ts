@@ -21,17 +21,41 @@ serve(async (req) => {
     if (requestData.debugEnv === true) {
       console.log("Environment check requested");
       
-      // Get environment variables
-      const googleNlApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
-      const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
+      // Get Supabase URL and service key from environment
       const supabaseUrl = Deno.env.get('SUPABASE_URL');
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      
+      // Create Supabase admin client for checking secrets
+      const supabase = supabaseUrl && supabaseServiceKey 
+        ? createClient(supabaseUrl, supabaseServiceKey)
+        : null;
+        
+      // Check for Google NL API key
+      let googleNlApiConfigured = false;
+      try {
+        if (supabase) {
+          const { data: secrets, error } = await supabase.functions.listSecrets();
+          if (!error && secrets) {
+            googleNlApiConfigured = secrets.some(secret => secret.name === 'GOOGLE_NL_API_KEY');
+          }
+        }
+        
+        // Fallback to direct environment check if listSecrets fails or isn't available
+        if (!googleNlApiConfigured) {
+          const googleNlApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+          googleNlApiConfigured = !!googleNlApiKey;
+        }
+      } catch (error) {
+        console.error("Error checking for Google NL API key:", error);
+      }
+      
+      // Check for OpenAI API key
+      const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
       
       // Test Supabase connection
       let supabaseConnected = false;
       try {
-        if (supabaseUrl && supabaseServiceKey) {
-          const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        if (supabase) {
           const { data, error } = await supabase.from('emotions').select('name').limit(1);
           supabaseConnected = !error;
         }
@@ -42,7 +66,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          googleNlApiConfigured: !!googleNlApiKey,
+          googleNlApiConfigured: googleNlApiConfigured,
           openAiApiConfigured: !!openAiApiKey,
           supabaseConnected: supabaseConnected,
           message: "Environment check completed successfully"
@@ -61,8 +85,33 @@ serve(async (req) => {
       throw new Error("No text provided for analysis");
     }
     
-    // Get the Google Natural Language API key from environment variables
-    const apiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+    // Get the Google Natural Language API key from secrets
+    let apiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+    
+    // If the API key is not found in environment, try to fetch it from Supabase secrets
+    if (!apiKey) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      
+      if (supabaseUrl && supabaseServiceKey) {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        try {
+          const { data: secrets, error } = await supabase.functions.listSecrets();
+          if (!error && secrets) {
+            const googleNlApiKeySecret = secrets.find(secret => secret.name === 'GOOGLE_NL_API_KEY');
+            if (googleNlApiKeySecret) {
+              // We can't get the actual value, but we know it exists
+              console.log("Google NL API key found in Supabase secrets");
+              // We'll have to rely on Deno.env.get to actually use it
+              apiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+            }
+          }
+        } catch (error) {
+          console.error("Error checking for Google NL API key in Supabase secrets:", error);
+        }
+      }
+    }
+    
     if (!apiKey) {
       throw new Error("Google Natural Language API key is not configured");
     }
