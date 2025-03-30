@@ -21,7 +21,7 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
-  const [noiseReduction, setNoiseReduction] = useState(true);
+  const [noiseReduction, setNoiseReduction] = useState(false); // Changed from true to false
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const { user } = useAuth();

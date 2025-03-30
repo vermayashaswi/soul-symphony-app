@@ -43,7 +43,20 @@ export default function SmartChatInterface() {
       setIsRecording(true);
       
       // Start recording
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: false, // Changed from true to false
+          noiseSuppression: false, // Changed from true to false
+          autoGainControl: true,
+          // Use higher sample rate for better quality
+          sampleRate: 48000,
+          // Try to use higher bit depth
+          sampleSize: 24,
+          // Use stereo if available
+          channelCount: 2,
+        } 
+      });
+      
       const mediaRecorder = new MediaRecorder(stream);
       const audioChunks: BlobPart[] = [];
       

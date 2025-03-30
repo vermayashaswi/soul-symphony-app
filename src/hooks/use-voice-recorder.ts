@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 
@@ -19,7 +20,7 @@ interface UseVoiceRecorderReturn {
 }
 
 export function useVoiceRecorder({ 
-  noiseReduction = true,
+  noiseReduction = false, // Changed default from true to false
   maxDuration = 300 // 5 minutes maximum by default
 }: UseVoiceRecorderOptions = {}): UseVoiceRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
