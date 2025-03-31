@@ -148,13 +148,30 @@ serve(async (req) => {
       }
     }
     
+    // Get user's first name for personalized response
+    let firstName = "";
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .single();
+        
+      if (!profileError && profileData?.full_name) {
+        firstName = profileData.full_name.split(' ')[0];
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+    }
+    
     // Prepare system prompt with RAG context
-    const systemPrompt = `You are Feelosophy, an AI assistant specialized in emotional wellbeing and journaling. 
+    const systemPrompt = `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
 ${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
 Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
-Focus on being helpful rather than diagnostic.`;
+Focus on being helpful rather than diagnostic. 
+${firstName ? `Always address the user by their first name (${firstName}) in your responses.` : ""}`;
 
     console.log("Sending to GPT with RAG context...");
     

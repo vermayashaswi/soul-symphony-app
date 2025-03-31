@@ -1,17 +1,18 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon } from 'lucide-react';
 import Navbar from '@/components/Navbar';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 import { useTheme } from '@/hooks/use-theme';
 import { setupJournalReminder, initializeCapacitorNotifications } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useJournalEntries } from '@/hooks/use-journal-entries';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -41,6 +42,8 @@ export default function Settings() {
   const { theme, setTheme, colorTheme, setColorTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { user } = useAuth();
+  const [streakDays, setStreakDays] = useState(0);
+  const { entries } = useJournalEntries(user?.id, 0, !!user);
   
   const colorThemes = [
     { name: 'Default', color: 'bg-violet-600' },
@@ -51,9 +54,57 @@ export default function Settings() {
   ];
 
   useEffect(() => {
+    const calculateStreak = async () => {
+      if (user?.id) {
+        try {
+          const { data, error } = await supabase
+            .from('Journal Entries')
+            .select('created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+            
+          if (error) {
+            console.error("Error fetching entries for streak:", error);
+            return;
+          }
+          
+          if (!data || data.length === 0) {
+            setStreakDays(0);
+            return;
+          }
+          
+          let streak = 1;
+          let currentDate = new Date(data[0].created_at);
+          
+          for (let i = 1; i < data.length; i++) {
+            const entryDate = new Date(data[i].created_at);
+            
+            const timeDiff = currentDate.getTime() - entryDate.getTime();
+            const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
+            
+            if (daysDiff === 1) {
+              streak++;
+              currentDate = entryDate;
+            } else if (daysDiff > 1) {
+              break;
+            } else if (daysDiff === 0) {
+              currentDate = entryDate;
+            }
+          }
+          
+          setStreakDays(streak);
+        } catch (error) {
+          console.error("Error calculating streak:", error);
+        }
+      }
+    };
+    
+    calculateStreak();
+  }, [user, entries]);
+
+  useEffect(() => {
     if (notificationsEnabled) {
       setupJournalReminder(true).then(() => {
-        // Show a mobile notification message
         if (typeof window !== 'undefined' && !('Notification' in window) || 
             (window.Notification && window.Notification.permission !== 'granted')) {
           initializeCapacitorNotifications();
@@ -79,7 +130,6 @@ export default function Settings() {
         </div>
         
         <div className="space-y-6">
-          {/* Profile Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -102,18 +152,17 @@ export default function Settings() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-secondary rounded-lg p-3">
                     <p className="text-muted-foreground text-sm">Journal Entries</p>
-                    <p className="text-xl font-medium text-foreground">48</p>
+                    <p className="text-xl font-medium text-foreground">{entries.length}</p>
                   </div>
                   <div className="bg-secondary rounded-lg p-3">
                     <p className="text-muted-foreground text-sm">Current Streak</p>
-                    <p className="text-xl font-medium text-foreground">8 days</p>
+                    <p className="text-xl font-medium text-foreground">{streakDays} days</p>
                   </div>
                 </div>
               </div>
             </div>
           </motion.div>
           
-          {/* Appearance Settings */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -202,7 +251,6 @@ export default function Settings() {
             </div>
           </motion.div>
           
-          {/* Other Settings */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -225,7 +273,6 @@ export default function Settings() {
             </div>
           </motion.div>
           
-          {/* Support Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
