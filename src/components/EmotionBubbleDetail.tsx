@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -35,17 +34,10 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   useEffect(() => {
     if (isHighlighted) {
       setShowPercentage(true);
-      const timer = setTimeout(() => {
-        setShowPercentage(false);
-      }, 2000);
-      
-      return () => clearTimeout(timer);
     }
   }, [isHighlighted]);
 
-  // Calculate text size based on bubble size and device
   const calculateFontSize = () => {
-    // Base size adjustments for different text lengths
     let baseSize;
     
     if (name.length <= 3) {
@@ -58,19 +50,16 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
       baseSize = size / 6;
     }
     
-    // Further adjust size for very small bubbles
     if (size < 50) {
       baseSize = baseSize * 0.8;
     }
     
-    // Ensure minimum and maximum font sizes based on device
     const minSize = isMobile ? 10 : 12;
     const maxSize = isMobile ? 16 : 20;
     
     return Math.min(maxSize, Math.max(minSize, baseSize));
   };
   
-  // Set font size style
   const fontSizeStyle: React.CSSProperties = {
     fontSize: `${calculateFontSize()}px`,
     lineHeight: '1.2',
@@ -87,13 +76,11 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     fontWeight: name.length <= 1 ? 'normal' : 'medium'
   };
 
-  // Set a minimum size for the bubble to ensure legibility
   const bubbleSize = Math.max(isMobile ? 40 : 50, size);
 
-  // Create different animations based on disturbed state
   const getAnimation = () => {
     if (isDragging) {
-      return {}; // No animation while dragging
+      return {};
     } else if (isDisturbed) {
       return {
         scale: [1, 1.1, 0.95, 1.05, 1],
@@ -117,6 +104,8 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   };
 
   const handleBubbleClick = () => {
+    setShowPercentage(prev => !prev);
+    
     if (onClick && name && name !== '•') {
       onClick(name);
     }
