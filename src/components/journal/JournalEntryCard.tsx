@@ -1,37 +1,25 @@
 import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/utils/format-time';
-import { AlertTriangle, Clock, Trash2 } from 'lucide-react';
-import { ThemeBoxes } from './ThemeBoxes';
-import { motion } from 'framer-motion';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import ThemeBoxes from './ThemeBoxes';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export interface JournalEntry {
   id: number;
-  "transcription text": string | null;
-  "refined text": string | null;
+  content: string;
   created_at: string;
-  audio_url?: string | null;
-  user_id?: string | null;
-  "foreign key"?: string | null;
-  emotions?: Record<string, number>;
-  duration?: number;
-  master_themes?: string[];
-  sentiment?: string;
-  entities?: Array<{ type: string; name: string }>;
+  audio_url?: string;
+  sentiment?: {
+    sentiment: string;
+    score: number;
+  };
+  themes?: string[];
+  entities?: {
+    text: string;
+    type: string;
+  }[];
 }
 
 interface JournalEntryCardProps {
@@ -40,83 +28,83 @@ interface JournalEntryCardProps {
 }
 
 export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
-  const [isDeleting, setIsDeleting] = useState(false);
-  
-  const handleDelete = async () => {
-    try {
-      setIsDeleting(true);
-      
-      // Delete the entry from the database
-      const { error } = await supabase
-        .from('Journal Entries')
-        .delete()
-        .eq('id', entry.id);
-      
-      if (error) throw new Error(error.message);
-      
-      toast.success('Journal entry deleted successfully');
-      
-      // Call the onDelete callback to update the UI
-      if (onDelete) {
-        onDelete(entry.id);
-      }
-    } catch (error: any) {
-      console.error('Error deleting journal entry:', error);
-      toast.error('Failed to delete entry: ' + error.message);
-    } finally {
-      setIsDeleting(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [open, setOpen] = React.useState(false);
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  const handleDelete = () => {
+    if (onDelete && entry.id) {
+      onDelete(entry.id);
+      setOpen(false);
     }
   };
 
-  const transcriptionText = entry["transcription text"] || 'No transcription available';
-  const refinedText = entry["refined text"] || 'No refined text available';
+  const createdAtFormatted = formatRelativeTime(entry.created_at);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-    >
-      <Card className="mb-4">
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-start">
-            <CardTitle className="text-lg font-semibold">
-              {formatRelativeTime(new Date(entry.created_at))}
-            </CardTitle>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Journal Entry</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete this journal entry? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? 'Deleting...' : 'Delete'}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </CardHeader>
-        
-        <CardContent className="py-3">
-          <p className="text-sm text-muted-foreground line-clamp-3">
-            {refinedText}
+    <Card className="bg-background shadow-md">
+      <div className="flex justify-between items-start p-4">
+        <div>
+          <h3 className="scroll-m-20 text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
+          <p className="text-sm text-muted-foreground">
+            {entry.sentiment?.sentiment} ({entry.sentiment?.score})
           </p>
-        </CardContent>
-      </Card>
-    </motion.div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Button variant="ghost" size="icon" onClick={toggleExpanded}>
+            {isExpanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </Button>
+
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Are you absolutely sure?</DialogTitle>
+                <DialogDescription>
+                  This action cannot be undone. This will permanently delete your journal entry from our
+                  servers.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="destructive" onClick={handleDelete}>
+                  Delete
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      <div className="p-4">
+        {isExpanded ? (
+          <div>
+            <p className="text-sm text-muted-foreground">{entry.content}</p>
+            {entry.themes && entry.themes.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-semibold">Themes</h4>
+                <ThemeBoxes themes={entry.themes} />
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground line-clamp-3">{entry.content}</p>
+        )}
+      </div>
+    </Card>
   );
 }

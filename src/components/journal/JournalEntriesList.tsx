@@ -3,7 +3,7 @@ import React from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, RefreshCw } from 'lucide-react';
-import { EmptyJournalState } from './EmptyJournalState';
+import EmptyJournalState from './EmptyJournalState';
 import { Card } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon } from 'lucide-react';
@@ -9,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 import { useTheme } from '@/hooks/use-theme';
-import { setupJournalReminder } from '@/services/notificationService';
+import { setupJournalReminder, initializeCapacitorNotifications } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SettingItemProps {
@@ -51,7 +52,13 @@ export default function Settings() {
 
   useEffect(() => {
     if (notificationsEnabled) {
-      setupJournalReminder(true);
+      setupJournalReminder(true).then(() => {
+        // Show a mobile notification message
+        if (typeof window !== 'undefined' && !('Notification' in window) || 
+            (window.Notification && window.Notification.permission !== 'granted')) {
+          initializeCapacitorNotifications();
+        }
+      });
     }
   }, [notificationsEnabled]);
 
