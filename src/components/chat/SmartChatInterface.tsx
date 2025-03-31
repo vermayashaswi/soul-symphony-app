@@ -16,37 +16,101 @@ export default function SmartChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [renderAttempt, setRenderAttempt] = useState(0);
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const componentRef = useRef<HTMLDivElement>(null);
 
-  // Make component visible on mount
+  // Force visibility and make sure component renders
   useEffect(() => {
-    console.log("SmartChatInterface mounted");
+    console.log("SmartChatInterface mounted (attempt #" + renderAttempt + ")");
 
     if (componentRef.current) {
-      // Force visibility
+      // Force styles directly onto the element
       componentRef.current.style.display = 'flex';
       componentRef.current.style.flexDirection = 'column';
       componentRef.current.style.visibility = 'visible';
       componentRef.current.style.opacity = '1';
+      componentRef.current.style.height = 'calc(70vh)';
+      componentRef.current.style.position = 'relative';
+      componentRef.current.style.zIndex = '1';
       
-      console.log("SmartChatInterface visibility forced", componentRef.current);
+      console.log("SmartChatInterface visibility forced via ref", componentRef.current);
+    } else {
+      console.error("SmartChatInterface ref is null, component may not have rendered");
+      
+      // Try to re-render the component
+      if (renderAttempt < 3) {
+        console.log("Attempting to re-render SmartChatInterface");
+        const timer = setTimeout(() => {
+          setRenderAttempt(prev => prev + 1);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
     }
     
-    // Double-check visibility after a delay
-    const timer = setTimeout(() => {
+    // Set an observer to ensure the component remains visible
+    try {
+      const observer = new MutationObserver((mutations) => {
+        if (componentRef.current) {
+          // If any style changes happen, reapply our styles
+          componentRef.current.style.display = 'flex';
+          componentRef.current.style.flexDirection = 'column';
+          componentRef.current.style.visibility = 'visible';
+          componentRef.current.style.opacity = '1';
+        }
+      });
+      
       if (componentRef.current) {
-        componentRef.current.style.display = 'flex';
-        componentRef.current.style.flexDirection = 'column';
-        componentRef.current.style.visibility = 'visible';
-        componentRef.current.style.opacity = '1';
-        console.log("SmartChatInterface delayed visibility check");
+        observer.observe(componentRef.current, { 
+          attributes: true, 
+          attributeFilter: ['style', 'class'] 
+        });
+        
+        // Also observe parent containers
+        let parent = componentRef.current.parentElement;
+        while (parent) {
+          observer.observe(parent, { 
+            attributes: true, 
+            attributeFilter: ['style', 'class'] 
+          });
+          parent = parent.parentElement;
+          if (parent && parent.id === 'root') break;
+        }
       }
-    }, 1000);
-    
-    return () => clearTimeout(timer);
+      
+      return () => observer.disconnect();
+    } catch (e) {
+      console.error("Error setting up observer:", e);
+    }
+  }, [renderAttempt]);
+
+  // Emergency rendering helper
+  useEffect(() => {
+    // Check if we're visible with the IntersectionObserver API
+    try {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) {
+            console.log("SmartChatInterface is not visible in viewport!");
+            if (componentRef.current) {
+              componentRef.current.style.display = 'flex';
+              componentRef.current.style.visibility = 'visible';
+              componentRef.current.style.opacity = '1';
+            }
+          }
+        });
+      });
+      
+      if (componentRef.current) {
+        observer.observe(componentRef.current);
+      }
+      
+      return () => observer.disconnect();
+    } catch (e) {
+      console.error("IntersectionObserver error:", e);
+    }
   }, []);
 
   const handleSendMessage = async (userMessage: string) => {
@@ -90,6 +154,28 @@ export default function SmartChatInterface() {
     setShowAnalysis(!showAnalysis);
   };
 
+  // Simple emergency fallback
+  if (renderAttempt >= 3 && !componentRef.current) {
+    return (
+      <div 
+        className="w-full max-w-3xl mx-auto border rounded-lg p-4 bg-white shadow-lg"
+        style={{height: '70vh', display: 'flex', flexDirection: 'column'}}
+      >
+        <div className="text-lg font-bold">Smart Chat</div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <EmptyChatState />
+        </div>
+        <div className="border-t p-3">
+          <ChatInput 
+            onSendMessage={handleSendMessage} 
+            isLoading={isLoading} 
+            userId={user?.id}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Card 
       ref={componentRef}
@@ -99,7 +185,8 @@ export default function SmartChatInterface() {
         flexDirection: 'column',
         visibility: 'visible',
         opacity: 1,
-        overflow: 'visible'
+        position: 'relative',
+        zIndex: 1
       }}
     >
       <CardHeader className="pb-2 flex flex-row items-center justify-between">

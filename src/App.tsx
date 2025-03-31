@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,7 +15,7 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "./integrations/supabase/client";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
 import MobileDebugOverlay from "./components/MobileDebugOverlay";
@@ -57,6 +58,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
+  const [renderError, setRenderError] = useState(false);
+  const location = useLocation();
+  
   useEffect(() => {
     const setCorrectViewport = () => {
       const metaViewport = document.querySelector('meta[name="viewport"]');
@@ -83,11 +87,77 @@ const AppRoutes = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth event outside React context:", event, session?.user?.email);
     });
+
+    // Force visibility for mobile elements
+    const forceVisibility = () => {
+      const containers = document.querySelectorAll('.smart-chat-container, .smart-chat-interface, .container');
+      containers.forEach(el => {
+        if (el instanceof HTMLElement) {
+          el.style.display = el.classList.contains('flex') ? 'flex' : 'block';
+          el.style.visibility = 'visible';
+          el.style.opacity = '1';
+        }
+      });
+    };
+
+    // Apply visibility fix after render and with delay
+    forceVisibility();
+    const timer = setTimeout(forceVisibility, 500);
     
     return () => {
       subscription.unsubscribe();
+      clearTimeout(timer);
     };
-  }, []);
+  }, [location]);
+
+  // Error boundary effect
+  useEffect(() => {
+    // Check if the main content rendered correctly
+    const checkRender = () => {
+      if (location.pathname === '/smart-chat') {
+        const smartChatElement = document.querySelector('.smart-chat-interface');
+        if (!smartChatElement && !renderError) {
+          console.error('Smart chat interface failed to render');
+          setRenderError(true);
+        }
+      }
+    };
+    
+    // Check after a reasonable delay
+    const timer = setTimeout(checkRender, 2000);
+    return () => clearTimeout(timer);
+  }, [location, renderError]);
+  
+  // Show a very simple emergency fallback if needed
+  if (renderError && location.pathname === '/smart-chat') {
+    return (
+      <div style={{ 
+        padding: '20px', 
+        textAlign: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh'
+      }}>
+        <h2>Smart Chat</h2>
+        <p>The chat interface couldn't be loaded properly.</p>
+        <button 
+          onClick={() => window.location.reload()}
+          style={{
+            padding: '8px 16px',
+            background: '#4f46e5',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            marginTop: '16px'
+          }}
+        >
+          Reload Page
+        </button>
+      </div>
+    );
+  }
   
   return (
     <>

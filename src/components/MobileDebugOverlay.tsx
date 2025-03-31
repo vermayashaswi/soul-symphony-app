@@ -3,12 +3,13 @@ import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation, useNavigate } from 'react-router-dom';
-import { X, InfoIcon, Bug } from 'lucide-react';
+import { X, InfoIcon, Bug, RefreshCw, AlertTriangle, Smartphone } from 'lucide-react';
 
 export function MobileDebugOverlay() {
   const [visible, setVisible] = useState(false);
   const [deviceInfo, setDeviceInfo] = useState<Record<string, any>>({});
   const [domInfo, setDomInfo] = useState<string[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -59,43 +60,140 @@ export function MobileDebugOverlay() {
   
   const analyzeDom = () => {
     const domInfo: string[] = [];
+    const errors: string[] = [];
     const rootElement = document.getElementById('root');
     
     if (rootElement) {
       domInfo.push(`Root element found: ${rootElement.children.length} children`);
       
-      // Check for common container elements
-      const containers = rootElement.querySelectorAll('.container, .chat-container, .smart-chat-container');
-      domInfo.push(`Found ${containers.length} container elements`);
-      
-      // Look for elements with display:none or visibility:hidden
-      const hiddenElements = rootElement.querySelectorAll('[style*="display: none"], [style*="visibility: hidden"]');
-      domInfo.push(`Found ${hiddenElements.length} hidden elements`);
-      
-      // Check if our expected components are in DOM
-      const chatInterface = rootElement.querySelector('.smart-chat-interface');
-      domInfo.push(`Smart chat interface: ${chatInterface ? 'Found' : 'Not found'}`);
-      
-      // Check overflow properties
-      const overflowHidden = rootElement.querySelectorAll('[style*="overflow: hidden"]');
-      domInfo.push(`Elements with overflow:hidden: ${overflowHidden.length}`);
+      try {
+        // Debug React components
+        const mainApp = rootElement.querySelector('[class*="container"]');
+        if (mainApp) {
+          domInfo.push(`Main app container found: ${mainApp.children.length} children`);
+        } else {
+          errors.push('ERROR: Main app container not found');
+        }
+        
+        // Check for smart chat specific elements
+        const smartChatInterface = document.querySelector('.smart-chat-interface');
+        if (smartChatInterface) {
+          domInfo.push(`Smart chat interface found: ${smartChatInterface.children.length} children`);
+          const rect = smartChatInterface.getBoundingClientRect();
+          domInfo.push(`SmartChat dimensions: ${Math.round(rect.width)}x${Math.round(rect.height)}`);
+          domInfo.push(`SmartChat position: top=${Math.round(rect.top)}, left=${Math.round(rect.left)}`);
+          
+          // Check if it's actually visible
+          const styles = window.getComputedStyle(smartChatInterface);
+          domInfo.push(`SmartChat visibility: ${styles.visibility}, opacity: ${styles.opacity}`);
+          domInfo.push(`SmartChat display: ${styles.display}`);
+          
+          if (styles.display === 'none' || styles.visibility === 'hidden' || styles.opacity === '0') {
+            errors.push('ERROR: SmartChat is in DOM but not visible!');
+          }
+        } else {
+          errors.push('ERROR: Smart chat interface not found in DOM');
+        }
+        
+        // Check react root
+        const reactRoot = rootElement.querySelector('[data-reactroot]');
+        if (reactRoot) {
+          domInfo.push('React root found in DOM');
+        } else {
+          errors.push('WARNING: React root not found, possible unmounting issue');
+        }
+        
+        // Check for animations causing issues
+        const animatingElements = rootElement.querySelectorAll('[class*="animate-"]');
+        if (animatingElements.length > 0) {
+          domInfo.push(`Found ${animatingElements.length} animating elements`);
+        }
+        
+        // Check if framer motion exists
+        const framerElements = rootElement.querySelectorAll('[style*="transform"]');
+        if (framerElements.length > 0) {
+          domInfo.push(`Found ${framerElements.length} elements with transforms`);
+        }
+      } catch (e) {
+        errors.push(`DOM analysis error: ${e.message}`);
+      }
     } else {
-      domInfo.push('Root element not found');
+      errors.push('ERROR: Root element not found');
     }
     
     setDomInfo(domInfo);
+    setErrors(errors);
+  };
+  
+  const forceRender = () => {
+    // Add the SmartChatInterface directly to the body if it doesn't exist
+    if (!document.querySelector('.smart-chat-interface')) {
+      addLog('Force rendering SmartChat');
+      
+      try {
+        // Try to force the interface to render by navigating to smart-chat
+        navigate('/smart-chat?debug=true&forceMobile=true');
+        
+        // Add temporary emergency styles to ensure visibility
+        const style = document.createElement('style');
+        style.textContent = `
+          .smart-chat-interface, .smart-chat-container {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            min-height: 70vh !important;
+          }
+          
+          .container {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+        `;
+        document.head.appendChild(style);
+        
+        setTimeout(() => {
+          analyzeDom();
+        }, 1000);
+      } catch (e) {
+        addLog(`Error forcing render: ${e.message}`);
+      }
+    }
   };
   
   const forceBrowserReload = () => {
     window.location.reload();
   };
   
-  const navigateToSmartChat = () => {
-    navigate('/smart-chat?debug=true&mobileDemo=true');
+  const addLog = (message: string) => {
+    setDomInfo(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
   };
   
-  // If not visible, render nothing
-  if (!visible) return null;
+  const resetApp = () => {
+    // Clear any React state issues
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Redirect to root
+      window.location.href = '/?mobileDebug=true';
+    } catch (e) {
+      addLog(`Error resetting app: ${e.message}`);
+    }
+  };
+  
+  // If not visible, render the button to open the debug panel
+  if (!visible) return (
+    <Button 
+      variant="outline" 
+      size="sm" 
+      className="fixed bottom-4 left-4 z-50 bg-red-100 hover:bg-red-200 text-red-800"
+      onClick={() => setVisible(true)}
+    >
+      <Smartphone className="h-4 w-4 mr-2" />
+      Debug
+    </Button>
+  );
   
   return (
     <div 
@@ -127,13 +225,47 @@ export function MobileDebugOverlay() {
           <div className="space-y-3">
             <div className="text-sm font-medium">Current Route: {location.pathname}</div>
             
+            {errors.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded p-2 text-xs space-y-1">
+                <div className="font-semibold text-red-700 flex items-center">
+                  <AlertTriangle className="h-3 w-3 mr-1" /> Critical Issues Detected:
+                </div>
+                {errors.map((error, i) => (
+                  <div key={i} className="text-red-600">{error}</div>
+                ))}
+                
+                <div className="flex gap-2 mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="bg-red-100 text-red-800 hover:bg-red-200 text-xs"
+                    onClick={forceRender}
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" /> Force Render
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="bg-amber-100 text-amber-800 hover:bg-amber-200 text-xs"
+                    onClick={resetApp}
+                  >
+                    Reset App
+                  </Button>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-2">
               <div className="text-sm font-medium">Navigation:</div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={() => navigate('/')}>
                   Home
                 </Button>
-                <Button variant="outline" size="sm" onClick={navigateToSmartChat}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate('/smart-chat?debug=true&forceMobile=true')}
+                >
                   Smart Chat (Debug)
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => navigate('/journal')}>
@@ -170,9 +302,9 @@ export function MobileDebugOverlay() {
                 <Button 
                   onClick={() => {
                     const style = document.createElement('style');
-                    style.innerHTML = '* { transition: none !important; animation: none !important; opacity: 1 !important; visibility: visible !important; }';
+                    style.innerHTML = '* { transition: none !important; animation: none !important; }';
                     document.head.appendChild(style);
-                    alert('CSS transitions disabled');
+                    addLog('CSS transitions disabled');
                   }}
                   variant="outline"
                   size="sm"
@@ -181,10 +313,10 @@ export function MobileDebugOverlay() {
                 </Button>
                 <Button 
                   onClick={() => {
-                    document.querySelectorAll('.smart-chat-interface, .chat-container, .container').forEach(el => {
-                      (el as HTMLElement).style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important; overflow: visible !important;';
+                    document.querySelectorAll('.smart-chat-interface, .chat-container, .container, [class*="container"]').forEach(el => {
+                      (el as HTMLElement).style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important;';
                     });
-                    alert('Forced visibility on containers');
+                    addLog('Forced visibility on containers');
                   }}
                   variant="outline"
                   size="sm"
