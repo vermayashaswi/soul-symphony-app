@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, BarChart4 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,35 @@ export default function SmartChatInterface() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const componentRef = useRef<HTMLDivElement>(null);
+
+  // Make component visible on mount
+  useEffect(() => {
+    console.log("SmartChatInterface mounted");
+
+    if (componentRef.current) {
+      // Force visibility
+      componentRef.current.style.display = 'flex';
+      componentRef.current.style.flexDirection = 'column';
+      componentRef.current.style.visibility = 'visible';
+      componentRef.current.style.opacity = '1';
+      
+      console.log("SmartChatInterface visibility forced", componentRef.current);
+    }
+    
+    // Double-check visibility after a delay
+    const timer = setTimeout(() => {
+      if (componentRef.current) {
+        componentRef.current.style.display = 'flex';
+        componentRef.current.style.flexDirection = 'column';
+        componentRef.current.style.visibility = 'visible';
+        componentRef.current.style.opacity = '1';
+        console.log("SmartChatInterface delayed visibility check");
+      }
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {
@@ -62,7 +91,17 @@ export default function SmartChatInterface() {
   };
 
   return (
-    <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col">
+    <Card 
+      ref={componentRef}
+      className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col"
+      style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        visibility: 'visible',
+        opacity: 1,
+        overflow: 'visible'
+      }}
+    >
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-center">Smart Chat {isMobile ? "(Mobile)" : ""}</CardTitle>
         {chatHistory.length > 0 && (
@@ -78,7 +117,10 @@ export default function SmartChatInterface() {
         )}
       </CardHeader>
       
-      <CardContent className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
+      <CardContent 
+        className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4"
+        style={{ display: 'block', visibility: 'visible', opacity: 1 }}
+      >
         {chatHistory.length === 0 ? (
           <EmptyChatState />
         ) : (

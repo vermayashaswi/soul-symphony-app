@@ -6,6 +6,14 @@ const MOBILE_BREAKPOINT = 768
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean>(false);
   const [isInitialized, setIsInitialized] = React.useState<boolean>(false);
+  const mountedRef = React.useRef(true);
+
+  React.useEffect(() => {
+    // Cleanup function for unmounting
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   React.useEffect(() => {
     // Function to check if mobile
@@ -13,8 +21,9 @@ export function useIsMobile() {
       // Check URL parameter for demo mode
       const urlParams = new URLSearchParams(window.location.search);
       const mobileDemo = urlParams.get('mobileDemo') === 'true';
+      const forceMobile = urlParams.get('forceMobile') === 'true';
       
-      if (mobileDemo) {
+      if (mobileDemo || forceMobile) {
         return true;
       }
       
@@ -45,6 +54,8 @@ export function useIsMobile() {
     
     // Create event listeners for resize and orientation change
     const handleResize = () => {
+      if (!mountedRef.current) return;
+      
       const newIsMobile = checkIfMobile();
       if (newIsMobile !== isMobile) {
         console.log("Mobile state changed:", newIsMobile, "width:", window.innerWidth);
@@ -58,6 +69,7 @@ export function useIsMobile() {
     // Setup matchMedia query as well
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
     const handleMqlChange = () => {
+      if (!mountedRef.current) return;
       setIsMobile(checkIfMobile());
     };
     
@@ -70,18 +82,30 @@ export function useIsMobile() {
       mql.addListener && mql.addListener(handleMqlChange);
     }
     
-    // Force a recheck after a short delay (helps with some mobile browsers)
-    setTimeout(() => {
-      const delayedCheck = checkIfMobile();
-      if (delayedCheck !== isMobile) {
-        console.log("Delayed mobile check different:", delayedCheck, "width:", window.innerWidth);
-        setIsMobile(delayedCheck);
-      }
-    }, 500);
+    // Force a recheck after short delays (helps with some mobile browsers)
+    const timers = [
+      setTimeout(() => {
+        if (!mountedRef.current) return;
+        const delayedCheck = checkIfMobile();
+        if (delayedCheck !== isMobile) {
+          console.log("Delayed mobile check (500ms):", delayedCheck, "width:", window.innerWidth);
+          setIsMobile(delayedCheck);
+        }
+      }, 500),
+      setTimeout(() => {
+        if (!mountedRef.current) return;
+        const delayedCheck = checkIfMobile();
+        if (delayedCheck !== isMobile) {
+          console.log("Delayed mobile check (2000ms):", delayedCheck, "width:", window.innerWidth);
+          setIsMobile(delayedCheck);
+        }
+      }, 2000)
+    ];
     
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
+      timers.forEach(clearTimeout);
       
       try {
         mql.removeEventListener('change', handleMqlChange);
@@ -101,11 +125,24 @@ export function useIsMobile() {
       setIsMobile(window.__forceMobileView);
     };
     
+    // Add helper to force mobile view through URL
+    const checkForForceMobile = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceMobile = urlParams.get('forceMobile') === 'true';
+      if (forceMobile && !isMobile) {
+        console.log("Forcing mobile view from URL parameter");
+        window.__forceMobileView = true;
+        setIsMobile(true);
+      }
+    };
+    
+    checkForForceMobile();
+    
     return () => {
       // @ts-ignore
       delete window.toggleMobileView;
     };
-  }, []);
+  }, [isMobile]);
 
   return isInitialized ? isMobile : false;
 }
