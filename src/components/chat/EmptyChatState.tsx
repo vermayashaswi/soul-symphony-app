@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Motion, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
