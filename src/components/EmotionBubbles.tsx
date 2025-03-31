@@ -312,7 +312,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         bubblesRef.current = bubbleBodies;
       }
       
-      // Create and configure mouse constraint with improved settings
+      // Create and configure mouse constraint for desktop interaction
       const mouse = Mouse.create(canvasRef.current);
       const mouseConstraint = MouseConstraint.create(engine, {
         mouse: mouse,
@@ -324,7 +324,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           }
         }
       });
-
+      
       // Enhanced drag events for better interaction
       let isDragging = false;
       let draggedBody: Matter.Body | null = null;
@@ -333,17 +333,23 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       let lastDragTime = 0;
       let velocity = { x: 0, y: 0 };
       
+      // Variables for touch interaction
+      let touchId: number | null = null;
+      
+      // Function to find bubble at position
+      const findBubbleAtPosition = (position: { x: number, y: number }) => {
+        return bubblesRef.current.find(bubble => {
+          const distance = Vector.magnitude(
+            Vector.sub(bubble.body.position, position)
+          );
+          return distance <= bubble.size / 2;
+        });
+      };
+      
+      // Mouse events for desktop
       Events.on(mouseConstraint, 'mousedown', (event) => {
-        // Fix: access the mousePosition through mouseConstraint.mouse instead of event.mouse
         const mousePosition = mouseConstraint.mouse.position;
-        const foundBody = bubblesRef.current.find(
-          bubble => {
-            const distance = Vector.magnitude(
-              Vector.sub(bubble.body.position, mousePosition)
-            );
-            return distance <= bubble.size / 2;
-          }
-        );
+        const foundBody = findBubbleAtPosition(mousePosition);
         
         if (foundBody) {
           draggedBody = foundBody.body;
@@ -361,7 +367,6 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           const dt = now - lastDragTime;
           
           if (dt > 0) {
-            // Fix: access the mousePosition through mouseConstraint.mouse instead of event.mouse
             const currentPosition = mouseConstraint.mouse.position;
             velocity = {
               x: (currentPosition.x - previousPosition.x) / dt * 15, // Scale velocity
@@ -409,12 +414,11 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         }
       });
       
-      // Handle click events
+      // Handle click events for desktop
       Events.on(mouseConstraint, 'click', (event) => {
         const clickTime = Date.now();
         // Only count as click if it's a short interaction
         if (dragStartTime && clickTime - dragStartTime < 200) {
-          // Fix: access the mousePosition through mouseConstraint.mouse instead of event.mouse
           const mousePosition = mouseConstraint.mouse.position;
           
           bubblesRef.current.forEach(bubble => {
@@ -428,6 +432,134 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           });
         }
       });
+      
+      // ===== TOUCH INTERACTION HANDLERS =====
+      if (canvasRef.current) {
+        // Touch start - similar to mousedown
+        canvasRef.current.addEventListener('touchstart', (e) => {
+          if (e.touches.length > 0 && touchId === null) {
+            e.preventDefault(); // Prevent scrolling
+            
+            const touch = e.touches[0];
+            touchId = touch.identifier;
+            
+            // Convert touch coordinates to canvas coordinates
+            const canvasRect = canvasRef.current!.getBoundingClientRect();
+            const touchPosition = {
+              x: touch.clientX - canvasRect.left,
+              y: touch.clientY - canvasRect.top
+            };
+            
+            const foundBody = findBubbleAtPosition(touchPosition);
+            
+            if (foundBody) {
+              draggedBody = foundBody.body;
+              setDraggingBubble(foundBody.name);
+              isDragging = true;
+              dragStartTime = Date.now();
+              previousPosition = { ...touchPosition };
+              lastDragTime = Date.now();
+              setIsCurrentlyDisturbed(true);
+              
+              // Move the body to the touch position
+              Body.setPosition(draggedBody, touchPosition);
+            }
+          }
+        }, { passive: false });
+        
+        // Touch move - similar to mousemove
+        canvasRef.current.addEventListener('touchmove', (e) => {
+          if (isDragging && draggedBody && touchId !== null) {
+            e.preventDefault(); // Prevent scrolling
+            
+            // Find the touch with the correct identifier
+            const touchList = Array.from(e.touches);
+            const touch = touchList.find(t => t.identifier === touchId);
+            
+            if (touch) {
+              const now = Date.now();
+              const dt = now - lastDragTime;
+              
+              // Convert touch coordinates to canvas coordinates
+              const canvasRect = canvasRef.current!.getBoundingClientRect();
+              const currentPosition = {
+                x: touch.clientX - canvasRect.left,
+                y: touch.clientY - canvasRect.top
+              };
+              
+              // Move the body directly to follow the finger precisely on touch devices
+              Body.setPosition(draggedBody, currentPosition);
+              
+              if (dt > 0) {
+                velocity = {
+                  x: (currentPosition.x - previousPosition.x) / dt * 15,
+                  y: (currentPosition.y - previousPosition.y) / dt * 15
+                };
+                previousPosition = { ...currentPosition };
+                lastDragTime = now;
+              }
+            }
+          }
+        }, { passive: false });
+        
+        // Touch end & cancel - similar to mouseup
+        const handleTouchEnd = (e: TouchEvent) => {
+          if (isDragging && draggedBody && touchId !== null) {
+            // Check if our touch has ended
+            const isOurTouchEnded = Array.from(e.changedTouches).some(
+              t => t.identifier === touchId
+            );
+            
+            if (isOurTouchEnded) {
+              e.preventDefault(); // Prevent any default behavior
+              
+              isDragging = false;
+              touchId = null;
+              
+              // Apply velocity for throwing effect
+              Body.setVelocity(draggedBody, velocity);
+              
+              // Apply additional impulse for more realistic physics
+              const impulseMultiplier = 0.005;
+              Body.applyForce(
+                draggedBody,
+                draggedBody.position,
+                {
+                  x: velocity.x * impulseMultiplier,
+                  y: velocity.y * impulseMultiplier
+                }
+              );
+              
+              // Check if this was a tap/click (short duration interaction)
+              const touchEndTime = Date.now();
+              if (touchEndTime - dragStartTime < 200 && 
+                  Math.abs(velocity.x) < 5 && 
+                  Math.abs(velocity.y) < 5) {
+                handleEmotionClick(draggedBody.label as string);
+              }
+              
+              // Apply random forces to other bubbles for interactive feel
+              bubblesRef.current.forEach(bubble => {
+                if (bubble.body !== draggedBody) {
+                  const forceX = (Math.random() - 0.5) * 0.002;
+                  const forceY = (Math.random() - 0.5) * 0.002;
+                  Body.applyForce(bubble.body, bubble.body.position, { x: forceX, y: forceY });
+                }
+              });
+              
+              draggedBody = null;
+              setDraggingBubble(null);
+              
+              setTimeout(() => {
+                setIsCurrentlyDisturbed(false);
+              }, 3000);
+            }
+          }
+        };
+        
+        canvasRef.current.addEventListener('touchend', handleTouchEnd, { passive: false });
+        canvasRef.current.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+      }
       
       World.add(engine.world, mouseConstraint);
       mouseConstraintRef.current = mouseConstraint;
@@ -449,6 +581,14 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       setPhysicsInitialized(true);
       
       return () => {
+        // Clean up all event listeners for touch events
+        if (canvasRef.current) {
+          canvasRef.current.removeEventListener('touchstart', () => {});
+          canvasRef.current.removeEventListener('touchmove', () => {});
+          canvasRef.current.removeEventListener('touchend', () => {});
+          canvasRef.current.removeEventListener('touchcancel', () => {});
+        }
+        
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
         }
@@ -728,6 +868,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           <canvas 
             ref={canvasRef} 
             className="absolute top-0 left-0 w-full h-full z-10"
+            // Add touch-action CSS to prevent browser touch actions
+            style={{ touchAction: 'none' }}
           />
           {bubblesRef.current.map((bubble, index) => (
             <div
