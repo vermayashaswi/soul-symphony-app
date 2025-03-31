@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ThemeBoxesProps {
   themes: string[];
@@ -10,6 +11,8 @@ interface ThemeBoxesProps {
 }
 
 const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed = false }) => {
+  const isMobile = useIsMobile();
+  
   // Color classes for theme boxes - enhancing with more visually distinct colors
   const colorClasses = [
     'bg-blue-100 text-blue-800 border border-blue-200',
@@ -41,7 +44,7 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
   const allThemes = [...themes, ...fillerThemes];
 
   return (
-    <div className={cn("flex flex-wrap gap-4 relative p-2 h-full w-full justify-center items-center", className)}>
+    <div className={cn("flex flex-wrap gap-2 md:gap-4 relative p-2 h-full w-full justify-center items-center", className)}>
       {allThemes.map((theme, index) => {
         // Determine if this is a filler (small) bubble
         const isFiller = index >= themes.length;
@@ -58,10 +61,10 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
               isFiller ? "opacity-40" : "opacity-100"
             )}
             style={{
-              minWidth: isFiller ? '50px' : '140px',
-              height: isFiller ? '50px' : '60px',
-              fontSize: isFiller ? '14px' : '16px',
-              padding: isFiller ? '8px' : '12px',
+              minWidth: isFiller ? (isMobile ? '40px' : '50px') : (isMobile ? '100px' : '140px'),
+              height: isFiller ? (isMobile ? '40px' : '50px') : (isMobile ? '50px' : '60px'),
+              fontSize: isFiller ? (isMobile ? '12px' : '14px') : (isMobile ? '14px' : '16px'),
+              padding: isFiller ? '8px' : (isMobile ? '8px' : '12px'),
             }}
             initial={{ scale: 0, opacity: 0 }}
             animate={isDisturbed ? {
@@ -100,6 +103,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
       })}
     </div>
   );
-};
+}
 
 export default ThemeBoxes;

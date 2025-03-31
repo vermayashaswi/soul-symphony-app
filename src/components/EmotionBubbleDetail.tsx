@@ -2,6 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface EmotionBubbleDetailProps {
   name: string;
@@ -20,10 +21,12 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   className,
   isDisturbed = false
 }) => {
+  const isMobile = useIsMobile();
+  
   // Set a minimum font size to ensure legibility
   // Increased minimum size for better readability
   const fontSizeStyle: React.CSSProperties = {
-    fontSize: `${Math.max(16, size / 3)}px`, // Increased minimum font size to 16px
+    fontSize: `${Math.max(isMobile ? 14 : 16, size / 3)}px`, // Adjust minimum based on device
     lineHeight: '1.2',
     maxWidth: '90%',
     overflow: 'hidden',
@@ -39,7 +42,8 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   };
 
   // Set a minimum size for the bubble to ensure legibility
-  const bubbleSize = Math.max(70, size);
+  // Increased minimum size for mobile
+  const bubbleSize = Math.max(isMobile ? 60 : 70, size);
 
   // Create different animations based on disturbed state
   const getAnimation = () => {
