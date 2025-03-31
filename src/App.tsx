@@ -14,6 +14,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ThemeProvider } from "./hooks/use-theme";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 
@@ -106,17 +107,19 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <div className="relative min-h-screen">
-          <div className="relative z-10">
-            <Toaster />
-            <Sonner position="top-center" />
-            <BrowserRouter>
-              <AnimatePresence mode="wait">
-                <AppRoutes />
-              </AnimatePresence>
-            </BrowserRouter>
+        <ThemeProvider>
+          <div className="relative min-h-screen">
+            <div className="relative z-10">
+              <Toaster />
+              <Sonner position="top-center" />
+              <BrowserRouter>
+                <AnimatePresence mode="wait">
+                  <AppRoutes />
+                </AnimatePresence>
+              </BrowserRouter>
+            </div>
           </div>
-        </div>
+        </ThemeProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

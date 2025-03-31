@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,20 +18,16 @@ const Journal = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
-  
-  // Add a flag to prevent unnecessary fetches
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
-  // Check if user profile exists and create if needed
   useEffect(() => {
     if (user?.id) {
       checkUserProfile(user.id);
     }
   }, [user?.id]);
   
-  // When tab changes to entries, refresh the entries list only once initially
   useEffect(() => {
     if (activeTab === 'entries' && isProfileChecked && !initialFetchDone) {
       console.log('Tab changed to entries, doing initial fetch...');
@@ -43,7 +38,6 @@ const Journal = () => {
 
   const checkUserProfile = async (userId: string) => {
     try {
-      // Check if profile exists
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('id')
@@ -53,11 +47,9 @@ const Journal = () => {
       if (error || !profile) {
         console.log('Creating user profile...');
         
-        // Get user data
         const { data: userData, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
         
-        // Create profile
         const { error: insertError } = await supabase
           .from('profiles')
           .insert([{
@@ -71,7 +63,6 @@ const Journal = () => {
         console.log('Profile created successfully');
       }
       
-      // Mark profile as checked so we can load entries
       setIsProfileChecked(true);
     } catch (error: any) {
       console.error('Error checking/creating user profile:', error);
@@ -82,19 +73,14 @@ const Journal = () => {
   const onEntryRecorded = async (audioBlob: Blob, tempId?: string) => {
     console.log('Entry recorded, adding to processing queue');
     
-    // Add this entry to the processing list if we have a tempId
     if (tempId) {
       setProcessingEntries(prev => [...prev, tempId]);
     }
     
-    // Switch to entries tab to show progress
     setActiveTab('entries');
     
-    // Wait a bit for initial processing to complete
     setTimeout(async () => {
-      // Try to extract themes for this new entry
       try {
-        // First, get the entry ID from database using tempId
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
@@ -106,7 +92,6 @@ const Journal = () => {
         } else if (data) {
           console.log('Generating themes for new entry:', data.id);
           
-          // Call the generate-themes edge function
           await supabase.functions.invoke('generate-themes', {
             body: {
               text: data["refined text"],
@@ -118,11 +103,14 @@ const Journal = () => {
         console.error('Error generating themes for new entry:', error);
       }
       
-      // Refresh entries list after processing
       setProcessingEntries(prev => prev.filter(id => id !== tempId));
       setRefreshKey(prev => prev + 1);
-      fetchEntries(); // Explicitly fetch entries after timeout
-    }, 15000); // After 15 seconds, refresh list
+      fetchEntries();
+    }, 15000);
+  };
+
+  const handleDeleteEntry = (entryId: number) => {
+    setRefreshKey(prev => prev + 1);
   };
 
   return (
@@ -157,6 +145,7 @@ const Journal = () => {
               loading={loading || !isProfileChecked}
               processingEntries={processingEntries}
               onStartRecording={() => setActiveTab('record')}
+              onDeleteEntry={handleDeleteEntry}
             />
           </TabsContent>
         </Tabs>

@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, Volume2, HelpCircle, Shield, Edit, Check as CheckIcon } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
+import { useTheme } from '@/hooks/use-theme';
+import { setupJournalReminder } from '@/services/notificationService';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -34,10 +37,9 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 }
 
 export default function Settings() {
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [aiVoiceFeedback, setAiVoiceFeedback] = useState(false);
-  const [privacyMode, setPrivacyMode] = useState(false);
+  const { theme, setTheme, colorTheme, setColorTheme } = useTheme();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const { user } = useAuth();
   
   const colorThemes = [
     { name: 'Default', color: 'bg-primary' },
@@ -46,8 +48,18 @@ export default function Settings() {
     { name: 'Energy', color: 'bg-amber-400' },
     { name: 'Focus', color: 'bg-emerald-400' },
   ];
-  
-  const [selectedTheme, setSelectedTheme] = useState(colorThemes[0].name);
+
+  useEffect(() => {
+    if (notificationsEnabled) {
+      setupJournalReminder(true);
+    }
+  }, [notificationsEnabled]);
+
+  const handleContactSupport = () => {
+    const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
+    const mailtoLink = `mailto:verma.yashaswi@gmail.com?subject=${subject}`;
+    window.open(mailtoLink, '_blank');
+  };
   
   return (
     <div className="min-h-screen pb-20">
@@ -65,31 +77,19 @@ export default function Settings() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="bg-white rounded-xl p-6 shadow-sm"
+            className="bg-background rounded-xl p-6 shadow-sm border"
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold">Your Profile</h2>
-              <Button variant="outline" size="sm" className="rounded-full flex items-center gap-1.5">
-                <Edit className="h-3.5 w-3.5" />
-                <span>Edit</span>
-              </Button>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-              <div className="relative">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&auto=format&fit=crop" />
-                  <AvatarFallback>JD</AvatarFallback>
-                </Avatar>
-                <button className="absolute bottom-0 right-0 h-8 w-8 bg-primary text-white rounded-full flex items-center justify-center border-2 border-background">
-                  <Edit className="h-4 w-4" />
-                </button>
-              </div>
+              <ProfilePictureUpload />
               
               <div className="flex-1 space-y-4 text-center sm:text-left">
                 <div>
-                  <h3 className="text-xl font-semibold">Alex Johnson</h3>
-                  <p className="text-muted-foreground">alex.johnson@example.com</p>
+                  <h3 className="text-xl font-semibold">{user?.user_metadata?.full_name || 'User'}</h3>
+                  <p className="text-muted-foreground">{user?.email}</p>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
@@ -111,7 +111,7 @@ export default function Settings() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
-            className="bg-white rounded-xl p-6 shadow-sm"
+            className="bg-background rounded-xl p-6 shadow-sm border"
           >
             <h2 className="text-xl font-semibold mb-4">Appearance</h2>
             
@@ -126,7 +126,7 @@ export default function Settings() {
                     }}
                     className={cn(
                       "flex items-center gap-1.5 px-4 py-1.5 rounded-full transition-all",
-                      theme === 'light' ? "bg-white shadow-sm" : "hover:text-foreground text-muted-foreground"
+                      theme === 'light' ? "bg-background shadow-sm" : "hover:text-foreground text-muted-foreground"
                     )}
                   >
                     <Sun className="h-4 w-4" />
@@ -139,7 +139,7 @@ export default function Settings() {
                     }}
                     className={cn(
                       "flex items-center gap-1.5 px-4 py-1.5 rounded-full transition-all",
-                      theme === 'dark' ? "bg-white shadow-sm" : "hover:text-foreground text-muted-foreground"
+                      theme === 'dark' ? "bg-background shadow-sm" : "hover:text-foreground text-muted-foreground"
                     )}
                   >
                     <Moon className="h-4 w-4" />
@@ -152,7 +152,7 @@ export default function Settings() {
                     }}
                     className={cn(
                       "flex items-center gap-1.5 px-4 py-1.5 rounded-full transition-all",
-                      theme === 'system' ? "bg-white shadow-sm" : "hover:text-foreground text-muted-foreground"
+                      theme === 'system' ? "bg-background shadow-sm" : "hover:text-foreground text-muted-foreground"
                     )}
                   >
                     <span>System</span>
@@ -167,7 +167,7 @@ export default function Settings() {
                     <button
                       key={themeOption.name}
                       onClick={() => {
-                        setSelectedTheme(themeOption.name);
+                        setColorTheme(themeOption.name as any);
                         toast.success(`${themeOption.name} theme applied`);
                       }}
                       className={cn(
@@ -178,12 +178,12 @@ export default function Settings() {
                         className={cn(
                           "h-10 w-10 rounded-full flex items-center justify-center border-2 transition-all",
                           themeOption.color,
-                          selectedTheme === themeOption.name 
+                          colorTheme === themeOption.name 
                             ? "border-foreground ring-2 ring-background ring-offset-2" 
                             : "border-muted"
                         )}
                       >
-                        {selectedTheme === themeOption.name && (
+                        {colorTheme === themeOption.name && (
                           <CheckIcon className="h-5 w-5 text-white" />
                         )}
                       </div>
@@ -200,7 +200,7 @@ export default function Settings() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
-            className="bg-white rounded-xl p-6 shadow-sm"
+            className="bg-background rounded-xl p-6 shadow-sm border"
           >
             <h2 className="text-xl font-semibold mb-4">Preferences</h2>
             
@@ -215,28 +215,6 @@ export default function Settings() {
                   onCheckedChange={setNotificationsEnabled}
                 />
               </SettingItem>
-              
-              <SettingItem
-                icon={Volume2}
-                title="AI Voice Feedback"
-                description="Enable voice responses from your AI assistant"
-              >
-                <Switch 
-                  checked={aiVoiceFeedback}
-                  onCheckedChange={setAiVoiceFeedback}
-                />
-              </SettingItem>
-              
-              <SettingItem
-                icon={Lock}
-                title="Privacy Mode"
-                description="Hide sensitive content when others might see your screen"
-              >
-                <Switch 
-                  checked={privacyMode}
-                  onCheckedChange={setPrivacyMode}
-                />
-              </SettingItem>
             </div>
           </motion.div>
           
@@ -245,7 +223,7 @@ export default function Settings() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.3 }}
-            className="bg-white rounded-xl p-6 shadow-sm"
+            className="bg-background rounded-xl p-6 shadow-sm border"
           >
             <h2 className="text-xl font-semibold mb-4">Help & Support</h2>
             
@@ -272,7 +250,8 @@ export default function Settings() {
             </div>
             
             <div className="mt-6 text-center">
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+              <Button variant="default" className="gap-2" onClick={handleContactSupport}>
+                <Mail className="h-4 w-4" />
                 Contact Support
               </Button>
             </div>
@@ -284,11 +263,5 @@ export default function Settings() {
         </div>
       </div>
     </div>
-  );
-}
-
-function Check(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <CheckIcon {...props} />
   );
 }
