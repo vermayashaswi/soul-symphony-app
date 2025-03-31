@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -16,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import SouloLogo from '@/components/SouloLogo';
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -83,9 +81,9 @@ export function Navbar() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
-            className="flex items-center justify-center"
+            className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse"
           >
-            <SouloLogo smileOnly={true} size="large" className="animate-pulse" />
+            <span className="text-white font-bold text-lg">S</span>
           </motion.div>
         </Link>
 

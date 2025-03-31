@@ -11,7 +11,6 @@ interface SouloLogoProps {
   textClassName?: string;
   smileyClassName?: string;
   useColorTheme?: boolean;
-  smileOnly?: boolean;
 }
 
 const SouloLogo = ({
@@ -19,8 +18,7 @@ const SouloLogo = ({
   size = "normal",
   textClassName = "",
   smileyClassName = "",
-  useColorTheme = true,
-  smileOnly = false
+  useColorTheme = true
 }: SouloLogoProps) => {
   const { colorTheme } = useTheme();
   
@@ -33,25 +31,6 @@ const SouloLogo = ({
   
   // Apply color theme if useColorTheme is true
   const themeTextClass = useColorTheme ? "text-primary" : "";
-  
-  // If smileOnly is true, only render the smile icon
-  if (smileOnly) {
-    return (
-      <span className={cn("relative inline-block", sizeClasses[size], themeTextClass, smileyClassName, className)}>
-        {/* U-shaped character instead of circle */}
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="relative w-full h-full flex items-center justify-center">
-            {/* U shape */}
-            <div className="w-full h-3/4 border-2 border-current rounded-b-full border-t-0 flex items-end pb-[2px]">
-              {/* Eyes */}
-              <span className="absolute top-[25%] left-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
-              <span className="absolute top-[25%] right-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
-            </div>
-          </span>
-        </span>
-      </span>
-    );
-  }
   
   return (
     <span className={cn("font-semibold inline-flex items-center", themeTextClass, textClassName, className)}>
