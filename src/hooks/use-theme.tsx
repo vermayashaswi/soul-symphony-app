@@ -23,6 +23,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return (savedTheme as Theme) || 'light';
   });
   
+  // Changed default color theme to 'Calm'
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
     const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
     return (savedColorTheme as ColorTheme) || 'Calm'; // Default to 'Calm'
