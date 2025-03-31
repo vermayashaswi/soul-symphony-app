@@ -74,6 +74,13 @@ export default function SmartChatMobileDebug() {
     const isVisible = document.visibilityState === 'visible';
     addLog(`Page visibility: ${isVisible ? 'visible' : 'hidden'}`);
     
+    // Check content overflow
+    const interfaces = document.querySelectorAll('.card');
+    interfaces.forEach((el, i) => {
+      const rect = el.getBoundingClientRect();
+      addLog(`Card ${i} position: ${rect.top}, ${rect.left}, ${rect.width}x${rect.height}`);
+    });
+    
     // Check for any errors in console
     if (window.console && console.error) {
       const originalError = console.error;

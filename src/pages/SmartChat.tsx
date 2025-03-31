@@ -26,9 +26,16 @@ export default function SmartChat() {
       metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
     }
     
-    // Log for debugging
-    console.log("SmartChat page mounted, mobile:", isMobile, "width:", window.innerWidth, "height:", window.innerHeight);
-  }, [isMobile]);
+    // Enhanced logging for debugging
+    console.log("SmartChat page mounted", {
+      isMobile,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      userAgent: navigator.userAgent,
+      viewportMeta: metaViewport?.getAttribute('content'),
+      auth: !!user
+    });
+  }, [isMobile, user]);
 
   const hasEnoughEntries = !loading && entries.length > 0;
 
@@ -71,8 +78,8 @@ export default function SmartChat() {
         <SmartChatInterface />
       </div>
       
-      {/* Only show the debug component during development */}
-      {process.env.NODE_ENV !== 'production' && isMobile && <SmartChatMobileDebug />}
+      {/* Show the debug component in development and on mobile */}
+      {(process.env.NODE_ENV !== 'production' || isMobile) && <SmartChatMobileDebug />}
     </motion.div>
   );
 }

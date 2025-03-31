@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, BarChart4 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,21 @@ export default function SmartChatInterface() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const [componentMounted, setComponentMounted] = useState(false);
+
+  // Add an effect to track when the component mounts
+  useEffect(() => {
+    console.log("SmartChatInterface mounted", { 
+      isMobile, 
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth
+    });
+    setComponentMounted(true);
+    
+    return () => {
+      console.log("SmartChatInterface unmounted");
+    };
+  }, [isMobile]);
 
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {
@@ -64,7 +79,9 @@ export default function SmartChatInterface() {
   };
 
   return (
-    <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-full md:h-[70vh] flex flex-col">
+    <Card 
+      className={`smart-chat-interface w-full max-w-3xl mx-auto flex flex-col ${isMobile ? 'h-[80vh]' : 'h-[70vh]'}`}
+    >
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-lg md:text-xl">Smart Chat</CardTitle>
         {chatHistory.length > 0 && (
