@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,12 +15,9 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
-import MobileDebugOverlay from "./components/MobileDebugOverlay";
-import EmergencyMobileUI from "./components/EmergencyMobileUI";
-import { useIsMobile } from "./hooks/use-mobile";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,61 +56,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const EmergencyFallbackWrapper = ({ children }: { children: React.ReactNode }) => {
-  const location = useLocation();
-  const [renderError, setRenderError] = useState<boolean>(false);
-  const [renderStartTime] = useState<number>(Date.now());
-  const isMobile = useIsMobile();
-  
-  useEffect(() => {
-    const checkRender = () => {
-      const mainElements = [
-        { route: '/smart-chat', selector: '.smart-chat-interface' },
-        { route: '/journal', selector: '.journal-container' },
-        { route: '/chat', selector: '.chat-container' },
-        { route: '/insights', selector: '.insights-container' },
-      ];
-      
-      const currentCheck = mainElements.find(el => 
-        location.pathname === el.route || 
-        location.pathname.startsWith(el.route + '/')
-      );
-      
-      if (currentCheck) {
-        const targetEl = document.querySelector(currentCheck.selector);
-        if (!targetEl) {
-          console.error(`Emergency render check: ${currentCheck.selector} not found in DOM for route ${location.pathname}`);
-          setRenderError(true);
-        }
-      }
-    };
-    
-    const timer = setTimeout(checkRender, 2000);
-    
-    const fallbackTimer = setTimeout(() => {
-      if (Date.now() - renderStartTime > 5000) {
-        console.log('Emergency render: 5 second timeout reached');
-        setRenderError(true);
-      }
-    }, 5000);
-    
-    return () => {
-      clearTimeout(timer);
-      clearTimeout(fallbackTimer);
-    };
-  }, [location.pathname, renderStartTime]);
-  
-  if (renderError && isMobile) {
-    return <EmergencyMobileUI route={location.pathname} errorMessage="Regular interface failed to load" />;
-  }
-  
-  return <>{children}</>;
-};
-
 const AppRoutes = () => {
-  const [renderError, setRenderError] = useState(false);
-  const location = useLocation();
-  
   useEffect(() => {
     const setCorrectViewport = () => {
       const metaViewport = document.querySelector('meta[name="viewport"]');
@@ -139,71 +83,11 @@ const AppRoutes = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth event outside React context:", event, session?.user?.email);
     });
-
-    const forceVisibility = () => {
-      const containers = document.querySelectorAll('.smart-chat-container, .smart-chat-interface, .container');
-      containers.forEach(el => {
-        if (el instanceof HTMLElement) {
-          el.style.display = el.classList.contains('flex') ? 'flex' : 'block';
-          el.style.visibility = 'visible';
-          el.style.opacity = '1';
-        }
-      });
-    };
-
-    forceVisibility();
-    const timer = setTimeout(forceVisibility, 500);
     
     return () => {
       subscription.unsubscribe();
-      clearTimeout(timer);
     };
-  }, [location]);
-
-  useEffect(() => {
-    const checkRender = () => {
-      if (location.pathname === '/smart-chat') {
-        const smartChatElement = document.querySelector('.smart-chat-interface');
-        if (!smartChatElement && !renderError) {
-          console.error('Smart chat interface failed to render');
-          setRenderError(true);
-        }
-      }
-    };
-    
-    const timer = setTimeout(checkRender, 2000);
-    return () => clearTimeout(timer);
-  }, [location, renderError]);
-  
-  if (renderError && location.pathname === '/smart-chat') {
-    return (
-      <div style={{ 
-        padding: '20px', 
-        textAlign: 'center',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh'
-      }}>
-        <h2>Smart Chat</h2>
-        <p>The chat interface couldn't be loaded properly.</p>
-        <button 
-          onClick={() => window.location.reload()}
-          style={{
-            padding: '8px 16px',
-            background: '#4f46e5',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            marginTop: '16px'
-          }}
-        >
-          Reload Page
-        </button>
-      </div>
-    );
-  }
+  }, []);
   
   return (
     <>
@@ -237,7 +121,6 @@ const AppRoutes = () => {
         } />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <MobileDebugOverlay />
     </>
   );
 };
@@ -254,9 +137,7 @@ const App = () => (
               <BrowserRouter>
                 <MobilePreviewFrame>
                   <AnimatePresence mode="wait">
-                    <EmergencyFallbackWrapper>
-                      <AppRoutes />
-                    </EmergencyFallbackWrapper>
+                    <AppRoutes />
                   </AnimatePresence>
                 </MobilePreviewFrame>
               </BrowserRouter>
