@@ -10,6 +10,7 @@ import EmptyChatState from "./EmptyChatState";
 import ChatInput from "./ChatInput";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function SmartChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,6 +18,7 @@ export default function SmartChatInterface() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {
@@ -62,7 +64,7 @@ export default function SmartChatInterface() {
   return (
     <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-center">Smart Chat</CardTitle>
+        <CardTitle className="text-center">Smart Chat {isMobile ? "(Mobile)" : ""}</CardTitle>
         {chatHistory.length > 0 && (
           <Button 
             variant="outline" 

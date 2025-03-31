@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,7 +16,6 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
-import { MobileBrowserDebug } from "./components/MobileBrowserDebug";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,7 +48,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   
   if (!user) {
     console.log("Redirecting to auth from protected route:", location.pathname);
-    // Pass the current path as a query parameter for redirect after login
     return <Navigate to={`/auth?redirectTo=${location.pathname}`} replace />;
   }
   
@@ -59,7 +56,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppRoutes = () => {
   useEffect(() => {
-    // Make sure viewport is correctly set for mobile
     const setCorrectViewport = () => {
       const metaViewport = document.querySelector('meta[name="viewport"]');
       const correctContent = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
@@ -70,7 +66,6 @@ const AppRoutes = () => {
           metaViewport.setAttribute('content', correctContent);
         }
       } else {
-        // Create one if it doesn't exist
         console.log("Creating new viewport meta tag");
         const meta = document.createElement('meta');
         meta.name = 'viewport';
@@ -79,7 +74,6 @@ const AppRoutes = () => {
       }
     };
     
-    // Call immediately and after a delay (for some mobile browsers)
     setCorrectViewport();
     setTimeout(setCorrectViewport, 100);
     
@@ -143,8 +137,6 @@ const App = () => (
                   <AppRoutes />
                 </AnimatePresence>
               </BrowserRouter>
-              {/* The debug component has highest z-index to ensure visibility */}
-              <MobileBrowserDebug />
             </div>
           </div>
         </ThemeProvider>

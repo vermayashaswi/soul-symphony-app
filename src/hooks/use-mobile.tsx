@@ -10,6 +10,14 @@ export function useIsMobile() {
   React.useEffect(() => {
     // Function to check if mobile
     const checkIfMobile = () => {
+      // Check URL parameter for demo mode
+      const urlParams = new URLSearchParams(window.location.search);
+      const mobileDemo = urlParams.get('mobileDemo') === 'true';
+      
+      if (mobileDemo) {
+        return true;
+      }
+      
       // Check for __forceMobileView override for debugging
       if (typeof window.__forceMobileView !== 'undefined') {
         return window.__forceMobileView;
