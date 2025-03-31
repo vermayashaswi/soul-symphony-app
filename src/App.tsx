@@ -60,17 +60,28 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => {
   useEffect(() => {
     // Make sure viewport is correctly set for mobile
-    const metaViewport = document.querySelector('meta[name="viewport"]');
-    if (metaViewport) {
-      metaViewport.setAttribute('content', 
-        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
-    } else {
-      // Create one if it doesn't exist
-      const meta = document.createElement('meta');
-      meta.name = 'viewport';
-      meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
-      document.head.appendChild(meta);
-    }
+    const setCorrectViewport = () => {
+      const metaViewport = document.querySelector('meta[name="viewport"]');
+      const correctContent = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+      
+      if (metaViewport) {
+        if (metaViewport.getAttribute('content') !== correctContent) {
+          console.log("Updating existing viewport meta tag");
+          metaViewport.setAttribute('content', correctContent);
+        }
+      } else {
+        // Create one if it doesn't exist
+        console.log("Creating new viewport meta tag");
+        const meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = correctContent;
+        document.head.appendChild(meta);
+      }
+    };
+    
+    // Call immediately and after a delay (for some mobile browsers)
+    setCorrectViewport();
+    setTimeout(setCorrectViewport, 100);
     
     console.log("Setting up Supabase auth debugging listener");
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -132,6 +143,7 @@ const App = () => (
                   <AppRoutes />
                 </AnimatePresence>
               </BrowserRouter>
+              {/* The debug component has highest z-index to ensure visibility */}
               <MobileBrowserDebug />
             </div>
           </div>

@@ -25,13 +25,23 @@ export function useIsMobile() {
       return viewportWidth || (userAgentMobile && touchCapable);
     };
 
-    // Initial determination
-    setIsMobile(checkIfMobile());
+    // Set initial state immediately
+    const initialIsMobile = checkIfMobile();
+    setIsMobile(initialIsMobile);
     setIsInitialized(true);
+    
+    console.log("Mobile detection initialized:", initialIsMobile, 
+                "width:", window.innerWidth, 
+                "userAgent:", navigator.userAgent,
+                "touch:", 'ontouchstart' in window || navigator.maxTouchPoints > 0);
     
     // Create event listeners for resize and orientation change
     const handleResize = () => {
-      setIsMobile(checkIfMobile());
+      const newIsMobile = checkIfMobile();
+      if (newIsMobile !== isMobile) {
+        console.log("Mobile state changed:", newIsMobile, "width:", window.innerWidth);
+        setIsMobile(newIsMobile);
+      }
     };
     
     window.addEventListener('resize', handleResize);
@@ -52,7 +62,14 @@ export function useIsMobile() {
       mql.addListener && mql.addListener(handleMqlChange);
     }
     
-    console.log("Mobile detection initialized:", checkIfMobile(), "width:", window.innerWidth);
+    // Force a recheck after a short delay (helps with some mobile browsers)
+    setTimeout(() => {
+      const delayedCheck = checkIfMobile();
+      if (delayedCheck !== isMobile) {
+        console.log("Delayed mobile check different:", delayedCheck, "width:", window.innerWidth);
+        setIsMobile(delayedCheck);
+      }
+    }, 500);
     
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -65,6 +82,21 @@ export function useIsMobile() {
         mql.removeListener && mql.removeListener(handleMqlChange);
       }
     };
+  }, [isMobile]);
+
+  // Expose a debug trigger function for the global scope
+  React.useEffect(() => {
+    // Add debug helper to window
+    window.toggleMobileView = () => {
+      window.__forceMobileView = !window.__forceMobileView;
+      console.log("Mobile view manually toggled:", window.__forceMobileView);
+      setIsMobile(window.__forceMobileView);
+    };
+    
+    return () => {
+      // @ts-ignore
+      delete window.toggleMobileView;
+    };
   }, []);
 
   return isInitialized ? isMobile : false;
@@ -72,3 +104,11 @@ export function useIsMobile() {
 
 // Add an alias export so that Chat.tsx can import it as useMobile
 export const useMobile = useIsMobile;
+
+// Extend global interface for our debug helpers
+declare global {
+  interface Window {
+    __forceMobileView?: boolean;
+    toggleMobileView?: () => void;
+  }
+}

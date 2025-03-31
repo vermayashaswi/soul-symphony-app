@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, Smartphone, AlertTriangle } from "lucide-react";
+import { X, Smartphone, AlertTriangle, Bug, RotateCw } from "lucide-react";
 
 export function MobileBrowserDebug() {
   const [isOpen, setIsOpen] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [deviceInfo, setDeviceInfo] = useState<Record<string, any>>({});
   const isMobile = useIsMobile();
+  const [renderCount, setRenderCount] = useState(0);
 
   useEffect(() => {
     // Log initial load
@@ -48,9 +49,15 @@ export function MobileBrowserDebug() {
     // Add resize listener
     const handleResize = () => {
       addLog(`Window resized: ${window.innerWidth}x${window.innerHeight}`);
+      setRenderCount(prev => prev + 1);
     };
     
     window.addEventListener('resize', handleResize);
+    
+    // Check HTML meta viewport tag
+    const metaViewport = document.querySelector('meta[name="viewport"]');
+    addLog(`Viewport meta tag: ${metaViewport ? metaViewport.getAttribute('content') : 'Not found'}`);
+    
     return () => window.removeEventListener('resize', handleResize);
   }, [isMobile]);
   
@@ -84,64 +91,80 @@ export function MobileBrowserDebug() {
       document.body.style.visibility = 'visible';
       addLog("Layout recalculation complete");
     }, 50);
+    
+    // Toggle mobile view for testing
+    if (window.toggleMobileView) {
+      window.toggleMobileView();
+      addLog(`Toggled mobile view: ${window.__forceMobileView}`);
+    }
+    
+    // Update render count
+    setRenderCount(prev => prev + 1);
   };
   
-  if (!isOpen) {
-    return (
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="fixed bottom-4 right-4 z-50 bg-red-100 hover:bg-red-200 text-red-800"
-        onClick={() => setIsOpen(true)}
-      >
-        <Smartphone className="h-4 w-4 mr-2" />
-        Mobile Debug
-      </Button>
-    );
-  }
-  
+  // Always show a small indicator, even when debug panel is closed
   return (
-    <Card className="fixed bottom-0 left-0 right-0 z-50 h-[60vh] m-2 shadow-lg">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm flex items-center">
-          <Smartphone className="h-4 w-4 mr-2" />
-          Mobile Browser Debug
-          <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-800">
-            {isMobile ? 'Mobile' : 'Desktop'}
-          </Badge>
-        </CardTitle>
-        <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
-          <X className="h-4 w-4" />
+    <>
+      {!isOpen ? (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="fixed bottom-4 right-4 z-[9999] bg-red-100 hover:bg-red-200 text-red-800 shadow-lg animate-pulse"
+          onClick={() => setIsOpen(true)}
+          style={{
+            opacity: 0.95,
+            border: '2px solid red',
+            padding: '8px',
+          }}
+        >
+          <Bug className="h-4 w-4 mr-2" />
+          Debug ({renderCount})
         </Button>
-      </CardHeader>
-      <CardContent className="p-3">
-        <div className="flex flex-col gap-2 mb-3">
-          <div className="text-xs font-semibold flex items-center">
-            <AlertTriangle className="h-3 w-3 mr-1" /> Device Information
-          </div>
-          <div className="bg-slate-50 p-2 rounded text-xs overflow-x-auto">
-            <pre>{JSON.stringify(deviceInfo, null, 2)}</pre>
-          </div>
-        </div>
-        
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs font-semibold">Debug Log</div>
-          <Button variant="outline" size="sm" onClick={runTests} className="text-xs h-7 px-2">
-            Run Tests
-          </Button>
-        </div>
-        
-        <ScrollArea className="h-[calc(60vh-150px)] border rounded">
-          <div className="p-2 text-xs space-y-1">
-            {logs.map((log, index) => (
-              <div key={index} className="font-mono border-l-2 border-slate-300 pl-2 py-1">
-                {log}
+      ) : (
+        <Card className="fixed bottom-0 left-0 right-0 z-[9999] h-[60vh] m-2 shadow-lg border-2 border-red-500">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm flex items-center">
+              <Smartphone className="h-4 w-4 mr-2" />
+              Mobile Browser Debug
+              <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-800">
+                {isMobile ? 'Mobile' : 'Desktop'}
+              </Badge>
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={runTests} className="h-8 px-2">
+                <RotateCw className="h-3 w-3 mr-1" />
+                Test
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3">
+            <div className="flex flex-col gap-2 mb-3">
+              <div className="text-xs font-semibold flex items-center">
+                <AlertTriangle className="h-3 w-3 mr-1" /> Device Information
               </div>
-            ))}
-          </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+              <div className="bg-slate-50 p-2 rounded text-xs overflow-x-auto">
+                <pre>{JSON.stringify(deviceInfo, null, 2)}</pre>
+              </div>
+            </div>
+            
+            <div className="text-xs font-semibold mb-2">Debug Log</div>
+            
+            <ScrollArea className="h-[calc(60vh-180px)] border rounded">
+              <div className="p-2 text-xs space-y-1">
+                {logs.map((log, index) => (
+                  <div key={index} className="font-mono border-l-2 border-slate-300 pl-2 py-1">
+                    {log}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
+    </>
   );
 }
 
@@ -149,5 +172,6 @@ export function MobileBrowserDebug() {
 declare global {
   interface Window {
     __forceMobileView?: boolean;
+    toggleMobileView?: () => void;
   }
 }
