@@ -342,11 +342,24 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
       
       if (entriesInMonth.length === 0) return null;
       
-      const totalSentiment = entriesInMonth.reduce((sum, entry) => {
-        return sum + (entry.sentiment ? parseFloat(entry.sentiment) : 0);
-      }, 0);
+      let totalSentiment = 0;
+      let validEntries = 0;
+
+      entriesInMonth.forEach(entry => {
+        if (entry.sentiment) {
+          // Extract sentiment score, handling both string and object formats
+          const score = typeof entry.sentiment === 'string' 
+            ? parseFloat(entry.sentiment) 
+            : entry.sentiment.score;
+          
+          if (!isNaN(score)) {
+            totalSentiment += score;
+            validEntries++;
+          }
+        }
+      });
       
-      return totalSentiment / entriesInMonth.length;
+      return validEntries > 0 ? totalSentiment / validEntries : null;
     };
 
     return (
