@@ -1,5 +1,5 @@
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Camera, Loader2 } from 'lucide-react';
@@ -10,68 +10,9 @@ import { toast } from 'sonner';
 export function ProfilePictureUpload() {
   const { user, updateUserProfile } = useAuth();
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Get the avatar URL from the user metadata or default to an empty string
   const avatarUrl = user?.user_metadata?.avatar_url || '';
-
-  const compressImage = async (file: File): Promise<File> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          // Create a canvas with max dimensions of 400x400 while maintaining aspect ratio
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          
-          // Determine the target dimensions (max 400px while preserving aspect ratio)
-          const maxDimension = 400;
-          if (width > height && width > maxDimension) {
-            height = (height / width) * maxDimension;
-            width = maxDimension;
-          } else if (height > width && height > maxDimension) {
-            width = (width / height) * maxDimension;
-            height = maxDimension;
-          } else if (width > maxDimension && height > maxDimension) {
-            width = height = maxDimension;
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          // Draw the image on the canvas with the new dimensions
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          
-          // Convert canvas to blob with quality 0.8 (80%)
-          canvas.toBlob((blob) => {
-            if (!blob) {
-              reject(new Error('Canvas to Blob conversion failed'));
-              return;
-            }
-            
-            // Create a new file with the compressed blob
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            
-            resolve(compressedFile);
-          }, 'image/jpeg', 0.8);
-        };
-        img.onerror = () => {
-          reject(new Error('Image loading failed'));
-        };
-      };
-      reader.onerror = () => {
-        reject(new Error('File reading failed'));
-      };
-    });
-  };
 
   const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -82,24 +23,14 @@ export function ProfilePictureUpload() {
       }
 
       const file = event.target.files[0];
-      
-      // Validate file type
-      if (!file.type.match(/^image\/(jpeg|jpg|png|webp)$/)) {
-        throw new Error('Only JPG, PNG, and WebP images are supported.');
-      }
-      
-      // Compress the image before uploading
-      const compressedFile = await compressImage(file);
-      
-      // Create a unique filename based on user ID and timestamp
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
-      const filePath = fileName;
+      const fileName = `${user?.id}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
 
-      // Upload the compressed file to the 'profile-pictures' bucket
+      // Upload file to Supabase Storage
       const { error: uploadError, data } = await supabase.storage
-        .from('profile-pictures')
-        .upload(filePath, compressedFile, { upsert: true });
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
 
       if (uploadError) {
         throw uploadError;
@@ -107,7 +38,7 @@ export function ProfilePictureUpload() {
 
       // Get public URL for the uploaded file
       const { data: { publicUrl } } = supabase.storage
-        .from('profile-pictures')
+        .from('avatars')
         .getPublicUrl(filePath);
 
       // Update user metadata with the new avatar URL
@@ -117,10 +48,6 @@ export function ProfilePictureUpload() {
 
       if (success) {
         toast.success('Profile picture updated');
-        // Clear the file input
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
       } else {
         toast.error('Failed to update profile');
       }
@@ -155,10 +82,9 @@ export function ProfilePictureUpload() {
           )}
           Change Photo
           <input
-            ref={fileInputRef}
             type="file"
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/*"
             onChange={uploadAvatar}
             disabled={uploading}
           />
