@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
+import { MobileBrowserDebug } from "./components/MobileBrowserDebug";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +59,19 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppRoutes = () => {
   useEffect(() => {
+    // Make sure viewport is correctly set for mobile
+    const metaViewport = document.querySelector('meta[name="viewport"]');
+    if (metaViewport) {
+      metaViewport.setAttribute('content', 
+        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+    } else {
+      // Create one if it doesn't exist
+      const meta = document.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+      document.head.appendChild(meta);
+    }
+    
     console.log("Setting up Supabase auth debugging listener");
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth event outside React context:", event, session?.user?.email);
@@ -118,6 +132,7 @@ const App = () => (
                   <AppRoutes />
                 </AnimatePresence>
               </BrowserRouter>
+              <MobileBrowserDebug />
             </div>
           </div>
         </ThemeProvider>
