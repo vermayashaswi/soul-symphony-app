@@ -1,149 +1,181 @@
-
 import React, { useEffect, useRef } from 'react';
 
 interface Particle {
   x: number;
   y: number;
-  radius: number;
+  size: number;
+  speedX: number;
+  speedY: number;
   color: string;
-  vx: number;
-  vy: number;
-  alpha: number;
+  opacity: number;
+  life: number;
+  maxLife: number;
 }
 
-// Make particles much more visible
-const PARTICLE_COUNT = 150; // Increased count
-const PARTICLE_MIN_RADIUS = 2; // Larger minimum size
-const PARTICLE_MAX_RADIUS = 5; // Larger maximum size
-const PARTICLE_COLOR = 'rgba(255, 255, 255, 0.9)'; // Much higher opacity
-const PARTICLE_SPEED = 0.8; // Slightly faster movement
-
-const initializeParticles = (canvas: HTMLCanvasElement, particles: Particle[]) => {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  particles.length = 0; // Clear existing particles
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
-    const radius = PARTICLE_MIN_RADIUS + Math.random() * (PARTICLE_MAX_RADIUS - PARTICLE_MIN_RADIUS);
-    const x = Math.random() * canvas.width;
-    const y = Math.random() * canvas.height;
-    const color = PARTICLE_COLOR;
-    const vx = (Math.random() - 0.5) * PARTICLE_SPEED;
-    const vy = (Math.random() - 0.5) * PARTICLE_SPEED;
-    const alpha = 0.9; // Higher base opacity
-
-    particles.push({ x, y, radius, color, vx, vy, alpha });
-  }
-};
-
-const animateParticles = (canvas: HTMLCanvasElement, particles: Particle[]) => {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  particles.forEach((particle) => {
-    particle.x += particle.vx;
-    particle.y += particle.vy;
-
-    // Bounce off the walls
-    if (particle.x + particle.radius > canvas.width || particle.x - particle.radius < 0) {
-      particle.vx = -particle.vx;
-    }
-    if (particle.y + particle.radius > canvas.height || particle.y - particle.radius < 0) {
-      particle.vy = -particle.vy;
-    }
-
-    ctx.beginPath();
-    ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-    ctx.fillStyle = particle.color;
-    ctx.globalAlpha = particle.alpha;
-    ctx.fill();
-    ctx.closePath();
-  });
-};
-
-const ParticleBackground: React.FC = () => {
+export function ParticleBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const particlesRef = useRef<Particle[]>([]);
-  const requestIdRef = useRef<number | null>(null);
-  const isInitializedRef = useRef<boolean>(false);
-
+  const particles = useRef<Particle[]>([]);
+  const animationRef = useRef<number>();
+  const mousePos = useRef<{ x: number, y: number } | null>(null);
+  const lastTouchTime = useRef<number>(0);
+  
+  const colors = [
+    '#9b87f5', '#7E69AB', '#FDE1D3', '#D3E4FD', '#E5DEFF', 
+    '#FFDEE2', '#D6BCFA', '#33C3F0', '#FF6B6B', '#FFD166'
+  ];
+  
+  const getRandomColor = () => colors[Math.floor(Math.random() * colors.length)];
+  
+  const createRipple = (x: number, y: number, count = 15) => {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.8 + Math.random() * 2.5;
+      
+      particles.current.push({
+        x,
+        y,
+        size: 2 + Math.random() * 5,
+        speedX: Math.cos(angle) * speed,
+        speedY: Math.sin(angle) * speed,
+        color: getRandomColor(),
+        opacity: 0.8,
+        life: 0,
+        maxLife: 50 + Math.random() * 100
+      });
+    }
+  };
+  
+  const createFloatingParticles = (canvas: HTMLCanvasElement, count = 50) => {
+    const { width, height } = canvas;
+    
+    for (let i = 0; i < count; i++) {
+      particles.current.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        size: 1.5 + Math.random() * 3,
+        speedX: (Math.random() - 0.5) * 0.8,
+        speedY: (Math.random() - 0.5) * 0.8,
+        color: getRandomColor(),
+        opacity: 0.4 + Math.random() * 0.4,
+        life: 0,
+        maxLife: 200 + Math.random() * 200
+      });
+    }
+  };
+  
+  const drawParticles = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    const now = Date.now();
+    if (mousePos.current && now - lastTouchTime.current > 40) {
+      createRipple(mousePos.current.x, mousePos.current.y, 6);
+      lastTouchTime.current = now;
+    }
+    
+    if (particles.current.length < 120) {
+      createFloatingParticles(canvas, 8);
+    }
+    
+    const liveParticles: Particle[] = [];
+    
+    particles.current.forEach(particle => {
+      particle.life += 1;
+      
+      if (particle.life < particle.maxLife) {
+        const fadeInPhase = Math.min(1, particle.life / 20);
+        const fadeOutPhase = Math.max(0, 1 - (particle.life - (particle.maxLife * 0.7)) / (particle.maxLife * 0.3));
+        particle.opacity = 0.9 * fadeInPhase * fadeOutPhase;
+        
+        particle.x += particle.speedX;
+        particle.y += particle.speedY;
+        
+        particle.speedX *= 0.991;
+        particle.speedY *= 0.991;
+        
+        ctx.globalAlpha = particle.opacity;
+        ctx.fillStyle = particle.color;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        liveParticles.push(particle);
+      }
+    });
+    
+    particles.current = liveParticles;
+    
+    animationRef.current = requestAnimationFrame(() => drawParticles(ctx, canvas));
+  };
+  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    console.log("ParticleBackground mounted and canvas found");
     
     const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      console.error("Could not get canvas context");
-      return;
-    }
-
-    const resizeCanvas = () => {
-      console.log("Resizing canvas to window dimensions");
+    if (!ctx) return;
+    
+    const updateCanvasSize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      initializeParticles(canvas, particlesRef.current);
     };
-
-    // Initial resize and particle initialization
-    resizeCanvas();
-    isInitializedRef.current = true;
-    console.log("Particles initialized:", particlesRef.current.length);
-
-    // Animation function
-    const animate = () => {
-      if (!isInitializedRef.current) return;
-      animateParticles(canvas, particlesRef.current);
-      requestIdRef.current = requestAnimationFrame(animate);
+    
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    
+    // Increase initial particles for more visible effect
+    createFloatingParticles(canvas, 150);
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      mousePos.current = {
+        x: e.clientX,
+        y: e.clientY
+      };
     };
-
-    // Start animation
-    animate();
-    console.log("Animation started");
-
-    // Handle window resize
-    window.addEventListener('resize', resizeCanvas);
-
-    // Cleanup function
+    
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        mousePos.current = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY
+        };
+      }
+    };
+    
+    const handleClick = (e: MouseEvent) => {
+      createRipple(e.clientX, e.clientY, 40);
+    };
+    
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        createRipple(e.touches[0].clientX, e.touches[0].clientY, 40);
+      }
+    };
+    
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('click', handleClick);
+    window.addEventListener('touchstart', handleTouchStart);
+    
+    animationRef.current = requestAnimationFrame(() => drawParticles(ctx, canvas));
+    
     return () => {
-      console.log("ParticleBackground unmounting");
-      isInitializedRef.current = false;
-      window.removeEventListener('resize', resizeCanvas);
-      if (requestIdRef.current !== null) {
-        cancelAnimationFrame(requestIdRef.current);
+      window.removeEventListener('resize', updateCanvasSize);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('click', handleClick);
+      window.removeEventListener('touchstart', handleTouchStart);
+      
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
       }
     };
   }, []);
-
-  // Debugging check to verify element in DOM
-  useEffect(() => {
-    console.log("Canvas element:", canvasRef.current);
-    if (canvasRef.current) {
-      console.log("Canvas dimensions:", {
-        width: canvasRef.current.width,
-        height: canvasRef.current.height,
-        clientWidth: canvasRef.current.clientWidth,
-        clientHeight: canvasRef.current.clientHeight
-      });
-    }
-  }, []);
-
+  
   return (
     <canvas
       ref={canvasRef}
       className="fixed inset-0 w-full h-full pointer-events-none"
-      style={{ 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        zIndex: 0, // Changed from -1 to 0 to ensure visibility
-        opacity: 1,
-        backgroundColor: 'transparent'
-      }}
-      data-testid="particle-background"
+      style={{ zIndex: -1 }} // Change from 0 to -1 to ensure it stays behind all content
     />
   );
 }

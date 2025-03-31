@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -49,6 +50,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   
   if (!user) {
     console.log("Redirecting to auth from protected route:", location.pathname);
+    // Pass the current path as a query parameter for redirect after login
     return <Navigate to={`/auth?redirectTo=${location.pathname}`} replace />;
   }
   
@@ -108,9 +110,9 @@ const App = () => (
     <TooltipProvider>
       <AuthProvider>
         <ThemeProvider>
-          <div className="relative min-h-screen overflow-hidden">
+          <div className="relative min-h-screen">
             <ParticleBackground />
-            <div className="relative" style={{ zIndex: 1 }}>
+            <div className="relative z-10">
               <Toaster />
               <Sonner position="top-center" />
               <BrowserRouter>
