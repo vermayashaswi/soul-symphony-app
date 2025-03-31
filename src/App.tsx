@@ -49,7 +49,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   
   if (!user) {
     console.log("Redirecting to auth from protected route:", location.pathname);
-    // Pass the current path as a query parameter for redirect after login
     return <Navigate to={`/auth?redirectTo=${location.pathname}`} replace />;
   }
   

@@ -1,11 +1,12 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import VoiceRecordingButton from "./VoiceRecordingButton";
 import { sendAudioForTranscription } from "@/utils/audio/transcription-service";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -23,6 +24,15 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingTimer, setRecordingTimer] = useState<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+
+  // Focus the textarea when component mounts (on desktop)
+  useEffect(() => {
+    if (!isMobile) {
+      const textarea = document.querySelector('textarea');
+      if (textarea) textarea.focus();
+    }
+  }, [isMobile]);
 
   const handleStartRecording = () => {
     if (!userId) {
@@ -60,16 +70,25 @@ const ChatInput: React.FC<ChatInputProps> = ({
       const base64String = reader.result as string;
       const base64Data = base64String.split(',')[1];
       
-      const result = await sendAudioForTranscription(base64Data, userId);
-      
-      if (result.success && result.data?.transcription) {
-        const transcription = result.data.transcription;
-        setMessage(transcription);
-        onSendMessage(transcription);
-      } else {
+      try {
+        const result = await sendAudioForTranscription(base64Data, userId);
+        
+        if (result.success && result.data?.transcription) {
+          const transcription = result.data.transcription;
+          setMessage(transcription);
+          onSendMessage(transcription);
+        } else {
+          toast({
+            title: "Transcription failed",
+            description: result.error || "Failed to transcribe audio. Try speaking clearly and try again.",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error("Error transcribing audio:", error);
         toast({
-          title: "Transcription failed",
-          description: result.error || "Failed to transcribe audio. Try speaking clearly and try again.",
+          title: "Error",
+          description: "Failed to process audio. Please try again.",
           variant: "destructive"
         });
       }
@@ -90,8 +109,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
       <Textarea
         value={message}
         onChange={(e) => setMessage(e.target.value)}
-        placeholder="Ask about your journal entries..."
-        className="flex-1 min-h-[60px] resize-none"
+        placeholder={isMobile ? "Ask a question..." : "Ask about your journal entries..."}
+        className="flex-1 min-h-[60px] max-h-[120px] resize-none text-sm md:text-base"
         disabled={isLoading || isRecording}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
@@ -113,7 +132,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           size="icon" 
           disabled={isLoading || isRecording || !message.trim()}
         >
-          <Send className="h-5 w-5" />
+          <Send className="h-4 w-4 md:h-5 md:w-5" />
         </Button>
       </div>
     </form>

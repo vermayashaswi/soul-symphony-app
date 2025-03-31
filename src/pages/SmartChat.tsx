@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import SmartChatMobileDebug from "@/components/chat/SmartChatMobileDebug";
 
 export default function SmartChat() {
   const isMobile = useIsMobile();
@@ -36,12 +37,12 @@ export default function SmartChat() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="smart-chat-container container py-4 md:py-8 mx-auto min-h-[calc(100vh-4rem)] flex flex-col"
+      className="smart-chat-container container mx-auto py-2 md:py-8 min-h-[calc(100vh-4rem)] flex flex-col"
     >
-      <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 md:mb-8">Smart Journal Chat</h1>
+      <h1 className="text-xl md:text-3xl font-bold text-center mb-2 md:mb-8">Smart Journal Chat</h1>
       
       {!hasEnoughEntries && !loading && (
-        <Alert className="mb-6 border-amber-300 bg-amber-50 text-amber-800">
+        <Alert className="mb-3 md:mb-6 border-amber-300 bg-amber-50 text-amber-800">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>No journal entries found</AlertTitle>
           <AlertDescription className="mt-2">
@@ -59,16 +60,19 @@ export default function SmartChat() {
       )}
       
       {!isMobile && (
-        <p className="text-center text-muted-foreground mb-6 md:mb-8 px-2">
+        <p className="text-center text-muted-foreground mb-4 md:mb-8 px-2">
           Ask questions about your journal entries using natural language.
           Get both qualitative insights ("How did I feel about work?") and quantitative analysis 
           ("What are my top 3 emotions?" or "When was I most sad?").
         </p>
       )}
       
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <SmartChatInterface />
       </div>
+      
+      {/* Only show the debug component during development */}
+      {process.env.NODE_ENV !== 'production' && isMobile && <SmartChatMobileDebug />}
     </motion.div>
   );
 }

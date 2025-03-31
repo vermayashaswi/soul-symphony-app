@@ -10,6 +10,7 @@ import EmptyChatState from "./EmptyChatState";
 import ChatInput from "./ChatInput";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function SmartChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,6 +18,7 @@ export default function SmartChatInterface() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {
@@ -60,23 +62,25 @@ export default function SmartChatInterface() {
   };
 
   return (
-    <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col">
+    <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[70vh] flex flex-col">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-center">Smart Chat</CardTitle>
+        <CardTitle className="text-lg md:text-xl">Smart Chat</CardTitle>
         {chatHistory.length > 0 && (
           <Button 
             variant="outline" 
             size="sm" 
             onClick={toggleAnalysis}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 text-xs md:text-sm"
           >
-            <BarChart4 className="h-4 w-4" />
-            {showAnalysis ? "Hide Analysis" : "Show Analysis"}
+            <BarChart4 className="h-3 w-3 md:h-4 md:w-4" />
+            <span className={isMobile ? "sr-only" : ""}>
+              {showAnalysis ? "Hide Analysis" : "Show Analysis"}
+            </span>
           </Button>
         )}
       </CardHeader>
       
-      <CardContent className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
+      <CardContent className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4">
         {chatHistory.length === 0 ? (
           <EmptyChatState />
         ) : (
@@ -86,13 +90,13 @@ export default function SmartChatInterface() {
         )}
         
         {isLoading && (
-          <div className="flex justify-center">
+          <div className="flex justify-center py-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         )}
       </CardContent>
       
-      <CardFooter className="border-t p-3 md:p-4">
+      <CardFooter className="border-t p-2 md:p-4">
         <ChatInput 
           onSendMessage={handleSendMessage} 
           isLoading={isLoading} 
