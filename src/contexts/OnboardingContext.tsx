@@ -74,6 +74,19 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             if (data.full_name) {
               setUserName(data.full_name);
             }
+            
+            // Set focus areas if available
+            if (data.journal_focus_areas && Array.isArray(data.journal_focus_areas)) {
+              setSelectedFocusAreas(data.journal_focus_areas);
+            }
+            
+            // Set reminder settings if available
+            if (data.reminder_settings) {
+              setReminderSettings(prev => ({
+                ...prev,
+                ...data.reminder_settings
+              }));
+            }
           }
         }
       } catch (error) {
