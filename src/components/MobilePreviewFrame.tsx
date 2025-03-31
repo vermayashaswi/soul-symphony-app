@@ -25,6 +25,8 @@ export const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
       
       // Expose the mobile view flag for other components
       window.__forceMobileView = true;
+      
+      console.log('Mobile preview frame activated');
     }
     
     return () => {
@@ -32,6 +34,7 @@ export const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
         document.body.style.overflow = '';
         document.body.style.backgroundColor = '';
         window.__forceMobileView = undefined;
+        console.log('Mobile preview frame deactivated');
       }
     };
   }, [mobileDemo]);

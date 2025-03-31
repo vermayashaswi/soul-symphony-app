@@ -31,6 +31,19 @@ export default function SmartChat() {
     
     // Log for debugging
     console.log("SmartChat page mounted, mobile:", isMobile, "width:", window.innerWidth, "mobileDemo:", mobileDemo);
+    
+    // Check if component is visible
+    const chatContainer = document.querySelector('.smart-chat-container');
+    if (chatContainer) {
+      const styles = window.getComputedStyle(chatContainer);
+      console.log("Chat container styles:", {
+        display: styles.display,
+        visibility: styles.visibility,
+        opacity: styles.opacity,
+        position: styles.position,
+        zIndex: styles.zIndex
+      });
+    }
   }, [isMobile, mobileDemo]);
 
   const hasEnoughEntries = !loading && entries.length > 0;
@@ -41,6 +54,7 @@ export default function SmartChat() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="smart-chat-container container py-4 md:py-8 mx-auto min-h-[calc(100vh-4rem)] flex flex-col"
+      style={{ minHeight: "100%", position: "relative", zIndex: 10 }}
     >
       <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 md:mb-8">
         Smart Journal Chat {isMobile || mobileDemo ? "(Mobile View)" : ""}
