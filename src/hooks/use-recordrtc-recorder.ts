@@ -17,6 +17,7 @@ interface UseRecordRTCRecorderReturn {
   startRecording: () => Promise<void>;
   stopRecording: () => void;
   requestPermissions: () => Promise<void>;
+  resetRecording: () => void;
 }
 
 export function useRecordRTCRecorder({ 
@@ -38,12 +39,10 @@ export function useRecordRTCRecorder({
   const audioLevelTimerRef = useRef<number | null>(null);
   const maxDurationTimerRef = useRef<number | null>(null);
   
-  // Check for microphone permission on component mount
   useEffect(() => {
     const checkMicPermission = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Stop the stream immediately after checking permission
         stream.getTracks().forEach(track => track.stop());
         setHasPermission(true);
       } catch (error) {
@@ -54,7 +53,6 @@ export function useRecordRTCRecorder({
     
     checkMicPermission();
     
-    // Cleanup function
     return () => {
       cleanupResources();
     };
@@ -94,36 +92,28 @@ export function useRecordRTCRecorder({
     }
   };
 
-  // Setup audio processing for visualization and noise reduction
   const setupAudioProcessing = (stream: MediaStream) => {
     try {
-      // Create audio context
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = audioContext;
       
-      // Create analyzer node for visualization
       const analyzerNode = audioContext.createAnalyser();
       analyzerNode.fftSize = 1024;
       analyzerRef.current = analyzerNode;
       
-      // Create source from stream
       const source = audioContext.createMediaStreamSource(stream);
       
-      // If noise reduction is enabled, add filtering
       if (noiseReduction) {
-        // High-pass filter to remove low-frequency noise
         const highpassFilter = audioContext.createBiquadFilter();
         highpassFilter.type = 'highpass';
         highpassFilter.frequency.value = 100;
         highpassFilter.Q.value = 0.7;
         
-        // Low-pass filter to remove high-frequency noise
         const lowpassFilter = audioContext.createBiquadFilter();
         lowpassFilter.type = 'lowpass';
         lowpassFilter.frequency.value = 12000;
         lowpassFilter.Q.value = 0.7;
         
-        // Compressor to normalize volume
         const compressor = audioContext.createDynamicsCompressor();
         compressor.threshold.value = -24;
         compressor.knee.value = 30;
@@ -131,24 +121,20 @@ export function useRecordRTCRecorder({
         compressor.attack.value = 0.003;
         compressor.release.value = 0.25;
         
-        // Connect the nodes
         source.connect(highpassFilter);
         highpassFilter.connect(lowpassFilter);
         lowpassFilter.connect(compressor);
         compressor.connect(analyzerNode);
       } else {
-        // Simple connection without filtering
         source.connect(analyzerNode);
       }
       
-      // Start monitoring audio levels
       const dataArray = new Uint8Array(analyzerNode.frequencyBinCount);
       
       audioLevelTimerRef.current = window.setInterval(() => {
         if (analyzerRef.current) {
           analyzerRef.current.getByteFrequencyData(dataArray);
           
-          // Calculate average volume level
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) {
             sum += dataArray[i];
@@ -158,7 +144,6 @@ export function useRecordRTCRecorder({
           
           setAudioLevel(scaledLevel);
           
-          // Add ripple based on audio level
           if (isRecording && avg > 50 && Math.random() > 0.7) {
             setRipples(prev => [...prev, Date.now()]);
           }
@@ -174,19 +159,16 @@ export function useRecordRTCRecorder({
   
   const startRecording = async () => {
     try {
-      // Reset state
       setAudioBlob(null);
       setRecordingTime(0);
       
       toast.loading('Accessing microphone...');
       
-      // Get user media with optimized constraints for mobile
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          // Higher quality settings
           sampleRate: 48000,
           sampleSize: 24,
           channelCount: 2,
@@ -196,42 +178,33 @@ export function useRecordRTCRecorder({
       toast.dismiss();
       toast.success('Microphone accessed. Recording started!');
       
-      // Save stream reference
       streamRef.current = stream;
       
-      // Set up audio processing for visualization
       setupAudioProcessing(stream);
       
-      // Detect mobile platform
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       
-      // Configure RecordRTC with optimal settings
       const options = {
         type: 'audio',
-        mimeType: 'audio/webm;codecs=opus', // Best compatibility and quality
+        mimeType: 'audio/webm;codecs=opus',
         recorderType: StereoAudioRecorder,
-        numberOfAudioChannels: 2, // Stereo
-        desiredSampRate: 48000, // High-quality sample rate
-        bufferSize: 16384, // Larger buffer for better quality
+        numberOfAudioChannels: 2,
+        desiredSampRate: 48000,
+        bufferSize: 16384,
         checkForInactiveTracks: true,
         disableLogs: false,
-        // Special settings for mobile
-        timeSlice: isMobile ? 1000 : 2000, // More frequent data handling on mobile
+        timeSlice: isMobile ? 1000 : 2000,
       };
       
-      // Create RecordRTC instance
       recorderRef.current = new RecordRTC(stream, options);
       
-      // Start recording
       recorderRef.current.startRecording();
       setIsRecording(true);
       
-      // Start timer
       timerRef.current = window.setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
       
-      // Set up max duration timeout
       if (maxDuration > 0) {
         maxDurationTimerRef.current = window.setTimeout(() => {
           if (isRecording && recorderRef.current) {
@@ -241,7 +214,6 @@ export function useRecordRTCRecorder({
         }, maxDuration * 1000);
       }
       
-      // Initial ripple
       setRipples([Date.now()]);
       
     } catch (error) {
@@ -264,10 +236,8 @@ export function useRecordRTCRecorder({
         setAudioBlob(blob);
         setIsRecording(false);
         
-        // Clear ripples
         setRipples([]);
         
-        // Cleanup resources but keep the blob
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
         }
@@ -307,7 +277,14 @@ export function useRecordRTCRecorder({
     }
   };
 
-  // Manage ripples lifecycle
+  const resetRecording = () => {
+    cleanupResources();
+    setAudioBlob(null);
+    setRecordingTime(0);
+    setAudioLevel(0);
+    setRipples([]);
+  };
+
   useEffect(() => {
     if (ripples.length > 0) {
       const timer = setTimeout(() => {
@@ -327,6 +304,7 @@ export function useRecordRTCRecorder({
     ripples,
     startRecording,
     stopRecording,
-    requestPermissions
+    requestPermissions,
+    resetRecording
   };
 }

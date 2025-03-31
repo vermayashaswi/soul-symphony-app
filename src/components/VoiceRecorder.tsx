@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Loader2, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
@@ -12,6 +13,7 @@ import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -33,7 +35,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     ripples,
     startRecording,
     stopRecording,
-    requestPermissions
+    requestPermissions,
+    resetRecording
   } = useRecordRTCRecorder({ 
     noiseReduction: false,
     maxDuration: 300
@@ -44,7 +47,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     playbackProgress,
     audioDuration,
     togglePlayback,
-    audioRef
+    audioRef,
+    reset: resetPlayback
   } = useAudioPlayback({ audioBlob });
 
   useEffect(() => {
@@ -101,6 +105,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     }
   };
 
+  const handleRestart = () => {
+    resetRecording();
+    resetPlayback();
+    setRecordingError(null);
+    toast.info("Recording discarded. Ready to start a new recording.");
+  };
+
   return (
     <div className={cn("flex flex-col items-center", className)}>
       <audio ref={audioRef} className="hidden" />
@@ -127,15 +138,27 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             recordingTime={recordingTime} 
           />
         ) : audioBlob ? (
-          <PlaybackControls
-            audioBlob={audioBlob}
-            isPlaying={isPlaying}
-            isProcessing={isProcessing}
-            playbackProgress={playbackProgress}
-            audioDuration={audioDuration}
-            onTogglePlayback={togglePlayback}
-            onSaveEntry={handleSaveEntry}
-          />
+          <div className="flex flex-col items-center w-full">
+            <PlaybackControls
+              audioBlob={audioBlob}
+              isPlaying={isPlaying}
+              isProcessing={isProcessing}
+              playbackProgress={playbackProgress}
+              audioDuration={audioDuration}
+              onTogglePlayback={togglePlayback}
+              onSaveEntry={handleSaveEntry}
+            />
+            
+            <Button
+              onClick={handleRestart}
+              variant="outline"
+              className="mt-4 flex items-center gap-2"
+              disabled={isProcessing}
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Start Over</span>
+            </Button>
+          </div>
         ) : hasPermission === false ? (
           <motion.p
             key="permission"

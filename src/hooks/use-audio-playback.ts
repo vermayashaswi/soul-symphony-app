@@ -1,99 +1,85 @@
 
 import { useState, useRef, useEffect } from 'react';
 
-interface UseAudioPlaybackOptions {
+interface UseAudioPlaybackProps {
   audioBlob: Blob | null;
 }
 
-export function useAudioPlayback({ audioBlob }: UseAudioPlaybackOptions) {
+export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
-  
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressTimerRef = useRef<number | null>(null);
-  
-  // Create an object URL when the blob changes
+
+  // Set up the audio when the blob changes
   useEffect(() => {
-    if (audioBlob && audioRef.current) {
-      // Revoke previous URL if it exists
-      if (audioRef.current.src) {
-        URL.revokeObjectURL(audioRef.current.src);
-      }
-      
-      const url = URL.createObjectURL(audioBlob);
-      audioRef.current.src = url;
-      
-      // Reset state
-      setIsPlaying(false);
-      setPlaybackProgress(0);
-      
-      // Load audio to get duration
-      audioRef.current.load();
-      audioRef.current.onloadedmetadata = () => {
+    if (audioRef.current && audioBlob) {
+      const audioUrl = URL.createObjectURL(audioBlob);
+      audioRef.current.src = audioUrl;
+      audioRef.current.addEventListener('loadedmetadata', () => {
         if (audioRef.current) {
           setAudioDuration(audioRef.current.duration);
+          console.log(`Audio duration: ${audioRef.current.duration}s`);
         }
-      };
-      
-      // Clean up URL on unmount
+      });
+
       return () => {
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(audioUrl);
       };
     }
   }, [audioBlob]);
-  
-  // Set up audio element event listeners
+
+  // Clean up on unmount
   useEffect(() => {
-    const audio = audioRef.current;
-    
-    if (!audio) return;
-    
+    return () => {
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Set up event listeners for the audio element
+  useEffect(() => {
+    if (!audioRef.current) return;
+
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => {
       setIsPlaying(false);
       setPlaybackProgress(0);
-      if (audio) audio.currentTime = 0;
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+      }
     };
-    const handleError = (e: Event) => {
-      console.error('Audio playback error:', e);
-      setIsPlaying(false);
-    };
-    
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('error', handleError);
-    
+
+    audioRef.current.addEventListener('play', handlePlay);
+    audioRef.current.addEventListener('pause', handlePause);
+    audioRef.current.addEventListener('ended', handleEnded);
+
     return () => {
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('error', handleError);
-      
-      if (progressTimerRef.current) {
-        clearInterval(progressTimerRef.current);
-        progressTimerRef.current = null;
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('play', handlePlay);
+        audioRef.current.removeEventListener('pause', handlePause);
+        audioRef.current.removeEventListener('ended', handleEnded);
       }
     };
   }, []);
-  
-  // Set up or tear down progress tracking
+
+  // Update progress during playback
   useEffect(() => {
     if (isPlaying) {
-      // Update progress every 100ms
       progressTimerRef.current = window.setInterval(() => {
-        if (audioRef.current && audioRef.current.duration) {
+        if (audioRef.current) {
           const progress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
           setPlaybackProgress(progress);
         }
-      }, 100);
+      }, 50);
     } else if (progressTimerRef.current) {
       clearInterval(progressTimerRef.current);
       progressTimerRef.current = null;
     }
-    
+
     return () => {
       if (progressTimerRef.current) {
         clearInterval(progressTimerRef.current);
@@ -101,35 +87,35 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackOptions) {
       }
     };
   }, [isPlaying]);
-  
-  // Function to toggle playback
+
   const togglePlayback = () => {
-    if (!audioRef.current || !audioBlob) return;
+    if (!audioRef.current) return;
     
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      // Reset if ended
-      if (audioRef.current.currentTime >= audioRef.current.duration) {
-        audioRef.current.currentTime = 0;
-      }
-      
-      // Play with error handling
-      const playPromise = audioRef.current.play();
-      
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.error('Error playing audio:', error);
-        });
-      }
+      audioRef.current.play().catch(error => {
+        console.error('Error playing audio:', error);
+      });
     }
   };
-  
+
+  const reset = () => {
+    setIsPlaying(false);
+    setPlaybackProgress(0);
+    setAudioDuration(0);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+  };
+
   return {
     isPlaying,
     playbackProgress,
     audioDuration,
     togglePlayback,
-    audioRef
+    audioRef,
+    reset
   };
 }
