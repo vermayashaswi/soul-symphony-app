@@ -11,12 +11,12 @@ interface Particle {
   alpha: number;
 }
 
-// Increase particle count and make them more visible
-const PARTICLE_COUNT = 100;
-const PARTICLE_MIN_RADIUS = 1.5;
-const PARTICLE_MAX_RADIUS = 4;
-const PARTICLE_COLOR = 'rgba(255, 255, 255, 0.7)'; // Increased opacity
-const PARTICLE_SPEED = 0.7; // Slightly faster movement
+// Make particles much more visible
+const PARTICLE_COUNT = 150; // Increased count
+const PARTICLE_MIN_RADIUS = 2; // Larger minimum size
+const PARTICLE_MAX_RADIUS = 5; // Larger maximum size
+const PARTICLE_COLOR = 'rgba(255, 255, 255, 0.9)'; // Much higher opacity
+const PARTICLE_SPEED = 0.8; // Slightly faster movement
 
 const initializeParticles = (canvas: HTMLCanvasElement, particles: Particle[]) => {
   const ctx = canvas.getContext('2d');
@@ -30,7 +30,7 @@ const initializeParticles = (canvas: HTMLCanvasElement, particles: Particle[]) =
     const color = PARTICLE_COLOR;
     const vx = (Math.random() - 0.5) * PARTICLE_SPEED;
     const vy = (Math.random() - 0.5) * PARTICLE_SPEED;
-    const alpha = 0.7; // Increased base opacity
+    const alpha = 0.9; // Higher base opacity
 
     particles.push({ x, y, radius, color, vx, vy, alpha });
   }
@@ -118,7 +118,7 @@ const ParticleBackground: React.FC = () => {
     };
   }, []);
 
-  // Debugging check to verify element is in DOM
+  // Debugging check to verify element in DOM
   useEffect(() => {
     console.log("Canvas element:", canvasRef.current);
     if (canvasRef.current) {
@@ -139,7 +139,7 @@ const ParticleBackground: React.FC = () => {
         position: 'fixed', 
         top: 0, 
         left: 0, 
-        zIndex: -1, 
+        zIndex: 0, // Changed from -1 to 0 to ensure visibility
         opacity: 1,
         backgroundColor: 'transparent'
       }}

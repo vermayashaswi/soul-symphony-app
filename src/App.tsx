@@ -108,9 +108,9 @@ const App = () => (
     <TooltipProvider>
       <AuthProvider>
         <ThemeProvider>
-          <div className="relative min-h-screen">
+          <div className="relative min-h-screen overflow-hidden">
             <ParticleBackground />
-            <div className="relative z-10">
+            <div className="relative" style={{ zIndex: 1 }}>
               <Toaster />
               <Sonner position="top-center" />
               <BrowserRouter>
