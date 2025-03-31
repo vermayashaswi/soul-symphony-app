@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -14,17 +15,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Define relevant database schema for GPT
+// Define relevant database schema for GPT with detailed information
 const DATABASE_SCHEMA = `
 Table: "Journal Entries"
 - id: bigint (primary key)
-- user_id: uuid (references user)
+- user_id: uuid (references user, stored as text)
 - created_at: timestamp with time zone
 - "refined text": text (contains the cleaned journal content)
 - transcription_text: text (raw transcription)
 - master_themes: text[] (array of themes extracted from the journal)
-- emotions: jsonb (emotion analysis with scores, e.g. {"happy": 0.8, "sad": 0.2})
-- sentiment: text (overall sentiment classification)
+- emotions: jsonb (emotion analysis with scores as key-value pairs, e.g. {"happy": 0.8, "sad": 0.2, "angry": 0.1, "excited": 0.6})
+- sentiment: text (overall sentiment classification, e.g. "positive", "negative", "neutral")
 - entities: jsonb (array of entities detected in the text, e.g. [{"type": "organization", "name": "Acme Inc"}])
 
 Table: journal_embeddings
@@ -33,6 +34,55 @@ Table: journal_embeddings
 - content: text (the text that was embedded)
 - embedding: vector(1536) (the embedding vector)
 - created_at: timestamp with time zone
+
+Available SQL Functions:
+1. execute_dynamic_query(query_text text, param_values text[] DEFAULT '{}'::text[]) - Executes a dynamic SQL query with parameter binding
+2. match_journal_entries(query_embedding vector, match_threshold float, match_count int, user_id_filter uuid) - Finds journal entries by vector similarity
+3. match_journal_entries_with_date(query_embedding vector, match_threshold float, match_count int, user_id_filter uuid, start_date timestamp, end_date timestamp) - Finds journal entries by vector similarity with date range filter
+4. match_journal_entries_by_emotion(emotion_name text, user_id_filter uuid, min_score float, start_date timestamp, end_date timestamp, limit_count int) - Finds journal entries by specific emotion with minimum score
+
+Common Emotion Analysis SQL Patterns:
+1. Finding top emotions across all entries:
+   SELECT emotion_key, AVG(CAST(emotion_value AS FLOAT)) as avg_score
+   FROM "Journal Entries",
+        jsonb_each_text(emotions) as e(emotion_key, emotion_value)
+   WHERE user_id = $1
+   GROUP BY emotion_key
+   ORDER BY avg_score DESC
+   LIMIT 3;
+
+2. Finding when a specific emotion was strongest:
+   SELECT id, created_at, CAST(emotions->>'sad' AS FLOAT) as emotion_score, "refined text"
+   FROM "Journal Entries"
+   WHERE user_id = $1 AND emotions->>'sad' IS NOT NULL
+   ORDER BY emotion_score DESC
+   LIMIT 1;
+
+3. Comparing positive vs negative emotions:
+   WITH emotion_categories AS (
+     SELECT 
+       id, 
+       created_at,
+       COALESCE(emotions->>'happy', '0')::float + COALESCE(emotions->>'excited', '0')::float + COALESCE(emotions->>'content', '0')::float AS positive_score,
+       COALESCE(emotions->>'sad', '0')::float + COALESCE(emotions->>'angry', '0')::float + COALESCE(emotions->>'anxious', '0')::float AS negative_score
+     FROM "Journal Entries"
+     WHERE user_id = $1
+   )
+   SELECT id, created_at, positive_score, negative_score, 
+     CASE WHEN positive_score > negative_score THEN 'positive' ELSE 'negative' END as dominant_type,
+     (positive_score - negative_score) as emotional_balance
+   FROM emotion_categories
+   ORDER BY created_at DESC;
+
+4. Finding emotional trends over time:
+   SELECT 
+     DATE_TRUNC('week', created_at) as time_period,
+     AVG(CAST(emotions->>'happy' AS FLOAT)) as avg_happiness,
+     AVG(CAST(emotions->>'sad' AS FLOAT)) as avg_sadness
+   FROM "Journal Entries"
+   WHERE user_id = $1 AND emotions IS NOT NULL
+   GROUP BY time_period
+   ORDER BY time_period;
 `;
 
 // Generate embeddings using OpenAI
@@ -104,39 +154,55 @@ Your task:
    - Returns only the necessary columns
    - For emotional analysis, properly extracts and analyzes the emotions jsonb field
    - For temporal questions, uses appropriate date functions
+   - Uses jsonb_each_text() to extract emotion key-value pairs when needing to work with all emotions
 
 4. Be especially attentive to:
    - Comparative questions asking for "most", "least", "top", etc.
    - Temporal questions asking "when" with emotional context
    - Questions about trends or patterns over time
-   - Questions requiring counting, averaging, or analyzing distributions`;
+   - Questions requiring counting, averaging, or analyzing distributions
+
+For the emotions jsonb field, consider:
+- It contains key-value pairs where keys are emotion names like "happy", "sad", "angry", "anxious", "excited"
+- Values are floating point numbers between 0 and 1 representing the intensity of the emotion
+- Not all entries will have all emotions, so handle NULLs appropriately
+- For "positive emotions" generally consider: happy, joy, excited, content, grateful
+- For "negative emotions" generally consider: sad, angry, anxious, disappointed, frustrated`;
 
     // Add specific guidance based on query types
     if (queryTypes.isQuantitative || queryTypes.isComparative || queryTypes.asksForNumber) {
       systemPrompt += `\n\nSPECIAL INSTRUCTIONS FOR QUANTITATIVE/COMPARATIVE QUERIES:
 - Use appropriate SQL aggregation functions (AVG, COUNT, SUM, etc.)
-- For emotion-related queries, extract values from the emotions JSONB field using jsonb_object_keys and jsonb_extract_path_text functions
+- For emotion-related queries:
+  - Extract values using jsonb_each_text(emotions) as e(emotion_key, emotion_value)
+  - For specific emotions, use emotions->>'emotion_name' with CAST() to convert to float
+  - For comparisons across emotions, use jsonb_each_text to get all emotion key/value pairs
 - For ranking questions (top N, etc.), use ORDER BY with LIMIT
 - For "most" or "least" questions, use MAX/MIN or ORDER BY with LIMIT
 - Calculate percentages when appropriate using CAST() to ensure proper numeric division
-- Handle NULL values properly in calculations
-- For time-based analysis, use date_trunc and other time functions as needed`;
+- Handle NULL values properly in calculations using COALESCE()
+- For time-based analysis, use date_trunc and other time functions as needed
+- If comparing positive vs negative emotions, group them appropriately in your query`;
     }
 
     if (queryTypes.isTemporal) {
       systemPrompt += `\n\nSPECIAL INSTRUCTIONS FOR TEMPORAL QUERIES:
 - For "when" questions, focus on extracting and formatting dates appropriately
-- Use date_trunc to aggregate data by relevant time periods
+- Use date_trunc to aggregate data by relevant time periods (day, week, month, etc.)
 - Consider returning the actual dates of peak emotions or events
-- For questions about trends over time, generate SQL that groups by time periods`;
+- For questions about trends over time, generate SQL that groups by time periods
+- Use EXTRACT() functions to get specific components of dates when needed
+- For questions about "most sad and why", include content from the journal to explain why`;
     }
 
     if (queryTypes.isEmotionFocused) {
       systemPrompt += `\n\nSPECIAL INSTRUCTIONS FOR EMOTION-FOCUSED QUERIES:
 - Use jsonb_object_keys(emotions) to extract all emotion keys when needed
-- For specific emotions, access their values using emotions->>'emotion_name'
+- For specific emotions, access their values using emotions->>'emotion_name' with CAST() to convert to float
 - Consider the relative intensities of emotions (higher scores = stronger emotions)
-- For complex emotion analysis, you may need to cross-reference with the text content`;
+- For complex emotion analysis, you may need to cross-reference with the text content
+- Use conditional logic to categorize emotions as needed (e.g., CASE WHEN)
+- For "positive" vs "negative" emotions, group them appropriately in your analysis`;
     }
 
     systemPrompt += `\n\nReturn your response in the following JSON format:
@@ -452,6 +518,29 @@ async function calculateEmotionStatistics(userId: string) {
     // Calculate emotion trends over time
     const emotionTrends = await calculateEmotionTrends(userId);
     
+    // Group emotions into positive and negative categories
+    const positiveEmotions = ['happy', 'joy', 'excited', 'content', 'grateful', 'peaceful', 'hopeful'];
+    const negativeEmotions = ['sad', 'angry', 'anxious', 'disappointed', 'frustrated', 'fearful', 'stressed'];
+    
+    const emotionCategories = {
+      positive: Object.entries(emotionAverages)
+        .filter(([emotion]) => positiveEmotions.includes(emotion.toLowerCase()))
+        .sort(([, a], [, b]) => b.normalizedScore - a.normalizedScore)
+        .map(([emotion, data]) => ({ 
+          name: emotion, 
+          score: data.normalizedScore,
+          frequency: Math.round(data.frequency)
+        })),
+      negative: Object.entries(emotionAverages)
+        .filter(([emotion]) => negativeEmotions.includes(emotion.toLowerCase()))
+        .sort(([, a], [, b]) => b.normalizedScore - a.normalizedScore)
+        .map(([emotion, data]) => ({ 
+          name: emotion, 
+          score: data.normalizedScore,
+          frequency: Math.round(data.frequency)
+        }))
+    };
+    
     return {
       success: true,
       totalJournalEntries: entries.length,
@@ -473,6 +562,7 @@ async function calculateEmotionStatistics(userId: string) {
           score: data.normalizedScore,
           frequency: Math.round(data.frequency)
         })),
+      emotionCategories,
       dominantEmotion,
       dominantEmotionScore: emotionAverages[dominantEmotion]?.normalizedScore || 0,
       sentimentDistribution: sentimentPercentages,
@@ -490,7 +580,7 @@ async function calculateEmotionStatistics(userId: string) {
   }
 }
 
-// New function to calculate emotion trends over time
+// Function to calculate emotion trends over time
 async function calculateEmotionTrends(userId: string) {
   try {
     // Get all entries with emotions
@@ -555,6 +645,72 @@ async function calculateEmotionTrends(userId: string) {
   }
 }
 
+// Function to find emotional peaks and when they occurred
+async function findEmotionalPeaks(userId: string, emotion: string, limit: number = 3) {
+  try {
+    console.log(`Finding peaks for emotion: ${emotion}`);
+    
+    // Find entries with the highest score for the specified emotion
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('id, created_at, emotions, "refined text"')
+      .eq('user_id', userId)
+      .not('emotions', 'is', null)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching emotion peaks:", error);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      return { success: false, message: "No journal entries found" };
+    }
+    
+    // Filter entries that have the specified emotion
+    const entriesWithEmotion = data
+      .filter(entry => 
+        entry.emotions && 
+        entry.emotions[emotion] !== undefined && 
+        entry.emotions[emotion] !== null
+      )
+      .map(entry => ({
+        id: entry.id,
+        date: entry.created_at,
+        score: typeof entry.emotions[emotion] === 'string' 
+          ? parseFloat(entry.emotions[emotion]) 
+          : entry.emotions[emotion],
+        text: entry["refined text"] || ""
+      }));
+    
+    if (entriesWithEmotion.length === 0) {
+      return { 
+        success: false, 
+        message: `No entries found with emotion: ${emotion}` 
+      };
+    }
+    
+    // Sort by emotion score (descending)
+    entriesWithEmotion.sort((a, b) => b.score - a.score);
+    
+    // Get the top N entries
+    const peakEntries = entriesWithEmotion.slice(0, limit);
+    
+    return {
+      success: true,
+      emotion,
+      peaks: peakEntries.map(entry => ({
+        date: entry.date,
+        score: Math.round(entry.score * 100) / 100,
+        text: entry.text.substring(0, 200) + (entry.text.length > 200 ? "..." : "")
+      }))
+    };
+  } catch (error) {
+    console.error("Error in findEmotionalPeaks:", error);
+    throw error;
+  }
+}
+
 // Function to generate the final response using GPT
 async function generateFinalResponse(
   userQuery: string,
@@ -562,7 +718,8 @@ async function generateFinalResponse(
   vectorResults: any[] | null,
   analysisJson: any,
   statisticsData: any = null,
-  queryTypes: Record<string, boolean> = {}
+  queryTypes: Record<string, boolean> = {},
+  emotionalPeaksData: any = null
 ) {
   try {
     console.log("Generating final response with GPT");
@@ -580,6 +737,17 @@ async function generateFinalResponse(
         vectorResults.map((entry, i) => 
           `Entry ${i+1} (Similarity: ${entry.similarity.toFixed(2)}):\n${entry.content}`
         ).join('\n\n');
+    }
+    
+    // Add emotional peaks context if available
+    let peaksContext = "";
+    if (emotionalPeaksData && emotionalPeaksData.success) {
+      peaksContext = `
+Emotional Peaks Analysis for "${emotionalPeaksData.emotion}":
+${emotionalPeaksData.peaks.map((peak, i) => 
+  `Peak ${i+1} (${new Date(peak.date).toLocaleDateString()}, Score: ${peak.score}):\n"${peak.text}"`
+).join('\n\n')}
+`;
     }
     
     // Add statistics context if available
@@ -608,6 +776,17 @@ Data Timeframe:
 - Oldest Entry: ${statisticsData.timeframe.oldest ? new Date(statisticsData.timeframe.oldest).toLocaleDateString() : "None"}
 - Newest Entry: ${statisticsData.timeframe.newest ? new Date(statisticsData.timeframe.newest).toLocaleDateString() : "None"}
 `;
+
+      // Add categorized emotion data if available
+      if (statisticsData.emotionCategories) {
+        statisticsContext += `
+Positive Emotions:
+${statisticsData.emotionCategories.positive.map(e => `- ${e.name}: ${e.score}/10 (appears in ${e.frequency}% of entries)`).join('\n')}
+
+Negative Emotions:
+${statisticsData.emotionCategories.negative.map(e => `- ${e.name}: ${e.score}/10 (appears in ${e.frequency}% of entries)`).join('\n')}
+`;
+      }
 
       // Add top entries examples for emotions if this is a "most" or "when" query
       if (queryTypes.isComparative || queryTypes.isTemporal) {
@@ -659,6 +838,8 @@ ${analysisJson.requiresSql ? sqlContext : ''}
 ${analysisJson.requiresVectorSearch ? vectorContext : ''}
 
 ${statisticsContext}
+
+${peaksContext}
 `;
 
     // System prompt for response generation
@@ -676,14 +857,16 @@ Keep your tone warm, supportive, and conversational.`;
 - When presenting emotion scores, use a consistent 1-10 scale
 - Make comparisons explicit when relevant (e.g., "Joy at 8/10 is your highest emotion, compared to Anxiety at 4/10")
 - Include specific examples from journal entries to support your findings
-- If trends are available, highlight changes over time`;
+- If trends are available, highlight changes over time
+- For "top emotions" questions, clearly list them in order with their scores`;
     }
 
     if (queryTypes.isTemporal) {
       systemPrompt += `\n\nSince this is a temporal/"when" query:
 - Be specific about dates and time periods in your answer
 - Highlight the specific context from journal entries that correspond to the time period
-- If asking about an emotional peak/valley, clearly state when it occurred and provide the relevant journal context`;
+- If asking about an emotional peak/valley, clearly state when it occurred and provide the relevant journal context
+- For "when was I most sad" type questions, include direct quotes from the entries to explain why`;
     }
 
     systemPrompt += `\n\n${combinedContext}`;
@@ -753,6 +936,7 @@ serve(async (req) => {
     
     // Determine if this is likely a quantitative query based on the queryTypes
     const isLikelyQuantitative = queryTypes.isQuantitative || queryTypes.isComparative || queryTypes.asksForNumber;
+    const isTemporalEmotionQuery = queryTypes.isTemporal && queryTypes.isEmotionFocused;
     
     // Step 1: Ask GPT to analyze the query and generate SQL if needed
     const analysisStartTime = Date.now();
@@ -767,6 +951,7 @@ serve(async (req) => {
     let sqlResults = null;
     let sqlFilteredIds = null;
     let statisticsData = null;
+    let emotionalPeaksData = null;
     
     // Step 3: Execute SQL query if needed
     if (analysisJson.requiresSql) {
@@ -801,6 +986,30 @@ serve(async (req) => {
         } else {
           diagnostics.error += `; Statistics calculation error: ${statsError.message}`;
         }
+      }
+    }
+    
+    // Step 3.6: For temporal emotion queries (like "when was I most sad"), get specific peak data
+    if (isTemporalEmotionQuery) {
+      const peaksStartTime = Date.now();
+      
+      try {
+        // Extract the emotion from the query
+        const lowerQuery = message.toLowerCase();
+        const emotionWords = [
+          'happy', 'sad', 'angry', 'anxious', 'excited', 'content', 
+          'frustrated', 'stressed', 'grateful', 'peaceful', 'hopeful'
+        ];
+        
+        const matchedEmotion = emotionWords.find(emotion => lowerQuery.includes(emotion));
+        
+        if (matchedEmotion) {
+          emotionalPeaksData = await findEmotionalPeaks(userId, matchedEmotion);
+          console.log(`Found emotional peaks for ${matchedEmotion}:`, 
+            emotionalPeaksData.success ? emotionalPeaksData.peaks.length : 'none');
+        }
+      } catch (peaksError) {
+        console.error("Error finding emotional peaks:", peaksError);
       }
     }
     
@@ -840,7 +1049,8 @@ serve(async (req) => {
       vectorResults,
       analysisJson,
       statisticsData,
-      queryTypes
+      queryTypes,
+      emotionalPeaksData
     );
     diagnostics.timings.responseGeneration = Date.now() - responseStartTime;
     
@@ -868,6 +1078,10 @@ serve(async (req) => {
       
       if (statisticsData) {
         responseObject.statisticsData = statisticsData;
+      }
+      
+      if (emotionalPeaksData) {
+        responseObject.emotionalPeaksData = emotionalPeaksData;
       }
     }
     

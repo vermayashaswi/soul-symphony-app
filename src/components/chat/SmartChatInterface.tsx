@@ -237,52 +237,94 @@ export default function SmartChatInterface() {
   const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     const lowerQuery = query.toLowerCase();
     
-    // Check for different query types
-    return {
-      // Quantitative patterns
-      isQuantitative: checkForQuantitativeQuery(query),
-      
-      // Temporal patterns - when questions
-      isTemporal: /\bwhen\b|\btime\b|\bdate\b|\bperiod\b|\bduring\b|\bafter\b|\bbefore\b/i.test(lowerQuery),
-      
-      // Comparative patterns - asking for most/least/top/bottom
-      isComparative: /\bmost\b|\bleast\b|\btop\b|\bbottom\b|\bhighest\b|\blowest\b|\branking\b|\brank\b/i.test(lowerQuery),
-      
-      // Emotional analysis specific patterns
-      isEmotionFocused: /\bfeel\b|\bfeeling\b|\bemotion\b|\bhappy\b|\bsad\b|\bangry\b|\bfear\b|\bjoy\b|\bworried\b|\banxious\b/i.test(lowerQuery),
-      
-      // Requiring context understanding
-      needsContext: /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b/i.test(lowerQuery),
-      
-      // Question asking for specific number 
-      asksForNumber: /how many|how much|what percentage|how often|frequency|count/i.test(lowerQuery),
-      
-      // Standard vector search still needed
-      needsVectorSearch: true
-    };
-  };
-
-  const checkForQuantitativeQuery = (query: string): boolean => {
-    const quantitativePatterns = [
-      /score/i, 
-      /rate/i, 
-      /average/i, 
-      /how much/i, 
-      /how many/i, 
-      /percentage/i, 
-      /quantity/i, 
-      /count/i,
-      /times/i,
-      /frequency/i,
-      /sentiment score/i,
-      /emotion score/i,
-      /out of 10/i,
-      /out of ten/i,
-      /statistics/i,
-      /stats/i
+    // Define keyword sets for better detection
+    const quantitativeWords = [
+      'how many', 'how much', 'count', 'total', 'average', 'avg', 'statistics',
+      'stats', 'number', 'percentage', 'percent', 'ratio', 'frequency', 'score',
+      'rate', 'top', 'bottom', 'most', 'least', 'highest', 'lowest', 'ranking',
+      'rank', 'distribution', 'mean', 'median', 'majority', 'out of', 'scale'
     ];
     
-    return quantitativePatterns.some(pattern => pattern.test(query));
+    const comparativeWords = [
+      'more than', 'less than', 'greater', 'smaller', 'better', 'worse', 'between',
+      'compared to', 'versus', 'vs', 'difference', 'similar', 'most', 'least',
+      'highest', 'lowest', 'top', 'bottom', 'maximum', 'minimum', 'max', 'min',
+      'best', 'worst', 'stronger', 'weaker', 'dominant', 'primary', 'secondary'
+    ];
+    
+    const temporalWords = [
+      'when', 'time', 'date', 'period', 'duration', 'during', 'after', 'before',
+      'since', 'until', 'day', 'week', 'month', 'year', 'today', 'yesterday',
+      'tomorrow', 'recent', 'last', 'this', 'next', 'previous', 'upcoming',
+      'now', 'past', 'future', 'earlier', 'later', 'history', 'trend'
+    ];
+    
+    const emotionWords = [
+      'feel', 'feeling', 'emotion', 'mood', 'happy', 'sad', 'angry', 'anxious',
+      'joyful', 'excited', 'disappointed', 'frustrated', 'content', 'hopeful',
+      'grateful', 'proud', 'afraid', 'scared', 'worried', 'stressed', 'peaceful',
+      'calm', 'love', 'hate', 'fear', 'disgust', 'surprise', 'shame', 'guilt'
+    ];
+    
+    const numberWordPatterns = [
+      /\b\d+\b/, /\bone\b/, /\btwo\b/, /\bthree\b/, /\bfour\b/, /\bfive\b/,
+      /\bsix\b/, /\bseven\b/, /\beight\b/, /\bnine\b/, /\bten\b/, /\bdozen\b/,
+      /\bhundred\b/, /\bthousand\b/, /\bmillion\b/, /\bbillion\b/, /\btrillion\b/,
+      /\bfirst\b/, /\bsecond\b/, /\bthird\b/, /\blast\b/, /\bhalf\b/, /\btwice\b/,
+      /\bdouble\b/, /\btriple\b/, /\bquadruple\b/, /\bquintuple\b/, /\bmultiple\b/
+    ];
+    
+    // Check for quantitative query
+    const hasQuantitativeWords = quantitativeWords.some(word => 
+      lowerQuery.includes(word)
+    );
+    
+    // Check for numbers in the query
+    const hasNumbers = numberWordPatterns.some(pattern => 
+      pattern.test(lowerQuery)
+    );
+    
+    // Check for comparative query
+    const hasComparativeWords = comparativeWords.some(word => 
+      lowerQuery.includes(word)
+    );
+    
+    // Check for temporal query
+    const hasTemporalWords = temporalWords.some(word => 
+      new RegExp(`\\b${word}\\b`).test(lowerQuery)
+    );
+    
+    // Check for emotion focus
+    const hasEmotionWords = emotionWords.some(word => 
+      new RegExp(`\\b${word}\\b`).test(lowerQuery)
+    );
+    
+    // Check for context understanding needs
+    const needsContext = /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b|\bmeaning\b|\binterpret\b/.test(lowerQuery);
+    
+    // Return comprehensive analysis
+    return {
+      // Quantitative patterns
+      isQuantitative: hasQuantitativeWords || hasNumbers,
+      
+      // Temporal patterns
+      isTemporal: hasTemporalWords,
+      
+      // Comparative patterns
+      isComparative: hasComparativeWords,
+      
+      // Emotion specific patterns
+      isEmotionFocused: hasEmotionWords,
+      
+      // Context understanding
+      needsContext: needsContext,
+      
+      // Question asking for specific number 
+      asksForNumber: hasNumbers || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
+      
+      // Standard vector search still needed for semantic understanding
+      needsVectorSearch: true
+    };
   };
 
   const handleChatError = (error: any) => {
@@ -325,6 +367,7 @@ export default function SmartChatInterface() {
                 <li>"What are my top 3 emotions in my journal?"</li>
                 <li>"When was I feeling most anxious and why?"</li>
                 <li>"What's the sentiment trend in my journal?"</li>
+                <li>"My top 3 positive and negative emotions?"</li>
               </ul>
             </div>
           </div>
