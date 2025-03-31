@@ -18,8 +18,6 @@ import { ThemeProvider } from "./hooks/use-theme";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
-import { OnboardingProvider, useOnboarding } from "./contexts/OnboardingContext";
-import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -127,43 +125,28 @@ const AppRoutes = () => {
   );
 };
 
-const App = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <ThemeProvider>
-            <OnboardingProvider>
-              <div className="relative min-h-screen">
-                <div className="relative z-10">
-                  <Toaster />
-                  <Sonner position="top-center" />
-                  <BrowserRouter>
-                    <MobilePreviewFrame>
-                      <AnimatePresence mode="wait">
-                        <AppWithOnboardingFlow />
-                      </AnimatePresence>
-                    </MobilePreviewFrame>
-                  </BrowserRouter>
-                </div>
-              </div>
-            </OnboardingProvider>
-          </ThemeProvider>
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
-};
-
-const AppWithOnboardingFlow = () => {
-  const { showOnboarding } = useOnboarding();
-  
-  return (
-    <>
-      <AppRoutes />
-      {showOnboarding && <OnboardingFlow />}
-    </>
-  );
-};
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <div className="relative min-h-screen">
+            <div className="relative z-10">
+              <Toaster />
+              <Sonner position="top-center" />
+              <BrowserRouter>
+                <MobilePreviewFrame>
+                  <AnimatePresence mode="wait">
+                    <AppRoutes />
+                  </AnimatePresence>
+                </MobilePreviewFrame>
+              </BrowserRouter>
+            </div>
+          </div>
+        </ThemeProvider>
+      </AuthProvider>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;
