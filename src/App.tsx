@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +17,8 @@ import { ThemeProvider } from "./hooks/use-theme";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
+import { OnboardingProvider } from "./contexts/OnboardingContext";
+import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +55,27 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   return <>{children}</>;
+};
+
+const AppWithOnboarding = () => {
+  const { showOnboarding } = useOnboarding();
+  
+  return (
+    <OnboardingProvider>
+      <AppRoutes />
+      <OnboardingWrapper />
+    </OnboardingProvider>
+  );
+};
+
+const OnboardingWrapper = () => {
+  const { showOnboarding } = useOnboarding();
+  
+  if (!showOnboarding) {
+    return null;
+  }
+  
+  return <OnboardingFlow />;
 };
 
 const AppRoutes = () => {
@@ -137,7 +159,7 @@ const App = () => (
               <BrowserRouter>
                 <MobilePreviewFrame>
                   <AnimatePresence mode="wait">
-                    <AppRoutes />
+                    <AppWithOnboarding />
                   </AnimatePresence>
                 </MobilePreviewFrame>
               </BrowserRouter>

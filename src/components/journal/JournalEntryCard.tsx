@@ -37,7 +37,7 @@ interface JournalEntryCardProps {
 }
 
 export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
-  const [isExpanded, setIsExpanded] = useState(true); // Changed to true by default
+  const [isExpanded, setIsExpanded] = useState(true);
   const [open, setOpen] = React.useState(false);
 
   const toggleExpanded = () => {
@@ -52,19 +52,38 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
   };
 
   const createdAtFormatted = formatRelativeTime(entry.created_at);
+  
+  // Get sentiment emoji
+  const getSentimentEmoji = () => {
+    if (typeof entry.sentiment === 'string') {
+      const sentiment = entry.sentiment.toLowerCase();
+      if (sentiment.includes('positive')) return '😊';
+      if (sentiment.includes('negative')) return '😔';
+      return '😐';
+    } else if (entry.sentiment) {
+      const score = entry.sentiment.score;
+      if (score > 0.3) return '😊';
+      if (score < -0.3) return '😔';
+      return '😐';
+    }
+    return '📝';
+  };
 
   return (
-    <Card className="bg-background shadow-md">
+    <Card className="bg-background shadow-md overflow-hidden">
       <div className="flex justify-between items-start p-4">
-        <div>
-          <h3 className="scroll-m-20 text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-          <p className="text-sm text-muted-foreground">
-            {typeof entry.sentiment === 'string' 
-              ? entry.sentiment 
-              : entry.sentiment 
-                ? `${entry.sentiment.sentiment} (${entry.sentiment.score})` 
-                : 'No sentiment data'}
-          </p>
+        <div className="flex items-center gap-2">
+          <div className="text-2xl">{getSentimentEmoji()}</div>
+          <div>
+            <h3 className="scroll-m-20 text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
+            <p className="text-sm text-muted-foreground">
+              {typeof entry.sentiment === 'string' 
+                ? entry.sentiment 
+                : entry.sentiment 
+                  ? `${entry.sentiment.sentiment} (${entry.sentiment.score})` 
+                  : 'No sentiment data'}
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -103,7 +122,7 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="px-4 pb-4">
         {isExpanded ? (
           <div>
             <p className="text-sm text-foreground">{entry.content}</p>
