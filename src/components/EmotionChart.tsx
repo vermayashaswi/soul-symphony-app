@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -12,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
+import { Sparkles } from 'lucide-react';
 
 type EmotionData = {
   day: string;
@@ -81,6 +83,7 @@ export function EmotionChart({
 }: EmotionChartProps) {
   const [chartType, setChartType] = useState<ChartType>('bubble');
   const [bubbleKey, setBubbleKey] = useState(0); // Add key for forcing re-render
+  const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
   
   const chartTypes = [
     { id: 'line', label: 'Line' },
@@ -98,16 +101,23 @@ export function EmotionChart({
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       if (dataPoints.length > 0) {
         const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
-        emotionScores[emotion] = totalScore;
+        if (totalScore > 0) {
+          emotionScores[emotion] = totalScore;
+        }
       }
     });
     
+    // Filter out any emotions with zero score
+    const filteredEmotions = Object.fromEntries(
+      Object.entries(emotionScores).filter(([_, value]) => value > 0)
+    );
+    
     console.log(`[EmotionChart] Bubble data updated for timeframe: ${timeframe}`, {
-      emotionCount: Object.keys(emotionScores).length,
-      firstFewEmotions: Object.entries(emotionScores).slice(0, 3)
+      emotionCount: Object.keys(filteredEmotions).length,
+      firstFewEmotions: Object.entries(filteredEmotions).slice(0, 3)
     });
     
-    return emotionScores;
+    return filteredEmotions;
   }, [aggregatedData, timeframe]);
   
   useEffect(() => {
@@ -118,6 +128,23 @@ export function EmotionChart({
     });
     setBubbleKey(prev => prev + 1);
   }, [timeframe, aggregatedData, bubbleData]);
+
+  const handleEmotionClick = (emotion: string) => {
+    if (bubbleData && emotion in bubbleData) {
+      const total = Object.values(bubbleData).reduce((sum, value) => sum + value, 0);
+      const percentage = (bubbleData[emotion] / total) * 100;
+      
+      setSelectedEmotionInfo({
+        name: emotion,
+        percentage
+      });
+      
+      // Auto-hide after 2 seconds
+      setTimeout(() => {
+        setSelectedEmotionInfo(null);
+      }, 2000);
+    }
+  };
   
   const lineData = useMemo(() => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
@@ -128,15 +155,19 @@ export function EmotionChart({
     const dateMap: Map<string, Record<string, number>> = new Map();
     
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
-      emotionTotals[emotion] = dataPoints.reduce((sum, point) => sum + point.value, 0);
-      
-      dataPoints.forEach(point => {
-        if (!dateMap.has(point.date)) {
-          dateMap.set(point.date, {});
-        }
-        const dateEntry = dateMap.get(point.date)!;
-        dateEntry[emotion] = point.value;
-      });
+      // Only include emotions with positive values
+      const totalValue = dataPoints.reduce((sum, point) => sum + point.value, 0);
+      if (totalValue > 0) {
+        emotionTotals[emotion] = totalValue;
+        
+        dataPoints.forEach(point => {
+          if (!dateMap.has(point.date)) {
+            dateMap.set(point.date, {});
+          }
+          const dateEntry = dateMap.get(point.date)!;
+          dateEntry[emotion] = point.value;
+        });
+      }
     });
     
     const topEmotions = Object.entries(emotionTotals)
@@ -244,15 +275,27 @@ export function EmotionChart({
         </div>
       </div>
       
-      <div className="bg-white p-4 rounded-xl shadow-sm">
+      <div className="bg-white p-4 rounded-xl shadow-sm relative">
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && (
           <div className="w-full h-[350px]" key={bubbleKey}>
             {Object.keys(bubbleData).length > 0 ? (
-              <EmotionBubbles 
-                emotions={bubbleData} 
-                preventOverlap={true}
-              />
+              <>
+                <EmotionBubbles 
+                  emotions={bubbleData} 
+                  preventOverlap={true}
+                  onEmotionClick={handleEmotionClick}
+                />
+                {selectedEmotionInfo && (
+                  <div className="absolute top-3 left-3 bg-background/90 border border-border rounded-lg px-3 py-2 shadow-md flex items-center gap-2 animate-fade-in z-10">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">{selectedEmotionInfo.name}: {selectedEmotionInfo.percentage.toFixed(1)}%</span>
+                  </div>
+                )}
+                <div className="absolute bottom-3 right-3 text-xs text-muted-foreground bg-background/70 px-2 py-1 rounded-md">
+                  Tip: Tap bubbles to see percentages
+                </div>
+              </>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 No themes data available for this timeframe

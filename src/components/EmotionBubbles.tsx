@@ -45,6 +45,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     name: string;
     size: number;
     color: string;
+    value?: number;
+    percentage?: number;
   }[]>([]);
   const mouseConstraintRef = useRef<Matter.MouseConstraint | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -57,6 +59,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     color: string; 
     position: { x: number; y: number };
     value?: number;
+    percentage?: number;
   }>>([]);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const [physicsInitialized, setPhysicsInitialized] = useState(false);
@@ -121,6 +124,21 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       }, 3000);
     }
   }, [isDisturbed]);
+
+  const handleEmotionClick = (emotion: string) => {
+    if (emotion === '•' || !emotion) return;
+    
+    setSelectedEmotion(emotion);
+    
+    // Reset after 2 seconds
+    setTimeout(() => {
+      setSelectedEmotion(null);
+    }, 2000);
+    
+    if (onEmotionClick) {
+      onEmotionClick(emotion);
+    }
+  };
 
   const applyRandomForces = () => {
     if (!engineRef.current || !bubblesRef.current.length) return;
@@ -187,6 +205,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         }
       }
       
+      // Create engine with zero gravity
       const engine = Engine.create({
         enableSleeping: false,
         gravity: { x: 0, y: 0, scale: 0 }
@@ -194,6 +213,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       engineRef.current = engine;
       worldRef.current = engine.world;
       
+      // Create renderer
       const render = Render.create({
         canvas: canvasRef.current,
         engine: engine,
@@ -206,6 +226,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       });
       renderRef.current = render;
       
+      // Create boundaries
       const wallThickness = 100;
       const containerPadding = 30;
       const walls = [
@@ -246,6 +267,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         name: string;
         size: number;
         color: string;
+        value?: number;
+        percentage?: number;
       }[] = [];
       
       if (items.length > 0) {
@@ -275,7 +298,9 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
             body,
             name: item.name,
             size: item.size,
-            color: item.color
+            color: item.color,
+            value: item.value,
+            percentage: item.percentage
           };
         });
         
@@ -283,24 +308,26 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         bubblesRef.current = bubbleBodies;
       }
       
+      // Create mouse constraint for interaction
       const mouse = Mouse.create(canvasRef.current);
       const mouseConstraint = MouseConstraint.create(engine, {
         mouse: mouse,
         constraint: {
-          stiffness: 0.1,
+          stiffness: 0.2,
           render: {
             visible: false
           }
         }
       });
       
+      // Handle mouse interactions
       Events.on(mouseConstraint, 'mousedown', () => {
         setIsCurrentlyDisturbed(true);
         lastDisturbTimeRef.current = Date.now();
         
         bubbleBodies.forEach(bubble => {
-          const forceX = (Math.random() - 0.5) * 0.01;
-          const forceY = (Math.random() - 0.5) * 0.01;
+          const forceX = (Math.random() - 0.5) * 0.005;
+          const forceY = (Math.random() - 0.5) * 0.005;
           Body.applyForce(bubble.body, bubble.body.position, { x: forceX, y: forceY });
         });
         
@@ -313,6 +340,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       mouseConstraintRef.current = mouseConstraint;
       render.mouse = mouse;
       
+      // Run the engine
       const runner = Runner.create({
         isFixed: true,
       });
@@ -321,6 +349,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       
       Render.run(render);
       
+      // Start applying small random forces to keep bubbles moving
       animationFrameRef.current = requestAnimationFrame(applyRandomForces);
       
       setPhysicsInitialized(true);
@@ -383,6 +412,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       color: string; 
       position: { x: number; y: number };
       value?: number;
+      percentage?: number;
     }> = [];
     
     const calculateMinBubbleSize = (text: string): number => {
@@ -399,32 +429,26 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       }
     };
     
-    const createFillerBubbles = (mainBubbles: typeof newItems): typeof newItems => {
-      if (mainBubbles.length >= 5) return [];
-      
-      const fillerCount = 12 - mainBubbles.length * 2;
-      const fillerSize = Math.min(availableWidth, availableHeight) * 0.06;
-      
-      return Array(fillerCount).fill(null).map((_, i) => ({
-        name: '•',
-        size: fillerSize,
-        color: colorPalette[i % colorPalette.length],
-        position: { x: 0, y: 0 },
-        value: 0.1
-      }));
-    };
-    
     if (emotions && Object.keys(emotions).length > 0) {
-      const values = Object.values(emotions);
+      // Filter out any invalid or empty emotions
+      const filteredEmotions = Object.entries(emotions).filter(([emotion, value]) => 
+        emotion && emotion.trim() !== '' && emotion !== '•' && value > 0
+      );
+      
+      if (filteredEmotions.length === 0) return;
+      
+      // Calculate total value for percentage calculation
+      const totalValue = filteredEmotions.reduce((sum, [_, value]) => sum + value, 0);
+      
+      const values = filteredEmotions.map(([_, value]) => value);
       const maxValue = Math.max(...values);
       const minValue = Math.min(...values);
       const valueRange = maxValue - minValue;
       
       const totalArea = availableWidth * availableHeight * 0.7;
-      const itemCount = Object.keys(emotions).length;
+      const itemCount = filteredEmotions.length;
       
-      const emotionEntries = Object.entries(emotions);
-      const baseMinSizes = emotionEntries.map(([emotion, _]) => ({
+      const baseMinSizes = filteredEmotions.map(([emotion, _]) => ({
         emotion,
         minSize: calculateMinBubbleSize(emotion)
       }));
@@ -434,7 +458,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.4
       );
       
-      newItems = emotionEntries.map(([emotion, value], index) => {
+      newItems = filteredEmotions.map(([emotion, value], index) => {
         const minSize = baseMinSizes.find(item => item.emotion === emotion)?.minSize || 
                        Math.min(availableWidth, availableHeight) * 0.22;
         
@@ -446,43 +470,50 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           size = minSize + (normalizedValue * (maxBubbleSize - minSize) * 0.8);
         }
         
+        const percentage = (value / totalValue) * 100;
+        
         return {
           name: emotion,
           size,
           color: colorPalette[index % colorPalette.length],
           position: { x: 0, y: 0 },
-          value: valueRange === 0 ? 0.5 : (value - minValue) / valueRange
+          value,
+          percentage
         };
       });
       
-      const fillerBubbles = createFillerBubbles(newItems);
-      newItems = [...newItems, ...fillerBubbles];
+      // Sort by size (value) for better visualization
+      newItems.sort((a, b) => (b.value || 0) - (a.value || 0));
     } else if (themes && themes.length > 0) {
-      const itemCount = themes.length;
+      // Filter out any empty themes
+      const filteredThemes = themes.filter(theme => theme && theme.trim() !== '' && theme !== '•');
+      
+      if (filteredThemes.length === 0) return;
+      
+      const itemCount = filteredThemes.length;
       
       const bubbleSize = Math.min(
         Math.min(availableWidth, availableHeight) * 0.28,
         Math.sqrt((availableWidth * availableHeight * 0.8) / itemCount) * 1.3
       );
       
-      newItems = themes.map((theme, index) => {
+      newItems = filteredThemes.map((theme, index) => {
+        // Calculate equal percentages for themes
+        const percentage = 100 / filteredThemes.length;
+        
         return {
           name: theme,
           size: bubbleSize,
           color: colorPalette[index % colorPalette.length],
-          position: { x: 0, y: 0 }
+          position: { x: 0, y: 0 },
+          value: 1,
+          percentage
         };
       });
-      
-      const fillerBubbles = createFillerBubbles(newItems);
-      newItems = [...newItems, ...fillerBubbles];
     }
     
     if (newItems.length > 0) {
-      if (!themes) {
-        newItems.sort((a, b) => b.size - a.size);
-      }
-      
+      // Position items
       for (let i = 0; i < newItems.length; i++) {
         const placeItem = (item: any, index: number, attempts = 0) => {
           if (attempts > 100) {
@@ -553,12 +584,6 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     
     setItems(newItems);
   }, [containerSize, emotions, themes, preventOverlap]);
-
-  const handleEmotionClick = (emotion: string) => {
-    if (onEmotionClick) {
-      onEmotionClick(emotion);
-    }
-  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -653,6 +678,9 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
                   size={bubble.size}
                   color={items[index]?.color}
                   isDisturbed={isCurrentlyDisturbed}
+                  isHighlighted={selectedEmotion === bubble.name}
+                  percentage={bubble.percentage}
+                  onClick={handleEmotionClick}
                 />
               </motion.div>
             </div>
@@ -685,6 +713,9 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
                   size={item.size}
                   color={item.color}
                   isDisturbed={isDisturbed}
+                  isHighlighted={selectedEmotion === item.name}
+                  percentage={item.percentage}
+                  onClick={handleEmotionClick}
                 />
               </motion.div>
             ))}

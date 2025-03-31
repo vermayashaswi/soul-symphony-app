@@ -50,7 +50,10 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
     }
   };
 
-  if (!themes || themes.length === 0) {
+  // Filter out any empty themes
+  const filteredThemes = themes ? themes.filter(theme => theme && theme.trim() !== '' && theme !== '•') : [];
+
+  if (!themes || themes.length === 0 || filteredThemes.length === 0) {
     // Display placeholder theme boxes with loading animation when no themes are present
     return (
       <div className={cn("flex flex-wrap gap-3 justify-center items-center h-full w-full", className)}>
@@ -89,7 +92,7 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
       initial="hidden"
       animate="visible"
     >
-      {themes.map((theme, index) => {
+      {filteredThemes.map((theme, index) => {
         // Generate a random offset for the animation
         const randomOffset = Math.random() * 0.5 + 0.5; // Between 0.5 and 1
         
