@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
-import ParticleBackground from '@/components/ParticleBackground';
 import SouloLogo from '@/components/SouloLogo';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -347,7 +345,6 @@ const Index = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <ParticleBackground />
       <Navbar />
       
       <motion.main

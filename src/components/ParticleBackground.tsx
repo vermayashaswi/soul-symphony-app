@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 
 interface Particle {
@@ -176,7 +175,7 @@ export function ParticleBackground() {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 w-full h-full pointer-events-none"
-      style={{ zIndex: 0 }} // Ensure it has a z-index of 0
+      style={{ zIndex: -1 }} // Change from 0 to -1 to ensure it stays behind all content
     />
   );
 }

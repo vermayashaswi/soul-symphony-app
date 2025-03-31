@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
+import ParticleBackground from "./components/ParticleBackground";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -110,6 +111,7 @@ const App = () => (
       <AuthProvider>
         <ThemeProvider>
           <div className="relative min-h-screen">
+            <ParticleBackground />
             <div className="relative z-10">
               <Toaster />
               <Sonner position="top-center" />
