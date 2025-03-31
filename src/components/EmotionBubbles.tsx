@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -12,7 +13,8 @@ import Matter, {
   Body,
   Composite,
   Events,
-  Runner
+  Runner,
+  Vector
 } from 'matter-js';
 import EmotionBubbleDetail from './EmotionBubbleDetail';
 import { useToast } from '@/components/ui/use-toast';
@@ -64,6 +66,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const [physicsInitialized, setPhysicsInitialized] = useState(false);
   const [isCurrentlyDisturbed, setIsCurrentlyDisturbed] = useState(false);
+  const [draggingBubble, setDraggingBubble] = useState<string | null>(null);
   
   const location = useLocation();
   const isInsightsPage = location.pathname.includes('insights');
@@ -113,8 +116,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       
       if (bubblesRef.current.length > 0) {
         bubblesRef.current.forEach(bubble => {
-          const forceX = (Math.random() - 0.5) * 0.01;
-          const forceY = (Math.random() - 0.5) * 0.01;
+          const forceX = (Math.random() - 0.5) * 0.02; // Increased force
+          const forceY = (Math.random() - 0.5) * 0.02; // Increased force
           Body.applyForce(bubble.body, bubble.body.position, { x: forceX, y: forceY });
         });
       }
@@ -144,7 +147,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     if (!engineRef.current || !bubblesRef.current.length) return;
     
     const now = Date.now();
-    const forceFactor = isCurrentlyDisturbed ? 0.004 : 0.0010;
+    const forceFactor = isCurrentlyDisturbed ? 0.008 : 0.002; // Increased force factor
     const timeSinceLastDisturb = now - lastDisturbTimeRef.current;
     const disturbanceFadeFactor = Math.max(0, Math.min(1, 1 - (timeSinceLastDisturb / 3000)));
     
@@ -164,20 +167,20 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       };
       
       if (pos.x < bounds.min.x + 10) {
-        Body.applyForce(bubble.body, pos, { x: 0.0005, y: 0 });
+        Body.applyForce(bubble.body, pos, { x: 0.001, y: 0 });
       } else if (pos.x > bounds.max.x - 10) {
-        Body.applyForce(bubble.body, pos, { x: -0.0005, y: 0 });
+        Body.applyForce(bubble.body, pos, { x: -0.001, y: 0 });
       }
       
       if (pos.y < bounds.min.y + 10) {
-        Body.applyForce(bubble.body, pos, { x: 0, y: 0.0005 });
+        Body.applyForce(bubble.body, pos, { x: 0, y: 0.001 });
       } else if (pos.y > bounds.max.y - 10) {
-        Body.applyForce(bubble.body, pos, { x: 0, y: -0.0005 });
+        Body.applyForce(bubble.body, pos, { x: 0, y: -0.001 });
       }
       
       if (Math.random() > 0.95) {
-        const tinyForceX = (Math.random() - 0.5) * 0.0005;
-        const tinyForceY = (Math.random() - 0.5) * 0.0005;
+        const tinyForceX = (Math.random() - 0.5) * 0.0008;
+        const tinyForceY = (Math.random() - 0.5) * 0.0008;
         Body.applyForce(bubble.body, pos, { x: tinyForceX, y: tinyForceY });
       }
     });
@@ -187,6 +190,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
 
   useEffect(() => {
     if ((isInsightsPage || isJournalPage) && containerSize.width > 0 && containerSize.height > 0 && canvasRef.current) {
+      // Clean up previous physics engine if it exists
       if (engineRef.current) {
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
@@ -227,36 +231,35 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       renderRef.current = render;
       
       // Create boundaries
-      const wallThickness = 100;
-      const containerPadding = 30;
+      const wallThickness = 50;
       const walls = [
         Bodies.rectangle(
           containerSize.width / 2, 
-          containerSize.height + wallThickness / 2 + containerPadding, 
-          containerSize.width + containerPadding * 2, 
+          containerSize.height + wallThickness / 2, 
+          containerSize.width + 100, 
           wallThickness, 
-          { isStatic: true, render: { visible: false } }
+          { isStatic: true, render: { visible: false }, friction: 0.2, restitution: 0.8 }
         ),
         Bodies.rectangle(
           containerSize.width / 2, 
-          -wallThickness / 2 - containerPadding, 
-          containerSize.width + containerPadding * 2, 
+          -wallThickness / 2, 
+          containerSize.width + 100, 
           wallThickness, 
-          { isStatic: true, render: { visible: false } }
+          { isStatic: true, render: { visible: false }, friction: 0.2, restitution: 0.8 }
         ),
         Bodies.rectangle(
-          -wallThickness / 2 - containerPadding, 
+          -wallThickness / 2, 
           containerSize.height / 2, 
           wallThickness, 
-          containerSize.height + containerPadding * 2, 
-          { isStatic: true, render: { visible: false } }
+          containerSize.height + 100, 
+          { isStatic: true, render: { visible: false }, friction: 0.2, restitution: 0.8 }
         ),
         Bodies.rectangle(
-          containerSize.width + wallThickness / 2 + containerPadding, 
+          containerSize.width + wallThickness / 2, 
           containerSize.height / 2, 
           wallThickness, 
-          containerSize.height + containerPadding * 2, 
-          { isStatic: true, render: { visible: false } }
+          containerSize.height + 100, 
+          { isStatic: true, render: { visible: false }, friction: 0.2, restitution: 0.8 }
         ),
       ];
       
@@ -273,9 +276,10 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       
       if (items.length > 0) {
         bubbleBodies = items.map((item) => {
-          const friction = 0.02 + Math.random() * 0.02;
-          const frictionAir = 0.05 + Math.random() * 0.05;
-          const restitution = 0.6 + Math.random() * 0.2;
+          // Improved physics parameters for more dynamic movement
+          const friction = 0.01 + Math.random() * 0.02;
+          const frictionAir = 0.02 + Math.random() * 0.03; // Reduced air friction for better sliding
+          const restitution = 0.7 + Math.random() * 0.25; // Increased bounciness
           
           const body = Bodies.circle(
             item.position.x,
@@ -290,7 +294,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
                 strokeStyle: 'transparent',
                 lineWidth: 0
               },
-              density: 0.001 * (1 + Math.random() * 0.2)
+              density: 0.001 * (1 + Math.random() * 0.2),
+              label: item.name // Add label for identification
             }
           );
           
@@ -308,41 +313,128 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         bubblesRef.current = bubbleBodies;
       }
       
-      // Create mouse constraint for interaction
+      // Create and configure mouse constraint with improved settings
       const mouse = Mouse.create(canvasRef.current);
       const mouseConstraint = MouseConstraint.create(engine, {
         mouse: mouse,
         constraint: {
-          stiffness: 0.2,
+          stiffness: 0.1, // Lower stiffness for more natural dragging
+          damping: 0.1,   // Lower damping for more momentum
           render: {
             visible: false
           }
         }
       });
+
+      // Enhanced drag events for better interaction
+      let isDragging = false;
+      let draggedBody: Matter.Body | null = null;
+      let dragStartTime = 0;
+      let previousPosition = { x: 0, y: 0 };
+      let lastDragTime = 0;
+      let velocity = { x: 0, y: 0 };
       
-      // Handle mouse interactions
-      Events.on(mouseConstraint, 'mousedown', () => {
-        setIsCurrentlyDisturbed(true);
-        lastDisturbTimeRef.current = Date.now();
+      Events.on(mouseConstraint, 'mousedown', (event) => {
+        const mousePosition = event.mouse.position;
+        const foundBody = bubblesRef.current.find(
+          bubble => {
+            const distance = Vector.magnitude(
+              Vector.sub(bubble.body.position, mousePosition)
+            );
+            return distance <= bubble.size / 2;
+          }
+        );
         
-        bubbleBodies.forEach(bubble => {
-          const forceX = (Math.random() - 0.5) * 0.005;
-          const forceY = (Math.random() - 0.5) * 0.005;
-          Body.applyForce(bubble.body, bubble.body.position, { x: forceX, y: forceY });
-        });
-        
-        setTimeout(() => {
-          setIsCurrentlyDisturbed(false);
-        }, 3000);
+        if (foundBody) {
+          draggedBody = foundBody.body;
+          setDraggingBubble(foundBody.name);
+          isDragging = true;
+          dragStartTime = Date.now();
+          previousPosition = { ...mousePosition };
+          setIsCurrentlyDisturbed(true);
+        }
+      });
+
+      Events.on(mouseConstraint, 'mousemove', (event) => {
+        if (isDragging && draggedBody) {
+          const now = Date.now();
+          const dt = now - lastDragTime;
+          
+          if (dt > 0) {
+            const currentPosition = event.mouse.position;
+            velocity = {
+              x: (currentPosition.x - previousPosition.x) / dt * 15, // Scale velocity
+              y: (currentPosition.y - previousPosition.y) / dt * 15
+            };
+            previousPosition = { ...currentPosition };
+            lastDragTime = now;
+          }
+        }
+      });
+
+      Events.on(mouseConstraint, 'mouseup', () => {
+        if (isDragging && draggedBody) {
+          isDragging = false;
+          
+          // Apply velocity on release for throwing effect
+          Body.setVelocity(draggedBody, velocity);
+          
+          // Apply an additional impulse in the direction of movement
+          const impulseMultiplier = 0.005;
+          Body.applyForce(
+            draggedBody,
+            draggedBody.position,
+            {
+              x: velocity.x * impulseMultiplier,
+              y: velocity.y * impulseMultiplier
+            }
+          );
+          
+          draggedBody = null;
+          setDraggingBubble(null);
+          
+          // Disturb other bubbles
+          bubblesRef.current.forEach(bubble => {
+            if (bubble.body !== draggedBody) {
+              const forceX = (Math.random() - 0.5) * 0.002;
+              const forceY = (Math.random() - 0.5) * 0.002;
+              Body.applyForce(bubble.body, bubble.body.position, { x: forceX, y: forceY });
+            }
+          });
+          
+          setTimeout(() => {
+            setIsCurrentlyDisturbed(false);
+          }, 3000);
+        }
+      });
+      
+      // Handle click events
+      Events.on(mouseConstraint, 'click', (event) => {
+        const clickTime = Date.now();
+        // Only count as click if it's a short interaction
+        if (dragStartTime && clickTime - dragStartTime < 200) {
+          const mousePosition = event.mouse.position;
+          
+          bubblesRef.current.forEach(bubble => {
+            const distance = Vector.magnitude(
+              Vector.sub(bubble.body.position, mousePosition)
+            );
+            
+            if (distance <= bubble.size / 2) {
+              handleEmotionClick(bubble.name);
+            }
+          });
+        }
       });
       
       World.add(engine.world, mouseConstraint);
       mouseConstraintRef.current = mouseConstraint;
       render.mouse = mouse;
       
-      // Run the engine
+      // Run the engine with higher speed for more dynamic simulation
       const runner = Runner.create({
         isFixed: true,
+        delta: 1000 / 60, // Lock at 60 FPS for consistent physics
       });
       Runner.run(runner, engine);
       runnerRef.current = runner;
@@ -385,14 +477,16 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     if ((isInsightsPage || isJournalPage) && bubblesRef.current.length > 0 && items.length > 0) {
       bubblesRef.current.forEach((bubble, index) => {
         if (index < items.length) {
+          // Initialize positions when items change
           Body.setPosition(bubble.body, {
             x: items[index].position.x,
             y: items[index].position.y
           });
           
+          // Add slight initial velocities for more life-like behavior
           Body.setVelocity(bubble.body, {
-            x: (Math.random() - 0.5) * 0.5,
-            y: (Math.random() - 0.5) * 0.5
+            x: (Math.random() - 0.5) * 1,
+            y: (Math.random() - 0.5) * 1
           });
         }
       });
@@ -419,13 +513,13 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       const textLength = text.length;
       
       if (textLength <= 5) {
-        return Math.min(availableWidth, availableHeight) * 0.22;
+        return Math.min(availableWidth, availableHeight) * 0.18; // Reduced sizes for better physics
       } else if (textLength <= 10) {
-        return Math.min(availableWidth, availableHeight) * 0.28;
+        return Math.min(availableWidth, availableHeight) * 0.24;
       } else if (textLength <= 15) {
-        return Math.min(availableWidth, availableHeight) * 0.32;
+        return Math.min(availableWidth, availableHeight) * 0.28;
       } else {
-        return Math.min(availableWidth, availableHeight) * 0.38;
+        return Math.min(availableWidth, availableHeight) * 0.32;
       }
     };
     
@@ -454,13 +548,13 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       }));
       
       const maxBubbleSize = Math.min(
-        Math.min(availableWidth, availableHeight) * 0.35,
-        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.4
+        Math.min(availableWidth, availableHeight) * 0.32, // Reduced for better physics
+        Math.sqrt((totalArea) / (itemCount * Math.PI)) * 1.3
       );
       
       newItems = filteredEmotions.map(([emotion, value], index) => {
         const minSize = baseMinSizes.find(item => item.emotion === emotion)?.minSize || 
-                       Math.min(availableWidth, availableHeight) * 0.22;
+                       Math.min(availableWidth, availableHeight) * 0.18;
         
         let size;
         if (valueRange === 0) {
@@ -493,8 +587,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       const itemCount = filteredThemes.length;
       
       const bubbleSize = Math.min(
-        Math.min(availableWidth, availableHeight) * 0.28,
-        Math.sqrt((availableWidth * availableHeight * 0.8) / itemCount) * 1.3
+        Math.min(availableWidth, availableHeight) * 0.25,
+        Math.sqrt((availableWidth * availableHeight * 0.8) / itemCount) * 1.2
       );
       
       newItems = filteredThemes.map((theme, index) => {
@@ -513,73 +607,44 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
     }
     
     if (newItems.length > 0) {
-      // Position items
-      for (let i = 0; i < newItems.length; i++) {
-        const placeItem = (item: any, index: number, attempts = 0) => {
-          if (attempts > 100) {
-            const cols = Math.ceil(Math.sqrt(newItems.length));
-            const col = index % cols;
-            const row = Math.floor(index / cols);
-            const cellWidth = availableWidth / cols;
-            const cellHeight = availableHeight / cols;
-            
-            return {
-              x: padding + cellWidth * (col + 0.5),
-              y: padding + cellHeight * (row + 0.5)
-            };
-          }
+      // Position items using a spiral pattern for better initial placement
+      const spiralPositioning = (items: typeof newItems) => {
+        const centerX = availableWidth / 2;
+        const centerY = availableHeight / 2;
+        const a = Math.min(availableWidth, availableHeight) * 0.15; // Controls spiral spread
+        const b = 0.5; // Controls spiral tightness
+        
+        return items.map((item, i) => {
+          const angle = b * i;
+          const x = centerX + a * angle * Math.cos(angle);
+          const y = centerY + a * angle * Math.sin(angle);
           
-          const maxRadius = Math.min(availableWidth, availableHeight) * 0.35;
-          const maxAngle = 2 * Math.PI * 6;
-          const t = index / newItems.length;
-          const angle = t * maxAngle;
-          const radius = Math.sqrt(t) * maxRadius;
-          
-          const centerX = availableWidth / 2;
-          const centerY = availableHeight / 2;
-          
-          const randomOffset = Math.min(availableWidth, availableHeight) * 0.02;
+          // Add slight randomness to prevent perfect symmetry
+          const randomOffset = Math.min(availableWidth, availableHeight) * 0.01;
           const randomX = (Math.random() - 0.5) * randomOffset;
           const randomY = (Math.random() - 0.5) * randomOffset;
           
-          const x = padding + centerX + radius * Math.cos(angle) + randomX;
-          const y = padding + centerY + radius * Math.sin(angle) + randomY;
-          
-          if (preventOverlap && attempts < 100) {
-            for (let j = 0; j < i; j++) {
-              const otherItem = newItems[j];
-              const dx = x - otherItem.position.x;
-              const dy = y - otherItem.position.y;
-              const distance = Math.sqrt(dx * dx + dy * dy);
-              
-              const minDistance = (item.size / 2 + otherItem.size / 2) * 1.4;
-              
-              if (distance < minDistance) {
-                return placeItem(item, index, attempts + 1);
-              }
-            }
-          }
-          
-          return { x, y };
-        };
-        
-        const position = placeItem(newItems[i], i);
-        
-        const safeBubblePlacement = (pos: {x: number, y: number}, size: number) => {
-          const halfSize = size / 2;
-          const minX = padding + halfSize + 5;
-          const maxX = padding + availableWidth - halfSize - 5;
-          const minY = padding + halfSize + 5;
-          const maxY = padding + availableHeight - halfSize - 5;
+          const safeBubblePlacement = (pos: {x: number, y: number}, size: number) => {
+            const halfSize = size / 2;
+            const minX = padding + halfSize + 5;
+            const maxX = padding + availableWidth - halfSize - 5;
+            const minY = padding + halfSize + 5;
+            const maxY = padding + availableHeight - halfSize - 5;
+            
+            return {
+              x: Math.min(maxX, Math.max(minX, pos.x + randomX)),
+              y: Math.min(maxY, Math.max(minY, pos.y + randomY))
+            };
+          };
           
           return {
-            x: Math.min(maxX, Math.max(minX, pos.x)),
-            y: Math.min(maxY, Math.max(minY, pos.y))
+            ...item,
+            position: safeBubblePlacement({x: padding + x, y: padding + y}, item.size)
           };
-        };
-        
-        newItems[i].position = safeBubblePlacement(position, newItems[i].size);
-      }
+        });
+      };
+      
+      newItems = spiralPositioning(newItems);
     }
     
     setItems(newItems);
@@ -660,29 +725,28 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         <>
           <canvas 
             ref={canvasRef} 
-            className="absolute top-0 left-0 w-full h-full"
+            className="absolute top-0 left-0 w-full h-full z-10"
           />
           {bubblesRef.current.map((bubble, index) => (
             <div
               key={bubble.name + index}
-              className="absolute pointer-events-auto"
+              className="absolute pointer-events-auto z-20"
               style={{
                 width: bubble.size,
                 height: bubble.size,
                 transform: `translate(${bubble.body.position.x - bubble.size/2}px, ${bubble.body.position.y - bubble.size/2}px)`,
               }}
             >
-              <motion.div>
-                <EmotionBubbleDetail
-                  name={bubble.name}
-                  size={bubble.size}
-                  color={items[index]?.color}
-                  isDisturbed={isCurrentlyDisturbed}
-                  isHighlighted={selectedEmotion === bubble.name}
-                  percentage={bubble.percentage}
-                  onClick={handleEmotionClick}
-                />
-              </motion.div>
+              <EmotionBubbleDetail
+                name={bubble.name}
+                size={bubble.size}
+                color={items[index]?.color}
+                isDisturbed={isCurrentlyDisturbed}
+                isDragging={draggingBubble === bubble.name}
+                isHighlighted={selectedEmotion === bubble.name}
+                percentage={bubble.percentage}
+                onClick={handleEmotionClick}
+              />
             </div>
           ))}
         </>

@@ -14,6 +14,7 @@ interface EmotionBubbleDetailProps {
   onClick?: (name: string) => void;
   isDisturbed?: boolean;
   isHighlighted?: boolean;
+  isDragging?: boolean;
 }
 
 const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
@@ -25,7 +26,8 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   percentage,
   onClick,
   isDisturbed = false,
-  isHighlighted = false
+  isHighlighted = false,
+  isDragging = false
 }) => {
   const isMobile = useIsMobile();
   const [showPercentage, setShowPercentage] = useState(false);
@@ -56,9 +58,14 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
       baseSize = size / 6;
     }
     
+    // Further adjust size for very small bubbles
+    if (size < 50) {
+      baseSize = baseSize * 0.8;
+    }
+    
     // Ensure minimum and maximum font sizes based on device
-    const minSize = isMobile ? 11 : 13;
-    const maxSize = isMobile ? 18 : 22;
+    const minSize = isMobile ? 10 : 12;
+    const maxSize = isMobile ? 16 : 20;
     
     return Math.min(maxSize, Math.max(minSize, baseSize));
   };
@@ -81,11 +88,13 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   };
 
   // Set a minimum size for the bubble to ensure legibility
-  const bubbleSize = Math.max(isMobile ? 45 : 60, size);
+  const bubbleSize = Math.max(isMobile ? 40 : 50, size);
 
   // Create different animations based on disturbed state
   const getAnimation = () => {
-    if (isDisturbed) {
+    if (isDragging) {
+      return {}; // No animation while dragging
+    } else if (isDisturbed) {
       return {
         scale: [1, 1.1, 0.95, 1.05, 1],
         rotate: [0, 5, -5, 3, 0],
@@ -122,6 +131,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
           "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow relative",
           color,
           isHighlighted ? "ring-4 ring-primary ring-opacity-70" : "",
+          isDragging ? "shadow-lg z-50" : "",
           className
         )}
         style={{ width: bubbleSize, height: bubbleSize }}
@@ -137,7 +147,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
           {name}
         </span>
         
-        {showPercentage && percentage !== undefined && (
+        {(showPercentage || isHighlighted) && percentage !== undefined && (
           <motion.div 
             className="absolute -top-8 bg-background border border-border shadow-md px-2 py-1 rounded-md text-xs font-semibold z-10"
             initial={{ opacity: 0, y: 10 }}
