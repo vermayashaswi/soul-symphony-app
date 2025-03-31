@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
 
-// Type definitions for emotion data
 type EmotionData = {
   day: string;
   [key: string]: number | string;
@@ -27,7 +26,6 @@ interface EmotionChartProps {
   aggregatedData?: AggregatedEmotionData;
 }
 
-// Enhanced color mapping for emotions with distinct colors
 const EMOTION_COLORS: Record<string, string> = {
   joy: '#4299E1',           // Blue
   happiness: '#48BB78',     // Green
@@ -50,7 +48,6 @@ const EMOTION_COLORS: Record<string, string> = {
   boredom: '#4B5563',       // Gray
   disgust: '#65A30D',       // Lime
   contentment: '#0D9488',   // Dark Teal
-  // Additional distinct colors for more emotions
   trust: '#A78BFA',         // Light Purple
   anticipation: '#FB923C',  // Light Orange
   pensiveness: '#93C5FD',   // Light Blue
@@ -63,20 +60,17 @@ const EMOTION_COLORS: Record<string, string> = {
   admiration: '#C4B5FD'     // Lavender
 };
 
-// Get color for an emotion, with fallback
 const getEmotionColor = (emotion: string, index: number): string => {
   const normalized = emotion.toLowerCase();
   if (EMOTION_COLORS[normalized]) {
     return EMOTION_COLORS[normalized];
   }
   
-  // If we don't have a predefined color, use one of these fallback colors
   const fallbackColors = [
     '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
     '#EC4899', '#6366F1', '#D946EF', '#F97316', '#0EA5E9'
   ];
   
-  // Use modulo to cycle through the colors if we have more emotions than colors
   return fallbackColors[index % fallbackColors.length];
 };
 
@@ -93,20 +87,16 @@ export function EmotionChart({
     { id: 'bubble', label: 'Emotion Bubbles' },
   ];
   
-  // Process emotion data for bubble chart - properly tied to aggregatedData and timeframe
   const bubbleData = useMemo(() => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
       console.log('[EmotionChart] No aggregated data available for timeframe:', timeframe);
       return {};
     }
     
-    // Combine all emotions from aggregatedData for the current timeframe
     const emotionScores: Record<string, number> = {};
     
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
-      // Only include emotions that have data points in the current timeframe
       if (dataPoints.length > 0) {
-        // Sum up all values for this emotion
         const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
         emotionScores[emotion] = totalScore;
       }
@@ -120,7 +110,6 @@ export function EmotionChart({
     return emotionScores;
   }, [aggregatedData, timeframe]);
   
-  // This effect will re-render the bubble chart when data or timeframe changes
   useEffect(() => {
     console.log('[EmotionChart] Timeframe or aggregatedData changed, updating bubble chart', {
       timeframe,
@@ -130,21 +119,17 @@ export function EmotionChart({
     setBubbleKey(prev => prev + 1);
   }, [timeframe, aggregatedData, bubbleData]);
   
-  // Process aggregated data for line chart
   const lineData = useMemo(() => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
       return [];
     }
     
-    // Get top 5 emotions based on total score
     const emotionTotals: Record<string, number> = {};
     const dateMap: Map<string, Record<string, number>> = new Map();
     
-    // Calculate totals for each emotion to find top emotions
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       emotionTotals[emotion] = dataPoints.reduce((sum, point) => sum + point.value, 0);
       
-      // Populate the dateMap for creating the chart data
       dataPoints.forEach(point => {
         if (!dateMap.has(point.date)) {
           dateMap.set(point.date, {});
@@ -154,20 +139,17 @@ export function EmotionChart({
       });
     });
     
-    // Get top 5 emotions by total score
     const topEmotions = Object.entries(emotionTotals)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
-    // Convert the dateMap to an array of data points for the chart
     return Array.from(dateMap.entries())
       .map(([date, emotions]) => {
         const dataPoint: EmotionData = { 
           day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
         };
         
-        // Add the top emotions to the data point
         topEmotions.forEach(emotion => {
           dataPoint[emotion] = emotions[emotion] || 0;
         });
@@ -190,7 +172,6 @@ export function EmotionChart({
       );
     }
     
-    // Get the emotion names that are present in the data
     const emotions = Object.keys(lineData[0]).filter(key => key !== 'day');
     
     return (
@@ -267,10 +248,16 @@ export function EmotionChart({
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && (
           <div className="w-full h-[350px]" key={bubbleKey}>
-            <EmotionBubbles 
-              emotions={bubbleData} 
-              preventOverlap={true} // Ensure bubbles don't overlap
-            />
+            {Object.keys(bubbleData).length > 0 ? (
+              <EmotionBubbles 
+                emotions={bubbleData} 
+                preventOverlap={true}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                No themes data available for this timeframe
+              </div>
+            )}
           </div>
         )}
       </div>

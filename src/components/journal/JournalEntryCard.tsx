@@ -250,17 +250,17 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                 transition={{ duration: 0.2 }}
                 onClick={handleBubbleBoxClick}
               >
-                {entry.emotions && Object.keys(entry.emotions).length > 0 ? (
+                {entry.master_themes && entry.master_themes.length > 0 ? (
+                  <ThemeBoxes 
+                    themes={entry.master_themes} 
+                    className="w-full h-full items-center justify-center" 
+                    isDisturbed={bubbleDisturbance}
+                  />
+                ) : entry.emotions && Object.keys(entry.emotions).length > 0 ? (
                   <EmotionBubbles 
                     emotions={entry.emotions} 
                     className="w-full h-full"
                     preventOverlap={true}
-                    isDisturbed={bubbleDisturbance}
-                  />
-                ) : entry.master_themes && entry.master_themes.length > 0 ? (
-                  <ThemeBoxes 
-                    themes={entry.master_themes} 
-                    className="w-full h-full items-center justify-center" 
                     isDisturbed={bubbleDisturbance}
                   />
                 ) : (

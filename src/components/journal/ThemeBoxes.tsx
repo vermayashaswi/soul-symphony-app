@@ -25,37 +25,29 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
     'bg-cyan-100 text-cyan-800 border border-cyan-200',
   ];
 
-  // Filler themes to add small bubbles when there are few main themes
-  const [fillerThemes, setFillerThemes] = useState<string[]>([]);
-  
-  useEffect(() => {
-    // Generate filler bubbles if we have fewer than 5 main themes
-    if (themes.length < 5) {
-      const fillers = Array(8 - themes.length)
-        .fill('')
-        .map((_, i) => `•`); // Use bullet character for small bubbles
-      setFillerThemes(fillers);
-    } else {
-      setFillerThemes([]);
-    }
-  }, [themes]);
-
-  // All themes including fillers
-  const allThemes = [...themes, ...fillerThemes];
-
-  // Additional animation variants for floating effect
-  const floatingAnimation = {
-    initial: { y: 0 },
-    animate: (i: number) => ({
-      y: [0, -10, 0, 5, 0],
+  // Animation variants for floating and entrance effects
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
       transition: {
-        duration: 4 + Math.random() * 2,
-        repeat: Infinity,
-        repeatType: "loop" as const,
-        ease: "easeInOut",
-        delay: i * 0.2
+        staggerChildren: 0.08,
       }
-    })
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20, scale: 0.8 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1,
+      transition: { 
+        type: "spring",
+        stiffness: 260,
+        damping: 20
+      }
+    }
   };
 
   if (!themes || themes.length === 0) {
@@ -91,11 +83,13 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
   }
 
   return (
-    <div className={cn("flex flex-wrap gap-2 md:gap-4 relative p-2 h-full w-full justify-center items-center", className)}>
-      {allThemes.map((theme, index) => {
-        // Determine if this is a filler (small) bubble
-        const isFiller = index >= themes.length;
-        
+    <motion.div 
+      className={cn("flex flex-wrap gap-3 md:gap-4 justify-center items-center h-full w-full p-2", className)}
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {themes.map((theme, index) => {
         // Generate a random offset for the animation
         const randomOffset = Math.random() * 0.5 + 0.5; // Between 0.5 and 1
         
@@ -103,55 +97,38 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
           <motion.div
             key={`${theme}-${index}`}
             className={cn(
-              "rounded-lg shadow-sm font-medium flex items-center justify-center",
+              "rounded-lg shadow-sm font-medium flex items-center justify-center px-4 py-2",
               colorClasses[index % colorClasses.length],
-              isFiller ? "opacity-40" : "opacity-100"
             )}
-            style={{
-              minWidth: isFiller ? (isMobile ? '40px' : '50px') : (isMobile ? '100px' : '140px'),
-              height: isFiller ? (isMobile ? '40px' : '50px') : (isMobile ? '50px' : '60px'),
-              fontSize: isFiller ? (isMobile ? '12px' : '14px') : (isMobile ? '14px' : '16px'),
-              padding: isFiller ? '8px' : (isMobile ? '8px' : '12px'),
+            variants={itemVariants}
+            whileHover={{ 
+              scale: 1.05, 
+              boxShadow: "0 8px 20px -5px rgba(0, 0, 0, 0.1)",
+              transition: { duration: 0.2 }
             }}
-            initial={{ scale: 0, opacity: 0 }}
             animate={isDisturbed ? {
-              x: [0, (Math.random() - 0.5) * 40, 0],
-              y: [0, (Math.random() - 0.5) * 40, 0],
-              rotate: [0, (Math.random() - 0.5) * 30, 0],
-              scale: [1, 1.1, 1],
+              x: [0, (Math.random() - 0.5) * 20, 0],
+              y: [0, (Math.random() - 0.5) * 20, 0],
+              rotate: [0, (Math.random() - 0.5) * 10, 0],
               transition: {
-                duration: 2,
+                duration: 1.5,
                 ease: "easeInOut"
               }
             } : {
-              y: [0, -5 * randomOffset, 0, 5 * randomOffset, 0],
-              scale: [1, 1.02, 1, 0.98, 1],
-              opacity: 1,
+              y: [0, -3 * randomOffset, 0, 3 * randomOffset, 0],
               transition: { 
-                duration: 3 + Math.random() * 2,
+                duration: 3 + Math.random() * 1.5,
                 repeat: Infinity,
-                ease: "easeInOut"
+                ease: "easeInOut",
+                delay: index * 0.1
               }
             }}
-            transition={{ 
-              type: "spring",
-              stiffness: 260,
-              damping: 20,
-              delay: index * 0.1
-            }}
-            whileHover={{ 
-              scale: 1.1, 
-              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
-              transition: { duration: 0.2 }
-            }}
-            custom={index}
-            variants={floatingAnimation}
           >
             {theme}
           </motion.div>
         );
       })}
-    </div>
+    </motion.div>
   );
 }
 
