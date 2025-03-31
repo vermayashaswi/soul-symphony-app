@@ -10,11 +10,14 @@ import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from 'react-markdown';
 import { sendAudioForTranscription } from "@/utils/audio/transcription-service";
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function SmartChatInterface() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingTimer, setRecordingTimer] = useState<NodeJS.Timeout | null>(null);
   const [chatHistory, setChatHistory] = useState<{
     role: 'user' | 'assistant';
     content: string;
@@ -22,6 +25,7 @@ export default function SmartChatInterface() {
   }[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   
   const [recorder, setRecorder] = useState<RecordRTC | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -39,6 +43,12 @@ export default function SmartChatInterface() {
     try {
       if (isRecording) {
         setIsRecording(false);
+        
+        if (recordingTimer) {
+          clearInterval(recordingTimer);
+          setRecordingTimer(null);
+        }
+        setRecordingTime(0);
         
         if (recorder) {
           recorder.stopRecording(() => {
@@ -81,6 +91,12 @@ export default function SmartChatInterface() {
       }
 
       setIsRecording(true);
+      setRecordingTime(0);
+      
+      const timer = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      setRecordingTimer(timer);
       
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -130,6 +146,12 @@ export default function SmartChatInterface() {
       });
       setIsRecording(false);
       setIsLoading(false);
+      
+      if (recordingTimer) {
+        clearInterval(recordingTimer);
+        setRecordingTimer(null);
+      }
+      setRecordingTime(0);
     }
   };
 
@@ -250,22 +272,28 @@ export default function SmartChatInterface() {
     ]);
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
   return (
-    <Card className="w-full max-w-3xl mx-auto h-[80vh] flex flex-col">
-      <CardHeader>
+    <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col">
+      <CardHeader className="pb-2">
         <CardTitle className="text-center">Smart Chat</CardTitle>
       </CardHeader>
       
-      <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+      <CardContent className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
         {chatHistory.length === 0 ? (
-          <div className="text-center text-muted-foreground p-8">
+          <div className="text-center text-muted-foreground p-4 md:p-8">
             Start a conversation with your journal by asking a question.
           </div>
         ) : (
           chatHistory.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`max-w-[80%] rounded-lg p-4 ${
+                className={`max-w-[80%] rounded-lg p-3 ${
                   msg.role === 'user' 
                     ? 'bg-primary text-primary-foreground' 
                     : 'bg-muted'
@@ -306,7 +334,7 @@ export default function SmartChatInterface() {
         )}
       </CardContent>
       
-      <CardFooter className="border-t p-4">
+      <CardFooter className="border-t p-3 md:p-4">
         <form onSubmit={handleSubmit} className="flex w-full gap-2">
           <Textarea
             value={message}
@@ -328,8 +356,14 @@ export default function SmartChatInterface() {
               variant={isRecording ? "destructive" : "outline"}
               onClick={handleVoiceInput}
               disabled={isLoading}
+              className="relative"
             >
-              <Mic className={`h-5 w-5 ${isRecording ? 'animate-pulse' : ''}`} />
+              <Mic className={`h-5 w-5 ${isRecording ? 'animate-pulse text-white' : ''}`} />
+              {isRecording && (
+                <span className="absolute -bottom-6 text-xs font-medium">
+                  {formatTime(recordingTime)}
+                </span>
+              )}
             </Button>
             <Button type="submit" size="icon" disabled={isLoading || isRecording || !message.trim()}>
               <Send className="h-5 w-5" />
