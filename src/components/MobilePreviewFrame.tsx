@@ -1,5 +1,5 @@
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 interface MobilePreviewFrameProps {
@@ -10,6 +10,31 @@ export const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
   const location = useLocation();
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  
+  useEffect(() => {
+    if (mobileDemo) {
+      // When in mobile preview mode, force the viewport meta tag
+      const metaViewport = document.querySelector('meta[name="viewport"]');
+      if (metaViewport) {
+        metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+      
+      // Set the body style to prevent scrolling outside the frame
+      document.body.style.overflow = 'hidden';
+      document.body.style.backgroundColor = '#1e293b'; // slate-800
+      
+      // Expose the mobile view flag for other components
+      window.__forceMobileView = true;
+    }
+    
+    return () => {
+      if (mobileDemo) {
+        document.body.style.overflow = '';
+        document.body.style.backgroundColor = '';
+        window.__forceMobileView = undefined;
+      }
+    };
+  }, [mobileDemo]);
   
   // Only show the mobile frame if the mobileDemo parameter is true
   if (!mobileDemo) {

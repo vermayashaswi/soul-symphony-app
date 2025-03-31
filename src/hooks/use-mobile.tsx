@@ -92,21 +92,6 @@ export function useIsMobile() {
     };
   }, [isMobile]);
 
-  // Expose a debug trigger function for the global scope
-  React.useEffect(() => {
-    // Add debug helper to window
-    window.toggleMobileView = () => {
-      window.__forceMobileView = !window.__forceMobileView;
-      console.log("Mobile view manually toggled:", window.__forceMobileView);
-      setIsMobile(window.__forceMobileView);
-    };
-    
-    return () => {
-      // @ts-ignore
-      delete window.toggleMobileView;
-    };
-  }, []);
-
   return isInitialized ? isMobile : false;
 }
 

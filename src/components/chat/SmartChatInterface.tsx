@@ -20,6 +20,10 @@ export default function SmartChatInterface() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
 
+  // Check if we're in mobile preview mode
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {
       toast({
@@ -62,9 +66,9 @@ export default function SmartChatInterface() {
   };
 
   return (
-    <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col">
+    <Card className={`smart-chat-interface w-full max-w-3xl mx-auto ${isMobile || mobileDemo ? 'h-[calc(75vh)]' : 'h-[80vh]'} flex flex-col`}>
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-center">Smart Chat {isMobile ? "(Mobile)" : ""}</CardTitle>
+        <CardTitle className="text-center">Smart Chat {isMobile || mobileDemo ? "(Mobile)" : ""}</CardTitle>
         {chatHistory.length > 0 && (
           <Button 
             variant="outline" 
