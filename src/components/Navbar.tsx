@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -6,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import SouloLogo from '@/components/SouloLogo';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -81,9 +83,9 @@ export function Navbar() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
-            className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse"
+            className="flex items-center justify-center"
           >
-            <span className="text-white font-bold text-lg">S</span>
+            <SouloLogo useColorTheme={true} />
           </motion.div>
         </Link>
 
