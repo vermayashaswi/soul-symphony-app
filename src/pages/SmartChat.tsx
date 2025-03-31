@@ -31,7 +31,8 @@ export default function SmartChat() {
       {!isMobile && (
         <p className="text-center text-muted-foreground mb-6 md:mb-8 px-2">
           Ask questions about your journal entries using natural language.
-          Get both qualitative insights and quantitative analysis of your emotions, sentiments, and patterns over time.
+          Get both qualitative insights ("How did I feel about work?") and quantitative analysis 
+          ("What are my top 3 emotions?" or "When was I most sad?").
         </p>
       )}
       

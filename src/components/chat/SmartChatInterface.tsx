@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -201,7 +202,7 @@ export default function SmartChatInterface() {
   };
 
   const processChatMessage = async (userMessage: string) => {
-    const isQuantitativeQuery = checkForQuantitativeQuery(userMessage);
+    const queryTypes = analyzeQueryTypes(userMessage);
     
     try {
       const { data, error } = await supabase.functions.invoke('smart-chat', {
@@ -209,7 +210,7 @@ export default function SmartChatInterface() {
           message: userMessage,
           userId: user!.id,
           includeDiagnostics: true,
-          isQuantitativeQuery
+          queryTypes
         }
       });
       
@@ -230,6 +231,35 @@ export default function SmartChatInterface() {
     } catch (error) {
       throw error;
     }
+  };
+
+  // Enhanced query analysis function
+  const analyzeQueryTypes = (query: string): Record<string, boolean> => {
+    const lowerQuery = query.toLowerCase();
+    
+    // Check for different query types
+    return {
+      // Quantitative patterns
+      isQuantitative: checkForQuantitativeQuery(query),
+      
+      // Temporal patterns - when questions
+      isTemporal: /\bwhen\b|\btime\b|\bdate\b|\bperiod\b|\bduring\b|\bafter\b|\bbefore\b/i.test(lowerQuery),
+      
+      // Comparative patterns - asking for most/least/top/bottom
+      isComparative: /\bmost\b|\bleast\b|\btop\b|\bbottom\b|\bhighest\b|\blowest\b|\branking\b|\brank\b/i.test(lowerQuery),
+      
+      // Emotional analysis specific patterns
+      isEmotionFocused: /\bfeel\b|\bfeeling\b|\bemotion\b|\bhappy\b|\bsad\b|\bangry\b|\bfear\b|\bjoy\b|\bworried\b|\banxious\b/i.test(lowerQuery),
+      
+      // Requiring context understanding
+      needsContext: /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b/i.test(lowerQuery),
+      
+      // Question asking for specific number 
+      asksForNumber: /how many|how much|what percentage|how often|frequency|count/i.test(lowerQuery),
+      
+      // Standard vector search still needed
+      needsVectorSearch: true
+    };
   };
 
   const checkForQuantitativeQuery = (query: string): boolean => {
@@ -287,7 +317,16 @@ export default function SmartChatInterface() {
       <CardContent className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
         {chatHistory.length === 0 ? (
           <div className="text-center text-muted-foreground p-4 md:p-8">
-            Start a conversation with your journal by asking a question.
+            <p>Start a conversation with your journal by asking a question.</p>
+            <div className="mt-4 text-sm">
+              <p className="font-medium">Try questions like:</p>
+              <ul className="list-disc list-inside mt-2 space-y-1 text-left max-w-md mx-auto">
+                <li>"How did I feel about work last week?"</li>
+                <li>"What are my top 3 emotions in my journal?"</li>
+                <li>"When was I feeling most anxious and why?"</li>
+                <li>"What's the sentiment trend in my journal?"</li>
+              </ul>
+            </div>
           </div>
         ) : (
           chatHistory.map((msg, idx) => (

@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -77,14 +76,14 @@ async function generateEmbedding(text: string) {
   }
 }
 
-// Function to ask GPT to analyze the query and generate SQL
+// Enhanced function to ask GPT to analyze the query and generate SQL
 async function analyzeQueryWithGPT(
   userQuery: string, 
   userId: string,
-  isQuantitativeQuery: boolean = false
+  queryTypes: Record<string, boolean> = {}
 ) {
   try {
-    console.log("Asking GPT to analyze query and generate SQL");
+    console.log("Asking GPT to analyze query and generate SQL with query types:", queryTypes);
     
     let systemPrompt = `You are an AI assistant specialized in analyzing user queries about journal entries and generating appropriate SQL queries.
 
@@ -92,51 +91,66 @@ ${DATABASE_SCHEMA}
 
 Your task:
 1. Analyze the user's question about their journal entries
-2. Determine if the question requires:
-   a) Direct SQL querying for factual/statistical questions (e.g., "How many journal entries did I write last week?")
-   b) Vector similarity search for semantic/content questions (e.g., "What did I write about happiness?")
-   c) A combination of both approaches
+2. Determine the best approach to answer their question based on its nature:
+   a) For quantitative questions (statistics, counts, rankings, etc.), generate precise SQL queries
+   b) For semantic/content questions, use vector similarity search
+   c) For questions requiring both numerical data and context, use a hybrid approach
 
-3. If SQL is needed, generate a PostgreSQL query that:
-   - Filters by the correct user_id (provided separately)
-   - Includes appropriate WHERE clauses based on the user's question
-   - Uses appropriate aggregations if needed
+3. Generate a PostgreSQL query that:
+   - Is accurate for the specific question type (aggregate functions for statistics, etc.)
+   - Filters by the correct user_id
+   - Uses appropriate GROUP BY, ORDER BY, and LIMIT clauses as needed
    - Is secure and properly parameterized
    - Returns only the necessary columns
-   - If the question involves filtering by emotions, use the emotions jsonb field
-   - If the question involves filtering by entities, use the entities jsonb field (an array of objects with type and name)
+   - For emotional analysis, properly extracts and analyzes the emotions jsonb field
+   - For temporal questions, uses appropriate date functions
 
-4. For vector similarity parts, specify what text should be used for the embedding search.`;
+4. Be especially attentive to:
+   - Comparative questions asking for "most", "least", "top", etc.
+   - Temporal questions asking "when" with emotional context
+   - Questions about trends or patterns over time
+   - Questions requiring counting, averaging, or analyzing distributions`;
 
-    // Enhanced prompt for quantitative queries
-    if (isQuantitativeQuery) {
-      systemPrompt += `\n\nSPECIAL INSTRUCTIONS FOR QUANTITATIVE QUERIES:
-Since this is a quantitative query about statistics, scores, or metrics:
-- Use SQL aggregation functions (AVG, SUM, COUNT, etc.) when appropriate
-- For emotion scores, extract values from the emotions JSONB field using jsonb_object_keys and jsonb_extract_path_text
-- For sentiment analysis, use string functions on the sentiment field
-- Calculate percentages and distributions when requested
-- Make sure to handle NULL values properly in calculations
-- When scoring on a scale (e.g., "out of 10"), normalize values appropriately
-- For time-based trends, use time-series analysis with date_trunc as needed`;
+    // Add specific guidance based on query types
+    if (queryTypes.isQuantitative || queryTypes.isComparative || queryTypes.asksForNumber) {
+      systemPrompt += `\n\nSPECIAL INSTRUCTIONS FOR QUANTITATIVE/COMPARATIVE QUERIES:
+- Use appropriate SQL aggregation functions (AVG, COUNT, SUM, etc.)
+- For emotion-related queries, extract values from the emotions JSONB field using jsonb_object_keys and jsonb_extract_path_text functions
+- For ranking questions (top N, etc.), use ORDER BY with LIMIT
+- For "most" or "least" questions, use MAX/MIN or ORDER BY with LIMIT
+- Calculate percentages when appropriate using CAST() to ensure proper numeric division
+- Handle NULL values properly in calculations
+- For time-based analysis, use date_trunc and other time functions as needed`;
+    }
+
+    if (queryTypes.isTemporal) {
+      systemPrompt += `\n\nSPECIAL INSTRUCTIONS FOR TEMPORAL QUERIES:
+- For "when" questions, focus on extracting and formatting dates appropriately
+- Use date_trunc to aggregate data by relevant time periods
+- Consider returning the actual dates of peak emotions or events
+- For questions about trends over time, generate SQL that groups by time periods`;
+    }
+
+    if (queryTypes.isEmotionFocused) {
+      systemPrompt += `\n\nSPECIAL INSTRUCTIONS FOR EMOTION-FOCUSED QUERIES:
+- Use jsonb_object_keys(emotions) to extract all emotion keys when needed
+- For specific emotions, access their values using emotions->>'emotion_name'
+- Consider the relative intensities of emotions (higher scores = stronger emotions)
+- For complex emotion analysis, you may need to cross-reference with the text content`;
     }
 
     systemPrompt += `\n\nReturn your response in the following JSON format:
 {
   "analysis": "Brief explanation of how you're approaching this query",
+  "queryType": "quantitative", "semantic", "hybrid", or "informational",
   "requiresSql": true/false,
   "sqlQuery": "The SQL query to execute (if applicable)",
   "requiresVectorSearch": true/false,
   "vectorSearchText": "The text to use for vector search (if applicable)",
-  "combinedApproach": true/false,
   "explanation": "Explanation of your reasoning"
 }
 
-Important: For the SQL query, the user_id parameter will be passed separately, so use $1 as a parameter placeholder for the user_id in the SQL query.
-
-Special attention to entity and emotion filtering: 
-- For emotion filters (e.g., "when was I happy?"), check if the emotions jsonb field contains the emotion key with significant value (e.g., WHERE emotions->>'happy' > '0.5')
-- For entity filters (e.g., "what did I write about my workplace?"), check if any of the entities match the type or name mentioned (e.g., WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(entities) e WHERE e->>'type' = 'organization'))`;
+Important: For the SQL query, the user_id parameter will be passed separately, so use $1 as a parameter placeholder for the user_id in the SQL query.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -271,15 +285,15 @@ async function performVectorSearch(
   }
 }
 
-// Function to calculate emotion statistics and aggregated data 
+// Enhanced function to calculate emotion statistics with more detailed analysis
 async function calculateEmotionStatistics(userId: string) {
   try {
-    console.log("Calculating emotion statistics");
+    console.log("Calculating enhanced emotion statistics");
     
     // Query to get all journal entries with emotions
     const { data: entries, error } = await supabase
       .from('Journal Entries')
-      .select('emotions, created_at')
+      .select('emotions, created_at, sentiment, "refined text"')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
       
@@ -293,7 +307,15 @@ async function calculateEmotionStatistics(userId: string) {
     }
     
     // Process the emotion data
-    const emotionStats: Record<string, { total: number, count: number, max: number, scores: number[] }> = {};
+    const emotionStats: Record<string, { 
+      total: number, 
+      count: number, 
+      max: number, 
+      min: number,
+      scores: number[],
+      entries: Array<{id: number, date: string, score: number, text: string}>
+    }> = {};
+    
     const entriesWithEmotions = entries.filter(entry => entry.emotions && Object.keys(entry.emotions).length > 0);
     
     if (entriesWithEmotions.length === 0) {
@@ -301,25 +323,54 @@ async function calculateEmotionStatistics(userId: string) {
     }
     
     // Collect statistics for each emotion
-    entriesWithEmotions.forEach(entry => {
+    entriesWithEmotions.forEach((entry, idx) => {
       const emotions = entry.emotions;
       if (!emotions) return;
       
       Object.entries(emotions).forEach(([emotion, score]) => {
         if (!emotionStats[emotion]) {
-          emotionStats[emotion] = { total: 0, count: 0, max: 0, scores: [] };
+          emotionStats[emotion] = { 
+            total: 0, 
+            count: 0, 
+            max: 0, 
+            min: Number.MAX_VALUE,
+            scores: [],
+            entries: []
+          };
         }
         
         const numericScore = typeof score === 'string' ? parseFloat(score) : (score as number);
         emotionStats[emotion].total += numericScore;
         emotionStats[emotion].count += 1;
         emotionStats[emotion].max = Math.max(emotionStats[emotion].max, numericScore);
+        emotionStats[emotion].min = Math.min(emotionStats[emotion].min, numericScore);
         emotionStats[emotion].scores.push(numericScore);
+        
+        // Store entries with highest emotion scores for context retrieval
+        emotionStats[emotion].entries.push({
+          id: idx, // Using index as a placeholder since we don't have the actual ID
+          date: entry.created_at,
+          score: numericScore,
+          text: entry["refined text"] || ""
+        });
       });
     });
     
+    // Sort each emotion's entries by score (descending)
+    Object.keys(emotionStats).forEach(emotion => {
+      emotionStats[emotion].entries.sort((a, b) => b.score - a.score);
+      // Limit to top 5 entries per emotion
+      emotionStats[emotion].entries = emotionStats[emotion].entries.slice(0, 5);
+    });
+    
     // Calculate averages and normalize to 1-10 scale
-    const emotionAverages: Record<string, { average: number, normalizedScore: number, frequency: number }> = {};
+    const emotionAverages: Record<string, { 
+      average: number, 
+      normalizedScore: number, 
+      frequency: number,
+      topEntries: Array<{date: string, score: number, text: string}>
+    }> = {};
+    
     const totalEntries = entriesWithEmotions.length;
     
     Object.entries(emotionStats).forEach(([emotion, stats]) => {
@@ -331,14 +382,19 @@ async function calculateEmotionStatistics(userId: string) {
       emotionAverages[emotion] = {
         average, 
         normalizedScore,
-        frequency
+        frequency,
+        topEntries: stats.entries.map(entry => ({
+          date: entry.date,
+          score: entry.score,
+          text: entry.text.substring(0, 150) + (entry.text.length > 150 ? "..." : "")
+        }))
       };
     });
     
     // Get overall sentiment distribution
     const { data: sentimentData, error: sentimentError } = await supabase
       .from('Journal Entries')
-      .select('sentiment')
+      .select('sentiment, created_at')
       .eq('user_id', userId)
       .not('sentiment', 'is', null);
       
@@ -347,12 +403,26 @@ async function calculateEmotionStatistics(userId: string) {
     }
     
     const sentimentCounts: Record<string, number> = {};
+    const sentimentByMonth: Record<string, Record<string, number>> = {};
     const totalSentimentEntries = sentimentData?.length || 0;
     
     if (sentimentData && sentimentData.length > 0) {
       sentimentData.forEach(entry => {
         if (!entry.sentiment) return;
+        
+        // Count overall sentiments
         sentimentCounts[entry.sentiment] = (sentimentCounts[entry.sentiment] || 0) + 1;
+        
+        // Group sentiments by month for trend analysis
+        if (entry.created_at) {
+          const monthYear = new Date(entry.created_at).toISOString().substring(0, 7); // YYYY-MM format
+          if (!sentimentByMonth[monthYear]) {
+            sentimentByMonth[monthYear] = {};
+          }
+          
+          sentimentByMonth[monthYear][entry.sentiment] = 
+            (sentimentByMonth[monthYear][entry.sentiment] || 0) + 1;
+        }
       });
     }
     
@@ -378,16 +448,37 @@ async function calculateEmotionStatistics(userId: string) {
           return percentage > (sentimentPercentages[highest] || 0) ? sentiment : highest;
         }, Object.keys(sentimentPercentages)[0])
       : null;
+      
+    // Calculate emotion trends over time
+    const emotionTrends = await calculateEmotionTrends(userId);
     
     return {
       success: true,
       totalJournalEntries: entries.length,
       entriesWithEmotions: entriesWithEmotions.length,
       emotionScores: emotionAverages,
+      topEmotions: Object.entries(emotionAverages)
+        .sort(([, a], [, b]) => b.normalizedScore - a.normalizedScore)
+        .slice(0, 5)
+        .map(([emotion, data]) => ({ 
+          name: emotion, 
+          score: data.normalizedScore,
+          frequency: Math.round(data.frequency)
+        })),
+      bottomEmotions: Object.entries(emotionAverages)
+        .sort(([, a], [, b]) => a.normalizedScore - b.normalizedScore)
+        .slice(0, 5)
+        .map(([emotion, data]) => ({ 
+          name: emotion, 
+          score: data.normalizedScore,
+          frequency: Math.round(data.frequency)
+        })),
       dominantEmotion,
       dominantEmotionScore: emotionAverages[dominantEmotion]?.normalizedScore || 0,
       sentimentDistribution: sentimentPercentages,
+      sentimentTrends: sentimentByMonth,
       predominantSentiment: averageSentiment,
+      emotionTrends,
       timeframe: {
         oldest: entries.length > 0 ? entries[entries.length - 1].created_at : null,
         newest: entries.length > 0 ? entries[0].created_at : null
@@ -399,6 +490,71 @@ async function calculateEmotionStatistics(userId: string) {
   }
 }
 
+// New function to calculate emotion trends over time
+async function calculateEmotionTrends(userId: string) {
+  try {
+    // Get all entries with emotions
+    const { data: entries, error } = await supabase
+      .from('Journal Entries')
+      .select('emotions, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+      
+    if (error || !entries || entries.length === 0) {
+      return null;
+    }
+    
+    // Group by month
+    const monthlyEmotions: Record<string, Record<string, number[]>> = {};
+    
+    entries.forEach(entry => {
+      if (!entry.emotions || !entry.created_at) return;
+      
+      const monthYear = new Date(entry.created_at).toISOString().substring(0, 7); // YYYY-MM format
+      if (!monthlyEmotions[monthYear]) {
+        monthlyEmotions[monthYear] = {};
+      }
+      
+      Object.entries(entry.emotions).forEach(([emotion, score]) => {
+        const numericScore = typeof score === 'string' ? parseFloat(score) : (score as number);
+        
+        if (!monthlyEmotions[monthYear][emotion]) {
+          monthlyEmotions[monthYear][emotion] = [];
+        }
+        
+        monthlyEmotions[monthYear][emotion].push(numericScore);
+      });
+    });
+    
+    // Calculate averages by month
+    const emotionTrends: Record<string, Array<{month: string, average: number}>> = {};
+    
+    Object.entries(monthlyEmotions).forEach(([month, emotions]) => {
+      Object.entries(emotions).forEach(([emotion, scores]) => {
+        if (!emotionTrends[emotion]) {
+          emotionTrends[emotion] = [];
+        }
+        
+        const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+        emotionTrends[emotion].push({
+          month,
+          average
+        });
+      });
+    });
+    
+    // Sort each emotion's trend data by month
+    Object.keys(emotionTrends).forEach(emotion => {
+      emotionTrends[emotion].sort((a, b) => a.month.localeCompare(b.month));
+    });
+    
+    return emotionTrends;
+  } catch (error) {
+    console.error("Error calculating emotion trends:", error);
+    return null;
+  }
+}
+
 // Function to generate the final response using GPT
 async function generateFinalResponse(
   userQuery: string,
@@ -406,7 +562,7 @@ async function generateFinalResponse(
   vectorResults: any[] | null,
   analysisJson: any,
   statisticsData: any = null,
-  isQuantitativeQuery: boolean = false
+  queryTypes: Record<string, boolean> = {}
 ) {
   try {
     console.log("Generating final response with GPT");
@@ -428,7 +584,7 @@ async function generateFinalResponse(
     
     // Add statistics context if available
     let statisticsContext = "";
-    if (isQuantitativeQuery && statisticsData && statisticsData.success) {
+    if (statisticsData && statisticsData.success) {
       statisticsContext = `
 Statistical Analysis of Journal Emotions and Sentiments:
 - Total Journal Entries: ${statisticsData.totalJournalEntries}
@@ -436,11 +592,11 @@ Statistical Analysis of Journal Emotions and Sentiments:
 - Dominant Emotion: ${statisticsData.dominantEmotion} (Score out of 10: ${statisticsData.dominantEmotionScore})
 - Predominant Sentiment: ${statisticsData.predominantSentiment || "Not available"}
 
-Emotion Scores (normalized to 1-10 scale):
-${Object.entries(statisticsData.emotionScores)
-  .sort(([, a], [, b]) => (b as any).normalizedScore - (a as any).normalizedScore)
-  .map(([emotion, data]) => `- ${emotion}: ${(data as any).normalizedScore}/10 (appears in ${Math.round((data as any).frequency)}% of entries)`)
-  .join('\n')}
+Top 5 Emotions (normalized to 1-10 scale):
+${statisticsData.topEmotions.map(e => `- ${e.name}: ${e.score}/10 (appears in ${e.frequency}% of entries)`).join('\n')}
+
+Bottom 5 Emotions:
+${statisticsData.bottomEmotions.map(e => `- ${e.name}: ${e.score}/10 (appears in ${e.frequency}% of entries)`).join('\n')}
 
 Sentiment Distribution:
 ${Object.entries(statisticsData.sentimentDistribution || {})
@@ -452,6 +608,44 @@ Data Timeframe:
 - Oldest Entry: ${statisticsData.timeframe.oldest ? new Date(statisticsData.timeframe.oldest).toLocaleDateString() : "None"}
 - Newest Entry: ${statisticsData.timeframe.newest ? new Date(statisticsData.timeframe.newest).toLocaleDateString() : "None"}
 `;
+
+      // Add top entries examples for emotions if this is a "most" or "when" query
+      if (queryTypes.isComparative || queryTypes.isTemporal) {
+        // Find relevant emotions based on the query
+        const queryLower = userQuery.toLowerCase();
+        const relevantEmotions = Object.keys(statisticsData.emotionScores).filter(emotion => 
+          queryLower.includes(emotion.toLowerCase())
+        );
+        
+        // If specific emotions are mentioned, add their top entries
+        if (relevantEmotions.length > 0) {
+          statisticsContext += "\nTop entries for relevant emotions:\n";
+          
+          relevantEmotions.forEach(emotion => {
+            const data = statisticsData.emotionScores[emotion];
+            if (data && data.topEntries && data.topEntries.length > 0) {
+              statisticsContext += `\n${emotion.toUpperCase()} - Top entries:\n`;
+              data.topEntries.forEach((entry, i) => {
+                const date = new Date(entry.date).toLocaleDateString();
+                statisticsContext += `Entry ${i+1} (${date}, Score: ${(entry.score * 10).toFixed(1)}/10):\n"${entry.text}"\n`;
+              });
+            }
+          });
+        }
+        // If no specific emotions are mentioned but it's a "most" query, include top entries for the dominant emotions
+        else if (statisticsData.topEmotions.length > 0) {
+          const topEmotion = statisticsData.topEmotions[0].name;
+          const data = statisticsData.emotionScores[topEmotion];
+          
+          if (data && data.topEntries && data.topEntries.length > 0) {
+            statisticsContext += `\nTop entries for ${topEmotion.toUpperCase()}:\n`;
+            data.topEntries.forEach((entry, i) => {
+              const date = new Date(entry.date).toLocaleDateString();
+              statisticsContext += `Entry ${i+1} (${date}, Score: ${(entry.score * 10).toFixed(1)}/10):\n"${entry.text}"\n`;
+            });
+          }
+        }
+      }
     }
     
     // Combine all contexts
@@ -474,16 +668,22 @@ Focus on answering the user's question directly using the available data.
 If the data doesn't contain relevant information to answer the query, acknowledge this limitation.
 Keep your tone warm, supportive, and conversational.`;
 
-    // Enhanced prompt for quantitative queries
-    if (isQuantitativeQuery) {
-      systemPrompt += `\n\nSince this is a quantitative query about statistics, scores, or ratings:
+    // Enhanced prompt for different query types
+    if (queryTypes.isQuantitative || queryTypes.isComparative || queryTypes.asksForNumber) {
+      systemPrompt += `\n\nSince this is a quantitative/comparative query:
 - Present numerical data clearly and precisely
-- When appropriate, explain what the numbers mean (e.g., "a joy score of 8/10 suggests...")
-- Use comparative language to provide context (e.g., "higher than your average")
-- Present emotional scores on a 1-10 scale where applicable
-- Explain the timeframe and data limitations if relevant
-- Give specific examples from journal entries when they support numerical findings
-- Format numbers consistently (use the same precision throughout)`;
+- Format all rankings and statistics in a clean, readable format (use markdown lists when appropriate)
+- When presenting emotion scores, use a consistent 1-10 scale
+- Make comparisons explicit when relevant (e.g., "Joy at 8/10 is your highest emotion, compared to Anxiety at 4/10")
+- Include specific examples from journal entries to support your findings
+- If trends are available, highlight changes over time`;
+    }
+
+    if (queryTypes.isTemporal) {
+      systemPrompt += `\n\nSince this is a temporal/"when" query:
+- Be specific about dates and time periods in your answer
+- Highlight the specific context from journal entries that correspond to the time period
+- If asking about an emotional peak/valley, clearly state when it occurred and provide the relevant journal context`;
     }
 
     systemPrompt += `\n\n${combinedContext}`;
@@ -541,7 +741,7 @@ serve(async (req) => {
   };
 
   try {
-    const { message, userId, includeDiagnostics = false, isQuantitativeQuery = false } = await req.json();
+    const { message, userId, includeDiagnostics = false, queryTypes = {} } = await req.json();
     
     if (!message || !userId) {
       throw new Error('Missing required parameters: message and userId');
@@ -549,11 +749,14 @@ serve(async (req) => {
 
     console.log("Processing smart-chat request for user:", userId);
     console.log("Message:", message.substring(0, 50) + "...");
-    console.log("Is quantitative query:", isQuantitativeQuery);
+    console.log("Query types:", JSON.stringify(queryTypes));
+    
+    // Determine if this is likely a quantitative query based on the queryTypes
+    const isLikelyQuantitative = queryTypes.isQuantitative || queryTypes.isComparative || queryTypes.asksForNumber;
     
     // Step 1: Ask GPT to analyze the query and generate SQL if needed
     const analysisStartTime = Date.now();
-    const analysisJson = await analyzeQueryWithGPT(message, userId, isQuantitativeQuery);
+    const analysisJson = await analyzeQueryWithGPT(message, userId, queryTypes);
     diagnostics.timings.analysis = Date.now() - analysisStartTime;
     
     console.log("Query analysis:", JSON.stringify(analysisJson));
@@ -573,7 +776,7 @@ serve(async (req) => {
         sqlResults = sqlResult.data;
         
         // If we have SQL results and need vector search, extract IDs for filtering
-        if (analysisJson.combinedApproach && sqlResults && sqlResults.length > 0) {
+        if (analysisJson.requiresVectorSearch && sqlResults && sqlResults.length > 0) {
           sqlFilteredIds = sqlResults.map(row => Number(row.id)).filter(id => !isNaN(id));
         }
         
@@ -585,8 +788,8 @@ serve(async (req) => {
       }
     }
     
-    // Step 3.5: Calculate statistics for quantitative queries
-    if (isQuantitativeQuery) {
+    // Step 3.5: Calculate statistics for quantitative and comparative queries
+    if (isLikelyQuantitative || queryTypes.isTemporal) {
       const statsStartTime = Date.now();
       try {
         statisticsData = await calculateEmotionStatistics(userId);
@@ -637,7 +840,7 @@ serve(async (req) => {
       vectorResults,
       analysisJson,
       statisticsData,
-      isQuantitativeQuery
+      queryTypes
     );
     diagnostics.timings.responseGeneration = Date.now() - responseStartTime;
     
