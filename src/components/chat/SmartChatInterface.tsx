@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Send, Mic } from "lucide-react";
+import { Loader2, Send, Mic, BarChart4 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +23,9 @@ export default function SmartChatInterface() {
     role: 'user' | 'assistant';
     content: string;
     analysis?: any;
+    references?: any[];
   }[]>([]);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -205,6 +207,8 @@ export default function SmartChatInterface() {
     const queryTypes = analyzeQueryTypes(userMessage);
     
     try {
+      console.log("Sending message to smart-chat with query types:", queryTypes);
+      
       const { data, error } = await supabase.functions.invoke('smart-chat', {
         body: {
           message: userMessage,
@@ -221,12 +225,21 @@ export default function SmartChatInterface() {
         { 
           role: 'assistant', 
           content: data.response, 
-          analysis: data.analysis 
+          analysis: data.analysis,
+          references: data.references
         }
       ]);
       
       if (data.diagnostics) {
         console.log("Chat diagnostics:", data.diagnostics);
+      }
+      
+      if (data.queryAnalysis) {
+        console.log("Query analysis:", data.queryAnalysis);
+      }
+      
+      if (data.statisticsData) {
+        console.log("Statistics data:", data.statisticsData);
       }
     } catch (error) {
       throw error;
@@ -263,7 +276,8 @@ export default function SmartChatInterface() {
       'feel', 'feeling', 'emotion', 'mood', 'happy', 'sad', 'angry', 'anxious',
       'joyful', 'excited', 'disappointed', 'frustrated', 'content', 'hopeful',
       'grateful', 'proud', 'afraid', 'scared', 'worried', 'stressed', 'peaceful',
-      'calm', 'love', 'hate', 'fear', 'disgust', 'surprise', 'shame', 'guilt'
+      'calm', 'love', 'hate', 'fear', 'disgust', 'surprise', 'shame', 'guilt',
+      'positive', 'negative', 'neutral'
     ];
     
     const numberWordPatterns = [
@@ -273,6 +287,9 @@ export default function SmartChatInterface() {
       /\bfirst\b/, /\bsecond\b/, /\bthird\b/, /\blast\b/, /\bhalf\b/, /\btwice\b/,
       /\bdouble\b/, /\btriple\b/, /\bquadruple\b/, /\bquintuple\b/, /\bmultiple\b/
     ];
+    
+    // Check for top positive/negative emotions pattern
+    const topEmotionsPattern = /top\s+\d+\s+(positive|negative)\s+emotions/i;
     
     // Check for quantitative query
     const hasQuantitativeWords = quantitativeWords.some(word => 
@@ -299,28 +316,34 @@ export default function SmartChatInterface() {
       new RegExp(`\\b${word}\\b`).test(lowerQuery)
     );
     
+    // Check for top emotions pattern
+    const hasTopEmotionsPattern = topEmotionsPattern.test(lowerQuery);
+    
     // Check for context understanding needs
     const needsContext = /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b|\bmeaning\b|\binterpret\b/.test(lowerQuery);
     
     // Return comprehensive analysis
     return {
       // Quantitative patterns
-      isQuantitative: hasQuantitativeWords || hasNumbers,
+      isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern,
       
       // Temporal patterns
       isTemporal: hasTemporalWords,
       
       // Comparative patterns
-      isComparative: hasComparativeWords,
+      isComparative: hasComparativeWords || hasTopEmotionsPattern,
       
       // Emotion specific patterns
-      isEmotionFocused: hasEmotionWords,
+      isEmotionFocused: hasEmotionWords || hasTopEmotionsPattern,
+      
+      // Top emotions pattern specifically
+      hasTopEmotionsPattern,
       
       // Context understanding
       needsContext: needsContext,
       
       // Question asking for specific number 
-      asksForNumber: hasNumbers || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
+      asksForNumber: hasNumbers || hasTopEmotionsPattern || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
       
       // Standard vector search still needed for semantic understanding
       needsVectorSearch: true
@@ -350,10 +373,44 @@ export default function SmartChatInterface() {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const toggleAnalysis = () => {
+    setShowAnalysis(!showAnalysis);
+  };
+
+  const renderReferences = (references: any[]) => {
+    if (!references || references.length === 0) return null;
+    
+    return (
+      <div className="mt-2 text-xs">
+        <Separator className="my-2" />
+        <div className="font-semibold">Based on {references.length} journal entries:</div>
+        <div className="max-h-40 overflow-y-auto mt-1">
+          {references.slice(0, 3).map((ref, idx) => (
+            <div key={idx} className="mt-1 border-l-2 border-primary pl-2 py-1">
+              <div className="font-medium">{new Date(ref.date).toLocaleDateString()}</div>
+              <div className="text-muted-foreground">{ref.snippet}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-center">Smart Chat</CardTitle>
+        {chatHistory.length > 0 && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={toggleAnalysis}
+            className="flex items-center gap-1"
+          >
+            <BarChart4 className="h-4 w-4" />
+            {showAnalysis ? "Hide Analysis" : "Show Analysis"}
+          </Button>
+        )}
       </CardHeader>
       
       <CardContent className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
@@ -389,7 +446,7 @@ export default function SmartChatInterface() {
                   <p>{msg.content}</p>
                 )}
                 
-                {msg.analysis && (
+                {showAnalysis && msg.role === 'assistant' && msg.analysis && (
                   <div className="mt-2 text-xs opacity-70">
                     <Separator className="my-2" />
                     <div className="font-semibold">Analysis:</div>
@@ -404,6 +461,8 @@ export default function SmartChatInterface() {
                     )}
                   </div>
                 )}
+                
+                {msg.role === 'assistant' && msg.references && renderReferences(msg.references)}
               </div>
             </div>
           ))
