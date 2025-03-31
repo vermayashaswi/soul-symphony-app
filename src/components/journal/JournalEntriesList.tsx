@@ -5,7 +5,8 @@ import JournalEntryCard, { JournalEntry } from './JournalEntryCard';
 import JournalSearch from './JournalSearch';
 import EmptyJournalState from './EmptyJournalState';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Smile, Meh, Frown } from 'lucide-react';
+import { Smile, Meh, Frown, Mic } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -74,7 +75,31 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   }
 
   if (entries.length === 0 && processingEntries.length === 0) {
-    return <EmptyJournalState onStartRecording={onStartRecording} />;
+    return (
+      <div className="space-y-8">
+        <EmptyJournalState onStartRecording={onStartRecording} />
+        <div className="p-6 bg-muted/30 rounded-lg border border-dashed border-muted-foreground/50">
+          <h3 className="text-lg font-medium mb-2">Chat with your journal</h3>
+          <p className="text-muted-foreground mb-4">
+            Once you've created journal entries, you can use the Smart Chat to ask questions like:
+          </p>
+          <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5 mb-4">
+            <li>"What were my top 3 emotions last week?"</li>
+            <li>"How did I feel about work recently?"</li>
+            <li>"What themes keep appearing in my journal?"</li>
+            <li>"When was I feeling most stressed and why?"</li>
+          </ul>
+          <Button 
+            onClick={() => window.location.href = "/SmartChat"} 
+            className="mt-2" 
+            variant="outline"
+            disabled={entries.length === 0}
+          >
+            Go to Smart Chat
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   const noSearchResults = searchQuery.trim() !== '' && filteredEntries.length === 0;

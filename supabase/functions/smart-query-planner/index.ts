@@ -103,6 +103,9 @@ async function generateQueryPlan(message: string, userId: string) {
           const emotionsText = formatEmotions(entry.emotions);
           return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
         }).join('\n\n') + "\n\n";
+    } else {
+      // Add context about no entries found, but don't fail completely
+      journalContext = "Note: The user doesn't have any journal entries yet. Generate a response that acknowledges this but is still helpful.\n\n";
     }
     
     // First, generate the sample answer
@@ -110,7 +113,7 @@ async function generateQueryPlan(message: string, userId: string) {
 ${journalContext}
 The user has asked: "${message}"
 
-1. First, generate a sample answer to this query as if you had complete access to the user's journal data.
+1. First, generate a sample answer to this query as if you had complete access to the user's journal data. If there are no journal entries yet, acknowledge this but still provide a helpful response.
 2. Then, break down how to execute this query into logical segments, specifying what type of operation is needed for each segment:
 
 For each segment, indicate:
@@ -263,9 +266,39 @@ async function executeVectorSegment(query: string, userId: string, startDate: st
   }
 }
 
+// Check if there are any journal entries for a user
+async function checkJournalEntries(userId: string) {
+  try {
+    const { count, error } = await supabase
+      .from('Journal Entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    return { hasEntries: count ? count > 0 : false, count };
+  } catch (error) {
+    console.error("Error checking journal entries:", error);
+    return { hasEntries: false, count: 0 };
+  }
+}
+
 // Main execution handler
 async function executeQueryPlan(plan, userId, message) {
   console.log("Executing query plan for:", message);
+  
+  // First check if the user has any journal entries
+  const { hasEntries, count } = await checkJournalEntries(userId);
+  
+  if (!hasEntries) {
+    console.log("User has no journal entries. Returning sample answer with explanation.");
+    // If no entries, still return the sample answer but with a note
+    return {
+      sample_answer: plan.sample_answer,
+      execution_results: [],
+      no_entries: true,
+      count: count
+    };
+  }
   
   const timeframe = detectTimeframe(message);
   const results = [];
@@ -326,22 +359,37 @@ async function executeQueryPlan(plan, userId, message) {
   
   return {
     sample_answer: plan.sample_answer,
-    execution_results: results
+    execution_results: results,
+    no_entries: false,
+    count: count
   };
 }
 
 // Generate the final response using the execution results and sample answer
 async function generateFinalResponse(plan, results, message) {
-  const executionSummary = results.execution_results.map(r => {
-    return `
+  // Build execution summary for context to GPT
+  const executionSummary = results.no_entries 
+    ? "The user has no journal entries yet."
+    : results.execution_results.map(r => {
+        return `
 Segment: ${r.segment}
 Type: ${r.type}
 Result: ${r.error ? `Error: ${r.error}` : JSON.stringify(r.result, null, 2)}
 `;
-  }).join("\n---\n");
+      }).join("\n---\n");
   
-  const responseSynthesisPrompt = `You are an AI assistant for a journaling app. You need to generate a response to the user's query based on the sample answer and execution results.
+  // Create a system prompt for GPT based on execution results
+  let promptHeading;
+  if (results.no_entries) {
+    promptHeading = `You are an AI assistant for a journaling app. The user has asked a question but they don't have any journal entries yet (count: ${results.count}).
+You should acknowledge this in a friendly way and provide guidance on how to use the journaling features.
+`;
+  } else {
+    promptHeading = `You are an AI assistant for a journaling app. You need to generate a response to the user's query based on the sample answer and execution results.
+`;
+  }
 
+  const responseSynthesisPrompt = `${promptHeading}
 User query: "${message}"
 
 Sample answer that was planned:
@@ -352,7 +400,10 @@ ${executionSummary}
 
 Please generate a final, natural-sounding response using the actual data from the execution results. Be conversational and helpful. Use the execution results to provide specific details, but follow the structure of the sample answer.
 
-If any segment had an error, gracefully handle it by saying you couldn't retrieve that specific information. If all segments failed, fall back to a general response acknowledging the difficulties.`;
+If any segment had an error, gracefully handle it by saying you couldn't retrieve that specific information. If all segments failed but the user has journal entries, acknowledge that you're having trouble processing their data but offer a general response.
+
+${results.no_entries ? "Since there are no journal entries yet, encourage the user to create some journal entries so you can analyze them later." : ""}
+`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
