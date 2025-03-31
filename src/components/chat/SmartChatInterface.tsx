@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +23,7 @@ export default function SmartChatInterface() {
     content: string;
     analysis?: any;
     references?: any[];
+    diagnostics?: any;
   }[]>([]);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const { toast } = useToast();
@@ -207,7 +207,39 @@ export default function SmartChatInterface() {
     const queryTypes = analyzeQueryTypes(userMessage);
     
     try {
-      console.log("Sending message to smart-chat with query types:", queryTypes);
+      console.log("Using smart-query-planner for message:", userMessage);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('smart-query-planner', {
+          body: {
+            message: userMessage,
+            userId: user!.id,
+            includeDiagnostics: true
+          }
+        });
+        
+        if (error) {
+          console.error("Error from smart-query-planner:", error);
+          throw error;
+        }
+        
+        console.log("Smart query planner response:", data);
+        
+        setChatHistory(prev => [
+          ...prev, 
+          { 
+            role: 'assistant', 
+            content: data.response,
+            diagnostics: data.diagnostics
+          }
+        ]);
+        
+        return;
+      } catch (smartQueryError) {
+        console.error("Smart query planner failed, falling back to smart-chat:", smartQueryError);
+      }
+      
+      console.log("Falling back to smart-chat with query types:", queryTypes);
       
       const { data, error } = await supabase.functions.invoke('smart-chat', {
         body: {
@@ -226,7 +258,8 @@ export default function SmartChatInterface() {
           role: 'assistant', 
           content: data.response, 
           analysis: data.analysis,
-          references: data.references
+          references: data.references,
+          diagnostics: data.diagnostics
         }
       ]);
       
@@ -246,11 +279,9 @@ export default function SmartChatInterface() {
     }
   };
 
-  // Enhanced query analysis function
   const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     const lowerQuery = query.toLowerCase();
     
-    // Define keyword sets for better detection
     const quantitativeWords = [
       'how many', 'how much', 'count', 'total', 'average', 'avg', 'statistics',
       'stats', 'number', 'percentage', 'percent', 'ratio', 'frequency', 'score',
@@ -288,64 +319,47 @@ export default function SmartChatInterface() {
       /\bdouble\b/, /\btriple\b/, /\bquadruple\b/, /\bquintuple\b/, /\bmultiple\b/
     ];
     
-    // Check for top positive/negative emotions pattern
     const topEmotionsPattern = /top\s+\d+\s+(positive|negative)\s+emotions/i;
     
-    // Check for quantitative query
     const hasQuantitativeWords = quantitativeWords.some(word => 
       lowerQuery.includes(word)
     );
     
-    // Check for numbers in the query
     const hasNumbers = numberWordPatterns.some(pattern => 
       pattern.test(lowerQuery)
     );
     
-    // Check for comparative query
     const hasComparativeWords = comparativeWords.some(word => 
       lowerQuery.includes(word)
     );
     
-    // Check for temporal query
     const hasTemporalWords = temporalWords.some(word => 
       new RegExp(`\\b${word}\\b`).test(lowerQuery)
     );
     
-    // Check for emotion focus
     const hasEmotionWords = emotionWords.some(word => 
       new RegExp(`\\b${word}\\b`).test(lowerQuery)
     );
     
-    // Check for top emotions pattern
     const hasTopEmotionsPattern = topEmotionsPattern.test(lowerQuery);
     
-    // Check for context understanding needs
     const needsContext = /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b|\bmeaning\b|\binterpret\b/.test(lowerQuery);
     
-    // Return comprehensive analysis
     return {
-      // Quantitative patterns
       isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern,
       
-      // Temporal patterns
       isTemporal: hasTemporalWords,
       
-      // Comparative patterns
       isComparative: hasComparativeWords || hasTopEmotionsPattern,
       
-      // Emotion specific patterns
       isEmotionFocused: hasEmotionWords || hasTopEmotionsPattern,
       
-      // Top emotions pattern specifically
       hasTopEmotionsPattern,
       
-      // Context understanding
       needsContext: needsContext,
       
-      // Question asking for specific number 
       asksForNumber: hasNumbers || hasTopEmotionsPattern || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
       
-      // Standard vector search still needed for semantic understanding
       needsVectorSearch: true
     };
   };
@@ -391,6 +405,62 @@ export default function SmartChatInterface() {
               <div className="text-muted-foreground">{ref.snippet}</div>
             </div>
           ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDiagnostics = (diagnostics: any) => {
+    if (!diagnostics) return null;
+    
+    return (
+      <div className="mt-2 text-xs">
+        <Separator className="my-2" />
+        <div className="font-semibold">Query Diagnostics:</div>
+        <div className="max-h-60 overflow-y-auto mt-1 bg-slate-800 p-2 rounded text-slate-200">
+          {diagnostics.query_plan && (
+            <div>
+              <div className="font-medium">Sample Answer:</div>
+              <div className="text-xs whitespace-pre-wrap mb-2">{diagnostics.query_plan.sample_answer}</div>
+              
+              <div className="font-medium">Execution Plan:</div>
+              {diagnostics.query_plan.execution_plan.map((segment: any, idx: number) => (
+                <div key={idx} className="mb-2 border-l-2 border-blue-500 pl-2">
+                  <div><span className="font-medium">Segment:</span> {segment.segment}</div>
+                  <div><span className="font-medium">Type:</span> {segment.segment_type}</div>
+                  {segment.sql_query && (
+                    <div>
+                      <span className="font-medium">SQL:</span>
+                      <pre className="text-xs overflow-x-auto">{segment.sql_query}</pre>
+                    </div>
+                  )}
+                  {segment.vector_search && (
+                    <div><span className="font-medium">Vector Search:</span> {segment.vector_search}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {diagnostics.execution_results && (
+            <div className="mt-2">
+              <div className="font-medium">Execution Results:</div>
+              {diagnostics.execution_results.execution_results.map((result: any, idx: number) => (
+                <div key={idx} className="mb-2 border-l-2 border-green-500 pl-2">
+                  <div><span className="font-medium">Segment:</span> {result.segment}</div>
+                  <div><span className="font-medium">Type:</span> {result.type}</div>
+                  {result.error ? (
+                    <div className="text-red-400"><span className="font-medium">Error:</span> {result.error}</div>
+                  ) : (
+                    <div>
+                      <span className="font-medium">Result:</span>
+                      <pre className="text-xs overflow-x-auto">{JSON.stringify(result.result, null, 2)}</pre>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -461,6 +531,8 @@ export default function SmartChatInterface() {
                     )}
                   </div>
                 )}
+                
+                {showAnalysis && msg.role === 'assistant' && msg.diagnostics && renderDiagnostics(msg.diagnostics)}
                 
                 {msg.role === 'assistant' && msg.references && renderReferences(msg.references)}
               </div>
