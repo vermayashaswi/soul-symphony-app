@@ -9,7 +9,7 @@ interface SouloLogoProps {
   className?: string;
   size?: LogoSize;
   textClassName?: string;
-  smileyClassName?: string;
+  logoClassName?: string;
   useColorTheme?: boolean;
 }
 
@@ -17,12 +17,12 @@ const SouloLogo = ({
   className = "",
   size = "normal",
   textClassName = "",
-  smileyClassName = "",
+  logoClassName = "",
   useColorTheme = true
 }: SouloLogoProps) => {
   const { colorTheme } = useTheme();
   
-  // Size classes for the smiley
+  // Size classes for the logo
   const sizeClasses = {
     small: "w-4 h-4 mx-0.5",
     normal: "w-5 h-5 mx-0.5",
@@ -35,18 +35,12 @@ const SouloLogo = ({
   return (
     <span className={cn("font-semibold inline-flex items-center", themeTextClass, textClassName, className)}>
       S<span className="mx-[0.5px]">O</span>
-      <span className={cn("relative inline-block", sizeClasses[size], smileyClassName)}>
-        {/* U-shaped character instead of circle */}
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="relative w-full h-full flex items-center justify-center">
-            {/* U shape */}
-            <div className="w-full h-3/4 border-2 border-current rounded-b-full border-t-0 flex items-end pb-[2px]">
-              {/* Eyes */}
-              <span className="absolute top-[25%] left-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
-              <span className="absolute top-[25%] right-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
-            </div>
-          </span>
-        </span>
+      <span className={cn("relative inline-block", sizeClasses[size], logoClassName)}>
+        <img 
+          src="/lovable-uploads/58d999f1-51c6-401a-bad2-41869a71052b.png" 
+          alt="SOULO" 
+          className="w-full h-full object-cover rounded-full"
+        />
       </span>
       <span className="mx-[0.5px]">L</span>
       <span className="mx-[0.5px]">O</span>
