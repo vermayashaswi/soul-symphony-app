@@ -28,7 +28,7 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
           <Icon className="h-5 w-5 text-muted-foreground" />
         </div>
         <div>
-          <h3 className="font-medium">{title}</h3>
+          <h3 className="font-medium text-foreground">{title}</h3>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
       </div>
@@ -43,8 +43,8 @@ export default function Settings() {
   const { user } = useAuth();
   
   const colorThemes = [
-    { name: 'Default', color: 'bg-primary' },
-    { name: 'Calm', color: 'bg-blue-400' },
+    { name: 'Default', color: 'bg-violet-600' },
+    { name: 'Calm', color: 'bg-blue-500' },
     { name: 'Soothing', color: 'bg-violet-400' },
     { name: 'Energy', color: 'bg-amber-400' },
     { name: 'Focus', color: 'bg-emerald-400' },
@@ -74,7 +74,7 @@ export default function Settings() {
       
       <div className="max-w-3xl mx-auto px-4 pt-28">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Settings</h1>
+          <h1 className="text-3xl font-bold mb-2 text-foreground">Settings</h1>
           <p className="text-muted-foreground">Personalize your Feelosophy experience</p>
         </div>
         
@@ -87,7 +87,7 @@ export default function Settings() {
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Your Profile</h2>
+              <h2 className="text-xl font-semibold text-foreground">Your Profile</h2>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
@@ -95,18 +95,18 @@ export default function Settings() {
               
               <div className="flex-1 space-y-4 text-center sm:text-left">
                 <div>
-                  <h3 className="text-xl font-semibold">{user?.user_metadata?.full_name || 'User'}</h3>
+                  <h3 className="text-xl font-semibold text-foreground">{user?.user_metadata?.full_name || 'User'}</h3>
                   <p className="text-muted-foreground">{user?.email}</p>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-secondary rounded-lg p-3">
                     <p className="text-muted-foreground text-sm">Journal Entries</p>
-                    <p className="text-xl font-medium">48</p>
+                    <p className="text-xl font-medium text-foreground">48</p>
                   </div>
                   <div className="bg-secondary rounded-lg p-3">
                     <p className="text-muted-foreground text-sm">Current Streak</p>
-                    <p className="text-xl font-medium">8 days</p>
+                    <p className="text-xl font-medium text-foreground">8 days</p>
                   </div>
                 </div>
               </div>
@@ -120,11 +120,11 @@ export default function Settings() {
             transition={{ duration: 0.3, delay: 0.1 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
-            <h2 className="text-xl font-semibold mb-4">Appearance</h2>
+            <h2 className="text-xl font-semibold mb-4 text-foreground">Appearance</h2>
             
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">Theme Mode</label>
+                <label className="text-sm font-medium mb-2 block text-foreground">Theme Mode</label>
                 <div className="flex p-1 bg-secondary rounded-full w-fit">
                   <button
                     onClick={() => {
@@ -168,7 +168,7 @@ export default function Settings() {
               </div>
               
               <div>
-                <label className="text-sm font-medium mb-2 block">Color Theme</label>
+                <label className="text-sm font-medium mb-2 block text-foreground">Color Theme</label>
                 <div className="flex flex-wrap gap-3">
                   {colorThemes.map((themeOption) => (
                     <button
@@ -194,7 +194,7 @@ export default function Settings() {
                           <CheckIcon className="h-5 w-5 text-white" />
                         )}
                       </div>
-                      <span className="text-xs">{themeOption.name}</span>
+                      <span className="text-xs text-foreground">{themeOption.name}</span>
                     </button>
                   ))}
                 </div>
@@ -209,7 +209,7 @@ export default function Settings() {
             transition={{ duration: 0.3, delay: 0.2 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
-            <h2 className="text-xl font-semibold mb-4">Preferences</h2>
+            <h2 className="text-xl font-semibold mb-4 text-foreground">Preferences</h2>
             
             <div className="space-y-3 divide-y">
               <SettingItem
@@ -232,14 +232,14 @@ export default function Settings() {
             transition={{ duration: 0.3, delay: 0.3 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
-            <h2 className="text-xl font-semibold mb-4">Help & Support</h2>
+            <h2 className="text-xl font-semibold mb-4 text-foreground">Help & Support</h2>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Button variant="outline" size="lg" className="h-auto py-6 rounded-xl justify-start">
                 <div className="flex flex-col items-start text-left">
                   <div className="flex items-center gap-2 mb-1">
                     <HelpCircle className="h-4 w-4" />
-                    <span className="font-medium">FAQ</span>
+                    <span className="font-medium text-foreground">FAQ</span>
                   </div>
                   <p className="text-xs text-muted-foreground">Frequently asked questions</p>
                 </div>
@@ -249,7 +249,7 @@ export default function Settings() {
                 <div className="flex flex-col items-start text-left">
                   <div className="flex items-center gap-2 mb-1">
                     <Shield className="h-4 w-4" />
-                    <span className="font-medium">Privacy Policy</span>
+                    <span className="font-medium text-foreground">Privacy Policy</span>
                   </div>
                   <p className="text-xs text-muted-foreground">How we protect your data</p>
                 </div>

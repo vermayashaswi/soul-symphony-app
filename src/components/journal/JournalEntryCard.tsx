@@ -37,7 +37,7 @@ interface JournalEntryCardProps {
 }
 
 export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true); // Changed to true by default
   const [open, setOpen] = React.useState(false);
 
   const toggleExpanded = () => {
@@ -106,16 +106,16 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
       <div className="p-4">
         {isExpanded ? (
           <div>
-            <p className="text-sm text-muted-foreground">{entry.content}</p>
+            <p className="text-sm text-foreground">{entry.content}</p>
             {entry.themes && entry.themes.length > 0 && (
               <div className="mt-4">
-                <h4 className="text-sm font-semibold">Themes</h4>
+                <h4 className="text-sm font-semibold text-foreground">Themes</h4>
                 <ThemeBoxes themes={entry.themes} />
               </div>
             )}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground line-clamp-3">{entry.content}</p>
+          <p className="text-sm text-foreground line-clamp-3">{entry.content}</p>
         )}
       </div>
     </Card>

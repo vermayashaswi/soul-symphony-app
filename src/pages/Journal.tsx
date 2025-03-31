@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import JournalHeader from '@/components/journal/JournalHeader';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
+import JournalSearch from '@/components/journal/JournalSearch';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,6 +21,7 @@ const Journal = () => {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
@@ -113,6 +116,21 @@ const Journal = () => {
     setRefreshKey(prev => prev + 1);
   };
 
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  // Filter entries based on search query
+  const filteredEntries = entries.filter(entry => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    const content = entry.content.toLowerCase();
+    const themes = entry.themes?.join(' ').toLowerCase() || '';
+    
+    return content.includes(query) || themes.includes(query);
+  });
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
@@ -140,8 +158,11 @@ const Journal = () => {
           </TabsContent>
           
           <TabsContent value="entries">
+            {activeTab === 'entries' && (
+              <JournalSearch onSearch={handleSearch} />
+            )}
             <JournalEntriesList 
-              entries={entries} 
+              entries={filteredEntries} 
               loading={loading || !isProfileChecked}
               processingEntries={processingEntries}
               onStartRecording={() => setActiveTab('record')}
