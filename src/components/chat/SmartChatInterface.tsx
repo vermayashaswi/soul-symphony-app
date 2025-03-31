@@ -225,6 +225,11 @@ export default function SmartChatInterface() {
         
         console.log("Smart query planner response:", data);
         
+        if (data.response.includes("couldn't find any") && data.fallbackToRag) {
+          console.log("Planning indicated fallback to RAG may be useful, trying chat-with-rag...");
+          throw new Error("Trigger RAG fallback");
+        }
+        
         setChatHistory(prev => [
           ...prev, 
           { 
@@ -236,43 +241,31 @@ export default function SmartChatInterface() {
         
         return;
       } catch (smartQueryError) {
-        console.error("Smart query planner failed, falling back to smart-chat:", smartQueryError);
-      }
-      
-      console.log("Falling back to smart-chat with query types:", queryTypes);
-      
-      const { data, error } = await supabase.functions.invoke('smart-chat', {
-        body: {
-          message: userMessage,
-          userId: user!.id,
-          includeDiagnostics: true,
-          queryTypes
-        }
-      });
-      
-      if (error) throw error;
-      
-      setChatHistory(prev => [
-        ...prev, 
-        { 
-          role: 'assistant', 
-          content: data.response, 
-          analysis: data.analysis,
-          references: data.references,
-          diagnostics: data.diagnostics
-        }
-      ]);
-      
-      if (data.diagnostics) {
-        console.log("Chat diagnostics:", data.diagnostics);
-      }
-      
-      if (data.queryAnalysis) {
-        console.log("Query analysis:", data.queryAnalysis);
-      }
-      
-      if (data.statisticsData) {
-        console.log("Statistics data:", data.statisticsData);
+        console.error("Smart query planner failed, falling back to chat-with-rag:", smartQueryError);
+        
+        const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+          body: {
+            message: userMessage,
+            userId: user!.id,
+            threadId: null,
+            isNewThread: true,
+            includeDiagnostics: true,
+            queryTypes
+          }
+        });
+        
+        if (error) throw error;
+        
+        setChatHistory(prev => [
+          ...prev, 
+          { 
+            role: 'assistant', 
+            content: data.response, 
+            analysis: data.analysis,
+            references: data.references,
+            diagnostics: data.diagnostics
+          }
+        ]);
       }
     } catch (error) {
       throw error;

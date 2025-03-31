@@ -5,7 +5,7 @@ import JournalEntryCard, { JournalEntry } from './JournalEntryCard';
 import JournalSearch from './JournalSearch';
 import EmptyJournalState from './EmptyJournalState';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Smile, Meh, Frown, Mic, MessagesSquare } from 'lucide-react';
+import { Smile, Meh, Frown, Mic, MessagesSquare, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface JournalEntriesListProps {
@@ -78,8 +78,12 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     return (
       <div className="space-y-8">
         <EmptyJournalState onStartRecording={onStartRecording} />
+        
         <div className="p-6 bg-muted/30 rounded-lg border border-dashed border-muted-foreground/50">
-          <h3 className="text-lg font-medium mb-2">Chat with your journal</h3>
+          <h3 className="text-lg font-medium mb-2 flex items-center">
+            <Sparkles className="h-5 w-5 mr-2 text-amber-500" />
+            Chat with your journal
+          </h3>
           <p className="text-muted-foreground mb-4">
             Once you've created journal entries, you can use the Smart Chat to ask questions like:
           </p>
@@ -110,9 +114,19 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           </div>
           
           <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-md text-amber-800">
-            <h4 className="font-medium mb-1">Important Note</h4>
+            <h4 className="font-medium mb-1 flex items-center">
+              <ArrowRight className="h-4 w-4 mr-1 flex-shrink-0" />
+              How Smart Chat Works
+            </h4>
             <p className="text-sm">
-              The Smart Chat feature requires journal entries to provide meaningful insights. Start by recording a few entries to get the most out of this feature.
+              Smart Chat analyzes your journal entries to provide insights about your emotions, 
+              experiences, and patterns. The more journal entries you create, the more accurate and 
+              helpful the insights will be.
+            </p>
+            <p className="text-sm mt-2">
+              For optimal results, try to journal regularly about your daily experiences, emotions, 
+              and thoughts. This helps Smart Chat understand your emotional patterns and provide
+              meaningful responses.
             </p>
           </div>
         </div>

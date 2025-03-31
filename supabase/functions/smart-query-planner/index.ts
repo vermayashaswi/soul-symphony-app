@@ -32,8 +32,35 @@ serve(async (req) => {
     console.log(`Message: ${message.substring(0, 50)}...`);
     console.log(`Include diagnostics: ${includeDiagnostics ? 'yes' : 'no'}`);
 
+    // Check if the user has any journal entries first
+    const { count, error: countError } = await supabase
+      .from('Journal Entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    const hasEntries = count && count > 0;
+    console.log(`User has ${count || 0} journal entries`);
+    
+    // If user has no entries, generate a specialized response
+    if (!hasEntries) {
+      const noEntriesResponse = await generateNoEntriesResponse(message);
+      
+      return new Response(JSON.stringify({
+        response: noEntriesResponse,
+        success: true,
+        fallbackToRag: false,
+        diagnostics: {
+          hasJournalEntries: false,
+          entriesCount: 0,
+          query: message
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Step 1: Generate a query plan using GPT-4
-    const queryPlan = await generateQueryPlan(message, userId);
+    const queryPlan = await generateQueryPlan(message, userId, hasEntries, count || 0);
     
     // Step 2: Execute the query plan
     const results = await executeQueryPlan(queryPlan, userId);
@@ -43,13 +70,20 @@ serve(async (req) => {
     
     const responseData: any = {
       response,
-      success: true
+      success: true,
+      // Allow fallback to RAG if the query plan execution didn't find enough data
+      fallbackToRag: results.execution_results.some(r => r.error) || 
+                    !results.execution_results.some(r => 
+                       r.result && (Array.isArray(r.result) ? r.result.length > 0 : Object.keys(r.result).length > 0)
+                    )
     };
     
     if (includeDiagnostics) {
       responseData.diagnostics = {
         query_plan: queryPlan,
-        execution_results: results
+        execution_results: results,
+        hasJournalEntries: hasEntries,
+        entriesCount: count || 0
       };
     }
     
@@ -62,6 +96,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
+      fallbackToRag: true,
       response: "I'm having trouble processing your request. Please try a different question or check back later."
     }), {
       status: 200, // Using 200 even for errors to avoid CORS issues
@@ -70,16 +105,9 @@ serve(async (req) => {
   }
 });
 
-async function generateQueryPlan(query: string, userId: string) {
+async function generateQueryPlan(query: string, userId: string, hasEntries: boolean, entryCount: number) {
   try {
-    // First, check if the user has any journal entries
-    const { count, error } = await supabase
-      .from('Journal Entries')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    
-    const hasEntries = count && count > 0;
-    console.log(`User has ${count || 0} journal entries`);
+    console.log(`Generating query plan for "${query}" with ${entryCount} entries available`);
     
     const systemPrompt = `You are an advanced query planning system that creates execution plans for journal analysis.
     
@@ -89,7 +117,9 @@ Your task is to:
 3. Plan a sequence of operations to answer the question
 4. Generate a sample answer format that the system should aim to produce
 
-${!hasEntries ? "IMPORTANT: The user has NO journal entries yet. Create a plan that acknowledges this and provides an appropriate response, encouraging them to create journal entries first." : ""}
+${!hasEntries ? 
+  "IMPORTANT: The user has NO journal entries yet. Create a plan that acknowledges this and provides an appropriate response, encouraging them to create journal entries first." : 
+  `The user has ${entryCount} journal entries available for analysis.`}
 
 For time-based references:
 - "today" = the current day
@@ -352,6 +382,49 @@ Please generate a helpful response based on this information.`;
   } catch (error) {
     console.error("Error generating response:", error);
     return "I'm having trouble analyzing your journal entries right now. Please try again later.";
+  }
+}
+
+// Generate specialized response for users with no journal entries
+async function generateNoEntriesResponse(query) {
+  try {
+    const systemPrompt = `You are an AI assistant specializing in personal journal analysis. The user has just asked about their journal entries, but they haven't created any journal entries yet.
+
+Your task is to:
+1. Acknowledge that they don't have journal entries yet in a friendly way
+2. Explain that the Smart Chat feature works by analyzing their journal entries
+3. Encourage them to create some journal entries
+4. Suggest types of entries they could create that would be relevant to their query
+5. Reassure them that once they have some entries, you'll be able to provide insights
+
+Be conversational, encouraging, and helpful. Avoid sounding judgmental or disappointed.`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: query }
+        ],
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to generate no-entries response: ${errorText}`);
+    }
+
+    const result = await response.json();
+    return result.choices[0].message.content;
+  } catch (error) {
+    console.error("Error generating no-entries response:", error);
+    return "I notice you don't have any journal entries yet. To get insights from the Smart Chat feature, start by creating a few journal entries about your day, emotions, or experiences. Once you have some entries, I'll be able to analyze them and provide personalized insights.";
   }
 }
 
