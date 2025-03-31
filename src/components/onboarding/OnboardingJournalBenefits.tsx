@@ -40,7 +40,9 @@ export function OnboardingJournalBenefits({ onContinue, onBack }: OnboardingJour
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <p className="text-lg text-primary">Let's make this even better! ✨</p>
+          <p className="text-lg text-primary">
+            {userName ? `${userName}, let's make this even better! ✨` : `Let's make this even better! ✨`}
+          </p>
           
           <h1 className="text-2xl font-semibold leading-tight">
             With guided prompts and challenges, SOULo helps you notice the small, everyday joys of life.

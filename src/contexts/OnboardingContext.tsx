@@ -42,14 +42,17 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const { data: { user } } = await supabase.auth.getUser();
         
         if (user) {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('profiles')
-            .select('onboarding_completed')
+            .select('onboarding_completed, full_name')
             .eq('id', user.id)
             .single();
             
           if (data && data.onboarding_completed) {
             setShowOnboarding(false);
+            if (data.full_name) {
+              setUserName(data.full_name);
+            }
           }
         }
       } catch (error) {
@@ -66,7 +69,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       
       if (user) {
         // Update user profile with onboarding data
-        await supabase
+        const { error } = await supabase
           .from('profiles')
           .update({
             onboarding_completed: true,
@@ -75,6 +78,10 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             reminder_settings: reminderSettings
           })
           .eq('id', user.id);
+          
+        if (error) {
+          console.error('Error updating profile:', error);
+        }
       }
       
       // Save to localStorage as fallback for non-authenticated users
