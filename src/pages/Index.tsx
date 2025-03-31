@@ -80,6 +80,12 @@ const Index = () => {
   };
 
   useEffect(() => {
+    const particleCanvas = document.querySelector('canvas');
+    if (particleCanvas) {
+      particleCanvas.style.zIndex = '-1';
+      particleCanvas.style.opacity = '1';
+    }
+
     if (isTyping) {
       const text = "How have I been feeling lately?";
       let currentIndex = 0;

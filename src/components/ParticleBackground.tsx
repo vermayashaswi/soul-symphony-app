@@ -112,6 +112,7 @@ const ParticleBackground: React.FC = () => {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 w-full h-full pointer-events-none z-[-1]"
+      style={{ position: 'fixed', top: 0, left: 0, zIndex: -1 }}
     />
   );
 }
