@@ -39,17 +39,38 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       try {
+        // First check localStorage as a fallback
+        const localOnboardingCompleted = localStorage.getItem('soulo_onboarding_completed');
+        if (localOnboardingCompleted === 'true') {
+          setShowOnboarding(false);
+          const localUserName = localStorage.getItem('soulo_user_name');
+          if (localUserName) {
+            setUserName(localUserName);
+          }
+          return;
+        }
+        
+        // Then check Supabase if user is authenticated
         const { data: { user } } = await supabase.auth.getUser();
         
         if (user) {
+          // Check if the profile exists
           const { data, error } = await supabase
             .from('profiles')
-            .select('onboarding_completed, full_name')
+            .select('*')
             .eq('id', user.id)
             .single();
+          
+          console.log("Profile data:", data);
+          console.log("Profile error:", error);
             
-          if (data && data.onboarding_completed) {
-            setShowOnboarding(false);
+          if (data) {
+            // Look for onboarding_completed flag
+            if (data.onboarding_completed) {
+              setShowOnboarding(false);
+            }
+            
+            // Set user name if available
             if (data.full_name) {
               setUserName(data.full_name);
             }

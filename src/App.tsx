@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -56,27 +55,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   return <>{children}</>;
-};
-
-const AppWithOnboarding = () => {
-  const { showOnboarding } = useOnboarding();
-  
-  return (
-    <>
-      <AppRoutes />
-      <OnboardingWrapper />
-    </>
-  );
-};
-
-const OnboardingWrapper = () => {
-  const { showOnboarding } = useOnboarding();
-  
-  if (!showOnboarding) {
-    return null;
-  }
-  
-  return <OnboardingFlow />;
 };
 
 const AppRoutes = () => {
@@ -148,30 +126,43 @@ const AppRoutes = () => {
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <ThemeProvider>
-          <OnboardingProvider>
-            <div className="relative min-h-screen">
-              <div className="relative z-10">
-                <Toaster />
-                <Sonner position="top-center" />
-                <BrowserRouter>
-                  <MobilePreviewFrame>
-                    <AnimatePresence mode="wait">
-                      <AppWithOnboarding />
-                    </AnimatePresence>
-                  </MobilePreviewFrame>
-                </BrowserRouter>
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <OnboardingProvider>
+              <div className="relative min-h-screen">
+                <div className="relative z-10">
+                  <Toaster />
+                  <Sonner position="top-center" />
+                  <BrowserRouter>
+                    <MobilePreviewFrame>
+                      <AnimatePresence mode="wait">
+                        <AppWithOnboardingFlow />
+                      </AnimatePresence>
+                    </MobilePreviewFrame>
+                  </BrowserRouter>
+                </div>
               </div>
-            </div>
-          </OnboardingProvider>
-        </ThemeProvider>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+            </OnboardingProvider>
+          </ThemeProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
+
+const AppWithOnboardingFlow = () => {
+  const { showOnboarding } = useOnboarding();
+  
+  return (
+    <>
+      <AppRoutes />
+      {showOnboarding && <OnboardingFlow />}
+    </>
+  );
+};
 
 export default App;
