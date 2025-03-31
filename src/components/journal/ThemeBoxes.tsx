@@ -43,6 +43,53 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
   // All themes including fillers
   const allThemes = [...themes, ...fillerThemes];
 
+  // Additional animation variants for floating effect
+  const floatingAnimation = {
+    initial: { y: 0 },
+    animate: (i: number) => ({
+      y: [0, -10, 0, 5, 0],
+      transition: {
+        duration: 4 + Math.random() * 2,
+        repeat: Infinity,
+        repeatType: "loop" as const,
+        ease: "easeInOut",
+        delay: i * 0.2
+      }
+    })
+  };
+
+  if (!themes || themes.length === 0) {
+    // Display placeholder theme boxes with loading animation when no themes are present
+    return (
+      <div className={cn("flex flex-wrap gap-3 justify-center items-center h-full w-full", className)}>
+        {[1, 2, 3, 4].map((_, i) => (
+          <motion.div
+            key={`placeholder-${i}`}
+            className="bg-gray-100 text-transparent rounded-lg h-12 shadow-sm"
+            style={{ 
+              width: isMobile ? '80px' : '120px',
+              opacity: 0.5 - (i * 0.1) 
+            }}
+            animate={{ 
+              opacity: [0.3, 0.5, 0.3], 
+              scale: [0.95, 1, 0.95] 
+            }}
+            transition={{ 
+              duration: 1.5, 
+              repeat: Infinity, 
+              delay: i * 0.3 
+            }}
+          >
+            &nbsp;
+          </motion.div>
+        ))}
+        <div className="absolute text-sm text-muted-foreground">
+          Extracting themes...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("flex flex-wrap gap-2 md:gap-4 relative p-2 h-full w-full justify-center items-center", className)}>
       {allThemes.map((theme, index) => {
@@ -79,6 +126,7 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
             } : {
               y: [0, -5 * randomOffset, 0, 5 * randomOffset, 0],
               scale: [1, 1.02, 1, 0.98, 1],
+              opacity: 1,
               transition: { 
                 duration: 3 + Math.random() * 2,
                 repeat: Infinity,
@@ -96,6 +144,8 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
               boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
               transition: { duration: 0.2 }
             }}
+            custom={index}
+            variants={floatingAnimation}
           >
             {theme}
           </motion.div>

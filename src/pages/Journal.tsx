@@ -79,7 +79,7 @@ const Journal = () => {
     }
   };
 
-  const onEntryRecorded = (audioBlob: Blob, tempId?: string) => {
+  const onEntryRecorded = async (audioBlob: Blob, tempId?: string) => {
     console.log('Entry recorded, adding to processing queue');
     
     // Add this entry to the processing list if we have a tempId
@@ -90,14 +90,39 @@ const Journal = () => {
     // Switch to entries tab to show progress
     setActiveTab('entries');
     
-    // Refresh entries list to catch any completed entries
-    // We'll use a timer to simulate the entry being processed
-    // (in real app this should happen when the background process completes)
-    setTimeout(() => {
+    // Wait a bit for initial processing to complete
+    setTimeout(async () => {
+      // Try to extract themes for this new entry
+      try {
+        // First, get the entry ID from database using tempId
+        const { data, error } = await supabase
+          .from('Journal Entries')
+          .select('id, "refined text"')
+          .eq('foreign key', tempId)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching newly created entry:', error);
+        } else if (data) {
+          console.log('Generating themes for new entry:', data.id);
+          
+          // Call the generate-themes edge function
+          await supabase.functions.invoke('generate-themes', {
+            body: {
+              text: data["refined text"],
+              entryId: data.id
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error generating themes for new entry:', error);
+      }
+      
+      // Refresh entries list after processing
       setProcessingEntries(prev => prev.filter(id => id !== tempId));
       setRefreshKey(prev => prev + 1);
       fetchEntries(); // Explicitly fetch entries after timeout
-    }, 30000); // After 30 seconds, simulate completion and refresh list
+    }, 15000); // After 15 seconds, refresh list
   };
 
   return (

@@ -1,14 +1,16 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { Sparkles, Smile, Meh, Frown, Tag } from 'lucide-react';
+import { Sparkles, Smile, Meh, Frown, Tag, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EmotionChart from '@/components/EmotionChart';
 import EmotionBubbles from '@/components/EmotionBubbles';
 import ThemeBoxes from '@/components/journal/ThemeBoxes';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // Type for JournalEntry matching Supabase table schema
 export type JournalEntry = {
@@ -33,7 +35,8 @@ interface JournalEntryCardProps {
 const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const [bubbleDisturbance, setBubbleDisturbance] = useState(false);
-  const { toast } = useToast();
+  const [isRefreshingThemes, setIsRefreshingThemes] = useState(false);
+  const { toast: uiToast } = useToast();
 
   // Helper function to determine sentiment color
   const getSentimentColor = () => {
@@ -112,6 +115,37 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
     
     return Array.from(uniqueNames.values());
   }, [entry.entities]);
+
+  // Function to manually refresh themes
+  const refreshThemes = async () => {
+    if (isRefreshingThemes) return;
+
+    setIsRefreshingThemes(true);
+    toast.info("Refreshing themes...");
+
+    try {
+      // Extract themes using our edge function
+      const { data, error } = await supabase.functions.invoke('generate-themes', {
+        body: {
+          text: entry["refined text"] || entry["transcription text"],
+          entryId: entry.id
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data.success) {
+        toast.success("Themes updated successfully");
+      } else {
+        throw new Error(data.error || "Failed to update themes");
+      }
+    } catch (error: any) {
+      console.error("Error refreshing themes:", error);
+      toast.error("Failed to refresh themes: " + (error.message || "Unknown error"));
+    } finally {
+      setIsRefreshingThemes(false);
+    }
+  };
 
   return (
     <motion.div
@@ -194,10 +228,21 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
             </div>
             
             <div>
-              <h3 className="font-medium mb-4 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-amber-500" />
-                Themes
-              </h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-medium flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  Themes
+                </h3>
+                
+                <button
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                  onClick={refreshThemes}
+                  disabled={isRefreshingThemes}
+                >
+                  <RefreshCw className={`h-3 w-3 ${isRefreshingThemes ? 'animate-spin' : ''}`} />
+                  {isRefreshingThemes ? 'Updating...' : 'Refresh'}
+                </button>
+              </div>
               
               <motion.div 
                 className="h-80 mb-4 flex items-center justify-center p-4 border border-muted rounded-lg shadow-sm bg-white cursor-pointer"
@@ -219,7 +264,11 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry }) => {
                     isDisturbed={bubbleDisturbance}
                   />
                 ) : (
-                  <p className="text-muted-foreground text-center">Analyzing emotions...</p>
+                  <ThemeBoxes 
+                    themes={[]} 
+                    className="w-full h-full items-center justify-center"
+                    isDisturbed={bubbleDisturbance}
+                  />
                 )}
               </motion.div>
             </div>
