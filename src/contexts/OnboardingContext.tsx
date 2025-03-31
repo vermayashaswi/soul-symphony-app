@@ -33,6 +33,10 @@ interface ProfileData {
     morningTime: string;
     eveningTime: string;
   } | null;
+  avatar_url?: string | null;
+  created_at?: string;
+  email?: string | null;
+  updated_at?: string;
   [key: string]: any; // Allow for other properties
 }
 
@@ -81,7 +85,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             
           if (data) {
             // Type assertion to use our expected profile structure
-            const profileData = data as unknown as ProfileData;
+            const profileData = data as ProfileData;
             
             // Look for onboarding_completed flag
             if (profileData.onboarding_completed) {
