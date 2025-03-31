@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -211,10 +212,10 @@ export function EmotionChart({
             data={lineData}
             margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid-color, #eee)" />
-            <XAxis dataKey="day" stroke="var(--chart-axis-color, #888)" fontSize={12} tickMargin={10} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+            <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
             <YAxis 
-              stroke="var(--chart-axis-color, #888)" 
+              stroke="#888" 
               fontSize={12} 
               tickMargin={10} 
               domain={[0, 1]} 
@@ -223,11 +224,10 @@ export function EmotionChart({
             />
             <Tooltip 
               contentStyle={{ 
-                backgroundColor: 'var(--tooltip-bg, rgba(255, 255, 255, 0.8))', 
+                backgroundColor: 'rgba(255, 255, 255, 0.8)', 
                 borderRadius: '8px',
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
-                border: 'none',
-                color: 'var(--tooltip-color, inherit)'
+                border: 'none' 
               }} 
             />
             <Legend verticalAlign="bottom" height={36} />
@@ -265,7 +265,7 @@ export function EmotionChart({
               className={cn(
                 "px-3 py-1 rounded-full text-sm",
                 chartType === type.id
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-white"
                   : "bg-secondary text-muted-foreground hover:text-foreground"
               )}
             >
@@ -275,7 +275,7 @@ export function EmotionChart({
         </div>
       </div>
       
-      <div className="bg-card p-4 rounded-xl shadow-sm relative">
+      <div className="bg-white p-4 rounded-xl shadow-sm relative">
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && (
           <div className="w-full h-[350px]" key={bubbleKey}>
@@ -287,12 +287,12 @@ export function EmotionChart({
                   onEmotionClick={handleEmotionClick}
                 />
                 {selectedEmotionInfo && (
-                  <div className="absolute top-3 left-3 bg-card/90 border border-border rounded-lg px-3 py-2 shadow-md flex items-center gap-2 animate-fade-in z-10">
+                  <div className="absolute top-3 left-3 bg-background/90 border border-border rounded-lg px-3 py-2 shadow-md flex items-center gap-2 animate-fade-in z-10">
                     <Sparkles className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium">{selectedEmotionInfo.name}: {selectedEmotionInfo.percentage.toFixed(1)}%</span>
                   </div>
                 )}
-                <div className="absolute bottom-3 right-3 text-xs text-muted-foreground bg-card/70 px-2 py-1 rounded-md">
+                <div className="absolute bottom-3 right-3 text-xs text-muted-foreground bg-background/70 px-2 py-1 rounded-md">
                   Tip: Tap bubbles to see percentages
                 </div>
               </>
