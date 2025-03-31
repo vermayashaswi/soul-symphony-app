@@ -16,7 +16,6 @@ import Auth from "./pages/Auth";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
-import DebugPanel from "./components/DebugPanel";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -117,7 +116,6 @@ const App = () => (
               </AnimatePresence>
             </BrowserRouter>
           </div>
-          <DebugPanel />
         </div>
       </AuthProvider>
     </TooltipProvider>

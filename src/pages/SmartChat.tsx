@@ -1,7 +1,6 @@
 
 import { useEffect } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
-import SmartChatMobileDebug from "@/components/chat/SmartChatMobileDebug";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -39,8 +38,6 @@ export default function SmartChat() {
       <div className="flex-1 min-h-0">
         <SmartChatInterface />
       </div>
-      
-      <SmartChatMobileDebug />
     </motion.div>
   );
 }
