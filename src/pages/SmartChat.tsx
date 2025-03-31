@@ -16,6 +16,10 @@ export default function SmartChat() {
   const { entries, loading } = useJournalEntries(user?.id, 0, true);
   const navigate = useNavigate();
   
+  // Check if we're in mobile preview mode
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  
   useEffect(() => {
     document.title = "Smart Chat | SOULo";
     
@@ -26,8 +30,8 @@ export default function SmartChat() {
     }
     
     // Log for debugging
-    console.log("SmartChat page mounted, mobile:", isMobile, "width:", window.innerWidth);
-  }, [isMobile]);
+    console.log("SmartChat page mounted, mobile:", isMobile, "width:", window.innerWidth, "mobileDemo:", mobileDemo);
+  }, [isMobile, mobileDemo]);
 
   const hasEnoughEntries = !loading && entries.length > 0;
 
@@ -38,7 +42,9 @@ export default function SmartChat() {
       exit={{ opacity: 0 }}
       className="smart-chat-container container py-4 md:py-8 mx-auto min-h-[calc(100vh-4rem)] flex flex-col"
     >
-      <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 md:mb-8">Smart Journal Chat</h1>
+      <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 md:mb-8">
+        Smart Journal Chat {isMobile || mobileDemo ? "(Mobile View)" : ""}
+      </h1>
       
       {!hasEnoughEntries && !loading && (
         <Alert className="mb-6 border-amber-300 bg-amber-50 text-amber-800">
@@ -58,7 +64,7 @@ export default function SmartChat() {
         </Alert>
       )}
       
-      {!isMobile && (
+      {!(isMobile || mobileDemo) && (
         <p className="text-center text-muted-foreground mb-6 md:mb-8 px-2">
           Ask questions about your journal entries using natural language.
           Get both qualitative insights ("How did I feel about work?") and quantitative analysis 
