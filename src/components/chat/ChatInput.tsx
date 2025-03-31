@@ -71,6 +71,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
       const base64Data = base64String.split(',')[1];
       
       try {
+        console.log("Sending audio for transcription...");
         const result = await sendAudioForTranscription(base64Data, userId);
         
         if (result.success && result.data?.transcription) {
@@ -115,7 +116,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            handleSubmit(e);
+            if (message.trim()) {
+              handleSubmit(e);
+            }
           }
         }}
       />

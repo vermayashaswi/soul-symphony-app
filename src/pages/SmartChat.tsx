@@ -27,7 +27,7 @@ export default function SmartChat() {
     }
     
     // Log for debugging
-    console.log("SmartChat page mounted, mobile:", isMobile, "width:", window.innerWidth);
+    console.log("SmartChat page mounted, mobile:", isMobile, "width:", window.innerWidth, "height:", window.innerHeight);
   }, [isMobile]);
 
   const hasEnoughEntries = !loading && entries.length > 0;
@@ -67,7 +67,7 @@ export default function SmartChat() {
         </p>
       )}
       
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 relative overflow-hidden">
         <SmartChatInterface />
       </div>
       

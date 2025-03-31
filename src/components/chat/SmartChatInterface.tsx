@@ -35,7 +35,9 @@ export default function SmartChatInterface() {
     
     try {
       const queryTypes = analyzeQueryTypes(userMessage);
+      console.log("Processing chat message with query types:", queryTypes);
       const response = await processChatMessage(userMessage, user.id, queryTypes);
+      console.log("Received chat response:", response);
       setChatHistory(prev => [...prev, response]);
     } catch (error) {
       console.error("Error sending message:", error);
@@ -62,7 +64,7 @@ export default function SmartChatInterface() {
   };
 
   return (
-    <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[70vh] flex flex-col">
+    <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-full md:h-[70vh] flex flex-col">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-lg md:text-xl">Smart Chat</CardTitle>
         {chatHistory.length > 0 && (

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 
 interface Particle {
@@ -110,8 +111,7 @@ const ParticleBackground: React.FC = () => {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 w-full h-full pointer-events-none"
-      style={{ zIndex: -1 }} // Set z-index to -1 so it's behind all content
+      className="fixed inset-0 w-full h-full pointer-events-none z-[-1]"
     />
   );
 }
