@@ -17,24 +17,45 @@ export default function SmartChatInterface() {
   const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [renderAttempt, setRenderAttempt] = useState(0);
+  const [fallbackUIActive, setFallbackUIActive] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const componentRef = useRef<HTMLDivElement>(null);
+  
+  // Detect when component didn't render correctly
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!componentRef.current || !document.body.contains(componentRef.current)) {
+        console.error("SmartChatInterface failed to render properly - activating fallback UI");
+        setFallbackUIActive(true);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(timeout);
+  }, []);
 
   // Force visibility and make sure component renders
   useEffect(() => {
     console.log("SmartChatInterface mounted (attempt #" + renderAttempt + ")");
-
+    
+    // Important: Set critical inline styles directly to ensure visibility
+    document.documentElement.style.height = '100%';
+    document.body.style.height = '100%';
+    document.getElementById('root')!.style.height = '100%';
+    
     if (componentRef.current) {
-      // Force styles directly onto the element
-      componentRef.current.style.display = 'flex';
-      componentRef.current.style.flexDirection = 'column';
-      componentRef.current.style.visibility = 'visible';
-      componentRef.current.style.opacity = '1';
-      componentRef.current.style.height = 'calc(70vh)';
-      componentRef.current.style.position = 'relative';
-      componentRef.current.style.zIndex = '1';
+      // Force styles directly onto the element with !important
+      const element = componentRef.current;
+      element.style.cssText = `
+        display: flex !important;
+        flex-direction: column !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        height: calc(70vh) !important;
+        position: relative !important;
+        z-index: 1 !important;
+      `;
       
       console.log("SmartChatInterface visibility forced via ref", componentRef.current);
     } else {
@@ -47,6 +68,9 @@ export default function SmartChatInterface() {
           setRenderAttempt(prev => prev + 1);
         }, 500);
         return () => clearTimeout(timer);
+      } else {
+        // After 3 failed attempts, activate fallback UI
+        setFallbackUIActive(true);
       }
     }
     
@@ -55,10 +79,15 @@ export default function SmartChatInterface() {
       const observer = new MutationObserver((mutations) => {
         if (componentRef.current) {
           // If any style changes happen, reapply our styles
-          componentRef.current.style.display = 'flex';
-          componentRef.current.style.flexDirection = 'column';
-          componentRef.current.style.visibility = 'visible';
-          componentRef.current.style.opacity = '1';
+          componentRef.current.style.cssText = `
+            display: flex !important;
+            flex-direction: column !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            height: calc(70vh) !important;
+            position: relative !important;
+            z-index: 1 !important;
+          `;
         }
       });
       
@@ -85,33 +114,6 @@ export default function SmartChatInterface() {
       console.error("Error setting up observer:", e);
     }
   }, [renderAttempt]);
-
-  // Emergency rendering helper
-  useEffect(() => {
-    // Check if we're visible with the IntersectionObserver API
-    try {
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (!entry.isIntersecting) {
-            console.log("SmartChatInterface is not visible in viewport!");
-            if (componentRef.current) {
-              componentRef.current.style.display = 'flex';
-              componentRef.current.style.visibility = 'visible';
-              componentRef.current.style.opacity = '1';
-            }
-          }
-        });
-      });
-      
-      if (componentRef.current) {
-        observer.observe(componentRef.current);
-      }
-      
-      return () => observer.disconnect();
-    } catch (e) {
-      console.error("IntersectionObserver error:", e);
-    }
-  }, []);
 
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {
@@ -154,17 +156,36 @@ export default function SmartChatInterface() {
     setShowAnalysis(!showAnalysis);
   };
 
-  // Simple emergency fallback
-  if (renderAttempt >= 3 && !componentRef.current) {
+  // Emergency fallback UI for when the normal rendering fails
+  if (fallbackUIActive) {
     return (
-      <div 
-        className="w-full max-w-3xl mx-auto border rounded-lg p-4 bg-white shadow-lg"
-        style={{height: '70vh', display: 'flex', flexDirection: 'column'}}
-      >
-        <div className="text-lg font-bold">Smart Chat</div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <EmptyChatState />
+      <div className="w-full max-w-3xl mx-auto border rounded-lg shadow-lg bg-card p-4 flex flex-col" style={{height: '70vh'}}>
+        <div className="flex justify-between items-center border-b pb-3">
+          <div className="text-lg font-bold">Smart Chat</div>
+          {chatHistory.length > 0 && (
+            <Button variant="outline" size="sm" onClick={toggleAnalysis} className="flex items-center gap-1">
+              <BarChart4 className="h-4 w-4" />
+              {showAnalysis ? "Hide Analysis" : "Show Analysis"}
+            </Button>
+          )}
         </div>
+        
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          {chatHistory.length === 0 ? (
+            <EmptyChatState />
+          ) : (
+            chatHistory.map((msg, idx) => (
+              <ChatMessage key={idx} message={msg} showAnalysis={showAnalysis} />
+            ))
+          )}
+          
+          {isLoading && (
+            <div className="flex justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          )}
+        </div>
+        
         <div className="border-t p-3">
           <ChatInput 
             onSendMessage={handleSendMessage} 

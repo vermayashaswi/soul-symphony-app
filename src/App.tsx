@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,6 +18,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "./integrations/supabase/client";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
 import MobileDebugOverlay from "./components/MobileDebugOverlay";
+import EmergencyMobileUI from "./components/EmergencyMobileUI";
+import { useIsMobile } from "./hooks/use-mobile";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,6 +58,57 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const EmergencyFallbackWrapper = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
+  const [renderError, setRenderError] = useState<boolean>(false);
+  const [renderStartTime] = useState<number>(Date.now());
+  const isMobile = useIsMobile();
+  
+  useEffect(() => {
+    const checkRender = () => {
+      const mainElements = [
+        { route: '/smart-chat', selector: '.smart-chat-interface' },
+        { route: '/journal', selector: '.journal-container' },
+        { route: '/chat', selector: '.chat-container' },
+        { route: '/insights', selector: '.insights-container' },
+      ];
+      
+      const currentCheck = mainElements.find(el => 
+        location.pathname === el.route || 
+        location.pathname.startsWith(el.route + '/')
+      );
+      
+      if (currentCheck) {
+        const targetEl = document.querySelector(currentCheck.selector);
+        if (!targetEl) {
+          console.error(`Emergency render check: ${currentCheck.selector} not found in DOM for route ${location.pathname}`);
+          setRenderError(true);
+        }
+      }
+    };
+    
+    const timer = setTimeout(checkRender, 2000);
+    
+    const fallbackTimer = setTimeout(() => {
+      if (Date.now() - renderStartTime > 5000) {
+        console.log('Emergency render: 5 second timeout reached');
+        setRenderError(true);
+      }
+    }, 5000);
+    
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(fallbackTimer);
+    };
+  }, [location.pathname, renderStartTime]);
+  
+  if (renderError && isMobile) {
+    return <EmergencyMobileUI route={location.pathname} errorMessage="Regular interface failed to load" />;
+  }
+  
+  return <>{children}</>;
+};
+
 const AppRoutes = () => {
   const [renderError, setRenderError] = useState(false);
   const location = useLocation();
@@ -88,7 +140,6 @@ const AppRoutes = () => {
       console.log("Auth event outside React context:", event, session?.user?.email);
     });
 
-    // Force visibility for mobile elements
     const forceVisibility = () => {
       const containers = document.querySelectorAll('.smart-chat-container, .smart-chat-interface, .container');
       containers.forEach(el => {
@@ -100,7 +151,6 @@ const AppRoutes = () => {
       });
     };
 
-    // Apply visibility fix after render and with delay
     forceVisibility();
     const timer = setTimeout(forceVisibility, 500);
     
@@ -110,9 +160,7 @@ const AppRoutes = () => {
     };
   }, [location]);
 
-  // Error boundary effect
   useEffect(() => {
-    // Check if the main content rendered correctly
     const checkRender = () => {
       if (location.pathname === '/smart-chat') {
         const smartChatElement = document.querySelector('.smart-chat-interface');
@@ -123,12 +171,10 @@ const AppRoutes = () => {
       }
     };
     
-    // Check after a reasonable delay
     const timer = setTimeout(checkRender, 2000);
     return () => clearTimeout(timer);
   }, [location, renderError]);
   
-  // Show a very simple emergency fallback if needed
   if (renderError && location.pathname === '/smart-chat') {
     return (
       <div style={{ 
@@ -208,7 +254,9 @@ const App = () => (
               <BrowserRouter>
                 <MobilePreviewFrame>
                   <AnimatePresence mode="wait">
-                    <AppRoutes />
+                    <EmergencyFallbackWrapper>
+                      <AppRoutes />
+                    </EmergencyFallbackWrapper>
                   </AnimatePresence>
                 </MobilePreviewFrame>
               </BrowserRouter>
