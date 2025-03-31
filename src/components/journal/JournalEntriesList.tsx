@@ -5,7 +5,7 @@ import JournalEntryCard, { JournalEntry } from './JournalEntryCard';
 import JournalSearch from './JournalSearch';
 import EmptyJournalState from './EmptyJournalState';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Smile, Meh, Frown, Mic } from 'lucide-react';
+import { Smile, Meh, Frown, Mic, MessagesSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface JournalEntriesListProps {
@@ -89,14 +89,32 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             <li>"What themes keep appearing in my journal?"</li>
             <li>"When was I feeling most stressed and why?"</li>
           </ul>
-          <Button 
-            onClick={() => window.location.href = "/SmartChat"} 
-            className="mt-2" 
-            variant="outline"
-            disabled={entries.length === 0}
-          >
-            Go to Smart Chat
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button 
+              onClick={() => window.location.href = "/smart-chat"} 
+              className="mt-2" 
+              variant="outline"
+              disabled={entries.length === 0}
+            >
+              <MessagesSquare className="mr-2 h-4 w-4" />
+              Go to Smart Chat
+            </Button>
+            <Button
+              onClick={onStartRecording}
+              className="mt-2"
+              variant="default"
+            >
+              <Mic className="mr-2 h-4 w-4" />
+              Record First Entry
+            </Button>
+          </div>
+          
+          <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-md text-amber-800">
+            <h4 className="font-medium mb-1">Important Note</h4>
+            <p className="text-sm">
+              The Smart Chat feature requires journal entries to provide meaningful insights. Start by recording a few entries to get the most out of this feature.
+            </p>
+          </div>
         </div>
       </div>
     );
