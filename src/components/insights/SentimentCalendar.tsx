@@ -106,8 +106,8 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     if (!todayData) {
       return (
         <div className="flex flex-col items-center justify-center h-64">
-          <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center">
-            <Meh className="h-8 w-8 text-gray-500" />
+          <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
+            <Meh className="h-8 w-8 text-muted-foreground" />
           </div>
           <p className="mt-4 text-lg font-medium">No entries for today</p>
           {renderLegends()}
@@ -186,8 +186,8 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
                     {getSentimentEmoji(dayData.avgScore)}
                   </motion.div>
                 ) : (
-                  <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
-                    <span className="text-gray-500 text-xs">N/A</span>
+                  <div className="h-10 w-10 bg-muted rounded-full flex items-center justify-center">
+                    <span className="text-muted-foreground text-xs">N/A</span>
                   </div>
                 )}
               </div>
@@ -252,14 +252,14 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
         <div className="flex items-center justify-between mb-4">
           <button 
             onClick={prevMonth}
-            className="p-1 rounded-full hover:bg-gray-100"
+            className="p-1 rounded-full hover:bg-muted"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <h3 className="text-lg font-medium">{monthStr}</h3>
           <button 
             onClick={nextMonth}
-            className="p-1 rounded-full hover:bg-gray-100"
+            className="p-1 rounded-full hover:bg-muted"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -281,7 +281,7 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
               <div 
                 key={i} 
                 className={cn(
-                  "aspect-square border border-gray-100",
+                  "aspect-square border border-border",
                   !isCurrentMonth && "opacity-30"
                 )}
               >
@@ -309,8 +309,8 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
                         {getSentimentEmoji(dayData.avgScore)}
                       </motion.div>
                     ) : isCurrentMonth ? (
-                      <div className="mt-1 mx-auto h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
-                        <span className="text-gray-500 text-xs">N/A</span>
+                      <div className="mt-1 mx-auto h-8 w-8 bg-muted rounded-full flex items-center justify-center">
+                        <span className="text-muted-foreground text-xs">N/A</span>
                       </div>
                     ) : null}
                   </div>
@@ -391,8 +391,8 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
                     {getSentimentEmoji(sentiment)}
                   </motion.div>
                 ) : (
-                  <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center">
-                    <span className="text-gray-500 text-xs">N/A</span>
+                  <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
+                    <span className="text-muted-foreground text-xs">N/A</span>
                   </div>
                 )}
               </div>
@@ -431,7 +431,7 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="bg-white p-4 rounded-xl shadow-sm"
+        className="bg-card p-4 rounded-xl shadow-sm"
         whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
       >
         {renderContent()}

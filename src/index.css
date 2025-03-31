@@ -26,6 +26,12 @@
     --ring: 217 91.2% 59.8%; /* Match primary */
     --radius: 0.75rem;
     --color-theme: #3b82f6; /* Calm/Blue as default */
+    
+    /* Chart-specific CSS variables */
+    --chart-grid-color: #eee;
+    --chart-axis-color: #888;
+    --tooltip-bg: rgba(255, 255, 255, 0.8);
+    --tooltip-color: inherit;
   }
  
   .dark {
@@ -48,6 +54,12 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 217 91.2% 59.8%; /* Match primary */
+    
+    /* Chart-specific CSS variables for dark mode */
+    --chart-grid-color: #333;
+    --chart-axis-color: #aaa;
+    --tooltip-bg: rgba(30, 30, 30, 0.8);
+    --tooltip-color: #fff;
   }
 }
  
