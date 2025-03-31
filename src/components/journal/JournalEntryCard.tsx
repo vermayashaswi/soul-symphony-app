@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger 
 } from '@/components/ui/dialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export interface JournalEntry {
   id: number;
@@ -39,6 +40,7 @@ interface JournalEntryCardProps {
 export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
   const [isExpanded, setIsExpanded] = useState(true); // Changed to true by default
   const [open, setOpen] = React.useState(false);
+  const isMobile = useIsMobile();
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
@@ -55,10 +57,10 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
 
   return (
     <Card className="bg-background shadow-md">
-      <div className="flex justify-between items-start p-4">
+      <div className="flex justify-between items-start p-3 md:p-4">
         <div>
-          <h3 className="scroll-m-20 text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
+          <p className="text-xs md:text-sm text-muted-foreground">
             {typeof entry.sentiment === 'string' 
               ? entry.sentiment 
               : entry.sentiment 
@@ -67,8 +69,8 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="icon" onClick={toggleExpanded}>
+        <div className="flex items-center space-x-1 md:space-x-2">
+          <Button variant="ghost" size={isMobile ? "sm" : "icon"} onClick={toggleExpanded} className={isMobile ? "h-8 w-8 p-0" : ""}>
             {isExpanded ? (
               <ChevronUp className="h-4 w-4" />
             ) : (
@@ -78,11 +80,11 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
 
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size={isMobile ? "sm" : "icon"} className={isMobile ? "h-8 w-8 p-0" : ""}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px] max-w-[90vw]">
               <DialogHeader>
                 <DialogTitle>Are you absolutely sure?</DialogTitle>
                 <DialogDescription>
@@ -103,19 +105,19 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-3 md:p-4">
         {isExpanded ? (
           <div>
-            <p className="text-sm text-foreground">{entry.content}</p>
+            <p className="text-xs md:text-sm text-foreground">{entry.content}</p>
             {entry.themes && entry.themes.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm font-semibold text-foreground">Themes</h4>
+              <div className="mt-3 md:mt-4">
+                <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
                 <ThemeBoxes themes={entry.themes} />
               </div>
             )}
           </div>
         ) : (
-          <p className="text-sm text-foreground line-clamp-3">{entry.content}</p>
+          <p className="text-xs md:text-sm text-foreground line-clamp-3">{entry.content}</p>
         )}
       </div>
     </Card>

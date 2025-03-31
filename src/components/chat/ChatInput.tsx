@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import VoiceRecordingButton from "./VoiceRecordingButton";
 import { sendAudioForTranscription } from "@/utils/audio/transcription-service";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -23,6 +24,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingTimer, setRecordingTimer] = useState<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const handleStartRecording = () => {
     if (!userId) {
@@ -86,12 +88,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full gap-2">
+    <form onSubmit={handleSubmit} className="flex w-full gap-1 md:gap-2">
       <Textarea
         value={message}
         onChange={(e) => setMessage(e.target.value)}
-        placeholder="Ask about your journal entries..."
-        className="flex-1 min-h-[60px] resize-none"
+        placeholder={isMobile ? "Ask a question..." : "Ask about your journal entries..."}
+        className="flex-1 min-h-[50px] md:min-h-[60px] text-sm md:text-base resize-none"
         disabled={isLoading || isRecording}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
@@ -100,20 +102,22 @@ const ChatInput: React.FC<ChatInputProps> = ({
           }
         }}
       />
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1 md:gap-2">
         <VoiceRecordingButton
           isLoading={isLoading}
           isRecording={isRecording}
           recordingTime={recordingTime}
           onStartRecording={handleStartRecording}
           onStopRecording={handleStopRecording}
+          size={isMobile ? "sm" : "default"}
         />
         <Button 
           type="submit" 
-          size="icon" 
+          size={isMobile ? "sm" : "icon"} 
           disabled={isLoading || isRecording || !message.trim()}
+          className={isMobile ? "w-8 h-8 p-0" : ""}
         >
-          <Send className="h-5 w-5" />
+          <Send className={isMobile ? "h-4 w-4" : "h-5 w-5"} />
         </Button>
       </div>
     </form>

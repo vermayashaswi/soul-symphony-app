@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import MobilePreviewFrame from "@/components/MobilePreviewFrame";
 
 export default function SmartChat() {
   const isMobile = useIsMobile();
@@ -35,7 +36,8 @@ export default function SmartChat() {
 
   const hasEnoughEntries = !loading && entries.length > 0;
 
-  return (
+  // Content to render inside or outside the MobilePreviewFrame
+  const content = (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -77,4 +79,7 @@ export default function SmartChat() {
       </div>
     </motion.div>
   );
+  
+  // If we're in mobile demo mode, wrap the content in the MobilePreviewFrame
+  return mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content;
 }

@@ -2,6 +2,7 @@
 import React from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ChatMessageProps {
   message: {
@@ -15,10 +16,12 @@ interface ChatMessageProps {
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis }) => {
+  const isMobile = useIsMobile();
+  
   return (
     <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[80%] rounded-lg p-3 ${
+        className={`max-w-[90%] md:max-w-[80%] rounded-lg p-2 md:p-3 text-sm md:text-base ${
           message.role === 'user' 
             ? 'bg-primary text-primary-foreground' 
             : 'bg-muted'
@@ -40,7 +43,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
             {message.analysis.requiresSql && (
               <>
                 <div className="font-semibold mt-1">SQL Query:</div>
-                <pre className="text-xs bg-black/10 p-1 rounded overflow-x-auto">
+                <pre className={`text-xs bg-black/10 p-1 rounded overflow-x-auto ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
                   {message.analysis.sqlQuery}
                 </pre>
               </>
@@ -48,23 +51,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
           </div>
         )}
         
-        {showAnalysis && message.role === 'assistant' && message.diagnostics && renderDiagnostics(message.diagnostics)}
+        {showAnalysis && message.role === 'assistant' && message.diagnostics && renderDiagnostics(message.diagnostics, isMobile)}
         
-        {message.role === 'assistant' && message.references && renderReferences(message.references)}
+        {message.role === 'assistant' && message.references && renderReferences(message.references, isMobile)}
       </div>
     </div>
   );
 };
 
-const renderReferences = (references: any[]) => {
+const renderReferences = (references: any[], isMobile: boolean) => {
   if (!references || references.length === 0) return null;
   
   return (
     <div className="mt-2 text-xs">
       <Separator className="my-2" />
       <div className="font-semibold">Based on {references.length} journal entries:</div>
-      <div className="max-h-40 overflow-y-auto mt-1">
-        {references.slice(0, 3).map((ref, idx) => (
+      <div className={`max-h-20 md:max-h-40 overflow-y-auto mt-1 ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
+        {references.slice(0, isMobile ? 2 : 3).map((ref, idx) => (
           <div key={idx} className="mt-1 border-l-2 border-primary pl-2 py-1">
             <div className="font-medium">{new Date(ref.date).toLocaleDateString()}</div>
             <div className="text-muted-foreground">{ref.snippet}</div>
@@ -75,39 +78,43 @@ const renderReferences = (references: any[]) => {
   );
 };
 
-const renderDiagnostics = (diagnostics: any) => {
+const renderDiagnostics = (diagnostics: any, isMobile: boolean) => {
   if (!diagnostics) return null;
   
   return (
     <div className="mt-2 text-xs">
       <Separator className="my-2" />
       <div className="font-semibold">Query Diagnostics:</div>
-      <div className="max-h-60 overflow-y-auto mt-1 bg-slate-800 p-2 rounded text-slate-200">
+      <div className={`max-h-40 md:max-h-60 overflow-y-auto mt-1 bg-slate-800 p-2 rounded text-slate-200 ${isMobile ? 'text-[9px]' : 'text-xs'}`}>
         {diagnostics.query_plan && (
           <div>
             <div className="font-medium">Sample Answer:</div>
             <div className="text-xs whitespace-pre-wrap mb-2">{diagnostics.query_plan.sample_answer}</div>
             
-            <div className="font-medium">Execution Plan:</div>
-            {diagnostics.query_plan.execution_plan.map((segment: any, idx: number) => (
-              <div key={idx} className="mb-2 border-l-2 border-blue-500 pl-2">
-                <div><span className="font-medium">Segment:</span> {segment.segment}</div>
-                <div><span className="font-medium">Type:</span> {segment.segment_type}</div>
-                {segment.sql_query && (
-                  <div>
-                    <span className="font-medium">SQL:</span>
-                    <pre className="text-xs overflow-x-auto">{segment.sql_query}</pre>
+            {!isMobile && (
+              <>
+                <div className="font-medium">Execution Plan:</div>
+                {diagnostics.query_plan.execution_plan.map((segment: any, idx: number) => (
+                  <div key={idx} className="mb-2 border-l-2 border-blue-500 pl-2">
+                    <div><span className="font-medium">Segment:</span> {segment.segment}</div>
+                    <div><span className="font-medium">Type:</span> {segment.segment_type}</div>
+                    {segment.sql_query && (
+                      <div>
+                        <span className="font-medium">SQL:</span>
+                        <pre className="text-xs overflow-x-auto">{segment.sql_query}</pre>
+                      </div>
+                    )}
+                    {segment.vector_search && (
+                      <div><span className="font-medium">Vector Search:</span> {segment.vector_search}</div>
+                    )}
                   </div>
-                )}
-                {segment.vector_search && (
-                  <div><span className="font-medium">Vector Search:</span> {segment.vector_search}</div>
-                )}
-              </div>
-            ))}
+                ))}
+              </>
+            )}
           </div>
         )}
         
-        {diagnostics.execution_results && (
+        {!isMobile && diagnostics.execution_results && (
           <div className="mt-2">
             <div className="font-medium">Execution Results:</div>
             {diagnostics.execution_results.execution_results.map((result: any, idx: number) => (

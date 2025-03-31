@@ -64,21 +64,21 @@ export default function SmartChatInterface() {
   return (
     <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-center">Smart Chat {isMobile ? "(Mobile)" : ""}</CardTitle>
+        <CardTitle className="text-center text-lg md:text-xl">Smart Chat</CardTitle>
         {chatHistory.length > 0 && (
           <Button 
             variant="outline" 
-            size="sm" 
+            size={isMobile ? "sm" : "default"}
             onClick={toggleAnalysis}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 text-xs md:text-sm"
           >
-            <BarChart4 className="h-4 w-4" />
+            <BarChart4 className="h-3 w-3 md:h-4 md:w-4" />
             {showAnalysis ? "Hide Analysis" : "Show Analysis"}
           </Button>
         )}
       </CardHeader>
       
-      <CardContent className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
+      <CardContent className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4">
         {chatHistory.length === 0 ? (
           <EmptyChatState />
         ) : (
@@ -94,7 +94,7 @@ export default function SmartChatInterface() {
         )}
       </CardContent>
       
-      <CardFooter className="border-t p-3 md:p-4">
+      <CardFooter className="border-t p-2 md:p-4">
         <ChatInput 
           onSendMessage={handleSendMessage} 
           isLoading={isLoading} 
