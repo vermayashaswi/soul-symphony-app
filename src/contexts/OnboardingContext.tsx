@@ -21,6 +21,21 @@ interface OnboardingContextType {
   updateReminderTime: (type: 'morning' | 'evening', time: string) => void;
 }
 
+// Define the expected profile data structure
+interface ProfileData {
+  id: string;
+  full_name?: string | null;
+  onboarding_completed?: boolean | null;
+  journal_focus_areas?: string[] | null;
+  reminder_settings?: {
+    morning: boolean;
+    evening: boolean;
+    morningTime: string;
+    eveningTime: string;
+  } | null;
+  [key: string]: any; // Allow for other properties
+}
+
 export const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
 export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -65,26 +80,29 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           console.log("Profile error:", error);
             
           if (data) {
+            // Type assertion to use our expected profile structure
+            const profileData = data as unknown as ProfileData;
+            
             // Look for onboarding_completed flag
-            if (data.onboarding_completed) {
+            if (profileData.onboarding_completed) {
               setShowOnboarding(false);
             }
             
             // Set user name if available
-            if (data.full_name) {
-              setUserName(data.full_name);
+            if (profileData.full_name) {
+              setUserName(profileData.full_name);
             }
             
             // Set focus areas if available
-            if (data.journal_focus_areas && Array.isArray(data.journal_focus_areas)) {
-              setSelectedFocusAreas(data.journal_focus_areas);
+            if (profileData.journal_focus_areas && Array.isArray(profileData.journal_focus_areas)) {
+              setSelectedFocusAreas(profileData.journal_focus_areas);
             }
             
             // Set reminder settings if available
-            if (data.reminder_settings) {
+            if (profileData.reminder_settings) {
               setReminderSettings(prev => ({
                 ...prev,
-                ...data.reminder_settings
+                ...profileData.reminder_settings
               }));
             }
           }
