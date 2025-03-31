@@ -1,5 +1,5 @@
 
-import React, { ReactNode, useEffect } from 'react';
+import React, { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 
 interface MobilePreviewFrameProps {
@@ -10,38 +10,6 @@ export const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
   const location = useLocation();
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  
-  useEffect(() => {
-    if (mobileDemo) {
-      // When in mobile preview mode, force the viewport meta tag
-      const metaViewport = document.querySelector('meta[name="viewport"]');
-      if (metaViewport) {
-        metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-      }
-      
-      // Set the body style to prevent scrolling outside the frame
-      document.body.style.overflow = 'hidden';
-      document.body.style.backgroundColor = '#1e293b'; // slate-800
-      
-      // Expose the mobile view flag for other components
-      window.__forceMobileView = true;
-      
-      console.log('Mobile preview frame activated:', {
-        location: location.pathname,
-        innerWidth: window.innerWidth, 
-        innerHeight: window.innerHeight
-      });
-    }
-    
-    return () => {
-      if (mobileDemo) {
-        document.body.style.overflow = '';
-        document.body.style.backgroundColor = '';
-        window.__forceMobileView = undefined;
-        console.log('Mobile preview frame deactivated');
-      }
-    };
-  }, [mobileDemo, location]);
   
   // Only show the mobile frame if the mobileDemo parameter is true
   if (!mobileDemo) {
@@ -56,9 +24,8 @@ export const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
           <div className="absolute top-1 left-1/2 transform -translate-x-1/2 w-16 h-4 bg-black rounded-b-lg"></div>
         </div>
         
-        {/* Content area with scrolling - ensure proper z-index and overflow handling */}
-        <div className="absolute top-6 left-0 right-0 bottom-6 overflow-auto bg-background"
-             style={{ zIndex: 5, WebkitOverflowScrolling: 'touch' }}>
+        {/* Content area with scrolling */}
+        <div className="absolute top-6 left-0 right-0 bottom-6 overflow-auto bg-background">
           {children}
         </div>
         

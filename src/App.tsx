@@ -58,7 +58,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppRoutes = () => {
   useEffect(() => {
-    // Immediately set viewport meta tag when component mounts
     const setCorrectViewport = () => {
       const metaViewport = document.querySelector('meta[name="viewport"]');
       const correctContent = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
@@ -77,7 +76,6 @@ const AppRoutes = () => {
       }
     };
     
-    // Set it immediately and again after a short delay to ensure it takes effect
     setCorrectViewport();
     setTimeout(setCorrectViewport, 100);
     

@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -15,7 +15,6 @@ export default function SmartChat() {
   const { user } = useAuth();
   const { entries, loading } = useJournalEntries(user?.id, 0, true);
   const navigate = useNavigate();
-  const chatInterfaceRef = useRef<HTMLDivElement>(null);
   
   // Check if we're in mobile preview mode
   const urlParams = new URLSearchParams(window.location.search);
@@ -31,65 +30,7 @@ export default function SmartChat() {
     }
     
     // Log for debugging
-    console.log("SmartChat page mounted", {
-      mobile: isMobile, 
-      width: window.innerWidth, 
-      mobileDemo: mobileDemo,
-      pathname: window.location.pathname,
-      ref: chatInterfaceRef.current ? "exists" : "null"
-    });
-    
-    // Ensure chat interface is visible
-    setTimeout(() => {
-      const chatContainer = document.querySelector('.smart-chat-container');
-      const chatInterface = document.querySelector('.smart-chat-interface');
-      
-      if (chatContainer) {
-        const styles = window.getComputedStyle(chatContainer);
-        console.log("Chat container styles:", {
-          display: styles.display,
-          visibility: styles.visibility,
-          opacity: styles.opacity,
-          position: styles.position,
-          zIndex: styles.zIndex,
-          height: styles.height
-        });
-        
-        // Force visibility
-        chatContainer.setAttribute('style', 'opacity: 1 !important; visibility: visible !important; display: flex !important; z-index: 50 !important; min-height: 100% !important; position: relative !important');
-      }
-      
-      if (chatInterface) {
-        console.log("Chat interface found");
-        chatInterface.setAttribute('style', 'display: flex !important; opacity: 1 !important; visibility: visible !important;');
-      } else {
-        console.log("Chat interface NOT found in DOM");
-      }
-    }, 500);
-    
-    // Check if ChatInterface is in viewport
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(entry => {
-          console.log("Chat interface visibility:", entry.isIntersecting);
-          if (!entry.isIntersecting) {
-            // If not visible, force scroll to it
-            entry.target.scrollIntoView({ behavior: 'smooth' });
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-    
-    if (chatInterfaceRef.current) {
-      observer.observe(chatInterfaceRef.current);
-    }
-    
-    return () => {
-      if (chatInterfaceRef.current) {
-        observer.unobserve(chatInterfaceRef.current);
-      }
-    };
+    console.log("SmartChat page mounted, mobile:", isMobile, "width:", window.innerWidth, "mobileDemo:", mobileDemo);
   }, [isMobile, mobileDemo]);
 
   const hasEnoughEntries = !loading && entries.length > 0;
@@ -100,14 +41,6 @@ export default function SmartChat() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="smart-chat-container container py-4 md:py-8 mx-auto min-h-[calc(100vh-4rem)] flex flex-col"
-      style={{ 
-        minHeight: "100%", 
-        position: "relative", 
-        zIndex: 10,
-        opacity: 1,
-        visibility: "visible",
-        display: "flex"
-      }}
     >
       <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 md:mb-8">
         Smart Journal Chat {isMobile || mobileDemo ? "(Mobile View)" : ""}
@@ -139,7 +72,7 @@ export default function SmartChat() {
         </p>
       )}
       
-      <div className="flex-1 min-h-0" ref={chatInterfaceRef}>
+      <div className="flex-1 min-h-0">
         <SmartChatInterface />
       </div>
     </motion.div>

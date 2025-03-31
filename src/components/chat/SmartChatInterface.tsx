@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, BarChart4 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,47 +19,6 @@ export default function SmartChatInterface() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  // Check if we're in mobile preview mode
-  const urlParams = new URLSearchParams(window.location.search);
-  const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  
-  // Add debugging for component lifecycle
-  useEffect(() => {
-    console.log("SmartChatInterface mounted", {
-      isMobile, 
-      mobileDemo, 
-      windowWidth: window.innerWidth,
-      windowHeight: window.innerHeight,
-      pathname: window.location.pathname
-    });
-    
-    // Force element to be visible after a short delay
-    setTimeout(() => {
-      if (cardRef.current) {
-        console.log("Forcing chat interface visibility");
-        cardRef.current.style.display = 'flex';
-        cardRef.current.style.opacity = '1';
-        cardRef.current.style.visibility = 'visible';
-        
-        // Log computed styles
-        const styles = window.getComputedStyle(cardRef.current);
-        console.log("Card styles after force:", {
-          display: styles.display,
-          visibility: styles.visibility,
-          opacity: styles.opacity,
-          position: styles.position,
-          zIndex: styles.zIndex,
-          height: styles.height
-        });
-      }
-    }, 100);
-    
-    return () => {
-      console.log("SmartChatInterface unmounted");
-    };
-  }, [isMobile, mobileDemo]);
 
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {
@@ -103,18 +62,9 @@ export default function SmartChatInterface() {
   };
 
   return (
-    <Card 
-      ref={cardRef}
-      className={`smart-chat-interface w-full max-w-3xl mx-auto ${isMobile || mobileDemo ? 'h-[calc(75vh)]' : 'h-[80vh]'} flex flex-col overflow-hidden`}
-      style={{ 
-        display: "flex", 
-        visibility: "visible", 
-        opacity: 1,
-        zIndex: 20
-      }}
-    >
+    <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-center">Smart Chat {isMobile || mobileDemo ? "(Mobile)" : ""}</CardTitle>
+        <CardTitle className="text-center">Smart Chat {isMobile ? "(Mobile)" : ""}</CardTitle>
         {chatHistory.length > 0 && (
           <Button 
             variant="outline" 

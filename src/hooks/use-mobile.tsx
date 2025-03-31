@@ -10,16 +10,15 @@ export function useIsMobile() {
   React.useEffect(() => {
     // Function to check if mobile
     const checkIfMobile = () => {
-      // Check URL parameter for demo mode first (highest priority)
+      // Check URL parameter for demo mode
       const urlParams = new URLSearchParams(window.location.search);
       const mobileDemo = urlParams.get('mobileDemo') === 'true';
       
       if (mobileDemo) {
-        console.log("Mobile view forced by URL parameter");
         return true;
       }
       
-      // Check for __forceMobileView override for debugging (second priority)
+      // Check for __forceMobileView override for debugging
       if (typeof window.__forceMobileView !== 'undefined') {
         return window.__forceMobileView;
       }
@@ -31,8 +30,7 @@ export function useIsMobile() {
       
       // For most cases, viewport width is sufficient
       // But combine with user agent for edge cases
-      const result = viewportWidth || (userAgentMobile && touchCapable);
-      return result;
+      return viewportWidth || (userAgentMobile && touchCapable);
     };
 
     // Set initial state immediately
@@ -43,8 +41,7 @@ export function useIsMobile() {
     console.log("Mobile detection initialized:", initialIsMobile, 
                 "width:", window.innerWidth, 
                 "userAgent:", navigator.userAgent,
-                "touch:", 'ontouchstart' in window || navigator.maxTouchPoints > 0,
-                "pathname:", window.location.pathname);
+                "touch:", 'ontouchstart' in window || navigator.maxTouchPoints > 0);
     
     // Create event listeners for resize and orientation change
     const handleResize = () => {
@@ -74,7 +71,7 @@ export function useIsMobile() {
     }
     
     // Force a recheck after a short delay (helps with some mobile browsers)
-    const delayTimeout = setTimeout(() => {
+    setTimeout(() => {
       const delayedCheck = checkIfMobile();
       if (delayedCheck !== isMobile) {
         console.log("Delayed mobile check different:", delayedCheck, "width:", window.innerWidth);
@@ -85,7 +82,6 @@ export function useIsMobile() {
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
-      clearTimeout(delayTimeout);
       
       try {
         mql.removeEventListener('change', handleMqlChange);
@@ -111,7 +107,6 @@ export function useIsMobile() {
     };
   }, []);
 
-  // This guarantees our hook returns deterministically after initialization
   return isInitialized ? isMobile : false;
 }
 
