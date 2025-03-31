@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BarChart2, Settings, Menu, X, LogOut, LogIn } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -20,6 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [scrolled, setScrolled] = useState(false);
   const { user, signOut } = useAuth();
@@ -56,6 +56,16 @@ export function Navbar() {
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
+  // Function to handle navigation with auth check
+  const handleNavigation = (path: string) => {
+    if (!user && path !== '/') {
+      navigate(`/auth?redirectTo=${path}`);
+    } else {
+      navigate(path);
+    }
+    closeMenu();
+  };
+
   const closeMenu = () => setIsOpen(false);
 
   return (
@@ -78,28 +88,57 @@ export function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "relative px-4 py-2 rounded-full flex items-center gap-2 transition-all duration-300",
-                location.pathname === item.path
-                  ? "text-primary font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {location.pathname === item.path && (
-                <motion.div
-                  layoutId="nav-pill"
-                  className="absolute inset-0 bg-primary/10 rounded-full"
-                  transition={{ type: "spring", duration: 0.6 }}
-                />
-              )}
-              <item.icon className="h-4 w-4" />
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            // For the home page, we don't need auth
+            if (item.path === '/') {
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={cn(
+                    "relative px-4 py-2 rounded-full flex items-center gap-2 transition-all duration-300",
+                    location.pathname === item.path
+                      ? "text-primary font-medium"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {location.pathname === item.path && (
+                    <motion.div
+                      layoutId="nav-pill"
+                      className="absolute inset-0 bg-primary/10 rounded-full"
+                      transition={{ type: "spring", duration: 0.6 }}
+                    />
+                  )}
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            }
+            
+            // For other pages, we need to check auth
+            return (
+              <button
+                key={item.path}
+                onClick={() => handleNavigation(item.path)}
+                className={cn(
+                  "relative px-4 py-2 rounded-full flex items-center gap-2 transition-all duration-300",
+                  location.pathname === item.path
+                    ? "text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {location.pathname === item.path && (
+                  <motion.div
+                    layoutId="nav-pill"
+                    className="absolute inset-0 bg-primary/10 rounded-full"
+                    transition={{ type: "spring", duration: 0.6 }}
+                  />
+                )}
+                <item.icon className="h-4 w-4" />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
           
           {user ? (
             <DropdownMenu>
@@ -191,10 +230,9 @@ export function Navbar() {
         >
           <div className="py-4 flex flex-col gap-2">
             {navItems.map((item) => (
-              <Link
+              <button
                 key={item.path}
-                to={item.path}
-                onClick={closeMenu}
+                onClick={() => handleNavigation(item.path)}
                 className={cn(
                   "p-3 rounded-lg flex items-center gap-3 transition-all",
                   location.pathname === item.path
@@ -204,7 +242,7 @@ export function Navbar() {
               >
                 <item.icon className="h-5 w-5" />
                 <span>{item.label}</span>
-              </Link>
+              </button>
             ))}
           </div>
         </motion.div>

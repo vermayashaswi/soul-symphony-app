@@ -70,6 +70,14 @@ const Index = () => {
     }
   };
 
+  const navigateToFeature = (path: string) => {
+    if (!user) {
+      navigate(`/auth?redirectTo=${path}`);
+    } else {
+      navigate(path);
+    }
+  };
+
   useEffect(() => {
     if (isTyping) {
       const text = "How have I been feeling lately?";
@@ -118,7 +126,7 @@ const Index = () => {
       animation: pulseVariants,
       animationState: "pulse",
       cta: "Start Journaling",
-      ctaAction: () => navigate('/journal'),
+      ctaAction: () => navigateToFeature('/journal'),
       visualComponent: (
         <motion.div 
           className="relative flex items-center justify-center p-4 bg-primary/10 rounded-full"
@@ -149,7 +157,7 @@ const Index = () => {
       animation: waveVariants,
       animationState: "wave",
       cta: "See Insights",
-      ctaAction: () => navigate('/insights'),
+      ctaAction: () => navigateToFeature('/insights'),
       visualComponent: (
         <motion.div 
           className="flex flex-wrap gap-2 justify-center"
@@ -190,7 +198,7 @@ const Index = () => {
       icon: <LineChart className="h-10 w-10 text-primary" />,
       animation: itemVariants,
       cta: "View Progress",
-      ctaAction: () => navigate('/insights'),
+      ctaAction: () => navigateToFeature('/insights'),
       visualComponent: (
         <motion.div 
           className="relative h-32 w-full bg-background/80 rounded-lg overflow-hidden"
@@ -287,7 +295,7 @@ const Index = () => {
       icon: <MessageSquare className="h-10 w-10 text-primary" />,
       animation: itemVariants,
       cta: "Start Chatting",
-      ctaAction: () => navigate('/chat'),
+      ctaAction: () => navigateToFeature('/chat'),
       visualComponent: (
         <motion.div 
           className="flex flex-col gap-2 min-h-[120px]"
@@ -398,7 +406,7 @@ const Index = () => {
                   <Button 
                     className="w-full" 
                     onClick={feature.ctaAction}
-                    disabled={!user}
+                    disabled={false}
                   >
                     {feature.cta}
                   </Button>

@@ -55,6 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const getRedirectUrl = () => {
     const origin = window.location.origin;
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectTo = urlParams.get('redirectTo');
+    if (redirectTo) {
+      localStorage.setItem('authRedirectTo', redirectTo);
+    }
     return `${origin}/auth`;
   };
 
@@ -138,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         throw error;
       }
+      localStorage.removeItem('authRedirectTo');
     } catch (error: any) {
       console.error('Error signing out:', error);
       toast.error(`Error signing out: ${error.message}`);

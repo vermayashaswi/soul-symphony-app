@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,18 +12,27 @@ export default function Auth() {
   const { user, isLoading, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
   
-  // Get the return path from the location state or default to /journal
-  const from = location.state?.from?.pathname || '/journal';
+  // Get the return path - prioritize query param, then location state, then localStorage, or default to /journal
+  const redirectParam = searchParams.get('redirectTo');
+  const fromLocation = location.state?.from?.pathname;
+  const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
+  
+  const from = redirectParam || fromLocation || storedRedirect || '/journal';
 
   useEffect(() => {
     // Log the current origin/domain for debugging
     console.log('Current origin for Auth page:', window.location.origin);
+    console.log('Redirect destination after auth:', from);
     
     if (user && !redirecting) {
       console.log('Auth page: User detected, redirecting to:', from);
       setRedirecting(true);
+      
+      // Clear the stored redirect path after successful login
+      localStorage.removeItem('authRedirectTo');
       
       // Add a brief delay to ensure state changes have processed
       const timer = setTimeout(() => {
@@ -78,6 +88,10 @@ export default function Auth() {
   const handleSignIn = async () => {
     console.log('Initiating Google sign-in from', window.location.origin);
     try {
+      // Store the intended destination before initiating sign-in
+      if (from && from !== '/journal') {
+        localStorage.setItem('authRedirectTo', from);
+      }
       await signInWithGoogle();
     } catch (error) {
       console.error('Failed to initiate Google sign-in:', error);
