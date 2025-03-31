@@ -22,7 +22,7 @@ const JournalHeader = () => {
               transition={{ duration: 0.5 }}
             >
               <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500 shrink-0" />
-              <span className="inline-block">Your <SouloLogo className="inline-flex" /> Journal</span>
+              <span className="inline-block">Your <SouloLogo className="inline-flex" useColorTheme={true} /> Journal</span>
             </motion.h1>
             <motion.p 
               className="text-muted-foreground mt-2 text-sm sm:text-base"

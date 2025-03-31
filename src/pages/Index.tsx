@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -8,10 +9,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
 import SouloLogo from '@/components/SouloLogo';
+import { useTheme } from '@/hooks/use-theme';
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { colorTheme } = useTheme();
   const [typingText, setTypingText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [showResponse, setShowResponse] = useState(false);
@@ -358,9 +361,9 @@ const Index = () => {
           variants={itemVariants}
         >
           <h1 className="text-4xl md:text-5xl font-bold mb-4 flex items-center justify-center">
-            Welcome to <SouloLogo size="large" className="ml-2 text-blue-600" />
+            Welcome to <SouloLogo size="large" className="ml-2" useColorTheme={true} />
           </h1>
-          <p className="text-xl max-w-2xl mx-auto bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent animate-pulse shadow-glow">
+          <p className="text-xl max-w-2xl mx-auto text-primary animate-pulse">
             Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
           </p>
           

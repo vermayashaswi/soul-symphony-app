@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/use-theme';
 
 export type LogoSize = "small" | "normal" | "large";
 
@@ -9,14 +10,18 @@ interface SouloLogoProps {
   size?: LogoSize;
   textClassName?: string;
   smileyClassName?: string;
+  useColorTheme?: boolean;
 }
 
 const SouloLogo = ({
   className = "",
   size = "normal",
   textClassName = "",
-  smileyClassName = ""
+  smileyClassName = "",
+  useColorTheme = true
 }: SouloLogoProps) => {
+  const { colorTheme } = useTheme();
+  
   // Size classes for the smiley
   const sizeClasses = {
     small: "w-4 h-4 mx-0.5",
@@ -24,8 +29,11 @@ const SouloLogo = ({
     large: "w-6 h-6 mx-0.5",
   };
   
+  // Apply color theme if useColorTheme is true
+  const themeTextClass = useColorTheme ? "text-primary" : "";
+  
   return (
-    <span className={cn("font-semibold inline-flex items-center", textClassName, className)}>
+    <span className={cn("font-semibold inline-flex items-center", themeTextClass, textClassName, className)}>
       S<span className="mx-[0.5px]">O</span>
       <span className={cn("relative inline-block", sizeClasses[size], smileyClassName)}>
         {/* U-shaped character instead of circle */}
