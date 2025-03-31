@@ -23,17 +23,22 @@ export function useIsMobile() {
         return window.__forceMobileView;
       }
       
-      // Use multiple signals to determine if we're on mobile
+      // For mobile detection, prioritize viewport width which is more reliable
       const viewportWidth = window.innerWidth < MOBILE_BREAKPOINT;
+      
+      // Additional mobile signals for edge cases
       const userAgentMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const touchCapable = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       
-      // For most cases, viewport width is sufficient
-      // But combine with user agent for edge cases
-      return viewportWidth || (userAgentMobile && touchCapable);
+      // Always consider phones to be mobile regardless of width
+      if (userAgentMobile && touchCapable) {
+        return true;
+      }
+      
+      return viewportWidth;
     };
 
-    // Set initial state immediately
+    // Set initial state immediately to prevent flash of incorrect layout
     const initialIsMobile = checkIfMobile();
     setIsMobile(initialIsMobile);
     setIsInitialized(true);
@@ -90,7 +95,7 @@ export function useIsMobile() {
         mql.removeListener && mql.removeListener(handleMqlChange);
       }
     };
-  }, [isMobile]);
+  }, []);
 
   // Expose a debug trigger function for the global scope
   React.useEffect(() => {
@@ -106,6 +111,15 @@ export function useIsMobile() {
       delete window.toggleMobileView;
     };
   }, []);
+
+  // Always return true for actual mobile devices to fix rendering issues
+  if (!isInitialized) {
+    // Check user agent directly for initial render to avoid flash
+    const isActualMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isActualMobile) {
+      return true;
+    }
+  }
 
   return isInitialized ? isMobile : false;
 }

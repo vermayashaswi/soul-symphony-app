@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, BarChart4 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,29 @@ export default function SmartChatInterface() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  
+  // Add initialization effect to ensure proper rendering
+  useEffect(() => {
+    console.log("SmartChatInterface mounted, mobile:", isMobile);
+    
+    // Force a re-render after a short delay
+    const timer = setTimeout(() => {
+      console.log("Forcing visibility check on SmartChatInterface");
+      const element = document.querySelector('.smart-chat-interface');
+      if (element) {
+        console.log("Smart chat interface found in DOM");
+        // Force a reflow/repaint
+        (element as HTMLElement).style.display = 'none';
+        setTimeout(() => {
+          (element as HTMLElement).style.display = 'flex';
+        }, 10);
+      } else {
+        console.log("Smart chat interface NOT found in DOM after delay");
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [isMobile]);
 
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {

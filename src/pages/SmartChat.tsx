@@ -24,13 +24,41 @@ export default function SmartChat() {
     document.title = "Smart Chat | SOULo";
     
     // Force proper viewport setup for mobile
-    const metaViewport = document.querySelector('meta[name="viewport"]');
-    if (metaViewport) {
-      metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-    }
+    const setCorrectViewport = () => {
+      const metaViewport = document.querySelector('meta[name="viewport"]');
+      const correctContent = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+      
+      if (metaViewport) {
+        if (metaViewport.getAttribute('content') !== correctContent) {
+          console.log("Updating viewport meta tag in SmartChat page");
+          metaViewport.setAttribute('content', correctContent);
+        }
+      } else {
+        console.log("Creating new viewport meta tag in SmartChat page");
+        const meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = correctContent;
+        document.head.appendChild(meta);
+      }
+    };
+    
+    // Call immediately and again after a short delay to ensure it takes effect
+    setCorrectViewport();
+    setTimeout(setCorrectViewport, 100);
     
     // Log for debugging
     console.log("SmartChat page mounted, mobile:", isMobile, "width:", window.innerWidth, "mobileDemo:", mobileDemo);
+    
+    // Force visibility of container after a delay
+    setTimeout(() => {
+      const container = document.querySelector('.smart-chat-container');
+      if (container) {
+        console.log("Smart chat container found, ensuring visibility");
+        (container as HTMLElement).style.display = 'flex';
+      } else {
+        console.log("Smart chat container NOT found after timeout");
+      }
+    }, 200);
   }, [isMobile, mobileDemo]);
 
   const hasEnoughEntries = !loading && entries.length > 0;
@@ -41,6 +69,7 @@ export default function SmartChat() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="smart-chat-container container py-4 md:py-8 mx-auto min-h-[calc(100vh-4rem)] flex flex-col"
+      style={{ display: 'flex' }} // Force display flex to ensure visibility
     >
       <h1 className="text-2xl md:text-3xl font-bold text-center mb-4 md:mb-8">
         Smart Journal Chat {isMobile || mobileDemo ? "(Mobile View)" : ""}
