@@ -12,6 +12,7 @@ interface VoiceRecordingButtonProps {
   recordingTime: number;
   onStartRecording: () => void;
   onStopRecording: (blob: Blob) => void;
+  size?: "default" | "sm" | "lg" | "icon"; // Add size prop to match Button's size options
 }
 
 const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
@@ -19,7 +20,8 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   isRecording,
   recordingTime,
   onStartRecording,
-  onStopRecording
+  onStopRecording,
+  size = "icon" // Default to 'icon' size
 }) => {
   const [recorder, setRecorder] = useState<RecordRTC | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -117,15 +119,15 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   return (
     <Button 
       type="button" 
-      size="icon" 
+      size={size} 
       variant={isRecording ? "destructive" : "outline"}
       onClick={handleVoiceRecording}
       disabled={isLoading}
       className="relative"
     >
-      <Mic className={`h-5 w-5 ${isRecording ? 'animate-pulse text-white' : ''}`} />
+      <Mic className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} ${isRecording ? 'animate-pulse text-white' : ''}`} />
       {isRecording && (
-        <span className="absolute -bottom-6 text-xs font-medium">
+        <span className={`absolute ${size === "sm" ? "-bottom-5" : "-bottom-6"} text-xs font-medium`}>
           {formatTime(recordingTime)}
         </span>
       )}
