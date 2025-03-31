@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -335,7 +334,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       let velocity = { x: 0, y: 0 };
       
       Events.on(mouseConstraint, 'mousedown', (event) => {
-        const mousePosition = event.mouse.position;
+        // Fix: access the mousePosition through mouseConstraint.mouse instead of event.mouse
+        const mousePosition = mouseConstraint.mouse.position;
         const foundBody = bubblesRef.current.find(
           bubble => {
             const distance = Vector.magnitude(
@@ -361,7 +361,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           const dt = now - lastDragTime;
           
           if (dt > 0) {
-            const currentPosition = event.mouse.position;
+            // Fix: access the mousePosition through mouseConstraint.mouse instead of event.mouse
+            const currentPosition = mouseConstraint.mouse.position;
             velocity = {
               x: (currentPosition.x - previousPosition.x) / dt * 15, // Scale velocity
               y: (currentPosition.y - previousPosition.y) / dt * 15
@@ -413,7 +414,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         const clickTime = Date.now();
         // Only count as click if it's a short interaction
         if (dragStartTime && clickTime - dragStartTime < 200) {
-          const mousePosition = event.mouse.position;
+          // Fix: access the mousePosition through mouseConstraint.mouse instead of event.mouse
+          const mousePosition = mouseConstraint.mouse.position;
           
           bubblesRef.current.forEach(bubble => {
             const distance = Vector.magnitude(
