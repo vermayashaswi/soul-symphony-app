@@ -26,7 +26,11 @@ export const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
       // Expose the mobile view flag for other components
       window.__forceMobileView = true;
       
-      console.log('Mobile preview frame activated');
+      console.log('Mobile preview frame activated:', {
+        location: location.pathname,
+        innerWidth: window.innerWidth, 
+        innerHeight: window.innerHeight
+      });
     }
     
     return () => {
@@ -37,7 +41,7 @@ export const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
         console.log('Mobile preview frame deactivated');
       }
     };
-  }, [mobileDemo]);
+  }, [mobileDemo, location]);
   
   // Only show the mobile frame if the mobileDemo parameter is true
   if (!mobileDemo) {
@@ -52,8 +56,9 @@ export const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
           <div className="absolute top-1 left-1/2 transform -translate-x-1/2 w-16 h-4 bg-black rounded-b-lg"></div>
         </div>
         
-        {/* Content area with scrolling */}
-        <div className="absolute top-6 left-0 right-0 bottom-6 overflow-auto bg-background">
+        {/* Content area with scrolling - ensure proper z-index and overflow handling */}
+        <div className="absolute top-6 left-0 right-0 bottom-6 overflow-auto bg-background"
+             style={{ zIndex: 5, WebkitOverflowScrolling: 'touch' }}>
           {children}
         </div>
         
