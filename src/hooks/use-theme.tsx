@@ -25,7 +25,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
     const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
-    return (savedColorTheme as ColorTheme) || 'Calm'; // Changed default to 'Calm'
+    return (savedColorTheme as ColorTheme) || 'Calm'; // Default to 'Calm'
   });
 
   useEffect(() => {
@@ -57,6 +57,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       // Convert RGB to HSL for primary color
       const [h, s, l] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
       root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
+      root.style.setProperty('--ring', `${h} ${s}% ${l}%`); // Also update ring color
     }
   }, [colorTheme]);
 

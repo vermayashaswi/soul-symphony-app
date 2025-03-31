@@ -82,7 +82,7 @@ export default function Insights() {
             className={cn(
               "px-4 py-1.5 rounded-full text-sm font-medium transition-all",
               timeRange === range.value
-                ? "bg-white text-primary shadow-sm"
+                ? "bg-background text-primary shadow-sm"
                 : "text-muted-foreground hover:text-foreground bg-transparent"
             )}
           >
@@ -130,7 +130,7 @@ export default function Insights() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : insightsData.entries.length === 0 ? (
-          <div className="bg-white rounded-xl p-8 text-center">
+          <div className="bg-background rounded-xl p-8 text-center border">
             <h2 className="text-xl font-semibold mb-4">No journal data available</h2>
             <p className="text-muted-foreground mb-6">
               Start recording journal entries to see your emotional insights.
@@ -147,17 +147,17 @@ export default function Insights() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="bg-white p-6 rounded-xl shadow-sm"
+                className="bg-background p-6 rounded-xl shadow-sm border"
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">Dominant Mood</h2>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-full text-xs font-medium">
                     This {timeRange}
                   </span>
                 </div>
                 {insightsData.dominantMood ? (
                   <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center">
+                    <div className="h-16 w-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                       <span className="text-2xl">{insightsData.dominantMood.emoji}</span>
                     </div>
                     <div>
@@ -167,7 +167,7 @@ export default function Insights() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center">
+                    <div className="h-16 w-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                       <span className="text-2xl">🤔</span>
                     </div>
                     <div>
@@ -178,12 +178,12 @@ export default function Insights() {
                 )}
               </motion.div>
               
-              {/* Biggest Change Card - Updated title from "Biggest Improvement" to "Biggest Change" */}
+              {/* Biggest Change Card */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.1 }}
-                className="bg-white p-6 rounded-xl shadow-sm"
+                className="bg-background p-6 rounded-xl shadow-sm border"
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">Biggest Change</h2>
@@ -192,8 +192,8 @@ export default function Insights() {
                       className={cn(
                         "px-2 py-1 rounded-full text-xs font-medium",
                         insightsData.biggestImprovement.percentage >= 0 
-                          ? "bg-green-100 text-green-700" 
-                          : "bg-red-100 text-red-700"
+                          ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200" 
+                          : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200"
                       )}
                     >
                       {insightsData.biggestImprovement.percentage >= 0 ? '+' : ''}
@@ -207,14 +207,19 @@ export default function Insights() {
                       className={cn(
                         "h-16 w-16 rounded-full flex items-center justify-center",
                         insightsData.biggestImprovement.percentage >= 0 
-                          ? "bg-green-100" 
-                          : "bg-blue-100"
+                          ? "bg-green-100 dark:bg-green-900" 
+                          : "bg-blue-100 dark:bg-blue-900"
                       )}
                     >
                       {insightsData.biggestImprovement.percentage >= 0 ? (
-                        <ArrowUp className="h-8 w-8 text-green-600" />
+                        <ArrowUp className={cn(
+                          "h-8 w-8",
+                          insightsData.biggestImprovement.percentage >= 0 
+                            ? "text-green-600 dark:text-green-300" 
+                            : "text-blue-600 dark:text-blue-300"
+                        )} />
                       ) : (
-                        <ArrowDown className="h-8 w-8 text-blue-600" />
+                        <ArrowDown className="h-8 w-8 text-blue-600 dark:text-blue-300" />
                       )}
                     </div>
                     <div>
@@ -228,8 +233,8 @@ export default function Insights() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center">
-                      <TrendingUp className="h-8 w-8 text-gray-500" />
+                    <div className="h-16 w-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                      <TrendingUp className="h-8 w-8 text-gray-500 dark:text-gray-400" />
                     </div>
                     <div>
                       <h3 className="text-2xl font-bold">Not enough data</h3>
@@ -244,19 +249,19 @@ export default function Insights() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.2 }}
-                className="bg-white p-6 rounded-xl shadow-sm"
+                className="bg-background p-6 rounded-xl shadow-sm border"
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">Journal Activity</h2>
                   {insightsData.journalActivity.streak > 0 && (
-                    <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded-full text-xs font-medium">
                       {insightsData.journalActivity.streak} day streak
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center">
-                    <Activity className="h-8 w-8 text-purple-600" />
+                  <div className="h-16 w-16 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                    <Activity className="h-8 w-8 text-purple-600 dark:text-purple-300" />
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold">{insightsData.journalActivity.entryCount} entries</h3>
@@ -270,7 +275,7 @@ export default function Insights() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.3 }}
-              className="bg-white p-6 md:p-8 rounded-xl shadow-sm mb-8"
+              className="bg-background p-6 md:p-8 rounded-xl shadow-sm mb-8 border"
               whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
             >
               <EmotionChart 
