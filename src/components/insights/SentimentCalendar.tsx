@@ -34,8 +34,12 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
           data[dateStr] = { avgScore: 0, count: 0 };
         }
         
-        const score = parseFloat(entry.sentiment);
-        data[dateStr].avgScore = (data[dateStr].avgScore * data[dateStr].count + score) / (data[dateStr].count + 1);
+        // Extract score from the sentiment object
+        const sentimentScore = typeof entry.sentiment === 'string' 
+          ? parseFloat(entry.sentiment) 
+          : entry.sentiment.score;
+        
+        data[dateStr].avgScore = (data[dateStr].avgScore * data[dateStr].count + sentimentScore) / (data[dateStr].count + 1);
         data[dateStr].count += 1;
       }
     });

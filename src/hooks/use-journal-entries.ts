@@ -68,20 +68,16 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       // Convert the data to match our JournalEntry type
       const typedEntries: JournalEntry[] = (data || []).map(item => ({
         id: item.id,
-        "transcription text": item["transcription text"],
-        "refined text": item["refined text"],
+        content: item["refined text"] || item["transcription text"] || "", // Use refined text as content
         created_at: item.created_at,
         audio_url: item.audio_url,
-        user_id: item.user_id,
-        "foreign key": item["foreign key"],
-        emotions: item.emotions as Record<string, number> | undefined,
-        duration: item.duration,
-        master_themes: item.master_themes,
         sentiment: item.sentiment,
+        themes: item.master_themes,
         // Properly convert the entities JSON to the expected type
         entities: item.entities ? (item.entities as any[]).map(entity => ({
           type: entity.type,
-          name: entity.name
+          name: entity.name,
+          text: entity.text
         })) : undefined
       }));
       

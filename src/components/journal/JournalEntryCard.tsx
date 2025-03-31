@@ -1,10 +1,19 @@
+
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/utils/format-time';
 import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import ThemeBoxes from './ThemeBoxes';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle,
+  DialogTrigger 
+} from '@/components/ui/dialog';
 
 export interface JournalEntry {
   id: number;
@@ -14,7 +23,7 @@ export interface JournalEntry {
   sentiment?: {
     sentiment: string;
     score: number;
-  };
+  } | string;
   themes?: string[];
   entities?: {
     text: string;
@@ -50,7 +59,11 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         <div>
           <h3 className="scroll-m-20 text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
           <p className="text-sm text-muted-foreground">
-            {entry.sentiment?.sentiment} ({entry.sentiment?.score})
+            {typeof entry.sentiment === 'string' 
+              ? entry.sentiment 
+              : entry.sentiment 
+                ? `${entry.sentiment.sentiment} (${entry.sentiment.score})` 
+                : 'No sentiment data'}
           </p>
         </div>
 
