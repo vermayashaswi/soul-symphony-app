@@ -237,7 +237,11 @@ export default function MobileChatInterface({
           </div>
         ) : (
           messages.map((message, index) => (
-            <MobileChatMessage key={index} message={message} />
+            <MobileChatMessage 
+              key={index} 
+              message={message} 
+              showAnalysis={false} // Add this prop with a default value
+            />
           ))
         )}
         
