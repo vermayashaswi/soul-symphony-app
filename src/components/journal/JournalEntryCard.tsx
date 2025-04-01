@@ -61,7 +61,7 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
       <div className="flex justify-between items-start p-3 md:p-4">
         <div>
           <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-          {/* Remove sentiment display on mobile as requested */}
+          {/* Only show sentiment on non-mobile devices */}
           {!isMobile && (
             <p className="text-xs md:text-sm text-muted-foreground">
               {typeof entry.sentiment === 'string' 

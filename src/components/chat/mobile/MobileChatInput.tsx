@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Send, Mic, Plus } from "lucide-react";
+import { Send, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import VoiceRecordingButton from "../VoiceRecordingButton";

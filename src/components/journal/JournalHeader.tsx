@@ -15,7 +15,7 @@ const JournalHeader = () => {
   const marginTopClass = isMobile ? "" : "mt-16 md:mt-20";
   
   return (
-    <div className={`bg-muted/30 py-8 md:py-12 border-b ${marginTopClass}`}>
+    <div className={`bg-muted/30 py-6 md:py-10 border-b ${marginTopClass}`}>
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="w-full">
