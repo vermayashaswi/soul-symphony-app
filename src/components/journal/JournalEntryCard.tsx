@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/utils/format-time';
-import { Trash2, ChevronDown, ChevronUp, Layers } from 'lucide-react';
+import { Trash2, ChevronDown, ChevronUp, Layers, Frown, Meh, Smile } from 'lucide-react';
 import ThemeBoxes from './ThemeBoxes';
 import { 
   Dialog, 
@@ -24,9 +24,9 @@ export interface JournalEntry {
   created_at: string;
   audio_url?: string;
   sentiment?: {
-    sentiment: string;
+    sentiment: string | number;
     score: number;
-  } | string;
+  } | string | number;
   themes?: string[];
   entities?: {
     text: string;
@@ -87,19 +87,31 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
 
   const createdAtFormatted = formatRelativeTime(entry.created_at);
 
-  // Format sentiment without showing the score on mobile
-  const formattedSentiment = () => {
-    if (typeof entry.sentiment === 'string') {
+  // Helper function to get sentiment value as a number
+  const getSentimentValue = (): number => {
+    if (typeof entry.sentiment === 'number') {
       return entry.sentiment;
-    } else if (entry.sentiment) {
-      // On mobile, just show the sentiment without the score
-      if (isMobile) {
-        return entry.sentiment.sentiment;
-      }
-      // On desktop, show both sentiment and score
-      return `${entry.sentiment.sentiment} (${entry.sentiment.score})`;
+    } else if (typeof entry.sentiment === 'string') {
+      return parseFloat(entry.sentiment) || 0;
+    } else if (entry.sentiment && typeof entry.sentiment === 'object' && 'score' in entry.sentiment) {
+      return typeof entry.sentiment.score === 'number' 
+        ? entry.sentiment.score 
+        : parseFloat(entry.sentiment.score as string) || 0;
     }
-    return 'No sentiment data';
+    return 0;
+  };
+
+  // Determine which emoji to show based on sentiment value
+  const renderSentimentEmoji = () => {
+    const sentimentValue = getSentimentValue();
+    
+    if (sentimentValue >= 0.3) {
+      return <Smile className="h-4 w-4 text-green-500" />;
+    } else if (sentimentValue >= -0.1) {
+      return <Meh className="h-4 w-4 text-amber-500" />;
+    } else {
+      return <Frown className="h-4 w-4 text-red-500" />;
+    }
   };
 
   return (
@@ -107,9 +119,10 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
       <div className="flex justify-between items-start p-3 md:p-4">
         <div>
           <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-          <p className="text-xs md:text-sm text-muted-foreground">
-            {formattedSentiment()}
-          </p>
+          <div className="flex items-center text-xs md:text-sm text-muted-foreground gap-1">
+            {renderSentimentEmoji()}
+            <span>Sentiment</span>
+          </div>
           {entry.isChunked && (
             <div className="flex items-center mt-1 text-xs text-muted-foreground">
               <Layers className="h-3 w-3 mr-1" />
