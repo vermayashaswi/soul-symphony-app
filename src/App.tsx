@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +16,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
+import "./styles/mobile.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

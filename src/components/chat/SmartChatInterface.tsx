@@ -1,7 +1,7 @@
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, BarChart4 } from "lucide-react";
+import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -11,14 +11,45 @@ import ChatInput from "./ChatInput";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { motion, AnimatePresence } from "framer-motion";
+import SouloLogo from "@/components/SouloLogo";
 
 export default function SmartChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const isMobile = useIsMobile();
+
+  const demoQuestions = [
+    {
+      text: "How did I feel yesterday?",
+      icon: <BarChart2 className="h-4 w-4 mr-2" />
+    },
+    {
+      text: "What makes me happy?",
+      icon: <Lightbulb className="h-4 w-4 mr-2" />
+    },
+    {
+      text: "Find entries about work",
+      icon: <Search className="h-4 w-4 mr-2" />
+    },
+    {
+      text: "Analyze my emotions",
+      icon: <Brain className="h-4 w-4 mr-2" />
+    }
+  ];
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatHistory, isLoading]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {
@@ -32,6 +63,7 @@ export default function SmartChatInterface() {
     
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
+    setShowSuggestions(false);
     
     try {
       const queryTypes = analyzeQueryTypes(userMessage);
@@ -57,34 +89,64 @@ export default function SmartChatInterface() {
     }
   };
 
-  const toggleAnalysis = () => {
-    setShowAnalysis(!showAnalysis);
-  };
-
   return (
-    <Card className="smart-chat-interface w-full max-w-3xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-center text-lg md:text-xl">Smart Chat</CardTitle>
+    <Card className="smart-chat-interface w-full max-w-4xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col shadow-md border rounded-xl overflow-hidden">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b">
+        <div className="flex items-center">
+          <SouloLogo useColorTheme={true} className="w-7 h-7 mr-2" />
+          <CardTitle className="text-xl">Smart Journal Assistant</CardTitle>
+        </div>
         {chatHistory.length > 0 && (
           <Button 
             variant="outline" 
-            size={isMobile ? "sm" : "default"}
-            onClick={toggleAnalysis}
-            className="flex items-center gap-1 text-xs md:text-sm"
+            size="sm"
+            onClick={() => setShowAnalysis(!showAnalysis)}
+            className="flex items-center gap-1 text-sm"
           >
-            <BarChart4 className="h-3 w-3 md:h-4 md:w-4" />
+            <BarChart4 className="h-4 w-4" />
             {showAnalysis ? "Hide Analysis" : "Show Analysis"}
           </Button>
         )}
       </CardHeader>
       
-      <CardContent className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4">
+      <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
         {chatHistory.length === 0 ? (
-          <EmptyChatState />
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="text-center max-w-lg mx-auto">
+              <h1 className="text-3xl font-bold mb-3">How can I help you?</h1>
+              <p className="text-muted-foreground mb-6">
+                Ask me about your journal entries, feelings, or patterns I notice in your writing.
+              </p>
+              
+              {showSuggestions && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="grid grid-cols-2 gap-3 max-w-md mx-auto"
+                >
+                  {demoQuestions.map((question, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="default"
+                      className="px-4 py-3 h-auto flex items-center justify-start text-left bg-muted/50 hover:bg-muted"
+                      onClick={() => handleSendMessage(question.text)}
+                    >
+                      {question.icon}
+                      <span>{question.text}</span>
+                    </Button>
+                  ))}
+                </motion.div>
+              )}
+            </div>
+          </div>
         ) : (
-          chatHistory.map((msg, idx) => (
-            <ChatMessage key={idx} message={msg} showAnalysis={showAnalysis} />
-          ))
+          <>
+            {chatHistory.map((msg, idx) => (
+              <ChatMessage key={idx} message={msg} showAnalysis={showAnalysis} />
+            ))}
+          </>
         )}
         
         {isLoading && (
@@ -92,9 +154,11 @@ export default function SmartChatInterface() {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         )}
+        
+        <div ref={messagesEndRef} />
       </CardContent>
       
-      <CardFooter className="border-t p-2 md:p-4">
+      <CardFooter className="border-t bg-muted/30 p-4 md:p-6">
         <ChatInput 
           onSendMessage={handleSendMessage} 
           isLoading={isLoading} 

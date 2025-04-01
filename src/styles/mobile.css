@@ -3,7 +3,7 @@
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
   .mobile-chat-interface .rounded-full {
-    border-radius: 20px;
+    border-radius: 24px;
   }
   
   /* Increase touch targets */
@@ -22,19 +22,88 @@
   }
   
   /* Mobile-friendly scrolling */
-  .mobile-chat-interface .overflow-y-auto {
+  .mobile-chat-interface .overflow-y-auto,
+  .smart-chat-interface .overflow-y-auto {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
   }
   
   /* Improve readability on small screens */
-  .mobile-chat-interface .prose {
+  .mobile-chat-interface .prose,
+  .smart-chat-interface .prose {
     font-size: 0.95rem;
     line-height: 1.5;
   }
   
   /* Mobile-friendly input */
-  .mobile-chat-interface textarea {
+  .mobile-chat-interface textarea,
+  .smart-chat-interface textarea {
     font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+  
+  /* Message bubbles styling */
+  .mobile-chat-interface .bg-muted,
+  .smart-chat-interface .bg-muted {
+    background-color: rgba(var(--muted), 0.7);
+  }
+  
+  /* Suggestion chips */
+  .mobile-chat-interface .suggestion-chip {
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  
+  .mobile-chat-interface .suggestion-chip:active {
+    transform: scale(0.98);
+  }
+  
+  /* Message animation */
+  .message-appear {
+    animation: message-appear 0.3s cubic-bezier(0.25, 0.1, 0.25, 1.0);
+  }
+  
+  @keyframes message-appear {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Input focus styling */
+  .mobile-chat-interface textarea:focus,
+  .smart-chat-interface textarea:focus {
+    box-shadow: 0 0 0 2px rgba(var(--primary), 0.2);
+  }
+  
+  /* Icon button hover effects */
+  .mobile-chat-interface button:hover .lucide,
+  .smart-chat-interface button:hover .lucide {
+    transform: scale(1.05);
+  }
+  
+  /* Recording animation */
+  .recording-indicator {
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.7);
+    }
+    
+    70% {
+      transform: scale(1);
+      box-shadow: 0 0 0 10px rgba(255, 82, 82, 0);
+    }
+    
+    100% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(255, 82, 82, 0);
+    }
   }
 }

@@ -1,7 +1,7 @@
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Loader2, BarChart4, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, BarChart4, ChevronDown, ChevronUp, Lightbulb, BarChart2, Search, Brain } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -11,22 +11,43 @@ import MobileChatInput from "./MobileChatInput";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
 import { AnimatePresence, motion } from "framer-motion";
+import SouloLogo from "@/components/SouloLogo";
 
 export default function MobileChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
   const demoQuestions = [
-    "How did I feel yesterday?",
-    "What makes me happy?",
-    "Am I stressed about work?",
-    "When was I most sad?",
-    "What are my recurring themes?"
+    {
+      text: "How did I feel yesterday?",
+      icon: <BarChart2 className="h-3 w-3 mr-1.5" />
+    },
+    {
+      text: "What makes me happy?",
+      icon: <Lightbulb className="h-3 w-3 mr-1.5" />
+    },
+    {
+      text: "Find entries about work",
+      icon: <Search className="h-3 w-3 mr-1.5" />
+    },
+    {
+      text: "Analyze my emotions",
+      icon: <Brain className="h-3 w-3 mr-1.5" />
+    }
   ];
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatHistory, isLoading]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {
@@ -68,8 +89,11 @@ export default function MobileChatInterface() {
 
   return (
     <Card className="mobile-chat-interface w-full h-full flex flex-col rounded-none shadow-none border-0">
-      <div className="flex items-center justify-between px-3 py-2 border-b">
-        <h2 className="text-lg font-semibold">Smart Journal Chat</h2>
+      <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="flex items-center">
+          <SouloLogo useColorTheme={true} className="w-6 h-6 mr-2" />
+          <h2 className="text-lg font-semibold">Smart Journal Assistant</h2>
+        </div>
         {chatHistory.length > 0 && (
           <Button 
             variant="ghost" 
@@ -83,10 +107,15 @@ export default function MobileChatInterface() {
         )}
       </div>
       
-      <CardContent className="flex-1 overflow-y-auto p-3 space-y-3">
+      <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
         {chatHistory.length === 0 ? (
-          <div className="pt-4">
-            <EmptyChatState />
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="text-center max-w-md mx-auto">
+              <h1 className="text-2xl font-bold mb-2">How can I help you?</h1>
+              <p className="text-muted-foreground mb-6">
+                Ask me about your journal entries, feelings, or patterns I notice in your writing.
+              </p>
+            </div>
           </div>
         ) : (
           <>
@@ -105,6 +134,8 @@ export default function MobileChatInterface() {
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         )}
+        
+        <div ref={messagesEndRef} />
       </CardContent>
       
       <AnimatePresence>
@@ -113,10 +144,10 @@ export default function MobileChatInterface() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="px-3 pb-3"
+            className="px-4 pb-4"
           >
-            <div className="rounded-lg bg-muted/50 p-3">
-              <div className="flex justify-between items-center mb-2">
+            <div className="rounded-lg bg-muted/50 p-4">
+              <div className="flex justify-between items-center mb-3">
                 <h3 className="text-sm font-medium">Try asking</h3>
                 <Button 
                   variant="ghost" 
@@ -127,16 +158,17 @@ export default function MobileChatInterface() {
                   <ChevronUp className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {demoQuestions.map((question, index) => (
                   <Button
                     key={index}
                     variant="outline"
                     size="sm"
-                    className="text-xs px-2 py-1 h-auto"
-                    onClick={() => handleSendMessage(question)}
+                    className="text-xs px-3 py-2 h-auto flex items-center justify-start text-left"
+                    onClick={() => handleSendMessage(question.text)}
                   >
-                    {question}
+                    {question.icon}
+                    <span className="truncate">{question.text}</span>
                   </Button>
                 ))}
               </div>
@@ -145,7 +177,7 @@ export default function MobileChatInterface() {
         )}
       </AnimatePresence>
       
-      <CardFooter className="p-3 pt-2 border-t">
+      <CardFooter className="p-4 pt-2 border-t">
         <MobileChatInput 
           onSendMessage={handleSendMessage} 
           isLoading={isLoading} 

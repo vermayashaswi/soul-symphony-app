@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Send, Mic } from "lucide-react";
+import { Send, Mic, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import VoiceRecordingButton from "../VoiceRecordingButton";
@@ -95,13 +95,13 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
 
   return (
     <div className="w-full">
-      <form onSubmit={handleSubmit} className="flex w-full gap-2 items-end">
-        <div className="relative flex-1">
+      <form onSubmit={handleSubmit} className="relative flex items-end w-full gap-2">
+        <div className="flex items-center w-full relative">
           <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Ask a question..."
-            className="min-h-[40px] max-h-[120px] text-sm resize-none rounded-full pl-4 pr-10 py-2"
+            placeholder="Ask anything..."
+            className="min-h-[44px] max-h-[120px] text-sm resize-none rounded-full pl-10 pr-12 py-2.5 shadow-sm border-muted bg-background"
             disabled={isLoading || isRecording}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
@@ -112,37 +112,40 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
               }
             }}
           />
-          <AnimatePresence>
-            {!isRecording && message.length === 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute right-2 bottom-1"
-              >
-                <VoiceRecordingButton
-                  isLoading={isLoading}
-                  isRecording={isRecording}
-                  recordingTime={recordingTime}
-                  onStartRecording={handleStartRecording}
-                  onStopRecording={handleStopRecording}
-                  size="sm"
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="absolute left-1.5 top-1/2 transform -translate-y-1/2 h-7 w-7 rounded-full"
+            disabled={isLoading || isRecording}
+          >
+            <Plus className="h-4 w-4 text-muted-foreground" />
+          </Button>
         </div>
         
-        {(message.trim().length > 0 || isRecording) && (
-          <Button 
-            type="submit" 
-            size="sm"
-            className="rounded-full h-10 w-10 p-0"
-            disabled={isLoading || isRecording || !message.trim()}
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        )}
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+          {message.trim().length === 0 ? (
+            <VoiceRecordingButton
+              isLoading={isLoading}
+              isRecording={isRecording}
+              recordingTime={recordingTime}
+              onStartRecording={handleStartRecording}
+              onStopRecording={handleStopRecording}
+              size="sm"
+              className="h-8 w-8 rounded-full bg-primary text-primary-foreground"
+            />
+          ) : (
+            <Button 
+              type="submit" 
+              size="sm"
+              className="rounded-full h-8 w-8 p-0 bg-primary text-primary-foreground"
+              disabled={isLoading || isRecording || !message.trim()}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </form>
       
       <AnimatePresence>
