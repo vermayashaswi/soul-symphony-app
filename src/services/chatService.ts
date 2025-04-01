@@ -67,6 +67,27 @@ export async function processChatMessage(
               data.response = "Based on your journal entries, " + data.response.toLowerCase();
             }
           }
+          
+          // Format emotion data if present
+          if (data.hasNumericResult && data.diagnostics && data.diagnostics.executionResults) {
+            const emotionResults = data.diagnostics.executionResults.find(
+              (result: any) => Array.isArray(result.result) && 
+                result.result[0] && 
+                typeof result.result[0] === 'object' && 
+                (result.result[0].emotion || result.result[0].emotions)
+            );
+            
+            if (emotionResults && emotionResults.result && data.response.includes('[object Object]')) {
+              const emotionData = emotionResults.result.map((item: any) => {
+                const emotion = item.emotion || Object.keys(item)[0];
+                const score = item.score || item[emotion];
+                return `${emotion} (${typeof score === 'number' ? score.toFixed(2) : score})`;
+              }).join(', ');
+              
+              // Replace the response content with formatted emotion data
+              data.response = data.response.replace(/\[object Object\](, \[object Object\])*/, emotionData);
+            }
+          }
         } else {
           console.log("Smart query planner couldn't handle the query, falling back to RAG");
         }
@@ -130,6 +151,7 @@ export async function processChatMessage(
     // Add analysis data if available
     if (queryResponse.diagnostics) {
       chatResponse.analysis = queryResponse.diagnostics;
+      chatResponse.diagnostics = queryResponse.diagnostics;
     }
     
     // Set flag if we have a numeric result
