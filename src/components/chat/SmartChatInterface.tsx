@@ -1,5 +1,4 @@
-
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -12,10 +11,8 @@ import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/c
 import { motion } from "framer-motion";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function SmartChatInterface() {
-  // Ensure all hooks are at the top level
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -24,7 +21,6 @@ export default function SmartChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-  const isMobile = useIsMobile();
 
   const demoQuestions = [
     {
@@ -45,7 +41,16 @@ export default function SmartChatInterface() {
     }
   ];
 
-  const loadThreadMessages = useCallback(async (threadId: string) => {
+  useEffect(() => {
+    scrollToBottom();
+    
+    // This effect will run when the currentThreadId changes
+    if (currentThreadId) {
+      loadThreadMessages(currentThreadId);
+    }
+  }, [chatHistory, isLoading, currentThreadId]);
+
+  const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !user?.id) return;
     
     try {
@@ -65,24 +70,13 @@ export default function SmartChatInterface() {
         })) as ChatMessageType[];
         
         setChatHistory(formattedMessages);
-        setShowSuggestions(false);
       } else {
         setChatHistory([]);
-        setShowSuggestions(true);
       }
     } catch (error) {
       console.error("Error loading messages:", error);
     }
-  }, [user?.id]);
-
-  useEffect(() => {
-    scrollToBottom();
-    
-    // This effect will run when the currentThreadId changes
-    if (currentThreadId) {
-      loadThreadMessages(currentThreadId);
-    }
-  }, [chatHistory, isLoading, currentThreadId, loadThreadMessages]);
+  };
 
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -215,24 +209,22 @@ export default function SmartChatInterface() {
 
   return (
     <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden">
-      {!isMobile && (
-        <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b">
-          <div className="flex items-center">
-            <h2 className="text-xl font-semibold">Roha</h2>
-          </div>
-          {chatHistory.length > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowAnalysis(!showAnalysis)}
-              className="flex items-center gap-1 text-sm"
-            >
-              <BarChart4 className="h-4 w-4" />
-              {showAnalysis ? "Hide Analysis" : "Show Analysis"}
-            </Button>
-          )}
-        </CardHeader>
-      )}
+      <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b">
+        <div className="flex items-center">
+          <h2 className="text-xl font-semibold">Roha</h2>
+        </div>
+        {chatHistory.length > 0 && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowAnalysis(!showAnalysis)}
+            className="flex items-center gap-1 text-sm"
+          >
+            <BarChart4 className="h-4 w-4" />
+            {showAnalysis ? "Hide Analysis" : "Show Analysis"}
+          </Button>
+        )}
+      </CardHeader>
       
       <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
         {chatHistory.length === 0 ? (

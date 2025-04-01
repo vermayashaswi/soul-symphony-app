@@ -6,36 +6,6 @@
     border-radius: 24px;
   }
   
-  /* Add padding to the bottom of the page content to make room for the navigation bar */
-  .smart-chat-container,
-  .journal-container,
-  .insights-container,
-  .settings-container {
-    padding-bottom: 4rem !important;
-  }
-  
-  /* Adjust the top padding for pages since we're removing the navbar */
-  .journal-container,
-  .insights-container,
-  .settings-container {
-    padding-top: 0 !important;
-  }
-  
-  /* Ensure the chat interface takes the full height on mobile */
-  .smart-chat-container {
-    min-height: 100vh !important;  
-  }
-  
-  /* Make the chat interface cleaner with less empty space */
-  .mobile-chat-interface {
-    margin-bottom: 0 !important;
-  }
-  
-  /* Reduce padding in mobile chat footer */
-  .smart-chat-interface CardFooter {
-    padding-bottom: 0.5rem !important;
-  }
-  
   /* Increase touch targets */
   .mobile-chat-interface button {
     min-height: 40px;

@@ -13,7 +13,6 @@ import JournalSearch from '@/components/journal/JournalSearch';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
@@ -23,7 +22,6 @@ const Journal = () => {
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const isMobile = useIsMobile();
   
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
@@ -33,30 +31,13 @@ const Journal = () => {
     }
   }, [user?.id]);
   
-  // Monitor active tab changes and fetch entries when switching to entries tab
   useEffect(() => {
-    if (activeTab === 'entries' && isProfileChecked) {
-      console.log('Tab changed to entries, fetching entries...');
+    if (activeTab === 'entries' && isProfileChecked && !initialFetchDone) {
+      console.log('Tab changed to entries, doing initial fetch...');
       fetchEntries();
-      if (!initialFetchDone) {
-        setInitialFetchDone(true);
-      }
+      setInitialFetchDone(true);
     }
   }, [activeTab, isProfileChecked, fetchEntries, initialFetchDone]);
-
-  // Add a new effect to monitor processing entries
-  useEffect(() => {
-    // If there are processing entries, set up a polling interval to check for updates
-    if (processingEntries.length > 0 && activeTab === 'entries') {
-      console.log('Setting up polling for processing entries:', processingEntries);
-      
-      const pollingInterval = setInterval(() => {
-        fetchEntries();
-      }, 5000); // Poll every 5 seconds while processing
-      
-      return () => clearInterval(pollingInterval);
-    }
-  }, [processingEntries, activeTab, fetchEntries]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -101,13 +82,8 @@ const Journal = () => {
     
     setActiveTab('entries');
     
-    // Immediately fetch entries to show the processing state
-    fetchEntries();
-    
-    // Set up a check to verify the entry was processed
-    const checkEntryProcessed = async () => {
+    setTimeout(async () => {
       try {
-        console.log('Checking if entry is processed with temp ID:', tempId);
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
@@ -116,48 +92,24 @@ const Journal = () => {
           
         if (error) {
           console.error('Error fetching newly created entry:', error);
-          return false;
         } else if (data) {
-          console.log('New entry found:', data.id);
+          console.log('Generating themes for new entry:', data.id);
           
-          // Generate themes in the background
           await supabase.functions.invoke('generate-themes', {
             body: {
               text: data["refined text"],
               entryId: data.id
             }
           });
-          
-          return true;
         }
-        return false;
       } catch (error) {
-        console.error('Error checking for processed entry:', error);
-        return false;
+        console.error('Error generating themes for new entry:', error);
       }
-    };
-    
-    // Poll for the entry to be processed
-    const pollInterval = setInterval(async () => {
-      const isProcessed = await checkEntryProcessed();
       
-      if (isProcessed) {
-        clearInterval(pollInterval);
-        setProcessingEntries(prev => prev.filter(id => id !== tempId));
-        setRefreshKey(prev => prev + 1);
-        fetchEntries();
-        toast.success('Journal entry processed successfully!');
-      }
-    }, 3000); // Check every 3 seconds
-    
-    // Clear interval after a timeout (e.g., 2 minutes) to prevent infinite polling
-    setTimeout(() => {
-      clearInterval(pollInterval);
-      if (processingEntries.includes(tempId || '')) {
-        setProcessingEntries(prev => prev.filter(id => id !== tempId));
-        toast.info('Entry processing is taking longer than expected. It should appear soon.');
-      }
-    }, 120000); // 2 minutes timeout
+      setProcessingEntries(prev => prev.filter(id => id !== tempId));
+      setRefreshKey(prev => prev + 1);
+      fetchEntries();
+    }, 15000);
   };
 
   const handleDeleteEntry = (entryId: number) => {
@@ -181,11 +133,11 @@ const Journal = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {!isMobile && <Navbar />}
+      <Navbar />
       
       <JournalHeader />
       
-      <div className={`container mx-auto px-4 py-8 max-w-5xl ${isMobile ? 'pb-20' : ''}`}>
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
         <Tabs defaultValue="record" value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="record">Record Entry</TabsTrigger>

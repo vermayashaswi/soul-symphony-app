@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -25,7 +26,6 @@ export default function SmartChat() {
   // Check if we're in mobile preview mode
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  const shouldRenderMobile = isMobile || mobileDemo;
   
   useEffect(() => {
     document.title = "Roha | SOULo";
@@ -53,12 +53,6 @@ export default function SmartChat() {
 
         if (threads && threads.length > 0) {
           setCurrentThreadId(threads[0].id);
-          // Dispatch event to notify SmartChatInterface about the selected thread
-          window.dispatchEvent(
-            new CustomEvent('threadSelected', { 
-              detail: { threadId: threads[0].id } 
-            })
-          );
         } else {
           // Create a new thread if none exists
           await createNewThread();
@@ -90,13 +84,6 @@ export default function SmartChat() {
       
       if (error) throw error;
       setCurrentThreadId(newThreadId);
-      
-      // Dispatch event to notify SmartChatInterface about the new thread
-      window.dispatchEvent(
-        new CustomEvent('threadSelected', { 
-          detail: { threadId: newThreadId } 
-        })
-      );
     } catch (error) {
       console.error("Error creating thread:", error);
     }
@@ -104,12 +91,6 @@ export default function SmartChat() {
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);
-    // Dispatch event to notify SmartChatInterface about the selected thread
-    window.dispatchEvent(
-      new CustomEvent('threadSelected', { 
-        detail: { threadId: threadId } 
-      })
-    );
   };
 
   // Desktop content
@@ -158,43 +139,41 @@ export default function SmartChat() {
 
   // Mobile content
   const mobileContent = (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="smart-chat-container h-screen flex flex-col"
-    >
-      {!hasEnoughEntries && !loading && (
-        <Alert className="mx-3 mt-3 border-amber-300 bg-amber-50 text-amber-800">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle className="text-sm">No journal entries found</AlertTitle>
-          <AlertDescription className="mt-1 text-xs">
-            <p>Create journal entries to get personalized insights.</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mt-1 h-7 text-xs border-amber-300 text-amber-800 hover:bg-amber-100"
-              onClick={() => navigate('/journal')}
-            >
-              Go to Journal
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-      
-      <div className="flex-1 min-h-0">
-        <MobileChatInterface 
-          currentThreadId={currentThreadId}
-          onSelectThread={handleSelectThread}
-          onCreateNewThread={createNewThread}
-          userId={user?.id}
-        />
-      </div>
-    </motion.div>
+    <>
+      <Navbar />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="smart-chat-container h-[calc(100vh-4rem)] flex flex-col pt-16" // Added pt-16 for consistent spacing
+      >
+        {!hasEnoughEntries && !loading && (
+          <Alert className="mx-3 mt-3 border-amber-300 bg-amber-50 text-amber-800">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle className="text-sm">No journal entries found</AlertTitle>
+            <AlertDescription className="mt-1 text-xs">
+              <p>Create journal entries to get personalized insights.</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-1 h-7 text-xs border-amber-300 text-amber-800 hover:bg-amber-100"
+                onClick={() => navigate('/journal')}
+              >
+                Go to Journal
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        <div className="flex-1 min-h-0">
+          <MobileChatInterface />
+        </div>
+      </motion.div>
+    </>
   );
   
   // Decide which content to render based on mobile status
-  const content = shouldRenderMobile ? mobileContent : desktopContent;
+  const content = (isMobile || mobileDemo) ? mobileContent : desktopContent;
   
   // If we're in mobile demo mode, wrap the content in the MobilePreviewFrame
   return mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content;

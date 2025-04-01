@@ -1,9 +1,10 @@
 
-import React, { useState } from "react";
+import React from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
 import { Bot, User, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -15,13 +16,10 @@ interface MobileChatMessageProps {
     references?: any[];
     diagnostics?: any;
   };
-  showAnalysis?: boolean;
+  showAnalysis: boolean;
 }
 
-const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ 
-  message, 
-  showAnalysis = false 
-}) => {
+const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis }) => {
   const [showReferences, setShowReferences] = useState(false);
   
   const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;

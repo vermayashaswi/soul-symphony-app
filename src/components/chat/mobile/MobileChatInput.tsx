@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Send, Plus } from "lucide-react";
+import React, { useState } from "react";
+import { Send, Mic, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import VoiceRecordingButton from "../VoiceRecordingButton";
@@ -19,26 +19,14 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
   isLoading,
   userId
 }) => {
-  // Always declare all hooks first, regardless of conditions
   const [message, setMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingTimer, setRecordingTimer] = useState<NodeJS.Timeout | null>(null);
   const [isFocused, setIsFocused] = useState(false);
-  const [permissionState, setPermissionState] = useState<boolean | null>(null);
   const { toast } = useToast();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Effect for cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (recordingTimer) {
-        clearInterval(recordingTimer);
-      }
-    };
-  }, [recordingTimer]);
-
-  const handleStartRecording = useCallback(() => {
+  const handleStartRecording = () => {
     if (!userId) {
       toast({
         title: "Authentication required",
@@ -55,9 +43,9 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
       setRecordingTime(prev => prev + 1);
     }, 1000);
     setRecordingTimer(timer);
-  }, [userId, toast]);
+  };
 
-  const handleStopRecording = useCallback(async (blob: Blob) => {
+  const handleStopRecording = async (blob: Blob) => {
     setIsRecording(false);
     
     if (recordingTimer) {
@@ -93,9 +81,9 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
         });
       }
     };
-  }, [recordingTimer, userId, toast, onSendMessage]);
+  };
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!message.trim()) return;
@@ -103,15 +91,13 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
     onSendMessage(message);
     setMessage("");
     setIsFocused(false);
-  }, [message, onSendMessage]);
+  };
 
-  // This renders the visual part of the component
   return (
     <div className="w-full">
       <form onSubmit={handleSubmit} className="relative flex items-end w-full gap-2">
         <div className="flex items-center w-full relative">
           <Textarea
-            ref={textareaRef}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Ask anything..."
@@ -139,7 +125,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
         </div>
         
         <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-          {!message.trim() ? (
+          {message.trim().length === 0 ? (
             <VoiceRecordingButton
               isLoading={isLoading}
               isRecording={isRecording}

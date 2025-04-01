@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -25,16 +24,6 @@ export function Navbar() {
   const isMobile = useIsMobile();
   const [scrolled, setScrolled] = useState(false);
   const { user, signOut } = useAuth();
-
-  // Check if we're in mobile preview mode
-  const urlParams = new URLSearchParams(window.location.search);
-  const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  const shouldHideForMobile = isMobile || mobileDemo;
-
-  // Don't render navbar at all in mobile view
-  if (shouldHideForMobile) {
-    return null;
-  }
 
   useEffect(() => {
     const handleScroll = () => {

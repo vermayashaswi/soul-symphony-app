@@ -7,15 +7,11 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import SouloLogo from '@/components/SouloLogo';
 
 const JournalHeader = () => {
-  // Always call hooks at the top level
   const { user } = useAuth();
   const isMobile = useIsMobile();
   
-  // Adjust top margin based on mobile/desktop
-  const marginTopClass = isMobile ? "" : "mt-16 md:mt-20";
-  
   return (
-    <div className={`bg-muted/30 py-6 md:py-10 border-b ${marginTopClass}`}>
+    <div className="bg-muted/30 py-8 md:py-12 border-b mt-16 md:mt-20">
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="w-full">

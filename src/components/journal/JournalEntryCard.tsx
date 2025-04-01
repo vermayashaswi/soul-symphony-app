@@ -38,9 +38,8 @@ interface JournalEntryCardProps {
 }
 
 export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
-  // Always call hooks at the top level, before any conditional logic
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [open, setOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true); // Changed to true by default
+  const [open, setOpen] = React.useState(false);
   const isMobile = useIsMobile();
 
   const toggleExpanded = () => {
@@ -61,16 +60,13 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
       <div className="flex justify-between items-start p-3 md:p-4">
         <div>
           <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-          {/* Only show sentiment on non-mobile devices */}
-          {!isMobile && (
-            <p className="text-xs md:text-sm text-muted-foreground">
-              {typeof entry.sentiment === 'string' 
-                ? entry.sentiment 
-                : entry.sentiment 
-                  ? `${entry.sentiment.sentiment} (${entry.sentiment.score})` 
-                  : 'No sentiment data'}
-            </p>
-          )}
+          <p className="text-xs md:text-sm text-muted-foreground">
+            {typeof entry.sentiment === 'string' 
+              ? entry.sentiment 
+              : entry.sentiment 
+                ? `${entry.sentiment.sentiment} (${entry.sentiment.score})` 
+                : 'No sentiment data'}
+          </p>
         </div>
 
         <div className="flex items-center space-x-1 md:space-x-2">
