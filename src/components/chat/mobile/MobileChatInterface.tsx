@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
@@ -32,6 +32,7 @@ export default function MobileChatInterface({
   const { toast } = useToast();
   const { user } = useAuth();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (propThreadId) {
@@ -54,6 +55,15 @@ export default function MobileChatInterface({
       window.removeEventListener('threadSelected' as any, onThreadChange);
     };
   }, []);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !user?.id) return;
@@ -250,10 +260,17 @@ export default function MobileChatInterface({
             <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
           </div>
         )}
+        
+        {/* Add ref for auto-scrolling */}
+        <div ref={messagesEndRef} />
       </div>
       
       <div className="mobile-chat-input-container">
-        <MobileChatInput onSendMessage={handleSendMessage} isLoading={loading} />
+        <MobileChatInput 
+          onSendMessage={handleSendMessage} 
+          isLoading={loading}
+          userId={userId || user?.id}
+        />
       </div>
     </div>
   );

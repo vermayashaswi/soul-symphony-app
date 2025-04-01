@@ -152,8 +152,10 @@
   }
   
   .mobile-chat-input-container {
-    position: sticky;
-    bottom: 0;
+    position: fixed;
+    bottom: 4rem; /* Position above the navbar which is 4rem tall */
+    left: 0;
+    right: 0;
     z-index: 40;
     background-color: white;
     border-top: 1px solid rgba(0, 0, 0, 0.1);
@@ -163,8 +165,8 @@
   
   /* Ensure proper content area height in chat */
   .mobile-chat-content {
-    height: calc(100vh - 120px); /* Adjust based on header and input heights */
+    height: calc(100vh - 180px); /* Adjust based on header, input and navbar heights */
     overflow-y: auto;
-    padding-bottom: 0 !important;
+    padding-bottom: 4rem !important; /* Add more padding at the bottom */
   }
 }

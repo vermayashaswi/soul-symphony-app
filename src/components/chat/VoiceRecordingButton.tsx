@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from "react";
-import { Mic } from "lucide-react";
+import { Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
-import { formatTime } from "@/utils/format-time"; // Updated import to use existing utility
+import { formatTime } from "@/utils/format-time"; 
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -13,8 +13,8 @@ interface VoiceRecordingButtonProps {
   recordingTime: number;
   onStartRecording: () => void;
   onStopRecording: (blob: Blob) => void;
-  size?: "default" | "sm" | "lg" | "icon"; // Add size prop to match Button's size options
-  className?: string; // Add className prop
+  size?: "default" | "sm" | "lg" | "icon";
+  className?: string;
 }
 
 const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
@@ -23,7 +23,7 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   recordingTime,
   onStartRecording,
   onStopRecording,
-  size = "icon", // Default to 'icon' size
+  size = "icon",
   className
 }) => {
   const [recorder, setRecorder] = useState<RecordRTC | null>(null);
@@ -56,18 +56,13 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
             numberOfAudioChannels: 2,
             desiredSampRate: 96000,
             checkForInactiveTracks: true,
-            timeSlice: 50,
+            timeSlice: 50, // Record in smaller chunks for real-time processing
             audioBitsPerSecond: 320000,
           };
           
           const rtcRecorder = new RecordRTC(mediaStream, options);
           rtcRecorder.startRecording();
           setRecorder(rtcRecorder);
-          
-          toast({
-            title: "Recording started",
-            description: "Recording for up to 15 seconds. Speak clearly.",
-          });
           
           // Auto-stop after 15 seconds
           const timeout = setTimeout(() => {
@@ -123,12 +118,20 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
     <Button 
       type="button" 
       size={size} 
-      variant={isRecording ? "destructive" : "outline"}
+      variant={isRecording ? "destructive" : "default"}
       onClick={handleVoiceRecording}
       disabled={isLoading}
-      className={cn("relative", className)}
+      className={cn(
+        "relative",
+        isRecording && "animate-pulse",
+        className
+      )}
     >
-      <Mic className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} ${isRecording ? 'animate-pulse text-white' : ''}`} />
+      {isRecording ? (
+        <Square className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} text-white`} />
+      ) : (
+        <Mic className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"}`} />
+      )}
       {isRecording && (
         <span className={`absolute ${size === "sm" ? "-bottom-5" : "-bottom-6"} text-xs font-medium`}>
           {formatTime(recordingTime)}

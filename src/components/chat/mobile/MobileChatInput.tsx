@@ -1,6 +1,6 @@
 
-import React, { useState } from "react";
-import { Send, Mic, Plus } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Send, Mic, Plus, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import VoiceRecordingButton from "../VoiceRecordingButton";
@@ -26,6 +26,16 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
   const [isFocused, setIsFocused] = useState(false);
   const { toast } = useToast();
 
+  // Reset scroll position when input is focused
+  useEffect(() => {
+    if (isFocused) {
+      const chatContent = document.querySelector('.mobile-chat-content');
+      if (chatContent) {
+        chatContent.scrollTop = chatContent.scrollHeight;
+      }
+    }
+  }, [isFocused]);
+
   const handleStartRecording = () => {
     if (!userId) {
       toast({
@@ -43,6 +53,11 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
       setRecordingTime(prev => prev + 1);
     }, 1000);
     setRecordingTimer(timer);
+    
+    toast({
+      title: "Recording started",
+      description: "Speak clearly. Recording will automatically stop after 15 seconds.",
+    });
   };
 
   const handleStopRecording = async (blob: Blob) => {
