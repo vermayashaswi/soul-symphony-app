@@ -84,17 +84,28 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
 
   const createdAtFormatted = formatRelativeTime(entry.created_at);
 
+  // Format sentiment without showing the score on mobile
+  const formattedSentiment = () => {
+    if (typeof entry.sentiment === 'string') {
+      return entry.sentiment;
+    } else if (entry.sentiment) {
+      // On mobile, just show the sentiment without the score
+      if (isMobile) {
+        return entry.sentiment.sentiment;
+      }
+      // On desktop, show both sentiment and score
+      return `${entry.sentiment.sentiment} (${entry.sentiment.score})`;
+    }
+    return 'No sentiment data';
+  };
+
   return (
     <Card className="bg-background shadow-md">
       <div className="flex justify-between items-start p-3 md:p-4">
         <div>
           <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
           <p className="text-xs md:text-sm text-muted-foreground">
-            {typeof entry.sentiment === 'string' 
-              ? entry.sentiment 
-              : entry.sentiment 
-                ? `${entry.sentiment.sentiment} (${entry.sentiment.score})` 
-                : 'No sentiment data'}
+            {formattedSentiment()}
           </p>
         </div>
 
