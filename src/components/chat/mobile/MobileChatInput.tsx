@@ -19,7 +19,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
   isLoading,
   userId
 }) => {
-  // Ensure all hooks are called at the top level, before any conditional logic
+  // Ensure all hooks are called at the top level consistently
   const [message, setMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -126,7 +126,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
         </div>
         
         <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-          {message.trim().length === 0 ? (
+          {!message.trim() ? (
             <VoiceRecordingButton
               isLoading={isLoading}
               isRecording={isRecording}

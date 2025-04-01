@@ -57,7 +57,7 @@ export default function MobileChatInterface({
   }, []);
 
   const loadThreadMessages = async (threadId: string) => {
-    if (!threadId || !user?.id) return;
+    if (!threadId) return;
     
     try {
       const { data, error } = await supabase
@@ -86,7 +86,8 @@ export default function MobileChatInterface({
 
   const handleSendMessage = async (message: string) => {
     if (!message.trim()) return;
-    if (!user?.id) {
+    const activeUser = user?.id;
+    if (!activeUser) {
       toast({
         title: "Authentication required",
         description: "Please sign in to use the chat feature.",
@@ -107,7 +108,7 @@ export default function MobileChatInterface({
             .from('chat_threads')
             .insert({
               id: newThreadId,
-              user_id: user.id,
+              user_id: activeUser,
               title: "New Conversation",
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
@@ -143,7 +144,7 @@ export default function MobileChatInterface({
       if (msgError) throw msgError;
       
       const queryTypes = analyzeQueryTypes(message);
-      const response = await processChatMessage(message, user.id, queryTypes);
+      const response = await processChatMessage(message, activeUser, queryTypes);
       
       await supabase
         .from('chat_messages')
