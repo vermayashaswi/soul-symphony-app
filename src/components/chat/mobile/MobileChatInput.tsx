@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Send, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,7 +25,17 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingTimer, setRecordingTimer] = useState<NodeJS.Timeout | null>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [permissionState, setPermissionState] = useState<boolean | null>(null);
   const { toast } = useToast();
+
+  // Effect for cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimer) {
+        clearInterval(recordingTimer);
+      }
+    };
+  }, [recordingTimer]);
 
   const handleStartRecording = () => {
     if (!userId) {

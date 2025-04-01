@@ -1,5 +1,5 @@
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -45,16 +45,7 @@ export default function SmartChatInterface() {
     }
   ];
 
-  useEffect(() => {
-    scrollToBottom();
-    
-    // This effect will run when the currentThreadId changes
-    if (currentThreadId) {
-      loadThreadMessages(currentThreadId);
-    }
-  }, [chatHistory, isLoading, currentThreadId]);
-
-  const loadThreadMessages = async (threadId: string) => {
+  const loadThreadMessages = useCallback(async (threadId: string) => {
     if (!threadId || !user?.id) return;
     
     try {
@@ -82,7 +73,16 @@ export default function SmartChatInterface() {
     } catch (error) {
       console.error("Error loading messages:", error);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    scrollToBottom();
+    
+    // This effect will run when the currentThreadId changes
+    if (currentThreadId) {
+      loadThreadMessages(currentThreadId);
+    }
+  }, [chatHistory, isLoading, currentThreadId, loadThreadMessages]);
 
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {

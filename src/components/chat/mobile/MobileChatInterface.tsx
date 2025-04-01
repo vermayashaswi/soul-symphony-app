@@ -72,17 +72,18 @@ export default function MobileChatInterface({
   }, [propThreadId, loadThreadMessages]);
 
   useEffect(() => {
-    const onThreadChange = (event: CustomEvent) => {
-      if (event.detail.threadId) {
-        setCurrentThreadId(event.detail.threadId);
-        loadThreadMessages(event.detail.threadId);
+    const handleThreadSelected = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail && customEvent.detail.threadId) {
+        setCurrentThreadId(customEvent.detail.threadId);
+        loadThreadMessages(customEvent.detail.threadId);
       }
     };
     
-    window.addEventListener('threadSelected' as any, onThreadChange);
+    window.addEventListener('threadSelected', handleThreadSelected as EventListener);
     
     return () => {
-      window.removeEventListener('threadSelected' as any, onThreadChange);
+      window.removeEventListener('threadSelected', handleThreadSelected as EventListener);
     };
   }, [loadThreadMessages]);
 
