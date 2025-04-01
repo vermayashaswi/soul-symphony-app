@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -129,6 +130,9 @@ async function generateQueryAnalysis(message: string, entryCount: number) {
       - expected_response_format: A description of how the final response should be formatted.
       
       IMPORTANT: The database table name is "Journal Entries" (with a space and capital letters), not "journal_entries". Always use double quotes around the table name in SQL queries.
+
+      IMPORTANT: For emotion-related queries, ensure that your SQL query directly extracts and formats emotion data rather than just returning journal entry IDs. 
+      Use SQL functions to process the emotion data within the query whenever possible.
       
       Example:
       User Query: "How did I feel about my friend Sarah last week?"
@@ -188,13 +192,54 @@ async function generateQueryAnalysis(message: string, entryCount: number) {
   }
 }
 
+// Utility function to process emotion data
+async function processEmotionData(journalEntries: any[], timeframe: string): Promise<{emotionsList: string, topEmotions: [string, number][], explanation?: string}> {
+  // Extract and aggregate emotion data from entries
+  const emotionCounts: {[key: string]: {count: number, total: number, entries: any[]}} = {};
+  
+  journalEntries.forEach(entry => {
+    if (entry.emotions && typeof entry.emotions === 'object') {
+      Object.entries(entry.emotions).forEach(([emotion, score]) => {
+        if (!emotionCounts[emotion]) {
+          emotionCounts[emotion] = { count: 0, total: 0, entries: [] };
+        }
+        emotionCounts[emotion].count += 1;
+        emotionCounts[emotion].total += Number(score);
+        emotionCounts[emotion].entries.push(entry);
+      });
+    }
+  });
+  
+  // Get the top emotions
+  const topEmotions = Object.entries(emotionCounts)
+    .sort((a, b) => {
+      if (b[1].count !== a[1].count) return b[1].count - a[1].count;
+      return (b[1].total / b[1].count) - (a[1].total / a[1].count);
+    })
+    .slice(0, 3)
+    .map(([emotion, stats]) => {
+      const avgScore = (stats.total / stats.count).toFixed(2);
+      return [emotion, Number(avgScore)] as [string, number];
+    });
+  
+  // Format the emotion list
+  const emotionsList = topEmotions.map(([emotion, score]) => 
+    `${emotion} (${score})`
+  ).join(', ');
+  
+  return {
+    emotionsList,
+    topEmotions,
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { message, userId, includeDiagnostics = false, enableQueryBreakdown = false, generateSqlQueries = false, analyzeComponents = false, allowRetry = true } = await req.json();
+    const { message, userId, includeDiagnostics = false, enableQueryBreakdown = false, generateSqlQueries = false, analyzeComponents = false, allowRetry = true, requiresExplanation = false } = await req.json();
 
     if (!message || !userId) {
       return new Response(JSON.stringify({ error: 'Missing required parameters' }), {
@@ -240,8 +285,14 @@ serve(async (req) => {
     const executionResults = [];
     const executionErrors = [];
     let needsRetry = false;
-    let retryAttempts = 0;
+    let retryAttempted = 0;
     const MAX_RETRY_ATTEMPTS = 2;
+    
+    // Detect if this is an emotion-focused query
+    const isEmotionQuery = message.toLowerCase().includes('emotion') || 
+                          message.toLowerCase().includes('feel') ||
+                          (queryAnalysisPlan.intent && 
+                           queryAnalysisPlan.intent.toLowerCase().includes('emotion'));
     
     if (queryAnalysisPlan.execution_plan) {
       for (const step of queryAnalysisPlan.execution_plan) {
@@ -297,6 +348,7 @@ serve(async (req) => {
                       console.log(`Generated improved SQL query: ${improvedQuery}`);
                       cleanedQuery = improvedQuery; // Use the improved query for the next retry
                       currentRetryAttempt++;
+                      retryAttempted++;
                       needsRetry = true;
                       continue; // Try again with the improved query
                     }
@@ -308,7 +360,6 @@ serve(async (req) => {
                 // If we got here, either retries are not allowed or all retries failed
                 console.error(`Final SQL error for step "${step.step}":`, lastError);
                 executionErrors.push({ step: step.step, error: lastError });
-                needsRetry = false;
                 break;
               }
             }
@@ -317,34 +368,118 @@ serve(async (req) => {
             executionErrors.push({ step: step.step, error: error.message || String(error) });
           }
         } else if (step.step_type === 'data_aggregation') {
-          const stepDependencies = step.dependencies || [];
-          const stepResults = stepDependencies.map(dep => {
-            const foundResult = executionResults.find(res => res.step === dep);
-            return foundResult ? foundResult.result : null;
-          });
-
-          if (stepResults.every(result => result !== null)) {
-            try {
-              if (step.aggregation_type === 'count') {
-                const totalCount = stepResults.reduce((acc, curr) => acc + (Array.isArray(curr) ? curr.length : 0), 0);
-                executionResults.push({ step: step.step, result: totalCount });
-              } else if (step.aggregation_type === 'average') {
-                const validValues = stepResults.flat().filter(val => typeof val === 'number');
-                const averageValue = validValues.length > 0 ? validValues.reduce((acc, val) => acc + val, 0) / validValues.length : 0;
-                executionResults.push({ step: step.step, result: averageValue });
-              } else if (step.aggregation_type === 'sum') {
-                const validValues = stepResults.flat().filter(val => typeof val === 'number');
-                const sumValue = validValues.reduce((acc, val) => acc + val, 0);
-                executionResults.push({ step: step.step, result: sumValue });
-              } else {
-                executionErrors.push({ step: step.step, error: `Unsupported aggregation type: ${step.aggregation_type}` });
+          // For emotion queries, let's do special processing
+          if (isEmotionQuery && executionResults.length > 0) {
+            const lastResult = executionResults[executionResults.length - 1];
+            
+            if (lastResult && lastResult.result && Array.isArray(lastResult.result)) {
+              try {
+                // Check if we have journal entries with emotions
+                if (lastResult.result.length > 0 && 
+                    lastResult.result[0] && 
+                    typeof lastResult.result[0] === 'object') {
+                  
+                  if (lastResult.result[0].emotions) {
+                    // We have journal entries with emotion data
+                    const emotionData = await processEmotionData(
+                      lastResult.result, 
+                      queryAnalysisPlan.time_range
+                    );
+                    
+                    executionResults.push({ 
+                      step: "Process and rank emotions",
+                      result: emotionData.topEmotions.map(([emotion, score]) => ({ 
+                        emotion, 
+                        score 
+                      }))
+                    });
+                  } 
+                  // Check if we directly have emotion objects
+                  else if (lastResult.result[0].emotion || lastResult.result[0].name) {
+                    // We already have processed emotion data
+                    executionResults.push({ 
+                      step: "Format emotion data",
+                      result: lastResult.result
+                    });
+                  }
+                  // If we just have IDs, we need to fetch the entries
+                  else if (lastResult.result.every((item: any) => 
+                      typeof item === 'number' || (typeof item === 'object' && item.id))) {
+                    
+                    // Extract IDs
+                    const entryIds = lastResult.result.map((item: any) => 
+                      typeof item === 'number' ? item : item.id
+                    );
+                    
+                    // Fetch emotions for these entries
+                    try {
+                      const { data: entriesData, error: entriesError } = await supabase
+                        .from('Journal Entries')
+                        .select('id, "refined text", emotions, created_at')
+                        .in('id', entryIds);
+                      
+                      if (!entriesError && entriesData && entriesData.length > 0) {
+                        const emotionData = await processEmotionData(
+                          entriesData, 
+                          queryAnalysisPlan.time_range
+                        );
+                        
+                        executionResults.push({ 
+                          step: "Process and rank emotions from retrieved entries",
+                          result: emotionData.topEmotions.map(([emotion, score]) => ({ 
+                            emotion, 
+                            score 
+                          }))
+                        });
+                      }
+                    } catch (fetchError) {
+                      console.error("Error fetching emotion data for entries:", fetchError);
+                      executionErrors.push({ 
+                        step: "Fetch emotion data", 
+                        error: fetchError.message || String(fetchError) 
+                      });
+                    }
+                  }
+                }
+              } catch (emotionError) {
+                console.error("Error processing emotion data:", emotionError);
+                executionErrors.push({ 
+                  step: "Process emotion data", 
+                  error: emotionError.message || String(emotionError) 
+                });
               }
-            } catch (aggregationError) {
-              console.error(`Error during data aggregation for step "${step.step}":`, aggregationError);
-              executionErrors.push({ step: step.step, error: aggregationError.message || String(aggregationError) });
             }
           } else {
-            executionErrors.push({ step: step.step, error: `Missing dependencies: ${stepDependencies.join(', ')}` });
+            // Standard data aggregation for non-emotion queries
+            const stepDependencies = step.dependencies || [];
+            const stepResults = stepDependencies.map(dep => {
+              const foundResult = executionResults.find(res => res.step === dep);
+              return foundResult ? foundResult.result : null;
+            });
+
+            if (stepResults.every(result => result !== null)) {
+              try {
+                if (step.aggregation_type === 'count') {
+                  const totalCount = stepResults.reduce((acc, curr) => acc + (Array.isArray(curr) ? curr.length : 0), 0);
+                  executionResults.push({ step: step.step, result: totalCount });
+                } else if (step.aggregation_type === 'average') {
+                  const validValues = stepResults.flat().filter(val => typeof val === 'number');
+                  const averageValue = validValues.length > 0 ? validValues.reduce((acc, val) => acc + val, 0) / validValues.length : 0;
+                  executionResults.push({ step: step.step, result: averageValue });
+                } else if (step.aggregation_type === 'sum') {
+                  const validValues = stepResults.flat().filter(val => typeof val === 'number');
+                  const sumValue = validValues.reduce((acc, val) => acc + val, 0);
+                  executionResults.push({ step: step.step, result: sumValue });
+                } else {
+                  executionErrors.push({ step: step.step, error: `Unsupported aggregation type: ${step.aggregation_type}` });
+                }
+              } catch (aggregationError) {
+                console.error(`Error during data aggregation for step "${step.step}":`, aggregationError);
+                executionErrors.push({ step: step.step, error: aggregationError.message || String(aggregationError) });
+              }
+            } else {
+              executionErrors.push({ step: step.step, error: `Missing dependencies: ${stepDependencies.join(', ')}` });
+            }
           }
         }
       }
@@ -360,42 +495,125 @@ serve(async (req) => {
 
     let response = "I couldn't find a direct answer to your question using the available data. I will try a different approach.";
     let hasNumericResult = false;
+    let references = null;
 
     if (executionResults.length > 0 && !fallbackToRag) {
-      const finalResult = executionResults[executionResults.length - 1].result;
-      if (typeof finalResult === 'number') {
-        response = `The answer is: ${finalResult}`;
-        hasNumericResult = true;
-      } else if (Array.isArray(finalResult)) {
-        if (finalResult.length > 0) {
-          const firstItem = finalResult[0];
-          if (typeof firstItem === 'object' && firstItem !== null) {
-            const keys = Object.keys(firstItem);
-            if (keys.length > 0) {
-              const key = keys[0];
-              response = `Here's what I found: ${finalResult.map(item => item[key]).join(', ')}`;
+      // Special handling for emotion queries
+      if (isEmotionQuery) {
+        const emotionResults = executionResults.find(res => 
+          res.step.includes("emotion") && 
+          Array.isArray(res.result) && 
+          res.result.length > 0 && 
+          res.result[0].emotion
+        );
+        
+        if (emotionResults) {
+          const emotionsList = emotionResults.result.map((item: any) => 
+            `${item.emotion} (${typeof item.score === 'number' ? item.score.toFixed(2) : item.score})`
+          ).join(', ');
+          
+          // Get the time period from the query analysis
+          const timePeriod = queryAnalysisPlan.time_range ? 
+            queryAnalysisPlan.time_range.toLowerCase() : 
+            "based on your journal entries";
+          
+          response = `Based on your journal entries from ${timePeriod}, your top emotions were: ${emotionsList}.`;
+          
+          // Try to include journal entries as references
+          const entriesResult = executionResults.find(res => 
+            Array.isArray(res.result) && 
+            res.result.length > 0 && 
+            res.result[0] && 
+            (res.result[0]["refined text"] || res.result[0].text)
+          );
+          
+          if (entriesResult) {
+            references = entriesResult.result.map((entry: any) => ({
+              id: entry.id,
+              date: entry.created_at,
+              snippet: (entry["refined text"] || entry.text)?.substring(0, 150) + "..."
+            }));
+          }
+          
+          // If the query asks for "why", include explanations
+          if (requiresExplanation) {
+            const entriesWithEmotions = executionResults.find(res => 
+              Array.isArray(res.result) && 
+              res.result.some((entry: any) => entry.emotions || entry["refined text"] || entry.text)
+            );
+            
+            if (entriesWithEmotions) {
+              const topEmotions = emotionResults.result.slice(0, 2).map((item: any) => item.emotion);
+              let explanations = '';
+              
+              // Find examples for each top emotion
+              for (const emotion of topEmotions) {
+                const relevantEntries = entriesWithEmotions.result
+                  .filter((entry: any) => 
+                    entry.emotions && 
+                    entry.emotions[emotion] && 
+                    entry.emotions[emotion] > 0.5 &&
+                    (entry["refined text"] || entry.text)
+                  )
+                  .slice(0, 2);
+                
+                if (relevantEntries.length > 0) {
+                  explanations += `\n\nYou experienced ${emotion} when: `;
+                  relevantEntries.forEach((entry: any) => {
+                    const snippet = (entry["refined text"] || entry.text)?.substring(0, 100) + "...";
+                    if (snippet) {
+                      explanations += `"${snippet}" `;
+                    }
+                  });
+                }
+              }
+              
+              if (explanations) {
+                response += explanations;
+              }
+            }
+          }
+        } else {
+          // Couldn't find structured emotion data, use a generic response
+          response = "I found some emotion data in your journal entries, but I'm having trouble analyzing it in detail.";
+        }
+      } else {
+        // Standard handling for non-emotion queries
+        const finalResult = executionResults[executionResults.length - 1].result;
+        if (typeof finalResult === 'number') {
+          response = `The answer is: ${finalResult}`;
+          hasNumericResult = true;
+        } else if (Array.isArray(finalResult)) {
+          if (finalResult.length > 0) {
+            const firstItem = finalResult[0];
+            if (typeof firstItem === 'object' && firstItem !== null) {
+              const keys = Object.keys(firstItem);
+              if (keys.length > 0) {
+                const key = keys[0];
+                response = `Here's what I found: ${finalResult.map(item => item[key]).join(', ')}`;
+              } else {
+                response = `Here's what I found: ${finalResult.join(', ')}`;
+              }
             } else {
               response = `Here's what I found: ${finalResult.join(', ')}`;
             }
           } else {
-            response = `Here's what I found: ${finalResult.join(', ')}`;
+            response = "I found some data, but it doesn't seem to contain any specific answers.";
+          }
+        } else if (typeof finalResult === 'string') {
+          response = finalResult;
+        } else if (typeof finalResult === 'boolean') {
+          response = finalResult ? "Yes" : "No";
+        } else if (finalResult !== null && finalResult !== undefined) {
+          try {
+            response = JSON.stringify(finalResult);
+          } catch (stringifyError) {
+            console.error("Error stringifying result:", stringifyError);
+            response = "I found some data, but I'm having trouble displaying it.";
           }
         } else {
           response = "I found some data, but it doesn't seem to contain any specific answers.";
         }
-      } else if (typeof finalResult === 'string') {
-        response = finalResult;
-      } else if (typeof finalResult === 'boolean') {
-        response = finalResult ? "Yes" : "No";
-      } else if (finalResult !== null && finalResult !== undefined) {
-        try {
-          response = JSON.stringify(finalResult);
-        } catch (stringifyError) {
-          console.error("Error stringifying result:", stringifyError);
-          response = "I found some data, but I'm having trouble displaying it.";
-        }
-      } else {
-        response = "I found some data, but it doesn't seem to contain any specific answers.";
       }
     }
 
@@ -405,13 +623,14 @@ serve(async (req) => {
         hasNumericResult,
         fallbackToRag,
         retryAttempted: needsRetry,
+        references,
         diagnostics: includeDiagnostics ? {
           queryAnalysis: queryAnalysisPlan,
           executionResults,
           executionErrors,
           generationTime: Date.now() - startTime,
           needsRetry,
-          retryAttempts
+          retryAttempted
         } : null
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
