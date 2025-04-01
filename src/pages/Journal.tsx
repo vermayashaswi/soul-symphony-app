@@ -21,10 +21,8 @@ const Journal = () => {
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Use stable references for entries
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
-  // Keep track of successfully processed entries
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
 
   useEffect(() => {
@@ -33,7 +31,6 @@ const Journal = () => {
     }
   }, [user?.id]);
   
-  // Monitor active tab changes and fetch entries when switching to entries tab
   useEffect(() => {
     if (activeTab === 'entries' && isProfileChecked) {
       console.log('Tab changed to entries, fetching entries...');
@@ -41,35 +38,29 @@ const Journal = () => {
     }
   }, [activeTab, isProfileChecked, fetchEntries]);
 
-  // Add a new effect to monitor processing entries
   useEffect(() => {
-    // If there are processing entries, set up a polling interval to check for updates
     if (processingEntries.length > 0 && activeTab === 'entries') {
       console.log('Setting up polling for processing entries:', processingEntries);
       
       const pollingInterval = setInterval(() => {
         fetchEntries();
-      }, 5000); // Poll every 5 seconds while processing
+      }, 5000);
       
       return () => clearInterval(pollingInterval);
     }
   }, [processingEntries, activeTab, fetchEntries]);
 
-  // Effect to check if a processing entry has been completed
   useEffect(() => {
-    // We loop through all entries to see if any processing entries are now in the entries list
     if (processingEntries.length > 0 && entries.length > 0) {
-      // Look for entries corresponding to processingEntries
       const newlyCompletedTempIds = [];
       
       for (const entry of entries) {
-        if (processingEntries.includes(entry.foreignKey)) {
+        if (entry.foreignKey && processingEntries.includes(entry.foreignKey)) {
           newlyCompletedTempIds.push(entry.foreignKey);
           setProcessedEntryIds(prev => [...prev, entry.id]);
         }
       }
       
-      // Remove completed entries from processing list
       if (newlyCompletedTempIds.length > 0) {
         setProcessingEntries(prev => 
           prev.filter(id => !newlyCompletedTempIds.includes(id))
@@ -121,10 +112,8 @@ const Journal = () => {
     
     setActiveTab('entries');
     
-    // Immediately fetch entries to show the processing state
     fetchEntries();
     
-    // Set up a check to verify the entry was processed
     const checkEntryProcessed = async () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
@@ -140,7 +129,6 @@ const Journal = () => {
         } else if (data) {
           console.log('New entry found:', data.id);
           
-          // Generate themes in the background
           await supabase.functions.invoke('generate-themes', {
             body: {
               text: data["refined text"],
@@ -157,33 +145,29 @@ const Journal = () => {
       }
     };
     
-    // Poll for the entry to be processed
     const pollInterval = setInterval(async () => {
       const isProcessed = await checkEntryProcessed();
       
       if (isProcessed) {
         clearInterval(pollInterval);
-        // Remove the tempId from processing entries
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
         setRefreshKey(prev => prev + 1);
         fetchEntries();
         toast.success('Journal entry processed successfully!');
       }
-    }, 3000); // Check every 3 seconds
+    }, 3000);
     
-    // Clear interval after a timeout (e.g., 2 minutes) to prevent infinite polling
     setTimeout(() => {
       clearInterval(pollInterval);
       if (processingEntries.includes(tempId || '')) {
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
         toast.info('Entry processing is taking longer than expected. It should appear soon.');
       }
-    }, 120000); // 2 minutes timeout
+    }, 120000);
   };
 
   const handleDeleteEntry = (entryId: number) => {
     console.log('Entry deleted, updating UI:', entryId);
-    // This will trigger a re-fetch of entries
     setRefreshKey(prev => prev + 1);
   };
 
@@ -191,7 +175,6 @@ const Journal = () => {
     setSearchQuery(query);
   };
 
-  // Filter entries based on search query
   const filteredEntries = entries.filter(entry => {
     if (!searchQuery.trim()) return true;
     
@@ -202,12 +185,8 @@ const Journal = () => {
     return content.includes(query) || themes.includes(query);
   });
 
-  // Determine if we should show the loading screen
   const showLoading = loading && activeTab === 'entries' && !entries.length;
   
-  // Entries are ready to view when either:
-  // 1. We have entries to show, or
-  // 2. We're not loading and on the entries tab (showing empty state)
   const showEntries = activeTab === 'entries' && (!loading || entries.length > 0);
 
   return (
@@ -241,7 +220,6 @@ const Journal = () => {
               <JournalSearch onSearch={handleSearch} />
             )}
             
-            {/* Show loading state */}
             {showLoading && (
               <div className="flex flex-col items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
@@ -249,11 +227,10 @@ const Journal = () => {
               </div>
             )}
             
-            {/* Show entries or empty state when ready */}
             {showEntries && (
               <JournalEntriesList 
                 entries={filteredEntries} 
-                loading={false} // We're handling loading separately now
+                loading={false}
                 processingEntries={processingEntries}
                 processedEntryIds={processedEntryIds}
                 onStartRecording={() => setActiveTab('record')}

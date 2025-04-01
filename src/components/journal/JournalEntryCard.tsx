@@ -32,6 +32,7 @@ export interface JournalEntry {
     text: string;
     type: string;
   }[];
+  foreignKey?: string; // Added foreignKey property
 }
 
 interface JournalEntryCardProps {

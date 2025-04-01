@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,12 +11,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [fetchCount, setFetchCount] = useState(0);
   const [lastRefreshKey, setLastRefreshKey] = useState(refreshKey);
   
-  // Add ref to track if a fetch is in progress to prevent duplicate calls
   const isFetchingRef = useRef(false);
-  // Add ref to track if we've already done the initial fetch
   const initialFetchDoneRef = useRef(false);
 
-  // Use useCallback to make fetchEntries reusable
   const fetchEntries = useCallback(async () => {
     if (!userId) {
       console.log('No user ID provided for fetching entries');
@@ -25,7 +21,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       return;
     }
     
-    // Don't fetch if we're already fetching to prevent multiple simultaneous requests
     if (isFetchingRef.current) {
       console.log('[useJournalEntries] Skipping fetch as one is already in progress');
       return;
@@ -37,7 +32,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const fetchStartTime = Date.now();
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
-      // Fetch entries from the Journal Entries table
       const { data, error, status } = await supabase
         .from('Journal Entries')
         .select('*')
@@ -65,15 +59,14 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         console.log('[useJournalEntries] No entries found for this user');
       }
       
-      // Convert the data to match our JournalEntry type
       const typedEntries: JournalEntry[] = (data || []).map(item => ({
         id: item.id,
-        content: item["refined text"] || item["transcription text"] || "", // Use refined text as content
+        content: item["refined text"] || item["transcription text"] || "",
         created_at: item.created_at,
         audio_url: item.audio_url,
         sentiment: item.sentiment,
         themes: item.master_themes,
-        // Properly convert the entities JSON to the expected type
+        foreignKey: item["foreign key"],
         entities: item.entities ? (item.entities as any[]).map(entity => ({
           type: entity.type,
           name: entity.name,
@@ -94,10 +87,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     }
   }, [userId, fetchCount]);
 
-  // Only fetch when userId changes, refreshKey changes, or isProfileChecked becomes true
   useEffect(() => {
     if (userId && isProfileChecked) {
-      // Only fetch if this is the initial load or if refreshKey has changed
       const isInitialLoad = !initialFetchDoneRef.current;
       const hasRefreshKeyChanged = refreshKey !== lastRefreshKey;
       
@@ -110,7 +101,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       }
     } else {
       console.log(`[useJournalEntries] Waiting for prerequisites: userId=${!!userId}, isProfileChecked=${isProfileChecked}`);
-      setLoading(userId !== undefined); // Only show loading if we have a userId but aren't fully ready
+      setLoading(userId !== undefined);
     }
   }, [userId, refreshKey, isProfileChecked, fetchEntries, lastRefreshKey]);
 
