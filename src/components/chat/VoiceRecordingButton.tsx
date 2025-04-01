@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
 import { formatTime } from "@/utils/format-time"; // Updated import to use existing utility
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface VoiceRecordingButtonProps {
   isLoading: boolean;
@@ -13,6 +14,7 @@ interface VoiceRecordingButtonProps {
   onStartRecording: () => void;
   onStopRecording: (blob: Blob) => void;
   size?: "default" | "sm" | "lg" | "icon"; // Add size prop to match Button's size options
+  className?: string; // Add className prop
 }
 
 const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
@@ -21,7 +23,8 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   recordingTime,
   onStartRecording,
   onStopRecording,
-  size = "icon" // Default to 'icon' size
+  size = "icon", // Default to 'icon' size
+  className
 }) => {
   const [recorder, setRecorder] = useState<RecordRTC | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -123,7 +126,7 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
       variant={isRecording ? "destructive" : "outline"}
       onClick={handleVoiceRecording}
       disabled={isLoading}
-      className="relative"
+      className={cn("relative", className)}
     >
       <Mic className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} ${isRecording ? 'animate-pulse text-white' : ''}`} />
       {isRecording && (
