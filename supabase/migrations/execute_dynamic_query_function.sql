@@ -32,7 +32,7 @@ BEGIN
   
   -- Replace each parameter placeholder ($1, $2, etc) with the actual value
   FOR i IN 1..array_length(param_values, 1) LOOP
-    query_with_params := replace(query_with_params, '$' || i::text, '''' || param_values[i] || '''');
+    query_with_params := replace(query_with_params, '$' || i::text, quote_literal(param_values[i]));
   END LOOP;
   
   -- Add additional safeguards for the query execution
