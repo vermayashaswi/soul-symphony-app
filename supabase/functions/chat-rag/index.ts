@@ -64,6 +64,109 @@ function formatEmotions(emotions: Record<string, number> | null | undefined): st
     .join(", ");
 }
 
+// Calculate average emotion score for quantitative analysis
+async function calculateAverageEmotionScore(userId: string, emotionType: string = 'happiness', timeRange: string = 'month') {
+  try {
+    let startDate = new Date();
+    
+    // Set time range
+    if (timeRange === 'week') {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (timeRange === 'month') {
+      startDate.setMonth(startDate.getMonth() - 1);
+    } else if (timeRange === 'year') {
+      startDate.setFullYear(startDate.getFullYear() - 1);
+    }
+    
+    // Query entries within the time range
+    const { data: entries, error } = await supabase
+      .from('Journal Entries')
+      .select('emotions, created_at')
+      .eq('user_id', userId)
+      .gte('created_at', startDate.toISOString())
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching entries for emotion calculation:", error);
+      return { averageScore: null, entryCount: 0, error: error.message };
+    }
+    
+    if (!entries || entries.length === 0) {
+      return { averageScore: null, entryCount: 0, error: 'No entries found' };
+    }
+    
+    // Calculate average emotion score
+    let totalScore = 0;
+    let validEntries = 0;
+    
+    entries.forEach(entry => {
+      if (entry.emotions && entry.emotions[emotionType]) {
+        totalScore += parseFloat(entry.emotions[emotionType]);
+        validEntries++;
+      }
+    });
+    
+    const averageScore = validEntries > 0 ? (totalScore / validEntries) * 100 : null;
+    
+    return { 
+      averageScore: averageScore ? Math.round(averageScore) : null, 
+      entryCount: entries.length,
+      validEntryCount: validEntries
+    };
+  } catch (error) {
+    console.error("Error calculating average emotion score:", error);
+    return { averageScore: null, entryCount: 0, error: error.message };
+  }
+}
+
+// Detect quantitative queries about emotions
+function detectEmotionQuantitativeQuery(message: string) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Match patterns like "how happy am I", "rate my happiness", etc.
+  const emotionPatterns = {
+    happiness: /how (happy|content|satisfied|joyful|cheerful)|(happiness|joy|satisfaction) (score|rating|level)/i,
+    sadness: /how (sad|unhappy|depressed|down|blue)|(sadness|depression|unhappiness) (score|rating|level)/i,
+    anger: /how (angry|mad|frustrated|irritated)|(anger|frustration|irritation) (score|rating|level)/i,
+    anxiety: /how (anxious|worried|nervous|stressed)|(anxiety|stress|worry) (score|rating|level)/i,
+    fear: /how (afraid|scared|fearful|frightened)|(fear) (score|rating|level)/i
+  };
+  
+  // Check for numeric rating requests
+  const ratingPattern = /(rate|score|percentage|level|out of \d+|scale|quantify)/i;
+  const hasRatingRequest = ratingPattern.test(lowerMessage);
+  
+  // Check for time periods
+  const timePatterns = {
+    week: /(this|last|past) week|7 days/i,
+    month: /(this|last|past) month|30 days/i,
+    year: /(this|last|past) year|365 days/i
+  };
+  
+  // Determine emotion type and time range
+  let emotionType = null;
+  for (const [emotion, pattern] of Object.entries(emotionPatterns)) {
+    if (pattern.test(lowerMessage)) {
+      emotionType = emotion;
+      break;
+    }
+  }
+  
+  let timeRange = 'month'; // Default
+  for (const [time, pattern] of Object.entries(timePatterns)) {
+    if (pattern.test(lowerMessage)) {
+      timeRange = time;
+      break;
+    }
+  }
+  
+  return {
+    isQuantitativeEmotionQuery: emotionType !== null || hasRatingRequest,
+    emotionType: emotionType || 'happiness', // Default to happiness if no specific emotion
+    timeRange
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -71,7 +174,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId } = await req.json();
+    const { message, userId, queryTypes } = await req.json();
     
     if (!message) {
       throw new Error('No message provided');
@@ -79,6 +182,45 @@ serve(async (req) => {
 
     console.log("Processing chat request for user:", userId);
     console.log("Message:", message.substring(0, 50) + "...");
+    
+    // Check if this is a quantitative query about emotions
+    const emotionQueryAnalysis = detectEmotionQuantitativeQuery(message);
+    
+    // If we have a quantitative query about emotions, handle it directly
+    if (queryTypes?.isQuantitative && emotionQueryAnalysis.isQuantitativeEmotionQuery) {
+      console.log("Detected quantitative emotion query:", emotionQueryAnalysis);
+      
+      const emotionStats = await calculateAverageEmotionScore(
+        userId, 
+        emotionQueryAnalysis.emotionType, 
+        emotionQueryAnalysis.timeRange
+      );
+      
+      console.log("Calculated emotion stats:", emotionStats);
+      
+      // If we have valid emotion data, provide a direct answer
+      if (emotionStats.averageScore !== null) {
+        let directResponse = `Based on your journal entries from the past ${emotionQueryAnalysis.timeRange}, `;
+        directResponse += `your average ${emotionQueryAnalysis.emotionType} score is ${emotionStats.averageScore} out of 100. `;
+        
+        if (emotionStats.validEntryCount < emotionStats.entryCount) {
+          directResponse += `This is calculated from ${emotionStats.validEntryCount} entries that had ${emotionQueryAnalysis.emotionType} data out of ${emotionStats.entryCount} total entries in this period. `;
+        }
+        
+        directResponse += `Would you like me to analyze this further or suggest ways to improve your ${emotionQueryAnalysis.emotionType}?`;
+        
+        return new Response(
+          JSON.stringify({ 
+            response: directResponse,
+            analysis: {
+              type: 'quantitative_emotion',
+              data: emotionStats
+            }
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
     
     // Generate embedding for the user query
     console.log("Generating embedding for user query...");
