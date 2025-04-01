@@ -26,7 +26,7 @@ export default function MobileChatInterface({
   onCreateNewThread,
   userId
 }: MobileChatInterfaceProps) {
-  // Ensure all hooks are called at the top level consistently
+  // Always call hooks at the top level consistently
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
