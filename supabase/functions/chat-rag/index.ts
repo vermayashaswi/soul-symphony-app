@@ -262,8 +262,7 @@ serve(async (req) => {
   }
 
   try {
-    const requestData = await req.json();
-    const { message, userId, threadId = null, includeDiagnostics = false } = requestData;
+    const { message, userId, queryTypes, threadId = null, isNewThread = false, includeDiagnostics = false } = await req.json();
     
     if (!message) {
       throw new Error('No message provided');
@@ -271,14 +270,12 @@ serve(async (req) => {
 
     console.log("Processing chat request for user:", userId);
     console.log("Message:", message.substring(0, 50) + "...");
-    console.log("Thread ID:", threadId);
-    console.log("Include diagnostics:", includeDiagnostics ? "yes" : "no");
     
     // Check if this is a quantitative query about emotions
     const emotionQueryAnalysis = detectEmotionQuantitativeQuery(message);
     
     // If we have a quantitative query about emotions, handle it directly
-    if (requestData.isQuantitative && emotionQueryAnalysis.isQuantitativeEmotionQuery) {
+    if (queryTypes?.isQuantitative && emotionQueryAnalysis.isQuantitativeEmotionQuery) {
       console.log("Detected quantitative emotion query:", emotionQueryAnalysis);
       
       if (emotionQueryAnalysis.isTopEmotionsQuery) {
@@ -348,122 +345,72 @@ serve(async (req) => {
       }
     }
     
-    // Try to analyze patterns in the query
-    let queryAnalysis = {
-      queryType: "general",
-      emotion: null,
-      theme: null,
-      entityType: null,
-      entityName: null,
-      timeframe: {
-        type: "month",
-        startDate: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString(),
-        endDate: new Date().toISOString()
-      },
-      isWhenQuestion: false
-    };
-    
-    console.log("Query analysis:", JSON.stringify(queryAnalysis));
-    
     // Generate embedding for the user query
     console.log("Generating embedding for user query...");
-    let queryEmbedding;
-    try {
-      queryEmbedding = await generateEmbedding(message);
-      console.log("Using embedding for search");
-    } catch (embeddingError) {
-      console.error("Error generating embedding:", embeddingError);
-      console.log("Will attempt search without embedding");
-    }
+    const queryEmbedding = await generateEmbedding(message);
     
     // Search for relevant journal entries using vector similarity
-    let similarEntries = [];
-    if (queryEmbedding) {
-      console.log("Searching entries with vector similarity for userId:", userId);
-      console.log("RPC params for match_journal_entries_with_date:", {
-        query_embedding: queryEmbedding.slice(0, 10) + "...",  // Log just a portion
+    console.log("Searching for relevant context using match_journal_entries function...");
+    const { data: similarEntries, error: searchError } = await supabase.rpc(
+      'match_journal_entries',
+      {
+        query_embedding: queryEmbedding,
         match_threshold: 0.5,
-        match_count: 7,
+        match_count: 5,
         user_id_filter: userId
-      });
-      
-      try {
-        const { data: entriesData, error: searchError } = await supabase.rpc(
-          'match_journal_entries_with_date',
-          {
-            query_embedding: queryEmbedding,
-            match_threshold: 0.5,
-            match_count: 7,
-            user_id_filter: userId
-          }
-        );
-        
-        if (searchError) {
-          console.error("Error searching for similar entries:", searchError);
-          console.error("Search error details:", JSON.stringify(searchError));
-        } else {
-          similarEntries = entriesData || [];
-          console.log("Vector similarity search found", similarEntries.length, "entries");
-        }
-      } catch (rpcError) {
-        console.error("RPC error:", rpcError);
       }
-    }
+    );
     
-    // Get entries based on search or fallback to recent entries
-    let entries = [];
-    if (similarEntries && similarEntries.length > 0) {
-      console.log("Found", similarEntries.length, "relevant entries");
-      
-      // Fetch full entries for context
-      const entryIds = similarEntries.map(entry => entry.id);
-      try {
-        const { data: entriesData, error: entriesError } = await supabase
-          .from('Journal Entries')
-          .select('refined text, created_at, emotions')
-          .in('id', entryIds);
-        
-        if (entriesError) {
-          console.error("Error retrieving journal entries:", entriesError);
-        } else if (entriesData && entriesData.length > 0) {
-          entries = entriesData;
-          console.log("Retrieved", entries.length, "full entries");
-        }
-      } catch (fetchError) {
-        console.error("Error fetching full entries:", fetchError);
-      }
-    } else {
-      console.log("No similar entries found, falling back to recent entries");
-      // Fallback to recent entries if no similar ones found
-      try {
-        const { data: recentEntries, error: recentError } = await supabase
-          .from('Journal Entries')
-          .select('refined text, created_at, emotions')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(3);
-        
-        if (recentError) {
-          console.error("Error retrieving recent entries:", recentError);
-        } else if (recentEntries && recentEntries.length > 0) {
-          entries = recentEntries;
-          console.log("Retrieved", entries.length, "recent entries");
-        }
-      } catch (recentError) {
-        console.error("Error fetching recent entries:", recentError);
-      }
+    if (searchError) {
+      console.error("Error searching for similar entries:", searchError);
+      console.error("Search error details:", JSON.stringify(searchError));
     }
     
     // Create RAG context from relevant entries
     let journalContext = "";
-    if (entries && entries.length > 0) {
-      // Format entries as context with emotions data
-      journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
-        entries.map((entry, index) => {
-          const date = new Date(entry.created_at).toLocaleDateString();
-          const emotionsText = formatEmotions(entry.emotions);
-          return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
-        }).join('\n\n') + "\n\n";
+    if (similarEntries && similarEntries.length > 0) {
+      console.log("Found similar entries:", similarEntries.length);
+      
+      // Fetch full entries for context
+      const entryIds = similarEntries.map(entry => entry.id);
+      const { data: entries, error: entriesError } = await supabase
+        .from('Journal Entries')
+        .select('refined text, created_at, emotions')
+        .in('id', entryIds);
+      
+      if (entriesError) {
+        console.error("Error retrieving journal entries:", entriesError);
+      } else if (entries && entries.length > 0) {
+        console.log("Retrieved full entries:", entries.length);
+        // Format entries as context with emotions data
+        journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
+          entries.map((entry, index) => {
+            const date = new Date(entry.created_at).toLocaleDateString();
+            const emotionsText = formatEmotions(entry.emotions);
+            return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
+          }).join('\n\n') + "\n\n";
+      }
+    } else {
+      console.log("No similar entries found, falling back to recent entries");
+      // Fallback to recent entries if no similar ones found
+      const { data: recentEntries, error: recentError } = await supabase
+        .from('Journal Entries')
+        .select('refined text, created_at, emotions')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
+      if (recentError) {
+        console.error("Error retrieving recent entries:", recentError);
+      } else if (recentEntries && recentEntries.length > 0) {
+        console.log("Retrieved recent entries:", recentEntries.length);
+        journalContext = "Here are some of your recent journal entries:\n\n" + 
+          recentEntries.map((entry, index) => {
+            const date = new Date(entry.created_at).toLocaleDateString();
+            const emotionsText = formatEmotions(entry.emotions);
+            return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
+          }).join('\n\n') + "\n\n";
+      }
     }
     
     // Get user's first name for personalized response
@@ -482,46 +429,16 @@ serve(async (req) => {
       console.error("Error fetching user profile:", error);
     }
     
-    // Get previous conversation context if there's a thread ID
-    let conversationContext = "";
-    if (threadId) {
-      console.log("Fetching previous messages for conversation context...");
-      try {
-        const { data: prevMessages, error: prevMessagesError } = await supabase
-          .from('chat_messages')
-          .select('content, sender')
-          .eq('thread_id', threadId)
-          .order('created_at', { ascending: true })
-          .limit(10);
-          
-        if (prevMessagesError) {
-          console.error("Error retrieving previous messages:", prevMessagesError);
-        } else if (prevMessages && prevMessages.length > 0) {
-          console.log("Retrieved", prevMessages.length, "previous messages");
-          
-          conversationContext = "\nHere is the conversation history so far:\n\n" + 
-            prevMessages.map(msg => {
-              const role = msg.sender === 'user' ? 'User' : 'Assistant';
-              return `${role}: ${msg.content}`;
-            }).join('\n\n');
-            
-          console.log("Including previous conversation context");
-        }
-      } catch (threadError) {
-        console.error("Error fetching thread messages:", threadError);
-      }
-    }
-    
     // Prepare system prompt with RAG context
     const systemPrompt = `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
-${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}${conversationContext}
+${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
 Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
 Focus on being helpful rather than diagnostic. 
 ${firstName ? `Always address the user by their first name (${firstName}) in your responses.` : ""}`;
 
-    console.log("Sending to GPT with RAG context" + (conversationContext ? " and conversation history" : "") + "...");
+    console.log("Sending to GPT with RAG context...");
     
     try {
       // Send to GPT with RAG context
@@ -557,27 +474,8 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
       
       console.log("AI response generated successfully");
       
-      // Prepare the response including diagnostic information if requested
-      const responseData = { 
-        response: aiResponse 
-      };
-      
-      if (includeDiagnostics) {
-        responseData.diagnostics = {
-          relevantEntries: similarEntries && similarEntries.length > 0 ? 
-            similarEntries.map(entry => ({
-              id: entry.id,
-              similarity: entry.similarity,
-              created_at: entry.created_at,
-              snippet: entry.content ? entry.content.substring(0, 150) + "..." : "No content available"
-            })) : [],
-          queryAnalysis,
-          entriesFound: entries.length
-        };
-      }
-      
       return new Response(
-        JSON.stringify(responseData),
+        JSON.stringify({ response: aiResponse }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
@@ -585,7 +483,7 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
     } catch (apiError) {
       console.error("API error:", apiError);
       
-      // Return a proper response with error information
+      // Return a 200 status even for errors to avoid CORS issues
       return new Response(
         JSON.stringify({ 
           error: apiError.message, 
@@ -593,7 +491,7 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
           success: false 
         }),
         { 
-          status: 200, // Use 200 to avoid CORS issues
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
@@ -601,7 +499,7 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
   } catch (error) {
     console.error("Error in chat-rag function:", error);
     
-    // Return a proper response with error information
+    // Return 200 status even for errors to avoid CORS issues
     return new Response(
       JSON.stringify({ 
         error: error.message, 
@@ -609,7 +507,7 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
         success: false 
       }),
       {
-        status: 200, // Use 200 to avoid CORS issues
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

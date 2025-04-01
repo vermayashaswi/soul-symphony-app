@@ -6,7 +6,15 @@ interface MobilePreviewFrameProps {
 }
 
 const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
-  // Always show the mobile frame in our mobile-only app
+  // Get mobileDemo parameter from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  
+  // Only show the mobile frame if the mobileDemo parameter is true
+  if (!mobileDemo) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-800 p-4 overflow-auto">
       <div className="relative w-[375px] h-[812px] bg-white rounded-[40px] shadow-2xl overflow-hidden border-8 border-black">

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -32,8 +31,10 @@ const queryClient = new QueryClient({
 });
 
 const MobilePreviewWrapper = ({ children }: { children: React.ReactNode }) => {
-  // In our mobile-only app, always use the mobile frame
-  return <MobilePreviewFrame>{children}</MobilePreviewFrame>;
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  
+  return mobileDemo ? <MobilePreviewFrame>{children}</MobilePreviewFrame> : <>{children}</>;
 };
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -57,11 +58,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) {
-    const url = new URL(`/auth`, window.location.origin);
-    url.searchParams.set('redirectTo', location.pathname);
-    
     console.log("Redirecting to auth from protected route:", location.pathname);
-    return <Navigate to={url.pathname + url.search} replace />;
+    return <Navigate to={`/auth?redirectTo=${location.pathname}`} replace />;
   }
   
   return <>{children}</>;
@@ -69,8 +67,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppRoutes = () => {
   const isMobile = useIsMobile();
-  // Always enable mobile mode
-  const shouldShowMobileNav = true;
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  const shouldShowMobileNav = isMobile || mobileDemo;
 
   useEffect(() => {
     const setCorrectViewport = () => {

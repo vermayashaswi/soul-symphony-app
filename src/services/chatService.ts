@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 
@@ -42,98 +43,88 @@ export async function processChatMessage(
     console.log("Using chunked search:", preferChunks ? "yes" : "no");
     
     // Execute the appropriate search strategy
-    try {
-      switch (searchStrategy) {
-        case 'temporal_vector_search':
-          // For "when" questions - vector search with temporal focus
-          console.log("Using temporal vector search strategy");
-          queryResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
-          break;
-          
-        case 'frequency_analysis':
-          // For "how often" questions - analyze frequency patterns
-          console.log("Using frequency analysis strategy");
-          queryResponse = await handleFrequencyAnalysis(message, userId, messageQueryTypes, threadId, preferChunks);
-          break;
-          
-        case 'emotion_aggregation':
-          // For emotion aggregation questions (top emotions)
-          console.log("Using emotion aggregation strategy");
-          queryResponse = await handleEmotionAggregation(message, userId, messageQueryTypes, threadId, preferChunks);
-          break;
-          
-        case 'emotion_causal_analysis':
-          // For emotion "why" questions
-          console.log("Using emotion causal analysis strategy");
-          queryResponse = await handleEmotionCausalAnalysis(message, userId, messageQueryTypes, threadId, preferChunks);
-          break;
-          
-        case 'relationship_analysis':
-          // For relationship-related queries
-          console.log("Using relationship analysis strategy");
-          queryResponse = await handleRelationshipAnalysis(message, userId, messageQueryTypes, threadId, preferChunks);
-          break;
-          
-        case 'contextual_advice':
-          // For improvement/advice questions
-          console.log("Using contextual advice strategy");
-          queryResponse = await handleContextualAdvice(message, userId, messageQueryTypes, threadId, preferChunks);
-          break;
-          
-        case 'data_aggregation':
-          // For queries needing data aggregation
-          console.log("Using data aggregation strategy");
-          
-          try {
-            const { data, error } = await supabase.functions.invoke('smart-query-planner', {
-              body: { 
-                message, 
-                userId, 
-                includeDiagnostics: true,
-                enableQueryBreakdown: true,
-                generateSqlQueries: true,
-                analyzeComponents: true,
-                allowRetry: true,
-                requiresExplanation: messageQueryTypes.needsContext || message.toLowerCase().includes('why'),
-                preferChunks: preferChunks
-              }
-            });
-            
-            if (error) {
-              console.error("Error using smart-query-planner:", error);
-              queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
-            } else if (data && !data.fallbackToRag) {
-              console.log("Successfully used smart query planner");
-              queryResponse = data;
-            } else {
-              console.log("Smart query planner couldn't handle the query, falling back to RAG");
-              queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
+    switch (searchStrategy) {
+      case 'temporal_vector_search':
+        // For "when" questions - vector search with temporal focus
+        console.log("Using temporal vector search strategy");
+        queryResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
+        break;
+        
+      case 'frequency_analysis':
+        // For "how often" questions - analyze frequency patterns
+        console.log("Using frequency analysis strategy");
+        queryResponse = await handleFrequencyAnalysis(message, userId, messageQueryTypes, threadId, preferChunks);
+        break;
+        
+      case 'emotion_aggregation':
+        // For emotion aggregation questions (top emotions)
+        console.log("Using emotion aggregation strategy");
+        queryResponse = await handleEmotionAggregation(message, userId, messageQueryTypes, threadId, preferChunks);
+        break;
+        
+      case 'emotion_causal_analysis':
+        // For emotion "why" questions
+        console.log("Using emotion causal analysis strategy");
+        queryResponse = await handleEmotionCausalAnalysis(message, userId, messageQueryTypes, threadId, preferChunks);
+        break;
+        
+      case 'relationship_analysis':
+        // For relationship-related queries
+        console.log("Using relationship analysis strategy");
+        queryResponse = await handleRelationshipAnalysis(message, userId, messageQueryTypes, threadId, preferChunks);
+        break;
+        
+      case 'contextual_advice':
+        // For improvement/advice questions
+        console.log("Using contextual advice strategy");
+        queryResponse = await handleContextualAdvice(message, userId, messageQueryTypes, threadId, preferChunks);
+        break;
+        
+      case 'data_aggregation':
+        // For queries needing data aggregation
+        console.log("Using data aggregation strategy");
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('smart-query-planner', {
+            body: { 
+              message, 
+              userId, 
+              includeDiagnostics: true,
+              enableQueryBreakdown: true,
+              generateSqlQueries: true,
+              analyzeComponents: true,
+              allowRetry: true,
+              requiresExplanation: messageQueryTypes.needsContext || message.toLowerCase().includes('why'),
+              preferChunks: preferChunks
             }
-          } catch (smartQueryError) {
-            console.error("Exception in smart-query-planner:", smartQueryError);
+          });
+          
+          if (error) {
+            console.error("Error using smart-query-planner:", error);
+          } else if (data && !data.fallbackToRag) {
+            console.log("Successfully used smart query planner");
+            queryResponse = data;
+          } else {
+            console.log("Smart query planner couldn't handle the query, falling back to RAG");
             queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
           }
-          break;
-          
-        case 'vector_search':
-        default:
-          // Default case - standard vector search
-          console.log("Using standard vector search strategy");
+        } catch (smartQueryError) {
+          console.error("Exception in smart-query-planner:", smartQueryError);
           queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
-          break;
-      }
-    } catch (strategyError) {
-      console.error(`Error in strategy ${searchStrategy}:`, strategyError);
-      console.log("Falling back to standard vector search");
-      queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
+        }
+        break;
+        
+      case 'vector_search':
+      default:
+        // Default case - standard vector search
+        console.log("Using standard vector search strategy");
+        queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
+        break;
     }
     
     if (!queryResponse) {
-      console.log("No response from any strategy, falling back to basic response");
-      return {
-        role: 'assistant',
-        content: "I don't have enough information to answer that. Could you ask in a different way or provide more context?",
-      };
+      console.log("No response from primary strategy, falling back to RAG");
+      queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
     }
     
     console.log("Response received:", queryResponse ? "yes" : "no");
@@ -173,44 +164,33 @@ export async function processChatMessage(
 
 // Handler for standard vector search
 async function handleVectorSearch(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string, preferChunks: boolean = true) {
-  try {
-    const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
-      ? {
-          type: queryTypes.timeRange.type,
-          startDate: queryTypes.timeRange.startDate,
-          endDate: queryTypes.timeRange.endDate
-        } 
-      : null;
-    
-    console.log("Invoking chat-with-rag function");
-    const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-      body: { 
-        message, 
-        userId,
-        threadId,
-        includeDiagnostics: true,
-        timeRange,
-        isComplexQuery: queryTypes.isComplexQuery || message.toLowerCase().includes('why'),
-        requiresEmotionAnalysis: queryTypes.isEmotionFocused,
-        preferChunks: preferChunks
-      }
-    });
-    
-    if (error) {
-      console.error("Error in chat-with-rag:", error);
-      throw error;
+  const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
+    ? {
+        type: queryTypes.timeRange.type,
+        startDate: queryTypes.timeRange.startDate,
+        endDate: queryTypes.timeRange.endDate
+      } 
+    : null;
+  
+  const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+    body: { 
+      message, 
+      userId,
+      threadId,
+      includeDiagnostics: true,
+      timeRange,
+      isComplexQuery: queryTypes.isComplexQuery || message.toLowerCase().includes('why'),
+      requiresEmotionAnalysis: queryTypes.isEmotionFocused,
+      preferChunks: preferChunks
     }
-    
-    if (!data) {
-      console.error("No data returned from chat-with-rag");
-      throw new Error("No data returned from edge function");
-    }
-    
-    return data;
-  } catch (error) {
-    console.error("Error in handleVectorSearch:", error);
+  });
+  
+  if (error) {
+    console.error("Error in chat-with-rag:", error);
     throw error;
   }
+  
+  return data;
 }
 
 // Handler for temporal vector search (when questions)
