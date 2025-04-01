@@ -360,6 +360,7 @@ const Index = () => {
     }
   ];
 
+  // Always render Navbar, SouloLogo, and other components
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <ParticleBackground />
