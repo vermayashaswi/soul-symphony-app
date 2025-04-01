@@ -70,22 +70,88 @@ export async function processChatMessage(
           
           // Format emotion data if present
           if (data.hasNumericResult && data.diagnostics && data.diagnostics.executionResults) {
-            const emotionResults = data.diagnostics.executionResults.find(
-              (result: any) => Array.isArray(result.result) && 
-                result.result[0] && 
-                typeof result.result[0] === 'object' && 
-                (result.result[0].emotion || result.result[0].emotions)
-            );
-            
-            if (emotionResults && emotionResults.result && data.response.includes('[object Object]')) {
-              const emotionData = emotionResults.result.map((item: any) => {
-                const emotion = item.emotion || Object.keys(item)[0];
-                const score = item.score || item[emotion];
-                return `${emotion} (${typeof score === 'number' ? score.toFixed(2) : score})`;
-              }).join(', ');
+            // Check if the response contains a simple list of IDs
+            if (data.response.includes("Here's what I found:") && 
+                data.response.split("Here's what I found:")[1].trim().match(/^\d+(,\s*\d+)*$/)) {
               
-              // Replace the response content with formatted emotion data
-              data.response = data.response.replace(/\[object Object\](, \[object Object\])*/, emotionData);
+              // Get the emotion results from diagnostics
+              const executionResults = data.diagnostics.executionResults;
+              const lastResult = executionResults[executionResults.length - 1];
+              
+              if (lastResult && lastResult.result && Array.isArray(lastResult.result)) {
+                if (lastResult.result[0] && typeof lastResult.result[0] === 'object') {
+                  // Format emotion data from the results
+                  let formattedData;
+                  
+                  // Check if we have emotion objects with name and score properties
+                  if (lastResult.result[0].emotion || lastResult.result[0].name) {
+                    formattedData = lastResult.result.map((item: any) => {
+                      const emotion = item.emotion || item.name || Object.keys(item)[0];
+                      const score = item.score || (item[emotion] ? item[emotion] : null);
+                      return `${emotion}${score ? ` (${typeof score === 'number' ? score.toFixed(2) : score})` : ''}`;
+                    }).join(', ');
+                  } 
+                  // Check if we have objects with emotion as keys
+                  else {
+                    // Calculate the emotions from all entries returned
+                    const emotionCounts: {[key: string]: {count: number, total: number}} = {};
+                    
+                    lastResult.result.forEach((item: any) => {
+                      if (item.emotions && typeof item.emotions === 'object') {
+                        Object.entries(item.emotions).forEach(([emotion, score]) => {
+                          if (!emotionCounts[emotion]) {
+                            emotionCounts[emotion] = { count: 0, total: 0 };
+                          }
+                          emotionCounts[emotion].count += 1;
+                          emotionCounts[emotion].total += Number(score);
+                        });
+                      }
+                    });
+                    
+                    // Sort emotions by frequency and score
+                    const sortedEmotions = Object.entries(emotionCounts)
+                      .sort((a, b) => {
+                        // Sort by count first, then by average score
+                        if (b[1].count !== a[1].count) return b[1].count - a[1].count;
+                        return (b[1].total / b[1].count) - (a[1].total / a[1].count);
+                      })
+                      .slice(0, 3) // Limit to top 3 emotions
+                      .map(([emotion, stats]) => {
+                        const avgScore = (stats.total / stats.count).toFixed(2);
+                        return `${emotion} (${avgScore})`;
+                      });
+                    
+                    formattedData = sortedEmotions.join(', ');
+                  }
+                  
+                  // Replace the IDs with formatted emotion data
+                  if (formattedData) {
+                    data.response = data.response.split("Here's what I found:")[0] + 
+                      "Here's what I found: " + formattedData;
+                  }
+                }
+              }
+            }
+            
+            // Also check for [object Object] in the response
+            if (data.response.includes('[object Object]')) {
+              const emotionResults = data.diagnostics.executionResults.find(
+                (result: any) => Array.isArray(result.result) && 
+                  result.result[0] && 
+                  typeof result.result[0] === 'object' && 
+                  (result.result[0].emotion || result.result[0].emotions)
+              );
+              
+              if (emotionResults && emotionResults.result) {
+                const emotionData = emotionResults.result.map((item: any) => {
+                  const emotion = item.emotion || Object.keys(item)[0];
+                  const score = item.score || item[emotion];
+                  return `${emotion} (${typeof score === 'number' ? score.toFixed(2) : score})`;
+                }).join(', ');
+                
+                // Replace the response content with formatted emotion data
+                data.response = data.response.replace(/\[object Object\](, \[object Object\])*/, emotionData);
+              }
             }
           }
         } else {
