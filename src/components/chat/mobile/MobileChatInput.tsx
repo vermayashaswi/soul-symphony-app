@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Send, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +27,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
   const [isFocused, setIsFocused] = useState(false);
   const [permissionState, setPermissionState] = useState<boolean | null>(null);
   const { toast } = useToast();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Effect for cleanup on unmount
   useEffect(() => {
@@ -110,6 +111,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
       <form onSubmit={handleSubmit} className="relative flex items-end w-full gap-2">
         <div className="flex items-center w-full relative">
           <Textarea
+            ref={textareaRef}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Ask anything..."
