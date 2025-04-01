@@ -18,6 +18,23 @@ type SentimentData = {
   };
 };
 
+// Helper function to extract sentiment value from different possible formats
+const getSentimentValue = (sentiment: any): number => {
+  if (typeof sentiment === 'number') {
+    return sentiment;
+  }
+  
+  if (typeof sentiment === 'string') {
+    return parseFloat(sentiment);
+  }
+  
+  if (sentiment && typeof sentiment === 'object' && 'score' in sentiment) {
+    return typeof sentiment.score === 'number' ? sentiment.score : parseFloat(String(sentiment.score));
+  }
+  
+  return 0; // Default to neutral if sentiment data is missing or invalid
+};
+
 const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRange }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   
