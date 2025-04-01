@@ -1,0 +1,40 @@
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  /* Rounded corners for mobile UI elements */
+  .mobile-chat-interface .rounded-full {
+    border-radius: 20px;
+  }
+  
+  /* Increase touch targets */
+  .mobile-chat-interface button {
+    min-height: 40px;
+  }
+  
+  /* Add some bounce animations for mobile interactions */
+  @keyframes mobile-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  
+  .mobile-animation-bounce {
+    animation: mobile-bounce 0.5s ease;
+  }
+  
+  /* Mobile-friendly scrolling */
+  .mobile-chat-interface .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Improve readability on small screens */
+  .mobile-chat-interface .prose {
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  
+  /* Mobile-friendly input */
+  .mobile-chat-interface textarea {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+}
