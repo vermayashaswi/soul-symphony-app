@@ -28,7 +28,7 @@ export default function SmartChat() {
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
   useEffect(() => {
-    document.title = "AI Assistant | SOULo";
+    document.title = "Roha | SOULo";
     
     // Force proper viewport setup for mobile
     const metaViewport = document.querySelector('meta[name="viewport"]');
@@ -101,10 +101,10 @@ export default function SmartChat() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="smart-chat-container w-full h-[calc(100vh-4rem)] flex"
+        className="smart-chat-container w-full h-[calc(100vh-4rem)] flex pt-16" // Added pt-16 to create space below navbar
       >
         {!hasEnoughEntries && !loading && (
-          <Alert className="absolute z-10 top-16 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800">
+          <Alert className="absolute z-10 top-20 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800"> {/* Adjusted top position */}
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>No journal entries found</AlertTitle>
             <AlertDescription className="mt-2">
@@ -145,7 +145,7 @@ export default function SmartChat() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="smart-chat-container h-[calc(100vh-4rem)] flex flex-col pt-14"
+        className="smart-chat-container h-[calc(100vh-4rem)] flex flex-col pt-16" // Added pt-16 for consistent spacing
       >
         {!hasEnoughEntries && !loading && (
           <Alert className="mx-3 mt-3 border-amber-300 bg-amber-50 text-amber-800">
