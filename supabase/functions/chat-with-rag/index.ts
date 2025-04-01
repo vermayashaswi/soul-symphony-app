@@ -146,7 +146,7 @@ function extractTimePeriod(message: string): {startDate: Date | null, endDate: D
   return { startDate, endDate, periodName };
 }
 
-// Handle top emotions query using the new SQL function
+// Enhanced function to handle top emotions query using the new SQL function
 async function handleTopEmotionsQuery(userId: string, timeRange: {startDate: Date | null, endDate: Date | null, periodName: string}, isWhyQuery: boolean) {
   try {
     // Use the new SQL function to get top emotions with sample entries

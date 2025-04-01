@@ -392,6 +392,19 @@ export type Database = {
           score: number
         }[]
       }
+      get_top_emotions_with_entries: {
+        Args: {
+          user_id_param: string
+          start_date?: string
+          end_date?: string
+          limit_count?: number
+        }
+        Returns: {
+          emotion: string
+          score: number
+          sample_entries: Json
+        }[]
+      }
       mark_inactive_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -422,6 +435,22 @@ export type Database = {
           start_date?: string
           end_date?: string
           limit_count?: number
+        }
+        Returns: {
+          id: number
+          content: string
+          created_at: string
+          emotion_score: number
+          embedding: string
+        }[]
+      }
+      match_journal_entries_by_emotion_strength: {
+        Args: {
+          emotion_name: string
+          user_id_filter: string
+          match_count?: number
+          start_date?: string
+          end_date?: string
         }
         Returns: {
           id: number
