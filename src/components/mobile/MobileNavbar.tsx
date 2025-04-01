@@ -4,10 +4,15 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const MobileNavbar = () => {
   const location = useLocation();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  const shouldShow = (isMobile || mobileDemo) && (user || location.pathname === '/');
   
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
@@ -17,8 +22,8 @@ const MobileNavbar = () => {
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
-  // Only show the navbar if the user is logged in or on the home page
-  if (!user && location.pathname !== '/') {
+  // Don't render anything if we shouldn't show the navbar
+  if (!shouldShow) {
     return null;
   }
 
