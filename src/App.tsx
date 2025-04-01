@@ -103,7 +103,7 @@ const AppRoutes = () => {
             <Insights />
           </ProtectedRoute>
         } />
-        {/* Redirect /chat to /smart-chat */}
+        {/* Redirect /chat to /smart-chat for all devices */}
         <Route path="/chat" element={
           <Navigate to="/smart-chat" replace />
         } />

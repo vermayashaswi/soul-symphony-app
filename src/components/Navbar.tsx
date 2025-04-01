@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -58,7 +57,6 @@ export function Navbar() {
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
-  // Function to handle navigation with auth check
   const handleNavigation = (path: string) => {
     if (!user && path !== '/') {
       navigate(`/auth?redirectTo=${path}`);
@@ -91,7 +89,6 @@ export function Navbar() {
 
         <div className="hidden md:flex items-center gap-1">
           {navItems.map((item) => {
-            // For the home page, we don't need auth
             if (item.path === '/') {
               return (
                 <Link
@@ -117,7 +114,6 @@ export function Navbar() {
               );
             }
             
-            // For other pages, we need to check auth
             return (
               <button
                 key={item.path}
