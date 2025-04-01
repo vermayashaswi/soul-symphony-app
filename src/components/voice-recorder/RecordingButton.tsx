@@ -41,8 +41,9 @@ export function RecordingButton({
         "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
         isRecording 
           ? "bg-red-500 border-red-600 w-20 h-20" // Increased size during recording from 16 to 20
-          : "bg-primary hover:bg-primary/90 border-primary/20 w-20 h-20",
-        isProcessing && "opacity-50 cursor-not-allowed"
+          : isProcessing 
+            ? "bg-gray-400 border-gray-500 w-20 h-20 opacity-50 cursor-not-allowed" // Grey when processing
+            : "bg-primary hover:bg-primary/90 border-primary/20 w-20 h-20",
       )}
       whileTap={{ scale: 0.95 }}
       animate={isRecording ? 

@@ -89,9 +89,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ onSearch }) => {
           placeholder={`Search entries by ${currentPlaceholder}`}
         />
       </div>
-      <p className="text-xs text-muted-foreground mt-1 ml-1">
-        Search for people, places, events, or any other entities in your journal entries
-      </p>
+      {/* Removed the guidance text */}
     </motion.div>
   );
 };

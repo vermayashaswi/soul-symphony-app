@@ -138,6 +138,7 @@ const Journal = () => {
       
       if (isProcessed) {
         clearInterval(pollInterval);
+        // Remove the tempId from processing entries
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
         setRefreshKey(prev => prev + 1);
         fetchEntries();
