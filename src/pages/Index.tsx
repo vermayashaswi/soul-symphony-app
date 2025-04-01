@@ -374,7 +374,7 @@ const Index = () => {
           variants={itemVariants}
         >
           <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-4 flex items-center justify-center`}>
-            Welcome to <SouloLogo size={shouldRenderMobile ? "medium" : "large"} className="ml-2" useColorTheme={true} />
+            Welcome to <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} />
           </h1>
           <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse`}>
             Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
