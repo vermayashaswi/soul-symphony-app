@@ -8,6 +8,7 @@ import ChatThreadList from '@/components/chat/ChatThreadList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useMobile } from '@/hooks/use-mobile';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import MobilePreviewFrame from '@/components/MobilePreviewFrame';
 
 export default function Chat() {
   const { user } = useAuth();
@@ -15,10 +16,29 @@ export default function Chat() {
   const isMobile = useMobile();
   const [showSidebar, setShowSidebar] = useState(!isMobile);
 
+  // Check if we're in mobile preview mode
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+
   // Handle responsive layout
   useEffect(() => {
-    setShowSidebar(!isMobile);
-  }, [isMobile]);
+    // Only auto-hide sidebar on real mobile devices, not in preview
+    if (!mobileDemo) {
+      setShowSidebar(!isMobile);
+    }
+  }, [isMobile, mobileDemo]);
+
+  useEffect(() => {
+    document.title = "Chat | SOULo";
+    
+    // Force proper viewport setup for mobile
+    const metaViewport = document.querySelector('meta[name="viewport"]');
+    if (metaViewport) {
+      metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+    }
+    
+    console.log("Chat page mounted, mobile:", isMobile, "width:", window.innerWidth, "mobileDemo:", mobileDemo);
+  }, [isMobile, mobileDemo]);
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);
@@ -37,12 +57,13 @@ export default function Chat() {
     setShowSidebar(!showSidebar);
   };
 
-  return (
+  // Content for both desktop and mobile views
+  const chatContent = (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <Navbar />
       
       <div className="flex-1 pt-16 flex w-full h-[calc(100vh-4rem)]">
-        {isMobile && (
+        {(isMobile || mobileDemo) && (
           <div className="absolute top-20 left-4 z-10">
             <SidebarTrigger onClick={toggleSidebar} />
           </div>
@@ -81,4 +102,7 @@ export default function Chat() {
       </div>
     </div>
   );
+
+  // If we're in mobile demo mode, wrap the content in the MobilePreviewFrame
+  return mobileDemo ? <MobilePreviewFrame>{chatContent}</MobilePreviewFrame> : chatContent;
 }
