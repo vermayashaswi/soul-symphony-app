@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -56,7 +55,6 @@ export default function MobileChatInterface({
     };
   }, []);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading]);
@@ -111,7 +109,6 @@ export default function MobileChatInterface({
           await onCreateNewThread();
           return; // The event listener will trigger loadThreadMessages
         } else {
-          // Fallback if no callback provided
           const newThreadId = uuidv4();
           const { error } = await supabase
             .from('chat_threads')
@@ -152,8 +149,12 @@ export default function MobileChatInterface({
         
       if (msgError) throw msgError;
       
+      console.log("Performing comprehensive query analysis");
       const queryTypes = analyzeQueryTypes(message);
+      console.log("Query analysis result:", queryTypes);
+      
       const response = await processChatMessage(message, user.id, queryTypes);
+      console.log("Response received with references:", response.references?.length || 0);
       
       await supabase
         .from('chat_messages')
@@ -161,7 +162,9 @@ export default function MobileChatInterface({
           thread_id: threadId,
           content: response.content,
           sender: 'assistant',
-          reference_entries: response.references || null
+          reference_entries: response.references || null,
+          has_numeric_result: response.hasNumericResult || false,
+          analysis_data: response.analysis || null
         });
       
       if (messages.length === 0) {
@@ -234,7 +237,7 @@ export default function MobileChatInterface({
           </SheetContent>
         </Sheet>
         <h2 className="text-lg font-semibold flex-1 text-center">Roha</h2>
-        <div className="w-8"></div> {/* Reduced width for balance */}
+        <div className="w-8"></div>
       </div>
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3">
@@ -261,7 +264,6 @@ export default function MobileChatInterface({
           </div>
         )}
         
-        {/* Add ref for auto-scrolling */}
         <div ref={messagesEndRef} />
       </div>
       

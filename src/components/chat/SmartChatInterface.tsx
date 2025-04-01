@@ -156,8 +156,12 @@ export default function SmartChatInterface() {
         
       if (msgError) throw msgError;
       
+      console.log("Desktop: Performing comprehensive query analysis");
       const queryTypes = analyzeQueryTypes(userMessage);
+      console.log("Desktop: Query analysis result:", queryTypes);
+      
       const response = await processChatMessage(userMessage, user.id, queryTypes);
+      console.log("Desktop: Response received with references:", response.references?.length || 0);
       
       await supabase
         .from('chat_messages')
@@ -165,7 +169,9 @@ export default function SmartChatInterface() {
           thread_id: threadId,
           content: response.content,
           sender: 'assistant',
-          reference_entries: response.references || null
+          reference_entries: response.references || null,
+          has_numeric_result: response.hasNumericResult || false,
+          analysis_data: response.analysis || null
         });
       
       if (chatHistory.length === 0) {

@@ -2,6 +2,7 @@
 export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
   const lowerQuery = query.toLowerCase();
   
+  // Enhanced quantitative detection with more patterns
   const quantitativeWords = [
     'how many', 'how much', 'count', 'total', 'average', 'avg', 'statistics',
     'stats', 'number', 'percentage', 'percent', 'ratio', 'frequency', 'score',
@@ -20,17 +21,23 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     'when', 'time', 'date', 'period', 'duration', 'during', 'after', 'before',
     'since', 'until', 'day', 'week', 'month', 'year', 'today', 'yesterday',
     'tomorrow', 'recent', 'last', 'this', 'next', 'previous', 'upcoming',
-    'now', 'past', 'future', 'earlier', 'later', 'history', 'trend'
+    'now', 'past', 'future', 'earlier', 'later', 'history', 'trend', 'evolution',
+    'progress', 'development', 'growth', 'change', 'transition', 'shift'
   ];
   
+  // Expanded emotion vocabulary to catch more subtle references
   const emotionWords = [
     'feel', 'feeling', 'emotion', 'mood', 'happy', 'sad', 'angry', 'anxious',
     'joyful', 'excited', 'disappointed', 'frustrated', 'content', 'hopeful',
     'grateful', 'proud', 'afraid', 'scared', 'worried', 'stressed', 'peaceful',
     'calm', 'love', 'hate', 'fear', 'disgust', 'surprise', 'shame', 'guilt',
-    'positive', 'negative', 'neutral'
+    'positive', 'negative', 'neutral', 'depressed', 'ecstatic', 'elated',
+    'miserable', 'cheerful', 'gloomy', 'tense', 'relaxed', 'irritated',
+    'pleased', 'annoyed', 'fulfilled', 'empty', 'overwhelmed', 'satisfaction',
+    'dissatisfaction', 'delight', 'displeasure', 'anguish', 'bliss'
   ];
   
+  // Better detection of numbers and counts in queries
   const numberWordPatterns = [
     /\b\d+\b/, /\bone\b/, /\btwo\b/, /\bthree\b/, /\bfour\b/, /\bfive\b/,
     /\bsix\b/, /\bseven\b/, /\beight\b/, /\bnine\b/, /\bten\b/, /\bdozen\b/,
@@ -39,7 +46,26 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     /\bdouble\b/, /\btriple\b/, /\bquadruple\b/, /\bquintuple\b/, /\bmultiple\b/
   ];
   
-  const topEmotionsPattern = /top\s+\d+\s+(positive|negative)\s+emotions/i;
+  // Enhanced pattern detection for top emotions
+  const topEmotionsPattern = /(?:top|most|main|primary|strongest|highest|dominant)\s+(?:\d+|few|several)\s+(?:positive|negative|intense|strong)?\s*(?:emotion|emotions|feeling|feelings)/i;
+  
+  // Enhanced pattern detection for emotion ranking
+  const emotionRankingPattern = /(?:rank|ranking|order|sort)\s+(?:of|my|the)?\s*(?:emotion|emotions|feeling|feelings)/i;
+  
+  // Enhanced pattern detection for emotion changes over time
+  const emotionChangePattern = /(?:change|changes|changing|evolution|evolve|evolving|progress|progression|trend|trends|growth|development|shift|transition)\s+(?:in|of|my|the)?\s*(?:emotion|emotions|feeling|feelings)/i;
+  
+  // Enhanced detection for "when" questions that need temporal context
+  const whenQuestionPattern = /\b(?:when|what time|which day|which month|which week|during what|during which)\b/i;
+  
+  // Check for specific emotion quantification patterns
+  const emotionQuantificationPattern = /(?:how|what)\s+(?:much|level|degree|extent|intensity|amount)\s+(?:of|did|do|does|is|am|are|was|were)\s+(?:i|me|my|himself|herself|yourself|they|we|us|you)?\s*(?:feel|feeling|felt|experience|experienced|have|having|had|get|getting|got)\s+(?:a|an)?\s*(?:emotionWord)/i;
+  
+  // Create dynamic pattern for each emotion word
+  const hasEmotionQuantification = emotionWords.some(emotion => {
+    const pattern = new RegExp(emotionQuantificationPattern.source.replace('emotionWord', emotion), 'i');
+    return pattern.test(lowerQuery);
+  });
   
   const hasQuantitativeWords = quantitativeWords.some(word => 
     lowerQuery.includes(word)
@@ -62,21 +88,40 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
   );
   
   const hasTopEmotionsPattern = topEmotionsPattern.test(lowerQuery);
+  const hasEmotionRankingPattern = emotionRankingPattern.test(lowerQuery);
+  const hasEmotionChangePattern = emotionChangePattern.test(lowerQuery);
+  const isWhenQuestion = whenQuestionPattern.test(lowerQuery);
   
   const needsContext = /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b|\bmeaning\b|\binterpret\b/.test(lowerQuery);
   
+  // Enhanced detection for queries that need data aggregation
+  const needsDataAggregation = hasTopEmotionsPattern || 
+                              hasEmotionRankingPattern || 
+                              hasEmotionChangePattern ||
+                              (hasEmotionWords && (hasQuantitativeWords || hasNumbers || hasComparativeWords));
+  
   return {
-    isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern,
+    isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification,
     
     isTemporal: hasTemporalWords,
     
-    isComparative: hasComparativeWords || hasTopEmotionsPattern,
+    isComparative: hasComparativeWords || hasTopEmotionsPattern || hasEmotionChangePattern,
     
-    isEmotionFocused: hasEmotionWords || hasTopEmotionsPattern,
+    isEmotionFocused: hasEmotionWords || hasTopEmotionsPattern || hasEmotionRankingPattern || hasEmotionQuantification,
     
     hasTopEmotionsPattern,
     
-    needsContext: needsContext,
+    hasEmotionRankingPattern,
+    
+    hasEmotionChangePattern,
+    
+    hasEmotionQuantification,
+    
+    isWhenQuestion,
+    
+    needsContext,
+    
+    needsDataAggregation,
     
     asksForNumber: hasNumbers || hasTopEmotionsPattern || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
     
