@@ -22,6 +22,16 @@ const MobileNavbar = () => {
     return null;
   }
 
+  // Add mobile parameter to all navigation URLs
+  const getMobileUrl = (path: string) => {
+    // Create a URL object to handle parameter addition properly
+    const url = new URL(path, window.location.origin);
+    // Always ensure mobileDemo is set to true
+    url.searchParams.set('mobileDemo', 'true');
+    // Return just the pathname and search parts
+    return `${url.pathname}${url.search}`;
+  };
+
   return (
     <motion.div 
       className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t flex items-center justify-around z-50 px-1"
@@ -31,11 +41,12 @@ const MobileNavbar = () => {
     >
       {navItems.map(item => {
         const isActive = location.pathname === item.path;
+        const mobileUrl = getMobileUrl(item.path);
         
         return (
           <Link 
             key={item.path} 
-            to={item.path}
+            to={mobileUrl}
             className={cn(
               "flex flex-col items-center justify-center w-full h-full pt-1",
               isActive ? "text-primary" : "text-muted-foreground"

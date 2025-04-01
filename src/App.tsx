@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -31,10 +32,8 @@ const queryClient = new QueryClient({
 });
 
 const MobilePreviewWrapper = ({ children }: { children: React.ReactNode }) => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  
-  return mobileDemo ? <MobilePreviewFrame>{children}</MobilePreviewFrame> : <>{children}</>;
+  // In our mobile-only app, always use the mobile frame
+  return <MobilePreviewFrame>{children}</MobilePreviewFrame>;
 };
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -58,18 +57,21 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) {
+    // Ensure mobile parameter is preserved in the redirect URL
+    const url = new URL(`/auth`, window.location.origin);
+    url.searchParams.set('redirectTo', location.pathname);
+    url.searchParams.set('mobileDemo', 'true');
+    
     console.log("Redirecting to auth from protected route:", location.pathname);
-    return <Navigate to={`/auth?redirectTo=${location.pathname}`} replace />;
+    return <Navigate to={url.pathname + url.search} replace />;
   }
   
   return <>{children}</>;
 };
 
 const AppRoutes = () => {
-  const isMobile = useIsMobile();
-  const urlParams = new URLSearchParams(window.location.search);
-  const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  const shouldShowMobileNav = isMobile || mobileDemo;
+  // Always enable mobile mode
+  const shouldShowMobileNav = true;
 
   useEffect(() => {
     const setCorrectViewport = () => {
@@ -92,6 +94,13 @@ const AppRoutes = () => {
     
     setCorrectViewport();
     setTimeout(setCorrectViewport, 100);
+    
+    // Set initial URL parameters for mobile if not already present
+    if (!window.location.search.includes('mobileDemo=true')) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('mobileDemo', 'true');
+      window.history.replaceState({}, document.title, url.toString());
+    }
     
     console.log("Setting up Supabase auth debugging listener");
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -131,7 +140,7 @@ const AppRoutes = () => {
           </MobilePreviewWrapper>
         } />
         <Route path="/chat" element={
-          <Navigate to="/smart-chat" replace />
+          <Navigate to="/smart-chat?mobileDemo=true" replace />
         } />
         <Route path="/smart-chat" element={
           <MobilePreviewWrapper>
