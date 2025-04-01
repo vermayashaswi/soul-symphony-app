@@ -119,6 +119,77 @@ async function calculateAverageEmotionScore(userId: string, emotionType: string 
   }
 }
 
+// Calculate top emotions over a time period
+async function calculateTopEmotions(userId: string, timeRange: string = 'month', limit: number = 3) {
+  try {
+    let startDate = new Date();
+    
+    // Set time range
+    if (timeRange === 'week') {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (timeRange === 'month') {
+      startDate.setMonth(startDate.getMonth() - 1);
+    } else if (timeRange === 'year') {
+      startDate.setFullYear(startDate.getFullYear() - 1);
+    } else if (timeRange === 'day' || timeRange === 'today') {
+      startDate.setHours(0, 0, 0, 0);
+    } else if (timeRange === 'yesterday') {
+      startDate.setDate(startDate.getDate() - 1);
+      startDate.setHours(0, 0, 0, 0);
+    }
+    
+    // Query entries within the time range
+    const { data: entries, error } = await supabase
+      .from('Journal Entries')
+      .select('emotions, created_at')
+      .eq('user_id', userId)
+      .gte('created_at', startDate.toISOString())
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching entries for top emotions calculation:", error);
+      return { topEmotions: [], entryCount: 0, error: error.message };
+    }
+    
+    if (!entries || entries.length === 0) {
+      return { topEmotions: [], entryCount: 0, error: 'No entries found' };
+    }
+    
+    // Aggregate emotions across all entries
+    const emotionScores: Record<string, {total: number, count: number}> = {};
+    
+    entries.forEach(entry => {
+      if (entry.emotions) {
+        Object.entries(entry.emotions).forEach(([emotion, score]) => {
+          if (!emotionScores[emotion]) {
+            emotionScores[emotion] = { total: 0, count: 0 };
+          }
+          emotionScores[emotion].total += parseFloat(score as string);
+          emotionScores[emotion].count += 1;
+        });
+      }
+    });
+    
+    // Calculate average for each emotion and sort
+    const averagedEmotions = Object.entries(emotionScores)
+      .map(([emotion, data]) => ({
+        emotion,
+        score: data.total / data.count,
+        frequency: data.count
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+    
+    return { 
+      topEmotions: averagedEmotions, 
+      entryCount: entries.length
+    };
+  } catch (error) {
+    console.error("Error calculating top emotions:", error);
+    return { topEmotions: [], entryCount: 0, error: error.message };
+  }
+}
+
 // Detect quantitative queries about emotions
 function detectEmotionQuantitativeQuery(message: string) {
   const lowerMessage = message.toLowerCase();
@@ -143,6 +214,21 @@ function detectEmotionQuantitativeQuery(message: string) {
     year: /(this|last|past) year|365 days/i
   };
   
+  // Check for top emotions request
+  const topEmotionsPattern = /top (\d+|three|3|five|5) emotions/i;
+  const isTopEmotionsQuery = topEmotionsPattern.test(lowerMessage);
+  
+  // Extract number of emotions requested if applicable
+  let topCount = 3; // Default
+  if (isTopEmotionsQuery) {
+    const match = lowerMessage.match(/top (\d+|three|five)/i);
+    if (match && match[1]) {
+      if (match[1] === "three") topCount = 3;
+      else if (match[1] === "five") topCount = 5;
+      else topCount = parseInt(match[1], 10);
+    }
+  }
+  
   // Determine emotion type and time range
   let emotionType = null;
   for (const [emotion, pattern] of Object.entries(emotionPatterns)) {
@@ -161,9 +247,11 @@ function detectEmotionQuantitativeQuery(message: string) {
   }
   
   return {
-    isQuantitativeEmotionQuery: emotionType !== null || hasRatingRequest,
+    isQuantitativeEmotionQuery: emotionType !== null || hasRatingRequest || isTopEmotionsQuery,
     emotionType: emotionType || 'happiness', // Default to happiness if no specific emotion
-    timeRange
+    timeRange,
+    isTopEmotionsQuery,
+    topCount
   };
 }
 
@@ -174,7 +262,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, queryTypes } = await req.json();
+    const { message, userId, queryTypes, threadId = null, isNewThread = false, includeDiagnostics = false } = await req.json();
     
     if (!message) {
       throw new Error('No message provided');
@@ -190,35 +278,70 @@ serve(async (req) => {
     if (queryTypes?.isQuantitative && emotionQueryAnalysis.isQuantitativeEmotionQuery) {
       console.log("Detected quantitative emotion query:", emotionQueryAnalysis);
       
-      const emotionStats = await calculateAverageEmotionScore(
-        userId, 
-        emotionQueryAnalysis.emotionType, 
-        emotionQueryAnalysis.timeRange
-      );
-      
-      console.log("Calculated emotion stats:", emotionStats);
-      
-      // If we have valid emotion data, provide a direct answer
-      if (emotionStats.averageScore !== null) {
-        let directResponse = `Based on your journal entries from the past ${emotionQueryAnalysis.timeRange}, `;
-        directResponse += `your average ${emotionQueryAnalysis.emotionType} score is ${emotionStats.averageScore} out of 100. `;
-        
-        if (emotionStats.validEntryCount < emotionStats.entryCount) {
-          directResponse += `This is calculated from ${emotionStats.validEntryCount} entries that had ${emotionQueryAnalysis.emotionType} data out of ${emotionStats.entryCount} total entries in this period. `;
-        }
-        
-        directResponse += `Would you like me to analyze this further or suggest ways to improve your ${emotionQueryAnalysis.emotionType}?`;
-        
-        return new Response(
-          JSON.stringify({ 
-            response: directResponse,
-            analysis: {
-              type: 'quantitative_emotion',
-              data: emotionStats
-            }
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      if (emotionQueryAnalysis.isTopEmotionsQuery) {
+        // Handle request for top emotions
+        const emotionStats = await calculateTopEmotions(
+          userId,
+          emotionQueryAnalysis.timeRange,
+          emotionQueryAnalysis.topCount
         );
+        
+        console.log("Calculated top emotions:", emotionStats);
+        
+        // If we have valid emotion data, provide a direct answer
+        if (emotionStats.topEmotions.length > 0) {
+          const emotionsFormatted = emotionStats.topEmotions.map((emotion, index) => {
+            return `${index + 1}. ${emotion.emotion.charAt(0).toUpperCase() + emotion.emotion.slice(1)} (${Math.round(emotion.score * 100)}%)`;
+          }).join(', ');
+          
+          let directResponse = `Based on your journal entries from the past ${emotionQueryAnalysis.timeRange}, `;
+          directResponse += `your top ${emotionStats.topEmotions.length} emotions were: ${emotionsFormatted}. `;
+          directResponse += `This analysis is based on ${emotionStats.entryCount} journal entries. `;
+          directResponse += `Would you like me to provide more insights about any of these emotions?`;
+          
+          return new Response(
+            JSON.stringify({ 
+              response: directResponse,
+              analysis: {
+                type: 'top_emotions',
+                data: emotionStats
+              }
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } else {
+        // Handle request for specific emotion score
+        const emotionStats = await calculateAverageEmotionScore(
+          userId, 
+          emotionQueryAnalysis.emotionType, 
+          emotionQueryAnalysis.timeRange
+        );
+        
+        console.log("Calculated emotion stats:", emotionStats);
+        
+        // If we have valid emotion data, provide a direct answer
+        if (emotionStats.averageScore !== null) {
+          let directResponse = `Based on your journal entries from the past ${emotionQueryAnalysis.timeRange}, `;
+          directResponse += `your average ${emotionQueryAnalysis.emotionType} score is ${emotionStats.averageScore} out of 100. `;
+          
+          if (emotionStats.validEntryCount < emotionStats.entryCount) {
+            directResponse += `This is calculated from ${emotionStats.validEntryCount} entries that had ${emotionQueryAnalysis.emotionType} data out of ${emotionStats.entryCount} total entries in this period. `;
+          }
+          
+          directResponse += `Would you like me to analyze this further or suggest ways to improve your ${emotionQueryAnalysis.emotionType}?`;
+          
+          return new Response(
+            JSON.stringify({ 
+              response: directResponse,
+              analysis: {
+                type: 'quantitative_emotion',
+                data: emotionStats
+              }
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
     }
     

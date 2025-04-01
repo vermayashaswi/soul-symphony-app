@@ -33,10 +33,15 @@ export const processChatMessage = async (
       
       console.log("Smart query planner response:", data);
       
+      // Enhanced detection for quantitative queries
+      const isQuantitativeEmotionQuery = 
+        /how (happy|sad|angry|anxious|stressed|content|joyful|depressed)/i.test(userMessage) &&
+        /(score|rate|level|out of|percentage|quantify)/i.test(userMessage);
+      
       // Check if the query planner indicates we should fallback to RAG
-      // or if we detect it's a quantitative query that might need direct processing
       if ((data.response.includes("couldn't find any") && data.fallbackToRag) || 
-          (queryTypes.isQuantitative && !data.hasNumericResult)) {
+          (queryTypes.isQuantitative && !data.hasNumericResult) ||
+          isQuantitativeEmotionQuery) {
         console.log("Planning indicated fallback to RAG may be useful, trying chat-with-rag...");
         throw new Error("Trigger RAG fallback");
       }
