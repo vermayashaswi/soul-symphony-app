@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu } from "lucide-react";
+import { Menu, Loader2 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { Json } from "@/integrations/supabase/types";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // Create a type that includes only the roles allowed in the chat UI
 type UIChatMessage = {
@@ -22,6 +23,7 @@ type UIChatMessage = {
   analysis?: any;
   diagnostics?: any;
   hasNumericResult?: boolean;
+  isLoading?: boolean;
 }
 
 // Define a type for the chat message from database with all expected fields
@@ -170,6 +172,14 @@ export default function MobileChatInterface({
     
     // Add user message to UI immediately
     setMessages(prev => [...prev, { role: 'user', content: message }]);
+    
+    // Add AI thinking message
+    setMessages(prev => [...prev, { 
+      role: 'assistant', 
+      content: 'Thinking...',
+      isLoading: true 
+    }]);
+    
     setLoading(true);
     setProcessingStage("Analyzing your question...");
     
@@ -187,12 +197,35 @@ export default function MobileChatInterface({
       
       // Begin RAG pipeline - Step 1: Query Analysis
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
+      
+      // Update the AI thinking message with the current stage
+      setMessages(prev => {
+        const updatedMessages = [...prev];
+        const loadingMsgIndex = updatedMessages.findIndex(msg => msg.isLoading);
+        if (loadingMsgIndex !== -1) {
+          updatedMessages[loadingMsgIndex].content = "Analyzing patterns in your journal...";
+        }
+        return updatedMessages;
+      });
+      
       setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
       console.log("[Mobile] Query analysis result:", queryTypes);
       
+      // Update stage again based on query progress
+      setTimeout(() => {
+        setMessages(prev => {
+          const updatedMessages = [...prev];
+          const loadingMsgIndex = updatedMessages.findIndex(msg => msg.isLoading);
+          if (loadingMsgIndex !== -1) {
+            updatedMessages[loadingMsgIndex].content = "Searching for insights...";
+          }
+          return updatedMessages;
+        });
+        setProcessingStage("Searching for insights...");
+      }, 1500);
+      
       // Step 2-10: Process message through RAG pipeline
-      setProcessingStage("Searching for insights...");
       const response = await processChatMessage(message, user.id, queryTypes, threadId);
       console.log("[Mobile] Response received:", {
         role: response.role,
@@ -234,7 +267,7 @@ export default function MobileChatInterface({
       }
       
       // For new threads, set a title based on first message
-      if (messages.length === 0) {
+      if (messages.length <= 2) {
         const truncatedTitle = message.length > 30 
           ? message.substring(0, 30) + "..." 
           : message;
@@ -255,16 +288,22 @@ export default function MobileChatInterface({
         .eq('id', threadId);
       
       // Step 12: Update UI with assistant response
-      setMessages(prev => [...prev, uiResponse]);
+      setMessages(prev => {
+        const filteredMessages = prev.filter(msg => !msg.isLoading);
+        return [...filteredMessages, uiResponse];
+      });
     } catch (error) {
       console.error("[Mobile] Error sending message:", error);
-      setMessages(prev => [
-        ...prev, 
-        { 
-          role: 'assistant', 
-          content: "I'm having trouble processing your request. Please try again later."
-        }
-      ]);
+      setMessages(prev => {
+        const filteredMessages = prev.filter(msg => !msg.isLoading);
+        return [
+          ...filteredMessages, 
+          { 
+            role: 'assistant', 
+            content: "I'm having trouble processing your request. Please try again later."
+          }
+        ];
+      });
     } finally {
       setLoading(false);
       setProcessingStage(null);
@@ -319,16 +358,38 @@ export default function MobileChatInterface({
             </p>
           </div>
         ) : (
-          messages.map((message, index) => (
-            <MobileChatMessage 
-              key={index} 
-              message={message} 
-              showAnalysis={false}
-            />
-          ))
+          messages.map((message, index) => {
+            if (message.isLoading) {
+              return (
+                <div key={index} className="relative flex items-start gap-2 justify-start">
+                  <div className="w-8 h-8 rounded-full flex-shrink-0">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src="/roha-avatar.png" alt="Roha" />
+                      <AvatarFallback className="bg-primary/10">
+                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-none p-3.5 text-sm shadow-sm bg-muted/60 border border-border/50">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-3 w-3 text-primary animate-spin" />
+                      <span>{message.content}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <MobileChatMessage 
+                key={index} 
+                message={message} 
+                showAnalysis={false}
+              />
+            );
+          })
         )}
         
-        {loading && (
+        {loading && !messages.some(msg => msg.isLoading) && (
           <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5">
             <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
             <p className="text-sm text-muted-foreground">{processingStage || "Processing..."}</p>
