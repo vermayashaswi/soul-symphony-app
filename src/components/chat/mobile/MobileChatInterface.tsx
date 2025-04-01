@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -149,12 +150,12 @@ export default function MobileChatInterface({
         
       if (msgError) throw msgError;
       
-      console.log("Performing comprehensive query analysis");
+      console.log("Mobile: Performing comprehensive query analysis");
       const queryTypes = analyzeQueryTypes(message);
-      console.log("Query analysis result:", queryTypes);
+      console.log("Mobile: Query analysis result:", queryTypes);
       
-      const response = await processChatMessage(message, user.id, queryTypes);
-      console.log("Response received with references:", response.references?.length || 0);
+      const response = await processChatMessage(message, user.id, queryTypes, threadId);
+      console.log("Mobile: Response received with references:", response.references?.length || 0);
       
       await supabase
         .from('chat_messages')

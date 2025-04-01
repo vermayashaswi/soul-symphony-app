@@ -13,11 +13,13 @@ export interface ChatMessage {
 export const processChatMessage = async (
   userMessage: string, 
   userId: string,
-  queryTypes: Record<string, boolean>
+  queryTypes: Record<string, boolean>,
+  threadId?: string | null
 ): Promise<ChatMessage> => {
   try {
     console.log("Processing chat message with enhanced RAG pipeline");
     console.log("Query types detected:", JSON.stringify(queryTypes));
+    console.log("Thread ID:", threadId || "new thread");
     
     // Step 1: First try with smart-query-planner for structured queries
     try {
@@ -60,7 +62,8 @@ export const processChatMessage = async (
           isQuantitativeEmotionQuery ||
           isTopEmotionsQuery ||
           isEmotionRankingQuery ||
-          isEmotionChangeQuery) {
+          isEmotionChangeQuery ||
+          queryTypes.needsDataAggregation) {
         console.log("Planning indicated fallback to comprehensive RAG pipeline...");
         throw new Error("Trigger RAG fallback");
       }
@@ -80,8 +83,8 @@ export const processChatMessage = async (
         body: {
           message: userMessage,
           userId,
-          threadId: null,
-          isNewThread: true,
+          threadId: threadId,
+          isNewThread: !threadId,
           includeDiagnostics: true,
           queryTypes: {
             ...queryTypes,

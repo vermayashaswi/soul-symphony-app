@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
@@ -36,7 +37,7 @@ export default function SmartChatInterface() {
       icon: <Search className="h-4 w-4 mr-2" />
     },
     {
-      text: "Analyze my emotions",
+      text: "What were my top 3 positive and negative emotions last month?",
       icon: <Brain className="h-4 w-4 mr-2" />
     }
   ];
@@ -160,7 +161,7 @@ export default function SmartChatInterface() {
       const queryTypes = analyzeQueryTypes(userMessage);
       console.log("Desktop: Query analysis result:", queryTypes);
       
-      const response = await processChatMessage(userMessage, user.id, queryTypes);
+      const response = await processChatMessage(userMessage, user.id, queryTypes, threadId);
       console.log("Desktop: Response received with references:", response.references?.length || 0);
       
       await supabase

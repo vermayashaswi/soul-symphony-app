@@ -30,7 +30,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// New wrapper component to conditionally apply MobilePreviewFrame
 const MobilePreviewWrapper = ({ children }: { children: React.ReactNode }) => {
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -131,7 +130,6 @@ const AppRoutes = () => {
             </ProtectedRoute>
           </MobilePreviewWrapper>
         } />
-        {/* Redirect /chat to /smart-chat for all devices */}
         <Route path="/chat" element={
           <Navigate to="/smart-chat" replace />
         } />
