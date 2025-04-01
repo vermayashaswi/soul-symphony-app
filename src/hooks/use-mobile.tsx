@@ -2,7 +2,7 @@
 import * as React from "react"
 
 export function useIsMobile() {
-  // Since this is a mobile-only app, always return true
+  // Always return true to force mobile view everywhere
   return true;
 }
 
