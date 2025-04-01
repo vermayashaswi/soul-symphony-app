@@ -207,10 +207,10 @@ export default function MobileChatInterface({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between py-2 px-4 border-b">
+      <div className="flex items-center justify-between py-2 px-3 border-b">
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="mr-2">
+            <Button variant="ghost" size="icon" className="mr-1 h-8 w-8">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
@@ -224,14 +224,14 @@ export default function MobileChatInterface({
           </SheetContent>
         </Sheet>
         <h2 className="text-lg font-semibold flex-1 text-center">Roha</h2>
-        <div className="w-10"></div> {/* Empty div for balance */}
+        <div className="w-8"></div> {/* Reduced width for balance */}
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
         {messages.length === 0 ? (
           <div className="flex flex-col justify-center items-center h-full text-center">
             <h3 className="text-xl font-medium mb-2">How can I help you?</h3>
-            <p className="text-muted-foreground text-sm mb-4 px-6">
+            <p className="text-muted-foreground text-sm mb-4 px-4">
               Ask me anything about your mental well-being and journal entries
             </p>
           </div>
@@ -240,7 +240,7 @@ export default function MobileChatInterface({
             <MobileChatMessage 
               key={index} 
               message={message} 
-              showAnalysis={false} // Add this prop with a default value
+              showAnalysis={false}
             />
           ))
         )}

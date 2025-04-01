@@ -22,7 +22,9 @@ const Journal = () => {
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [entriesLoaded, setEntriesLoaded] = useState(false);
   
+  // Use stable references for entries
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
   useEffect(() => {
@@ -30,6 +32,13 @@ const Journal = () => {
       checkUserProfile(user.id);
     }
   }, [user?.id]);
+  
+  // Update entriesLoaded state when entries are loaded or loading state changes
+  useEffect(() => {
+    if (!loading && entries.length > 0) {
+      setEntriesLoaded(true);
+    }
+  }, [loading, entries.length]);
   
   // Monitor active tab changes and fetch entries when switching to entries tab
   useEffect(() => {
@@ -207,13 +216,21 @@ const Journal = () => {
             {activeTab === 'entries' && (
               <JournalSearch onSearch={handleSearch} />
             )}
-            <JournalEntriesList 
-              entries={filteredEntries} 
-              loading={loading || !isProfileChecked}
-              processingEntries={processingEntries}
-              onStartRecording={() => setActiveTab('record')}
-              onDeleteEntry={handleDeleteEntry}
-            />
+            <div className={entriesLoaded ? "" : "opacity-0 h-0 overflow-hidden"}>
+              <JournalEntriesList 
+                entries={filteredEntries} 
+                loading={loading || !isProfileChecked}
+                processingEntries={processingEntries}
+                onStartRecording={() => setActiveTab('record')}
+                onDeleteEntry={handleDeleteEntry}
+              />
+            </div>
+            {!entriesLoaded && activeTab === 'entries' && (loading || !isProfileChecked) && (
+              <div className="flex flex-col items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                <p className="text-muted-foreground">Loading your journal entries...</p>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

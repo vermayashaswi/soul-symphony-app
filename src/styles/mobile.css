@@ -19,6 +19,27 @@
     min-height: 40px;
   }
   
+  /* Optimize space usage in chat interface */
+  .smart-chat-interface .prose,
+  .mobile-chat-interface .prose {
+    font-size: 0.95rem;
+    line-height: 1.4;
+    margin: 0.5rem 0;
+  }
+  
+  /* Reduce padding in chat messages */
+  .smart-chat-interface .p-4,
+  .mobile-chat-interface .p-4 {
+    padding: 0.75rem !important;
+  }
+  
+  /* Reduce margins between chat messages */
+  .smart-chat-interface .space-y-4,
+  .mobile-chat-interface .space-y-4 {
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+  
   /* Add some bounce animations for mobile interactions */
   @keyframes mobile-bounce {
     0%, 100% { transform: translateY(0); }
@@ -36,17 +57,11 @@
     scroll-behavior: smooth;
   }
   
-  /* Improve readability on small screens */
-  .mobile-chat-interface .prose,
-  .smart-chat-interface .prose {
-    font-size: 0.95rem;
-    line-height: 1.5;
-  }
-  
   /* Mobile-friendly input */
   .mobile-chat-interface textarea,
   .smart-chat-interface textarea {
     font-size: 16px; /* Prevents iOS zoom on focus */
+    padding: 0.5rem 0.75rem !important;
   }
   
   /* Message bubbles styling */
@@ -81,16 +96,28 @@
     }
   }
   
-  /* Input focus styling */
-  .mobile-chat-interface textarea:focus,
-  .smart-chat-interface textarea:focus {
-    box-shadow: 0 0 0 2px rgba(var(--primary), 0.2);
+  /* Reduce excess space in mobile chat interface */
+  .smart-chat-container {
+    gap: 0.5rem !important;
   }
   
-  /* Icon button hover effects */
-  .mobile-chat-interface button:hover .lucide,
-  .smart-chat-interface button:hover .lucide {
-    transform: scale(1.05);
+  /* Optimize vertical space */
+  .smart-chat-interface h1,
+  .mobile-chat-interface h1,
+  .smart-chat-interface h2,
+  .mobile-chat-interface h2,
+  .smart-chat-interface h3,
+  .mobile-chat-interface h3 {
+    margin-bottom: 0.5rem !important;
+  }
+  
+  /* Fix for flickering journal entries */
+  .journal-container .opacity-0 {
+    transition: opacity 0.3s ease-in;
+  }
+  
+  .journal-container .opacity-100 {
+    transition: opacity 0.3s ease-in;
   }
   
   /* Recording animation */
