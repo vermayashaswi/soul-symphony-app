@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -291,6 +290,9 @@ serve(async (req) => {
     // Detect if this is an emotion-focused query
     const isEmotionQuery = message.toLowerCase().includes('emotion') || 
                           message.toLowerCase().includes('feel') ||
+                          message.toLowerCase().includes('sad') || 
+                          message.toLowerCase().includes('happy') ||
+                          message.toLowerCase().includes('angry') ||
                           (queryAnalysisPlan.intent && 
                            queryAnalysisPlan.intent.toLowerCase().includes('emotion'));
     
@@ -300,6 +302,23 @@ serve(async (req) => {
         
         if (step.step_type === 'sql_query' && step.sql_query) {
           let cleanedQuery = step.sql_query.trim().replace(/;$/, '');
+          
+          // Fix JSONB LIKE queries - replace with proper JSONB containment operators
+          if (cleanedQuery.includes('emotions LIKE') || cleanedQuery.includes('emotions ILIKE')) {
+            // Extract the emotion term we're searching for
+            const emotionMatch = cleanedQuery.match(/emotions (?:I?LIKE) '%(\w+)%'/i);
+            if (emotionMatch && emotionMatch[1]) {
+              const emotionTerm = emotionMatch[1].toLowerCase();
+              
+              // Replace the LIKE operator with proper JSONB query
+              cleanedQuery = cleanedQuery.replace(
+                /emotions (?:I?LIKE) '%\w+%'/i,
+                `(emotions ? '${emotionTerm}' OR emotions::text ILIKE '%${emotionTerm}%')`
+              );
+              
+              console.log(`Fixed emotion query for "${emotionTerm}": ${cleanedQuery}`);
+            }
+          }
           
           // Replace time variables with actual date values
           if (queryAnalysisPlan.time_range && typeof queryAnalysisPlan.time_range === 'string') {
@@ -336,6 +355,38 @@ serve(async (req) => {
                 break;
               } catch (sqlError) {
                 lastError = sqlError;
+                
+                // Special handling for emotion queries that failed
+                if (isEmotionQuery && sqlError.message && sqlError.message.includes('operator does not exist: jsonb')) {
+                  console.log("Detected error with emotion JSONB query, using alternative approach");
+                  
+                  try {
+                    // Use the dedicated get_top_emotions function instead
+                    const { data: emotionData, error: emotionError } = await supabase.rpc(
+                      'get_top_emotions',
+                      { 
+                        user_id_param: userId,
+                        limit_count: 3
+                      }
+                    );
+                    
+                    if (!emotionError && emotionData) {
+                      console.log("Successfully retrieved emotions using specialized function:", emotionData);
+                      result = emotionData;
+                      executionResults.push({ 
+                        step: "Get top emotions", 
+                        result: emotionData.map((item: any) => ({
+                          emotion: item.emotion,
+                          score: item.score
+                        }))
+                      });
+                      break; // Exit retry loop on success
+                    }
+                  } catch (emotionFunctionError) {
+                    console.error("Error using get_top_emotions function:", emotionFunctionError);
+                  }
+                }
+                
                 if (allowRetry && currentRetryAttempt < MAX_RETRY_ATTEMPTS) {
                   console.error(`SQL error for step "${step.step}" (attempt ${currentRetryAttempt + 1}):`, sqlError);
                   
@@ -360,6 +411,47 @@ serve(async (req) => {
                 // If we got here, either retries are not allowed or all retries failed
                 console.error(`Final SQL error for step "${step.step}":`, lastError);
                 executionErrors.push({ step: step.step, error: lastError });
+                
+                // For emotion queries that failed completely, let's try one more fallback approach
+                if (isEmotionQuery && message.toLowerCase().includes('sad')) {
+                  try {
+                    // Direct simple query for entries with emotions containing 'sad'
+                    const { data: sadEntries, error: sadError } = await supabase
+                      .from('Journal Entries')
+                      .select('id, "refined text", emotions, created_at')
+                      .eq('user_id', userId)
+                      .filter('emotions', 'neq', null)
+                      .order('created_at', { ascending: false });
+                      
+                    if (!sadError && sadEntries && sadEntries.length > 0) {
+                      // Filter entries with sad emotion manually
+                      const entriesWithSadness = sadEntries.filter(entry => 
+                        entry.emotions && 
+                        (entry.emotions.sad || 
+                         entry.emotions.sadness || 
+                         JSON.stringify(entry.emotions).toLowerCase().includes('sad'))
+                      );
+                      
+                      if (entriesWithSadness.length > 0) {
+                        // Sort by sadness score if available
+                        entriesWithSadness.sort((a, b) => {
+                          const scoreA = a.emotions && (a.emotions.sad || a.emotions.sadness || 0);
+                          const scoreB = b.emotions && (b.emotions.sad || b.emotions.sadness || 0);
+                          return scoreB - scoreA;
+                        });
+                        
+                        executionResults.push({ 
+                          step: "Find entries with sadness", 
+                          result: entriesWithSadness
+                        });
+                        break; // Exit retry loop on success
+                      }
+                    }
+                  } catch (fallbackError) {
+                    console.error("Error using fallback approach for sad entries:", fallbackError);
+                  }
+                }
+                
                 break;
               }
             }
@@ -498,8 +590,50 @@ serve(async (req) => {
     let references = null;
 
     if (executionResults.length > 0 && !fallbackToRag) {
+      // Special handling for specific emotion queries like "when was I most sad"
+      if (isEmotionQuery && (message.toLowerCase().includes("when") || message.toLowerCase().includes("most sad"))) {
+        // Look for entries with sadness emotion
+        const entriesWithEmotion = executionResults.find(res => 
+          res.step.includes("Find entries with") && Array.isArray(res.result) && res.result.length > 0
+        );
+        
+        if (entriesWithEmotion && entriesWithEmotion.result.length > 0) {
+          // Find the entry with the highest sad/sadness score
+          const sortedEntries = [...entriesWithEmotion.result].sort((a, b) => {
+            const scoreA = a.emotions && (a.emotions.sad || a.emotions.sadness || 0);
+            const scoreB = b.emotions && (b.emotions.sad || b.emotions.sadness || 0);
+            return scoreB - scoreA;
+          });
+          
+          const mostSadEntry = sortedEntries[0];
+          const sadScore = mostSadEntry.emotions && (mostSadEntry.emotions.sad || mostSadEntry.emotions.sadness || 0);
+          const formattedDate = new Date(mostSadEntry.created_at).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric'
+          });
+          
+          // Create a response with the date and context
+          response = `Based on your journal entries, you felt most sad on ${formattedDate}`;
+          if (sadScore) {
+            response += ` with a sadness intensity of ${sadScore.toFixed(2)} out of 1.0`;
+          }
+          response += `.`;
+          
+          // Add a snippet from the journal entry for context
+          if (mostSadEntry["refined text"]) {
+            const snippet = mostSadEntry["refined text"].substring(0, 150) + "...";
+            response += ` Here's what you wrote: "${snippet}"`;
+          }
+          
+          // Set references for UI display
+          references = [{
+            id: mostSadEntry.id,
+            date: mostSadEntry.created_at,
+            snippet: mostSadEntry["refined text"]?.substring(0, 150) + "..."
+          }];
+        }
+      }
       // Special handling for emotion queries
-      if (isEmotionQuery) {
+      else if (isEmotionQuery) {
         const emotionResults = executionResults.find(res => 
           res.step.includes("emotion") && 
           Array.isArray(res.result) && 
