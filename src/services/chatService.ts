@@ -30,6 +30,8 @@ export async function processChatMessage(
     console.log("Query analysis results:", messageQueryTypes);
     
     let queryResponse: any = null;
+    let retryAttempted = false;
+    let inProgressContent = "I'm thinking about your question..."; 
     
     // First try using the smart query planner for direct data querying
     if (messageQueryTypes.isQuantitative || messageQueryTypes.isEmotionFocused) {
@@ -53,6 +55,16 @@ export async function processChatMessage(
         } else if (data && !data.fallbackToRag) {
           console.log("Successfully used smart query planner");
           queryResponse = data;
+          retryAttempted = data.retryAttempted || false;
+          
+          // If the system gave a fallback message but we don't want to actually fallback,
+          // replace it with something better
+          if (data.response === "I couldn't find a direct answer to your question using the available data. I will try a different approach." && !data.fallbackToRag) {
+            // This means SQL retries ultimately succeeded
+            if (retryAttempted) {
+              data.response = "Based on your journal entries, " + data.response.toLowerCase();
+            }
+          }
         } else {
           console.log("Smart query planner couldn't handle the query, falling back to RAG");
         }
@@ -62,7 +74,7 @@ export async function processChatMessage(
     }
     
     // If direct querying didn't work, use RAG
-    if (!queryResponse) {
+    if (!queryResponse || queryResponse.fallbackToRag) {
       console.log("Using RAG approach for query");
       
       // Process time range if present

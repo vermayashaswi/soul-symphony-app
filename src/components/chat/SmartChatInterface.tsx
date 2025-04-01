@@ -20,10 +20,12 @@ type UIChatMessage = {
   references?: any[];
   analysis?: any;
   diagnostics?: any;
+  hasNumericResult?: boolean;
 }
 
 export default function SmartChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
+  const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<UIChatMessage[]>([]);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -75,7 +77,9 @@ export default function SmartChatInterface() {
         const formattedMessages = data.map(msg => ({
           role: msg.sender === 'user' ? 'user' : 'assistant',
           content: msg.content,
-          ...(msg.reference_entries && { references: msg.reference_entries })
+          ...(msg.reference_entries && { references: msg.reference_entries }),
+          ...(msg.analysis_data && { analysis: msg.analysis_data }),
+          ...(msg.has_numeric_result !== undefined && { hasNumericResult: msg.has_numeric_result })
         })) as UIChatMessage[];
         
         setChatHistory(formattedMessages);
@@ -154,6 +158,7 @@ export default function SmartChatInterface() {
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
     setShowSuggestions(false);
+    setProcessingStage("Analyzing your question...");
     
     try {
       const { error: msgError } = await supabase
@@ -167,9 +172,11 @@ export default function SmartChatInterface() {
       if (msgError) throw msgError;
       
       console.log("Desktop: Performing comprehensive query analysis");
+      setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(userMessage);
       console.log("Desktop: Query analysis result:", queryTypes);
       
+      setProcessingStage("Searching for insights...");
       const response = await processChatMessage(userMessage, user.id, queryTypes, threadId);
       console.log("Desktop: Response received with references:", response.references?.length || 0);
       
@@ -178,7 +185,8 @@ export default function SmartChatInterface() {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
         content: response.content,
         ...(response.references && { references: response.references }),
-        ...(response.analysis && { analysis: response.analysis })
+        ...(response.analysis && { analysis: response.analysis }),
+        ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
       };
       
       await supabase
@@ -229,6 +237,7 @@ export default function SmartChatInterface() {
       ]);
     } finally {
       setIsLoading(false);
+      setProcessingStage(null);
     }
   };
 
@@ -292,8 +301,9 @@ export default function SmartChatInterface() {
         )}
         
         {isLoading && (
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">{processingStage || "Processing..."}</p>
           </div>
         )}
         

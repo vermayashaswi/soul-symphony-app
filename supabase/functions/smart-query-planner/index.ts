@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -126,7 +127,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, includeDiagnostics = false, enableQueryBreakdown = false, generateSqlQueries = false, analyzeComponents = false, allowRetry = false } = await req.json();
+    const { message, userId, includeDiagnostics = false, enableQueryBreakdown = false, generateSqlQueries = false, analyzeComponents = false, allowRetry = true } = await req.json();
 
     if (!message || !userId) {
       return new Response(JSON.stringify({ error: 'Missing required parameters' }), {
@@ -172,51 +173,67 @@ serve(async (req) => {
     const executionResults = [];
     const executionErrors = [];
     let needsRetry = false;
+    let retryAttempts = 0;
+    const MAX_RETRY_ATTEMPTS = 2;
     
     if (queryAnalysisPlan.execution_plan) {
       for (const step of queryAnalysisPlan.execution_plan) {
         console.log(`Executing step: ${step.step} (${step.step_type})`);
         
         if (step.step_type === 'sql_query' && step.sql_query) {
-          const cleanedQuery = step.sql_query.trim().replace(/;$/, '');
+          let cleanedQuery = step.sql_query.trim().replace(/;$/, '');
           
           try {
             let result;
-            try {
-              if (step.dynamic_query) {
-                const dynamicValues = { userId };
-                let dynamicQuery = cleanedQuery;
-                for (const [key, value] of Object.entries(dynamicValues)) {
-                  dynamicQuery = dynamicQuery.replace(new RegExp(`\\$\\$${key}\\$\\$`, 'g'), value);
+            let currentRetryAttempt = 0;
+            let lastError = null;
+            
+            // Try executing the query, with retries if allowed
+            while (currentRetryAttempt <= MAX_RETRY_ATTEMPTS) {
+              try {
+                if (step.dynamic_query) {
+                  const dynamicValues = { userId };
+                  let dynamicQuery = cleanedQuery;
+                  for (const [key, value] of Object.entries(dynamicValues)) {
+                    dynamicQuery = dynamicQuery.replace(new RegExp(`\\$\\$${key}\\$\\$`, 'g'), value);
+                  }
+                  result = await executeDirectSqlQuery(dynamicQuery, userId);
+                } else {
+                  result = await executeDirectSqlQuery(cleanedQuery, userId);
                 }
-                result = await executeDirectSqlQuery(dynamicQuery, userId);
-              } else {
-                result = await executeDirectSqlQuery(cleanedQuery, userId);
-              }
-              
-              console.log(`SQL result for step "${step.step}":`, JSON.stringify(result).substring(0, 200) + "...");
-              executionResults.push({ step: step.step, result });
-            } catch (sqlError) {
-              console.error(`SQL error for step "${step.step}":`, sqlError);
-              executionErrors.push({ step: step.step, error: sqlError });
-              
-              if (allowRetry) {
-                needsRetry = true;
-                const improvedQuery = await regenerateImprovedSqlQuery(cleanedQuery, sqlError.message, message);
                 
-                if (improvedQuery) {
+                console.log(`SQL result for step "${step.step}":`, JSON.stringify(result).substring(0, 200) + "...");
+                executionResults.push({ step: step.step, result });
+                
+                // If we got here, the query was successful, so break out of retry loop
+                break;
+              } catch (sqlError) {
+                lastError = sqlError;
+                if (allowRetry && currentRetryAttempt < MAX_RETRY_ATTEMPTS) {
+                  console.error(`SQL error for step "${step.step}" (attempt ${currentRetryAttempt + 1}):`, sqlError);
+                  
+                  // Generate improved SQL query for next attempt
                   try {
-                    console.log(`Retrying with improved SQL query: ${improvedQuery}`);
-                    result = await executeDirectSqlQuery(improvedQuery, userId);
-                    console.log(`Retry successful! SQL result:`, JSON.stringify(result).substring(0, 200) + "...");
-                    executionResults.push({ step: step.step, result, wasRetry: true });
-                    executionErrors.pop();
-                    needsRetry = false;
-                  } catch (retryError) {
-                    console.error(`Retry SQL error:`, retryError);
-                    executionErrors.push({ step: `${step.step} (retry)`, error: retryError });
+                    console.log(`Attempting to regenerate improved SQL query...`);
+                    const improvedQuery = await regenerateImprovedSqlQuery(cleanedQuery, sqlError.message, message);
+                    
+                    if (improvedQuery) {
+                      console.log(`Generated improved SQL query: ${improvedQuery}`);
+                      cleanedQuery = improvedQuery; // Use the improved query for the next retry
+                      currentRetryAttempt++;
+                      needsRetry = true;
+                      continue; // Try again with the improved query
+                    }
+                  } catch (retryGenError) {
+                    console.error("Error generating retry query:", retryGenError);
                   }
                 }
+                
+                // If we got here, either retries are not allowed or all retries failed
+                console.error(`Final SQL error for step "${step.step}":`, lastError);
+                executionErrors.push({ step: step.step, error: lastError });
+                needsRetry = false;
+                break;
               }
             }
           } catch (error) {
@@ -257,16 +274,18 @@ serve(async (req) => {
       }
     }
     
-    let fallbackToRag = executionErrors.length > 0 || executionResults.length === 0 || needsRetry;
+    // Determine if we need to fall back to RAG
+    let fallbackToRag = (executionErrors.length > 0 && executionResults.length === 0) || executionResults.length === 0;
     
+    // If we have both results and errors, we can still potentially use the partial results
     if (executionResults.length > 0 && executionErrors.length > 0) {
-      fallbackToRag = needsRetry;
+      fallbackToRag = executionErrors.some(error => error.error && error.error.toString().includes("syntax error"));
     }
 
     let response = "I couldn't find a direct answer to your question using the available data. I will try a different approach.";
     let hasNumericResult = false;
 
-    if (executionResults.length > 0 && executionErrors.length === 0) {
+    if (executionResults.length > 0 && !fallbackToRag) {
       const finalResult = executionResults[executionResults.length - 1].result;
       if (typeof finalResult === 'number') {
         response = `The answer is: ${finalResult}`;
@@ -309,12 +328,14 @@ serve(async (req) => {
         response,
         hasNumericResult,
         fallbackToRag,
+        retryAttempted: needsRetry,
         diagnostics: includeDiagnostics ? {
           queryAnalysis: queryAnalysisPlan,
           executionResults,
           executionErrors,
           generationTime: Date.now() - startTime,
-          needsRetry
+          needsRetry,
+          retryAttempts
         } : null
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -358,7 +379,20 @@ async function regenerateImprovedSqlQuery(originalQuery, errorMessage, userQuest
             role: 'system',
             content: `You are an expert SQL developer specializing in PostgreSQL and Supabase. 
             Fix SQL queries that encounter errors. Only return the fixed SQL query without any explanations or formatting.
-            IMPORTANT: Don't include semicolons at the end of queries and ensure proper parameter references.`
+            IMPORTANT: Don't include semicolons at the end of queries and ensure proper parameter references.
+            
+            The database schema includes:
+            - "Journal Entries" table with columns: id, user_id, created_at, transcription_text, refined_text, emotions (JSONB), entities (JSONB), master_themes (ARRAY)
+            - emotions column structure: { "happy": 0.8, "sad": 0.2, ... }
+            - entities column structure: { "people": ["John", "Mary"], "places": ["New York"] }
+            
+            Common issues to fix:
+            - Remove semicolons at the end
+            - Fix JSON operators (use ->> instead of -> for text extraction)
+            - Fix array functions
+            - Fix parameter references ($1 is often user_id)
+            - Fix table and column names (remember "Journal Entries" needs double quotes)
+            - Fix time range filters (ensure proper timestamp format)`
           },
           {
             role: 'user',
@@ -371,7 +405,7 @@ async function regenerateImprovedSqlQuery(originalQuery, errorMessage, userQuest
             Provide only the corrected SQL query with no explanations or extra text.`
           }
         ],
-        temperature: 0.1,
+        temperature: 0.2,
       }),
     });
 
@@ -391,9 +425,10 @@ async function regenerateImprovedSqlQuery(originalQuery, errorMessage, userQuest
 }
 
 async function executeDirectSqlQuery(query, userId) {
-  const finalQuery = query.replace('$1', `'${userId}'`);
+  const finalQuery = query.replace(/\$1/g, `'${userId}'`);
   
   try {
+    console.log("Executing SQL query:", finalQuery);
     const { data, error } = await supabase.rpc('execute_dynamic_query', {
       query_text: finalQuery,
       param_values: [userId]

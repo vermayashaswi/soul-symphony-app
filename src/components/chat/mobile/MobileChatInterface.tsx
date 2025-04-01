@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ type UIChatMessage = {
   references?: any[];
   analysis?: any;
   diagnostics?: any;
+  hasNumericResult?: boolean;
 }
 
 // Define a type for the chat message from database with all expected fields
@@ -49,6 +51,7 @@ export default function MobileChatInterface({
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -168,6 +171,7 @@ export default function MobileChatInterface({
     // Add user message to UI immediately
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setLoading(true);
+    setProcessingStage("Analyzing your question...");
     
     try {
       // Store user message in database
@@ -183,10 +187,12 @@ export default function MobileChatInterface({
       
       // Begin RAG pipeline - Step 1: Query Analysis
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
+      setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
       console.log("[Mobile] Query analysis result:", queryTypes);
       
       // Step 2-10: Process message through RAG pipeline
+      setProcessingStage("Searching for insights...");
       const response = await processChatMessage(message, user.id, queryTypes, threadId);
       console.log("[Mobile] Response received:", {
         role: response.role,
@@ -202,7 +208,8 @@ export default function MobileChatInterface({
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
         content: response.content,
         ...(response.references && { references: response.references }),
-        ...(response.analysis && { analysis: response.analysis })
+        ...(response.analysis && { analysis: response.analysis }),
+        ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
       };
       
       // Check if the response indicates an error or failed retrieval
@@ -260,6 +267,7 @@ export default function MobileChatInterface({
       ]);
     } finally {
       setLoading(false);
+      setProcessingStage(null);
     }
   };
 
@@ -321,8 +329,9 @@ export default function MobileChatInterface({
         )}
         
         {loading && (
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5">
             <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
+            <p className="text-sm text-muted-foreground">{processingStage || "Processing..."}</p>
           </div>
         )}
         
