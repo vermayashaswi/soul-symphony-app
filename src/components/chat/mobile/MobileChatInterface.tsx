@@ -89,7 +89,9 @@ export default function MobileChatInterface({
         const formattedMessages = data.map(msg => ({
           role: msg.sender === 'user' ? 'user' : 'assistant',
           content: msg.content,
-          ...(msg.reference_entries && { references: msg.reference_entries })
+          ...(msg.reference_entries && { references: msg.reference_entries }),
+          ...(msg.analysis_data && { analysis: msg.analysis_data }),
+          ...(msg.has_numeric_result !== undefined && { hasNumericResult: msg.has_numeric_result })
         })) as UIChatMessage[];
         
         setMessages(formattedMessages);
@@ -145,10 +147,12 @@ export default function MobileChatInterface({
       }
     }
     
+    // Add user message to UI immediately
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setLoading(true);
     
     try {
+      // Store user message in database
       const { error: msgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -159,14 +163,16 @@ export default function MobileChatInterface({
         
       if (msgError) throw msgError;
       
+      // Begin RAG pipeline - Step 1: Query Analysis
       console.log("Mobile: Performing comprehensive query analysis");
       const queryTypes = analyzeQueryTypes(message);
       console.log("Mobile: Query analysis result:", queryTypes);
       
+      // Step 2-10: Process message through RAG pipeline
       const response = await processChatMessage(message, user.id, queryTypes, threadId);
       console.log("Mobile: Response received with references:", response.references?.length || 0);
       
-      // Convert to UI-compatible message and filter out system/error roles
+      // Step 11: Convert to UI-compatible message and filter out system/error roles
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
         content: response.content,
@@ -174,6 +180,7 @@ export default function MobileChatInterface({
         ...(response.analysis && { analysis: response.analysis })
       };
       
+      // Store assistant response in database
       await supabase
         .from('chat_messages')
         .insert({
@@ -185,6 +192,7 @@ export default function MobileChatInterface({
           analysis_data: response.analysis || null
         });
       
+      // For new threads, set a title based on first message
       if (messages.length === 0) {
         const truncatedTitle = message.length > 30 
           ? message.substring(0, 30) + "..." 
@@ -199,11 +207,13 @@ export default function MobileChatInterface({
           .eq('id', threadId);
       }
       
+      // Update thread's last activity timestamp
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
       
+      // Step 12: Update UI with assistant response
       setMessages(prev => [...prev, uiResponse]);
     } catch (error) {
       console.error("Error sending message:", error);
