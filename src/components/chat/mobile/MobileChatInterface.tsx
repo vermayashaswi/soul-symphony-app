@@ -22,6 +22,18 @@ type UIChatMessage = {
   diagnostics?: any;
 }
 
+// Define a type for the chat message from database with all expected fields
+type ChatMessageFromDB = {
+  content: string;
+  created_at: string;
+  id: string;
+  reference_entries: any | null;
+  analysis_data: any | null;
+  has_numeric_result?: boolean;
+  sender: string;
+  thread_id: string;
+}
+
 interface MobileChatInterfaceProps {
   currentThreadId?: string | null;
   onSelectThread?: (threadId: string) => void;
@@ -86,7 +98,7 @@ export default function MobileChatInterface({
       if (error) throw error;
       
       if (data && data.length > 0) {
-        const formattedMessages = data.map(msg => ({
+        const formattedMessages = data.map((msg: ChatMessageFromDB) => ({
           role: msg.sender === 'user' ? 'user' : 'assistant',
           content: msg.content,
           ...(msg.reference_entries && { references: msg.reference_entries }),
