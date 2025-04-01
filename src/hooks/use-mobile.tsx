@@ -1,13 +1,40 @@
-
 import * as React from "react"
 
 /**
- * Always returns true to ensure the app is always in mobile mode
- * regardless of the actual device being used.
+ * A hook that detects if the current device is mobile based on screen size
+ * or when mobile preview is explicitly enabled
  */
 export function useIsMobile() {
-  // Force mobile view for all devices
-  return true;
+  const [isMobile, setIsMobile] = React.useState(false);
+  
+  React.useEffect(() => {
+    // Check URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const mobileDemo = urlParams.get('mobileDemo') === 'true';
+    
+    if (mobileDemo) {
+      // If explicitly requested via URL, use mobile view
+      setIsMobile(true);
+      return;
+    }
+    
+    // Otherwise detect based on screen size
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Initial check
+    checkMobile();
+    
+    // Listen for resize events
+    window.addEventListener('resize', checkMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
+
+  return isMobile;
 }
 
 // Export an alias for backward compatibility

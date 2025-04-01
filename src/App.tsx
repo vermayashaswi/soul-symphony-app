@@ -31,9 +31,12 @@ const queryClient = new QueryClient({
   },
 });
 
-const MobilePreviewWrapper = ({ children }: { children: React.ReactNode }) => {
-  // In our mobile-only app, always use the mobile frame
-  return <MobilePreviewFrame>{children}</MobilePreviewFrame>;
+const MobileRouteWrapper = ({ children }: { children: React.ReactNode }) => {
+  // Only use the mobile frame if explicitly requested via URL parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  
+  return mobileDemo ? <MobilePreviewFrame>{children}</MobilePreviewFrame> : <>{children}</>;
 };
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -57,10 +60,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) {
-    // Ensure mobile parameter is preserved in the redirect URL
+    // Preserve the current URL for redirection after login
     const url = new URL(`/auth`, window.location.origin);
     url.searchParams.set('redirectTo', location.pathname);
-    url.searchParams.set('mobileDemo', 'true');
     
     console.log("Redirecting to auth from protected route:", location.pathname);
     return <Navigate to={url.pathname + url.search} replace />;
@@ -70,8 +72,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
-  // Always enable mobile mode
-  const shouldShowMobileNav = true;
+  const isMobile = useIsMobile();
+  const shouldShowMobileNav = isMobile;
 
   useEffect(() => {
     const setCorrectViewport = () => {
@@ -95,13 +97,6 @@ const AppRoutes = () => {
     setCorrectViewport();
     setTimeout(setCorrectViewport, 100);
     
-    // Set initial URL parameters for mobile if not already present
-    if (!window.location.search.includes('mobileDemo=true')) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('mobileDemo', 'true');
-      window.history.replaceState({}, document.title, url.toString());
-    }
-    
     console.log("Setting up Supabase auth debugging listener");
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("Auth event outside React context:", event, session?.user?.email);
@@ -116,50 +111,50 @@ const AppRoutes = () => {
     <>
       <Routes>
         <Route path="/" element={
-          <MobilePreviewWrapper>
+          <MobileRouteWrapper>
             <Index />
-          </MobilePreviewWrapper>
+          </MobileRouteWrapper>
         } />
         <Route path="/auth" element={
-          <MobilePreviewWrapper>
+          <MobileRouteWrapper>
             <Auth />
-          </MobilePreviewWrapper>
+          </MobileRouteWrapper>
         } />
         <Route path="/journal" element={
-          <MobilePreviewWrapper>
+          <MobileRouteWrapper>
             <ProtectedRoute>
               <Journal />
             </ProtectedRoute>
-          </MobilePreviewWrapper>
+          </MobileRouteWrapper>
         } />
         <Route path="/insights" element={
-          <MobilePreviewWrapper>
+          <MobileRouteWrapper>
             <ProtectedRoute>
               <Insights />
             </ProtectedRoute>
-          </MobilePreviewWrapper>
+          </MobileRouteWrapper>
         } />
         <Route path="/chat" element={
-          <Navigate to="/smart-chat?mobileDemo=true" replace />
+          <Navigate to="/smart-chat" replace />
         } />
         <Route path="/smart-chat" element={
-          <MobilePreviewWrapper>
+          <MobileRouteWrapper>
             <ProtectedRoute>
               <SmartChat />
             </ProtectedRoute>
-          </MobilePreviewWrapper>
+          </MobileRouteWrapper>
         } />
         <Route path="/settings" element={
-          <MobilePreviewWrapper>
+          <MobileRouteWrapper>
             <ProtectedRoute>
               <Settings />
             </ProtectedRoute>
-          </MobilePreviewWrapper>
+          </MobileRouteWrapper>
         } />
         <Route path="*" element={
-          <MobilePreviewWrapper>
+          <MobileRouteWrapper>
             <NotFound />
-          </MobilePreviewWrapper>
+          </MobileRouteWrapper>
         } />
       </Routes>
 
