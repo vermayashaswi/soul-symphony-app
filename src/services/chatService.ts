@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 
@@ -136,7 +137,7 @@ export async function processChatMessage(
       };
     }
     
-    console.log("Response received:", queryResponse ? "yes" : "no");
+    console.log("Response received:", queryResponse ? "yes" : "no", queryResponse);
     
     // Construct final response
     const responseContent = queryResponse.response || "I couldn't find an answer to your question.";

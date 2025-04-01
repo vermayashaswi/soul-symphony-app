@@ -236,21 +236,30 @@ export default function MobileChatInterface({
       
       if (response.role === 'error' || response.content.includes("issue retrieving")) {
         console.error("[Mobile] Received error response:", response.content);
+        toast({
+          title: "Something went wrong",
+          description: "We couldn't process your request. Please try again or try a different question.",
+          variant: "destructive"
+        });
       }
       
-      const { error: storeError } = await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: threadId,
-          content: response.content,
-          sender: 'assistant',
-          reference_entries: response.references || null,
-          has_numeric_result: response.hasNumericResult || false,
-          analysis_data: response.analysis || null
-        });
+      try {
+        const { error: storeError } = await supabase
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            content: response.content,
+            sender: 'assistant',
+            reference_entries: response.references || null,
+            has_numeric_result: response.hasNumericResult || false,
+            analysis_data: response.analysis || null
+          });
         
-      if (storeError) {
-        console.error("[Mobile] Error storing assistant response:", storeError);
+        if (storeError) {
+          console.error("[Mobile] Error storing assistant response:", storeError);
+        }
+      } catch (dbError) {
+        console.error("[Mobile] Failed to store response in database:", dbError);
       }
       
       if (messages.length <= 2) {
@@ -278,6 +287,11 @@ export default function MobileChatInterface({
       });
     } catch (error) {
       console.error("[Mobile] Error sending message:", error);
+      toast({
+        title: "Connection Error",
+        description: "We couldn't reach our servers. Please check your internet connection and try again.",
+        variant: "destructive"
+      });
       setMessages(prev => {
         const filteredMessages = prev.filter(msg => !msg.isLoading);
         return [

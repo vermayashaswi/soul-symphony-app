@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -381,7 +380,7 @@ serve(async (req) => {
     if (queryEmbedding) {
       console.log("Searching entries with vector similarity for userId:", userId);
       console.log("RPC params for match_journal_entries_with_date:", {
-        query_embedding: queryEmbedding.slice(0, 10) + "...",  // Log just a portion
+        query_embedding: "...",  // Log just a portion
         match_threshold: 0.5,
         match_count: 7,
         user_id_filter: userId
@@ -464,6 +463,8 @@ serve(async (req) => {
           const emotionsText = formatEmotions(entry.emotions);
           return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
         }).join('\n\n') + "\n\n";
+    } else {
+      journalContext = "I don't see any relevant journal entries that could help answer your question. If you'd like to get more personalized insights, consider adding some journal entries.";
     }
     
     // Get user's first name for personalized response
