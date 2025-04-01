@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
 import { motion } from "framer-motion";
@@ -12,19 +12,23 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import MobilePreviewFrame from "@/components/MobilePreviewFrame";
 import Navbar from "@/components/Navbar";
+import ChatThreadList from "@/components/chat/ChatThreadList";
+import { v4 as uuidv4 } from 'uuid';
+import { supabase } from "@/integrations/supabase/client";
 
 export default function SmartChat() {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const { entries, loading } = useJournalEntries(user?.id, 0, true);
   const navigate = useNavigate();
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   
   // Check if we're in mobile preview mode
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
   useEffect(() => {
-    document.title = "Smart Journal Chat | SOULo";
+    document.title = "AI Assistant | SOULo";
     
     // Force proper viewport setup for mobile
     const metaViewport = document.querySelector('meta[name="viewport"]');
@@ -32,10 +36,62 @@ export default function SmartChat() {
       metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
     }
     
-    console.log("SmartChat page mounted, mobile:", isMobile, "width:", window.innerWidth, "mobileDemo:", mobileDemo);
-  }, [isMobile, mobileDemo]);
+    // Check for active thread or create one
+    const checkOrCreateThread = async () => {
+      if (!user?.id) return;
+
+      try {
+        // Get most recent thread
+        const { data: threads, error } = await supabase
+          .from('chat_threads')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        if (error) throw error;
+
+        if (threads && threads.length > 0) {
+          setCurrentThreadId(threads[0].id);
+        } else {
+          // Create a new thread if none exists
+          await createNewThread();
+        }
+      } catch (error) {
+        console.error("Error checking threads:", error);
+      }
+    };
+
+    checkOrCreateThread();
+  }, [isMobile, mobileDemo, user]);
 
   const hasEnoughEntries = !loading && entries.length > 0;
+
+  const createNewThread = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const newThreadId = uuidv4();
+      const { error } = await supabase
+        .from('chat_threads')
+        .insert({
+          id: newThreadId,
+          user_id: user.id,
+          title: "New Conversation",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      setCurrentThreadId(newThreadId);
+    } catch (error) {
+      console.error("Error creating thread:", error);
+    }
+  };
+
+  const handleSelectThread = (threadId: string) => {
+    setCurrentThreadId(threadId);
+  };
 
   // Desktop content
   const desktopContent = (
@@ -45,14 +101,14 @@ export default function SmartChat() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="smart-chat-container container py-20 md:py-24 mx-auto min-h-[calc(100vh-4rem)] flex flex-col"
+        className="smart-chat-container w-full h-[calc(100vh-4rem)] flex"
       >
         {!hasEnoughEntries && !loading && (
-          <Alert className="mb-6 border-amber-300 bg-amber-50 text-amber-800">
+          <Alert className="absolute z-10 top-16 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>No journal entries found</AlertTitle>
             <AlertDescription className="mt-2">
-              <p>Smart Chat works best when you have journal entries to analyze. Create some journal entries to get personalized insights.</p>
+              <p>The AI Assistant works best when you have journal entries to analyze. Create some journal entries to get personalized insights.</p>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -65,7 +121,16 @@ export default function SmartChat() {
           </Alert>
         )}
         
-        <div className="flex-1 min-h-0">
+        <div className="w-72 h-full border-r">
+          <ChatThreadList 
+            userId={user?.id} 
+            onSelectThread={handleSelectThread}
+            onStartNewThread={createNewThread}
+            currentThreadId={currentThreadId}
+          />
+        </div>
+        
+        <div className="flex-1 p-4">
           <SmartChatInterface />
         </div>
       </motion.div>

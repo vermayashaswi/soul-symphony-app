@@ -14,10 +14,10 @@ const EmptyChatState: React.FC = () => {
         <MessageSquare className="h-8 w-8 text-primary" />
       </div>
       
-      <h3 className="text-xl font-bold mb-2">Your Journal Assistant</h3>
+      <h3 className="text-xl font-bold mb-2">AI Assistant</h3>
       
-      <p className="text-muted-foreground max-w-sm">
-        Ask questions about your journal entries, emotions, or patterns in your writing.
+      <p className="text-muted-foreground max-w-md">
+        Hey, I am Roha, your personal AI assistant. You can ask me anything about your mental well-being and I will answer your queries basis your own journal insights.
       </p>
       
       <div className="mt-6 text-sm text-muted-foreground/70">

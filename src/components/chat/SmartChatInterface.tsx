@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from "react";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,7 +11,7 @@ import ChatInput from "./ChatInput";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import SouloLogo from "@/components/SouloLogo";
 
 export default function SmartChatInterface() {
@@ -90,11 +90,11 @@ export default function SmartChatInterface() {
   };
 
   return (
-    <Card className="smart-chat-interface w-full max-w-4xl mx-auto h-[calc(70vh)] md:h-[80vh] flex flex-col shadow-md border rounded-xl overflow-hidden">
+    <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden">
       <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b">
         <div className="flex items-center">
           <SouloLogo useColorTheme={true} className="w-7 h-7 mr-2" />
-          <CardTitle className="text-xl">Smart Journal Assistant</CardTitle>
+          <h2 className="text-xl font-semibold">AI Assistant</h2>
         </div>
         {chatHistory.length > 0 && (
           <Button 
@@ -115,7 +115,7 @@ export default function SmartChatInterface() {
             <div className="text-center max-w-lg mx-auto">
               <h1 className="text-3xl font-bold mb-3">How can I help you?</h1>
               <p className="text-muted-foreground mb-6">
-                Ask me about your journal entries, feelings, or patterns I notice in your writing.
+                Hey, I am Roha, your personal AI assistant. You can ask me anything about your mental well-being and I will answer your queries basis your own journal insights.
               </p>
               
               {showSuggestions && (

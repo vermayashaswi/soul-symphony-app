@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Loader2, BarChart4, ChevronDown, ChevronUp, Lightbulb, BarChart2, Search, Brain } from "lucide-react";
@@ -6,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import MobileChatMessage from "./MobileChatMessage";
-import EmptyChatState from "../EmptyChatState";
 import MobileChatInput from "./MobileChatInput";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
@@ -92,7 +90,7 @@ export default function MobileChatInterface() {
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center">
           <SouloLogo useColorTheme={true} className="w-6 h-6 mr-2" />
-          <h2 className="text-lg font-semibold">Smart Journal Assistant</h2>
+          <h2 className="text-lg font-semibold">AI Assistant</h2>
         </div>
         {chatHistory.length > 0 && (
           <Button 
@@ -113,7 +111,7 @@ export default function MobileChatInterface() {
             <div className="text-center max-w-md mx-auto">
               <h1 className="text-2xl font-bold mb-2">How can I help you?</h1>
               <p className="text-muted-foreground mb-6">
-                Ask me about your journal entries, feelings, or patterns I notice in your writing.
+                Hey, I am Roha, your personal AI assistant. You can ask me anything about your mental well-being and I will answer your queries basis your own journal insights.
               </p>
             </div>
           </div>
