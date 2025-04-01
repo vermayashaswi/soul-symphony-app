@@ -1,4 +1,3 @@
-
 // Change the return type to allow nested objects for properties like timeRange
 export const analyzeQueryTypes = (query: string): Record<string, any> => {
   const lowerQuery = query.toLowerCase();
@@ -99,6 +98,37 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     /(?:first|second|third|lastly|finally|moreover|additionally)/i
   ];
   
+  // Enhanced pattern detection for relationship-related queries
+  const relationshipPatterns = [
+    /\b(?:partner|spouse|boyfriend|girlfriend|husband|wife|relationship|marriage|married)\b/i,
+    /\b(?:fight|argue|conflict|disagreement|tension|problem)\b.*\b(?:partner|spouse|boyfriend|girlfriend|husband|wife)\b/i,
+    /\b(?:partner|spouse|boyfriend|girlfriend|husband|wife)\b.*\b(?:fight|argue|conflict|disagreement|tension|problem)\b/i,
+    /\b(?:improve|better|fix|work on|strengthen|enhance)\b.*\b(?:relationship|marriage|partner|spouse)\b/i
+  ];
+  
+  // New pattern for "when" questions about specific events
+  const whenEventPatterns = [
+    /\bwhen\b.*\b(?:fight|argue|conflict|disagreement|fight with|argued with)\b/i,
+    /\bwhen\b.*\b(?:happened|occurred|took place|was there)\b/i,
+    /\bwhat time\b|\bwhich day\b|\bwhich date\b/i
+  ];
+  
+  // Pattern for "how often" questions
+  const frequencyPatterns = [
+    /\bhow often\b|\bhow frequently\b|\bhow many times\b/i,
+    /\bdo i (?:usually|regularly|often|frequently|commonly)\b/i,
+    /\bam i (?:always|often|regularly|repeatedly)\b/i,
+    /\bfrequency of\b|\brate of\b|\bpattern of\b/i
+  ];
+  
+  // Pattern for improvement/advice questions
+  const improvementPatterns = [
+    /\bhow (?:can|could|should|do) i (?:improve|better|fix|work on|strengthen|enhance)\b/i,
+    /\bwhat (?:can|could|should|do) i (?:do|try|practice) to (?:improve|better|fix)\b/i,
+    /\b(?:improve|better|fix|enhance|strengthen)\b.*\b(?:how|ways|steps|methods)\b/i,
+    /\b(?:advice|suggestion|recommendation|tip)\b.*\b(?:for|about|on)\b/i
+  ];
+  
   // Extract time range information
   const getTimeRange = (query: string): { timeframeType: string | null, startDate: Date | null, endDate: Date | null } => {
     const lowerQuery = query.toLowerCase();
@@ -160,7 +190,27 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     return { timeframeType: null, startDate: null, endDate: null };
   };
   
-  // Create dynamic pattern for each emotion word
+  // Check for relationship-related queries
+  const isRelationshipQuery = relationshipPatterns.some(pattern => 
+    pattern.test(lowerQuery)
+  );
+  
+  // Check for "when" event questions
+  const isWhenEventQuery = whenEventPatterns.some(pattern => 
+    pattern.test(lowerQuery)
+  );
+  
+  // Check for frequency questions
+  const isFrequencyQuery = frequencyPatterns.some(pattern => 
+    pattern.test(lowerQuery)
+  );
+  
+  // Check for improvement/advice questions
+  const isImprovementQuery = improvementPatterns.some(pattern => 
+    pattern.test(lowerQuery)
+  );
+  
+  // Check for specific emotion quantification patterns
   const hasEmotionQuantification = emotionWords.some(emotion => {
     const pattern = new RegExp(emotionQuantificationPattern.source.replace('emotionWord', emotion), 'i');
     return pattern.test(lowerQuery);
@@ -221,6 +271,34 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   // Extract time range
   const timeRange = getTimeRange(query);
   
+  // Enhanced search strategy determination
+  const determineSearchStrategy = () => {
+    if (isWhenEventQuery) {
+      return 'temporal_vector_search';
+    } 
+    if (isFrequencyQuery) {
+      return 'frequency_analysis';
+    }
+    if (isImprovementQuery) {
+      return 'contextual_advice';
+    }
+    if (hasTopEmotionsPattern) {
+      return 'emotion_aggregation';
+    }
+    if (isEmotionFocused && isWhyQuestion) {
+      return 'emotion_causal_analysis';
+    }
+    if (isRelationshipQuery && (isWhyQuestion || needsContext)) {
+      return 'relationship_analysis';
+    }
+    if (needsDataAggregation) {
+      return 'data_aggregation';
+    }
+    return 'vector_search';
+  };
+  
+  const hasExplicitHappinessRating = explicitHappinessRatingPattern.test(lowerQuery);
+  
   return {
     isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification || hasHappinessRating,
     
@@ -250,7 +328,7 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     
     isComplexQuery,
     
-    hasExplicitHappinessRating: explicitHappinessRatingPattern.test(lowerQuery),
+    hasExplicitHappinessRating,
     
     requiresComponentAnalysis: isComplexQuery || hasHappinessRating || hasTopEmotionsPattern || hasWhyEmotionsPattern || 
                               (hasTemporalWords && hasEmotionWords && hasQuantitativeWords),
@@ -260,6 +338,15 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     needsVectorSearch: needsVectorSearch,
     
     hasWhyEmotionsPattern,
+    
+    isRelationshipQuery,
+    isWhenEventQuery,
+    isFrequencyQuery,
+    isImprovementQuery,
+    
+    searchStrategy: determineSearchStrategy(),
+    needsTimeRetrieval: isWhenEventQuery || (isRelationshipQuery && isTemporal),
+    needsThemeFiltering: isRelationshipQuery || isImprovementQuery,
     
     timeRange: {
       type: timeRange.timeframeType,

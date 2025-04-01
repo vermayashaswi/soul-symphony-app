@@ -146,10 +146,10 @@ function extractTimePeriod(message: string): {startDate: Date | null, endDate: D
   return { startDate, endDate, periodName };
 }
 
-// Enhanced function to handle top emotions query using the new SQL function
+// Enhanced function to handle top emotions query using the SQL function
 async function handleTopEmotionsQuery(userId: string, timeRange: {startDate: Date | null, endDate: Date | null, periodName: string}, isWhyQuery: boolean) {
   try {
-    // Use the new SQL function to get top emotions with sample entries
+    // Use the SQL function to get top emotions with sample entries
     const { data: emotionsData, error } = await supabase.rpc(
       'get_top_emotions_with_entries',
       {
@@ -224,6 +224,124 @@ async function handleTopEmotionsQuery(userId: string, timeRange: {startDate: Dat
   }
 }
 
+// Search for entries by entity type and name
+async function searchEntriesByEntity(userId: string, entityType: string, entityName: string | null = null) {
+  try {
+    console.log(`Searching for entries with entity. Type: ${entityType}, Name: ${entityName}`);
+    
+    let query = supabase
+      .from('Journal Entries')
+      .select('id, "refined text", created_at, emotions, entities')
+      .eq('user_id', userId);
+    
+    // Add entity type filter
+    if (entityType) {
+      query = query.contains('entities', [{ type: entityType }]);
+    }
+    
+    // Add entity name filter if provided
+    if (entityName) {
+      query = query.filter('entities', 'cs', `{"name":"${entityName}"}`);
+    }
+    
+    // Execute query
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error("Error in entity search:", error);
+      throw error;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Exception in searchEntriesByEntity:", error);
+    throw error;
+  }
+}
+
+// Search for entries by theme keywords
+async function searchEntriesByThemes(userId: string, themeKeywords: string[]) {
+  try {
+    console.log(`Searching for entries with themes containing: ${themeKeywords.join(', ')}`);
+    
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('id, "refined text", created_at, emotions, master_themes')
+      .eq('user_id', userId)
+      .not('master_themes', 'is', null);
+    
+    if (error) {
+      console.error("Error in theme search:", error);
+      throw error;
+    }
+    
+    // Filter entries with matching themes
+    const matchedEntries = data?.filter(entry => {
+      if (!entry.master_themes || !Array.isArray(entry.master_themes)) return false;
+      
+      return entry.master_themes.some(theme => {
+        if (typeof theme !== 'string') return false;
+        const lowerTheme = theme.toLowerCase();
+        return themeKeywords.some(keyword => lowerTheme.includes(keyword.toLowerCase()));
+      });
+    });
+    
+    return matchedEntries;
+  } catch (error) {
+    console.error("Exception in searchEntriesByThemes:", error);
+    throw error;
+  }
+}
+
+// Search entries using vector similarity
+async function searchEntriesWithVector(
+  userId: string, 
+  queryEmbedding: any[], 
+  timeRange: {startDate: Date | null, endDate: Date | null} | null = null
+) {
+  try {
+    console.log(`Searching entries with vector similarity for userId: ${userId}`);
+    
+    // Prepare RPC parameters
+    const rpcParams: any = {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.5,
+      match_count: 10,
+      user_id_filter: userId
+    };
+    
+    // Add time range parameters if provided
+    if (timeRange) {
+      rpcParams.start_date = timeRange.startDate?.toISOString() || null;
+      rpcParams.end_date = timeRange.endDate?.toISOString() || null;
+    }
+    
+    console.log(`RPC params for match_journal_entries_with_date: ${JSON.stringify(rpcParams).substring(0, 100)}...`);
+    
+    // Call the RPC function
+    const { data, error } = await supabase.rpc(
+      'match_journal_entries_with_date',
+      rpcParams
+    );
+    
+    if (error) {
+      console.error("Error in vector search:", error);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      console.log("No vector search results found");
+      return [];
+    }
+    
+    console.log(`Vector similarity search found ${data.length} entries`);
+    return data;
+  } catch (error) {
+    console.error("Error in searchEntriesWithVector:", error);
+    throw error;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -231,7 +349,26 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, threadId = null, includeDiagnostics = false, requiresEmotionAnalysis = false } = await req.json();
+    const { 
+      message, 
+      userId, 
+      threadId = null, 
+      includeDiagnostics = false, 
+      requiresEmotionAnalysis = false,
+      isTemporalQuery = false,
+      isFrequencyQuery = false,
+      isEmotionQuery = false,
+      isWhyEmotionQuery = false,
+      isRelationshipQuery = false,
+      isAdviceQuery = false,
+      requiresThemeFiltering = false,
+      requiresEntryDates = false,
+      requiresCausalAnalysis = false,
+      requiresPatternAnalysis = false,
+      requiresSolutionFocus = false,
+      themeKeywords = [],
+      timeRange: providedTimeRange = null
+    } = await req.json();
     
     if (!message) {
       throw new Error('No message provided');
@@ -239,115 +376,132 @@ serve(async (req) => {
 
     console.log("Processing chat request for user:", userId);
     console.log("Message:", message.substring(0, 50) + "...");
+    console.log("Include diagnostics:", includeDiagnostics ? "yes" : "no");
     
-    // Analyze query type
-    const isEmotionQuery = isTopEmotionsQuery(message);
-    const isWhyEmotionQuery = isEmotionWhyQuery(message);
-    const timeRange = extractTimePeriod(message);
-    
-    console.log("Query analysis:", {
-      isEmotionQuery,
-      isWhyEmotionQuery,
-      timeRange: timeRange.periodName
-    });
-    
-    // If this is a top emotions query, handle it specifically
-    let emotionAnalysisData = null;
-    if (isEmotionQuery) {
-      emotionAnalysisData = await handleTopEmotionsQuery(userId, timeRange, isWhyEmotionQuery);
-      console.log("Emotion analysis completed:", emotionAnalysisData ? "success" : "failed");
+    if (threadId) {
+      console.log("Thread ID:", threadId);
     }
     
-    // Generate embedding for the user query
-    console.log("Generating embedding for user query...");
-    const queryEmbedding = await generateEmbedding(message);
-    console.log("Using embedding for search");
+    // Determine query type and approach
+    const queryType = {
+      queryType: isTemporalQuery ? "temporal" :
+                isFrequencyQuery ? "frequency" :
+                isEmotionQuery ? "emotion" :
+                isRelationshipQuery ? "relationship" :
+                isAdviceQuery ? "advice" : "general",
+      emotion: isEmotionQuery ? true : null,
+      theme: requiresThemeFiltering ? true : null,
+      entityType: isRelationshipQuery ? "person" : null,
+      entityName: null,
+      timeframe: providedTimeRange || extractTimePeriod(message),
+      isWhenQuestion: isTemporalQuery
+    };
     
-    // Search for relevant journal entries using vector similarity
-    let journalContext = "";
-    let relevantEntries = emotionAnalysisData?.relevantEntries || [];
+    console.log("Query analysis:", JSON.stringify(queryType));
     
-    if (!emotionAnalysisData || relevantEntries.length < 3) {
-      console.log("Searching for relevant context using vector similarity...");
-      const { data: similarEntries, error: searchError } = await supabase.rpc(
-        'match_journal_entries_with_date',
-        {
-          query_embedding: queryEmbedding,
-          match_threshold: 0.5,
-          match_count: 5,
-          user_id_filter: userId,
-          start_date: timeRange.startDate?.toISOString() || null,
-          end_date: timeRange.endDate?.toISOString() || null
-        }
-      );
+    // Relevant journal entries for context
+    let relevantEntries: any[] = [];
+    
+    // For emotion queries, use dedicated emotion handlers
+    let emotionAnalysisData = null;
+    if (isEmotionQuery) {
+      const timeRangeObj = providedTimeRange || extractTimePeriod(message);
+      emotionAnalysisData = await handleTopEmotionsQuery(userId, timeRangeObj, isWhyEmotionQuery);
+      console.log("Emotion analysis completed:", emotionAnalysisData ? "success" : "failed");
       
-      if (searchError) {
-        console.error("Error searching for similar entries:", searchError);
-      } else if (similarEntries && similarEntries.length > 0) {
-        console.log("Found similar entries:", similarEntries.length);
+      if (emotionAnalysisData && emotionAnalysisData.relevantEntries) {
+        relevantEntries = emotionAnalysisData.relevantEntries;
+      }
+    }
+    
+    // For relationship queries with theme filtering
+    if (requiresThemeFiltering && themeKeywords.length > 0) {
+      try {
+        console.log("Using theme-based search for relationship content");
+        const themeEntries = await searchEntriesByThemes(userId, themeKeywords);
         
-        // Fetch full entries for context
-        const entryIds = similarEntries.map(entry => entry.id);
-        const { data: entries, error: entriesError } = await supabase
-          .from('Journal Entries')
-          .select('refined text, created_at, emotions')
-          .in('id', entryIds);
-        
-        if (entriesError) {
-          console.error("Error retrieving journal entries:", entriesError);
-        } else if (entries && entries.length > 0) {
-          console.log("Retrieved full entries:", entries.length);
+        if (themeEntries && themeEntries.length > 0) {
+          console.log(`Found ${themeEntries.length} entries with matching themes`);
           
-          // Add to relevant entries if not already included from emotion analysis
+          // Add to relevant entries
+          themeEntries.forEach(entry => {
+            relevantEntries.push({
+              id: entry.id,
+              date: entry.created_at,
+              snippet: entry["refined text"] || "No content available",
+              themes: entry.master_themes
+            });
+          });
+        }
+      } catch (themeError) {
+        console.error("Error in theme search:", themeError);
+      }
+    }
+    
+    // For relationship queries with entity search
+    if (isRelationshipQuery && queryType.entityType) {
+      try {
+        console.log(`Using entity-based search for ${queryType.entityType}`);
+        const entityEntries = await searchEntriesByEntity(userId, queryType.entityType, queryType.entityName);
+        
+        if (entityEntries && entityEntries.length > 0) {
+          console.log(`Found ${entityEntries.length} entries with matching entities`);
+          
+          // Add to relevant entries if not already included
           const existingIds = new Set(relevantEntries.map(e => e.id));
           
-          entries.forEach((entry, index) => {
+          entityEntries.forEach(entry => {
             if (!existingIds.has(entry.id)) {
               relevantEntries.push({
                 id: entry.id,
                 date: entry.created_at,
                 snippet: entry["refined text"] || "No content available",
-                similarity: similarEntries[index]?.similarity || null
+                entities: entry.entities
               });
+              existingIds.add(entry.id);
             }
           });
-          
-          // Format entries as context with emotions data
-          journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
-            entries.map((entry, index) => {
-              const date = new Date(entry.created_at).toLocaleDateString();
-              const emotionsText = formatEmotions(entry.emotions);
-              return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
-            }).join('\n\n') + "\n\n";
         }
-      } else {
-        console.log("No similar entries found, falling back to recent entries");
-        // Fallback to recent entries if no similar ones found
-        const { data: recentEntries, error: recentError } = await supabase
-          .from('Journal Entries')
-          .select('refined text, created_at, emotions')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(3);
+      } catch (entityError) {
+        console.error("Error in entity search:", entityError);
+      }
+    }
+    
+    // Generate embedding for the user query
+    const queryEmbedding = await generateEmbedding(message);
+    console.log("Using embedding for search");
+    
+    // Search for relevant journal entries using vector similarity
+    if (!emotionAnalysisData || relevantEntries.length < 3) {
+      try {
+        const timeRangeObj = providedTimeRange ? 
+          { startDate: new Date(providedTimeRange.startDate), endDate: new Date(providedTimeRange.endDate) } :
+          { startDate: queryType.timeframe.startDate, endDate: queryType.timeframe.endDate };
         
-        if (recentError) {
-          console.error("Error retrieving recent entries:", recentError);
-        } else if (recentEntries && recentEntries.length > 0) {
-          console.log("Retrieved recent entries:", recentEntries.length);
+        const vectorResults = await searchEntriesWithVector(userId, queryEmbedding, timeRangeObj);
+        
+        if (vectorResults && vectorResults.length > 0) {
+          console.log(`Found ${vectorResults.length} relevant entries`);
           
-          relevantEntries = recentEntries.map((entry, index) => ({
-            id: entry.id,
-            date: entry.created_at,
-            snippet: entry["refined text"] || "No content available"
-          }));
+          // Add to relevant entries if not already included
+          const existingIds = new Set(relevantEntries.map(e => e.id));
           
-          journalContext = "Here are some of your recent journal entries:\n\n" + 
-            recentEntries.map((entry, index) => {
-              const date = new Date(entry.created_at).toLocaleDateString();
-              const emotionsText = formatEmotions(entry.emotions);
-              return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
-            }).join('\n\n') + "\n\n";
+          vectorResults.forEach(entry => {
+            if (!existingIds.has(entry.id)) {
+              relevantEntries.push({
+                id: entry.id,
+                date: entry.created_at,
+                snippet: entry.content,
+                similarity: entry.similarity,
+                themes: entry.themes,
+                emotions: entry.emotions
+              });
+              existingIds.add(entry.id);
+            }
+          });
         }
+      } catch (vectorError) {
+        console.error("Error in vector search:", vectorError);
       }
     }
     
@@ -367,32 +521,6 @@ serve(async (req) => {
       console.error("Error fetching user profile:", error);
     }
     
-    // For top emotions queries, prepare emotional context
-    let emotionPrompt = "";
-    if (emotionAnalysisData && isEmotionQuery) {
-      if (isWhyEmotionQuery && emotionAnalysisData.emotionContext) {
-        // Add emotion samples for GPT to analyze why these emotions were felt
-        emotionPrompt = `The user is asking about their top emotions during ${timeRange.periodName} and why they felt these emotions.
-Based on their journal entries, their top emotions were: ${emotionAnalysisData.formattedEmotions}.
-
-${emotionAnalysisData.emotionContext}
-
-Analyze these entries and explain why the user likely experienced these emotions during ${timeRange.periodName}. 
-Identify patterns, triggers, and common themes in the journal entries. 
-Provide a thoughtful analysis that helps the user understand their emotional patterns.
-Keep your response conversational and supportive.
-`;
-      } else {
-        // Just inform about top emotions without the 'why' analysis
-        emotionPrompt = `The user is asking about their top emotions during ${timeRange.periodName}.
-Based on their journal entries, their top emotions were: ${emotionAnalysisData.formattedEmotions}.
-
-Provide a concise summary of these emotions and their general patterns during this period.
-Keep your response conversational and supportive.
-`;
-      }
-    }
-    
     // Fetch previous conversation messages if a thread ID is provided
     let conversationContext = "";
     if (threadId) {
@@ -403,7 +531,7 @@ Keep your response conversational and supportive.
           .select('content, sender')
           .eq('thread_id', threadId)
           .order('created_at', { ascending: true })
-          .limit(5);
+          .limit(10);
           
         if (!msgsError && prevMessages && prevMessages.length > 0) {
           console.log("Retrieved", prevMessages.length, "previous messages");
@@ -421,12 +549,97 @@ Keep your response conversational and supportive.
       }
     }
     
+    // Format journal entries as context
+    let journalContext = "";
+    if (relevantEntries && relevantEntries.length > 0) {
+      console.log(`Found ${relevantEntries.length} relevant entries`);
+      
+      journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n";
+      
+      relevantEntries.slice(0, 5).forEach((entry, index) => {
+        const date = new Date(entry.date).toLocaleDateString();
+        const emotionsText = entry.emotions ? formatEmotions(entry.emotions) : "No emotion data";
+        const themesText = entry.themes && Array.isArray(entry.themes) ? entry.themes.join(", ") : "No themes";
+        
+        journalContext += `Entry ${index+1} (${date}):\n${entry.snippet}\n`;
+        
+        if (isEmotionQuery || requiresEmotionAnalysis) {
+          journalContext += `Primary emotions: ${emotionsText}\n`;
+        }
+        
+        if (requiresThemeFiltering) {
+          journalContext += `Themes: ${themesText}\n`;
+        }
+        
+        if (isTemporalQuery || requiresEntryDates) {
+          journalContext += `Date: ${date}\n`;
+        }
+        
+        journalContext += "\n";
+      });
+    } else {
+      journalContext = "I don't have enough journal entries that relate specifically to your question. Here's my best response based on the information available:\n\n";
+    }
+    
+    // For top emotions queries, prepare special emotional context
+    let emotionPrompt = "";
+    if (emotionAnalysisData && isEmotionQuery) {
+      if (isWhyEmotionQuery && emotionAnalysisData.emotionContext) {
+        // Add emotion samples for GPT to analyze why these emotions were felt
+        emotionPrompt = `The user is asking about their top emotions during ${queryType.timeframe.periodName} and why they felt these emotions.
+Based on their journal entries, their top emotions were: ${emotionAnalysisData.formattedEmotions}.
+
+${emotionAnalysisData.emotionContext}
+
+Analyze these entries and explain why the user likely experienced these emotions during ${queryType.timeframe.periodName}. 
+Identify patterns, triggers, and common themes in the journal entries. 
+Provide a thoughtful analysis that helps the user understand their emotional patterns.
+Keep your response conversational and supportive.
+`;
+      } else {
+        // Just inform about top emotions without the 'why' analysis
+        emotionPrompt = `The user is asking about their top emotions during ${queryType.timeframe.periodName}.
+Based on their journal entries, their top emotions were: ${emotionAnalysisData.formattedEmotions}.
+
+Provide a concise summary of these emotions and their general patterns during this period.
+Keep your response conversational and supportive.
+`;
+      }
+    }
+    
+    // Prepare query-specific instructions for GPT
+    let querySpecificInstructions = "";
+    
+    if (isTemporalQuery || queryType.isWhenQuestion) {
+      querySpecificInstructions = `
+The user is asking WHEN something happened. Focus on identifying and highlighting the specific dates or time periods
+when the events they're asking about occurred. Make sure to include these dates prominently in your response.
+`;
+    } else if (isFrequencyQuery) {
+      querySpecificInstructions = `
+The user is asking about HOW OFTEN something happens. Analyze the journal entries to identify patterns and frequency.
+Give a clear assessment of frequency (like "regularly", "occasionally", "rarely", etc.) and support it with evidence from the entries.
+`;
+    } else if (isRelationshipQuery) {
+      querySpecificInstructions = `
+The user is asking about their relationship with their partner. Focus on identifying patterns in how they interact,
+any recurring issues or positive aspects, and provide insights specifically about their relationship dynamics.
+`;
+    } else if (isAdviceQuery || requiresSolutionFocus) {
+      querySpecificInstructions = `
+The user is asking for advice on how to improve something. Based on their journal entries, identify both challenges they face
+and positive moments/strategies that have worked for them before. Provide practical, actionable suggestions that build on their
+existing strengths and address their specific challenges.
+`;
+    }
+    
     // Prepare system prompt with context
     const systemPrompt = emotionPrompt || `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
-${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
-${conversationContext ? conversationContext : ""}
+${journalContext}
+${conversationContext}
+${querySpecificInstructions}
 
-Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
+Based on the above context and the user's message, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
 mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
 Focus on being helpful rather than diagnostic. 
