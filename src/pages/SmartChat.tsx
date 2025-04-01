@@ -53,6 +53,12 @@ export default function SmartChat() {
 
         if (threads && threads.length > 0) {
           setCurrentThreadId(threads[0].id);
+          // Dispatch event to notify SmartChatInterface about the selected thread
+          window.dispatchEvent(
+            new CustomEvent('threadSelected', { 
+              detail: { threadId: threads[0].id } 
+            })
+          );
         } else {
           // Create a new thread if none exists
           await createNewThread();
@@ -84,6 +90,13 @@ export default function SmartChat() {
       
       if (error) throw error;
       setCurrentThreadId(newThreadId);
+      
+      // Dispatch event to notify SmartChatInterface about the new thread
+      window.dispatchEvent(
+        new CustomEvent('threadSelected', { 
+          detail: { threadId: newThreadId } 
+        })
+      );
     } catch (error) {
       console.error("Error creating thread:", error);
     }
@@ -91,6 +104,12 @@ export default function SmartChat() {
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);
+    // Dispatch event to notify SmartChatInterface about the selected thread
+    window.dispatchEvent(
+      new CustomEvent('threadSelected', { 
+        detail: { threadId: threadId } 
+      })
+    );
   };
 
   // Desktop content
@@ -166,7 +185,12 @@ export default function SmartChat() {
         )}
         
         <div className="flex-1 min-h-0">
-          <MobileChatInterface />
+          <MobileChatInterface 
+            currentThreadId={currentThreadId}
+            onSelectThread={handleSelectThread}
+            onCreateNewThread={createNewThread}
+            userId={user?.id}
+          />
         </div>
       </motion.div>
     </>
