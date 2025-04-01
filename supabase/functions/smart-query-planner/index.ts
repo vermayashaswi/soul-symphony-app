@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -147,7 +146,7 @@ async function generateQueryAnalysis(message: string, entryCount: number) {
           {
             "step": "Retrieve all journal entries related to Sarah from last week.",
             "step_type": "sql_query",
-            "sql_query": "SELECT id, \\"refined text\\" as text, emotions FROM \\"Journal Entries\\" WHERE user_id = $1 AND entities LIKE '%Sarah%' AND created_at >= '__LAST_WEEK_START__' AND created_at <= '__LAST_WEEK_END__'",
+            "sql_query": "SELECT id, \\"refined text\\" as text, emotions FROM \\"Journal Entries\\" WHERE user_id = $1 AND entities LIKE '%Sarah%' AND created_at >= __LAST_WEEK_START__ AND created_at <= __LAST_WEEK_END__",
             "data_fields": ["id", "text", "emotions"],
             "filters": ["user_id", "entities", "date"],
             "dynamic_query": false
@@ -169,6 +168,7 @@ async function generateQueryAnalysis(message: string, entryCount: number) {
       - __LAST_MONTH_START__ and __LAST_MONTH_END__ for last month
       - __LAST_WEEK_START__ and __LAST_WEEK_END__ for last week
       - __CURRENT_MONTH_START__ for current month start
+      - Do NOT use 'start_date' or 'end_date' as literal strings
       
       User Query: "${message}"
       
@@ -181,16 +181,7 @@ async function generateQueryAnalysis(message: string, entryCount: number) {
       response_format: { type: "json_object" },
     });
 
-    const analysis = completion.choices[0].message.content;
-    console.log("Raw analysis result:", analysis);
-    
-    try {
-      return JSON.parse(analysis);
-    } catch (jsonError) {
-      console.error("Failed to parse JSON analysis:", jsonError);
-      console.error("Problematic JSON:", analysis);
-      return { error: "Failed to parse analysis as JSON" };
-    }
+    return JSON.parse(completion.choices[0].message.content);
   } catch (error) {
     console.error("Error generating query analysis:", error);
     return { error: error.message };
@@ -487,7 +478,7 @@ async function regenerateImprovedSqlQuery(originalQuery, errorMessage, userQuest
             
             User was asking: "${userQuestion}"
             
-            Provide only the corrected SQL query with no explanations or extra text. Replace hardcoded date strings with variables like __LAST_MONTH_START__ if appropriate.`
+            Provide only the corrected SQL query with no explanations or extra text. Replace hardcoded date strings with variables like __LAST_MONTH_START__ if appropriate. Do not use 'start_date' or 'end_date' as literal strings.`
           }
         ],
         temperature: 0.2,
@@ -529,12 +520,15 @@ async function executeDirectSqlQuery(query, userId) {
   lastWeekEnd.setHours(23, 59, 59, 999);
   
   let finalQuery = query;
+  
+  // FIX: Correctly replace date placeholders without adding extra quotes
   finalQuery = finalQuery.replace(/__LAST_MONTH_START__/g, `'${lastMonthStart.toISOString()}'`);
   finalQuery = finalQuery.replace(/__LAST_MONTH_END__/g, `'${lastMonthEnd.toISOString()}'`);
   finalQuery = finalQuery.replace(/__CURRENT_MONTH_START__/g, `'${currentMonthStart.toISOString()}'`);
   finalQuery = finalQuery.replace(/__LAST_WEEK_START__/g, `'${lastWeekStart.toISOString()}'`);
   finalQuery = finalQuery.replace(/__LAST_WEEK_END__/g, `'${lastWeekEnd.toISOString()}'`);
   
+  // FIX: Ensure that $1 is properly replaced and no extra quotes are added
   finalQuery = finalQuery.replace(/\$1/g, `'${userId}'`);
   
   try {
