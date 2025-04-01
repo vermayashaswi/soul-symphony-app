@@ -6,6 +6,7 @@ interface MobilePreviewFrameProps {
 }
 
 const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
+  // Get mobileDemo parameter from URL
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   

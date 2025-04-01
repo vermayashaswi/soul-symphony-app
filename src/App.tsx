@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,6 +18,8 @@ import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 import "./styles/mobile.css";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
+import MobileNavbar from "./components/mobile/MobileNavbar";
+import { useIsMobile } from "./hooks/use-mobile";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +29,14 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// New wrapper component to conditionally apply MobilePreviewFrame
+const MobilePreviewWrapper = ({ children }: { children: React.ReactNode }) => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  
+  return mobileDemo ? <MobilePreviewFrame>{children}</MobilePreviewFrame> : <>{children}</>;
+};
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
@@ -58,6 +67,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
+  const isMobile = useIsMobile();
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  const shouldShowMobileNav = isMobile || mobileDemo;
+
   useEffect(() => {
     const setCorrectViewport = () => {
       const metaViewport = document.querySelector('meta[name="viewport"]');
@@ -93,34 +107,56 @@ const AppRoutes = () => {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/auth" element={<Auth />} />
+        <Route path="/" element={
+          <MobilePreviewWrapper>
+            <Index />
+          </MobilePreviewWrapper>
+        } />
+        <Route path="/auth" element={
+          <MobilePreviewWrapper>
+            <Auth />
+          </MobilePreviewWrapper>
+        } />
         <Route path="/journal" element={
-          <ProtectedRoute>
-            <Journal />
-          </ProtectedRoute>
+          <MobilePreviewWrapper>
+            <ProtectedRoute>
+              <Journal />
+            </ProtectedRoute>
+          </MobilePreviewWrapper>
         } />
         <Route path="/insights" element={
-          <ProtectedRoute>
-            <Insights />
-          </ProtectedRoute>
+          <MobilePreviewWrapper>
+            <ProtectedRoute>
+              <Insights />
+            </ProtectedRoute>
+          </MobilePreviewWrapper>
         } />
         {/* Redirect /chat to /smart-chat for all devices */}
         <Route path="/chat" element={
           <Navigate to="/smart-chat" replace />
         } />
         <Route path="/smart-chat" element={
-          <ProtectedRoute>
-            <SmartChat />
-          </ProtectedRoute>
+          <MobilePreviewWrapper>
+            <ProtectedRoute>
+              <SmartChat />
+            </ProtectedRoute>
+          </MobilePreviewWrapper>
         } />
         <Route path="/settings" element={
-          <ProtectedRoute>
-            <Settings />
-          </ProtectedRoute>
+          <MobilePreviewWrapper>
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          </MobilePreviewWrapper>
         } />
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={
+          <MobilePreviewWrapper>
+            <NotFound />
+          </MobilePreviewWrapper>
+        } />
       </Routes>
+
+      {shouldShowMobileNav && <MobileNavbar />}
     </>
   );
 };

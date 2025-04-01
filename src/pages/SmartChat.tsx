@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -26,6 +25,7 @@ export default function SmartChat() {
   // Check if we're in mobile preview mode
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  const shouldRenderMobile = isMobile || mobileDemo;
   
   useEffect(() => {
     document.title = "Roha | SOULo";
@@ -53,6 +53,12 @@ export default function SmartChat() {
 
         if (threads && threads.length > 0) {
           setCurrentThreadId(threads[0].id);
+          // Dispatch event to notify SmartChatInterface about the selected thread
+          window.dispatchEvent(
+            new CustomEvent('threadSelected', { 
+              detail: { threadId: threads[0].id } 
+            })
+          );
         } else {
           // Create a new thread if none exists
           await createNewThread();
@@ -84,6 +90,13 @@ export default function SmartChat() {
       
       if (error) throw error;
       setCurrentThreadId(newThreadId);
+      
+      // Dispatch event to notify SmartChatInterface about the new thread
+      window.dispatchEvent(
+        new CustomEvent('threadSelected', { 
+          detail: { threadId: newThreadId } 
+        })
+      );
     } catch (error) {
       console.error("Error creating thread:", error);
     }
@@ -91,6 +104,12 @@ export default function SmartChat() {
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);
+    // Dispatch event to notify SmartChatInterface about the selected thread
+    window.dispatchEvent(
+      new CustomEvent('threadSelected', { 
+        detail: { threadId: threadId } 
+      })
+    );
   };
 
   // Desktop content
@@ -145,7 +164,7 @@ export default function SmartChat() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="smart-chat-container h-[calc(100vh-4rem)] flex flex-col pt-16" // Added pt-16 for consistent spacing
+        className="smart-chat-container h-[calc(100vh-4rem)] flex flex-col pt-16 pb-16" // Added pb-16 for mobile nav
       >
         {!hasEnoughEntries && !loading && (
           <Alert className="mx-3 mt-3 border-amber-300 bg-amber-50 text-amber-800">
@@ -166,14 +185,19 @@ export default function SmartChat() {
         )}
         
         <div className="flex-1 min-h-0">
-          <MobileChatInterface />
+          <MobileChatInterface 
+            currentThreadId={currentThreadId}
+            onSelectThread={handleSelectThread}
+            onCreateNewThread={createNewThread}
+            userId={user?.id}
+          />
         </div>
       </motion.div>
     </>
   );
   
   // Decide which content to render based on mobile status
-  const content = (isMobile || mobileDemo) ? mobileContent : desktopContent;
+  const content = shouldRenderMobile ? mobileContent : desktopContent;
   
   // If we're in mobile demo mode, wrap the content in the MobilePreviewFrame
   return mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content;

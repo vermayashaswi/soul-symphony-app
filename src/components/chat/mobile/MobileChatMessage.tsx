@@ -16,10 +16,10 @@ interface MobileChatMessageProps {
     references?: any[];
     diagnostics?: any;
   };
-  showAnalysis: boolean;
+  showAnalysis?: boolean; // Make this prop optional
 }
 
-const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis }) => {
+const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false }) => { // Add default value
   const [showReferences, setShowReferences] = useState(false);
   
   const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;

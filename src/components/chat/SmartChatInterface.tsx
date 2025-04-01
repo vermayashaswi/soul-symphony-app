@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
@@ -70,8 +71,10 @@ export default function SmartChatInterface() {
         })) as ChatMessageType[];
         
         setChatHistory(formattedMessages);
+        setShowSuggestions(false);
       } else {
         setChatHistory([]);
+        setShowSuggestions(true);
       }
     } catch (error) {
       console.error("Error loading messages:", error);
