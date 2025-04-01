@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -22,6 +21,8 @@ export default function JournalEntriesList({ entries, loading, processingEntries
     }
   };
 
+  // We've moved primary loading state to the Journal page,
+  // but keep this as a fallback
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64">

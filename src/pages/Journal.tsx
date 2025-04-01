@@ -20,9 +20,7 @@ const Journal = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
-  const [initialFetchDone, setInitialFetchDone] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [entriesLoaded, setEntriesLoaded] = useState(false);
   
   // Use stable references for entries
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
@@ -33,23 +31,13 @@ const Journal = () => {
     }
   }, [user?.id]);
   
-  // Update entriesLoaded state when entries are loaded or loading state changes
-  useEffect(() => {
-    if (!loading && entries.length > 0) {
-      setEntriesLoaded(true);
-    }
-  }, [loading, entries.length]);
-  
   // Monitor active tab changes and fetch entries when switching to entries tab
   useEffect(() => {
     if (activeTab === 'entries' && isProfileChecked) {
       console.log('Tab changed to entries, fetching entries...');
       fetchEntries();
-      if (!initialFetchDone) {
-        setInitialFetchDone(true);
-      }
     }
-  }, [activeTab, isProfileChecked, fetchEntries, initialFetchDone]);
+  }, [activeTab, isProfileChecked, fetchEntries]);
 
   // Add a new effect to monitor processing entries
   useEffect(() => {
@@ -186,20 +174,28 @@ const Journal = () => {
     return content.includes(query) || themes.includes(query);
   });
 
+  // Determine if we should show the loading screen
+  const showLoading = loading && activeTab === 'entries' && !entries.length;
+  
+  // Entries are ready to view when either:
+  // 1. We have entries to show, or
+  // 2. We're not loading and on the entries tab (showing empty state)
+  const showEntries = activeTab === 'entries' && (!loading || entries.length > 0);
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
       
       <JournalHeader />
       
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
+      <div className="container mx-auto px-4 py-6 max-w-5xl">
         <Tabs defaultValue="record" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="record">Record Entry</TabsTrigger>
             <TabsTrigger value="entries">Past Entries</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="record" className="mt-6">
+          <TabsContent value="record" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="text-center">Record a New Journal Entry</CardTitle>
@@ -216,20 +212,24 @@ const Journal = () => {
             {activeTab === 'entries' && (
               <JournalSearch onSearch={handleSearch} />
             )}
-            <div className={entriesLoaded ? "" : "opacity-0 h-0 overflow-hidden"}>
-              <JournalEntriesList 
-                entries={filteredEntries} 
-                loading={loading || !isProfileChecked}
-                processingEntries={processingEntries}
-                onStartRecording={() => setActiveTab('record')}
-                onDeleteEntry={handleDeleteEntry}
-              />
-            </div>
-            {!entriesLoaded && activeTab === 'entries' && (loading || !isProfileChecked) && (
+            
+            {/* Show loading state */}
+            {showLoading && (
               <div className="flex flex-col items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                 <p className="text-muted-foreground">Loading your journal entries...</p>
               </div>
+            )}
+            
+            {/* Show entries or empty state when ready */}
+            {showEntries && (
+              <JournalEntriesList 
+                entries={filteredEntries} 
+                loading={false} // We're handling loading separately now
+                processingEntries={processingEntries}
+                onStartRecording={() => setActiveTab('record')}
+                onDeleteEntry={handleDeleteEntry}
+              />
             )}
           </TabsContent>
         </Tabs>
