@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -633,11 +632,23 @@ existing strengths and address their specific challenges.
 `;
     }
     
+    // Enhanced focus instructions to make GPT be very specific to the query
+    const focusInstructions = `
+IMPORTANT: Be extremely specific and directly answer ONLY what the user is asking. 
+Avoid tangents, generalizations, or information not directly relevant to the specific query.
+- Start with a direct answer to the exact question asked
+- Use only the journal entries provided as evidence
+- Do not introduce additional topics not mentioned in the user's question
+- If you don't have enough information to answer specifically, say so clearly
+- Organize your response to highlight the direct answer first, then supporting evidence
+`;
+    
     // Prepare system prompt with context
     const systemPrompt = emotionPrompt || `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
 ${journalContext}
 ${conversationContext}
 ${querySpecificInstructions}
+${focusInstructions}
 
 Based on the above context and the user's message, provide a thoughtful, personalized response.
 Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
