@@ -1,13 +1,12 @@
 
 import React, { ReactNode } from 'react';
-import { useLocation } from 'react-router-dom';
 
 interface MobilePreviewFrameProps {
   children: ReactNode;
 }
 
 const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
-  const location = useLocation();
+  // Get mobileDemo parameter from URL
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   

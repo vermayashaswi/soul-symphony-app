@@ -9,14 +9,21 @@ import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
 import SouloLogo from '@/components/SouloLogo';
 import { useTheme } from '@/hooks/use-theme';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { colorTheme } = useTheme();
+  const isMobile = useIsMobile();
   const [typingText, setTypingText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [showResponse, setShowResponse] = useState(false);
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  
+  const shouldRenderMobile = isMobile || mobileDemo;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -72,15 +79,14 @@ const Index = () => {
     }
   };
 
-  const navigateToFeature = (path: string) => {
-    if (!user) {
-      navigate(`/auth?redirectTo=${path}`);
-    } else {
-      navigate(path);
-    }
-  };
-
   useEffect(() => {
+    if (shouldRenderMobile) {
+      const metaViewport = document.querySelector('meta[name="viewport"]');
+      if (metaViewport) {
+        metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+    }
+    
     if (isTyping) {
       const text = "How have I been feeling lately?";
       let currentIndex = 0;
@@ -350,7 +356,7 @@ const Index = () => {
       <Navbar />
       
       <motion.main
-        className="flex-1 container mx-auto px-4 py-8 pt-24 relative z-10"
+        className={`flex-1 container mx-auto px-4 py-8 pt-24 relative z-10 ${shouldRenderMobile ? 'max-w-md' : ''}`}
         initial="hidden"
         animate="visible"
         variants={containerVariants}
@@ -359,10 +365,10 @@ const Index = () => {
           className="text-center mb-12"
           variants={itemVariants}
         >
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 flex items-center justify-center">
-            Welcome to <SouloLogo size="large" className="ml-2" useColorTheme={true} />
+          <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-4 flex items-center justify-center`}>
+            Welcome to <SouloLogo size={shouldRenderMobile ? "medium" : "large"} className="ml-2" useColorTheme={true} />
           </h1>
-          <p className="text-xl max-w-2xl mx-auto text-primary animate-pulse">
+          <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse`}>
             Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
           </p>
           
@@ -372,7 +378,7 @@ const Index = () => {
               variants={itemVariants}
             >
               <Button 
-                size="lg" 
+                size={shouldRenderMobile ? "default" : "lg"} 
                 onClick={() => navigate('/auth')}
                 className="animate-pulse"
               >
@@ -383,7 +389,7 @@ const Index = () => {
         </motion.div>
         
         <motion.div 
-          className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto"
+          className={`grid ${shouldRenderMobile ? 'grid-cols-1 gap-4' : 'grid-cols-1 md:grid-cols-2 gap-6'} max-w-4xl mx-auto`}
           variants={containerVariants}
         >
           {features.map((feature, index) => (

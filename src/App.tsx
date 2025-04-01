@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +18,7 @@ import { ThemeProvider } from "./hooks/use-theme";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 import "./styles/mobile.css";
+import MobilePreviewFrame from "./components/MobilePreviewFrame";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,6 +28,14 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// New wrapper component to conditionally apply MobilePreviewFrame
+const MobilePreviewWrapper = ({ children }: { children: React.ReactNode }) => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  
+  return mobileDemo ? <MobilePreviewFrame>{children}</MobilePreviewFrame> : <>{children}</>;
+};
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
@@ -89,44 +99,59 @@ const AppRoutes = () => {
   }, []);
   
   return (
-    <>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/journal" element={
+    <Routes>
+      <Route path="/" element={
+        <MobilePreviewWrapper>
+          <Index />
+        </MobilePreviewWrapper>
+      } />
+      <Route path="/auth" element={
+        <MobilePreviewWrapper>
+          <Auth />
+        </MobilePreviewWrapper>
+      } />
+      <Route path="/journal" element={
+        <MobilePreviewWrapper>
           <ProtectedRoute>
             <Journal />
           </ProtectedRoute>
-        } />
-        <Route path="/insights" element={
+        </MobilePreviewWrapper>
+      } />
+      <Route path="/insights" element={
+        <MobilePreviewWrapper>
           <ProtectedRoute>
             <Insights />
           </ProtectedRoute>
-        } />
-        {/* Redirect /chat to /smart-chat for all devices */}
-        <Route path="/chat" element={
-          <Navigate to="/smart-chat" replace />
-        } />
-        <Route path="/smart-chat" element={
+        </MobilePreviewWrapper>
+      } />
+      {/* Redirect /chat to /smart-chat for all devices */}
+      <Route path="/chat" element={
+        <Navigate to="/smart-chat" replace />
+      } />
+      <Route path="/smart-chat" element={
+        <MobilePreviewWrapper>
           <ProtectedRoute>
             <SmartChat />
           </ProtectedRoute>
-        } />
-        <Route path="/settings" element={
+        </MobilePreviewWrapper>
+      } />
+      <Route path="/settings" element={
+        <MobilePreviewWrapper>
           <ProtectedRoute>
             <Settings />
           </ProtectedRoute>
-        } />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </>
+        </MobilePreviewWrapper>
+      } />
+      <Route path="*" element={
+        <MobilePreviewWrapper>
+          <NotFound />
+        </MobilePreviewWrapper>
+      } />
+    </Routes>
   );
 };
 
 const App = () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
