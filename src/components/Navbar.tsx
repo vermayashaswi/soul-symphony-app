@@ -26,13 +26,10 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { user, signOut } = useAuth();
   
-  // If we're on mobile, don't render the navbar at all
+  // Check for mobile view after all hooks have been called
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  
-  if (isMobile || mobileDemo) {
-    return null;
-  }
+  const shouldHideNavbar = isMobile || mobileDemo;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -76,6 +73,11 @@ export function Navbar() {
   };
 
   const closeMenu = () => setIsOpen(false);
+
+  // Only return null after all hooks have been called
+  if (shouldHideNavbar) {
+    return null;
+  }
 
   return (
     <nav 
