@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -158,13 +159,12 @@ export default function SmartChat() {
 
   // Mobile content
   const mobileContent = (
-    <>
-      <Navbar />
+    <div className="flex flex-col h-full">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="smart-chat-container h-[calc(100vh-4rem)] flex flex-col pt-16 pb-16" // Added pb-16 for mobile nav
+        className="smart-chat-container flex-1 flex flex-col"
       >
         {!hasEnoughEntries && !loading && (
           <Alert className="mx-3 mt-3 border-amber-300 bg-amber-50 text-amber-800">
@@ -184,7 +184,7 @@ export default function SmartChat() {
           </Alert>
         )}
         
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 flex flex-col">
           <MobileChatInterface 
             currentThreadId={currentThreadId}
             onSelectThread={handleSelectThread}
@@ -193,7 +193,7 @@ export default function SmartChat() {
           />
         </div>
       </motion.div>
-    </>
+    </div>
   );
   
   // Decide which content to render based on mobile status

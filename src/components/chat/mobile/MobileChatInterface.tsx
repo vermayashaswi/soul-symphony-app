@@ -207,7 +207,7 @@ export default function MobileChatInterface({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between py-2 px-3 border-b">
+      <div className="mobile-chat-header flex items-center justify-between py-2 px-3">
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="mr-1 h-8 w-8">
@@ -227,7 +227,7 @@ export default function MobileChatInterface({
         <div className="w-8"></div> {/* Reduced width for balance */}
       </div>
       
-      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
+      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3">
         {messages.length === 0 ? (
           <div className="flex flex-col justify-center items-center h-full text-center">
             <h3 className="text-xl font-medium mb-2">How can I help you?</h3>
@@ -252,7 +252,7 @@ export default function MobileChatInterface({
         )}
       </div>
       
-      <div className="border-t p-2">
+      <div className="mobile-chat-input-container">
         <MobileChatInput onSendMessage={handleSendMessage} isLoading={loading} />
       </div>
     </div>

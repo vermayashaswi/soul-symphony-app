@@ -141,4 +141,30 @@
       box-shadow: 0 0 0 0 rgba(255, 82, 82, 0);
     }
   }
+  
+  /* Fixed header and input bar for mobile chat */
+  .mobile-chat-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background-color: white;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  
+  .mobile-chat-input-container {
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    background-color: white;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 0.5rem;
+    margin-bottom: 0 !important;
+  }
+  
+  /* Ensure proper content area height in chat */
+  .mobile-chat-content {
+    height: calc(100vh - 120px); /* Adjust based on header and input heights */
+    overflow-y: auto;
+    padding-bottom: 0 !important;
+  }
 }
