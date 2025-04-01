@@ -47,7 +47,7 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
   ];
   
   // Enhanced pattern detection for top emotions
-  const topEmotionsPattern = /(?:top|most|main|primary|strongest|highest|dominant)\s+(?:\d+|few|several)?\s*(?:positive|negative|intense|strong)?\s*(?:emotion|emotions|feeling|feelings)/i;
+  const topEmotionsPattern = /(?:top|most|main|primary|strongest|highest|dominant)\s+(?:\d+|few|several)?\s*(?:positive|negative|intense|strong|happy|sad)?\s*(?:emotion|emotions|feeling|feelings)/i;
   
   // More lenient pattern that just detects "top emotions" or similar phrases
   const simpleTopEmotionsPattern = /(?:top|main|primary|most)\s+(?:emotion|emotions|feeling|feelings)/i;
@@ -145,6 +145,11 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
                               (hasEmotionWords && hasWhyEmotionsPattern) ||
                               (hasEmotionWords && (hasQuantitativeWords || hasNumbers || hasComparativeWords));
   
+  // Determine if vector search is needed
+  const needsVectorSearch = needsContext || 
+                           hasWhyEmotionsPattern || 
+                           (isComplexQuery && !hasTopEmotionsPattern);
+  
   return {
     isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification || hasHappinessRating,
     
@@ -175,12 +180,10 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     hasExplicitHappinessRating: explicitHappinessRatingPattern.test(lowerQuery),
     
     requiresComponentAnalysis: isComplexQuery || hasHappinessRating || hasTopEmotionsPattern || hasWhyEmotionsPattern || 
-                               (hasTemporalWords && hasEmotionWords && hasQuantitativeWords),
+                              (hasTemporalWords && hasEmotionWords && hasQuantitativeWords),
     
     asksForNumber: hasNumbers || hasTopEmotionsPattern || hasHappinessRating || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
     
-    needsVectorSearch: true,
-    
-    hasWhyEmotionsPattern
+    needsVectorSearch: needsVectorSearch
   };
 };

@@ -359,6 +359,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      execute_dynamic_query: {
+        Args: {
+          query_text: string
+          param_values?: string[]
+        }
+        Returns: Json
+      }
       get_entries_by_emotion_term: {
         Args: {
           emotion_term: string
@@ -371,6 +378,18 @@ export type Database = {
           id: number
           content: string
           created_at: string
+        }[]
+      }
+      get_top_emotions: {
+        Args: {
+          user_id_param: string
+          start_date?: string
+          end_date?: string
+          limit_count?: number
+        }
+        Returns: {
+          emotion: string
+          score: number
         }[]
       }
       mark_inactive_sessions: {
