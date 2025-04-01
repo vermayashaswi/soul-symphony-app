@@ -94,6 +94,67 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     /(?:first|second|third|lastly|finally|moreover|additionally)/i
   ];
   
+  // Extract time range information
+  const getTimeRange = (query: string): { timeframeType: string | null, startDate: Date | null, endDate: Date | null } => {
+    const lowerQuery = query.toLowerCase();
+    const now = new Date();
+    
+    if (lowerQuery.includes('last month') || lowerQuery.includes('previous month')) {
+      const lastMonth = new Date(now);
+      lastMonth.setMonth(lastMonth.getMonth() - 1);
+      const startDate = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+      const endDate = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
+      return { timeframeType: 'month', startDate, endDate };
+    } 
+    else if (lowerQuery.includes('this month') || lowerQuery.includes('current month')) {
+      const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return { timeframeType: 'month', startDate, endDate };
+    }
+    else if (lowerQuery.includes('last week') || lowerQuery.includes('previous week')) {
+      const lastWeek = new Date(now);
+      lastWeek.setDate(lastWeek.getDate() - 7);
+      const dayOfWeek = lastWeek.getDay(); // 0 is Sunday, 6 is Saturday
+      const startDate = new Date(lastWeek);
+      startDate.setDate(lastWeek.getDate() - dayOfWeek);
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      return { timeframeType: 'week', startDate, endDate };
+    }
+    else if (lowerQuery.includes('this week') || lowerQuery.includes('current week')) {
+      const dayOfWeek = now.getDay();
+      const startDate = new Date(now);
+      startDate.setDate(now.getDate() - dayOfWeek);
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      return { timeframeType: 'week', startDate, endDate };
+    }
+    else if (lowerQuery.includes('yesterday')) {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      const endDate = new Date(yesterday);
+      endDate.setHours(23, 59, 59, 999);
+      return { timeframeType: 'day', startDate: yesterday, endDate };
+    }
+    else if (lowerQuery.includes('today')) {
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+      const endDate = new Date(now);
+      endDate.setHours(23, 59, 59, 999);
+      return { timeframeType: 'day', startDate: today, endDate };
+    }
+    else if (lowerQuery.includes('last year') || lowerQuery.includes('previous year')) {
+      const lastYear = now.getFullYear() - 1;
+      const startDate = new Date(lastYear, 0, 1);
+      const endDate = new Date(lastYear, 11, 31);
+      return { timeframeType: 'year', startDate, endDate };
+    }
+    
+    // Default to null if no specific timeframe is detected
+    return { timeframeType: null, startDate: null, endDate: null };
+  };
+  
   // Create dynamic pattern for each emotion word
   const hasEmotionQuantification = emotionWords.some(emotion => {
     const pattern = new RegExp(emotionQuantificationPattern.source.replace('emotionWord', emotion), 'i');
@@ -150,6 +211,9 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
                            hasWhyEmotionsPattern || 
                            (isComplexQuery && !hasTopEmotionsPattern);
   
+  // Extract time range
+  const timeRange = getTimeRange(query);
+  
   return {
     isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification || hasHappinessRating,
     
@@ -184,6 +248,14 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     
     asksForNumber: hasNumbers || hasTopEmotionsPattern || hasHappinessRating || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
     
-    needsVectorSearch: needsVectorSearch
+    needsVectorSearch: needsVectorSearch,
+    
+    hasWhyEmotionsPattern,
+    
+    timeRange: {
+      type: timeRange.timeframeType,
+      startDate: timeRange.startDate ? timeRange.startDate.toISOString() : null,
+      endDate: timeRange.endDate ? timeRange.endDate.toISOString() : null
+    }
   };
 };

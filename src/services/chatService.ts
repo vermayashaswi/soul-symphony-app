@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ChatMessage {
@@ -19,6 +20,22 @@ export const processChatMessage = async (
     console.log("Processing chat message with enhanced query breakdown approach");
     console.log("Query types detected:", JSON.stringify(queryTypes));
     console.log("Thread ID:", threadId || "new thread");
+    
+    // Handle top emotions queries directly with the database function if possible
+    if (queryTypes.hasTopEmotionsPattern && !queryTypes.isComplexQuery) {
+      try {
+        console.log("Detected top emotions query, attempting direct database function");
+        const result = await processTopEmotionsQuery(userMessage, userId, queryTypes);
+        if (result && !result.error) {
+          console.log("Successfully processed top emotions query with database function");
+          return result;
+        }
+        console.log("Direct processing failed, falling back to query breakdown");
+      } catch (topEmotionsError) {
+        console.error("Error in top emotions direct processing:", topEmotionsError);
+        // Continue with regular processing on error
+      }
+    }
     
     // Check if this is a query that specifically needs GPT-based breakdown
     const needsGptBreakdown = 
@@ -75,6 +92,112 @@ export const processChatMessage = async (
   }
 };
 
+// Process top emotions queries directly using the database function
+async function processTopEmotionsQuery(
+  userMessage: string,
+  userId: string,
+  queryTypes: Record<string, boolean>
+): Promise<ChatMessage | null> {
+  try {
+    // Extract the number of top emotions requested
+    const numRegex = /\b(one|two|three|four|five|\d+)\b/i;
+    const numMatch = userMessage.match(numRegex);
+    let limit = 3; // Default
+    
+    if (numMatch) {
+      const numStr = numMatch[1].toLowerCase();
+      switch (numStr) {
+        case 'one': limit = 1; break;
+        case 'two': limit = 2; break;
+        case 'three': limit = 3; break;
+        case 'four': limit = 4; break;
+        case 'five': limit = 5; break;
+        default: {
+          const parsed = parseInt(numStr);
+          if (!isNaN(parsed) && parsed > 0) {
+            limit = Math.min(parsed, 10); // Cap at 10
+          }
+        }
+      }
+    }
+    
+    // Extract time range info
+    let startDate = null;
+    let endDate = null;
+    
+    if (queryTypes.timeRange && queryTypes.timeRange.type) {
+      startDate = queryTypes.timeRange.startDate;
+      endDate = queryTypes.timeRange.endDate;
+    }
+    
+    console.log(`Fetching top ${limit} emotions with date range: ${startDate} to ${endDate}`);
+    
+    // Call database function to get top emotions
+    const { data, error } = await supabase.rpc('get_top_emotions', {
+      user_id_param: userId,
+      start_date: startDate,
+      end_date: endDate,
+      limit_count: limit
+    });
+    
+    if (error) {
+      console.error("Error fetching top emotions:", error);
+      return null;
+    }
+    
+    if (!data || data.length === 0) {
+      console.log("No emotion data found");
+      return null;
+    }
+    
+    console.log("Retrieved top emotions:", data);
+    
+    // Generate a response from the emotion data
+    let response = "";
+    const timeContext = getTimeContextText(queryTypes.timeRange?.type);
+    
+    if (data.length === 1) {
+      response = `${timeContext}, your dominant emotion was ${data[0].emotion} with an intensity score of ${data[0].score}. `;
+    } else {
+      response = `${timeContext}, your top ${data.length} emotions were:\n\n`;
+      data.forEach((item, idx) => {
+        response += `${idx + 1}. ${item.emotion} (intensity: ${item.score})\n`;
+      });
+      
+      // Add a bit of analysis
+      response += `\nIt appears that ${data[0].emotion} was your strongest emotion during this period. `;
+    }
+    
+    // Add a follow-up suggestion
+    response += `\nWould you like to explore what might have triggered these emotions or see how they've changed over time?`;
+    
+    return {
+      role: 'assistant',
+      content: response,
+      hasNumericResult: true,
+      diagnostics: {
+        directQueryResult: true,
+        emotions: data,
+        timeRange: queryTypes.timeRange
+      }
+    };
+  } catch (error) {
+    console.error("Error processing top emotions query:", error);
+    return null;
+  }
+}
+
+// Helper to get time context text
+function getTimeContextText(timeType: string | undefined | null): string {
+  switch (timeType) {
+    case 'day': return 'Today';
+    case 'week': return 'This week';
+    case 'month': return 'This month';
+    case 'year': return 'This year';
+    default: return 'Based on your journal entries';
+  }
+}
+
 // New function for processing queries with GPT-based breakdown
 async function processWithQueryBreakdown(
   userMessage: string,
@@ -93,7 +216,8 @@ async function processWithQueryBreakdown(
         includeDiagnostics: true,
         enableQueryBreakdown: true,   // Enable detailed query breakdown
         generateSqlQueries: true,     // Generate SQL queries where applicable
-        analyzeComponents: true       // Analyze query components separately
+        analyzeComponents: true,      // Analyze query components separately
+        timeRange: queryTypes.timeRange // Pass the time range information
       }
     });
     
@@ -143,6 +267,7 @@ async function useComprehensiveRagPipeline(
       includeDiagnostics: true,
       enableQueryBreakdown: true,        // Enable query breakdown
       analyzeSeparateComponents: true,   // Analyze components separately
+      timeRange: queryTypes.timeRange,   // Pass time range info
       queryTypes: {
         ...queryTypes,
         // Enhanced query types for better classification
