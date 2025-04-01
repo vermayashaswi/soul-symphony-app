@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isChunkingSupported } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { Json } from '@/integrations/supabase/types';
 
@@ -11,12 +11,34 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
   const [fetchCount, setFetchCount] = useState(0);
   const [lastRefreshKey, setLastRefreshKey] = useState(refreshKey);
+  const [isChunkingEnabled, setIsChunkingEnabled] = useState(false);
   
   const isFetchingRef = useRef(false);
   const initialFetchDoneRef = useRef(false);
 
+  // Check if chunking is supported
+  useEffect(() => {
+    async function checkChunkingSupport() {
+      try {
+        const chunking = await isChunkingSupported();
+        console.log(`Chunking support detected: ${chunking}`);
+        setIsChunkingEnabled(chunking);
+      } catch (error) {
+        console.error("Error checking chunking support:", error);
+        setIsChunkingEnabled(false);
+      }
+    }
+    
+    checkChunkingSupport();
+  }, []);
+
   // Process an entry for chunking and embedding
   const processJournalEntry = useCallback(async (entryId: number) => {
+    if (!isChunkingEnabled) {
+      console.log(`Chunking not enabled, skipping processing for entry ${entryId}`);
+      return false;
+    }
+    
     try {
       console.log(`Processing journal entry ${entryId} for chunking`);
       const { data, error } = await supabase.functions.invoke('process-journal', {
@@ -34,7 +56,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.error('Error invoking process-journal function:', error);
       return false;
     }
-  }, []);
+  }, [isChunkingEnabled]);
 
   const fetchEntries = useCallback(async () => {
     if (!userId) {
@@ -78,19 +100,21 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           created: data[0].created_at
         });
         
-        // Process entries that haven't been chunked yet
-        const unchunkedEntries = data.filter(entry => !entry.is_chunked && (entry["refined text"] || entry["transcription text"]));
-        if (unchunkedEntries.length > 0) {
-          console.log(`[useJournalEntries] Found ${unchunkedEntries.length} entries that need processing`);
-          
-          // Process up to 3 entries at a time to avoid overloading
-          const entriesToProcess = unchunkedEntries.slice(0, 3);
-          for (const entry of entriesToProcess) {
-            await processJournalEntry(entry.id);
-          }
-          
-          if (unchunkedEntries.length > 3) {
-            console.log(`[useJournalEntries] Queued ${unchunkedEntries.length - 3} more entries for future processing`);
+        if (isChunkingEnabled) {
+          // Process entries that haven't been chunked yet
+          const unchunkedEntries = data.filter(entry => !entry.is_chunked && (entry["refined text"] || entry["transcription text"]));
+          if (unchunkedEntries.length > 0) {
+            console.log(`[useJournalEntries] Found ${unchunkedEntries.length} entries that need processing`);
+            
+            // Process up to 3 entries at a time to avoid overloading
+            const entriesToProcess = unchunkedEntries.slice(0, 3);
+            for (const entry of entriesToProcess) {
+              await processJournalEntry(entry.id);
+            }
+            
+            if (unchunkedEntries.length > 3) {
+              console.log(`[useJournalEntries] Queued ${unchunkedEntries.length - 3} more entries for future processing`);
+            }
           }
         }
       } else {
@@ -125,7 +149,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [userId, fetchCount, processJournalEntry]);
+  }, [userId, fetchCount, processJournalEntry, isChunkingEnabled]);
 
   useEffect(() => {
     if (userId && isProfileChecked) {
@@ -151,6 +175,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     fetchEntries,
     lastFetchTime,
     fetchCount,
-    processJournalEntry
+    processJournalEntry,
+    isChunkingEnabled
   };
 }

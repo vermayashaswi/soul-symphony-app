@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/utils/format-time';
-import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, ChevronDown, ChevronUp, Layers } from 'lucide-react';
 import ThemeBoxes from './ThemeBoxes';
 import { 
   Dialog, 
@@ -33,6 +33,8 @@ export interface JournalEntry {
     type: string;
   }[];
   foreignKey?: string;
+  isChunked?: boolean;
+  chunksCount?: number;
 }
 
 interface JournalEntryCardProps {
@@ -108,6 +110,12 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
           <p className="text-xs md:text-sm text-muted-foreground">
             {formattedSentiment()}
           </p>
+          {entry.isChunked && (
+            <div className="flex items-center mt-1 text-xs text-muted-foreground">
+              <Layers className="h-3 w-3 mr-1" />
+              <span>{entry.chunksCount} chunks</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center space-x-1 md:space-x-2">
