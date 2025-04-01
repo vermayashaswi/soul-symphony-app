@@ -67,7 +67,8 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       
       console.log(`Fetching entries for ${timeRange}:`, {
         startDate: startDate.toISOString(),
-        endDate: endDate.toISOString()
+        endDate: endDate.toISOString(),
+        userId
       });
 
       // Fetch journal entries for the specified time range

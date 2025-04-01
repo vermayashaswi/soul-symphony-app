@@ -54,7 +54,7 @@ export function Navbar() {
     { path: '/', label: 'Home', icon: Home },
     { path: '/journal', label: 'Journal', icon: Home },
     { path: '/insights', label: 'Insights', icon: BarChart2 },
-    { path: '/smart-chat', label: 'AI Assistant', icon: MessageCircle }, // Changed from /chat to /smart-chat
+    { path: '/smart-chat', label: 'AI Assistant', icon: MessageCircle }, // Using /smart-chat path for AI Assistant
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
