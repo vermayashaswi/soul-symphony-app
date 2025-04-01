@@ -26,6 +26,16 @@
     min-height: 100vh !important;  
   }
   
+  /* Make the chat interface cleaner with less empty space */
+  .mobile-chat-interface {
+    margin-bottom: 0 !important;
+  }
+  
+  /* Reduce padding in mobile chat footer */
+  .smart-chat-interface CardFooter {
+    padding-bottom: 0.5rem !important;
+  }
+  
   /* Increase touch targets */
   .mobile-chat-interface button {
     min-height: 40px;

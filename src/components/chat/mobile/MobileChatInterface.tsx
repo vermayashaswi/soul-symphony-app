@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -25,12 +26,13 @@ export default function MobileChatInterface({
   onCreateNewThread,
   userId
 }: MobileChatInterfaceProps) {
+  // Ensure all hooks are called at the top level consistently
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
     if (propThreadId) {
@@ -251,7 +253,11 @@ export default function MobileChatInterface({
       </div>
       
       <div className="border-t p-2">
-        <MobileChatInput onSendMessage={handleSendMessage} isLoading={loading} />
+        <MobileChatInput 
+          onSendMessage={handleSendMessage} 
+          isLoading={loading} 
+          userId={userId || user?.id}
+        />
       </div>
     </div>
   );

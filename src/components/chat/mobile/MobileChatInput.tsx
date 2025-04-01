@@ -19,6 +19,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
   isLoading,
   userId
 }) => {
+  // Ensure all hooks are called at the top level, before any conditional logic
   const [message, setMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);

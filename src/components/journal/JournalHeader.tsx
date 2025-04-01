@@ -7,6 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import SouloLogo from '@/components/SouloLogo';
 
 const JournalHeader = () => {
+  // Always call hooks at the top level
   const { user } = useAuth();
   const isMobile = useIsMobile();
   
