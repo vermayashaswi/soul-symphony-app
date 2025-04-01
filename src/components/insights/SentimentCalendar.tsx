@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Smile, Meh, Frown, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -35,9 +34,7 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
         }
         
         // Extract score from the sentiment object
-        const sentimentScore = typeof entry.sentiment === 'string' 
-          ? parseFloat(entry.sentiment) 
-          : entry.sentiment.score;
+        const sentimentScore = getSentimentValue(entry.sentiment);
         
         data[dateStr].avgScore = (data[dateStr].avgScore * data[dateStr].count + sentimentScore) / (data[dateStr].count + 1);
         data[dateStr].count += 1;
@@ -348,9 +345,7 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
       entriesInMonth.forEach(entry => {
         if (entry.sentiment) {
           // Extract sentiment score, handling both string and object formats
-          const score = typeof entry.sentiment === 'string' 
-            ? parseFloat(entry.sentiment) 
-            : entry.sentiment.score;
+          const score = getSentimentValue(entry.sentiment);
           
           if (!isNaN(score)) {
             totalSentiment += score;
