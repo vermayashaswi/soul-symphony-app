@@ -239,7 +239,7 @@ export default function MobileChatInterface({
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3">
         {messages.length === 0 ? (
-          <div className="flex flex-col justify-center items-center h-full text-center">
+          <div className="flex flex-col justify-center items-center h-full text-center px-4 py-6">
             <h3 className="text-xl font-medium mb-2">How can I help you?</h3>
             <p className="text-muted-foreground text-sm mb-4 px-4">
               Ask me anything about your mental well-being and journal entries

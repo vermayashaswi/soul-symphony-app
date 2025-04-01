@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
@@ -45,7 +44,6 @@ export default function SmartChatInterface() {
   useEffect(() => {
     scrollToBottom();
     
-    // This effect will run when the currentThreadId changes
     if (currentThreadId) {
       loadThreadMessages(currentThreadId);
     }
@@ -231,9 +229,9 @@ export default function SmartChatInterface() {
       
       <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
         {chatHistory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="text-center max-w-lg mx-auto">
-              <h1 className="text-3xl font-bold mb-3">How can I help you?</h1>
+          <div className="flex flex-col items-center justify-center h-full w-full">
+            <div className="text-center max-w-lg mx-auto px-4">
+              <h1 className="text-2xl md:text-3xl font-bold mb-3">How can I help you?</h1>
               <p className="text-muted-foreground mb-6">
                 Hey, I am Roha, your personal AI assistant. You can ask me anything about your mental well-being and I will answer your queries basis your own journal insights.
               </p>
@@ -243,7 +241,7 @@ export default function SmartChatInterface() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="grid grid-cols-2 gap-3 max-w-md mx-auto"
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto"
                 >
                   {demoQuestions.map((question, index) => (
                     <Button
