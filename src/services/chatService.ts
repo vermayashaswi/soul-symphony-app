@@ -21,6 +21,24 @@ export const processChatMessage = async (
     console.log("Query types detected:", JSON.stringify(queryTypes));
     console.log("Thread ID:", threadId || "new thread");
     
+    // First check if this is a top emotions query or similar aggregation query
+    const isTopEmotionsQuery = 
+      queryTypes.hasTopEmotionsPattern || 
+      /top\s+\d*\s+emotions/i.test(userMessage) ||
+      /what\s+(were|are)\s+(my|the)\s+(top|main|primary|dominant)\s+emotions/i.test(userMessage);
+    
+    const isComplexEmotionQuery = 
+      (queryTypes.isEmotionFocused && queryTypes.needsContext) ||
+      (queryTypes.isEmotionFocused && queryTypes.hasWhyEmotionsPattern) ||
+      (queryTypes.isQuantitative && queryTypes.isEmotionFocused);
+    
+    // If it's clearly a top emotions query or complex emotion query, skip the smart-query-planner
+    // and go straight to the comprehensive RAG pipeline
+    if (isTopEmotionsQuery || isComplexEmotionQuery) {
+      console.log("Detected top emotions query or complex emotion query, using comprehensive RAG pipeline directly");
+      return await useComprehensiveRagPipeline(userMessage, userId, queryTypes, threadId);
+    }
+    
     // Step 1: First try with smart-query-planner to analyze and break down the query
     try {
       console.log("Step 1: Performing comprehensive query analysis and planning");
@@ -54,7 +72,8 @@ export const processChatMessage = async (
       
       const isTopEmotionsQuery = 
         /top\s+\d+\s+(positive|negative|intense|strong|happy|sad)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage) ||
-        /(most|least)\s+(common|frequent|intense|strong)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage);
+        /(most|least)\s+(common|frequent|intense|strong)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage) ||
+        /what\s+(were|are)\s+(my|the)\s+(top|main|primary|dominant)\s+emotions/i.test(userMessage);
       
       const isEmotionRankingQuery =
         /rank\s+(my|the)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage) ||
@@ -79,7 +98,7 @@ export const processChatMessage = async (
           isComplexQuery ||
           queryTypes.needsDataAggregation) {
         console.log("Planning indicated need for comprehensive RAG pipeline with component analysis...");
-        throw new Error("Trigger RAG fallback with component analysis");
+        return await useComprehensiveRagPipeline(userMessage, userId, queryTypes, threadId);
       }
       
       return { 
@@ -91,51 +110,62 @@ export const processChatMessage = async (
       
     } catch (smartQueryError) {
       console.error("Smart query planner failed or indicated need for comprehensive analysis:", smartQueryError);
-      
-      // Step 4: Multi-strategy RAG pipeline with component breakdown
-      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-        body: {
-          message: userMessage,
-          userId,
-          threadId: threadId,
-          isNewThread: !threadId,
-          includeDiagnostics: true,
-          enableQueryBreakdown: true, // Signal to break down the query into components
-          analyzeSeparateComponents: true, // Analyze each component separately
-          queryTypes: {
-            ...queryTypes,
-            // Enhance query types with more detailed classification
-            isHappinessQuery: /happiness|happy|joy|joyful|content|satisfaction/i.test(userMessage),
-            isTopEmotionsQuery: /top\s+\d+\s+(positive|negative|intense|strong|happy|sad)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage),
-            isEmotionRankingQuery: /rank\s+(my|the)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage),
-            isEmotionChangeQuery: /how\s+(have|has|did)\s+(my|the)\s+(emotion|emotions|feeling|feelings)\s+(change|evolve|develop|progress)/i.test(userMessage),
-            isQuantitativeTimeQuery: queryTypes.isQuantitative && queryTypes.isTemporal,
-            requiresEmotionAggregation: queryTypes.isEmotionFocused && queryTypes.isQuantitative,
-            isComplexQuery: userMessage.split(' ').length > 10 && 
-              (userMessage.includes('and') || userMessage.includes('or') || 
-               userMessage.includes('but') || userMessage.includes('while'))
-          }
-        }
-      });
-      
-      if (error) {
-        console.error("Error in comprehensive RAG pipeline:", error);
-        throw error;
-      }
-      
-      console.log("RAG pipeline produced response with references:", data.references ? data.references.length : 0);
-      
-      return { 
-        role: 'assistant', 
-        content: data.response, 
-        analysis: data.analysis,
-        references: data.references,
-        diagnostics: data.diagnostics,
-        hasNumericResult: data.hasNumericResult
-      };
+      return await useComprehensiveRagPipeline(userMessage, userId, queryTypes, threadId);
     }
   } catch (error) {
     console.error("Error processing chat message:", error);
     throw error;
   }
 };
+
+// Helper function to use the comprehensive RAG pipeline
+async function useComprehensiveRagPipeline(
+  userMessage: string, 
+  userId: string, 
+  queryTypes: Record<string, boolean>, 
+  threadId?: string | null
+): Promise<ChatMessage> {
+  // Step 4: Multi-strategy RAG pipeline with component breakdown
+  const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+    body: {
+      message: userMessage,
+      userId,
+      threadId: threadId,
+      isNewThread: !threadId,
+      includeDiagnostics: true,
+      enableQueryBreakdown: true, // Signal to break down the query into components
+      analyzeSeparateComponents: true, // Analyze each component separately
+      queryTypes: {
+        ...queryTypes,
+        // Enhance query types with more detailed classification
+        isHappinessQuery: /happiness|happy|joy|joyful|content|satisfaction/i.test(userMessage),
+        isTopEmotionsQuery: /top\s+\d*\s+(positive|negative|intense|strong|happy|sad)?\s*(emotion|emotions|feeling|feelings)/i.test(userMessage) || 
+                           /what\s+(were|are)\s+(my|the)\s+(top|main|primary|dominant)\s+emotions/i.test(userMessage),
+        isEmotionRankingQuery: /rank\s+(my|the)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage),
+        isEmotionChangeQuery: /how\s+(have|has|did)\s+(my|the)\s+(emotion|emotions|feeling|feelings)\s+(change|evolve|develop|progress)/i.test(userMessage),
+        isQuantitativeTimeQuery: queryTypes.isQuantitative && queryTypes.isTemporal,
+        requiresEmotionAggregation: queryTypes.isEmotionFocused && queryTypes.isQuantitative,
+        forceRagPipeline: true,
+        isComplexQuery: userMessage.split(' ').length > 10 && 
+          (userMessage.includes('and') || userMessage.includes('or') || 
+           userMessage.includes('but') || userMessage.includes('while'))
+      }
+    }
+  });
+  
+  if (error) {
+    console.error("Error in comprehensive RAG pipeline:", error);
+    throw error;
+  }
+  
+  console.log("RAG pipeline produced response with references:", data.references ? data.references.length : 0);
+  
+  return { 
+    role: 'assistant', 
+    content: data.response, 
+    analysis: data.analysis,
+    references: data.references,
+    diagnostics: data.diagnostics,
+    hasNumericResult: data.hasNumericResult
+  };
+}

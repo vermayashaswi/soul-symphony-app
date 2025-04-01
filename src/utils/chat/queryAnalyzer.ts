@@ -47,7 +47,10 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
   ];
   
   // Enhanced pattern detection for top emotions
-  const topEmotionsPattern = /(?:top|most|main|primary|strongest|highest|dominant)\s+(?:\d+|few|several)\s+(?:positive|negative|intense|strong)?\s*(?:emotion|emotions|feeling|feelings)/i;
+  const topEmotionsPattern = /(?:top|most|main|primary|strongest|highest|dominant)\s+(?:\d+|few|several)?\s*(?:positive|negative|intense|strong)?\s*(?:emotion|emotions|feeling|feelings)/i;
+  
+  // More lenient pattern that just detects "top emotions" or similar phrases
+  const simpleTopEmotionsPattern = /(?:top|main|primary|most)\s+(?:emotion|emotions|feeling|feelings)/i;
   
   // Enhanced pattern detection for emotion ranking
   const emotionRankingPattern = /(?:rank|ranking|order|sort)\s+(?:of|my|the)?\s*(?:emotion|emotions|feeling|feelings)/i;
@@ -66,6 +69,9 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
   
   // New pattern for explicit happiness rating questions like "how much would you rate my happiness out of 100"
   const explicitHappinessRatingPattern = /(?:how|what).*(?:rate|score).*(?:happiness|joy|content|satisfaction).*(?:out of|from|between).*\d+/i;
+  
+  // New pattern for why questions about emotions
+  const whyEmotionsPattern = /(?:why|reason|cause|what made).*(?:feel|emotion|mood)/i;
   
   // Detect complex multi-part queries that should be broken down
   const complexQueryPatterns = [
@@ -116,10 +122,11 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     new RegExp(`\\b${word}\\b`).test(lowerQuery)
   );
   
-  const hasTopEmotionsPattern = topEmotionsPattern.test(lowerQuery);
+  const hasTopEmotionsPattern = topEmotionsPattern.test(lowerQuery) || simpleTopEmotionsPattern.test(lowerQuery);
   const hasEmotionRankingPattern = emotionRankingPattern.test(lowerQuery);
   const hasEmotionChangePattern = emotionChangePattern.test(lowerQuery);
   const isWhenQuestion = whenQuestionPattern.test(lowerQuery);
+  const hasWhyEmotionsPattern = whyEmotionsPattern.test(lowerQuery);
   
   const needsContext = /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b|\bmeaning\b|\binterpret\b/.test(lowerQuery);
   
@@ -135,6 +142,7 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
                               hasEmotionChangePattern ||
                               hasHappinessRating ||
                               isComplexQuery ||
+                              (hasEmotionWords && hasWhyEmotionsPattern) ||
                               (hasEmotionWords && (hasQuantitativeWords || hasNumbers || hasComparativeWords));
   
   return {
@@ -166,11 +174,13 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     
     hasExplicitHappinessRating: explicitHappinessRatingPattern.test(lowerQuery),
     
-    requiresComponentAnalysis: isComplexQuery || hasHappinessRating || hasTopEmotionsPattern || 
+    requiresComponentAnalysis: isComplexQuery || hasHappinessRating || hasTopEmotionsPattern || hasWhyEmotionsPattern || 
                                (hasTemporalWords && hasEmotionWords && hasQuantitativeWords),
     
     asksForNumber: hasNumbers || hasTopEmotionsPattern || hasHappinessRating || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
     
-    needsVectorSearch: true
+    needsVectorSearch: true,
+    
+    hasWhyEmotionsPattern
   };
 };
