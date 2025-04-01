@@ -171,7 +171,20 @@ export default function SmartChatInterface() {
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
     setShowSuggestions(false);
-    setProcessingStage("Analyzing your question...");
+    
+    // Analyze the query to provide more specific processing stages
+    const queryTypes = analyzeQueryTypes(userMessage);
+    
+    // Set initial processing stage based on query analysis
+    if (queryTypes.isQuantitative && queryTypes.isEmotionFocused) {
+      setProcessingStage("Analyzing your emotions and calculating results...");
+    } else if (queryTypes.isWhyQuestion) {
+      setProcessingStage("Analyzing your question and looking for explanations...");
+    } else if (queryTypes.isEmotionFocused) {
+      setProcessingStage("Analyzing emotion patterns in your journal...");
+    } else {
+      setProcessingStage("Analyzing your question...");
+    }
     
     try {
       const { error: msgError } = await supabase
@@ -185,8 +198,14 @@ export default function SmartChatInterface() {
       if (msgError) throw msgError;
       
       console.log("Desktop: Performing comprehensive query analysis");
-      setProcessingStage("Analyzing patterns in your journal...");
-      const queryTypes = analyzeQueryTypes(userMessage);
+      
+      // Update processing stage based on query progress
+      if (queryTypes.needsDataAggregation) {
+        setProcessingStage("Aggregating data from your journal entries...");
+      } else if (queryTypes.needsVectorSearch) {
+        setProcessingStage("Searching for related entries in your journal...");
+      }
+      
       console.log("Desktop: Query analysis result:", queryTypes);
       
       setProcessingStage("Searching for insights...");

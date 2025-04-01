@@ -35,7 +35,8 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     'positive', 'negative', 'neutral', 'depressed', 'ecstatic', 'elated',
     'miserable', 'cheerful', 'gloomy', 'tense', 'relaxed', 'irritated',
     'pleased', 'annoyed', 'fulfilled', 'empty', 'overwhelmed', 'satisfaction',
-    'dissatisfaction', 'delight', 'displeasure', 'anguish', 'bliss', 'happiness'
+    'dissatisfaction', 'delight', 'displeasure', 'anguish', 'bliss', 'happiness',
+    'jovial', 'delighted', 'upbeat', 'jovial', 'merry', 'cheerful'
   ];
   
   // Better detection of numbers and counts in queries
@@ -61,6 +62,9 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   
   // Enhanced detection for "when" questions that need temporal context
   const whenQuestionPattern = /\b(?:when|what time|which day|which month|which week|during what|during which)\b/i;
+  
+  // Enhanced detection for "why" questions about emotions
+  const whyQuestionPattern = /\b(?:why|how come|reason|cause|what caused|what made|explain why)\b/i;
   
   // Check for specific emotion quantification patterns
   const emotionQuantificationPattern = /(?:how|what)\s+(?:much|level|degree|extent|intensity|amount)\s+(?:of|did|do|does|is|am|are|was|were)\s+(?:i|me|my|himself|herself|yourself|they|we|us|you)?\s*(?:feel|feeling|felt|experience|experienced|have|having|had|get|getting|got)\s+(?:a|an)?\s*(?:emotionWord)/i;
@@ -188,6 +192,7 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   const hasEmotionRankingPattern = emotionRankingPattern.test(lowerQuery);
   const hasEmotionChangePattern = emotionChangePattern.test(lowerQuery);
   const isWhenQuestion = whenQuestionPattern.test(lowerQuery);
+  const isWhyQuestion = whyQuestionPattern.test(lowerQuery);
   const hasWhyEmotionsPattern = whyEmotionsPattern.test(lowerQuery);
   
   const needsContext = /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b|\bmeaning\b|\binterpret\b/.test(lowerQuery);
@@ -209,6 +214,7 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   
   // Determine if vector search is needed
   const needsVectorSearch = needsContext || 
+                           isWhyQuestion ||
                            hasWhyEmotionsPattern || 
                            (isComplexQuery && !hasTopEmotionsPattern);
   
@@ -235,6 +241,8 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     hasHappinessRating,
     
     isWhenQuestion,
+    
+    isWhyQuestion,
     
     needsContext,
     

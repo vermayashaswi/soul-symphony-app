@@ -8,6 +8,7 @@ export interface ChatMessage {
   references?: any[];
   hasNumericResult?: boolean;
   analysis?: any;
+  diagnostics?: any;
 }
 
 export async function processChatMessage(
@@ -46,7 +47,8 @@ export async function processChatMessage(
             enableQueryBreakdown: true,
             generateSqlQueries: true,
             analyzeComponents: true,
-            allowRetry: true // Add flag to indicate retries are allowed
+            allowRetry: true, // Add flag to indicate retries are allowed
+            requiresExplanation: messageQueryTypes.needsContext || message.toLowerCase().includes('why')
           }
         });
         
@@ -94,7 +96,9 @@ export async function processChatMessage(
           userId,
           threadId,
           includeDiagnostics: true,
-          timeRange
+          timeRange,
+          isComplexQuery: messageQueryTypes.isComplexQuery || message.toLowerCase().includes('why'),
+          requiresEmotionAnalysis: messageQueryTypes.isEmotionFocused
         }
       });
       
