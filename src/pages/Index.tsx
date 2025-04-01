@@ -25,6 +25,14 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile || mobileDemo;
 
+  const navigateToFeature = (path: string) => {
+    if (!user && path !== '/') {
+      navigate(`/auth?redirectTo=${path}`);
+    } else {
+      navigate(path);
+    }
+  };
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -356,7 +364,7 @@ const Index = () => {
       <Navbar />
       
       <motion.main
-        className={`flex-1 container mx-auto px-4 py-8 pt-24 relative z-10 ${shouldRenderMobile ? 'max-w-md' : ''}`}
+        className={`flex-1 container mx-auto px-4 py-8 pt-24 relative z-10 ${shouldRenderMobile ? 'max-w-md' : ''} ${shouldRenderMobile ? 'pb-16' : ''}`}
         initial="hidden"
         animate="visible"
         variants={containerVariants}

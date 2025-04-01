@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,6 +18,8 @@ import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
 import "./styles/mobile.css";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
+import MobileNavbar from "./components/mobile/MobileNavbar";
+import { useIsMobile } from "./hooks/use-mobile";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +67,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
+  const isMobile = useIsMobile();
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  const shouldShowMobileNav = isMobile || mobileDemo;
+
   useEffect(() => {
     const setCorrectViewport = () => {
       const metaViewport = document.querySelector('meta[name="viewport"]');
@@ -99,55 +105,59 @@ const AppRoutes = () => {
   }, []);
   
   return (
-    <Routes>
-      <Route path="/" element={
-        <MobilePreviewWrapper>
-          <Index />
-        </MobilePreviewWrapper>
-      } />
-      <Route path="/auth" element={
-        <MobilePreviewWrapper>
-          <Auth />
-        </MobilePreviewWrapper>
-      } />
-      <Route path="/journal" element={
-        <MobilePreviewWrapper>
-          <ProtectedRoute>
-            <Journal />
-          </ProtectedRoute>
-        </MobilePreviewWrapper>
-      } />
-      <Route path="/insights" element={
-        <MobilePreviewWrapper>
-          <ProtectedRoute>
-            <Insights />
-          </ProtectedRoute>
-        </MobilePreviewWrapper>
-      } />
-      {/* Redirect /chat to /smart-chat for all devices */}
-      <Route path="/chat" element={
-        <Navigate to="/smart-chat" replace />
-      } />
-      <Route path="/smart-chat" element={
-        <MobilePreviewWrapper>
-          <ProtectedRoute>
-            <SmartChat />
-          </ProtectedRoute>
-        </MobilePreviewWrapper>
-      } />
-      <Route path="/settings" element={
-        <MobilePreviewWrapper>
-          <ProtectedRoute>
-            <Settings />
-          </ProtectedRoute>
-        </MobilePreviewWrapper>
-      } />
-      <Route path="*" element={
-        <MobilePreviewWrapper>
-          <NotFound />
-        </MobilePreviewWrapper>
-      } />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={
+          <MobilePreviewWrapper>
+            <Index />
+          </MobilePreviewWrapper>
+        } />
+        <Route path="/auth" element={
+          <MobilePreviewWrapper>
+            <Auth />
+          </MobilePreviewWrapper>
+        } />
+        <Route path="/journal" element={
+          <MobilePreviewWrapper>
+            <ProtectedRoute>
+              <Journal />
+            </ProtectedRoute>
+          </MobilePreviewWrapper>
+        } />
+        <Route path="/insights" element={
+          <MobilePreviewWrapper>
+            <ProtectedRoute>
+              <Insights />
+            </ProtectedRoute>
+          </MobilePreviewWrapper>
+        } />
+        {/* Redirect /chat to /smart-chat for all devices */}
+        <Route path="/chat" element={
+          <Navigate to="/smart-chat" replace />
+        } />
+        <Route path="/smart-chat" element={
+          <MobilePreviewWrapper>
+            <ProtectedRoute>
+              <SmartChat />
+            </ProtectedRoute>
+          </MobilePreviewWrapper>
+        } />
+        <Route path="/settings" element={
+          <MobilePreviewWrapper>
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          </MobilePreviewWrapper>
+        } />
+        <Route path="*" element={
+          <MobilePreviewWrapper>
+            <NotFound />
+          </MobilePreviewWrapper>
+        } />
+      </Routes>
+
+      {shouldShowMobileNav && <MobileNavbar />}
+    </>
   );
 };
 
