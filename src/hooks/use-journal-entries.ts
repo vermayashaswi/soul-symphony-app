@@ -78,7 +78,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       const { data, error, status } = await supabase
         .from('Journal Entries')
-        .select('*')
+        .select('*, is_chunked, chunks_count')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       
@@ -102,7 +102,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         
         if (isChunkingEnabled) {
           // Process entries that haven't been chunked yet
-          const unchunkedEntries = data.filter(entry => !entry.is_chunked && (entry["refined text"] || entry["transcription text"]));
+          const unchunkedEntries = data.filter(entry => entry.is_chunked === false && (entry["refined text"] || entry["transcription text"]));
           if (unchunkedEntries.length > 0) {
             console.log(`[useJournalEntries] Found ${unchunkedEntries.length} entries that need processing`);
             

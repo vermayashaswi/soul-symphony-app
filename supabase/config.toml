@@ -54,9 +54,6 @@ enabled = false
 port = 54327
 vector_port = 54328
 
-[experimental]
-multitenancy = false
-
 # New functions
 [functions]
 [functions.chat-with-rag]
