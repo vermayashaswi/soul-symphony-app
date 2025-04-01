@@ -57,10 +57,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) {
-    // Ensure mobile parameter is preserved in the redirect URL
     const url = new URL(`/auth`, window.location.origin);
     url.searchParams.set('redirectTo', location.pathname);
-    url.searchParams.set('mobileDemo', 'true');
     
     console.log("Redirecting to auth from protected route:", location.pathname);
     return <Navigate to={url.pathname + url.search} replace />;
@@ -95,13 +93,6 @@ const AppRoutes = () => {
     
     setCorrectViewport();
     setTimeout(setCorrectViewport, 100);
-    
-    // Set initial URL parameters for mobile if not already present
-    if (!window.location.search.includes('mobileDemo=true')) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('mobileDemo', 'true');
-      window.history.replaceState({}, document.title, url.toString());
-    }
     
     console.log("Setting up Supabase auth debugging listener");
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -141,7 +132,7 @@ const AppRoutes = () => {
           </MobilePreviewWrapper>
         } />
         <Route path="/chat" element={
-          <Navigate to="/smart-chat?mobileDemo=true" replace />
+          <Navigate to="/smart-chat" replace />
         } />
         <Route path="/smart-chat" element={
           <MobilePreviewWrapper>
