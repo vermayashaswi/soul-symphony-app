@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,7 +16,6 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import { useEffect } from "react";
 import { supabase } from "./integrations/supabase/client";
-import MobilePreviewFrame from "./components/MobilePreviewFrame";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -125,28 +123,31 @@ const AppRoutes = () => {
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <ThemeProvider>
-          <div className="relative min-h-screen">
-            <div className="relative z-10">
-              <Toaster />
-              <Sonner position="top-center" />
-              <BrowserRouter>
-                <MobilePreviewFrame>
+const App = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <div className="relative min-h-screen">
+              <div className="relative z-10">
+                <Toaster />
+                <Sonner position="top-center" />
+                <BrowserRouter>
                   <AnimatePresence mode="wait">
                     <AppRoutes />
                   </AnimatePresence>
-                </MobilePreviewFrame>
-              </BrowserRouter>
+                </BrowserRouter>
+              </div>
             </div>
-          </div>
-        </ThemeProvider>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+          </ThemeProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

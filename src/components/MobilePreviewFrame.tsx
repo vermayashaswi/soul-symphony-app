@@ -6,7 +6,7 @@ interface MobilePreviewFrameProps {
   children: ReactNode;
 }
 
-export const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
+const MobilePreviewFrame = ({ children }: MobilePreviewFrameProps) => {
   const location = useLocation();
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
