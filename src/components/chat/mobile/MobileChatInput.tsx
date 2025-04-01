@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Send, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,7 +37,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
     };
   }, [recordingTimer]);
 
-  const handleStartRecording = () => {
+  const handleStartRecording = useCallback(() => {
     if (!userId) {
       toast({
         title: "Authentication required",
@@ -54,9 +54,9 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
       setRecordingTime(prev => prev + 1);
     }, 1000);
     setRecordingTimer(timer);
-  };
+  }, [userId, toast]);
 
-  const handleStopRecording = async (blob: Blob) => {
+  const handleStopRecording = useCallback(async (blob: Blob) => {
     setIsRecording(false);
     
     if (recordingTimer) {
@@ -92,9 +92,9 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
         });
       }
     };
-  };
+  }, [recordingTimer, userId, toast, onSendMessage]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     
     if (!message.trim()) return;
@@ -102,7 +102,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
     onSendMessage(message);
     setMessage("");
     setIsFocused(false);
-  };
+  }, [message, onSendMessage]);
 
   // This renders the visual part of the component
   return (
