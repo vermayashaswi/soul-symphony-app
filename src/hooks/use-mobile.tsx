@@ -107,7 +107,8 @@ export function useIsMobile() {
     };
   }, []);
 
-  return isInitialized ? isMobile : false;
+  // IMPORTANT: Always return the same structure - don't conditionally return different things
+  return isMobile;
 }
 
 // Add an alias export so that Chat.tsx can import it as useMobile
