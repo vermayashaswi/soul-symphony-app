@@ -70,7 +70,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
-  const isMobile = useIsMobile();
   // Always enable mobile mode
   const shouldShowMobileNav = true;
 

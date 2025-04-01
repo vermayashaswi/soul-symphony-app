@@ -26,6 +26,7 @@ const MobileNavbar = () => {
   const getMobileUrl = (path: string) => {
     // Create a URL object to handle parameter addition properly
     const url = new URL(path, window.location.origin);
+    // Always ensure mobileDemo is set to true
     url.searchParams.set('mobileDemo', 'true');
     // Return just the pathname and search parts
     return `${url.pathname}${url.search}`;
