@@ -1,4 +1,6 @@
-export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
+
+// Change the return type to allow nested objects for properties like timeRange
+export const analyzeQueryTypes = (query: string): Record<string, any> => {
   const lowerQuery = query.toLowerCase();
   
   // Enhanced quantitative detection with more patterns
