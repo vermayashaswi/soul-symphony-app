@@ -1,4 +1,3 @@
-
 export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
   const lowerQuery = query.toLowerCase();
   

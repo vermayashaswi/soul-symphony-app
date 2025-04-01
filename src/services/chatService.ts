@@ -13,7 +13,7 @@ export interface ChatMessage {
 export const processChatMessage = async (
   userMessage: string, 
   userId: string,
-  queryTypes: Record<string, boolean>,
+  queryTypes: Record<string, any>, // Changed from Record<string, boolean> to handle nested objects
   threadId?: string | null
 ): Promise<ChatMessage> => {
   try {
@@ -26,7 +26,7 @@ export const processChatMessage = async (
       try {
         console.log("Detected top emotions query, attempting direct database function");
         const result = await processTopEmotionsQuery(userMessage, userId, queryTypes);
-        if (result && !result.error) {
+        if (result) {
           console.log("Successfully processed top emotions query with database function");
           return result;
         }
@@ -96,7 +96,7 @@ export const processChatMessage = async (
 async function processTopEmotionsQuery(
   userMessage: string,
   userId: string,
-  queryTypes: Record<string, boolean>
+  queryTypes: Record<string, any> // Changed to handle nested objects
 ): Promise<ChatMessage | null> {
   try {
     // Extract the number of top emotions requested
@@ -125,7 +125,7 @@ async function processTopEmotionsQuery(
     let startDate = null;
     let endDate = null;
     
-    if (queryTypes.timeRange && queryTypes.timeRange.type) {
+    if (queryTypes.timeRange && typeof queryTypes.timeRange === 'object') {
       startDate = queryTypes.timeRange.startDate;
       endDate = queryTypes.timeRange.endDate;
     }
@@ -154,7 +154,7 @@ async function processTopEmotionsQuery(
     
     // Generate a response from the emotion data
     let response = "";
-    const timeContext = getTimeContextText(queryTypes.timeRange?.type);
+    const timeContext = getTimeContextText(queryTypes.timeRange && typeof queryTypes.timeRange === 'object' ? queryTypes.timeRange.type : null);
     
     if (data.length === 1) {
       response = `${timeContext}, your dominant emotion was ${data[0].emotion} with an intensity score of ${data[0].score}. `;
