@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
@@ -10,7 +9,6 @@ import ChatInput from "./ChatInput";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
 import { motion } from "framer-motion";
-import SouloLogo from "@/components/SouloLogo";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 
@@ -52,7 +50,6 @@ export default function SmartChatInterface() {
     }
   }, [chatHistory, isLoading, currentThreadId]);
 
-  // Load messages for a thread
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !user?.id) return;
     
@@ -81,7 +78,6 @@ export default function SmartChatInterface() {
     }
   };
 
-  // Update current thread ID from parent component
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
@@ -110,7 +106,6 @@ export default function SmartChatInterface() {
       return;
     }
     
-    // Create or use existing thread
     let threadId = currentThreadId;
     if (!threadId) {
       try {
@@ -129,7 +124,6 @@ export default function SmartChatInterface() {
         threadId = newThreadId;
         setCurrentThreadId(newThreadId);
         
-        // Dispatch event to notify parent component of new thread
         window.dispatchEvent(
           new CustomEvent('newThreadCreated', { 
             detail: { threadId: newThreadId } 
@@ -146,13 +140,11 @@ export default function SmartChatInterface() {
       }
     }
     
-    // Add to UI first for immediate feedback
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
     setShowSuggestions(false);
     
     try {
-      // Save message to database
       const { error: msgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -163,11 +155,9 @@ export default function SmartChatInterface() {
         
       if (msgError) throw msgError;
       
-      // Process with AI
       const queryTypes = analyzeQueryTypes(userMessage);
       const response = await processChatMessage(userMessage, user.id, queryTypes);
       
-      // Save AI response to database
       await supabase
         .from('chat_messages')
         .insert({
@@ -177,7 +167,6 @@ export default function SmartChatInterface() {
           reference_entries: response.references || null
         });
       
-      // Update thread title if it's the first message
       if (chatHistory.length === 0) {
         const truncatedTitle = userMessage.length > 30 
           ? userMessage.substring(0, 30) + "..." 
@@ -192,7 +181,6 @@ export default function SmartChatInterface() {
           .eq('id', threadId);
       }
       
-      // Always update thread's last activity timestamp
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
@@ -223,8 +211,7 @@ export default function SmartChatInterface() {
     <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden">
       <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b">
         <div className="flex items-center">
-          <SouloLogo useColorTheme={true} className="w-7 h-7 mr-2" />
-          <h2 className="text-xl font-semibold">AI Assistant</h2>
+          <h2 className="text-xl font-semibold">Roha</h2>
         </div>
         {chatHistory.length > 0 && (
           <Button 

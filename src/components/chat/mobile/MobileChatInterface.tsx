@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Loader2, BarChart4, ChevronDown, ChevronUp, Lightbulb, BarChart2, Search, Brain, PanelLeft } from "lucide-react";
@@ -10,7 +9,6 @@ import MobileChatInput from "./MobileChatInput";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
 import { AnimatePresence, motion } from "framer-motion";
-import SouloLogo from "@/components/SouloLogo";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
@@ -49,12 +47,10 @@ export default function MobileChatInterface() {
   useEffect(() => {
     scrollToBottom();
     
-    // Check for active thread or create one
     const checkOrCreateThread = async () => {
       if (!user?.id) return;
 
       try {
-        // Get most recent thread
         const { data: threads, error } = await supabase
           .from('chat_threads')
           .select('*')
@@ -66,10 +62,8 @@ export default function MobileChatInterface() {
 
         if (threads && threads.length > 0) {
           setCurrentThreadId(threads[0].id);
-          // Load messages for this thread
           loadThreadMessages(threads[0].id);
         } else {
-          // Create a new thread if none exists
           await createNewThread();
         }
       } catch (error) {
@@ -80,7 +74,6 @@ export default function MobileChatInterface() {
     checkOrCreateThread();
   }, [user?.id]);
 
-  // Load messages for a thread
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !user?.id) return;
     
@@ -114,7 +107,6 @@ export default function MobileChatInterface() {
     }
   };
 
-  // Create a new thread
   const createNewThread = async () => {
     if (!user?.id) return;
     
@@ -144,14 +136,12 @@ export default function MobileChatInterface() {
     }
   };
 
-  // Handle thread selection
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);
     loadThreadMessages(threadId);
     setShowSidebar(false);
   };
 
-  // Handle starting a new thread
   const handleStartNewThread = async () => {
     const newThreadId = await createNewThread();
     if (newThreadId) {
@@ -175,19 +165,16 @@ export default function MobileChatInterface() {
       return;
     }
     
-    // Create thread if none exists
     if (!currentThreadId) {
       const newThreadId = await createNewThread();
       if (!newThreadId) return;
     }
     
-    // Add to UI first for immediate feedback
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
     setShowSuggestions(false);
     
     try {
-      // Save message to database
       const { error: msgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -198,11 +185,9 @@ export default function MobileChatInterface() {
         
       if (msgError) throw msgError;
       
-      // Process with AI
       const queryTypes = analyzeQueryTypes(userMessage);
       const response = await processChatMessage(userMessage, user.id, queryTypes);
       
-      // Save AI response to database
       await supabase
         .from('chat_messages')
         .insert({
@@ -212,7 +197,6 @@ export default function MobileChatInterface() {
           reference_entries: response.references || null
         });
       
-      // Update thread title if it's the first message
       if (chatHistory.length === 0) {
         const truncatedTitle = userMessage.length > 30 
           ? userMessage.substring(0, 30) + "..." 
@@ -227,7 +211,6 @@ export default function MobileChatInterface() {
           .eq('id', currentThreadId);
       }
       
-      // Always update thread's last activity timestamp
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
@@ -273,8 +256,7 @@ export default function MobileChatInterface() {
               />
             </SheetContent>
           </Sheet>
-          <SouloLogo useColorTheme={true} className="w-6 h-6 mr-2" />
-          <h2 className="text-lg font-semibold">AI Assistant</h2>
+          <h2 className="text-lg font-semibold">Roha</h2>
         </div>
         {chatHistory.length > 0 && (
           <Button 
