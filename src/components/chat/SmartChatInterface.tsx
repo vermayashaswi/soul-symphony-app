@@ -23,6 +23,19 @@ type UIChatMessage = {
   hasNumericResult?: boolean;
 }
 
+// Define a type for the chat message from the database
+type DbChatMessage = {
+  content: string;
+  created_at: string;
+  id: string;
+  reference_entries: any;
+  sender: string;
+  thread_id: string;
+  // Add optional fields that might not be present in all database records
+  analysis_data?: any;
+  has_numeric_result?: boolean;
+}
+
 export default function SmartChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
@@ -74,7 +87,7 @@ export default function SmartChatInterface() {
       if (error) throw error;
       
       if (data && data.length > 0) {
-        const formattedMessages = data.map(msg => ({
+        const formattedMessages = data.map((msg: DbChatMessage) => ({
           role: msg.sender === 'user' ? 'user' : 'assistant',
           content: msg.content,
           ...(msg.reference_entries && { references: msg.reference_entries }),
