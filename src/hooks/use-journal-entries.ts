@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +14,27 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   
   const isFetchingRef = useRef(false);
   const initialFetchDoneRef = useRef(false);
+
+  // Process an entry for chunking and embedding
+  const processJournalEntry = useCallback(async (entryId: number) => {
+    try {
+      console.log(`Processing journal entry ${entryId} for chunking`);
+      const { data, error } = await supabase.functions.invoke('process-journal', {
+        body: { entryId }
+      });
+      
+      if (error) {
+        console.error('Error processing journal entry:', error);
+        return false;
+      }
+      
+      console.log(`Successfully processed journal entry ${entryId} into ${data.chunks_count} chunks`);
+      return true;
+    } catch (error) {
+      console.error('Error invoking process-journal function:', error);
+      return false;
+    }
+  }, []);
 
   const fetchEntries = useCallback(async () => {
     if (!userId) {
@@ -55,6 +77,22 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           text: data[0]["refined text"],
           created: data[0].created_at
         });
+        
+        // Process entries that haven't been chunked yet
+        const unchunkedEntries = data.filter(entry => !entry.is_chunked && (entry["refined text"] || entry["transcription text"]));
+        if (unchunkedEntries.length > 0) {
+          console.log(`[useJournalEntries] Found ${unchunkedEntries.length} entries that need processing`);
+          
+          // Process up to 3 entries at a time to avoid overloading
+          const entriesToProcess = unchunkedEntries.slice(0, 3);
+          for (const entry of entriesToProcess) {
+            await processJournalEntry(entry.id);
+          }
+          
+          if (unchunkedEntries.length > 3) {
+            console.log(`[useJournalEntries] Queued ${unchunkedEntries.length - 3} more entries for future processing`);
+          }
+        }
       } else {
         console.log('[useJournalEntries] No entries found for this user');
       }
@@ -67,6 +105,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         sentiment: item.sentiment,
         themes: item.master_themes,
         foreignKey: item["foreign key"],
+        isChunked: item.is_chunked || false,
+        chunksCount: item.chunks_count || 0,
         entities: item.entities ? (item.entities as any[]).map(entity => ({
           type: entity.type,
           name: entity.name,
@@ -85,7 +125,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [userId, fetchCount]);
+  }, [userId, fetchCount, processJournalEntry]);
 
   useEffect(() => {
     if (userId && isProfileChecked) {
@@ -110,6 +150,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     loading, 
     fetchEntries,
     lastFetchTime,
-    fetchCount
+    fetchCount,
+    processJournalEntry
   };
 }

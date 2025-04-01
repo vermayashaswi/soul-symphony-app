@@ -38,42 +38,46 @@ export async function processChatMessage(
     const searchStrategy = messageQueryTypes.searchStrategy || 'vector_search';
     console.log("Selected search strategy:", searchStrategy);
     
+    // Check if chunking should be used (default to true for better results)
+    const preferChunks = messageQueryTypes.preferChunks !== false;
+    console.log("Using chunked search:", preferChunks ? "yes" : "no");
+    
     // Execute the appropriate search strategy
     switch (searchStrategy) {
       case 'temporal_vector_search':
         // For "when" questions - vector search with temporal focus
         console.log("Using temporal vector search strategy");
-        queryResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId);
+        queryResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
         break;
         
       case 'frequency_analysis':
         // For "how often" questions - analyze frequency patterns
         console.log("Using frequency analysis strategy");
-        queryResponse = await handleFrequencyAnalysis(message, userId, messageQueryTypes, threadId);
+        queryResponse = await handleFrequencyAnalysis(message, userId, messageQueryTypes, threadId, preferChunks);
         break;
         
       case 'emotion_aggregation':
         // For emotion aggregation questions (top emotions)
         console.log("Using emotion aggregation strategy");
-        queryResponse = await handleEmotionAggregation(message, userId, messageQueryTypes, threadId);
+        queryResponse = await handleEmotionAggregation(message, userId, messageQueryTypes, threadId, preferChunks);
         break;
         
       case 'emotion_causal_analysis':
         // For emotion "why" questions
         console.log("Using emotion causal analysis strategy");
-        queryResponse = await handleEmotionCausalAnalysis(message, userId, messageQueryTypes, threadId);
+        queryResponse = await handleEmotionCausalAnalysis(message, userId, messageQueryTypes, threadId, preferChunks);
         break;
         
       case 'relationship_analysis':
         // For relationship-related queries
         console.log("Using relationship analysis strategy");
-        queryResponse = await handleRelationshipAnalysis(message, userId, messageQueryTypes, threadId);
+        queryResponse = await handleRelationshipAnalysis(message, userId, messageQueryTypes, threadId, preferChunks);
         break;
         
       case 'contextual_advice':
         // For improvement/advice questions
         console.log("Using contextual advice strategy");
-        queryResponse = await handleContextualAdvice(message, userId, messageQueryTypes, threadId);
+        queryResponse = await handleContextualAdvice(message, userId, messageQueryTypes, threadId, preferChunks);
         break;
         
       case 'data_aggregation':
@@ -90,7 +94,8 @@ export async function processChatMessage(
               generateSqlQueries: true,
               analyzeComponents: true,
               allowRetry: true,
-              requiresExplanation: messageQueryTypes.needsContext || message.toLowerCase().includes('why')
+              requiresExplanation: messageQueryTypes.needsContext || message.toLowerCase().includes('why'),
+              preferChunks: preferChunks
             }
           });
           
@@ -101,11 +106,11 @@ export async function processChatMessage(
             queryResponse = data;
           } else {
             console.log("Smart query planner couldn't handle the query, falling back to RAG");
-            queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+            queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
           }
         } catch (smartQueryError) {
           console.error("Exception in smart-query-planner:", smartQueryError);
-          queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+          queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
         }
         break;
         
@@ -113,13 +118,13 @@ export async function processChatMessage(
       default:
         // Default case - standard vector search
         console.log("Using standard vector search strategy");
-        queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+        queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
         break;
     }
     
     if (!queryResponse) {
       console.log("No response from primary strategy, falling back to RAG");
-      queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+      queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId, preferChunks);
     }
     
     console.log("Response received:", queryResponse ? "yes" : "no");
@@ -158,7 +163,7 @@ export async function processChatMessage(
 }
 
 // Handler for standard vector search
-async function handleVectorSearch(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+async function handleVectorSearch(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string, preferChunks: boolean = true) {
   const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
     ? {
         type: queryTypes.timeRange.type,
@@ -175,7 +180,8 @@ async function handleVectorSearch(message: string, userId: string, queryTypes: R
       includeDiagnostics: true,
       timeRange,
       isComplexQuery: queryTypes.isComplexQuery || message.toLowerCase().includes('why'),
-      requiresEmotionAnalysis: queryTypes.isEmotionFocused
+      requiresEmotionAnalysis: queryTypes.isEmotionFocused,
+      preferChunks: preferChunks
     }
   });
   
@@ -188,7 +194,7 @@ async function handleVectorSearch(message: string, userId: string, queryTypes: R
 }
 
 // Handler for temporal vector search (when questions)
-async function handleTemporalVectorSearch(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+async function handleTemporalVectorSearch(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string, preferChunks: boolean = true) {
   console.log("Executing temporal vector search for 'when' question");
   
   // Include temporal parameters explicitly
@@ -201,7 +207,8 @@ async function handleTemporalVectorSearch(message: string, userId: string, query
       isTemporalQuery: true,
       needsTimeRetrieval: true,
       isComplexQuery: false, // Usually "when" questions are straightforward
-      requiresEntryDates: true // Specifically request entry dates
+      requiresEntryDates: true, // Specifically request entry dates
+      preferChunks: preferChunks
     }
   });
   
@@ -214,7 +221,7 @@ async function handleTemporalVectorSearch(message: string, userId: string, query
 }
 
 // Handler for frequency analysis (how often questions)
-async function handleFrequencyAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+async function handleFrequencyAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string, preferChunks: boolean = true) {
   console.log("Executing frequency analysis for 'how often' question");
   
   // Try smart-query-planner first as it might be able to do frequency counts
@@ -226,7 +233,8 @@ async function handleFrequencyAnalysis(message: string, userId: string, queryTyp
         includeDiagnostics: true,
         enableQueryBreakdown: true,
         generateSqlQueries: true,
-        isFrequencyQuery: true
+        isFrequencyQuery: true,
+        preferChunks: preferChunks
       }
     });
     
@@ -248,7 +256,8 @@ async function handleFrequencyAnalysis(message: string, userId: string, queryTyp
       threadId,
       includeDiagnostics: true,
       isFrequencyQuery: true,
-      requiresPatternAnalysis: true
+      requiresPatternAnalysis: true,
+      preferChunks: preferChunks
     }
   });
   
@@ -261,7 +270,7 @@ async function handleFrequencyAnalysis(message: string, userId: string, queryTyp
 }
 
 // Handler for emotion aggregation (top emotions)
-async function handleEmotionAggregation(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+async function handleEmotionAggregation(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string, preferChunks: boolean = true) {
   console.log("Executing emotion aggregation for top emotions question");
   
   // Extract time period from query or use default
@@ -290,7 +299,8 @@ async function handleEmotionAggregation(message: string, userId: string, queryTy
       timeRange,
       isEmotionQuery: true,
       isWhyEmotionQuery: isWhyQuestion,
-      topEmotionsCount: 3
+      topEmotionsCount: 3,
+      preferChunks: preferChunks
     }
   });
   
@@ -303,7 +313,7 @@ async function handleEmotionAggregation(message: string, userId: string, queryTy
 }
 
 // Handler for emotion causal analysis (why emotion questions)
-async function handleEmotionCausalAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+async function handleEmotionCausalAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string, preferChunks: boolean = true) {
   console.log("Executing emotion causal analysis");
   
   // Extract time period from query or use default
@@ -325,7 +335,8 @@ async function handleEmotionCausalAnalysis(message: string, userId: string, quer
       timeRange,
       isEmotionQuery: true,
       isWhyEmotionQuery: true,
-      requiresCausalAnalysis: true
+      requiresCausalAnalysis: true,
+      preferChunks: preferChunks
     }
   });
   
@@ -338,7 +349,7 @@ async function handleEmotionCausalAnalysis(message: string, userId: string, quer
 }
 
 // Handler for relationship analysis
-async function handleRelationshipAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+async function handleRelationshipAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string, preferChunks: boolean = true) {
   console.log("Executing relationship analysis");
   
   // Extract time period from query or use default
@@ -360,7 +371,8 @@ async function handleRelationshipAnalysis(message: string, userId: string, query
       timeRange,
       isRelationshipQuery: true,
       requiresThemeFiltering: true,
-      themeKeywords: ['partner', 'spouse', 'husband', 'wife', 'boyfriend', 'girlfriend', 'relationship', 'marriage']
+      themeKeywords: ['partner', 'spouse', 'husband', 'wife', 'boyfriend', 'girlfriend', 'relationship', 'marriage'],
+      preferChunks: preferChunks
     }
   });
   
@@ -373,7 +385,7 @@ async function handleRelationshipAnalysis(message: string, userId: string, query
 }
 
 // Handler for contextual advice (improvement questions)
-async function handleContextualAdvice(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+async function handleContextualAdvice(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string, preferChunks: boolean = true) {
   console.log("Executing contextual advice strategy");
   
   // For improvement questions, we need both context and a solution-oriented approach
@@ -386,7 +398,8 @@ async function handleContextualAdvice(message: string, userId: string, queryType
       isAdviceQuery: true,
       requiresThemeFiltering: true,
       requiresSolutionFocus: true,
-      themeKeywords: ['partner', 'spouse', 'husband', 'wife', 'boyfriend', 'girlfriend', 'relationship', 'marriage']
+      themeKeywords: ['partner', 'spouse', 'husband', 'wife', 'boyfriend', 'girlfriend', 'relationship', 'marriage'],
+      preferChunks: preferChunks
     }
   });
   

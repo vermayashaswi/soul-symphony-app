@@ -13,7 +13,36 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   global: {
     fetch: (url, options) => {
       const fetchOptions = options || {};
-      return fetch(url, { ...fetchOptions });
+      const headers = new Headers(fetchOptions.headers);
+      
+      // Add client version for feature detection
+      headers.set('x-client-version', '1.1.0');
+      headers.set('x-chunking-enabled', 'true');
+      
+      return fetch(url, { 
+        ...fetchOptions,
+        headers 
+      });
     }
   }
 });
+
+// Helper function to check if chunking is supported on the server
+export async function isChunkingSupported(): Promise<boolean> {
+  try {
+    // Check if the journal_chunks table exists
+    const { data, error } = await supabase.rpc('table_exists', {
+      table_name: 'journal_chunks'
+    });
+    
+    if (error) {
+      console.error('Error checking if chunking is supported:', error);
+      return false;
+    }
+    
+    return data === true;
+  } catch (error) {
+    console.error('Exception checking if chunking is supported:', error);
+    return false;
+  }
+}
