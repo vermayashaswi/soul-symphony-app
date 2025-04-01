@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -101,7 +100,6 @@ export default function MobileChatInterface({
           await onCreateNewThread();
           return; // The event listener will trigger loadThreadMessages
         } else {
-          // Fallback if no callback provided
           const newThreadId = uuidv4();
           const { error } = await supabase
             .from('chat_threads')
@@ -240,7 +238,7 @@ export default function MobileChatInterface({
             <MobileChatMessage 
               key={index} 
               message={message} 
-              showAnalysis={false} // Add this prop with a default value
+              showAnalysis={false}
             />
           ))
         )}

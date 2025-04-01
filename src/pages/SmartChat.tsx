@@ -158,42 +158,39 @@ export default function SmartChat() {
 
   // Mobile content
   const mobileContent = (
-    <>
-      <Navbar />
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="smart-chat-container h-[calc(100vh-4rem)] flex flex-col pt-16 pb-16" // Added pb-16 for mobile nav
-      >
-        {!hasEnoughEntries && !loading && (
-          <Alert className="mx-3 mt-3 border-amber-300 bg-amber-50 text-amber-800">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle className="text-sm">No journal entries found</AlertTitle>
-            <AlertDescription className="mt-1 text-xs">
-              <p>Create journal entries to get personalized insights.</p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-1 h-7 text-xs border-amber-300 text-amber-800 hover:bg-amber-100"
-                onClick={() => navigate('/journal')}
-              >
-                Go to Journal
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        <div className="flex-1 min-h-0">
-          <MobileChatInterface 
-            currentThreadId={currentThreadId}
-            onSelectThread={handleSelectThread}
-            onCreateNewThread={createNewThread}
-            userId={user?.id}
-          />
-        </div>
-      </motion.div>
-    </>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="smart-chat-container h-screen flex flex-col"
+    >
+      {!hasEnoughEntries && !loading && (
+        <Alert className="mx-3 mt-3 border-amber-300 bg-amber-50 text-amber-800">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle className="text-sm">No journal entries found</AlertTitle>
+          <AlertDescription className="mt-1 text-xs">
+            <p>Create journal entries to get personalized insights.</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-1 h-7 text-xs border-amber-300 text-amber-800 hover:bg-amber-100"
+              onClick={() => navigate('/journal')}
+            >
+              Go to Journal
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <div className="flex-1 min-h-0">
+        <MobileChatInterface 
+          currentThreadId={currentThreadId}
+          onSelectThread={handleSelectThread}
+          onCreateNewThread={createNewThread}
+          userId={user?.id}
+        />
+      </div>
+    </motion.div>
   );
   
   // Decide which content to render based on mobile status

@@ -13,6 +13,7 @@ import JournalSearch from '@/components/journal/JournalSearch';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
@@ -22,6 +23,7 @@ const Journal = () => {
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const isMobile = useIsMobile();
   
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
@@ -179,11 +181,11 @@ const Journal = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <Navbar />
+      {!isMobile && <Navbar />}
       
       <JournalHeader />
       
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
+      <div className={`container mx-auto px-4 py-8 max-w-5xl ${isMobile ? 'pb-20' : ''}`}>
         <Tabs defaultValue="record" value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="record">Record Entry</TabsTrigger>

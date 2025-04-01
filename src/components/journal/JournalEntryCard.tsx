@@ -60,13 +60,16 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
       <div className="flex justify-between items-start p-3 md:p-4">
         <div>
           <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-          <p className="text-xs md:text-sm text-muted-foreground">
-            {typeof entry.sentiment === 'string' 
-              ? entry.sentiment 
-              : entry.sentiment 
-                ? `${entry.sentiment.sentiment} (${entry.sentiment.score})` 
-                : 'No sentiment data'}
-          </p>
+          {/* Only show sentiment on desktop */}
+          {!isMobile && (
+            <p className="text-xs md:text-sm text-muted-foreground">
+              {typeof entry.sentiment === 'string' 
+                ? entry.sentiment 
+                : entry.sentiment 
+                  ? `${entry.sentiment.sentiment} (${entry.sentiment.score})` 
+                  : 'No sentiment data'}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center space-x-1 md:space-x-2">

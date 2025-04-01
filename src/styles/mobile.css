@@ -14,6 +14,18 @@
     padding-bottom: 4rem !important;
   }
   
+  /* Adjust the top padding for pages since we're removing the navbar */
+  .journal-container,
+  .insights-container,
+  .settings-container {
+    padding-top: 0 !important;
+  }
+  
+  /* Ensure the chat interface takes the full height on mobile */
+  .smart-chat-container {
+    min-height: 100vh !important;  
+  }
+  
   /* Increase touch targets */
   .mobile-chat-interface button {
     min-height: 40px;
