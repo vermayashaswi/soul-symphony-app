@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile || mobileDemo;
 
+  // Define the navigateToFeature function
   const navigateToFeature = (path: string) => {
     if (!user && path !== '/') {
       navigate(`/auth?redirectTo=${path}`);
@@ -115,7 +117,7 @@ const Index = () => {
       
       return () => clearInterval(typingInterval);
     }
-  }, [isTyping]);
+  }, [isTyping, shouldRenderMobile]);
 
   useEffect(() => {
     const animationCycle = () => {

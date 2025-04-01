@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
 
-export type LogoSize = "small" | "normal" | "large";
+export type LogoSize = "small" | "normal" | "large" | "medium";
 
 interface SouloLogoProps {
   className?: string;
@@ -27,6 +27,7 @@ const SouloLogo = ({
     small: "w-4 h-4 mx-0.5",
     normal: "w-5 h-5 mx-0.5",
     large: "w-6 h-6 mx-0.5",
+    medium: "w-5.5 h-5.5 mx-0.5", // Added medium size
   };
   
   // Apply color theme if useColorTheme is true
