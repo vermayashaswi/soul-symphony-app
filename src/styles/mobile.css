@@ -169,4 +169,13 @@
     overflow-y: auto;
     padding-bottom: 4rem !important; /* Add more padding at the bottom */
   }
+  
+  /* Remove extra spacing on journal and insights pages */
+  .journal-container {
+    padding-top: 0 !important;
+  }
+  
+  .insights-container {
+    padding-top: 0 !important;
+  }
 }
