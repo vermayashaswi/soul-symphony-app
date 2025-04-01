@@ -1,17 +1,23 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SouloLogo from '@/components/SouloLogo';
+import { cn } from '@/lib/utils';
 
 const JournalHeader = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  const shouldAdjustForMobile = isMobile || mobileDemo;
   
   return (
-    <div className="bg-muted/30 py-8 md:py-12 border-b mt-16 md:mt-20">
+    <div className={cn(
+      "bg-muted/30 py-8 md:py-12 border-b",
+      shouldAdjustForMobile ? "mt-4" : "mt-16 md:mt-20"
+    )}>
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="w-full">
