@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
@@ -26,37 +26,16 @@ export default function MobileChatInterface({
   onCreateNewThread,
   userId
 }: MobileChatInterfaceProps) {
-  // Always call hooks at the top level consistently
+  // Call all hooks at the top level consistently
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-
-  useEffect(() => {
-    if (propThreadId) {
-      setCurrentThreadId(propThreadId);
-      loadThreadMessages(propThreadId);
-    }
-  }, [propThreadId]);
-
-  useEffect(() => {
-    const onThreadChange = (event: CustomEvent) => {
-      if (event.detail.threadId) {
-        setCurrentThreadId(event.detail.threadId);
-        loadThreadMessages(event.detail.threadId);
-      }
-    };
-    
-    window.addEventListener('threadSelected' as any, onThreadChange);
-    
-    return () => {
-      window.removeEventListener('threadSelected' as any, onThreadChange);
-    };
-  }, []);
-
-  const loadThreadMessages = async (threadId: string) => {
+  
+  // Define functions after all hook declarations
+  const loadThreadMessages = useCallback(async (threadId: string) => {
     if (!threadId) return;
     
     try {
@@ -82,11 +61,34 @@ export default function MobileChatInterface({
     } catch (error) {
       console.error("Error loading messages:", error);
     }
-  };
+  }, []);
+
+  // Effect hooks
+  useEffect(() => {
+    if (propThreadId) {
+      setCurrentThreadId(propThreadId);
+      loadThreadMessages(propThreadId);
+    }
+  }, [propThreadId, loadThreadMessages]);
+
+  useEffect(() => {
+    const onThreadChange = (event: CustomEvent) => {
+      if (event.detail.threadId) {
+        setCurrentThreadId(event.detail.threadId);
+        loadThreadMessages(event.detail.threadId);
+      }
+    };
+    
+    window.addEventListener('threadSelected' as any, onThreadChange);
+    
+    return () => {
+      window.removeEventListener('threadSelected' as any, onThreadChange);
+    };
+  }, [loadThreadMessages]);
 
   const handleSendMessage = async (message: string) => {
     if (!message.trim()) return;
-    const activeUser = user?.id;
+    const activeUser = user?.id ?? userId;
     if (!activeUser) {
       toast({
         title: "Authentication required",
@@ -117,6 +119,12 @@ export default function MobileChatInterface({
           if (error) throw error;
           threadId = newThreadId;
           setCurrentThreadId(newThreadId);
+          
+          window.dispatchEvent(
+            new CustomEvent('newThreadCreated', { 
+              detail: { threadId: newThreadId } 
+            })
+          );
         }
       } catch (error) {
         console.error("Error creating thread:", error);

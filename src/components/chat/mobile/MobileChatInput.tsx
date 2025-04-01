@@ -19,7 +19,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
   isLoading,
   userId
 }) => {
-  // Ensure all hooks are called at the top level consistently
+  // Always declare all hooks first, regardless of conditions
   const [message, setMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -94,6 +94,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
     setIsFocused(false);
   };
 
+  // This renders the visual part of the component
   return (
     <div className="w-full">
       <form onSubmit={handleSubmit} className="relative flex items-end w-full gap-2">
