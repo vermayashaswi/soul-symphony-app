@@ -31,13 +31,30 @@ const Journal = () => {
     }
   }, [user?.id]);
   
+  // Monitor active tab changes and fetch entries when switching to entries tab
   useEffect(() => {
-    if (activeTab === 'entries' && isProfileChecked && !initialFetchDone) {
-      console.log('Tab changed to entries, doing initial fetch...');
+    if (activeTab === 'entries' && isProfileChecked) {
+      console.log('Tab changed to entries, fetching entries...');
       fetchEntries();
-      setInitialFetchDone(true);
+      if (!initialFetchDone) {
+        setInitialFetchDone(true);
+      }
     }
   }, [activeTab, isProfileChecked, fetchEntries, initialFetchDone]);
+
+  // Add a new effect to monitor processing entries
+  useEffect(() => {
+    // If there are processing entries, set up a polling interval to check for updates
+    if (processingEntries.length > 0 && activeTab === 'entries') {
+      console.log('Setting up polling for processing entries:', processingEntries);
+      
+      const pollingInterval = setInterval(() => {
+        fetchEntries();
+      }, 5000); // Poll every 5 seconds while processing
+      
+      return () => clearInterval(pollingInterval);
+    }
+  }, [processingEntries, activeTab, fetchEntries]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -82,8 +99,13 @@ const Journal = () => {
     
     setActiveTab('entries');
     
-    setTimeout(async () => {
+    // Immediately fetch entries to show the processing state
+    fetchEntries();
+    
+    // Set up a check to verify the entry was processed
+    const checkEntryProcessed = async () => {
       try {
+        console.log('Checking if entry is processed with temp ID:', tempId);
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
@@ -92,24 +114,48 @@ const Journal = () => {
           
         if (error) {
           console.error('Error fetching newly created entry:', error);
+          return false;
         } else if (data) {
-          console.log('Generating themes for new entry:', data.id);
+          console.log('New entry found:', data.id);
           
+          // Generate themes in the background
           await supabase.functions.invoke('generate-themes', {
             body: {
               text: data["refined text"],
               entryId: data.id
             }
           });
+          
+          return true;
         }
+        return false;
       } catch (error) {
-        console.error('Error generating themes for new entry:', error);
+        console.error('Error checking for processed entry:', error);
+        return false;
       }
+    };
+    
+    // Poll for the entry to be processed
+    const pollInterval = setInterval(async () => {
+      const isProcessed = await checkEntryProcessed();
       
-      setProcessingEntries(prev => prev.filter(id => id !== tempId));
-      setRefreshKey(prev => prev + 1);
-      fetchEntries();
-    }, 15000);
+      if (isProcessed) {
+        clearInterval(pollInterval);
+        setProcessingEntries(prev => prev.filter(id => id !== tempId));
+        setRefreshKey(prev => prev + 1);
+        fetchEntries();
+        toast.success('Journal entry processed successfully!');
+      }
+    }, 3000); // Check every 3 seconds
+    
+    // Clear interval after a timeout (e.g., 2 minutes) to prevent infinite polling
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (processingEntries.includes(tempId || '')) {
+        setProcessingEntries(prev => prev.filter(id => id !== tempId));
+        toast.info('Entry processing is taking longer than expected. It should appear soon.');
+      }
+    }, 120000); // 2 minutes timeout
   };
 
   const handleDeleteEntry = (entryId: number) => {
