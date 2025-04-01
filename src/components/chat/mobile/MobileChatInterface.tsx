@@ -89,13 +89,19 @@ export default function MobileChatInterface({
     if (!threadId || !user?.id) return;
     
     try {
+      console.log(`[Mobile] Loading messages for thread ${threadId}`);
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('thread_id', threadId)
         .order('created_at', { ascending: true });
         
-      if (error) throw error;
+      if (error) {
+        console.error(`[Mobile] Error loading messages:`, error);
+        throw error;
+      }
+      
+      console.log(`[Mobile] Loaded ${data?.length || 0} messages`);
       
       if (data && data.length > 0) {
         const formattedMessages = data.map((msg: ChatMessageFromDB) => ({
@@ -111,7 +117,7 @@ export default function MobileChatInterface({
         setMessages([]);
       }
     } catch (error) {
-      console.error("Error loading messages:", error);
+      console.error("[Mobile] Error loading messages:", error);
     }
   };
 
@@ -149,7 +155,7 @@ export default function MobileChatInterface({
           setCurrentThreadId(newThreadId);
         }
       } catch (error) {
-        console.error("Error creating thread:", error);
+        console.error("[Mobile] Error creating thread:", error);
         toast({
           title: "Error",
           description: "Failed to create new conversation",
@@ -176,13 +182,20 @@ export default function MobileChatInterface({
       if (msgError) throw msgError;
       
       // Begin RAG pipeline - Step 1: Query Analysis
-      console.log("Mobile: Performing comprehensive query analysis");
+      console.log("[Mobile] Performing comprehensive query analysis for:", message);
       const queryTypes = analyzeQueryTypes(message);
-      console.log("Mobile: Query analysis result:", queryTypes);
+      console.log("[Mobile] Query analysis result:", queryTypes);
       
       // Step 2-10: Process message through RAG pipeline
       const response = await processChatMessage(message, user.id, queryTypes, threadId);
-      console.log("Mobile: Response received with references:", response.references?.length || 0);
+      console.log("[Mobile] Response received:", {
+        role: response.role,
+        hasReferences: !!response.references?.length,
+        refCount: response.references?.length || 0,
+        hasAnalysis: !!response.analysis,
+        hasNumericResult: response.hasNumericResult,
+        errorState: response.role === 'error'
+      });
       
       // Step 11: Convert to UI-compatible message and filter out system/error roles
       const uiResponse: UIChatMessage = {
@@ -192,8 +205,13 @@ export default function MobileChatInterface({
         ...(response.analysis && { analysis: response.analysis })
       };
       
+      // Check if the response indicates an error or failed retrieval
+      if (response.role === 'error' || response.content.includes("issue retrieving")) {
+        console.error("[Mobile] Received error response:", response.content);
+      }
+      
       // Store assistant response in database
-      await supabase
+      const { error: storeError } = await supabase
         .from('chat_messages')
         .insert({
           thread_id: threadId,
@@ -203,6 +221,10 @@ export default function MobileChatInterface({
           has_numeric_result: response.hasNumericResult || false,
           analysis_data: response.analysis || null
         });
+        
+      if (storeError) {
+        console.error("[Mobile] Error storing assistant response:", storeError);
+      }
       
       // For new threads, set a title based on first message
       if (messages.length === 0) {
@@ -228,7 +250,7 @@ export default function MobileChatInterface({
       // Step 12: Update UI with assistant response
       setMessages(prev => [...prev, uiResponse]);
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("[Mobile] Error sending message:", error);
       setMessages(prev => [
         ...prev, 
         { 

@@ -247,6 +247,7 @@ For the SQL queries:
 - For temporal queries, use the 'created_at' field (timestamp with timezone)
 - Always include a WHERE condition for user_id = $1 (user ID is passed as parameter)
 - For complex emotion analysis, you may need to extract and aggregate data from the emotions JSONB field
+- IMPORTANT: DO NOT include semicolons at the end of SQL queries, they cause syntax errors
 
 Your analysis should be in this JSON format:
 {
@@ -274,7 +275,7 @@ Your analysis should be in this JSON format:
       "step": "description of this step", 
       "component_index": 0, // index in the components array this step addresses
       "step_type": "sql_query" | "vector_search" | "data_aggregation" | "insight_generation",
-      "sql_query": "SQL query to execute (if applicable)",
+      "sql_query": "SQL query to execute (if applicable) WITHOUT semicolons at the end",
       "vector_search_text": "Text for vector similarity search (if applicable)"
     }
   ],
@@ -351,8 +352,13 @@ async function executeQueryAnalysisPlan(queryAnalysis, userId) {
         // Replace $1 with the userId in the query for security
         const modifiedQuery = step.sql_query.replace(/\$1/g, `'${userId}'`);
         
+        // Remove trailing semicolons which cause syntax errors with the RPC function
+        const cleanedQuery = modifiedQuery.replace(/;$/, '');
+        
+        console.log(`Executing SQL query: ${cleanedQuery}`);
+        
         const { data, error } = await supabase.rpc('execute_dynamic_query', {
-          query_text: modifiedQuery,
+          query_text: cleanedQuery,
           param_values: [userId]
         });
         
@@ -439,6 +445,142 @@ async function executeQueryAnalysisPlan(queryAnalysis, userId) {
       results.execution_results.push({
         step: step.step,
         type: step.step_type,
+        error: error.message
+      });
+    }
+  }
+  
+  return results;
+}
+
+// Function to execute the enhanced query plan
+async function executeQueryPlan(queryPlan, userId) {
+  const results = {
+    success: true,
+    execution_results: []
+  };
+  
+  // If the plan indicates we don't have sufficient data, return early
+  if (queryPlan.has_sufficient_data === false) {
+    console.log("Query plan indicates insufficient data");
+    results.execution_results.push({
+      segment: "Data check",
+      type: "info",
+      result: "Insufficient journal data to provide a meaningful answer"
+    });
+    return results;
+  }
+
+  // Execute each segment of the plan
+  for (const segment of queryPlan.execution_plan) {
+    try {
+      console.log(`Executing segment: ${segment.segment} (${segment.segment_type})`);
+      
+      if (segment.segment_type === 'sql_query' && segment.sql_query) {
+        // SQL query execution - Remove trailing semicolons which cause errors
+        const cleanedQuery = segment.sql_query.replace(/;$/, '');
+        
+        console.log(`Executing SQL query: ${cleanedQuery}`);
+        
+        const { data, error } = await supabase.rpc('execute_dynamic_query', {
+          query_text: cleanedQuery,
+          user_id_param: userId
+        });
+        
+        if (error) {
+          console.error(`SQL error for segment "${segment.segment}":`, error);
+          results.execution_results.push({
+            segment: segment.segment,
+            type: "sql_query",
+            error: error.message
+          });
+        } else {
+          console.log(`SQL result for segment "${segment.segment}":`, data);
+          results.execution_results.push({
+            segment: segment.segment,
+            type: "sql_query",
+            result: data
+          });
+        }
+      } 
+      else if (segment.segment_type === 'vector_search' && segment.vector_search) {
+        // Vector search execution
+        const embedding = await generateEmbedding(segment.vector_search);
+        
+        const { data, error } = await supabase.rpc(
+          'match_journal_entries_with_date',
+          {
+            query_embedding: embedding,
+            match_threshold: 0.5,
+            match_count: 5,
+            user_id_filter: userId
+          }
+        );
+        
+        if (error) {
+          console.error(`Vector search error for segment "${segment.segment}":`, error);
+          results.execution_results.push({
+            segment: segment.segment,
+            type: "vector_search",
+            error: error.message
+          });
+        } else {
+          console.log(`Vector search result for segment "${segment.segment}":`, data.length);
+          results.execution_results.push({
+            segment: segment.segment,
+            type: "vector_search",
+            result: data
+          });
+        }
+      }
+      else if (segment.segment_type === 'hybrid') {
+        // Hybrid approach (combine SQL and vector search as needed)
+        let hybridResult = {};
+        
+        if (segment.sql_query) {
+          const { data, error } = await supabase.rpc('execute_dynamic_query', {
+            query_text: segment.sql_query,
+            user_id_param: userId
+          });
+          
+          if (error) {
+            console.error(`Hybrid SQL error for segment "${segment.segment}":`, error);
+          } else {
+            hybridResult.sql_result = data;
+          }
+        }
+        
+        if (segment.vector_search) {
+          const embedding = await generateEmbedding(segment.vector_search);
+          
+          const { data, error } = await supabase.rpc(
+            'match_journal_entries_with_date',
+            {
+              query_embedding: embedding,
+              match_threshold: 0.5,
+              match_count: 5,
+              user_id_filter: userId
+            }
+          );
+          
+          if (error) {
+            console.error(`Hybrid vector search error for segment "${segment.segment}":`, error);
+          } else {
+            hybridResult.vector_result = data;
+          }
+        }
+        
+        results.execution_results.push({
+          segment: segment.segment,
+          type: "hybrid",
+          result: hybridResult
+        });
+      }
+    } catch (error) {
+      console.error(`Error executing segment "${segment.segment}":`, error);
+      results.execution_results.push({
+        segment: segment.segment,
+        type: segment.segment_type,
         error: error.message
       });
     }
