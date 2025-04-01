@@ -188,7 +188,10 @@ export default function SmartChatInterface() {
           sender: 'user'
         });
         
-      if (msgError) throw msgError;
+      if (msgError) {
+        console.error("Error storing user message:", msgError);
+        throw msgError;
+      }
       
       console.log("Desktop: Performing comprehensive query analysis");
       
@@ -234,8 +237,19 @@ export default function SmartChatInterface() {
         });
       }, 1500);
       
+      console.log("Desktop: Calling processChatMessage with user ID:", user.id);
       const response = await processChatMessage(userMessage, user.id, queryTypes, threadId);
-      console.log("Desktop: Response received with references:", response.references?.length || 0);
+      console.log("Desktop: Response received:", response);
+      console.log("Desktop: Response content:", response.content);
+      
+      if (response.role === 'error') {
+        console.error("Desktop: Error response received:", response.content);
+        toast({
+          title: "Error",
+          description: "There was an issue processing your request. Please try again.",
+          variant: "destructive"
+        });
+      }
       
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
@@ -245,42 +259,46 @@ export default function SmartChatInterface() {
         ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
       };
       
-      await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: threadId,
-          content: response.content,
-          sender: 'assistant',
-          reference_entries: response.references || null,
-          has_numeric_result: response.hasNumericResult || false,
-          analysis_data: response.analysis || null
-        });
-      
-      if (chatHistory.length === 0 || (chatHistory.length === 2 && chatHistory[1].isLoading)) {
-        const truncatedTitle = userMessage.length > 30 
-          ? userMessage.substring(0, 30) + "..." 
-          : userMessage;
-          
+      try {
+        await supabase
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            content: response.content,
+            sender: 'assistant',
+            reference_entries: response.references || null,
+            has_numeric_result: response.hasNumericResult || false,
+            analysis_data: response.analysis || null
+          });
+        
+        if (chatHistory.length === 0 || (chatHistory.length === 2 && chatHistory[1].isLoading)) {
+          const truncatedTitle = userMessage.length > 30 
+            ? userMessage.substring(0, 30) + "..." 
+            : userMessage;
+            
+          await supabase
+            .from('chat_threads')
+            .update({ 
+              title: truncatedTitle,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', threadId);
+        }
+        
         await supabase
           .from('chat_threads')
-          .update({ 
-            title: truncatedTitle,
-            updated_at: new Date().toISOString()
-          })
+          .update({ updated_at: new Date().toISOString() })
           .eq('id', threadId);
+      } catch (dbError) {
+        console.error("Desktop: Error storing assistant response:", dbError);
       }
-      
-      await supabase
-        .from('chat_threads')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', threadId);
       
       setChatHistory(prev => {
         const filteredHistory = prev.filter(msg => !msg.isLoading);
         return [...filteredHistory, uiResponse];
       });
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Desktop: Error sending message:", error);
       toast({
         title: "Error",
         description: "Failed to get a response. Please try again.",
@@ -293,7 +311,7 @@ export default function SmartChatInterface() {
           ...filteredHistory, 
           { 
             role: 'assistant', 
-            content: "I'm having trouble processing your request. Please try again later."
+            content: "I'm having trouble processing your request. The server might be down or there might be an issue with the connection. Please try again later."
           }
         ];
       });

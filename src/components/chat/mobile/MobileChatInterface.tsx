@@ -187,7 +187,10 @@ export default function MobileChatInterface({
           sender: 'user'
         });
         
-      if (msgError) throw msgError;
+      if (msgError) {
+        console.error("[Mobile] Error storing user message:", msgError);
+        throw msgError;
+      }
       
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
       
@@ -216,15 +219,19 @@ export default function MobileChatInterface({
         setProcessingStage("Searching for insights...");
       }, 1500);
       
+      console.log("[Mobile] Calling processChatMessage with user ID:", user.id);
       const response = await processChatMessage(message, user.id, queryTypes, threadId);
-      console.log("[Mobile] Response received:", {
-        role: response.role,
-        hasReferences: !!response.references?.length,
-        refCount: response.references?.length || 0,
-        hasAnalysis: !!response.analysis,
-        hasNumericResult: response.hasNumericResult,
-        errorState: response.role === 'error'
-      });
+      console.log("[Mobile] Response received:", response);
+      console.log("[Mobile] Response content:", response.content);
+      
+      if (response.role === 'error') {
+        console.error("[Mobile] Error response received:", response.content);
+        toast({
+          title: "Error",
+          description: "There was an issue processing your request. Please try again.",
+          variant: "destructive"
+        });
+      }
       
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
@@ -233,15 +240,6 @@ export default function MobileChatInterface({
         ...(response.analysis && { analysis: response.analysis }),
         ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
       };
-      
-      if (response.role === 'error' || response.content.includes("issue retrieving")) {
-        console.error("[Mobile] Received error response:", response.content);
-        toast({
-          title: "Something went wrong",
-          description: "We couldn't process your request. Please try again or try a different question.",
-          variant: "destructive"
-        });
-      }
       
       try {
         const { error: storeError } = await supabase
@@ -276,10 +274,14 @@ export default function MobileChatInterface({
           .eq('id', threadId);
       }
       
-      await supabase
-        .from('chat_threads')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', threadId);
+      try {
+        await supabase
+          .from('chat_threads')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', threadId);
+      } catch (updateError) {
+        console.error("[Mobile] Error updating thread timestamp:", updateError);
+      }
       
       setMessages(prev => {
         const filteredMessages = prev.filter(msg => !msg.isLoading);
@@ -298,7 +300,7 @@ export default function MobileChatInterface({
           ...filteredMessages, 
           { 
             role: 'assistant', 
-            content: "I'm having trouble processing your request. Please try again later."
+            content: "I'm having trouble processing your request. The server might be down or there might be an issue with the connection. Please try again later."
           }
         ];
       });
