@@ -8,7 +8,6 @@ import Index from "./pages/Index";
 import Journal from "./pages/Journal";
 import Insights from "./pages/Insights";
 import Chat from "./pages/Chat";
-import SmartChat from "./pages/SmartChat";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -107,11 +106,6 @@ const AppRoutes = () => {
             <Chat />
           </ProtectedRoute>
         } />
-        <Route path="/smart-chat" element={
-          <ProtectedRoute>
-            <SmartChat />
-          </ProtectedRoute>
-        } />
         <Route path="/settings" element={
           <ProtectedRoute>
             <Settings />
@@ -124,9 +118,6 @@ const AppRoutes = () => {
 };
 
 const App = () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
