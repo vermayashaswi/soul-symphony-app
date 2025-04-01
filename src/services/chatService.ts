@@ -45,6 +45,11 @@ export const processChatMessage = async (
         /how (happy|sad|angry|anxious|stressed|content|joyful|depressed)/i.test(userMessage) &&
         /(score|rate|level|out of|percentage|quantify)/i.test(userMessage);
       
+      const isHappinessScoreQuery = 
+        /(how much|what is|rate) (my|the) happiness/i.test(userMessage) ||
+        /happiness (score|rating|level)/i.test(userMessage) ||
+        /how happy (am i|was i|have i been)/i.test(userMessage);
+      
       const isTopEmotionsQuery = 
         /top\s+\d+\s+(positive|negative|intense|strong|happy|sad)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage) ||
         /(most|least)\s+(common|frequent|intense|strong)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage);
@@ -60,6 +65,7 @@ export const processChatMessage = async (
       if ((data.response.includes("couldn't find any") && data.fallbackToRag) || 
           (queryTypes.isQuantitative && !data.hasNumericResult) ||
           isQuantitativeEmotionQuery ||
+          isHappinessScoreQuery ||  // Added explicit check for happiness score queries
           isTopEmotionsQuery ||
           isEmotionRankingQuery ||
           isEmotionChangeQuery ||
@@ -89,6 +95,7 @@ export const processChatMessage = async (
           queryTypes: {
             ...queryTypes,
             // Enhance query types with more detailed classification
+            isHappinessQuery: /happiness|happy|joy|joyful|content|satisfaction/i.test(userMessage),
             isTopEmotionsQuery: /top\s+\d+\s+(positive|negative|intense|strong|happy|sad)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage),
             isEmotionRankingQuery: /rank\s+(my|the)\s+(emotion|emotions|feeling|feelings)/i.test(userMessage),
             isEmotionChangeQuery: /how\s+(have|has|did)\s+(my|the)\s+(emotion|emotions|feeling|feelings)\s+(change|evolve|develop|progress)/i.test(userMessage),

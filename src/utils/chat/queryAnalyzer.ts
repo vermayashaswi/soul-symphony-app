@@ -34,7 +34,7 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     'positive', 'negative', 'neutral', 'depressed', 'ecstatic', 'elated',
     'miserable', 'cheerful', 'gloomy', 'tense', 'relaxed', 'irritated',
     'pleased', 'annoyed', 'fulfilled', 'empty', 'overwhelmed', 'satisfaction',
-    'dissatisfaction', 'delight', 'displeasure', 'anguish', 'bliss'
+    'dissatisfaction', 'delight', 'displeasure', 'anguish', 'bliss', 'happiness'
   ];
   
   // Better detection of numbers and counts in queries
@@ -61,11 +61,16 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
   // Check for specific emotion quantification patterns
   const emotionQuantificationPattern = /(?:how|what)\s+(?:much|level|degree|extent|intensity|amount)\s+(?:of|did|do|does|is|am|are|was|were)\s+(?:i|me|my|himself|herself|yourself|they|we|us|you)?\s*(?:feel|feeling|felt|experience|experienced|have|having|had|get|getting|got)\s+(?:a|an)?\s*(?:emotionWord)/i;
   
+  // Special pattern for happiness rating
+  const happinessRatingPattern = /(?:how|what)\s+(?:much|level|is|was|would you)\s+(?:rate|score|my)?\s+(?:my|the)?\s*(?:happiness|joy|content|satisfaction)(?:\s+(?:out of|level|score|rating))?\s+(?:\d+|percent|percentage)?/i;
+  
   // Create dynamic pattern for each emotion word
   const hasEmotionQuantification = emotionWords.some(emotion => {
     const pattern = new RegExp(emotionQuantificationPattern.source.replace('emotionWord', emotion), 'i');
     return pattern.test(lowerQuery);
   });
+  
+  const hasHappinessRating = happinessRatingPattern.test(lowerQuery);
   
   const hasQuantitativeWords = quantitativeWords.some(word => 
     lowerQuery.includes(word)
@@ -98,16 +103,17 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
   const needsDataAggregation = hasTopEmotionsPattern || 
                               hasEmotionRankingPattern || 
                               hasEmotionChangePattern ||
+                              hasHappinessRating ||
                               (hasEmotionWords && (hasQuantitativeWords || hasNumbers || hasComparativeWords));
   
   return {
-    isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification,
+    isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification || hasHappinessRating,
     
     isTemporal: hasTemporalWords,
     
     isComparative: hasComparativeWords || hasTopEmotionsPattern || hasEmotionChangePattern,
     
-    isEmotionFocused: hasEmotionWords || hasTopEmotionsPattern || hasEmotionRankingPattern || hasEmotionQuantification,
+    isEmotionFocused: hasEmotionWords || hasTopEmotionsPattern || hasEmotionRankingPattern || hasEmotionQuantification || hasHappinessRating,
     
     hasTopEmotionsPattern,
     
@@ -117,13 +123,15 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     
     hasEmotionQuantification,
     
+    hasHappinessRating,
+    
     isWhenQuestion,
     
     needsContext,
     
     needsDataAggregation,
     
-    asksForNumber: hasNumbers || hasTopEmotionsPattern || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
+    asksForNumber: hasNumbers || hasTopEmotionsPattern || hasHappinessRating || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
     
     needsVectorSearch: true
   };
