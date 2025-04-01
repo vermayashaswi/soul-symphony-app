@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +23,9 @@ const Journal = () => {
   
   // Use stable references for entries
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
+
+  // Keep track of successfully processed entries
+  const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (user?.id) {
@@ -52,6 +54,29 @@ const Journal = () => {
       return () => clearInterval(pollingInterval);
     }
   }, [processingEntries, activeTab, fetchEntries]);
+
+  // Effect to check if a processing entry has been completed
+  useEffect(() => {
+    // We loop through all entries to see if any processing entries are now in the entries list
+    if (processingEntries.length > 0 && entries.length > 0) {
+      // Look for entries corresponding to processingEntries
+      const newlyCompletedTempIds = [];
+      
+      for (const entry of entries) {
+        if (processingEntries.includes(entry.foreignKey)) {
+          newlyCompletedTempIds.push(entry.foreignKey);
+          setProcessedEntryIds(prev => [...prev, entry.id]);
+        }
+      }
+      
+      // Remove completed entries from processing list
+      if (newlyCompletedTempIds.length > 0) {
+        setProcessingEntries(prev => 
+          prev.filter(id => !newlyCompletedTempIds.includes(id))
+        );
+      }
+    }
+  }, [entries, processingEntries]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -230,6 +255,7 @@ const Journal = () => {
                 entries={filteredEntries} 
                 loading={false} // We're handling loading separately now
                 processingEntries={processingEntries}
+                processedEntryIds={processedEntryIds}
                 onStartRecording={() => setActiveTab('record')}
                 onDeleteEntry={handleDeleteEntry}
               />

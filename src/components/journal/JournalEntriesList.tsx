@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -10,11 +11,19 @@ interface JournalEntriesListProps {
   entries: JournalEntry[];
   loading: boolean;
   processingEntries?: string[];
+  processedEntryIds?: number[];
   onStartRecording: () => void;
   onDeleteEntry?: (entryId: number) => void;
 }
 
-export default function JournalEntriesList({ entries, loading, processingEntries = [], onStartRecording, onDeleteEntry }: JournalEntriesListProps) {
+export default function JournalEntriesList({ 
+  entries, 
+  loading, 
+  processingEntries = [], 
+  processedEntryIds = [],
+  onStartRecording, 
+  onDeleteEntry 
+}: JournalEntriesListProps) {
   // We've moved primary loading state to the Journal page,
   // but keep this as a fallback
   if (loading) {
@@ -30,9 +39,13 @@ export default function JournalEntriesList({ entries, loading, processingEntries
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
 
+  // Check if there are any entries still being processed that haven't been found yet
+  const showProcessingMessage = processingEntries.length > 0 && 
+    !processingEntries.every(id => entries.some(entry => entry.foreignKey === id));
+
   return (
     <div>
-      {processingEntries && processingEntries.length > 0 && (
+      {showProcessingMessage && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

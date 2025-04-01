@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -403,7 +404,7 @@ const Index = () => {
           {features.map((feature, index) => (
             <motion.div key={feature.title} variants={itemVariants}>
               <Card className="h-full border-primary/20 overflow-hidden">
-                <CardHeader>
+                <CardHeader className="pb-2 flex flex-col items-center">
                   <motion.div 
                     variants={iconVariants}
                     initial="initial"
@@ -412,13 +413,13 @@ const Index = () => {
                   >
                     {feature.icon}
                   </motion.div>
-                  <CardTitle>{feature.title}</CardTitle>
-                  <CardDescription>{feature.description}</CardDescription>
+                  <CardTitle className="text-center">{feature.title}</CardTitle>
+                  <CardDescription className="text-center">{feature.description}</CardDescription>
                 </CardHeader>
-                <CardContent className="flex justify-center">
+                <CardContent className="flex justify-center pb-3">
                   {feature.visualComponent}
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="pt-0">
                   <Button 
                     className="w-full" 
                     onClick={feature.ctaAction}
