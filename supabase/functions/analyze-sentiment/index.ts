@@ -102,11 +102,17 @@ serve(async (req) => {
     }
 
     const result = await response.json();
-    const sentimentScore = result.documentSentiment?.score?.toString() || "0";
+    
+    // Return sentiment as a number, not a string
+    const sentimentScore = result.documentSentiment?.score || 0;
+    
+    // Also return magnitude for more complete sentiment information
+    const sentimentMagnitude = result.documentSentiment?.magnitude || 0;
     
     return new Response(
       JSON.stringify({ 
         sentiment: sentimentScore,
+        magnitude: sentimentMagnitude,
         success: true 
       }),
       { 
