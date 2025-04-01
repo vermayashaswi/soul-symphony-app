@@ -13,9 +13,18 @@ import { motion } from "framer-motion";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 
+// Create a type that includes only the roles allowed in the chat UI
+type UIChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+  references?: any[];
+  analysis?: any;
+  diagnostics?: any;
+}
+
 export default function SmartChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
+  const [chatHistory, setChatHistory] = useState<UIChatMessage[]>([]);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
@@ -67,7 +76,7 @@ export default function SmartChatInterface() {
           role: msg.sender === 'user' ? 'user' : 'assistant',
           content: msg.content,
           ...(msg.reference_entries && { references: msg.reference_entries })
-        })) as ChatMessageType[];
+        })) as UIChatMessage[];
         
         setChatHistory(formattedMessages);
         setShowSuggestions(false);
@@ -164,6 +173,14 @@ export default function SmartChatInterface() {
       const response = await processChatMessage(userMessage, user.id, queryTypes, threadId);
       console.log("Desktop: Response received with references:", response.references?.length || 0);
       
+      // Convert to UI-compatible message and filter out system/error roles
+      const uiResponse: UIChatMessage = {
+        role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
+        content: response.content,
+        ...(response.references && { references: response.references }),
+        ...(response.analysis && { analysis: response.analysis })
+      };
+      
       await supabase
         .from('chat_messages')
         .insert({
@@ -194,7 +211,7 @@ export default function SmartChatInterface() {
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
       
-      setChatHistory(prev => [...prev, response]);
+      setChatHistory(prev => [...prev, uiResponse]);
     } catch (error) {
       console.error("Error sending message:", error);
       toast({

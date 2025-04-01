@@ -13,6 +13,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 
+// Create a type that includes only the roles allowed in the chat UI
+type UIChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+  references?: any[];
+  analysis?: any;
+  diagnostics?: any;
+}
+
 interface MobileChatInterfaceProps {
   currentThreadId?: string | null;
   onSelectThread?: (threadId: string) => void;
@@ -26,7 +35,7 @@ export default function MobileChatInterface({
   onCreateNewThread,
   userId
 }: MobileChatInterfaceProps) {
-  const [messages, setMessages] = useState<ChatMessageType[]>([]);
+  const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
   const { toast } = useToast();
@@ -81,7 +90,7 @@ export default function MobileChatInterface({
           role: msg.sender === 'user' ? 'user' : 'assistant',
           content: msg.content,
           ...(msg.reference_entries && { references: msg.reference_entries })
-        })) as ChatMessageType[];
+        })) as UIChatMessage[];
         
         setMessages(formattedMessages);
       } else {
@@ -157,6 +166,14 @@ export default function MobileChatInterface({
       const response = await processChatMessage(message, user.id, queryTypes, threadId);
       console.log("Mobile: Response received with references:", response.references?.length || 0);
       
+      // Convert to UI-compatible message and filter out system/error roles
+      const uiResponse: UIChatMessage = {
+        role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
+        content: response.content,
+        ...(response.references && { references: response.references }),
+        ...(response.analysis && { analysis: response.analysis })
+      };
+      
       await supabase
         .from('chat_messages')
         .insert({
@@ -187,7 +204,7 @@ export default function MobileChatInterface({
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
       
-      setMessages(prev => [...prev, response]);
+      setMessages(prev => [...prev, uiResponse]);
     } catch (error) {
       console.error("Error sending message:", error);
       setMessages(prev => [
