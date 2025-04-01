@@ -9,7 +9,8 @@ CREATE OR REPLACE FUNCTION match_journal_entries(
 RETURNS TABLE (
   id bigint,
   content text,
-  similarity float
+  similarity float,
+  embedding vector(1536)
 )
 LANGUAGE plpgsql
 AS $$
@@ -18,7 +19,8 @@ BEGIN
   SELECT
     je.journal_entry_id AS id,
     je.content,
-    1 - (je.embedding <=> query_embedding) AS similarity
+    1 - (je.embedding <=> query_embedding) AS similarity,
+    je.embedding
   FROM
     journal_embeddings je
   JOIN

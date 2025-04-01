@@ -12,7 +12,8 @@ RETURNS TABLE (
   id bigint,
   content text,
   created_at timestamp with time zone,
-  similarity float
+  similarity float,
+  embedding vector(1536)
 )
 LANGUAGE plpgsql
 AS $$
@@ -22,7 +23,8 @@ BEGIN
     je.journal_entry_id AS id,
     je.content,
     entries.created_at,
-    1 - (je.embedding <=> query_embedding) AS similarity
+    1 - (je.embedding <=> query_embedding) AS similarity,
+    je.embedding
   FROM
     journal_embeddings je
   JOIN
