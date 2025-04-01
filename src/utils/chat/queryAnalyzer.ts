@@ -62,7 +62,31 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
   const emotionQuantificationPattern = /(?:how|what)\s+(?:much|level|degree|extent|intensity|amount)\s+(?:of|did|do|does|is|am|are|was|were)\s+(?:i|me|my|himself|herself|yourself|they|we|us|you)?\s*(?:feel|feeling|felt|experience|experienced|have|having|had|get|getting|got)\s+(?:a|an)?\s*(?:emotionWord)/i;
   
   // Special pattern for happiness rating
-  const happinessRatingPattern = /(?:how|what)\s+(?:much|level|is|was|would you)\s+(?:rate|score|my)?\s+(?:my|the)?\s*(?:happiness|joy|content|satisfaction)(?:\s+(?:out of|level|score|rating))?\s+(?:\d+|percent|percentage)?/i;
+  const happinessRatingPattern = /(?:how|what)\s+(?:much|level|is|was|would you rate)\s+(?:rate|score|my)?\s+(?:my|the)?\s*(?:happiness|joy|content|satisfaction)(?:\s+(?:out of|level|score|rating))?\s*(?:\d+|percent|percentage)?/i;
+  
+  // New pattern for explicit happiness rating questions like "how much would you rate my happiness out of 100"
+  const explicitHappinessRatingPattern = /(?:how|what).*(?:rate|score).*(?:happiness|joy|content|satisfaction).*(?:out of|from|between).*\d+/i;
+  
+  // Detect complex multi-part queries that should be broken down
+  const complexQueryPatterns = [
+    // Logical connectors
+    /(?:.*and.*){2,}/i,  // Multiple "and" connectors
+    /.*and.*but.*/i,     // Mixed "and" and "but"
+    /.*but.*and.*/i,     // Mixed "but" and "and"
+    /.*while.*also.*/i,  // "while also" construction
+    
+    // Multiple questions in one
+    /\?.*\?/i,           // Multiple question marks
+    
+    // Comparisons of multiple time periods
+    /(?:compare|contrast|difference).*(?:between|of).*(?:and).*/i,
+    
+    // Multi-faceted questions with combined aspects
+    /(?:both|all|several).*(aspect|dimension|factor).*(and).*/i,
+    
+    // Questions that explicitly state multiple parts
+    /(?:first|second|third|lastly|finally|moreover|additionally)/i
+  ];
   
   // Create dynamic pattern for each emotion word
   const hasEmotionQuantification = emotionWords.some(emotion => {
@@ -70,7 +94,7 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     return pattern.test(lowerQuery);
   });
   
-  const hasHappinessRating = happinessRatingPattern.test(lowerQuery);
+  const hasHappinessRating = happinessRatingPattern.test(lowerQuery) || explicitHappinessRatingPattern.test(lowerQuery);
   
   const hasQuantitativeWords = quantitativeWords.some(word => 
     lowerQuery.includes(word)
@@ -99,11 +123,18 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
   
   const needsContext = /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b|\bmeaning\b|\binterpret\b/.test(lowerQuery);
   
+  // Check if query is complex and needs breakdown by components
+  const isComplexQuery = complexQueryPatterns.some(pattern => pattern.test(lowerQuery)) ||
+                        (lowerQuery.split(' ').length > 12 && 
+                         (lowerQuery.includes(' and ') || lowerQuery.includes(' or ') || 
+                          lowerQuery.includes(' but ') || lowerQuery.includes(' while ')));
+  
   // Enhanced detection for queries that need data aggregation
   const needsDataAggregation = hasTopEmotionsPattern || 
                               hasEmotionRankingPattern || 
                               hasEmotionChangePattern ||
                               hasHappinessRating ||
+                              isComplexQuery ||
                               (hasEmotionWords && (hasQuantitativeWords || hasNumbers || hasComparativeWords));
   
   return {
@@ -130,6 +161,13 @@ export const analyzeQueryTypes = (query: string): Record<string, boolean> => {
     needsContext,
     
     needsDataAggregation,
+    
+    isComplexQuery,
+    
+    hasExplicitHappinessRating: explicitHappinessRatingPattern.test(lowerQuery),
+    
+    requiresComponentAnalysis: isComplexQuery || hasHappinessRating || hasTopEmotionsPattern || 
+                               (hasTemporalWords && hasEmotionWords && hasQuantitativeWords),
     
     asksForNumber: hasNumbers || hasTopEmotionsPattern || hasHappinessRating || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
     
