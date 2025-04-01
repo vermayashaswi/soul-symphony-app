@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Loader2, RefreshCw } from 'lucide-react';
 import EmptyJournalState from './EmptyJournalState';
 import { Card } from '@/components/ui/card';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -15,12 +15,6 @@ interface JournalEntriesListProps {
 }
 
 export default function JournalEntriesList({ entries, loading, processingEntries = [], onStartRecording, onDeleteEntry }: JournalEntriesListProps) {
-  const handleEntryDeleted = (deletedEntryId: number) => {
-    if (onDeleteEntry) {
-      onDeleteEntry(deletedEntryId);
-    }
-  };
-
   // We've moved primary loading state to the Journal page,
   // but keep this as a fallback
   if (loading) {
@@ -66,11 +60,24 @@ export default function JournalEntriesList({ entries, loading, processingEntries
         </div>
       </div>
 
-      <div className="space-y-4">
-        {entries.map((entry) => (
-          <JournalEntryCard key={entry.id} entry={entry} onDelete={handleEntryDeleted} />
-        ))}
-      </div>
+      <AnimatePresence>
+        <div className="space-y-4">
+          {entries.map((entry) => (
+            <motion.div
+              key={entry.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <JournalEntryCard 
+                entry={entry} 
+                onDelete={onDeleteEntry} 
+              />
+            </motion.div>
+          ))}
+        </div>
+      </AnimatePresence>
     </div>
   );
 }

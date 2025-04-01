@@ -15,6 +15,8 @@ import {
   DialogTrigger 
 } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface JournalEntry {
   id: number;
@@ -40,16 +42,43 @@ interface JournalEntryCardProps {
 export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
   const [isExpanded, setIsExpanded] = useState(true); // Changed to true by default
   const [open, setOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
   };
 
-  const handleDelete = () => {
-    if (onDelete && entry.id) {
-      onDelete(entry.id);
+  const handleDelete = async () => {
+    if (!entry.id) return;
+    
+    try {
+      setIsDeleting(true);
+      
+      // Delete the entry from the database
+      const { error } = await supabase
+        .from('Journal Entries')
+        .delete()
+        .eq('id', entry.id);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Close the dialog
       setOpen(false);
+      
+      // Call the onDelete callback to update the UI
+      if (onDelete) {
+        onDelete(entry.id);
+      }
+      
+      toast.success('Journal entry deleted');
+    } catch (error) {
+      console.error('Error deleting journal entry:', error);
+      toast.error('Failed to delete entry');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -93,11 +122,16 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={isDeleting}>
                   Cancel
                 </Button>
-                <Button type="submit" variant="destructive" onClick={handleDelete}>
-                  Delete
+                <Button 
+                  type="submit" 
+                  variant="destructive" 
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete'}
                 </Button>
               </DialogFooter>
             </DialogContent>

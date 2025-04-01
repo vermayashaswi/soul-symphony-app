@@ -156,6 +156,8 @@ const Journal = () => {
   };
 
   const handleDeleteEntry = (entryId: number) => {
+    console.log('Entry deleted, updating UI:', entryId);
+    // This will trigger a re-fetch of entries
     setRefreshKey(prev => prev + 1);
   };
 
