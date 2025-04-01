@@ -6,23 +6,23 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import ChatMessage from "./ChatMessage";
-import EmptyChatState from "./EmptyChatState";
 import ChatInput from "./ChatInput";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { motion } from "framer-motion";
 import SouloLogo from "@/components/SouloLogo";
+import { v4 as uuidv4 } from 'uuid';
+import { supabase } from "@/integrations/supabase/client";
 
 export default function SmartChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-  const isMobile = useIsMobile();
 
   const demoQuestions = [
     {
@@ -45,7 +45,56 @@ export default function SmartChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatHistory, isLoading]);
+    
+    // This effect will run when the currentThreadId changes
+    if (currentThreadId) {
+      loadThreadMessages(currentThreadId);
+    }
+  }, [chatHistory, isLoading, currentThreadId]);
+
+  // Load messages for a thread
+  const loadThreadMessages = async (threadId: string) => {
+    if (!threadId || !user?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const formattedMessages = data.map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+          ...(msg.reference_entries && { references: msg.reference_entries })
+        })) as ChatMessageType[];
+        
+        setChatHistory(formattedMessages);
+      } else {
+        setChatHistory([]);
+      }
+    } catch (error) {
+      console.error("Error loading messages:", error);
+    }
+  };
+
+  // Update current thread ID from parent component
+  useEffect(() => {
+    const onThreadChange = (event: CustomEvent) => {
+      if (event.detail.threadId) {
+        setCurrentThreadId(event.detail.threadId);
+      }
+    };
+    
+    window.addEventListener('threadSelected' as any, onThreadChange);
+    
+    return () => {
+      window.removeEventListener('threadSelected' as any, onThreadChange);
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -61,13 +110,94 @@ export default function SmartChatInterface() {
       return;
     }
     
+    // Create or use existing thread
+    let threadId = currentThreadId;
+    if (!threadId) {
+      try {
+        const newThreadId = uuidv4();
+        const { error } = await supabase
+          .from('chat_threads')
+          .insert({
+            id: newThreadId,
+            user_id: user.id,
+            title: "New Conversation",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        
+        if (error) throw error;
+        threadId = newThreadId;
+        setCurrentThreadId(newThreadId);
+        
+        // Dispatch event to notify parent component of new thread
+        window.dispatchEvent(
+          new CustomEvent('newThreadCreated', { 
+            detail: { threadId: newThreadId } 
+          })
+        );
+      } catch (error) {
+        console.error("Error creating thread:", error);
+        toast({
+          title: "Error",
+          description: "Failed to create new conversation",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
+    // Add to UI first for immediate feedback
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
     setShowSuggestions(false);
     
     try {
+      // Save message to database
+      const { error: msgError } = await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: threadId,
+          content: userMessage,
+          sender: 'user'
+        });
+        
+      if (msgError) throw msgError;
+      
+      // Process with AI
       const queryTypes = analyzeQueryTypes(userMessage);
       const response = await processChatMessage(userMessage, user.id, queryTypes);
+      
+      // Save AI response to database
+      await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: threadId,
+          content: response.content,
+          sender: 'assistant',
+          reference_entries: response.references || null
+        });
+      
+      // Update thread title if it's the first message
+      if (chatHistory.length === 0) {
+        const truncatedTitle = userMessage.length > 30 
+          ? userMessage.substring(0, 30) + "..." 
+          : userMessage;
+          
+        await supabase
+          .from('chat_threads')
+          .update({ 
+            title: truncatedTitle,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', threadId);
+      }
+      
+      // Always update thread's last activity timestamp
+      await supabase
+        .from('chat_threads')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', threadId);
+      
       setChatHistory(prev => [...prev, response]);
     } catch (error) {
       console.error("Error sending message:", error);

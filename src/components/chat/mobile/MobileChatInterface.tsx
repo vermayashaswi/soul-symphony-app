@@ -1,6 +1,7 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Loader2, BarChart4, ChevronDown, ChevronUp, Lightbulb, BarChart2, Search, Brain } from "lucide-react";
+import { Loader2, BarChart4, ChevronDown, ChevronUp, Lightbulb, BarChart2, Search, Brain, PanelLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -10,12 +11,18 @@ import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
 import { AnimatePresence, motion } from "framer-motion";
 import SouloLogo from "@/components/SouloLogo";
+import { v4 as uuidv4 } from 'uuid';
+import { supabase } from "@/integrations/supabase/client";
+import ChatThreadList from "@/components/chat/ChatThreadList";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export default function MobileChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -41,7 +48,118 @@ export default function MobileChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatHistory, isLoading]);
+    
+    // Check for active thread or create one
+    const checkOrCreateThread = async () => {
+      if (!user?.id) return;
+
+      try {
+        // Get most recent thread
+        const { data: threads, error } = await supabase
+          .from('chat_threads')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        if (error) throw error;
+
+        if (threads && threads.length > 0) {
+          setCurrentThreadId(threads[0].id);
+          // Load messages for this thread
+          loadThreadMessages(threads[0].id);
+        } else {
+          // Create a new thread if none exists
+          await createNewThread();
+        }
+      } catch (error) {
+        console.error("Error checking threads:", error);
+      }
+    };
+
+    checkOrCreateThread();
+  }, [user?.id]);
+
+  // Load messages for a thread
+  const loadThreadMessages = async (threadId: string) => {
+    if (!threadId || !user?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const formattedMessages = data.map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+          ...(msg.reference_entries && { references: msg.reference_entries })
+        })) as ChatMessageType[];
+        
+        setChatHistory(formattedMessages);
+      } else {
+        setChatHistory([]);
+      }
+    } catch (error) {
+      console.error("Error loading messages:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load chat history",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Create a new thread
+  const createNewThread = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const newThreadId = uuidv4();
+      const { error } = await supabase
+        .from('chat_threads')
+        .insert({
+          id: newThreadId,
+          user_id: user.id,
+          title: "New Conversation",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      setCurrentThreadId(newThreadId);
+      setChatHistory([]);
+      return newThreadId;
+    } catch (error) {
+      console.error("Error creating thread:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create new conversation",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle thread selection
+  const handleSelectThread = (threadId: string) => {
+    setCurrentThreadId(threadId);
+    loadThreadMessages(threadId);
+    setShowSidebar(false);
+  };
+
+  // Handle starting a new thread
+  const handleStartNewThread = async () => {
+    const newThreadId = await createNewThread();
+    if (newThreadId) {
+      setCurrentThreadId(newThreadId);
+      setChatHistory([]);
+      setShowSidebar(false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,13 +175,64 @@ export default function MobileChatInterface() {
       return;
     }
     
+    // Create thread if none exists
+    if (!currentThreadId) {
+      const newThreadId = await createNewThread();
+      if (!newThreadId) return;
+    }
+    
+    // Add to UI first for immediate feedback
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
     setShowSuggestions(false);
     
     try {
+      // Save message to database
+      const { error: msgError } = await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: currentThreadId,
+          content: userMessage,
+          sender: 'user'
+        });
+        
+      if (msgError) throw msgError;
+      
+      // Process with AI
       const queryTypes = analyzeQueryTypes(userMessage);
       const response = await processChatMessage(userMessage, user.id, queryTypes);
+      
+      // Save AI response to database
+      await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: currentThreadId,
+          content: response.content,
+          sender: 'assistant',
+          reference_entries: response.references || null
+        });
+      
+      // Update thread title if it's the first message
+      if (chatHistory.length === 0) {
+        const truncatedTitle = userMessage.length > 30 
+          ? userMessage.substring(0, 30) + "..." 
+          : userMessage;
+          
+        await supabase
+          .from('chat_threads')
+          .update({ 
+            title: truncatedTitle,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentThreadId);
+      }
+      
+      // Always update thread's last activity timestamp
+      await supabase
+        .from('chat_threads')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', currentThreadId);
+      
       setChatHistory(prev => [...prev, response]);
     } catch (error) {
       console.error("Error sending message:", error);
@@ -89,6 +258,21 @@ export default function MobileChatInterface() {
     <Card className="mobile-chat-interface w-full h-full flex flex-col rounded-none shadow-none border-0">
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center">
+          <Sheet open={showSidebar} onOpenChange={setShowSidebar}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="mr-2 h-8 w-8">
+                <PanelLeft className="h-4 w-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[250px] sm:w-[300px] p-0">
+              <ChatThreadList
+                userId={user?.id}
+                onSelectThread={handleSelectThread}
+                onStartNewThread={handleStartNewThread}
+                currentThreadId={currentThreadId}
+              />
+            </SheetContent>
+          </Sheet>
           <SouloLogo useColorTheme={true} className="w-6 h-6 mr-2" />
           <h2 className="text-lg font-semibold">AI Assistant</h2>
         </div>
