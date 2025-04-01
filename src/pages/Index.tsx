@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -298,7 +297,7 @@ const Index = () => {
       icon: <MessageSquare className="h-10 w-10 text-primary" />,
       animation: itemVariants,
       cta: "Start Chatting",
-      ctaAction: () => navigateToFeature('/chat'),
+      ctaAction: () => navigateToFeature('/smart-chat'),
       visualComponent: (
         <motion.div 
           className="flex flex-col gap-2 min-h-[120px]"
