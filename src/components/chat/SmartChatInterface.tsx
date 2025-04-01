@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
@@ -14,7 +13,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// Create a type that includes only the roles allowed in the chat UI
 type UIChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -25,7 +23,6 @@ type UIChatMessage = {
   isLoading?: boolean;
 }
 
-// Define a type for the chat message from the database
 type DbChatMessage = {
   content: string;
   created_at: string;
@@ -33,7 +30,6 @@ type DbChatMessage = {
   reference_entries: any;
   sender: string;
   thread_id: string;
-  // Add optional fields that might not be present in all database records
   analysis_data?: any;
   has_numeric_result?: boolean;
 }
@@ -170,10 +166,8 @@ export default function SmartChatInterface() {
       }
     }
     
-    // Add user message to chat history
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
     
-    // Add AI thinking message
     setChatHistory(prev => [...prev, { 
       role: 'assistant', 
       content: 'Thinking...',
@@ -183,7 +177,6 @@ export default function SmartChatInterface() {
     setIsLoading(true);
     setShowSuggestions(false);
     
-    // Analyze the query to provide more specific processing stages
     const queryTypes = analyzeQueryTypes(userMessage);
     
     try {
@@ -199,15 +192,12 @@ export default function SmartChatInterface() {
       
       console.log("Desktop: Performing comprehensive query analysis");
       
-      // Update the AI thinking message with the current stage
       setChatHistory(prev => {
         const updatedHistory = [...prev];
         const loadingMsgIndex = updatedHistory.findIndex(msg => msg.isLoading);
         if (loadingMsgIndex !== -1) {
-          // Start with initial stage
           let stageName = "Analyzing your question...";
           
-          // Update stage based on query analysis
           if (queryTypes.isQuantitative && queryTypes.isEmotionFocused) {
             stageName = "Analyzing your emotions and calculating results...";
           } else if (queryTypes.isWhyQuestion) {
@@ -224,7 +214,6 @@ export default function SmartChatInterface() {
       
       console.log("Desktop: Query analysis result:", queryTypes);
       
-      // Update stage again based on query progress
       setTimeout(() => {
         setChatHistory(prev => {
           const updatedHistory = [...prev];
@@ -248,7 +237,6 @@ export default function SmartChatInterface() {
       const response = await processChatMessage(userMessage, user.id, queryTypes, threadId);
       console.log("Desktop: Response received with references:", response.references?.length || 0);
       
-      // Convert to UI-compatible message and filter out system/error roles
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
         content: response.content,
@@ -287,7 +275,6 @@ export default function SmartChatInterface() {
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
       
-      // Remove the loading message and add the actual response
       setChatHistory(prev => {
         const filteredHistory = prev.filter(msg => !msg.isLoading);
         return [...filteredHistory, uiResponse];
@@ -300,7 +287,6 @@ export default function SmartChatInterface() {
         variant: "destructive"
       });
       
-      // Remove the loading message and add an error message
       setChatHistory(prev => {
         const filteredHistory = prev.filter(msg => !msg.isLoading);
         return [
@@ -376,7 +362,7 @@ export default function SmartChatInterface() {
                   <div key={idx} className="flex items-start gap-3">
                     <div className="w-10 h-10 rounded-full flex-shrink-0">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src="/roha-avatar.png" alt="Roha" />
+                        <AvatarImage src="/lovable-uploads/20d23e7b-7e39-464d-816e-1d4a22b07283.png" alt="Roha" />
                         <AvatarFallback className="bg-primary/10">
                           <Loader2 className="h-5 w-5 text-primary animate-spin" />
                         </AvatarFallback>

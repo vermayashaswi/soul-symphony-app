@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,6 @@ import ChatThreadList from "@/components/chat/ChatThreadList";
 import { Json } from "@/integrations/supabase/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// Create a type that includes only the roles allowed in the chat UI
 type UIChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -26,7 +24,6 @@ type UIChatMessage = {
   isLoading?: boolean;
 }
 
-// Define a type for the chat message from database with all expected fields
 type ChatMessageFromDB = {
   content: string;
   created_at: string;
@@ -170,10 +167,8 @@ export default function MobileChatInterface({
       }
     }
     
-    // Add user message to UI immediately
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     
-    // Add AI thinking message
     setMessages(prev => [...prev, { 
       role: 'assistant', 
       content: 'Thinking...',
@@ -184,7 +179,6 @@ export default function MobileChatInterface({
     setProcessingStage("Analyzing your question...");
     
     try {
-      // Store user message in database
       const { error: msgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -195,10 +189,8 @@ export default function MobileChatInterface({
         
       if (msgError) throw msgError;
       
-      // Begin RAG pipeline - Step 1: Query Analysis
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
       
-      // Update the AI thinking message with the current stage
       setMessages(prev => {
         const updatedMessages = [...prev];
         const loadingMsgIndex = updatedMessages.findIndex(msg => msg.isLoading);
@@ -212,7 +204,6 @@ export default function MobileChatInterface({
       const queryTypes = analyzeQueryTypes(message);
       console.log("[Mobile] Query analysis result:", queryTypes);
       
-      // Update stage again based on query progress
       setTimeout(() => {
         setMessages(prev => {
           const updatedMessages = [...prev];
@@ -225,7 +216,6 @@ export default function MobileChatInterface({
         setProcessingStage("Searching for insights...");
       }, 1500);
       
-      // Step 2-10: Process message through RAG pipeline
       const response = await processChatMessage(message, user.id, queryTypes, threadId);
       console.log("[Mobile] Response received:", {
         role: response.role,
@@ -236,7 +226,6 @@ export default function MobileChatInterface({
         errorState: response.role === 'error'
       });
       
-      // Step 11: Convert to UI-compatible message and filter out system/error roles
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
         content: response.content,
@@ -245,12 +234,10 @@ export default function MobileChatInterface({
         ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
       };
       
-      // Check if the response indicates an error or failed retrieval
       if (response.role === 'error' || response.content.includes("issue retrieving")) {
         console.error("[Mobile] Received error response:", response.content);
       }
       
-      // Store assistant response in database
       const { error: storeError } = await supabase
         .from('chat_messages')
         .insert({
@@ -266,7 +253,6 @@ export default function MobileChatInterface({
         console.error("[Mobile] Error storing assistant response:", storeError);
       }
       
-      // For new threads, set a title based on first message
       if (messages.length <= 2) {
         const truncatedTitle = message.length > 30 
           ? message.substring(0, 30) + "..." 
@@ -281,13 +267,11 @@ export default function MobileChatInterface({
           .eq('id', threadId);
       }
       
-      // Update thread's last activity timestamp
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
       
-      // Step 12: Update UI with assistant response
       setMessages(prev => {
         const filteredMessages = prev.filter(msg => !msg.isLoading);
         return [...filteredMessages, uiResponse];
@@ -364,7 +348,7 @@ export default function MobileChatInterface({
                 <div key={index} className="relative flex items-start gap-2 justify-start">
                   <div className="w-8 h-8 rounded-full flex-shrink-0">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src="/roha-avatar.png" alt="Roha" />
+                      <AvatarImage src="/lovable-uploads/20d23e7b-7e39-464d-816e-1d4a22b07283.png" alt="Roha" />
                       <AvatarFallback className="bg-primary/10">
                         <Loader2 className="h-4 w-4 text-primary animate-spin" />
                       </AvatarFallback>
