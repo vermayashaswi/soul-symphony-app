@@ -61,6 +61,8 @@ async function generateQueryAnalysis(message: string, entryCount: number) {
         - dynamic_query: true or false, if the query needs dynamic values
       - expected_response_format: A description of how the final response should be formatted.
       
+      IMPORTANT: The database table name is "Journal Entries" (with a space and capital letters), not "journal_entries". Always use double quotes around the table name in SQL queries.
+      
       Example:
       User Query: "How did I feel about my friend Sarah last week?"
       
@@ -77,7 +79,7 @@ async function generateQueryAnalysis(message: string, entryCount: number) {
           {
             "step": "Retrieve all journal entries related to Sarah from last week.",
             "step_type": "sql_query",
-            "sql_query": "SELECT id, text, emotions FROM journal_entries WHERE user_id = $1 AND entities LIKE '%Sarah%' AND date >= 'start_date' AND date <= 'end_date'",
+            "sql_query": "SELECT id, \"refined text\" as text, emotions FROM \"Journal Entries\" WHERE user_id = $1 AND entities LIKE '%Sarah%' AND created_at >= 'start_date' AND created_at <= 'end_date'",
             "data_fields": ["id", "text", "emotions"],
             "filters": ["user_id", "entities", "date"],
             "dynamic_query": false
@@ -93,7 +95,9 @@ async function generateQueryAnalysis(message: string, entryCount: number) {
         "expected_response_format": "A summary of the user's feelings about Sarah last week, based on the emotions expressed in their journal entries."
       }
       
-      Now, analyze the following query. Keep the analysis concise and use valid JSON format:
+      Now, analyze the following query. Keep the analysis concise and use valid JSON format.
+      Remember to use "Journal Entries" (with double quotes) as the table name in all SQL queries.
+      
       User Query: "${message}"
       
       Available journal entries: ${entryCount}
