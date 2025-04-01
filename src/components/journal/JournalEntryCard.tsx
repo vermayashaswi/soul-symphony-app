@@ -32,7 +32,7 @@ export interface JournalEntry {
     text: string;
     type: string;
   }[];
-  foreignKey?: string; // Added foreignKey property
+  foreignKey?: string;
 }
 
 interface JournalEntryCardProps {
@@ -41,7 +41,7 @@ interface JournalEntryCardProps {
 }
 
 export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
-  const [isExpanded, setIsExpanded] = useState(true); // Changed to true by default
+  const [isExpanded, setIsExpanded] = useState(true);
   const [open, setOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();

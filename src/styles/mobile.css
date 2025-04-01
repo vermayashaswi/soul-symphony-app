@@ -40,6 +40,18 @@
     margin-bottom: 0.5rem !important;
   }
   
+  /* Adjust card headers on home page */
+  .card .card-header {
+    padding-top: 1rem;
+    padding-bottom: 0.5rem;
+  }
+  
+  /* Compact card titles and icons */
+  .card .card-title {
+    display: inline-flex;
+    align-items: center;
+  }
+  
   /* Add some bounce animations for mobile interactions */
   @keyframes mobile-bounce {
     0%, 100% { transform: translateY(0); }
