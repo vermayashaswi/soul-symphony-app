@@ -39,6 +39,74 @@ async function countJournalEntries(userId: string): Promise<number> {
   return count || 0;
 }
 
+// Utility function to get date range based on time range
+function getDateRangeForTimeframe(timeframe: string): { startDate: string, endDate: string } {
+  const now = new Date();
+  let startDate = new Date();
+  let endDate = new Date();
+
+  // Set end date to current time
+  endDate = now;
+
+  // Calculate start date based on timeframe
+  if (timeframe === 'last month' || timeframe === 'previous month') {
+    // First day of previous month
+    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    // Last day of previous month
+    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  } else if (timeframe === 'this month' || timeframe === 'current month') {
+    // First day of current month
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Current day
+    endDate = now;
+  } else if (timeframe === 'last week' || timeframe === 'previous week') {
+    // Start of previous week (Monday)
+    const dayOfWeek = now.getDay();
+    const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1) - 7;
+    startDate = new Date(now.getFullYear(), now.getMonth(), diff);
+    // End of previous week (Sunday)
+    endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    endDate.setHours(23, 59, 59, 999);
+  } else if (timeframe === 'this week' || timeframe === 'current week') {
+    // Start of current week (Monday)
+    const dayOfWeek = now.getDay();
+    const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    startDate = new Date(now.getFullYear(), now.getMonth(), diff);
+    // Current day
+    endDate = now;
+  } else if (timeframe === 'yesterday') {
+    // Yesterday
+    startDate = new Date(now);
+    startDate.setDate(now.getDate() - 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(startDate);
+    endDate.setHours(23, 59, 59, 999);
+  } else if (timeframe === 'today') {
+    // Today
+    startDate = new Date(now);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = now;
+  } else if (timeframe === 'last year' || timeframe === 'previous year') {
+    // Last year
+    startDate = new Date(now.getFullYear() - 1, 0, 1);
+    endDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+  } else if (timeframe === 'this year' || timeframe === 'current year') {
+    // This year
+    startDate = new Date(now.getFullYear(), 0, 1);
+    endDate = now;
+  } else {
+    // Default to last 30 days if timeframe not recognized
+    startDate = new Date();
+    startDate.setDate(now.getDate() - 30);
+  }
+
+  return {
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString()
+  };
+}
+
 // Utility function to analyze the query using OpenAI
 async function generateQueryAnalysis(message: string, entryCount: number) {
   try {
@@ -79,7 +147,7 @@ async function generateQueryAnalysis(message: string, entryCount: number) {
           {
             "step": "Retrieve all journal entries related to Sarah from last week.",
             "step_type": "sql_query",
-            "sql_query": "SELECT id, \"refined text\" as text, emotions FROM \"Journal Entries\" WHERE user_id = $1 AND entities LIKE '%Sarah%' AND created_at >= 'start_date' AND created_at <= 'end_date'",
+            "sql_query": "SELECT id, \\"refined text\\" as text, emotions FROM \\"Journal Entries\\" WHERE user_id = $1 AND entities LIKE '%Sarah%' AND created_at >= '__LAST_WEEK_START__' AND created_at <= '__LAST_WEEK_END__'",
             "data_fields": ["id", "text", "emotions"],
             "filters": ["user_id", "entities", "date"],
             "dynamic_query": false
@@ -97,6 +165,10 @@ async function generateQueryAnalysis(message: string, entryCount: number) {
       
       Now, analyze the following query. Keep the analysis concise and use valid JSON format.
       Remember to use "Journal Entries" (with double quotes) as the table name in all SQL queries.
+      IMPORTANT: For time-based queries, use the following date variables instead of hardcoded strings:
+      - __LAST_MONTH_START__ and __LAST_MONTH_END__ for last month
+      - __LAST_WEEK_START__ and __LAST_WEEK_END__ for last week
+      - __CURRENT_MONTH_START__ for current month start
       
       User Query: "${message}"
       
@@ -186,6 +258,15 @@ serve(async (req) => {
         
         if (step.step_type === 'sql_query' && step.sql_query) {
           let cleanedQuery = step.sql_query.trim().replace(/;$/, '');
+          
+          // Replace time variables with actual date values
+          if (queryAnalysisPlan.time_range && typeof queryAnalysisPlan.time_range === 'string') {
+            const timeRange = queryAnalysisPlan.time_range.toLowerCase();
+            const dateRange = getDateRangeForTimeframe(timeRange);
+            
+            // These replacements will happen inside the execute_dynamic_query function
+            console.log(`Using time range: ${timeRange}, Start: ${dateRange.startDate}, End: ${dateRange.endDate}`);
+          }
           
           try {
             let result;
@@ -396,7 +477,7 @@ async function regenerateImprovedSqlQuery(originalQuery, errorMessage, userQuest
             - Fix array functions
             - Fix parameter references ($1 is often user_id)
             - Fix table and column names (remember "Journal Entries" needs double quotes)
-            - Fix time range filters (ensure proper timestamp format)`
+            - Fix time range filters (use __LAST_MONTH_START__, __LAST_MONTH_END__, __LAST_WEEK_START__, __LAST_WEEK_END__, etc.)`
           },
           {
             role: 'user',
@@ -406,7 +487,7 @@ async function regenerateImprovedSqlQuery(originalQuery, errorMessage, userQuest
             
             User was asking: "${userQuestion}"
             
-            Provide only the corrected SQL query with no explanations or extra text.`
+            Provide only the corrected SQL query with no explanations or extra text. Replace hardcoded date strings with variables like __LAST_MONTH_START__ if appropriate.`
           }
         ],
         temperature: 0.2,
@@ -429,7 +510,32 @@ async function regenerateImprovedSqlQuery(originalQuery, errorMessage, userQuest
 }
 
 async function executeDirectSqlQuery(query, userId) {
-  const finalQuery = query.replace(/\$1/g, `'${userId}'`);
+  // Replace variables with actual dates
+  const now = new Date();
+  
+  // Last month
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  
+  // Current month
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  
+  // Last week (Monday-Sunday)
+  const dayOfWeek = now.getDay();
+  const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1) - 7;
+  const lastWeekStart = new Date(now.getFullYear(), now.getMonth(), diff);
+  const lastWeekEnd = new Date(lastWeekStart);
+  lastWeekEnd.setDate(lastWeekStart.getDate() + 6);
+  lastWeekEnd.setHours(23, 59, 59, 999);
+  
+  let finalQuery = query;
+  finalQuery = finalQuery.replace(/__LAST_MONTH_START__/g, `'${lastMonthStart.toISOString()}'`);
+  finalQuery = finalQuery.replace(/__LAST_MONTH_END__/g, `'${lastMonthEnd.toISOString()}'`);
+  finalQuery = finalQuery.replace(/__CURRENT_MONTH_START__/g, `'${currentMonthStart.toISOString()}'`);
+  finalQuery = finalQuery.replace(/__LAST_WEEK_START__/g, `'${lastWeekStart.toISOString()}'`);
+  finalQuery = finalQuery.replace(/__LAST_WEEK_END__/g, `'${lastWeekEnd.toISOString()}'`);
+  
+  finalQuery = finalQuery.replace(/\$1/g, `'${userId}'`);
   
   try {
     console.log("Executing SQL query:", finalQuery);
