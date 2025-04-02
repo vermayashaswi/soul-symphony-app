@@ -23,10 +23,28 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       const timeoutController = new AbortController();
       const timeoutId = setTimeout(() => timeoutController.abort(), 15000); // 15 second timeout
       
+      // Create a signal that works with both the timeout and any existing signal
+      let finalSignal = timeoutController.signal;
+      if (fetchOptions.signal) {
+        // This combines the timeout signal with any existing signal
+        const existingSignal = fetchOptions.signal;
+        finalSignal = new AbortController().signal;
+        
+        // Watch both signals
+        const abortHandler = () => {
+          timeoutController.abort();
+          clearTimeout(timeoutId);
+        };
+        existingSignal.addEventListener('abort', abortHandler);
+        timeoutController.signal.addEventListener('abort', () => {
+          clearTimeout(timeoutId);
+        });
+      }
+      
       return fetch(url, { 
         ...fetchOptions,
         headers,
-        signal: timeoutController.signal 
+        signal: finalSignal 
       }).finally(() => {
         clearTimeout(timeoutId);
       });

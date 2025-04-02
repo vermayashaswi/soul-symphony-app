@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase, isChunkingSupported, checkEdgeFunctionsHealth } from '@/integrations/supabase/client';
@@ -67,7 +68,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       // Create a promise that will reject after a timeout
       const timeoutPromise = new Promise<{success: false; error: string}>((_, reject) => {
-        setTimeout(() => reject(new Error('Function call timed out')), 10000);
+        setTimeout(() => reject(new Error('Function call timed out')), 15000);
       });
       
       // Create the actual function call
@@ -79,6 +80,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const result = await Promise.race([functionCallPromise, timeoutPromise])
         .catch(error => {
           console.error('Error or timeout in process-journal function:', error);
+          // Try a direct health check to diagnose the issue
+          checkEdgeFunctionsHealth().then(status => {
+            console.log('Edge function health after failure:', status);
+            setEdgeFunctionsHealth(status);
+          });
           return { success: false, error: error.message || 'Function call failed' };
         });
       
