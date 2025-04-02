@@ -72,7 +72,14 @@ export function useInsightsData() {
           
         if (emotionsError) throw emotionsError;
         
-        setEmotionsData(emotionsRawData || []);
+        // Type assertion to ensure correct typing for emotionsData
+        const typedEmotionsData: EmotionData[] = emotionsRawData ? emotionsRawData.map((item: any) => ({
+          emotion: item.emotion,
+          score: item.score,
+          sample_entries: Array.isArray(item.sample_entries) ? item.sample_entries : []
+        })) : [];
+        
+        setEmotionsData(typedEmotionsData);
       } catch (err: any) {
         console.error('Error fetching insights data:', err);
         setError(err.message || 'Failed to load insights data');

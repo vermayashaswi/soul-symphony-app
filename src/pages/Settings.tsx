@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -26,10 +27,11 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Loader2 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 
 const Settings = () => {
   const { user, signOut, updateUserProfile } = useAuth();
-  const router = useRouter();
+  const navigate = useNavigate();
   const [fullName, setFullName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -46,7 +48,7 @@ const Settings = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      router.push('/login');
+      navigate('/login');
     } catch (error) {
       console.error('Sign out failed:', error);
       toast.error('Sign out failed');
@@ -99,6 +101,8 @@ const Settings = () => {
             <CardDescription>Update your profile details here.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
+            <ProfilePictureUpload />
+            
             <div className="grid gap-2">
               <Label htmlFor="name">Full Name</Label>
               <Input
