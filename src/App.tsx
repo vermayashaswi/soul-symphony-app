@@ -169,9 +169,9 @@ function App() {
   return (
     <div className="app-container">
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <AuthProvider>
-            <ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <TooltipProvider>
               <div className="relative min-h-screen">
                 <div className="relative z-10">
                   <Toaster />
@@ -183,9 +183,9 @@ function App() {
                   </BrowserRouter>
                 </div>
               </div>
-            </ThemeProvider>
-          </AuthProvider>
-        </TooltipProvider>
+            </TooltipProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </div>
   );

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Calendar } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isWithinInterval } from 'date-fns';
@@ -6,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { JournalInsight, TimeRange } from '@/hooks/use-insights-data';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 type SentimentCalendarProps = {
   entries: JournalInsight[];
