@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -118,9 +119,9 @@ const Journal = () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         const { data, error } = await supabase
-          .from('Journal Entries')
+          .from('"Journal Entries"')
           .select('id, "refined text"')
-          .eq('foreign key', tempId)
+          .eq('"foreign key"', tempId)
           .single();
           
         if (error) {

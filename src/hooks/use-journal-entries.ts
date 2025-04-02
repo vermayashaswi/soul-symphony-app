@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,8 +33,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const fetchStartTime = Date.now();
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
+      // Make sure to use the correct table name with quotes
       const { data, error, status } = await supabase
-        .from('Journal Entries')
+        .from('"Journal Entries"')  // Use quotes for table name with spaces
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
