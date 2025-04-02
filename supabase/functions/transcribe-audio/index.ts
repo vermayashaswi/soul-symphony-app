@@ -60,11 +60,14 @@ serve(async (req) => {
       await createProfileIfNeeded(userId);
     }
     
+    // Add debug logging and timing information
     console.log("Audio data length:", audio.length);
     console.log("OpenAI API Key available:", !!openAIApiKey);
     
+    const startTime = Date.now();
     const binaryAudio = processBase64Chunks(audio);
-    console.log("Processed binary audio size:", binaryAudio.length);
+    const processTime = Date.now() - startTime;
+    console.log("Processed binary audio size:", binaryAudio.length, `in ${processTime}ms`);
 
     if (binaryAudio.length === 0) {
       throw new Error('Failed to process audio data - empty result');
@@ -122,6 +125,8 @@ serve(async (req) => {
     if (detectedFileType === 'mp4') mimeType = 'audio/mp4';
     if (detectedFileType === 'wav') mimeType = 'audio/wav';
     
+    // Track timing for Whisper API call
+    console.log("Creating audio blob...");
     const blob = new Blob([binaryAudio], { type: mimeType });
     formData.append('file', blob, `audio.${detectedFileType}`);
     
@@ -138,6 +143,9 @@ serve(async (req) => {
     console.log("Using file type:", detectedFileType, "with MIME type:", mimeType);
     
     try {
+      const whisperStartTime = Date.now();
+      console.log(`Starting Whisper API call at ${new Date().toISOString()}`);
+      
       const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
@@ -145,6 +153,9 @@ serve(async (req) => {
         },
         body: formData,
       });
+      
+      const whisperEndTime = Date.now();
+      console.log(`Whisper API call completed in ${whisperEndTime - whisperStartTime}ms`);
 
       if (!whisperResponse.ok) {
         const errorText = await whisperResponse.text();
@@ -155,7 +166,7 @@ serve(async (req) => {
       const whisperResult = await whisperResponse.json();
       const transcribedText = whisperResult.text;
       
-      console.log("Transcription successful:", transcribedText);
+      console.log("Transcription successful:", transcribedText ? transcribedText.substring(0, 100) + '...' : 'Empty result');
 
       // If we're in direct transcription mode, simply return the transcribed text
       if (directTranscription) {
@@ -171,6 +182,9 @@ serve(async (req) => {
       }
 
       // Continue with the standard processing flow for journal entries
+      const gptStartTime = Date.now();
+      console.log(`Starting GPT refinement at ${new Date().toISOString()}`);
+      
       const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -191,6 +205,9 @@ serve(async (req) => {
           ],
         }),
       });
+      
+      const gptEndTime = Date.now();
+      console.log(`GPT refinement completed in ${gptEndTime - gptStartTime}ms`);
 
       if (!gptResponse.ok) {
         const errorText = await gptResponse.text();
@@ -201,7 +218,7 @@ serve(async (req) => {
       const gptResult = await gptResponse.json();
       const refinedText = gptResult.choices[0].message.content;
       
-      console.log("Refinement successful:", refinedText);
+      console.log("Refinement successful:", refinedText ? refinedText.substring(0, 100) + '...' : 'Empty result');
 
       const emotions = await analyzeEmotions(refinedText);
       console.log("Emotion analysis:", emotions);
@@ -226,7 +243,8 @@ serve(async (req) => {
               "duration": audioDuration,
               "emotions": emotions,
               "sentiment": sentimentScore,
-              "entities": entities
+              "entities": entities,
+              "foreign key": payload.tempId || null
             }])
             .select();
               
@@ -295,6 +313,9 @@ serve(async (req) => {
         console.error('Error verifying entry in database:', verifyErr);
       }
 
+      const totalProcessTime = Date.now() - startTime;
+      console.log(`Total processing time: ${totalProcessTime}ms`);
+      
       return new Response(
         JSON.stringify({
           transcription: transcribedText,
@@ -304,6 +325,7 @@ serve(async (req) => {
           emotions: emotions,
           sentiment: sentimentScore,
           entities: entities,
+          processingTime: totalProcessTime,
           success: true
         }),
         { 
