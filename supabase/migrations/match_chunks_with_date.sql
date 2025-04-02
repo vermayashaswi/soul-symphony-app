@@ -38,7 +38,7 @@ BEGIN
   FROM
     journal_chunks chunks
   JOIN
-    "Journal Entries" entries ON chunks.journal_entry_id = entries.id
+    "Journal_Entries" entries ON chunks.journal_entry_id = entries.id
   WHERE 
     1 - (chunks.embedding <=> query_embedding) > match_threshold
     AND entries.user_id = user_id_filter::text  -- Cast UUID to text to match column type

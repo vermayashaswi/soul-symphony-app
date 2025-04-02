@@ -1,7 +1,6 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -140,7 +139,7 @@ async function processJournalEntry(entryId: number): Promise<boolean> {
   try {
     // Fetch the journal entry
     const { data: entry, error: entryError } = await supabase
-      .from('Journal Entries')
+      .from('Journal_Entries')
       .select('id, "refined text", "transcription text", is_chunked')
       .eq('id', entryId)
       .single();
@@ -199,7 +198,7 @@ async function processJournalEntry(entryId: number): Promise<boolean> {
     
     // Mark the entry as chunked
     const { error: updateError } = await supabase
-      .from('Journal Entries')
+      .from('Journal_Entries')
       .update({
         is_chunked: true,
         chunks_count: chunks.length
