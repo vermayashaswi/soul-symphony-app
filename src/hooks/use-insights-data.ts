@@ -31,7 +31,7 @@ export type TimelineData = {
 
 export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'all';
 
-export type AggregatedEmotionData = EmotionData[];
+export type AggregatedEmotionData = Record<string, Array<{ date: string; value: number }>>;
 
 export type InsightsOverview = {
   totalEntries: number;
@@ -119,7 +119,6 @@ export function useInsightsData() {
       }));
       
       // Generate timeline data (simplified for demonstration)
-      // Create an empty array with proper typing to avoid assignment errors
       const timelineData: TimelineData[] = [];
       
       setInsights({

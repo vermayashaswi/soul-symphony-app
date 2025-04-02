@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -7,12 +6,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-export function ProfilePictureUpload() {
+interface ProfilePictureUploadProps {
+  avatarUrl?: string | null;
+  onUploadComplete?: (avatarUrl: string) => Promise<void>;
+  isLoading?: boolean;
+}
+
+export function ProfilePictureUpload({ 
+  avatarUrl, 
+  onUploadComplete,
+  isLoading = false 
+}: ProfilePictureUploadProps) {
   const { user, updateUserProfile } = useAuth();
   const [uploading, setUploading] = useState(false);
   
-  // Get the avatar URL from the user metadata or default to an empty string
-  const avatarUrl = user?.user_metadata?.avatar_url || '';
+  // Get the avatar URL from the user metadata, props, or default to an empty string
+  const displayAvatarUrl = avatarUrl || user?.user_metadata?.avatar_url || '';
 
   const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -41,15 +50,20 @@ export function ProfilePictureUpload() {
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // Update user metadata with the new avatar URL
-      const success = await updateUserProfile({
-        avatar_url: publicUrl,
-      });
-
-      if (success) {
-        toast.success('Profile picture updated');
+      // If the custom handler is provided, use it
+      if (onUploadComplete) {
+        await onUploadComplete(publicUrl);
       } else {
-        toast.error('Failed to update profile');
+        // Otherwise update user metadata with the new avatar URL
+        const success = await updateUserProfile({
+          avatar_url: publicUrl,
+        });
+
+        if (success) {
+          toast.success('Profile picture updated');
+        } else {
+          toast.error('Failed to update profile');
+        }
       }
     } catch (error: any) {
       console.error('Error uploading avatar:', error.message);
@@ -62,7 +76,7 @@ export function ProfilePictureUpload() {
   return (
     <div className="flex flex-col items-center">
       <Avatar className="h-24 w-24 mb-4 relative">
-        <AvatarImage src={avatarUrl} />
+        <AvatarImage src={displayAvatarUrl} />
         <AvatarFallback>
           {user?.email?.substring(0, 2).toUpperCase() || "U"}
         </AvatarFallback>
@@ -73,7 +87,7 @@ export function ProfilePictureUpload() {
           variant="outline" 
           size="sm" 
           className="flex items-center gap-2"
-          disabled={uploading}
+          disabled={uploading || isLoading}
         >
           {uploading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -86,7 +100,7 @@ export function ProfilePictureUpload() {
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             accept="image/*"
             onChange={uploadAvatar}
-            disabled={uploading}
+            disabled={uploading || isLoading}
           />
         </Button>
       </div>
