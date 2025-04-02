@@ -217,7 +217,7 @@ serve(async (req) => {
       if (transcribedText) {
         try {
           const { data: entryData, error: insertError } = await supabase
-            .from('Journal_Entries')  // Updated to use Journal_Entries with underscore
+            .from('Journal Entries')
             .insert([{ 
               "transcription text": transcribedText,
               "refined text": refinedText,
@@ -277,18 +277,22 @@ serve(async (req) => {
       }
 
       // After successful database insertion, verify the entry was added
-      if (entryId) {
-        const { data: verifyEntry, error: verifyError } = await supabase
-          .from('Journal_Entries')  // Updated to use Journal_Entries with underscore
-          .select('id')
-          .eq('id', entryId)
-          .single();
-          
-        if (verifyError || !verifyEntry) {
-          console.error('Failed to verify entry in database:', verifyError);
-        } else {
-          console.log('Entry successfully verified in database:', verifyEntry.id);
+      try {
+        if (entryId) {
+          const { data: verifyEntry, error: verifyError } = await supabase
+            .from('Journal Entries')
+            .select('id')
+            .eq('id', entryId)
+            .single();
+            
+          if (verifyError || !verifyEntry) {
+            console.error('Failed to verify entry in database:', verifyError);
+          } else {
+            console.log('Entry successfully verified in database:', verifyEntry.id);
+          }
         }
+      } catch (verifyErr) {
+        console.error('Error verifying entry in database:', verifyErr);
       }
 
       return new Response(

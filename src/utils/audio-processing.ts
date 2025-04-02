@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
@@ -135,7 +134,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       // Verify the entry was saved by querying the database
       if (result.data?.entryId) {
         const { data: savedEntry, error: fetchError } = await supabase
-          .from('Journal_Entries')
+          .from('Journal Entries')
           .select('id, "refined text", duration')
           .eq('id', result.data.entryId)
           .single();

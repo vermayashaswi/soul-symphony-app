@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +33,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
       const { data, error, status } = await supabase
-        .from('Journal_Entries')  // Use 'Journal_Entries' as the table name (with underscore)
+        .from('Journal Entries')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
@@ -61,7 +60,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       }
       
       const typedEntries: JournalEntry[] = (data || []).map(item => ({
-        id: Number(item.id),  // Ensure id is a number
+        id: item.id,
         content: item["refined text"] || item["transcription text"] || "",
         created_at: item.created_at,
         audio_url: item.audio_url,

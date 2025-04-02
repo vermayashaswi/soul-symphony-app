@@ -1,4 +1,3 @@
-
 // Change the return type to allow nested objects for properties like timeRange
 export const analyzeQueryTypes = (query: string): Record<string, any> => {
   const lowerQuery = query.toLowerCase();
@@ -272,12 +271,6 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   // Extract time range
   const timeRange = getTimeRange(query);
   
-  // Set the emotion focused flag so we can use it in the search strategy
-  const isEmotionFocused = hasEmotionWords || hasTopEmotionsPattern || hasEmotionRankingPattern || hasEmotionQuantification || hasHappinessRating;
-  
-  // Set the temporal flag for use in the search strategy
-  const isTemporal = hasTemporalWords;
-  
   // Enhanced search strategy determination
   const determineSearchStrategy = () => {
     if (isWhenEventQuery) {
@@ -313,7 +306,7 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     
     isComparative: hasComparativeWords || hasTopEmotionsPattern || hasEmotionChangePattern,
     
-    isEmotionFocused,
+    isEmotionFocused: hasEmotionWords || hasTopEmotionsPattern || hasEmotionRankingPattern || hasEmotionQuantification || hasHappinessRating,
     
     hasTopEmotionsPattern,
     

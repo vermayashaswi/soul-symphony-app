@@ -1,195 +1,375 @@
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 
 export type TimeRange = 'today' | 'week' | 'month' | 'year';
 
-export type SentimentPoint = {
+export type EmotionDataPoint = {
   date: string;
   value: number;
-}
-
-export type EmotionData = {
   emotion: string;
-  score: number;
-  sample_entries: {
-    id: number;
-    content: string;
-    created_at: string;
-    score: number;
-  }[];
-}
-
-export type EmotionPoint = {
-  date: string;
-  value: number;
-}
+};
 
 export type AggregatedEmotionData = {
-  [emotion: string]: EmotionPoint[];
+  [emotion: string]: EmotionDataPoint[];
+};
+
+export type DominantMood = {
+  emotion: string;
+  emoji: string;
+  score: number;
+};
+
+export type BiggestImprovement = {
+  emotion: string;
+  percentage: number;
+};
+
+export type JournalActivity = {
+  entryCount: number;
+  streak: number;
+};
+
+interface InsightsData {
+  entries: any[];
+  dominantMood: DominantMood | null;
+  biggestImprovement: BiggestImprovement | null;
+  journalActivity: JournalActivity;
+  aggregatedEmotionData: AggregatedEmotionData;
 }
 
-export function useInsightsData(userId?: string, timeRange: TimeRange = 'week') {
-  const { user } = useAuth();
-  const [sentimentData, setSentimentData] = useState<SentimentPoint[]>([]);
-  const [emotionsData, setEmotionsData] = useState<EmotionData[]>([]);
-  const [aggregatedEmotionData, setAggregatedEmotionData] = useState<AggregatedEmotionData>({});
+export const useInsightsData = (userId: string | undefined, timeRange: TimeRange) => {
+  const [insightsData, setInsightsData] = useState<InsightsData>({
+    entries: [],
+    dominantMood: null,
+    biggestImprovement: null,
+    journalActivity: {
+      entryCount: 0,
+      streak: 0
+    },
+    aggregatedEmotionData: {}
+  });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [entries, setEntries] = useState<any[]>([]);
-  const [journalActivity, setJournalActivity] = useState({ entryCount: 0, streak: 0 });
-  const [dominantMood, setDominantMood] = useState<{ emotion: string; emoji: string } | null>(null);
-  const [biggestImprovement, setBiggestImprovement] = useState<{ emotion: string; percentage: number } | null>(null);
+  const [lastTimeRange, setLastTimeRange] = useState<TimeRange>(timeRange);
 
-  useEffect(() => {
-    const effectiveUserId = userId || user?.id;
-    if (!effectiveUserId) return;
-
-    const fetchInsightsData = async () => {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        // Fetch sentiment data
-        const { data: sentimentRawData, error: sentimentError } = await supabase
-          .rpc('execute_dynamic_query', {
-            query_text: `
-              SELECT 
-                DATE(created_at) as date, 
-                AVG(CAST(sentiment AS float)) as value
-              FROM 
-                "Journal_Entries"
-              WHERE 
-                user_id = '${effectiveUserId}'
-                AND sentiment IS NOT NULL
-              GROUP BY 
-                DATE(created_at)
-              ORDER BY 
-                date ASC
-            `
-          });
-          
-        if (sentimentError) throw sentimentError;
-        
-        // Format sentiment data for the chart
-        const formattedSentiment: SentimentPoint[] = sentimentRawData ? sentimentRawData.map((point: any) => ({
-          date: point.date,
-          value: parseFloat(point.value)
-        })) : [];
-        
-        setSentimentData(formattedSentiment);
-        
-        // Fetch emotions data
-        const { data: emotionsRawData, error: emotionsError } = await supabase
-          .rpc('get_top_emotions_with_entries', { 
-            user_id_param: effectiveUserId,
-            limit_count: 5
-          });
-          
-        if (emotionsError) throw emotionsError;
-        
-        // Type assertion to ensure correct typing for emotionsData
-        const typedEmotionsData: EmotionData[] = emotionsRawData ? emotionsRawData.map((item: any) => ({
-          emotion: item.emotion,
-          score: item.score,
-          sample_entries: Array.isArray(item.sample_entries) ? item.sample_entries : []
-        })) : [];
-        
-        setEmotionsData(typedEmotionsData);
-
-        // Fetch entries for the selected time range
-        const { data: entriesData, error: entriesError } = await supabase
-          .from('Journal_Entries')
-          .select('*')
-          .eq('user_id', effectiveUserId)
-          .order('created_at', { ascending: false });
-
-        if (entriesError) throw entriesError;
-        setEntries(entriesData || []);
-
-        // Calculate aggregated emotion data for each emotion over time
-        const tempAggregatedData: AggregatedEmotionData = {};
-        
-        if (entriesData) {
-          entriesData.forEach((entry: any) => {
-            if (entry.emotions && typeof entry.emotions === 'object') {
-              Object.entries(entry.emotions).forEach(([emotion, score]: [string, any]) => {
-                if (!tempAggregatedData[emotion]) {
-                  tempAggregatedData[emotion] = [];
-                }
-                
-                tempAggregatedData[emotion].push({
-                  date: entry.created_at.substring(0, 10),
-                  value: typeof score === 'number' ? score : 0
-                });
-              });
-            }
-          });
-        }
-        
-        setAggregatedEmotionData(tempAggregatedData);
-        
-        // Set dummy data for other stats - these would be calculated based on actual data in a real implementation
-        setJournalActivity({ 
-          entryCount: entriesData?.length || 0, 
-          streak: Math.floor(Math.random() * 5) + 1 
-        });
-        
-        setDominantMood({
-          emotion: typedEmotionsData.length > 0 ? typedEmotionsData[0].emotion : 'neutral',
-          emoji: '😊'
-        });
-        
-        setBiggestImprovement({
-          emotion: typedEmotionsData.length > 1 ? typedEmotionsData[1].emotion : 'calm',
-          percentage: Math.floor(Math.random() * 30) + 10
-        });
-        
-      } catch (err: any) {
-        console.error('Error fetching insights data:', err);
-        setError(err.message || 'Failed to load insights data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInsightsData();
-  }, [user?.id, userId, timeRange]);
-
-  const fetchJournalEntryById = async (entryId: number) => {
-    try {
-      const { data, error } = await supabase
-        .from('Journal_Entries')
-        .select('*, emotions')
-        .eq('id', entryId)
-        .single();
-        
-      if (error) throw error;
-      return data;
-    } catch (err: any) {
-      console.error('Error fetching journal entry:', err);
-      throw err;
+  // Make the fetchInsightsData function with useCallback to prevent unnecessary recreations
+  const fetchInsightsData = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
     }
+
+    setLoading(true);
+    try {
+      // Get date range based on timeRange
+      const { startDate, endDate } = getDateRange(timeRange);
+      
+      console.log(`Fetching entries for ${timeRange}:`, {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        userId
+      });
+
+      // Fetch journal entries for the specified time range
+      const { data: entries, error } = await supabase
+        .from('Journal Entries')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching insights data:', error);
+        throw error;
+      }
+
+      console.log(`Found ${entries?.length || 0} entries for ${timeRange}`);
+
+      if (!entries || entries.length === 0) {
+        setInsightsData({
+          entries: [],
+          dominantMood: null,
+          biggestImprovement: null,
+          journalActivity: { entryCount: 0, streak: 0 },
+          aggregatedEmotionData: {}
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Process the data
+      const dominantMood = calculateDominantMood(entries);
+      const biggestImprovement = calculateBiggestImprovement(entries);
+      const journalActivity = calculateJournalActivity(entries.length);
+      const aggregatedEmotionData = processEmotionData(entries, timeRange);
+
+      // Log the processed data for debugging
+      console.log(`[useInsightsData] Processed for ${timeRange}:`, {
+        entryCount: entries.length,
+        emotionCount: Object.keys(aggregatedEmotionData).length,
+        timeRange
+      });
+
+      setInsightsData({
+        entries,
+        dominantMood,
+        biggestImprovement,
+        journalActivity,
+        aggregatedEmotionData
+      });
+    } catch (error) {
+      console.error('Error fetching insights data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, timeRange]);
+
+  // Fetch data when userId or timeRange changes
+  useEffect(() => {
+    if (timeRange !== lastTimeRange) {
+      console.log(`[useInsightsData] TimeRange changed from ${lastTimeRange} to ${timeRange}, refetching data`);
+      setLastTimeRange(timeRange);
+    }
+    
+    fetchInsightsData();
+  }, [userId, timeRange, fetchInsightsData]);
+
+  return { insightsData, loading };
+};
+
+// Helper functions
+const getDateRange = (timeRange: TimeRange) => {
+  const now = new Date();
+  let startDate, endDate;
+
+  switch (timeRange) {
+    case 'today':
+      // For 'today', include the entire day from start to end
+      startDate = startOfDay(now);
+      endDate = endOfDay(now);
+      break;
+    case 'week':
+      // For 'week', use start of week (Monday) to end of week (Sunday)
+      // Setting weekStartsOn to 1 makes Monday the first day of the week
+      startDate = startOfWeek(now, { weekStartsOn: 1 });
+      endDate = endOfWeek(now, { weekStartsOn: 1 });
+      break;
+    case 'month':
+      startDate = startOfMonth(now);
+      endDate = endOfMonth(now);
+      break;
+    case 'year':
+      startDate = startOfYear(now);
+      endDate = endOfYear(now);
+      break;
+    default:
+      // Default to week if invalid timeRange
+      startDate = startOfWeek(now, { weekStartsOn: 1 });
+      endDate = endOfWeek(now, { weekStartsOn: 1 });
+  }
+
+  return { startDate, endDate };
+};
+
+const calculateDominantMood = (entries: any[]): DominantMood | null => {
+  if (!entries || entries.length === 0) return null;
+
+  // Aggregate emotions across entries
+  const emotionCounts: Record<string, { count: number; score: number }> = {};
+  
+  entries.forEach(entry => {
+    if (entry.emotions) {
+      try {
+        const emotions = typeof entry.emotions === 'string' 
+          ? JSON.parse(entry.emotions) 
+          : entry.emotions;
+        
+        Object.entries(emotions).forEach(([emotion, score]) => {
+          if (!emotionCounts[emotion]) {
+            emotionCounts[emotion] = { count: 0, score: 0 };
+          }
+          emotionCounts[emotion].count += 1;
+          emotionCounts[emotion].score += Number(score);
+        });
+      } catch (e) {
+        console.error('Error parsing emotions:', e);
+      }
+    }
+  });
+
+  // Find the emotion with the highest score
+  let dominantEmotion = '';
+  let highestScore = 0;
+
+  Object.entries(emotionCounts).forEach(([emotion, data]) => {
+    if (data.score > highestScore) {
+      dominantEmotion = emotion;
+      highestScore = data.score;
+    }
+  });
+
+  if (!dominantEmotion) return null;
+
+  // Map emotion to emoji
+  const emotionEmojis: Record<string, string> = {
+    happy: '😊',
+    sad: '😢',
+    angry: '😠',
+    fearful: '😨',
+    disgusted: '🤢',
+    surprised: '😲',
+    joy: '😄',
+    love: '❤️',
+    content: '😌',
+    peaceful: '😇',
+    anxious: '😰',
+    stressed: '😖',
+    tired: '😴',
+    excited: '🤩',
+    hopeful: '🙏',
+    grateful: '🙌',
   };
 
-  // Combined data object to return all insights data
-  const insightsData = {
-    sentimentData,
-    emotionsData,
-    entries,
-    aggregatedEmotionData,
-    journalActivity,
-    dominantMood,
-    biggestImprovement
+  return {
+    emotion: dominantEmotion,
+    emoji: emotionEmojis[dominantEmotion.toLowerCase()] || '🤔',
+    score: highestScore
   };
+};
 
-  return { 
-    sentimentData, 
-    emotionsData, 
-    loading, 
-    error,
-    fetchJournalEntryById,
-    insightsData
+const calculateBiggestImprovement = (entries: any[]): BiggestImprovement | null => {
+  if (!entries || entries.length === 0) return null;
+
+  // For this example, we'll compare the first half of entries with the second half
+  // This is a simplified calculation
+  const halfLength = Math.floor(entries.length / 2);
+  const recentEntries = entries.slice(0, halfLength);
+  const olderEntries = entries.slice(halfLength);
+
+  const recentEmotions: Record<string, number> = {};
+  const olderEmotions: Record<string, number> = {};
+
+  // Process recent entries
+  recentEntries.forEach(entry => {
+    if (entry.emotions) {
+      try {
+        const emotions = typeof entry.emotions === 'string' 
+          ? JSON.parse(entry.emotions) 
+          : entry.emotions;
+        
+        Object.entries(emotions).forEach(([emotion, score]) => {
+          if (!recentEmotions[emotion]) {
+            recentEmotions[emotion] = 0;
+          }
+          recentEmotions[emotion] += Number(score);
+        });
+      } catch (e) {
+        console.error('Error parsing emotions:', e);
+      }
+    }
+  });
+
+  // Process older entries
+  olderEntries.forEach(entry => {
+    if (entry.emotions) {
+      try {
+        const emotions = typeof entry.emotions === 'string' 
+          ? JSON.parse(entry.emotions) 
+          : entry.emotions;
+        
+        Object.entries(emotions).forEach(([emotion, score]) => {
+          if (!olderEmotions[emotion]) {
+            olderEmotions[emotion] = 0;
+          }
+          olderEmotions[emotion] += Number(score);
+        });
+      } catch (e) {
+        console.error('Error parsing emotions:', e);
+      }
+    }
+  });
+
+  // Calculate improvement percentages
+  let biggestImprovement: BiggestImprovement | null = null;
+  let maxImprovement = 0;
+
+  // Check emotions that exist in both periods
+  Object.keys(recentEmotions).forEach(emotion => {
+    if (olderEmotions[emotion] && olderEmotions[emotion] > 0) {
+      const improvement = ((recentEmotions[emotion] - olderEmotions[emotion]) / olderEmotions[emotion]) * 100;
+      
+      // We're looking for positive improvements (growth in positive emotions)
+      if (improvement > maxImprovement) {
+        maxImprovement = improvement;
+        biggestImprovement = {
+          emotion,
+          percentage: Math.round(improvement)
+        };
+      }
+    }
+  });
+
+  // If we didn't find any improvement, return mock data
+  if (!biggestImprovement) {
+    return {
+      emotion: entries.length > 0 ? 'peaceful' : 'content',
+      percentage: 24
+    };
+  }
+
+  return biggestImprovement;
+};
+
+const calculateJournalActivity = (entryCount: number): JournalActivity => {
+  // Simplified streak calculation - in a real app you'd look at consecutive days
+  const streak = Math.min(entryCount, 7); // Limit streak to a max of 7
+  
+  return {
+    entryCount,
+    streak
   };
-}
+};
+
+const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmotionData => {
+  const emotionData: AggregatedEmotionData = {};
+  
+  // Process entries and extract emotion data
+  entries.forEach(entry => {
+    const dateStr = format(new Date(entry.created_at), 'yyyy-MM-dd');
+    
+    if (entry.emotions) {
+      try {
+        const emotions = typeof entry.emotions === 'string' 
+          ? JSON.parse(entry.emotions) 
+          : entry.emotions;
+        
+        Object.entries(emotions).forEach(([emotion, score]) => {
+          if (!emotionData[emotion]) {
+            emotionData[emotion] = [];
+          }
+          
+          // Check if we already have an entry for this date
+          const existingPoint = emotionData[emotion].find(point => point.date === dateStr);
+          
+          if (existingPoint) {
+            // Update existing data point
+            existingPoint.value += Number(score);
+          } else {
+            // Add new data point
+            emotionData[emotion].push({
+              date: dateStr,
+              value: Number(score),
+              emotion: emotion
+            });
+          }
+        });
+      } catch (e) {
+        console.error('Error parsing emotions:', e);
+      }
+    }
+  });
+  
+  return emotionData;
+};

@@ -78,7 +78,7 @@ async function calculateAverageEmotionScore(userId: string, emotionType: string 
       startDate.setFullYear(startDate.getFullYear() - 1);
     }
     
-    // Query entries within the time range - use 'Journal Entries' table
+    // Query entries within the time range
     const { data: entries, error } = await supabase
       .from('Journal Entries')
       .select('emotions, created_at')
@@ -138,7 +138,7 @@ async function calculateTopEmotions(userId: string, timeRange: string = 'month',
       startDate.setHours(0, 0, 0, 0);
     }
     
-    // Query entries within the time range - use 'Journal Entries' table
+    // Query entries within the time range
     const { data: entries, error } = await supabase
       .from('Journal Entries')
       .select('emotions, created_at')
@@ -371,7 +371,7 @@ serve(async (req) => {
     if (similarEntries && similarEntries.length > 0) {
       console.log("Found similar entries:", similarEntries.length);
       
-      // Fetch full entries for context - use 'Journal Entries' table
+      // Fetch full entries for context
       const entryIds = similarEntries.map(entry => entry.id);
       const { data: entries, error: entriesError } = await supabase
         .from('Journal Entries')
@@ -392,7 +392,7 @@ serve(async (req) => {
       }
     } else {
       console.log("No similar entries found, falling back to recent entries");
-      // Fallback to recent entries if no similar ones found - use 'Journal Entries' table
+      // Fallback to recent entries if no similar ones found
       const { data: recentEntries, error: recentError } = await supabase
         .from('Journal Entries')
         .select('refined text, created_at, emotions')

@@ -19,7 +19,7 @@ export default function Insights() {
   const stickyThreshold = useRef<number>(0);
   const scrollPositionRef = useRef<number>(0);
   
-  const { insightsData, loading } = useInsightsData(user?.id);
+  const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
   const timeRanges = [
     { value: 'today', label: 'Today' },

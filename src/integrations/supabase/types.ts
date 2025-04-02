@@ -89,6 +89,62 @@ export type Database = {
         }
         Relationships: []
       }
+      "Journal Entries": {
+        Row: {
+          audio_url: string | null
+          categories: string[] | null
+          created_at: string
+          duration: number | null
+          emotions: Json | null
+          entities: Json | null
+          "foreign key": string | null
+          id: number
+          master_themes: string[] | null
+          "refined text": string | null
+          sentiment: string | null
+          "transcription text": string | null
+          user_id: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          categories?: string[] | null
+          created_at?: string
+          duration?: number | null
+          emotions?: Json | null
+          entities?: Json | null
+          "foreign key"?: string | null
+          id?: number
+          master_themes?: string[] | null
+          "refined text"?: string | null
+          sentiment?: string | null
+          "transcription text"?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          categories?: string[] | null
+          created_at?: string
+          duration?: number | null
+          emotions?: Json | null
+          entities?: Json | null
+          "foreign key"?: string | null
+          id?: number
+          master_themes?: string[] | null
+          "refined text"?: string | null
+          sentiment?: string | null
+          "transcription text"?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_journal_entries_profile"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       journal_embeddings: {
         Row: {
           content: string
@@ -116,69 +172,7 @@ export type Database = {
             foreignKeyName: "journal_embeddings_journal_entry_id_fkey"
             columns: ["journal_entry_id"]
             isOneToOne: false
-            referencedRelation: "Journal_Entries"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      Journal_Entries: {
-        Row: {
-          audio_url: string | null
-          categories: string[] | null
-          chunks_count: number | null
-          created_at: string
-          duration: number | null
-          emotions: Json | null
-          entities: Json | null
-          "foreign key": string | null
-          id: number
-          is_chunked: boolean | null
-          master_themes: string[] | null
-          "refined text": string | null
-          sentiment: string | null
-          "transcription text": string | null
-          user_id: string | null
-        }
-        Insert: {
-          audio_url?: string | null
-          categories?: string[] | null
-          chunks_count?: number | null
-          created_at?: string
-          duration?: number | null
-          emotions?: Json | null
-          entities?: Json | null
-          "foreign key"?: string | null
-          id?: number
-          is_chunked?: boolean | null
-          master_themes?: string[] | null
-          "refined text"?: string | null
-          sentiment?: string | null
-          "transcription text"?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          audio_url?: string | null
-          categories?: string[] | null
-          chunks_count?: number | null
-          created_at?: string
-          duration?: number | null
-          emotions?: Json | null
-          entities?: Json | null
-          "foreign key"?: string | null
-          id?: number
-          is_chunked?: boolean | null
-          master_themes?: string[] | null
-          "refined text"?: string | null
-          sentiment?: string | null
-          "transcription text"?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_journal_entries_profile"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "Journal Entries"
             referencedColumns: ["id"]
           },
         ]
@@ -398,19 +392,6 @@ export type Database = {
           score: number
         }[]
       }
-      get_top_emotions_by_chunks: {
-        Args: {
-          user_id_param: string
-          start_date?: string
-          end_date?: string
-          limit_count?: number
-        }
-        Returns: {
-          emotion: string
-          score: number
-          sample_chunks: Json
-        }[]
-      }
       get_top_emotions_with_entries: {
         Args: {
           user_id_param: string
@@ -427,28 +408,6 @@ export type Database = {
       mark_inactive_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
-      }
-      match_chunks_with_date: {
-        Args: {
-          query_embedding: string
-          match_threshold: number
-          match_count: number
-          user_id_filter: string
-          start_date?: string
-          end_date?: string
-        }
-        Returns: {
-          id: number
-          chunk_id: number
-          content: string
-          created_at: string
-          similarity: number
-          chunk_index: number
-          total_chunks: number
-          entry_content: string
-          themes: string[]
-          emotions: Json
-        }[]
       }
       match_journal_entries:
         | {
@@ -549,12 +508,6 @@ export type Database = {
             }
             Returns: string
           }
-      table_exists: {
-        Args: {
-          table_name: string
-        }
-        Returns: boolean
-      }
     }
     Enums: {
       [_ in never]: never
