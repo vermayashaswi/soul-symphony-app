@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, Smartphone, Bug, RotateCw, Maximize, Minimize } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 export function MobileBrowserDebug() {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,10 +15,12 @@ export function MobileBrowserDebug() {
   const isMobile = useIsMobile();
   const [renderCount, setRenderCount] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     // Log initial load
     addLog("MobileBrowserDebug component mounted");
+    addLog(`Current route: ${location.pathname}`);
     
     // Collect basic device information
     const info = {
@@ -29,6 +32,7 @@ export function MobileBrowserDebug() {
       devicePixelRatio: window.devicePixelRatio,
       isMobile: isMobile,
       timeStamp: new Date().toISOString(),
+      currentRoute: location.pathname
     };
     
     setDeviceInfo(info);
@@ -43,7 +47,7 @@ export function MobileBrowserDebug() {
     window.addEventListener('resize', handleResize);
     
     return () => window.removeEventListener('resize', handleResize);
-  }, [isMobile]);
+  }, [isMobile, location]);
   
   const addLog = (message: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
@@ -54,7 +58,40 @@ export function MobileBrowserDebug() {
     addLog(`Body dimensions: ${document.body.clientWidth}x${document.body.clientHeight}`);
     addLog(`Viewport dimensions: ${window.innerWidth}x${window.innerHeight}`);
     addLog(`Device pixel ratio: ${window.devicePixelRatio}`);
+    
+    // Test API health if on Journal page
+    if (location.pathname.includes('journal')) {
+      testProcessJournalConnection();
+    }
+    
     setRenderCount(prev => prev + 1);
+  };
+
+  const testProcessJournalConnection = async () => {
+    addLog("Testing process-journal API connection...");
+    try {
+      const healthUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-journal/health`;
+      addLog(`Sending health check to: ${healthUrl}`);
+      
+      const response = await fetch(healthUrl, { 
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        addLog(`Health check successful: ${JSON.stringify(data)}`);
+      } else {
+        addLog(`Health check failed: ${response.status}`);
+        const errorText = await response.text();
+        addLog(`Error details: ${errorText}`);
+      }
+    } catch (error) {
+      addLog(`Health check error: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const toggleFullScreen = () => {

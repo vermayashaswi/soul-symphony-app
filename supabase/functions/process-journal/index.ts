@@ -144,9 +144,11 @@ serve(async (req) => {
   }
 
   try {
-    // Check if it's a health check
+    // Improved health check handling
     const url = new URL(req.url);
-    if (url.pathname.endsWith('/health')) {
+    
+    // Check if it's a health check - support both /health path and health=true query param
+    if (url.pathname.endsWith('/health') || url.searchParams.has('health')) {
       console.log('[process-journal] Received health check request');
       return new Response(
         JSON.stringify({ 
@@ -164,6 +166,22 @@ serve(async (req) => {
     let entryId: number | undefined;
     let isHealthCheck: boolean = false;
     
+    // For GET requests without parameters, assume it's a health check
+    if (req.method === 'GET') {
+      console.log('[process-journal] Handling GET request as health check');
+      return new Response(
+        JSON.stringify({ 
+          status: 'healthy', 
+          timestamp: new Date().toISOString(),
+          service: 'process-journal'
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
     try {
       // Try to parse request body as JSON
       const body = await req.json();
@@ -173,22 +191,6 @@ serve(async (req) => {
       isHealthCheck = !!body.health || !!body.ping;
     } catch (jsonError) {
       console.error('[process-journal] Error parsing request JSON:', jsonError);
-      
-      // If it's a GET request, assume it's a health check
-      if (req.method === 'GET') {
-        console.log('[process-journal] Handling GET request as health check');
-        return new Response(
-          JSON.stringify({ 
-            status: 'healthy', 
-            timestamp: new Date().toISOString(),
-            service: 'process-journal'
-          }),
-          { 
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
-      }
       
       return new Response(
         JSON.stringify({ 
@@ -240,7 +242,7 @@ serve(async (req) => {
       { 
         status: result.success ? 200 : 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+        }
     );
   } catch (error) {
     console.error('[process-journal] Error processing request:', error);

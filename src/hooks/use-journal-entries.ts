@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase, isChunkingSupported, checkEdgeFunctionsHealth, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from '@/integrations/supabase/client';
@@ -20,16 +21,38 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   useEffect(() => {
     async function checkSystemStatus() {
       try {
+        console.log("Checking chunking support status...");
         const chunking = await isChunkingSupported();
         console.log(`Chunking support detected: ${chunking}`);
         setIsChunkingEnabled(chunking);
         
+        console.log("Checking edge functions health...");
         const healthStatus = await checkEdgeFunctionsHealth();
         console.log("Edge functions health status:", healthStatus);
         setEdgeFunctionsHealth(healthStatus);
         
         if (!healthStatus['process-journal']) {
-          console.warn("process-journal function is not healthy");
+          console.warn("process-journal function is not healthy, direct testing health endpoint...");
+          // Add direct test of health endpoint
+          try {
+            const healthResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-journal/health`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (healthResponse.ok) {
+              console.log("Direct health check successful:", await healthResponse.json());
+              // Override the health status if direct check succeeds
+              setEdgeFunctionsHealth(prev => ({...prev, 'process-journal': true}));
+            } else {
+              console.warn(`Direct health check failed with status: ${healthResponse.status}`);
+            }
+          } catch (directError) {
+            console.error("Direct health check error:", directError);
+          }
         }
       } catch (error) {
         console.error("Error checking system status:", error);
@@ -59,63 +82,71 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     try {
       console.log(`Processing journal entry ${entryId} for chunking`);
       
-      const timeoutPromise = new Promise<{success: false; error: string}>((_, reject) => {
-        setTimeout(() => reject(new Error('Function call timed out')), 20000);
-      });
+      // Try direct fetch with explicit headers and timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
       
-      console.log(`Invoking process-journal function for entry ${entryId}`);
-      const functionCallPromise = supabase.functions.invoke('process-journal', {
-        body: { entryId }
-      }).catch(error => {
-        console.error(`Initial error in process-journal invoke:`, error);
-        throw error;
-      });
+      console.log(`Invoking process-journal function for entry ${entryId} using direct fetch`);
       
-      const result = await Promise.race([functionCallPromise, timeoutPromise])
-        .catch(error => {
-          console.error('Error or timeout in process-journal function:', error);
-          
-          checkEdgeFunctionsHealth().then(status => {
-            console.log('Edge function health after failure:', status);
-            setEdgeFunctionsHealth(status);
-          });
-          
-          const functionUrl = `${SUPABASE_URL}/functions/v1/process-journal/health`;
-          console.log(`Attempting direct health check to: ${functionUrl}`);
-          
-          fetch(functionUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-              'Content-Type': 'application/json'
-            }
-          }).then(response => {
-            console.log(`Direct health check status: ${response.status}`);
-            return response.text();
-          }).then(text => {
-            console.log(`Direct health check response: ${text}`);
-          }).catch(directError => {
-            console.error(`Direct health check failed:`, directError);
-          });
-          
-          return { success: false, error: error.message || 'Function call failed' };
+      try {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/process-journal`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ entryId }),
+          signal: controller.signal
         });
-      
-      if (!result || ('error' in result)) {
-        console.error('Error processing journal entry:', result?.error);
-        setProcessFailures(prev => ({
-          ...prev,
-          [entryId]: (prev[entryId] || 0) + 1
-        }));
         
-        return false;
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Function response not OK: ${response.status} - ${errorText}`);
+          throw new Error(`Function returned ${response.status}: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          console.error('Error in process-journal result:', result.error);
+          setProcessFailures(prev => ({
+            ...prev,
+            [entryId]: (prev[entryId] || 0) + 1
+          }));
+          
+          return false;
+        }
+        
+        console.log(`Successfully processed journal entry ${entryId} into ${result.chunks_count || 0} chunks`);
+        return true;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.error('Direct fetch error:', fetchError);
+        
+        // Fall back to supabase.functions.invoke approach
+        console.log('Falling back to supabase.functions.invoke approach...');
+        
+        const result = await supabase.functions.invoke('process-journal', {
+          body: { entryId }
+        });
+        
+        if ('error' in result) {
+          console.error('Error in fallback invoke call:', result.error);
+          setProcessFailures(prev => ({
+            ...prev,
+            [entryId]: (prev[entryId] || 0) + 1
+          }));
+          
+          return false;
+        }
+        
+        console.log(`Successfully processed journal entry ${entryId} via fallback method`);
+        return true;
       }
-      
-      const responseData = result as unknown as { success: boolean; chunks_count?: number };
-      console.log(`Successfully processed journal entry ${entryId} into ${responseData.chunks_count || 0} chunks`);
-      return true;
     } catch (error) {
-      console.error('Error invoking process-journal function:', error);
+      console.error('Error processing journal entry:', error);
       
       setProcessFailures(prev => ({
         ...prev,

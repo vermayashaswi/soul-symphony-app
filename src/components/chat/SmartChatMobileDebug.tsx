@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { X, Smartphone, Info, AlertTriangle, Server, FileSearch } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLocation } from 'react-router-dom';
 
 interface ApiCall {
   url: string;
@@ -37,10 +37,12 @@ export default function SmartChatMobileDebug() {
   ]);
   const [activeTab, setActiveTab] = useState('logs');
   const isMobile = useIsMobile();
+  const location = useLocation();
 
   useEffect(() => {
     // Log initial info
     addLog("Debug component mounted");
+    addLog(`Current route: ${location.pathname}`);
     
     // Collect device and browser information
     const info = {
@@ -49,7 +51,8 @@ export default function SmartChatMobileDebug() {
       screenHeight: window.innerHeight,
       devicePixelRatio: window.devicePixelRatio,
       isMobileDetected: isMobile,
-      timeStamp: new Date().toISOString()
+      timeStamp: new Date().toISOString(),
+      currentRoute: location.pathname
     };
     
     setDeviceInfo(info);
@@ -58,15 +61,20 @@ export default function SmartChatMobileDebug() {
     // Setup fetch interceptor for API call monitoring
     setupFetchInterceptor();
     
-    // Test DOM elements
+    // Test DOM elements conditionally based on route
     setTimeout(() => {
-      const chatInterface = document.querySelector('.smart-chat-interface');
-      if (chatInterface) {
-        addLog("Chat interface found in DOM");
-        const rect = chatInterface.getBoundingClientRect();
-        addLog(`Chat interface dimensions: ${rect.width}x${rect.height}`);
+      // Only check for chat interface if on a chat-related route
+      if (location.pathname.includes('chat') || location.pathname.includes('smart-chat')) {
+        const chatInterface = document.querySelector('.smart-chat-interface, .mobile-chat-content');
+        if (chatInterface) {
+          addLog("Chat interface found in DOM");
+          const rect = chatInterface.getBoundingClientRect();
+          addLog(`Chat interface dimensions: ${rect.width}x${rect.height}`);
+        } else {
+          addLog("Note: Chat interface not found (expected on chat routes only)");
+        }
       } else {
-        addLog("ERROR: Chat interface not found in DOM");
+        addLog("Not on chat route - skipping chat interface check");
       }
     }, 500);
     
@@ -81,7 +89,7 @@ export default function SmartChatMobileDebug() {
       // Cleanup fetch interceptor if needed
       cleanupFetchInterceptor();
     };
-  }, [isMobile]);
+  }, [isMobile, location]);
   
   const addLog = (message: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
@@ -230,14 +238,27 @@ export default function SmartChatMobileDebug() {
   const testApiConnection = async () => {
     addLog("Testing API connection to edge functions...");
     try {
-      const pingResponse = await fetch('/ping', { method: 'GET' });
+      const pingUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-journal/health`;
+      addLog(`Sending ping to: ${pingUrl}`);
+      
+      const pingResponse = await fetch(pingUrl, { 
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        } 
+      });
+      
       if (pingResponse.ok) {
-        addLog("API connection test successful");
+        const pingJson = await pingResponse.json();
+        addLog(`API connection test successful: ${JSON.stringify(pingJson)}`);
       } else {
         addLog(`API connection test failed: ${pingResponse.status}`);
+        const errorText = await pingResponse.text();
+        addLog(`Error details: ${errorText}`);
       }
     } catch (error) {
-      addLog(`API connection test error: ${error}`);
+      addLog(`API connection test error: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
   
