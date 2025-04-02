@@ -124,7 +124,7 @@ const Journal = () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        // Use a type assertion directly on the response to avoid deep type inference
+        // Fix the excessively deep type instantiation by avoiding complex types
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
@@ -135,11 +135,11 @@ const Journal = () => {
           return false;
         }
         
-        // Simplify the type casting approach to avoid excessive type instantiation
+        // Avoid complex type inference by using simple property access
         if (data && data.length > 0) {
-          // Use a simple type assertion with a known structure
-          const entryId = data[0].id as number;
-          const refinedText = data[0]["refined text"] as string | undefined;
+          // Access properties directly without complex typing
+          const entryId = data[0].id;
+          const refinedText = data[0]["refined text"];
           
           console.log('New entry found:', entryId);
           
