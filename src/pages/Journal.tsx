@@ -10,35 +10,161 @@ import JournalHeader from '@/components/journal/JournalHeader';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import JournalSearch from '@/components/journal/JournalSearch';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
-import { useProfileCheck } from '@/hooks/use-profile-check';
-import { useEntryProcessing } from '@/hooks/use-entry-processing';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
   const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [processingEntries, setProcessingEntries] = useState<string[]>([]);
+  const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const { isProfileChecked } = useProfileCheck(user?.id);
-  
-  const { 
-    entries, 
-    loading, 
-    fetchEntries 
-  } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
-  
-  const { 
-    processingEntries, 
-    processedEntryIds, 
-    handleEntryRecording 
-  } = useEntryProcessing(activeTab, fetchEntries, entries);
+  const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
+  const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (user?.id) {
+      checkUserProfile(user.id);
+    }
+  }, [user?.id]);
+  
   useEffect(() => {
     if (activeTab === 'entries' && isProfileChecked) {
       console.log('Tab changed to entries, fetching entries...');
       fetchEntries();
     }
   }, [activeTab, isProfileChecked, fetchEntries]);
+
+  useEffect(() => {
+    if (processingEntries.length > 0 && activeTab === 'entries') {
+      console.log('Setting up polling for processing entries:', processingEntries);
+      
+      const pollingInterval = setInterval(() => {
+        fetchEntries();
+      }, 5000);
+      
+      return () => clearInterval(pollingInterval);
+    }
+  }, [processingEntries, activeTab, fetchEntries]);
+
+  useEffect(() => {
+    if (processingEntries.length > 0 && entries.length > 0) {
+      const newlyCompletedTempIds = [];
+      
+      for (const entry of entries) {
+        if (entry.foreignKey && processingEntries.includes(entry.foreignKey)) {
+          newlyCompletedTempIds.push(entry.foreignKey);
+          setProcessedEntryIds(prev => [...prev, entry.id]);
+        }
+      }
+      
+      if (newlyCompletedTempIds.length > 0) {
+        setProcessingEntries(prev => 
+          prev.filter(id => !newlyCompletedTempIds.includes(id))
+        );
+      }
+    }
+  }, [entries, processingEntries]);
+
+  const checkUserProfile = async (userId: string) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+      
+      if (error || !profile) {
+        console.log('Creating user profile...');
+        
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: userId,
+            email: userData.user?.email,
+            full_name: userData.user?.user_metadata?.full_name || '',
+            avatar_url: userData.user?.user_metadata?.avatar_url || ''
+          }]);
+          
+        if (insertError) throw insertError;
+        console.log('Profile created successfully');
+      }
+      
+      setIsProfileChecked(true);
+    } catch (error: any) {
+      console.error('Error checking/creating user profile:', error);
+      toast.error('Error setting up profile. Please try again.');
+    }
+  };
+
+  const onEntryRecorded = async (audioBlob: Blob, tempId?: string) => {
+    console.log('Entry recorded, adding to processing queue');
+    
+    if (tempId) {
+      setProcessingEntries(prev => [...prev, tempId]);
+    }
+    
+    setActiveTab('entries');
+    
+    fetchEntries();
+    
+    const checkEntryProcessed = async () => {
+      try {
+        console.log('Checking if entry is processed with temp ID:', tempId);
+        const { data, error } = await supabase
+          .from('Journal Entries')
+          .select('id, "refined text"')
+          .eq('foreign key', tempId)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching newly created entry:', error);
+          return false;
+        } else if (data) {
+          console.log('New entry found:', data.id);
+          
+          await supabase.functions.invoke('generate-themes', {
+            body: {
+              text: data["refined text"],
+              entryId: data.id
+            }
+          });
+          
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Error checking for processed entry:', error);
+        return false;
+      }
+    };
+    
+    const pollInterval = setInterval(async () => {
+      const isProcessed = await checkEntryProcessed();
+      
+      if (isProcessed) {
+        clearInterval(pollInterval);
+        setProcessingEntries(prev => prev.filter(id => id !== tempId));
+        setRefreshKey(prev => prev + 1);
+        fetchEntries();
+        toast.success('Journal entry processed successfully!');
+      }
+    }, 3000);
+    
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (processingEntries.includes(tempId || '')) {
+        setProcessingEntries(prev => prev.filter(id => id !== tempId));
+        toast.info('Entry processing is taking longer than expected. It should appear soon.');
+      }
+    }, 120000);
+  };
 
   const handleDeleteEntry = (entryId: number) => {
     console.log('Entry deleted, updating UI:', entryId);
@@ -49,22 +175,18 @@ const Journal = () => {
     setSearchQuery(query);
   };
 
-  const onEntryRecorded = (audioBlob: Blob, tempId?: string) => {
-    handleEntryRecording(audioBlob, tempId);
-    setActiveTab('entries');
-  };
-
   const filteredEntries = entries.filter(entry => {
     if (!searchQuery.trim()) return true;
     
     const query = searchQuery.toLowerCase();
-    const content = entry.content?.toLowerCase() || '';
+    const content = entry.content.toLowerCase();
     const themes = entry.themes?.join(' ').toLowerCase() || '';
     
     return content.includes(query) || themes.includes(query);
   });
 
   const showLoading = loading && activeTab === 'entries' && !entries.length;
+  
   const showEntries = activeTab === 'entries' && (!loading || entries.length > 0);
 
   return (
