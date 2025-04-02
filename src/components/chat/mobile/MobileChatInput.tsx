@@ -27,19 +27,10 @@ export default function MobileChatInput({
     stopRecording,
     isRecording: recorderIsRecording,
     recordingTime,
-    audioBlob,
-    isProcessing,
-    transcription,
-    resetRecording
+    audioBlob
   } = useVoiceRecorder();
 
-  // Handle text transcription
-  React.useEffect(() => {
-    if (transcription) {
-      setMessage(prev => prev ? `${prev} ${transcription}` : transcription);
-      resetRecording();
-    }
-  }, [transcription, resetRecording]);
+  // Handle text transcription - removed since useVoiceRecorder doesn't have these properties
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +72,8 @@ export default function MobileChatInput({
     if (recorderIsRecording) {
       setIsRecording(false);
       await stopRecording();
+      // We'll handle the transcription elsewhere since useVoiceRecorder doesn't have isProcessing and transcription
+      console.log("Recording stopped, audio blob:", audioBlob);
     } else {
       try {
         setIsRecording(true);
@@ -109,9 +102,9 @@ export default function MobileChatInput({
         onKeyDown={handleKeyDown}
         placeholder="Message Roha..."
         className="min-h-[40px] max-h-[120px] resize-none text-base border-muted rounded-full px-4 py-2"
-        disabled={isLoading || !userId || isRecording || isProcessing}
+        disabled={isLoading || !userId || isRecording}
       />
-      {!isRecording && !isProcessing ? (
+      {!isRecording ? (
         <>
           <Button 
             type="button" 
@@ -141,28 +134,21 @@ export default function MobileChatInput({
           type="button" 
           size="icon" 
           onClick={handleVoiceRecording}
-          disabled={isProcessing}
-          className={`rounded-full h-10 w-10 flex-shrink-0 ${isRecording ? 'bg-red-500 hover:bg-red-600' : ''} ${isProcessing ? 'bg-amber-500' : ''}`}
+          className={`rounded-full h-10 w-10 flex-shrink-0 ${isRecording ? 'bg-red-500 hover:bg-red-600' : ''}`}
         >
-          {isProcessing ? (
-            <Loader2 className="h-5 w-5 animate-spin text-white" />
-          ) : (
-            <>
-              <StopCircle className="h-5 w-5" />
-              {isRecording && (
-                <motion.div 
-                  className="absolute inset-0 rounded-full recording-indicator"
-                  animate={{ 
-                    boxShadow: ['0 0 0 0 rgba(239, 68, 68, 0.7)', '0 0 0 10px rgba(239, 68, 68, 0)'] 
-                  }}
-                  transition={{ 
-                    duration: 1.5, 
-                    repeat: Infinity,
-                    repeatType: "loop"
-                  }}
-                />
-              )}
-            </>
+          <StopCircle className="h-5 w-5" />
+          {isRecording && (
+            <motion.div 
+              className="absolute inset-0 rounded-full recording-indicator"
+              animate={{ 
+                boxShadow: ['0 0 0 0 rgba(239, 68, 68, 0.7)', '0 0 0 10px rgba(239, 68, 68, 0)'] 
+              }}
+              transition={{ 
+                duration: 1.5, 
+                repeat: Infinity,
+                repeatType: "loop"
+              }}
+            />
           )}
         </Button>
       )}
@@ -171,14 +157,6 @@ export default function MobileChatInput({
       {isRecording && (
         <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg">
           {formatTime(recordingTime)}
-        </div>
-      )}
-      
-      {/* Processing indicator */}
-      {isProcessing && (
-        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg flex items-center gap-1">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          Processing...
         </div>
       )}
     </form>

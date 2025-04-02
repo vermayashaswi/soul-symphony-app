@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,6 +20,9 @@ import "./styles/mobile.css";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
 import MobileNavbar from "./components/mobile/MobileNavbar";
 import { useIsMobile } from "./hooks/use-mobile";
+import { MobileBrowserDebug } from "./components/MobileBrowserDebug";
+import SmartChatMobileDebug from "./components/chat/SmartChatMobileDebug";
+import DebugPanel from "./components/DebugPanel";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,7 +34,6 @@ const queryClient = new QueryClient({
 });
 
 const MobileRouteWrapper = ({ children }: { children: React.ReactNode }) => {
-  // Only use the mobile frame if explicitly requested via URL parameter
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
@@ -60,7 +61,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) {
-    // Preserve the current URL for redirection after login
     const url = new URL(`/auth`, window.location.origin);
     url.searchParams.set('redirectTo', location.pathname);
     
@@ -163,28 +163,44 @@ const AppRoutes = () => {
   );
 };
 
-const App = () => {
+function App() {
+  const isMobile = useIsMobile();
+  
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <ThemeProvider>
-            <div className="relative min-h-screen">
-              <div className="relative z-10">
-                <Toaster />
-                <Sonner position="top-center" />
-                <BrowserRouter>
-                  <AnimatePresence mode="wait">
-                    <AppRoutes />
-                  </AnimatePresence>
-                </BrowserRouter>
+    <div className="app-container">
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <ThemeProvider>
+              <div className="relative min-h-screen">
+                <div className="relative z-10">
+                  <Toaster />
+                  <Sonner position="top-center" />
+                  <BrowserRouter>
+                    <AnimatePresence mode="wait">
+                      <AppRoutes />
+                    </AnimatePresence>
+                  </BrowserRouter>
+                </div>
               </div>
-            </div>
-          </ThemeProvider>
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+
+      {/* Add debugging tools - only visible in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <>
+          {isMobile ? (
+            <SmartChatMobileDebug />
+          ) : (
+            <DebugPanel />
+          )}
+          <MobileBrowserDebug />
+        </>
+      )}
+    </div>
   );
-};
+}
 
 export default App;
