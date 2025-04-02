@@ -1,11 +1,13 @@
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Mic, Loader2, StopCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { motion } from "framer-motion";
+import { sendAudioForTranscription } from "@/utils/audio/transcription-service";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string) => void;
@@ -19,19 +21,75 @@ export default function MobileChatInput({
   userId 
 }: MobileChatInputProps) {
   const [message, setMessage] = useState("");
+  const [isProcessingTranscription, setIsProcessingTranscription] = useState(false);
+  const [transcriptionText, setTranscriptionText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [isRecording, setIsRecording] = useState(false);
+  const { user } = useAuth();
   
   const {
     startRecording,
     stopRecording,
-    isRecording: recorderIsRecording,
+    isRecording,
     recordingTime,
-    audioBlob
-  } = useVoiceRecorder();
-
-  // Handle text transcription - removed since useVoiceRecorder doesn't have these properties
+    audioBlob,
+    audioLevel
+  } = useVoiceRecorder({
+    noiseReduction: true,
+    maxDuration: 60 // Limit to 60 seconds for chat
+  });
   
+  // Process audio for transcription when recording stops
+  useEffect(() => {
+    const processAudio = async () => {
+      if (!isRecording && audioBlob && !transcriptionText && !isProcessingTranscription) {
+        try {
+          setIsProcessingTranscription(true);
+          
+          // Convert the audio blob to base64
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          
+          reader.onloadend = async () => {
+            const base64Audio = reader.result?.toString().split(',')[1];
+            
+            if (base64Audio) {
+              // Send to transcription service
+              const result = await sendAudioForTranscription(
+                base64Audio,
+                user?.id,
+                true // Direct transcription mode
+              );
+              
+              if (result.success && result.data?.transcription) {
+                setTranscriptionText(result.data.transcription);
+                setMessage(result.data.transcription);
+                
+                // Auto-resize textarea
+                if (textareaRef.current) {
+                  textareaRef.current.style.height = "auto";
+                  textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+                }
+              } else {
+                toast.error(result.error || "Failed to transcribe audio");
+              }
+            }
+          };
+        } catch (error) {
+          console.error("Error processing audio:", error);
+          toast.error("Failed to process audio recording");
+        } finally {
+          setIsProcessingTranscription(false);
+        }
+      }
+    };
+    
+    processAudio();
+  }, [isRecording, audioBlob, transcriptionText, isProcessingTranscription, user?.id]);
+  
+  const resetRecordingState = () => {
+    setTranscriptionText("");
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -44,6 +102,7 @@ export default function MobileChatInput({
     
     onSendMessage(message.trim());
     setMessage("");
+    resetRecordingState();
     
     // Reset textarea height
     if (textareaRef.current) {
@@ -69,19 +128,15 @@ export default function MobileChatInput({
   };
 
   const handleVoiceRecording = async () => {
-    if (recorderIsRecording) {
-      setIsRecording(false);
+    if (isRecording) {
       await stopRecording();
-      // We'll handle the transcription elsewhere since useVoiceRecorder doesn't have isProcessing and transcription
-      console.log("Recording stopped, audio blob:", audioBlob);
     } else {
       try {
-        setIsRecording(true);
+        resetRecordingState();
         await startRecording();
       } catch (error) {
         console.error("Error starting recording:", error);
         toast.error("Could not access microphone. Please check permissions.");
-        setIsRecording(false);
       }
     }
   };
@@ -102,7 +157,7 @@ export default function MobileChatInput({
         onKeyDown={handleKeyDown}
         placeholder="Message Roha..."
         className="min-h-[40px] max-h-[120px] resize-none text-base border-muted rounded-full px-4 py-2"
-        disabled={isLoading || !userId || isRecording}
+        disabled={isLoading || !userId || isRecording || isProcessingTranscription}
       />
       {!isRecording ? (
         <>
@@ -110,7 +165,7 @@ export default function MobileChatInput({
             type="button" 
             size="icon" 
             onClick={handleVoiceRecording}
-            disabled={isLoading || !userId}
+            disabled={isLoading || !userId || isProcessingTranscription}
             className="rounded-full h-10 w-10 flex-shrink-0 bg-muted border-muted"
             variant="outline"
           >
@@ -157,6 +212,14 @@ export default function MobileChatInput({
       {isRecording && (
         <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg">
           {formatTime(recordingTime)}
+        </div>
+      )}
+      
+      {/* Transcription processing indicator */}
+      {isProcessingTranscription && (
+        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Transcribing...
         </div>
       )}
     </form>
