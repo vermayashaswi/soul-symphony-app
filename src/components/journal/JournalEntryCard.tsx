@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -73,7 +74,7 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
       }));
       
       const { error } = await supabase
-        .from('"Journal_Entries"')
+        .from('Journal_Entries') // Updated table name reference
         .delete()
         .eq('id', entry.id);
         

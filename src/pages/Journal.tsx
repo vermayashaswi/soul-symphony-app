@@ -212,7 +212,7 @@ const Journal = () => {
         }));
         
         const { data, error } = await supabase
-          .from('"Journal_Entries"')
+          .from('Journal_Entries')
           .select('id, "refined text"')
           .eq('foreign key', tempId)
           .single();

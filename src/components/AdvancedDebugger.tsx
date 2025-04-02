@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,21 +34,21 @@ export function AdvancedDebugger() {
     
     const checkSupabaseHealth = async () => {
       try {
-        // Check if we can access the Journal_Entries table (exact name with quotes)
+        // Check if we can access the Journal_Entries table (correct format)
         const journalCheck = await supabase
-          .from('"Journal_Entries"')
+          .from('Journal_Entries') // Updated table name reference
           .select('id')
           .limit(1);
           
         setTableChecks(prev => ({
           ...prev,
-          'Journal_Entries (with quotes)': !journalCheck.error
+          'Journal_Entries': !journalCheck.error
         }));
         
         if (journalCheck.error) {
-          console.error('Error accessing Journal_Entries table with quotes:', journalCheck.error);
+          console.error('Error accessing Journal_Entries table:', journalCheck.error);
         } else {
-          console.log('Successfully accessed Journal_Entries table with quotes');
+          console.log('Successfully accessed Journal_Entries table');
         }
         
         // Check lowercase journal_entries
@@ -155,15 +156,15 @@ export function AdvancedDebugger() {
   
   const refreshTableChecks = async () => {
     try {
-      // Check if we can access the Journal_Entries table (exact name with quotes)
+      // Check if we can access the Journal_Entries table (correct format)
       const journalCheck = await supabase
-        .from('"Journal_Entries"')
+        .from('Journal_Entries') // Updated table name reference
         .select('id')
         .limit(1);
         
       setTableChecks(prev => ({
         ...prev,
-        'Journal_Entries (with quotes)': !journalCheck.error
+        'Journal_Entries': !journalCheck.error
       }));
       
       // Check lowercase journal_entries
