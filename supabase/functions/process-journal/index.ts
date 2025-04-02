@@ -45,47 +45,64 @@ async function processJournalEntry(entryId: number) {
     
     // Call the chunk-and-embed function to process this entry
     console.log(`Invoking chunk-and-embed function for entry ${entryId}...`);
-    const chunkResponse = await fetch(
-      `${supabaseUrl}/functions/v1/chunk-and-embed`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseServiceKey}`
-        },
-        body: JSON.stringify({ entryId })
-      }
-    );
     
-    if (!chunkResponse.ok) {
-      const errorText = await chunkResponse.text();
-      console.error(`Error from chunk-and-embed function:`, errorText);
+    // Add timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    try {
+      const chunkResponse = await fetch(
+        `${supabaseUrl}/functions/v1/chunk-and-embed`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`
+          },
+          body: JSON.stringify({ entryId }),
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeoutId);
+      
+      if (!chunkResponse.ok) {
+        const errorText = await chunkResponse.text();
+        console.error(`Error from chunk-and-embed function:`, errorText);
+        return { 
+          success: false, 
+          error: `Chunking failed: ${errorText}`
+        };
+      }
+      
+      const chunkResult = await chunkResponse.json();
+      
+      console.log(`Chunk-and-embed result:`, chunkResult);
+      
+      // Re-fetch the entry to get the latest chunks_count
+      const { data: updatedEntry, error: refetchError } = await supabase
+        .from('Journal Entries')
+        .select('chunks_count')
+        .eq('id', entryId)
+        .single();
+      
+      if (refetchError) {
+        console.error(`Error re-fetching entry ${entryId} after chunking:`, refetchError);
+      }
+      
+      return { 
+        success: chunkResult.success, 
+        message: chunkResult.message,
+        chunks_count: updatedEntry?.chunks_count || 0
+      };
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.error(`Fetch error in processJournalEntry:`, fetchError);
       return { 
         success: false, 
-        error: `Chunking failed: ${errorText}`
+        error: fetchError instanceof Error ? fetchError.message : 'Fetch error in chunk-and-embed'
       };
     }
-    
-    const chunkResult = await chunkResponse.json();
-    
-    console.log(`Chunk-and-embed result:`, chunkResult);
-    
-    // Re-fetch the entry to get the latest chunks_count
-    const { data: updatedEntry, error: refetchError } = await supabase
-      .from('Journal Entries')
-      .select('chunks_count')
-      .eq('id', entryId)
-      .single();
-    
-    if (refetchError) {
-      console.error(`Error re-fetching entry ${entryId} after chunking:`, refetchError);
-    }
-    
-    return { 
-      success: chunkResult.success, 
-      message: chunkResult.message,
-      chunks_count: updatedEntry?.chunks_count || 0
-    };
   } catch (error) {
     console.error(`Exception in processJournalEntry:`, error);
     return { 
@@ -102,11 +119,31 @@ serve(async (req) => {
   }
 
   try {
-    const { entryId } = await req.json();
+    // Check if it's a health check
+    const url = new URL(req.url);
+    if (url.pathname.endsWith('/health')) {
+      return new Response(
+        JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    let entryId: number | undefined;
+    
+    try {
+      const body = await req.json();
+      entryId = body.entryId;
+    } catch (jsonError) {
+      console.error('Error parsing request JSON:', jsonError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body', success: false }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     if (!entryId) {
       return new Response(
-        JSON.stringify({ error: 'Missing required parameter: entryId' }),
+        JSON.stringify({ error: 'Missing required parameter: entryId', success: false }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -30,6 +30,22 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Helper function to check if chunking is supported on the server
 export async function isChunkingSupported(): Promise<boolean> {
   try {
+    // First, try to verify edge function availability
+    try {
+      const healthCheck = await supabase.functions.invoke('process-journal', {
+        body: { health: true },
+        method: 'GET'
+      });
+      
+      console.log('Edge function health check:', healthCheck);
+      if (healthCheck.error) {
+        console.warn('Edge function health check failed:', healthCheck.error);
+      }
+    } catch (healthError) {
+      console.warn('Edge function health check failed:', healthError);
+      // Continue despite health check failure
+    }
+    
     // Check if the journal_chunks table exists
     // Using a direct SQL query instead of rpc since table_exists is not in the types
     const { data, error } = await supabase
@@ -47,4 +63,25 @@ export async function isChunkingSupported(): Promise<boolean> {
     console.error('Exception checking if chunking is supported:', error);
     return false;
   }
+}
+
+// Add a helper function to check the health of all edge functions
+export async function checkEdgeFunctionsHealth(): Promise<Record<string, boolean>> {
+  const functionsToCheck = ['process-journal', 'chunk-and-embed'];
+  const results: Record<string, boolean> = {};
+  
+  for (const func of functionsToCheck) {
+    try {
+      const { data, error } = await supabase.functions.invoke(`${func}/health`, {
+        method: 'GET'
+      });
+      
+      results[func] = !error && data?.status === 'healthy';
+    } catch (error) {
+      console.error(`Health check failed for ${func}:`, error);
+      results[func] = false;
+    }
+  }
+  
+  return results;
 }

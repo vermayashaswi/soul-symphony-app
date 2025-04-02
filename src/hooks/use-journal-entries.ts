@@ -12,6 +12,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [fetchCount, setFetchCount] = useState(0);
   const [lastRefreshKey, setLastRefreshKey] = useState(refreshKey);
   const [isChunkingEnabled, setIsChunkingEnabled] = useState(false);
+  const [processFailures, setProcessFailures] = useState<Record<number, number>>({});
   
   const isFetchingRef = useRef(false);
   const initialFetchDoneRef = useRef(false);
@@ -39,24 +40,56 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       return false;
     }
     
+    // Check if we've already failed too many times with this entry
+    if (processFailures[entryId] && processFailures[entryId] >= 3) {
+      console.log(`Skipping processing for entry ${entryId} after ${processFailures[entryId]} failures`);
+      return false;
+    }
+    
     try {
       console.log(`Processing journal entry ${entryId} for chunking`);
+      
+      // Add timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const { data, error } = await supabase.functions.invoke('process-journal', {
-        body: { entryId }
+        body: { entryId },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       if (error) {
         console.error('Error processing journal entry:', error);
+        // Track failures
+        setProcessFailures(prev => ({
+          ...prev,
+          [entryId]: (prev[entryId] || 0) + 1
+        }));
+        
         return false;
       }
       
-      console.log(`Successfully processed journal entry ${entryId} into ${data.chunks_count} chunks`);
+      console.log(`Successfully processed journal entry ${entryId} into ${data?.chunks_count || 0} chunks`);
       return true;
     } catch (error) {
       console.error('Error invoking process-journal function:', error);
+      
+      // Track failures
+      setProcessFailures(prev => ({
+        ...prev,
+        [entryId]: (prev[entryId] || 0) + 1
+      }));
+      
+      // If we've failed twice, display a toast to let the user know
+      if ((processFailures[entryId] || 0) === 2) {
+        toast.error("Having trouble processing some journal entries. This won't affect your content.");
+      }
+      
       return false;
     }
-  }, [isChunkingEnabled]);
+  }, [isChunkingEnabled, processFailures]);
 
   const fetchEntries = useCallback(async () => {
     if (!userId) {
@@ -106,14 +139,18 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           if (unchunkedEntries.length > 0) {
             console.log(`[useJournalEntries] Found ${unchunkedEntries.length} entries that need processing`);
             
-            // Process up to 3 entries at a time to avoid overloading
-            const entriesToProcess = unchunkedEntries.slice(0, 3);
-            for (const entry of entriesToProcess) {
-              await processJournalEntry(entry.id);
+            // Process only 1 entry at a time to reduce load
+            const entryToProcess = unchunkedEntries[0];
+            const success = await processJournalEntry(entryToProcess.id);
+            
+            if (success) {
+              console.log(`[useJournalEntries] Successfully processed entry ${entryToProcess.id}`);
+            } else {
+              console.log(`[useJournalEntries] Failed to process entry ${entryToProcess.id}`);
             }
             
-            if (unchunkedEntries.length > 3) {
-              console.log(`[useJournalEntries] Queued ${unchunkedEntries.length - 3} more entries for future processing`);
+            if (unchunkedEntries.length > 1) {
+              console.log(`[useJournalEntries] ${unchunkedEntries.length - 1} more entries will be processed later`);
             }
           }
         }
