@@ -64,7 +64,7 @@ export function useEntryProcessing(
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        // Use a simpler typed query with explicit type casting to avoid excessive inference
+        // Use a simple query with explicit type casting to avoid deep type instantiation
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
@@ -76,7 +76,7 @@ export function useEntryProcessing(
         }
         
         if (data && data.length > 0) {
-          // Explicitly cast to simple type to avoid deep inference
+          // Cast data[0] to our simple interface
           const entry = data[0] as JournalEntryResponse;
           const entryId = entry.id;
           const refinedText = entry["refined text"];
