@@ -1,8 +1,8 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
-import { Json } from '@/integrations/supabase/types';
 
 export function useJournalEntries(userId: string | undefined, refreshKey: number, isProfileChecked: boolean = false) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -32,11 +32,14 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const fetchStartTime = Date.now();
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
-      const { data, error, status } = await supabase
+      // Use any to bypass TypeScript's deep type inference
+      const result: any = await supabase
         .from('Journal Entries')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
+      
+      const { data, error, status } = result;
       
       const fetchEndTime = Date.now();
       console.log(`[useJournalEntries] Fetch completed in ${fetchEndTime - fetchStartTime}ms with status: ${status}`);
