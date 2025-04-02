@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,7 +50,6 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
     
-    // Emit event for debugging
     window.dispatchEvent(new CustomEvent('operation-complete', {
       detail: {
         operation: 'Toggle Entry',
@@ -67,7 +65,6 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     try {
       setIsDeleting(true);
       
-      // Emit start event for debugging
       window.dispatchEvent(new CustomEvent('operation-start', {
         detail: {
           operation: 'Delete Entry',
@@ -75,14 +72,12 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         }
       }));
       
-      // Delete the entry from the database
       const { error } = await supabase
-        .from('Journal_Entries') // Updated table name
+        .from('"Journal_Entries"')
         .delete()
         .eq('id', entry.id);
         
       if (error) {
-        // Emit error event
         window.dispatchEvent(new CustomEvent('operation-complete', {
           detail: {
             operation: 'Delete Entry',
@@ -94,7 +89,6 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         throw error;
       }
       
-      // Emit success event
       window.dispatchEvent(new CustomEvent('operation-complete', {
         detail: {
           operation: 'Delete Entry',
@@ -103,10 +97,8 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         }
       }));
       
-      // Close the dialog
       setOpen(false);
       
-      // Call the onDelete callback to update the UI
       if (onDelete) {
         onDelete(entry.id);
       }
@@ -122,7 +114,6 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
 
   const createdAtFormatted = formatRelativeTime(entry.created_at);
 
-  // Helper function to get sentiment value as a number
   const getSentimentValue = (): number => {
     if (typeof entry.sentiment === 'number') {
       return entry.sentiment;
@@ -136,7 +127,6 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     return 0;
   };
 
-  // Determine which emoji to show based on sentiment value
   const renderSentimentEmoji = () => {
     const sentimentValue = getSentimentValue();
     

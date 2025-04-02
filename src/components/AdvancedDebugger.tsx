@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,21 +33,21 @@ export function AdvancedDebugger() {
     
     const checkSupabaseHealth = async () => {
       try {
-        // Check if we can access the Journal_Entries table (exact name)
+        // Check if we can access the Journal_Entries table (exact name with quotes)
         const journalCheck = await supabase
-          .from('Journal_Entries')
+          .from('"Journal_Entries"')
           .select('id')
           .limit(1);
           
         setTableChecks(prev => ({
           ...prev,
-          'Journal_Entries': !journalCheck.error
+          'Journal_Entries (with quotes)': !journalCheck.error
         }));
         
         if (journalCheck.error) {
-          console.error('Error accessing Journal_Entries table:', journalCheck.error);
+          console.error('Error accessing Journal_Entries table with quotes:', journalCheck.error);
         } else {
-          console.log('Successfully accessed Journal_Entries table');
+          console.log('Successfully accessed Journal_Entries table with quotes');
         }
         
         // Check lowercase journal_entries
@@ -62,24 +61,13 @@ export function AdvancedDebugger() {
           'journal_entries': !lowercaseCheck.error
         }));
         
-        // Check with space "Journal Entries"
-        const spaceCheck = await supabase
-          .from('Journal Entries')
-          .select('id')
-          .limit(1);
-          
-        setTableChecks(prev => ({
-          ...prev,
-          'Journal Entries': !spaceCheck.error
-        }));
-        
-        // Check with double quotes "Journal_Entries"
-        const quotedCheck = await supabase
+        // Check direct name without quotes
+        const directCheck = await supabase
           .rpc('table_exists', { table_name: 'Journal_Entries' });
           
         setTableChecks(prev => ({
           ...prev,
-          'table_exists(Journal_Entries)': quotedCheck.data === true
+          'table_exists(Journal_Entries)': directCheck.data === true
         }));
         
         // Check general Supabase health
@@ -167,15 +155,15 @@ export function AdvancedDebugger() {
   
   const refreshTableChecks = async () => {
     try {
-      // Check if we can access the Journal_Entries table (exact name)
+      // Check if we can access the Journal_Entries table (exact name with quotes)
       const journalCheck = await supabase
-        .from('Journal_Entries')
+        .from('"Journal_Entries"')
         .select('id')
         .limit(1);
         
       setTableChecks(prev => ({
         ...prev,
-        'Journal_Entries': !journalCheck.error
+        'Journal_Entries (with quotes)': !journalCheck.error
       }));
       
       // Check lowercase journal_entries
@@ -189,15 +177,13 @@ export function AdvancedDebugger() {
         'journal_entries': !lowercaseCheck.error
       }));
       
-      // Check with space "Journal Entries"
-      const spaceCheck = await supabase
-        .from('Journal Entries')
-        .select('id')
-        .limit(1);
+      // Check direct name without quotes
+      const directCheck = await supabase
+        .rpc('table_exists', { table_name: 'Journal_Entries' });
         
       setTableChecks(prev => ({
         ...prev,
-        'Journal Entries': !spaceCheck.error
+        'table_exists(Journal_Entries)': directCheck.data === true
       }));
     } catch (error) {
       console.error('Error refreshing table checks:', error);
