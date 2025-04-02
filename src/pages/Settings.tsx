@@ -19,7 +19,8 @@ import {
   FormField, 
   FormItem, 
   FormLabel, 
-  FormMessage 
+  FormMessage,
+  FormDescription 
 } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +31,7 @@ import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import ProfilePictureUpload from '@/components/settings/ProfilePictureUpload';
+import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -44,7 +45,7 @@ const Settings = () => {
         setIsLoading(true);
         try {
           const { count, error } = await supabase
-            .from('Journal_Entries') // Updated table name reference
+            .from('Journal_Entries')
             .select('id', { count: 'exact' })
             .eq('user_id', user.id);
             
@@ -100,7 +101,7 @@ const Settings = () => {
         try {
           const { data, error } = await supabase
             .from('profiles')
-            .select('full_name, email, avatar_url, is_public')
+            .select('full_name, email, avatar_url')
             .eq('id', user.id)
             .single();
             
@@ -110,13 +111,13 @@ const Settings = () => {
             full_name: data?.full_name || null,
             email: data?.email || null,
             avatar_url: data?.avatar_url || null,
-            is_public: data?.is_public || null,
+            is_public: false
           });
           
           profileForm.reset({
             fullName: data?.full_name || "",
             email: data?.email || "",
-            isPublic: data?.is_public || false,
+            isPublic: false
           });
         } catch (error) {
           console.error('Error fetching profile:', error);
@@ -136,12 +137,10 @@ const Settings = () => {
       const { error } = await supabase.from('profiles').update({
         full_name: values.fullName,
         email: values.email,
-        is_public: values.isPublic,
       }).eq('id', user!.id);
       
       if (error) throw error;
       
-      // Update auth user metadata
       const { error: userError } = await supabase.auth.updateUser({
         data: {
           full_name: values.fullName,

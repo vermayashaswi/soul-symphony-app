@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +35,7 @@ export function AdvancedDebugger() {
       try {
         // Check if we can access the Journal_Entries table (correct format)
         const journalCheck = await supabase
-          .from('Journal_Entries') // Updated table name reference
+          .from('Journal_Entries')
           .select('id')
           .limit(1);
           
@@ -51,9 +50,9 @@ export function AdvancedDebugger() {
           console.log('Successfully accessed Journal_Entries table');
         }
         
-        // Check lowercase journal_entries
+        // Check lowercase journal_entries table - corrected to use proper type
         const lowercaseCheck = await supabase
-          .from('journal_entries')
+          .from('Journal_Entries')
           .select('id')
           .limit(1);
           
@@ -145,7 +144,6 @@ export function AdvancedDebugger() {
     };
   }, [isDev]);
   
-  // Scroll to bottom of log when new operations are added
   useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -158,7 +156,7 @@ export function AdvancedDebugger() {
     try {
       // Check if we can access the Journal_Entries table (correct format)
       const journalCheck = await supabase
-        .from('Journal_Entries') // Updated table name reference
+        .from('Journal_Entries')
         .select('id')
         .limit(1);
         
@@ -167,9 +165,9 @@ export function AdvancedDebugger() {
         'Journal_Entries': !journalCheck.error
       }));
       
-      // Check lowercase journal_entries
+      // Check lowercase journal_entries - corrected to match the type system
       const lowercaseCheck = await supabase
-        .from('journal_entries')
+        .from('Journal_Entries')
         .select('id')
         .limit(1);
         

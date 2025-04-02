@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +29,10 @@ export type TimelineData = {
   entries: JournalInsight[];
 };
 
+export type TimeRange = 'today' | 'week' | 'month' | 'year' | 'all';
+
+export type AggregatedEmotionData = EmotionData[];
+
 export type InsightsOverview = {
   totalEntries: number;
   entriesThisMonth: number;
@@ -35,7 +40,7 @@ export type InsightsOverview = {
   averageSentiment: number;
   topEmotions: EmotionData[];
   recentInsights: JournalInsight[];
-  timelineData: [];
+  timelineData: TimelineData[];
 };
 
 export function useInsightsData() {
@@ -62,10 +67,9 @@ export function useInsightsData() {
     try {
       // Get entry counts and recent entries
       const { data: entriesData, error: entriesError } = await supabase
-        .from('Journal_Entries') // Updated table name reference
+        .from('Journal_Entries')
         .select('id, "refined text", created_at, sentiment, emotions, master_themes')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
       
       if (entriesError) throw new Error(entriesError.message);
       
@@ -79,7 +83,13 @@ export function useInsightsData() {
       
       // Calculate average sentiment
       const validSentimentEntries = entriesData.filter(entry => typeof entry.sentiment === 'number');
-      const totalSentiment = validSentimentEntries.reduce((sum, entry) => sum + (entry.sentiment as number), 0);
+      const totalSentiment = validSentimentEntries.reduce((sum, entry) => {
+        // Add type safety check for sentiment
+        const sentimentValue = typeof entry.sentiment === 'string' ? 
+          parseFloat(entry.sentiment) : (entry.sentiment as number || 0);
+        return sum + sentimentValue;
+      }, 0);
+      
       const averageSentiment = validSentimentEntries.length > 0 ? totalSentiment / validSentimentEntries.length : 0;
       
       // Get top emotions
@@ -109,6 +119,7 @@ export function useInsightsData() {
       }));
       
       // Generate timeline data (simplified for demonstration)
+      // Create an empty array with proper typing to avoid assignment errors
       const timelineData: TimelineData[] = [];
       
       setInsights({
