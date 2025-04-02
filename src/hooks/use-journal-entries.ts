@@ -17,16 +17,13 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const isFetchingRef = useRef(false);
   const initialFetchDoneRef = useRef(false);
 
-  // Check if chunking is supported and edge functions health
   useEffect(() => {
     async function checkSystemStatus() {
       try {
-        // First check chunking support
         const chunking = await isChunkingSupported();
         console.log(`Chunking support detected: ${chunking}`);
         setIsChunkingEnabled(chunking);
         
-        // Then check edge functions health
         const healthStatus = await checkEdgeFunctionsHealth();
         console.log("Edge functions health status:", healthStatus);
         setEdgeFunctionsHealth(healthStatus);
@@ -43,20 +40,17 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     checkSystemStatus();
   }, []);
 
-  // Process an entry for chunking and embedding
   const processJournalEntry = useCallback(async (entryId: number) => {
     if (!isChunkingEnabled) {
       console.log(`Chunking not enabled, skipping processing for entry ${entryId}`);
       return false;
     }
     
-    // Check if process-journal function is healthy
     if (edgeFunctionsHealth['process-journal'] === false) {
       console.log(`Skipping processing for entry ${entryId} as process-journal function is not healthy`);
       return false;
     }
     
-    // Check if we've already failed too many times with this entry
     if (processFailures[entryId] && processFailures[entryId] >= 3) {
       console.log(`Skipping processing for entry ${entryId} after ${processFailures[entryId]} failures`);
       return false;
@@ -65,37 +59,30 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     try {
       console.log(`Processing journal entry ${entryId} for chunking`);
       
-      // Create a promise that will reject after a timeout
       const timeoutPromise = new Promise<{success: false; error: string}>((_, reject) => {
-        setTimeout(() => reject(new Error('Function call timed out')), 20000); // Increased timeout
+        setTimeout(() => reject(new Error('Function call timed out')), 20000);
       });
       
-      // Create the actual function call with detailed logging
       console.log(`Invoking process-journal function for entry ${entryId}`);
       const functionCallPromise = supabase.functions.invoke('process-journal', {
         body: { entryId }
       }).catch(error => {
         console.error(`Initial error in process-journal invoke:`, error);
-        throw error; // Re-throw to be caught by the Promise.race
+        throw error;
       });
       
-      // Race between the timeout and the actual call with improved error handling
       const result = await Promise.race([functionCallPromise, timeoutPromise])
         .catch(error => {
           console.error('Error or timeout in process-journal function:', error);
           
-          // Try a direct health check to diagnose the issue
           checkEdgeFunctionsHealth().then(status => {
             console.log('Edge function health after failure:', status);
             setEdgeFunctionsHealth(status);
           });
           
-          // Try a direct HTTP ping to diagnose CORS or network issues
-          // Construct the function URL properly using the base URL
           const functionUrl = `${SUPABASE_URL}/functions/v1/process-journal/health`;
           console.log(`Attempting direct health check to: ${functionUrl}`);
           
-          // Use the exported SUPABASE_PUBLISHABLE_KEY constant
           fetch(functionUrl, {
             method: 'GET',
             headers: {
@@ -116,7 +103,6 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       if (!result || ('error' in result)) {
         console.error('Error processing journal entry:', result?.error);
-        // Track failures
         setProcessFailures(prev => ({
           ...prev,
           [entryId]: (prev[entryId] || 0) + 1
@@ -125,20 +111,17 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         return false;
       }
       
-      // Use type assertion to handle property access safely
       const responseData = result as unknown as { success: boolean; chunks_count?: number };
       console.log(`Successfully processed journal entry ${entryId} into ${responseData.chunks_count || 0} chunks`);
       return true;
     } catch (error) {
       console.error('Error invoking process-journal function:', error);
       
-      // Track failures
       setProcessFailures(prev => ({
         ...prev,
         [entryId]: (prev[entryId] || 0) + 1
       }));
       
-      // If we've failed twice, display a toast to let the user know
       if ((processFailures[entryId] || 0) === 2) {
         toast.error("Having trouble processing some journal entries. This won't affect your content.");
       }
@@ -190,12 +173,10 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         });
         
         if (isChunkingEnabled) {
-          // Process entries that haven't been chunked yet
           const unchunkedEntries = data.filter(entry => entry.is_chunked === false && (entry["refined text"] || entry["transcription text"]));
           if (unchunkedEntries.length > 0) {
             console.log(`[useJournalEntries] Found ${unchunkedEntries.length} entries that need processing`);
             
-            // Process only 1 entry at a time to reduce load
             const entryToProcess = unchunkedEntries[0];
             const success = await processJournalEntry(entryToProcess.id);
             
