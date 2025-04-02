@@ -19,34 +19,56 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       headers.set('x-client-version', '1.1.0');
       headers.set('x-chunking-enabled', 'true');
       
-      // Add request timeout
+      // Add request timeout with improved error handling
       const timeoutController = new AbortController();
-      const timeoutId = setTimeout(() => timeoutController.abort(), 15000); // 15 second timeout
+      const timeoutId = setTimeout(() => {
+        console.log(`Fetch timeout triggered for: ${url.toString()}`);
+        timeoutController.abort();
+      }, 20000); // Increase to 20 second timeout
       
       // Create a signal that works with both the timeout and any existing signal
       let finalSignal = timeoutController.signal;
       if (fetchOptions.signal) {
         // This combines the timeout signal with any existing signal
         const existingSignal = fetchOptions.signal;
-        finalSignal = new AbortController().signal;
+        
+        // Create a composite abort controller
+        const compositeController = new AbortController();
+        finalSignal = compositeController.signal;
         
         // Watch both signals
         const abortHandler = () => {
+          console.log(`Existing abort signal triggered for: ${url.toString()}`);
           timeoutController.abort();
           clearTimeout(timeoutId);
         };
-        existingSignal.addEventListener('abort', abortHandler);
-        timeoutController.signal.addEventListener('abort', () => {
+        
+        const timeoutHandler = () => {
+          console.log(`Timeout abort signal triggered for: ${url.toString()}`);
+          compositeController.abort();
           clearTimeout(timeoutId);
-        });
+        };
+        
+        existingSignal.addEventListener('abort', abortHandler);
+        timeoutController.signal.addEventListener('abort', timeoutHandler);
       }
       
+      console.log(`Fetch request to: ${url.toString()}`);
+      
+      // Add error handling for the fetch itself
       return fetch(url, { 
         ...fetchOptions,
         headers,
         signal: finalSignal 
-      }).finally(() => {
+      })
+      .then(response => {
         clearTimeout(timeoutId);
+        return response;
+      })
+      .catch(error => {
+        clearTimeout(timeoutId);
+        console.error(`Fetch error for ${url.toString()}:`, error);
+        throw error; // Re-throw to be handled by the caller
       });
     }
   }
@@ -97,6 +119,7 @@ export async function checkEdgeFunctionsHealth(): Promise<Record<string, boolean
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       try {
+        console.log(`Checking health of edge function: ${func}`);
         const response = await fetch(`${SUPABASE_URL}/functions/v1/${func}/health`, {
           method: 'GET',
           headers: {
@@ -112,6 +135,7 @@ export async function checkEdgeFunctionsHealth(): Promise<Record<string, boolean
           try {
             const data = await response.json();
             results[func] = data?.status === 'healthy';
+            console.log(`Health check for ${func}: ${results[func] ? 'healthy' : 'unhealthy'}`);
           } catch (jsonError) {
             console.warn(`Health check for ${func} returned non-JSON response:`, await response.text());
             results[func] = false;

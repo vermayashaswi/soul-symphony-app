@@ -68,23 +68,45 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       // Create a promise that will reject after a timeout
       const timeoutPromise = new Promise<{success: false; error: string}>((_, reject) => {
-        setTimeout(() => reject(new Error('Function call timed out')), 15000);
+        setTimeout(() => reject(new Error('Function call timed out')), 20000); // Increased timeout
       });
       
-      // Create the actual function call
+      // Create the actual function call with detailed logging
+      console.log(`Invoking process-journal function for entry ${entryId}`);
       const functionCallPromise = supabase.functions.invoke('process-journal', {
         body: { entryId }
+      }).catch(error => {
+        console.error(`Initial error in process-journal invoke:`, error);
+        throw error; // Re-throw to be caught by the Promise.race
       });
       
-      // Race between the timeout and the actual call
+      // Race between the timeout and the actual call with improved error handling
       const result = await Promise.race([functionCallPromise, timeoutPromise])
         .catch(error => {
           console.error('Error or timeout in process-journal function:', error);
+          
           // Try a direct health check to diagnose the issue
           checkEdgeFunctionsHealth().then(status => {
             console.log('Edge function health after failure:', status);
             setEdgeFunctionsHealth(status);
           });
+          
+          // Try a direct HTTP ping to diagnose CORS or network issues
+          fetch(`${supabase.functions.url}/process-journal/health`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }).then(response => {
+            console.log(`Direct health check status: ${response.status}`);
+            return response.text();
+          }).then(text => {
+            console.log(`Direct health check response: ${text}`);
+          }).catch(directError => {
+            console.error(`Direct health check failed:`, directError);
+          });
+          
           return { success: false, error: error.message || 'Function call failed' };
         });
       

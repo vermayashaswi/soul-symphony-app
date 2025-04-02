@@ -13,6 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 // Process a journal entry for chunking and embedding
@@ -50,7 +51,7 @@ async function processJournalEntry(entryId: number) {
     
     // Add timeout handling
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
     
     try {
       // Use direct fetch for more control over timeout and error handling
@@ -60,7 +61,8 @@ async function processJournalEntry(entryId: number) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            ...corsHeaders,
           },
           body: JSON.stringify({ entryId }),
           signal: controller.signal
@@ -134,7 +136,11 @@ async function processJournalEntry(entryId: number) {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    console.log('[process-journal] Handling CORS preflight request');
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    });
   }
 
   try {
@@ -148,7 +154,10 @@ serve(async (req) => {
           timestamp: new Date().toISOString(),
           service: 'process-journal'
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
     
@@ -174,7 +183,10 @@ serve(async (req) => {
             timestamp: new Date().toISOString(),
             service: 'process-journal'
           }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { 
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
         );
       }
       
@@ -184,7 +196,10 @@ serve(async (req) => {
           success: false,
           details: jsonError instanceof Error ? jsonError.message : 'Unknown parsing error'
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
     
@@ -197,7 +212,10 @@ serve(async (req) => {
           timestamp: new Date().toISOString(),
           service: 'process-journal'
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
     
@@ -205,7 +223,10 @@ serve(async (req) => {
       console.error('[process-journal] Missing required parameter: entryId');
       return new Response(
         JSON.stringify({ error: 'Missing required parameter: entryId', success: false }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
     
@@ -229,7 +250,10 @@ serve(async (req) => {
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error'
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
