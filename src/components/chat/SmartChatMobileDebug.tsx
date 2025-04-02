@@ -93,7 +93,13 @@ export default function SmartChatMobileDebug() {
     
     // Override the fetch function to monitor API calls
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.url;
+      // Extract the URL string correctly based on input type
+      const url = typeof input === 'string' 
+        ? input 
+        : input instanceof Request 
+          ? input.url 
+          : input.href; // Use href for URL objects
+      
       const method = init?.method || 'GET';
       const startTime = performance.now();
       
