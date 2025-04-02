@@ -1,8 +1,10 @@
+
 import { toast } from 'sonner';
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
 import { supabase } from '@/integrations/supabase/client';
+import { ensureOpenAIApiKey } from './api-key-setup';
 
 /**
  * Processes an audio recording for transcription and analysis
@@ -21,6 +23,12 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   }
   
   try {
+    // Make sure OpenAI API key is set
+    const isApiKeySet = await ensureOpenAIApiKey();
+    if (!isApiKeySet) {
+      return { success: false, error: "Failed to set OpenAI API key" };
+    }
+    
     // Generate a temporary ID for this recording
     const tempId = `temp-${Date.now()}`;
     

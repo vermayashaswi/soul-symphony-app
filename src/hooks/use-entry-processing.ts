@@ -51,12 +51,12 @@ export function useEntryProcessing(
     }
   }, [entries, processingEntries]);
 
-  // Fix: Use a different approach for type handling in the Supabase query
+  // Use any to bypass TypeScript's deep type inference
   const checkEntryProcessed = useCallback(async (tempId: string): Promise<boolean> => {
     try {
       console.log('Checking if entry is processed with temp ID:', tempId);
       
-      // Use "any" temporarily to bypass TypeScript's deep type inference
+      // Use any to avoid deep type inference issues
       const result: any = await supabase
         .from('Journal Entries')
         .select('id, "refined text"')
