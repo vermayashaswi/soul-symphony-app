@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +14,13 @@ interface JournalEntryRow {
   sentiment?: any;
   master_themes?: string[];
   "foreign key"?: string;
-  entities?: any[];
+  entities?: Json;
+  categories?: string[];
+  chunks_count?: number;
+  duration?: number;
+  emotions?: Json;
+  is_chunked?: boolean;
+  user_id?: string;
   [key: string]: any;
 }
 
@@ -86,7 +91,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         sentiment: item.sentiment,
         themes: item.master_themes,
         foreignKey: item["foreign key"],
-        entities: item.entities ? (item.entities as any[]).map(entity => ({
+        entities: item.entities ? (Array.isArray(item.entities) ? item.entities : []).map(entity => ({
           type: entity.type,
           name: entity.name,
           text: entity.text

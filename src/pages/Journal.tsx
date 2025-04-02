@@ -19,6 +19,7 @@ interface JournalEntryRow {
   id: number;
   "refined text"?: string;
   "foreign key"?: string;
+  created_at?: string;
   [key: string]: any;
 }
 
@@ -127,13 +128,11 @@ const Journal = () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        const response: PostgrestSingleResponse<JournalEntryRow> = await supabase
+        const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
           .eq('"foreign key"', tempId)
-          .single();
-          
-        const { data, error } = response;
+          .single<JournalEntryRow>();
           
         if (error) {
           console.error('Error fetching newly created entry:', error);
