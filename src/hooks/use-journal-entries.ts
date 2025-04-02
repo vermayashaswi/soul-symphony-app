@@ -1,7 +1,6 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { supabase, isChunkingSupported } from '@/integrations/supabase/client';
+import { supabase, isChunkingSupported, checkEdgeFunctionsHealth } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { Json } from '@/integrations/supabase/types';
 
@@ -13,30 +12,47 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [lastRefreshKey, setLastRefreshKey] = useState(refreshKey);
   const [isChunkingEnabled, setIsChunkingEnabled] = useState(false);
   const [processFailures, setProcessFailures] = useState<Record<number, number>>({});
+  const [edgeFunctionsHealth, setEdgeFunctionsHealth] = useState<Record<string, boolean>>({});
   
   const isFetchingRef = useRef(false);
   const initialFetchDoneRef = useRef(false);
 
-  // Check if chunking is supported
+  // Check if chunking is supported and edge functions health
   useEffect(() => {
-    async function checkChunkingSupport() {
+    async function checkSystemStatus() {
       try {
+        // First check chunking support
         const chunking = await isChunkingSupported();
         console.log(`Chunking support detected: ${chunking}`);
         setIsChunkingEnabled(chunking);
+        
+        // Then check edge functions health
+        const healthStatus = await checkEdgeFunctionsHealth();
+        console.log("Edge functions health status:", healthStatus);
+        setEdgeFunctionsHealth(healthStatus);
+        
+        if (!healthStatus['process-journal']) {
+          console.warn("process-journal function is not healthy");
+        }
       } catch (error) {
-        console.error("Error checking chunking support:", error);
+        console.error("Error checking system status:", error);
         setIsChunkingEnabled(false);
       }
     }
     
-    checkChunkingSupport();
+    checkSystemStatus();
   }, []);
 
   // Process an entry for chunking and embedding
   const processJournalEntry = useCallback(async (entryId: number) => {
     if (!isChunkingEnabled) {
       console.log(`Chunking not enabled, skipping processing for entry ${entryId}`);
+      return false;
+    }
+    
+    // Check if process-journal function is healthy
+    if (edgeFunctionsHealth['process-journal'] === false) {
+      console.log(`Skipping processing for entry ${entryId} as process-journal function is not healthy`);
       return false;
     }
     
@@ -49,24 +65,24 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     try {
       console.log(`Processing journal entry ${entryId} for chunking`);
       
-      // Create a promise with timeout instead of using AbortController signal
+      // Create a promise that will reject after a timeout
       const timeoutPromise = new Promise<{success: false; error: string}>((_, reject) => {
         setTimeout(() => reject(new Error('Function call timed out')), 10000);
       });
       
       // Create the actual function call
-      const functionPromise = supabase.functions.invoke('process-journal', {
+      const functionCallPromise = supabase.functions.invoke('process-journal', {
         body: { entryId }
       });
       
       // Race between the timeout and the actual call
-      const result = await Promise.race([functionPromise, timeoutPromise])
+      const result = await Promise.race([functionCallPromise, timeoutPromise])
         .catch(error => {
           console.error('Error or timeout in process-journal function:', error);
           return { success: false, error: error.message || 'Function call failed' };
         });
       
-      if (!result || 'error' in result) {
+      if (!result || ('error' in result)) {
         console.error('Error processing journal entry:', result?.error);
         // Track failures
         setProcessFailures(prev => ({
@@ -77,8 +93,8 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         return false;
       }
       
-      // Type assertion to fix TypeScript error by ensuring chunks_count exists
-      const responseData = result as { success: boolean; chunks_count?: number };
+      // Use type assertion to handle property access safely
+      const responseData = result as unknown as { success: boolean; chunks_count?: number };
       console.log(`Successfully processed journal entry ${entryId} into ${responseData.chunks_count || 0} chunks`);
       return true;
     } catch (error) {
@@ -97,7 +113,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       
       return false;
     }
-  }, [isChunkingEnabled, processFailures]);
+  }, [isChunkingEnabled, processFailures, edgeFunctionsHealth]);
 
   const fetchEntries = useCallback(async () => {
     if (!userId) {
@@ -221,6 +237,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     lastFetchTime,
     fetchCount,
     processJournalEntry,
-    isChunkingEnabled
+    isChunkingEnabled,
+    edgeFunctionsHealth
   };
 }

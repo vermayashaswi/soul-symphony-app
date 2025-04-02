@@ -37,29 +37,14 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Helper function to check if chunking is supported on the server
 export async function isChunkingSupported(): Promise<boolean> {
   try {
-    // First, try to verify edge function availability - use a simple GET request with timeout
+    // First, try to verify edge function availability with better error handling
+    let edgeFunctionsAvailable = false;
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const healthResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-journal/health`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (healthResponse.ok) {
-        console.log('Edge function health check passed');
-      } else {
-        console.warn('Edge function health check failed with status:', healthResponse.status);
-      }
+      const healthStatus = await checkEdgeFunctionsHealth();
+      edgeFunctionsAvailable = Object.values(healthStatus).some(status => status === true);
+      console.log('Edge functions health check result:', healthStatus);
     } catch (healthError) {
-      console.warn('Edge function health check failed:', healthError);
+      console.warn('Edge functions health check failed completely:', healthError);
       // Continue despite health check failure - try the DB check
     }
     
@@ -74,7 +59,8 @@ export async function isChunkingSupported(): Promise<boolean> {
       return false;
     }
     
-    return true;
+    // Either the edge functions are available or the table exists
+    return edgeFunctionsAvailable || (data && data.length >= 0);
   } catch (error) {
     console.error('Exception checking if chunking is supported:', error);
     return false;
@@ -83,36 +69,50 @@ export async function isChunkingSupported(): Promise<boolean> {
 
 // Add a helper function to check the health of all edge functions
 export async function checkEdgeFunctionsHealth(): Promise<Record<string, boolean>> {
-  const functionsToCheck = ['process-journal', 'chunk-and-embed'];
+  const functionsToCheck = ['process-journal', 'chunk-and-embed', 'chat-with-rag', 'chat-rag'];
   const results: Record<string, boolean> = {};
   
-  for (const func of functionsToCheck) {
+  const checkPromises = functionsToCheck.map(async (func) => {
     try {
+      // Create a controller for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/${func}/health`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const data = await response.json();
-        results[func] = data?.status === 'healthy';
-      } else {
+      try {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/${func}/health`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          try {
+            const data = await response.json();
+            results[func] = data?.status === 'healthy';
+          } catch (jsonError) {
+            console.warn(`Health check for ${func} returned non-JSON response:`, await response.text());
+            results[func] = false;
+          }
+        } else {
+          console.warn(`Health check for ${func} failed with status:`, response.status);
+          results[func] = false;
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.error(`Fetch error in health check for ${func}:`, fetchError);
         results[func] = false;
       }
     } catch (error) {
       console.error(`Health check failed for ${func}:`, error);
       results[func] = false;
     }
-  }
+  });
   
+  await Promise.allSettled(checkPromises);
   return results;
 }
