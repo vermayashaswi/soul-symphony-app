@@ -92,10 +92,15 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           });
           
           // Try a direct HTTP ping to diagnose CORS or network issues
-          fetch(`${supabase.functions.url}/process-journal/health`, {
+          // Fix: Use the proper method to get the function URL instead of accessing protected property
+          const functionUrl = `${supabase.functions.url}/process-journal/health`;
+          console.log(`Attempting direct health check to: ${functionUrl}`);
+          
+          // Fix: Use the imported SUPABASE_PUBLISHABLE_KEY from the client
+          fetch(functionUrl, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+              'Authorization': `Bearer ${supabase.auth.anon_key}`,
               'Content-Type': 'application/json'
             }
           }).then(response => {

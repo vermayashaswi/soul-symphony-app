@@ -74,6 +74,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
+// Expose the anon key for direct fetch calls that need it
+supabase.auth.anon_key = SUPABASE_PUBLISHABLE_KEY;
+
 // Helper function to check if chunking is supported on the server
 export async function isChunkingSupported(): Promise<boolean> {
   try {
