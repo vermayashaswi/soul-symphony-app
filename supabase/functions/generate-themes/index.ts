@@ -134,7 +134,7 @@ serve(async (req) => {
       
       if (Object.keys(updates).length > 0) {
         const { error } = await supabase
-          .from('Journal Entries')
+          .from('Journal Entries')  // Correct table name with space
           .update(updates)
           .eq('id', entryId);
           
