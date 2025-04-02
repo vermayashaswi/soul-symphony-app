@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -14,7 +13,6 @@ import { setupJournalReminder, initializeCapacitorNotifications } from '@/servic
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
-import { useNavigate } from 'react-router-dom';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -43,10 +41,9 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 export default function Settings() {
   const { theme, setTheme, colorTheme, setColorTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [streakDays, setStreakDays] = useState(0);
   const { entries } = useJournalEntries(user?.id, 0, !!user);
-  const navigate = useNavigate();
   
   const colorThemes = [
     { name: 'Default', color: 'bg-violet-600' },
@@ -122,29 +119,14 @@ export default function Settings() {
     window.open(mailtoLink, '_blank');
   };
   
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
-  };
-  
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
       
-      <div className="max-w-3xl mx-auto px-4 pt-16">
-        <div className="mb-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold mb-2 text-foreground">Settings</h1>
-            <p className="text-muted-foreground">Personalize your Feelosophy experience</p>
-          </div>
-          <Button 
-            variant="outline" 
-            onClick={handleSignOut} 
-            className="flex items-center gap-2"
-          >
-            <LogOut className="h-4 w-4" />
-            Log out
-          </Button>
+      <div className="max-w-3xl mx-auto px-4 pt-28">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2 text-foreground">Settings</h1>
+          <p className="text-muted-foreground">Personalize your Feelosophy experience</p>
         </div>
         
         <div className="space-y-6">

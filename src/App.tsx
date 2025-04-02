@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,9 +20,6 @@ import "./styles/mobile.css";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
 import MobileNavbar from "./components/mobile/MobileNavbar";
 import { useIsMobile } from "./hooks/use-mobile";
-import { MobileBrowserDebug } from "./components/MobileBrowserDebug";
-import SmartChatMobileDebug from "./components/chat/SmartChatMobileDebug";
-import DebugPanel from "./components/DebugPanel";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,7 +30,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const MobileRouteWrapper = ({ children }: { children: React.ReactNode }) => {
+const MobilePreviewWrapper = ({ children }: { children: React.ReactNode }) => {
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
@@ -62,39 +58,18 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) {
-    const url = new URL(`/auth`, window.location.origin);
-    url.searchParams.set('redirectTo', location.pathname);
-    
     console.log("Redirecting to auth from protected route:", location.pathname);
-    return <Navigate to={url.pathname + url.search} replace />;
+    return <Navigate to={`/auth?redirectTo=${location.pathname}`} replace />;
   }
   
   return <>{children}</>;
 };
 
-// Separated RouterAwareDebugTools component that has access to Router context
-const RouterAwareDebugTools = () => {
-  const isMobile = useIsMobile();
-  
-  return (
-    <>
-      {isMobile ? (
-        <SmartChatMobileDebug />
-      ) : (
-        <DebugPanel />
-      )}
-    </>
-  );
-};
-
-// Outside router DebugTools component
-const OutsideRouterDebugTools = () => (
-  <MobileBrowserDebug />
-);
-
 const AppRoutes = () => {
   const isMobile = useIsMobile();
-  const shouldShowMobileNav = isMobile;
+  const urlParams = new URLSearchParams(window.location.search);
+  const mobileDemo = urlParams.get('mobileDemo') === 'true';
+  const shouldShowMobileNav = isMobile || mobileDemo;
 
   useEffect(() => {
     const setCorrectViewport = () => {
@@ -132,87 +107,80 @@ const AppRoutes = () => {
     <>
       <Routes>
         <Route path="/" element={
-          <MobileRouteWrapper>
+          <MobilePreviewWrapper>
             <Index />
-          </MobileRouteWrapper>
+          </MobilePreviewWrapper>
         } />
         <Route path="/auth" element={
-          <MobileRouteWrapper>
+          <MobilePreviewWrapper>
             <Auth />
-          </MobileRouteWrapper>
+          </MobilePreviewWrapper>
         } />
         <Route path="/journal" element={
-          <MobileRouteWrapper>
+          <MobilePreviewWrapper>
             <ProtectedRoute>
               <Journal />
             </ProtectedRoute>
-          </MobileRouteWrapper>
+          </MobilePreviewWrapper>
         } />
         <Route path="/insights" element={
-          <MobileRouteWrapper>
+          <MobilePreviewWrapper>
             <ProtectedRoute>
               <Insights />
             </ProtectedRoute>
-          </MobileRouteWrapper>
+          </MobilePreviewWrapper>
         } />
         <Route path="/chat" element={
           <Navigate to="/smart-chat" replace />
         } />
         <Route path="/smart-chat" element={
-          <MobileRouteWrapper>
+          <MobilePreviewWrapper>
             <ProtectedRoute>
               <SmartChat />
             </ProtectedRoute>
-          </MobileRouteWrapper>
+          </MobilePreviewWrapper>
         } />
         <Route path="/settings" element={
-          <MobileRouteWrapper>
+          <MobilePreviewWrapper>
             <ProtectedRoute>
               <Settings />
             </ProtectedRoute>
-          </MobileRouteWrapper>
+          </MobilePreviewWrapper>
         } />
         <Route path="*" element={
-          <MobileRouteWrapper>
+          <MobilePreviewWrapper>
             <NotFound />
-          </MobileRouteWrapper>
+          </MobilePreviewWrapper>
         } />
       </Routes>
 
       {shouldShowMobileNav && <MobileNavbar />}
-      
-      {/* Debug tools inside Router context */}
-      <RouterAwareDebugTools />
     </>
   );
 };
 
-function App() {
+const App = () => {
   return (
-    <div className="app-container">
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <AuthProvider>
-            <ThemeProvider>
-              <div className="relative min-h-screen">
-                <div className="relative z-10">
-                  <Toaster />
-                  <Sonner position="top-center" />
-                  <BrowserRouter>
-                    <AnimatePresence mode="wait">
-                      <AppRoutes />
-                    </AnimatePresence>
-                  </BrowserRouter>
-                </div>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <div className="relative min-h-screen">
+              <div className="relative z-10">
+                <Toaster />
+                <Sonner position="top-center" />
+                <BrowserRouter>
+                  <AnimatePresence mode="wait">
+                    <AppRoutes />
+                  </AnimatePresence>
+                </BrowserRouter>
               </div>
-              {/* Debug tool that doesn't need Router context */}
-              <OutsideRouterDebugTools />
-            </ThemeProvider>
-          </AuthProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </div>
+            </div>
+          </ThemeProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
-}
+};
 
 export default App;

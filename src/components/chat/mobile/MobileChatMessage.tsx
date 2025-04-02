@@ -2,12 +2,11 @@
 import React from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
-import { Bot, User, FileText } from "lucide-react";
+import { Bot, User, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface MobileChatMessageProps {
   message: {
@@ -22,10 +21,9 @@ interface MobileChatMessageProps {
 }
 
 const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false }) => { // Add default value
-  const { user } = useAuth();
+  const [showReferences, setShowReferences] = useState(false);
   
-  // Get user avatar from metadata
-  const userAvatarUrl = user?.user_metadata?.avatar_url || '';
+  const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
   
   // Format content if it contains object notation
   const formattedContent = React.useMemo(() => {
@@ -77,13 +75,8 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       className={`relative flex items-start gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
     >
       {message.role === 'assistant' && (
-        <div className="w-8 h-8 rounded-full flex-shrink-0">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src="/lovable-uploads/20d23e7b-7e39-464d-816e-1d4a22b07283.png" alt="Roha" />
-            <AvatarFallback className="bg-primary/10">
-              <Bot className="h-4 w-4 text-primary" />
-            </AvatarFallback>
-          </Avatar>
+        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <Bot className="h-4 w-4 text-primary" />
         </div>
       )}
       
@@ -119,24 +112,52 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
           </div>
         )}
         
-        {message.role === 'assistant' && message.references && message.references.length > 0 && (
+        {hasReferences && (
           <div className="mt-2">
-            <div className="p-0 h-6 text-xs font-medium flex items-center gap-1 text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-0 h-6 text-xs font-medium flex items-center gap-1 text-muted-foreground"
+              onClick={() => setShowReferences(!showReferences)}
+            >
               <FileText className="h-3 w-3 mr-1" />
-              {message.references.length} journal entries referenced
-            </div>
+              {message.references!.length} journal entries
+              {showReferences ? (
+                <ChevronUp className="h-3 w-3 ml-1" />
+              ) : (
+                <ChevronDown className="h-3 w-3 ml-1" />
+              )}
+            </Button>
+            
+            <AnimatePresence>
+              {showReferences && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-1 text-xs max-h-32 overflow-y-auto border-l-2 border-primary/30 pl-2 pr-1"
+                >
+                  {message.references!.slice(0, 2).map((ref, idx) => (
+                    <div key={idx} className="mb-1 py-1">
+                      <div className="font-medium">{new Date(ref.date).toLocaleDateString()}</div>
+                      <div className="text-muted-foreground">{ref.snippet}</div>
+                    </div>
+                  ))}
+                  {message.references!.length > 2 && (
+                    <div className="text-xs text-muted-foreground">
+                      +{message.references!.length - 2} more entries
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </div>
       
       {message.role === 'user' && (
-        <div className="w-8 h-8 rounded-full flex-shrink-0">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={userAvatarUrl} alt="User" />
-            <AvatarFallback className="bg-primary/20">
-              <User className="h-4 w-4 text-primary" />
-            </AvatarFallback>
-          </Avatar>
+        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+          <User className="h-4 w-4 text-primary" />
         </div>
       )}
     </motion.div>

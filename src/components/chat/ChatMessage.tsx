@@ -3,12 +3,10 @@ import React, { useState } from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Bot, User, FileText } from "lucide-react";
+import { Bot, User, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface ChatMessageProps {
   message: {
@@ -24,19 +22,21 @@ interface ChatMessageProps {
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis }) => {
   const isMobile = useIsMobile();
-  const { user } = useAuth();
+  const [showReferences, setShowReferences] = useState(false);
   
-  const userAvatarUrl = user?.user_metadata?.avatar_url || '';
-  
+  // Format content if it contains object notation
   const formattedContent = React.useMemo(() => {
     if (message.role === 'assistant' && message.content.includes('[object Object]')) {
       try {
+        // Try to extract and format emotion data from the content
         const regex = /Here's what I found: (.*)/;
         const match = message.content.match(regex);
         
         if (match && match[1]) {
+          // If there's emotion data, we'll replace it with a formatted version
           let formattedData = message.content;
           
+          // Check if we have JSON data in diagnostics
           if (message.diagnostics && message.diagnostics.executionResults) {
             const emotionResults = message.diagnostics.executionResults.find(
               (result: any) => Array.isArray(result.result) && 
@@ -74,13 +74,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
       className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
     >
       {message.role === 'assistant' && (
-        <div className="w-10 h-10 rounded-full flex-shrink-0">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src="/lovable-uploads/20d23e7b-7e39-464d-816e-1d4a22b07283.png" alt="Roha" />
-            <AvatarFallback className="bg-primary/10">
-              <Bot className="h-5 w-5 text-primary" />
-            </AvatarFallback>
-          </Avatar>
+        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <Bot className="h-5 w-5 text-primary" />
         </div>
       )}
       
@@ -120,22 +115,50 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
         
         {message.role === 'assistant' && message.references && message.references.length > 0 && (
           <div className="mt-3">
-            <div className="p-0 h-7 text-xs md:text-sm font-medium flex items-center gap-1 text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-0 h-7 text-xs md:text-sm font-medium flex items-center gap-1 text-muted-foreground"
+              onClick={() => setShowReferences(!showReferences)}
+            >
               <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1" />
-              {message.references.length} journal entries referenced
-            </div>
+              {message.references.length} journal entries
+              {showReferences ? (
+                <ChevronUp className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+              ) : (
+                <ChevronDown className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+              )}
+            </Button>
+            
+            <AnimatePresence>
+              {showReferences && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-2 max-h-40 md:max-h-60 overflow-y-auto border-l-2 border-primary/30 pl-3 pr-1"
+                >
+                  {message.references.slice(0, isMobile ? 2 : 3).map((ref, idx) => (
+                    <div key={idx} className="mb-2 py-1">
+                      <div className="font-medium text-xs md:text-sm">{new Date(ref.date).toLocaleDateString()}</div>
+                      <div className="text-muted-foreground text-xs">{ref.snippet}</div>
+                    </div>
+                  ))}
+                  {message.references.length > (isMobile ? 2 : 3) && (
+                    <div className="text-xs text-muted-foreground">
+                      +{message.references.length - (isMobile ? 2 : 3)} more entries
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </div>
       
       {message.role === 'user' && (
-        <div className="w-10 h-10 rounded-full flex-shrink-0">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={userAvatarUrl} alt="User" />
-            <AvatarFallback className="bg-primary/20">
-              <User className="h-5 w-5 text-primary" />
-            </AvatarFallback>
-          </Avatar>
+        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+          <User className="h-5 w-5 text-primary" />
         </div>
       )}
     </motion.div>

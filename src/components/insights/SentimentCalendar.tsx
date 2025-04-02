@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Smile, Meh, Frown, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -18,23 +19,6 @@ type SentimentData = {
   };
 };
 
-// Helper function to extract sentiment value from different possible formats
-const getSentimentValue = (sentiment: any): number => {
-  if (typeof sentiment === 'number') {
-    return sentiment;
-  }
-  
-  if (typeof sentiment === 'string') {
-    return parseFloat(sentiment);
-  }
-  
-  if (sentiment && typeof sentiment === 'object' && 'score' in sentiment) {
-    return typeof sentiment.score === 'number' ? sentiment.score : parseFloat(String(sentiment.score));
-  }
-  
-  return 0; // Default to neutral if sentiment data is missing or invalid
-};
-
 const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRange }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   
@@ -51,7 +35,9 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
         }
         
         // Extract score from the sentiment object
-        const sentimentScore = getSentimentValue(entry.sentiment);
+        const sentimentScore = typeof entry.sentiment === 'string' 
+          ? parseFloat(entry.sentiment) 
+          : entry.sentiment.score;
         
         data[dateStr].avgScore = (data[dateStr].avgScore * data[dateStr].count + sentimentScore) / (data[dateStr].count + 1);
         data[dateStr].count += 1;
@@ -362,7 +348,9 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
       entriesInMonth.forEach(entry => {
         if (entry.sentiment) {
           // Extract sentiment score, handling both string and object formats
-          const score = getSentimentValue(entry.sentiment);
+          const score = typeof entry.sentiment === 'string' 
+            ? parseFloat(entry.sentiment) 
+            : entry.sentiment.score;
           
           if (!isNaN(score)) {
             totalSentiment += score;

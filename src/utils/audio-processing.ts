@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
@@ -110,20 +109,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     while (retries <= maxRetries) {
       try {
         // Set directTranscription to false to get full journal entry processing
-        console.log('Sending audio for transcription, attempt', retries + 1);
-        
-        // Add timeout handling for the edge function call
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Transcription request timed out')), 30000);
-        });
-
-        // Actual request 
-        const requestPromise = sendAudioForTranscription(base64String, authStatus.userId!, false);
-        
-        // Race between timeout and actual request
-        result = await Promise.race([requestPromise, timeoutPromise]);
-        
-        console.log('Transcription result:', result);
+        result = await sendAudioForTranscription(base64String, authStatus.userId!, false);
         if (result.success) break;
         retries++;
         if (retries <= maxRetries) {
@@ -163,11 +149,6 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
           const snippet = text.length > 40 ? text.substring(0, 37) + '...' : text;
           
           toast.success(`Journal entry saved successfully! (${duration}s) "${snippet}"`);
-          
-          // Force a refresh of the journal entries list
-          window.dispatchEvent(new CustomEvent('journal-entry-created', { 
-            detail: { entryId: result.data.entryId } 
-          }));
         }
       } else {
         toast.success('Journal entry processed, but no entry ID returned.');

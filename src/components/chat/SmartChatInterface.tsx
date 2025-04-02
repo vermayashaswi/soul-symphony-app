@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
@@ -11,8 +12,8 @@ import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/c
 import { motion } from "framer-motion";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+// Create a type that includes only the roles allowed in the chat UI
 type UIChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -20,9 +21,9 @@ type UIChatMessage = {
   analysis?: any;
   diagnostics?: any;
   hasNumericResult?: boolean;
-  isLoading?: boolean;
 }
 
+// Define a type for the chat message from the database
 type DbChatMessage = {
   content: string;
   created_at: string;
@@ -30,6 +31,7 @@ type DbChatMessage = {
   reference_entries: any;
   sender: string;
   thread_id: string;
+  // Add optional fields that might not be present in all database records
   analysis_data?: any;
   has_numeric_result?: boolean;
 }
@@ -167,17 +169,22 @@ export default function SmartChatInterface() {
     }
     
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
-    
-    setChatHistory(prev => [...prev, { 
-      role: 'assistant', 
-      content: 'Thinking...',
-      isLoading: true 
-    }]);
-    
     setIsLoading(true);
     setShowSuggestions(false);
     
+    // Analyze the query to provide more specific processing stages
     const queryTypes = analyzeQueryTypes(userMessage);
+    
+    // Set initial processing stage based on query analysis
+    if (queryTypes.isQuantitative && queryTypes.isEmotionFocused) {
+      setProcessingStage("Analyzing your emotions and calculating results...");
+    } else if (queryTypes.isWhyQuestion) {
+      setProcessingStage("Analyzing your question and looking for explanations...");
+    } else if (queryTypes.isEmotionFocused) {
+      setProcessingStage("Analyzing emotion patterns in your journal...");
+    } else {
+      setProcessingStage("Analyzing your question...");
+    }
     
     try {
       const { error: msgError } = await supabase
@@ -188,69 +195,24 @@ export default function SmartChatInterface() {
           sender: 'user'
         });
         
-      if (msgError) {
-        console.error("Error storing user message:", msgError);
-        throw msgError;
-      }
+      if (msgError) throw msgError;
       
       console.log("Desktop: Performing comprehensive query analysis");
       
-      setChatHistory(prev => {
-        const updatedHistory = [...prev];
-        const loadingMsgIndex = updatedHistory.findIndex(msg => msg.isLoading);
-        if (loadingMsgIndex !== -1) {
-          let stageName = "Analyzing your question...";
-          
-          if (queryTypes.isQuantitative && queryTypes.isEmotionFocused) {
-            stageName = "Analyzing your emotions and calculating results...";
-          } else if (queryTypes.isWhyQuestion) {
-            stageName = "Analyzing your question and looking for explanations...";
-          } else if (queryTypes.isEmotionFocused) {
-            stageName = "Analyzing emotion patterns in your journal...";
-          }
-          
-          updatedHistory[loadingMsgIndex].content = stageName;
-          setProcessingStage(stageName);
-        }
-        return updatedHistory;
-      });
+      // Update processing stage based on query progress
+      if (queryTypes.needsDataAggregation) {
+        setProcessingStage("Aggregating data from your journal entries...");
+      } else if (queryTypes.needsVectorSearch) {
+        setProcessingStage("Searching for related entries in your journal...");
+      }
       
       console.log("Desktop: Query analysis result:", queryTypes);
       
-      setTimeout(() => {
-        setChatHistory(prev => {
-          const updatedHistory = [...prev];
-          const loadingMsgIndex = updatedHistory.findIndex(msg => msg.isLoading);
-          if (loadingMsgIndex !== -1) {
-            let nextStage = "Searching for insights...";
-            
-            if (queryTypes.needsDataAggregation) {
-              nextStage = "Aggregating data from your journal entries...";
-            } else if (queryTypes.needsVectorSearch) {
-              nextStage = "Searching for related entries in your journal...";
-            }
-            
-            updatedHistory[loadingMsgIndex].content = nextStage;
-            setProcessingStage(nextStage);
-          }
-          return updatedHistory;
-        });
-      }, 1500);
-      
-      console.log("Desktop: Calling processChatMessage with user ID:", user.id);
+      setProcessingStage("Searching for insights...");
       const response = await processChatMessage(userMessage, user.id, queryTypes, threadId);
-      console.log("Desktop: Response received:", response);
-      console.log("Desktop: Response content:", response.content);
+      console.log("Desktop: Response received with references:", response.references?.length || 0);
       
-      if (response.role === 'error') {
-        console.error("Desktop: Error response received:", response.content);
-        toast({
-          title: "Error",
-          description: "There was an issue processing your request. Please try again.",
-          variant: "destructive"
-        });
-      }
-      
+      // Convert to UI-compatible message and filter out system/error roles
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
         content: response.content,
@@ -259,62 +221,52 @@ export default function SmartChatInterface() {
         ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
       };
       
-      try {
-        await supabase
-          .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            content: response.content,
-            sender: 'assistant',
-            reference_entries: response.references || null,
-            has_numeric_result: response.hasNumericResult || false,
-            analysis_data: response.analysis || null
-          });
-        
-        if (chatHistory.length === 0 || (chatHistory.length === 2 && chatHistory[1].isLoading)) {
-          const truncatedTitle = userMessage.length > 30 
-            ? userMessage.substring(0, 30) + "..." 
-            : userMessage;
-            
-          await supabase
-            .from('chat_threads')
-            .update({ 
-              title: truncatedTitle,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', threadId);
-        }
-        
+      await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: threadId,
+          content: response.content,
+          sender: 'assistant',
+          reference_entries: response.references || null,
+          has_numeric_result: response.hasNumericResult || false,
+          analysis_data: response.analysis || null
+        });
+      
+      if (chatHistory.length === 0) {
+        const truncatedTitle = userMessage.length > 30 
+          ? userMessage.substring(0, 30) + "..." 
+          : userMessage;
+          
         await supabase
           .from('chat_threads')
-          .update({ updated_at: new Date().toISOString() })
+          .update({ 
+            title: truncatedTitle,
+            updated_at: new Date().toISOString()
+          })
           .eq('id', threadId);
-      } catch (dbError) {
-        console.error("Desktop: Error storing assistant response:", dbError);
       }
       
-      setChatHistory(prev => {
-        const filteredHistory = prev.filter(msg => !msg.isLoading);
-        return [...filteredHistory, uiResponse];
-      });
+      await supabase
+        .from('chat_threads')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', threadId);
+      
+      setChatHistory(prev => [...prev, uiResponse]);
     } catch (error) {
-      console.error("Desktop: Error sending message:", error);
+      console.error("Error sending message:", error);
       toast({
         title: "Error",
         description: "Failed to get a response. Please try again.",
         variant: "destructive"
       });
       
-      setChatHistory(prev => {
-        const filteredHistory = prev.filter(msg => !msg.isLoading);
-        return [
-          ...filteredHistory, 
-          { 
-            role: 'assistant', 
-            content: "I'm having trouble processing your request. The server might be down or there might be an issue with the connection. Please try again later."
-          }
-        ];
-      });
+      setChatHistory(prev => [
+        ...prev, 
+        { 
+          role: 'assistant', 
+          content: "I'm having trouble processing your request. Please try again later."
+        }
+      ]);
     } finally {
       setIsLoading(false);
       setProcessingStage(null);
@@ -374,30 +326,17 @@ export default function SmartChatInterface() {
           </div>
         ) : (
           <>
-            {chatHistory.map((msg, idx) => {
-              if (msg.isLoading) {
-                return (
-                  <div key={idx} className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full flex-shrink-0">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src="/lovable-uploads/20d23e7b-7e39-464d-816e-1d4a22b07283.png" alt="Roha" />
-                        <AvatarFallback className="bg-primary/10">
-                          <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                    <div className="bg-muted/60 border border-border/50 rounded-2xl rounded-tl-none p-4 max-w-[85%] md:max-w-[75%] shadow-sm">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                        <span>{msg.content}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-              return <ChatMessage key={idx} message={msg} showAnalysis={showAnalysis} />;
-            })}
+            {chatHistory.map((msg, idx) => (
+              <ChatMessage key={idx} message={msg} showAnalysis={showAnalysis} />
+            ))}
           </>
+        )}
+        
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">{processingStage || "Processing..."}</p>
+          </div>
         )}
         
         <div ref={messagesEndRef} />

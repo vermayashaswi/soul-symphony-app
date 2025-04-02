@@ -93,14 +93,12 @@ export type Database = {
         Row: {
           audio_url: string | null
           categories: string[] | null
-          chunks_count: number | null
           created_at: string
           duration: number | null
           emotions: Json | null
           entities: Json | null
           "foreign key": string | null
           id: number
-          is_chunked: boolean | null
           master_themes: string[] | null
           "refined text": string | null
           sentiment: string | null
@@ -110,14 +108,12 @@ export type Database = {
         Insert: {
           audio_url?: string | null
           categories?: string[] | null
-          chunks_count?: number | null
           created_at?: string
           duration?: number | null
           emotions?: Json | null
           entities?: Json | null
           "foreign key"?: string | null
           id?: number
-          is_chunked?: boolean | null
           master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
@@ -127,14 +123,12 @@ export type Database = {
         Update: {
           audio_url?: string | null
           categories?: string[] | null
-          chunks_count?: number | null
           created_at?: string
           duration?: number | null
           emotions?: Json | null
           entities?: Json | null
           "foreign key"?: string | null
           id?: number
-          is_chunked?: boolean | null
           master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
@@ -147,47 +141,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      journal_chunks: {
-        Row: {
-          chunk_index: number
-          chunk_size: number
-          content: string
-          created_at: string
-          embedding: string
-          id: number
-          journal_entry_id: number
-          total_chunks: number
-        }
-        Insert: {
-          chunk_index: number
-          chunk_size: number
-          content: string
-          created_at?: string
-          embedding: string
-          id?: number
-          journal_entry_id: number
-          total_chunks: number
-        }
-        Update: {
-          chunk_index?: number
-          chunk_size?: number
-          content?: string
-          created_at?: string
-          embedding?: string
-          id?: number
-          journal_entry_id?: number
-          total_chunks?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "journal_chunks_journal_entry_id_fkey"
-            columns: ["journal_entry_id"]
-            isOneToOne: false
-            referencedRelation: "Journal Entries"
             referencedColumns: ["id"]
           },
         ]
@@ -439,19 +392,6 @@ export type Database = {
           score: number
         }[]
       }
-      get_top_emotions_by_chunks: {
-        Args: {
-          user_id_param: string
-          start_date?: string
-          end_date?: string
-          limit_count?: number
-        }
-        Returns: {
-          emotion: string
-          score: number
-          sample_chunks: Json
-        }[]
-      }
       get_top_emotions_with_entries: {
         Args: {
           user_id_param: string
@@ -468,28 +408,6 @@ export type Database = {
       mark_inactive_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
-      }
-      match_chunks_with_date: {
-        Args: {
-          query_embedding: string
-          match_threshold: number
-          match_count: number
-          user_id_filter: string
-          start_date?: string
-          end_date?: string
-        }
-        Returns: {
-          id: number
-          chunk_id: number
-          content: string
-          created_at: string
-          similarity: number
-          chunk_index: number
-          total_chunks: number
-          entry_content: string
-          themes: string[]
-          emotions: Json
-        }[]
       }
       match_journal_entries:
         | {
@@ -590,12 +508,6 @@ export type Database = {
             }
             Returns: string
           }
-      table_exists: {
-        Args: {
-          table_name: string
-        }
-        Returns: boolean
-      }
     }
     Enums: {
       [_ in never]: never

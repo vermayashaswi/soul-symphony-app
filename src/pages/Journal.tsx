@@ -12,7 +12,6 @@ import JournalSearch from '@/components/journal/JournalSearch';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
@@ -21,7 +20,6 @@ const Journal = () => {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const isMobile = useIsMobile();
   
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
@@ -29,13 +27,6 @@ const Journal = () => {
 
   useEffect(() => {
     if (user?.id) {
-      window.dispatchEvent(new CustomEvent('operation-start', {
-        detail: {
-          operation: 'Check User Profile',
-          details: `Checking if profile exists for user: ${user.id.substring(0, 8)}...`
-        }
-      }));
-      
       checkUserProfile(user.id);
     }
   }, [user?.id]);
@@ -43,14 +34,6 @@ const Journal = () => {
   useEffect(() => {
     if (activeTab === 'entries' && isProfileChecked) {
       console.log('Tab changed to entries, fetching entries...');
-      
-      window.dispatchEvent(new CustomEvent('operation-start', {
-        detail: {
-          operation: 'Fetch Entries',
-          details: 'Loading journal entries from database'
-        }
-      }));
-      
       fetchEntries();
     }
   }, [activeTab, isProfileChecked, fetchEntries]);
@@ -60,31 +43,12 @@ const Journal = () => {
       console.log('Setting up polling for processing entries:', processingEntries);
       
       const pollingInterval = setInterval(() => {
-        console.log('Polling for entries updates...');
         fetchEntries();
       }, 5000);
       
       return () => clearInterval(pollingInterval);
     }
   }, [processingEntries, activeTab, fetchEntries]);
-
-  useEffect(() => {
-    const handleJournalEntryCreated = () => {
-      console.log('Journal entry created event received');
-      setRefreshKey(prev => prev + 1);
-      fetchEntries();
-      
-      if (isMobile) {
-        setActiveTab('entries');
-      }
-    };
-    
-    window.addEventListener('journal-entry-created', handleJournalEntryCreated);
-    
-    return () => {
-      window.removeEventListener('journal-entry-created', handleJournalEntryCreated);
-    };
-  }, [fetchEntries, isMobile]);
 
   useEffect(() => {
     if (processingEntries.length > 0 && entries.length > 0) {
@@ -98,7 +62,6 @@ const Journal = () => {
       }
       
       if (newlyCompletedTempIds.length > 0) {
-        console.log('Found newly completed entries:', newlyCompletedTempIds);
         setProcessingEntries(prev => 
           prev.filter(id => !newlyCompletedTempIds.includes(id))
         );
@@ -117,13 +80,6 @@ const Journal = () => {
       if (error || !profile) {
         console.log('Creating user profile...');
         
-        window.dispatchEvent(new CustomEvent('operation-start', {
-          detail: {
-            operation: 'Create Profile',
-            details: `Creating new profile for user: ${userId.substring(0, 8)}...`
-          }
-        }));
-        
         const { data: userData, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
         
@@ -137,80 +93,30 @@ const Journal = () => {
           }]);
           
         if (insertError) throw insertError;
-        
-        window.dispatchEvent(new CustomEvent('operation-complete', {
-          detail: {
-            operation: 'Create Profile',
-            success: true,
-            details: 'User profile created successfully'
-          }
-        }));
-      } else {
-        window.dispatchEvent(new CustomEvent('operation-complete', {
-          detail: {
-            operation: 'Check User Profile',
-            success: true,
-            details: 'User profile exists'
-          }
-        }));
+        console.log('Profile created successfully');
       }
       
       setIsProfileChecked(true);
     } catch (error: any) {
       console.error('Error checking/creating user profile:', error);
-      
-      window.dispatchEvent(new CustomEvent('operation-complete', {
-        detail: {
-          operation: error.message.includes('Creating') ? 'Create Profile' : 'Check User Profile',
-          success: false,
-          error: error.message || 'Unknown error'
-        }
-      }));
-      
       toast.error('Error setting up profile. Please try again.');
     }
   };
 
   const onEntryRecorded = async (audioBlob: Blob, tempId?: string) => {
-    console.log('Entry recorded, adding to processing queue with temp ID:', tempId);
-    
-    window.dispatchEvent(new CustomEvent('operation-complete', {
-      detail: {
-        operation: 'Record Entry',
-        success: true,
-        details: `Recorded audio with temp ID: ${tempId}`
-      }
-    }));
-    
-    window.dispatchEvent(new CustomEvent('operation-start', {
-      detail: {
-        operation: 'Process Entry',
-        details: `Processing entry with temp ID: ${tempId}`
-      }
-    }));
+    console.log('Entry recorded, adding to processing queue');
     
     if (tempId) {
       setProcessingEntries(prev => [...prev, tempId]);
     }
     
-    if (isMobile) {
-      setActiveTab('entries');
-    }
+    setActiveTab('entries');
     
-    setRefreshKey(prev => prev + 1);
     fetchEntries();
     
     const checkEntryProcessed = async () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
-        
-        window.dispatchEvent(new CustomEvent('operation-start', {
-          detail: {
-            operation: 'Check Entry Status',
-            details: `Checking status for entry with temp ID: ${tempId}`
-          }
-        }));
-        
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
@@ -219,55 +125,15 @@ const Journal = () => {
           
         if (error) {
           console.error('Error fetching newly created entry:', error);
-          
-          window.dispatchEvent(new CustomEvent('operation-complete', {
-            detail: {
-              operation: 'Check Entry Status',
-              success: false,
-              error: error.message || 'Error fetching entry status'
-            }
-          }));
-          
           return false;
         } else if (data) {
           console.log('New entry found:', data.id);
-          
-          window.dispatchEvent(new CustomEvent('operation-complete', {
-            detail: {
-              operation: 'Check Entry Status',
-              success: true,
-              details: `Entry found with ID: ${data.id}`
-            }
-          }));
-          
-          window.dispatchEvent(new CustomEvent('operation-start', {
-            detail: {
-              operation: 'Generate Themes',
-              details: `Generating themes for entry ID: ${data.id}`
-            }
-          }));
           
           await supabase.functions.invoke('generate-themes', {
             body: {
               text: data["refined text"],
               entryId: data.id
             }
-          }).then(() => {
-            window.dispatchEvent(new CustomEvent('operation-complete', {
-              detail: {
-                operation: 'Generate Themes',
-                success: true,
-                details: 'Themes generated successfully'
-              }
-            }));
-          }).catch(error => {
-            window.dispatchEvent(new CustomEvent('operation-complete', {
-              detail: {
-                operation: 'Generate Themes',
-                success: false,
-                error: error.message || 'Error generating themes'
-              }
-            }));
           });
           
           return true;
@@ -275,15 +141,6 @@ const Journal = () => {
         return false;
       } catch (error) {
         console.error('Error checking for processed entry:', error);
-        
-        window.dispatchEvent(new CustomEvent('operation-complete', {
-          detail: {
-            operation: 'Check Entry Status',
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error checking entry status'
-          }
-        }));
-        
         return false;
       }
     };
@@ -296,15 +153,6 @@ const Journal = () => {
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
         setRefreshKey(prev => prev + 1);
         fetchEntries();
-        
-        window.dispatchEvent(new CustomEvent('operation-complete', {
-          detail: {
-            operation: 'Process Entry',
-            success: true,
-            details: 'Entry processed and stored successfully'
-          }
-        }));
-        
         toast.success('Journal entry processed successfully!');
       }
     }, 3000);
@@ -313,19 +161,7 @@ const Journal = () => {
       clearInterval(pollInterval);
       if (processingEntries.includes(tempId || '')) {
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
-        
-        window.dispatchEvent(new CustomEvent('operation-complete', {
-          detail: {
-            operation: 'Process Entry',
-            success: false,
-            details: 'Entry processing is taking longer than expected',
-            error: 'Processing timeout - the entry should appear soon'
-          }
-        }));
-        
         toast.info('Entry processing is taking longer than expected. It should appear soon.');
-        
-        fetchEntries();
       }
     }, 120000);
   };
@@ -353,25 +189,23 @@ const Journal = () => {
   
   const showEntries = activeTab === 'entries' && (!loading || entries.length > 0);
 
-  const tabContainerClass = isMobile ? "container mx-auto px-4 py-4 max-w-5xl" : "container mx-auto px-4 py-6 max-w-5xl";
-
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
       
       <JournalHeader />
       
-      <div className={tabContainerClass}>
+      <div className="container mx-auto px-4 py-6 max-w-5xl">
         <Tabs defaultValue="record" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4 md:mb-6">
-            <TabsTrigger value="record" className="text-sm md:text-base">Record Entry</TabsTrigger>
-            <TabsTrigger value="entries" className="text-sm md:text-base">Past Entries</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="record">Record Entry</TabsTrigger>
+            <TabsTrigger value="entries">Past Entries</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="record" className="mt-2 md:mt-4">
+          <TabsContent value="record" className="mt-4">
             <Card>
-              <CardHeader className="pb-2 md:pb-4">
-                <CardTitle className="text-center text-lg md:text-xl">Record a New Journal Entry</CardTitle>
+              <CardHeader>
+                <CardTitle className="text-center">Record a New Journal Entry</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col items-center">
@@ -387,7 +221,7 @@ const Journal = () => {
             )}
             
             {showLoading && (
-              <div className="flex flex-col items-center justify-center h-48 md:h-64">
+              <div className="flex flex-col items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                 <p className="text-muted-foreground">Loading your journal entries...</p>
               </div>

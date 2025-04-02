@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -403,7 +402,7 @@ const Index = () => {
         >
           {features.map((feature, index) => (
             <motion.div key={feature.title} variants={itemVariants}>
-              <Card className="h-full border-primary/20 overflow-hidden bg-background/70">
+              <Card className="h-full border-primary/20 overflow-hidden">
                 <CardHeader className="pb-0 pt-4 flex flex-row items-center justify-center gap-2">
                   <motion.div 
                     variants={iconVariants}

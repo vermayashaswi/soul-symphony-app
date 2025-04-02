@@ -1,40 +1,13 @@
 
 import { Home, Book, BarChart2, MessageSquare, Settings } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState, useEffect } from 'react';
 
 const MobileNavbar = () => {
+  const location = useLocation();
   const { user } = useAuth();
-  const [currentPath, setCurrentPath] = useState<string>('/');
-  
-  useEffect(() => {
-    // Get initial path
-    setCurrentPath(window.location.pathname);
-    
-    // Listen for path changes
-    const handlePathnameChange = () => {
-      setCurrentPath(window.location.pathname);
-    };
-    
-    window.addEventListener('popstate', handlePathnameChange);
-    
-    // Custom event for route changes via Link component
-    const handleRouteChange = () => {
-      setTimeout(() => {
-        setCurrentPath(window.location.pathname);
-      }, 50);
-    };
-    
-    window.addEventListener('routeChange', handleRouteChange);
-    
-    return () => {
-      window.removeEventListener('popstate', handlePathnameChange);
-      window.removeEventListener('routeChange', handleRouteChange);
-    };
-  }, []);
   
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
@@ -45,22 +18,9 @@ const MobileNavbar = () => {
   ];
 
   // Only show the navbar if the user is logged in or on the home page
-  if (!user && currentPath !== '/') {
+  if (!user && location.pathname !== '/') {
     return null;
   }
-
-  // Get mobileDemo parameter from current URL if present
-  const preserveMobileParam = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const mobileDemo = urlParams.get('mobileDemo');
-    
-    if (mobileDemo === 'true') {
-      return '?mobileDemo=true';
-    }
-    return '';
-  };
-  
-  const mobileParam = preserveMobileParam();
 
   return (
     <motion.div 
@@ -70,22 +30,16 @@ const MobileNavbar = () => {
       transition={{ duration: 0.3 }}
     >
       {navItems.map(item => {
-        const isActive = currentPath === item.path;
-        // Only preserve mobileDemo parameter if it's already present in the URL
-        const navUrl = `${item.path}${mobileParam}`;
+        const isActive = location.pathname === item.path;
         
         return (
           <Link 
             key={item.path} 
-            to={navUrl}
+            to={item.path}
             className={cn(
               "flex flex-col items-center justify-center w-full h-full pt-1",
               isActive ? "text-primary" : "text-muted-foreground"
             )}
-            onClick={() => {
-              // Dispatch a custom event that we can listen to for route changes
-              window.dispatchEvent(new CustomEvent('routeChange'));
-            }}
           >
             <div className="relative">
               {isActive && (

@@ -47,7 +47,7 @@ async function analyzeSentiment(text: string) {
     const result = await response.json();
     console.log('Sentiment analysis complete:', JSON.stringify(result.documentSentiment, null, 2));
     
-    // Return the document sentiment score as a number, not a string
+    // Return the document sentiment score
     return result.documentSentiment?.score;
   } catch (error) {
     console.error('Error in analyzeSentiment:', error);
@@ -93,10 +93,10 @@ serve(async (req) => {
 
         const sentimentScore = await analyzeSentiment(entry["refined text"]);
         
-        // Update the database with the sentiment score as a number, not a string
+        // Update the database with the sentiment score
         const { error: updateError } = await supabase
           .from('Journal Entries')
-          .update({ sentiment: sentimentScore })
+          .update({ sentiment: sentimentScore.toString() })
           .eq('id', entry.id);
         
         if (updateError) {

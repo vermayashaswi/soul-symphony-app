@@ -74,12 +74,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       return;
     }
     
-    if (!user?.id) {
-      setRecordingError("You need to be signed in to save entries.");
-      toast.error("Please sign in to save journal entries");
-      return;
-    }
-    
     try {
       setIsProcessing(true);
       setRecordingError(null);
@@ -93,13 +87,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         recordingTime: recordingTime
       });
       
-      // Add debugging info
-      console.log('User auth state:', { 
-        userId: user.id,
-        isAuthenticated: !!user.id
-      });
-      
-      const result = await processRecording(normalizedBlob, user.id);
+      const result = await processRecording(normalizedBlob, user?.id);
       
       if (result.success && onRecordingComplete) {
         onRecordingComplete(normalizedBlob, result.tempId);

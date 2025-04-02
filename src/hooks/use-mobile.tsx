@@ -1,46 +1,119 @@
+
 import * as React from "react"
 
-/**
- * A hook that detects if the current device is mobile based on screen size
- * or when mobile preview is explicitly enabled
- */
+const MOBILE_BREAKPOINT = 768
+
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState(false);
-  
+  const [isMobile, setIsMobile] = React.useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = React.useState<boolean>(false);
+
   React.useEffect(() => {
-    // Check URL parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const mobileDemo = urlParams.get('mobileDemo') === 'true';
+    // Function to check if mobile
+    const checkIfMobile = () => {
+      // Check URL parameter for demo mode
+      const urlParams = new URLSearchParams(window.location.search);
+      const mobileDemo = urlParams.get('mobileDemo') === 'true';
+      
+      if (mobileDemo) {
+        return true;
+      }
+      
+      // Check for __forceMobileView override for debugging
+      if (typeof window.__forceMobileView !== 'undefined') {
+        return window.__forceMobileView;
+      }
+      
+      // Use multiple signals to determine if we're on mobile
+      const viewportWidth = window.innerWidth < MOBILE_BREAKPOINT;
+      const userAgentMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const touchCapable = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      
+      // For most cases, viewport width is sufficient
+      // But combine with user agent for edge cases
+      return viewportWidth || (userAgentMobile && touchCapable);
+    };
+
+    // Set initial state immediately
+    const initialIsMobile = checkIfMobile();
+    setIsMobile(initialIsMobile);
+    setIsInitialized(true);
     
-    if (mobileDemo) {
-      // If explicitly requested via URL, use mobile view
-      setIsMobile(true);
-      return;
-    }
+    console.log("Mobile detection initialized:", initialIsMobile, 
+                "width:", window.innerWidth, 
+                "userAgent:", navigator.userAgent,
+                "touch:", 'ontouchstart' in window || navigator.maxTouchPoints > 0);
     
-    // Otherwise detect based on screen size
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+    // Create event listeners for resize and orientation change
+    const handleResize = () => {
+      const newIsMobile = checkIfMobile();
+      if (newIsMobile !== isMobile) {
+        console.log("Mobile state changed:", newIsMobile, "width:", window.innerWidth);
+        setIsMobile(newIsMobile);
+      }
     };
     
-    // Initial check
-    checkMobile();
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
     
-    // Listen for resize events
-    window.addEventListener('resize', checkMobile);
+    // Setup matchMedia query as well
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const handleMqlChange = () => {
+      setIsMobile(checkIfMobile());
+    };
+    
+    try {
+      // Modern browsers
+      mql.addEventListener('change', handleMqlChange);
+    } catch (err) {
+      // For older browsers
+      // @ts-ignore - Using deprecated API for compatibility
+      mql.addListener && mql.addListener(handleMqlChange);
+    }
+    
+    // Force a recheck after a short delay (helps with some mobile browsers)
+    setTimeout(() => {
+      const delayedCheck = checkIfMobile();
+      if (delayedCheck !== isMobile) {
+        console.log("Delayed mobile check different:", delayedCheck, "width:", window.innerWidth);
+        setIsMobile(delayedCheck);
+      }
+    }, 500);
     
     return () => {
-      window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      
+      try {
+        mql.removeEventListener('change', handleMqlChange);
+      } catch (err) {
+        // @ts-ignore - Using deprecated API for compatibility
+        mql.removeListener && mql.removeListener(handleMqlChange);
+      }
+    };
+  }, [isMobile]);
+
+  // Expose a debug trigger function for the global scope
+  React.useEffect(() => {
+    // Add debug helper to window
+    window.toggleMobileView = () => {
+      window.__forceMobileView = !window.__forceMobileView;
+      console.log("Mobile view manually toggled:", window.__forceMobileView);
+      setIsMobile(window.__forceMobileView);
+    };
+    
+    return () => {
+      // @ts-ignore
+      delete window.toggleMobileView;
     };
   }, []);
 
-  return isMobile;
+  return isInitialized ? isMobile : false;
 }
 
-// Export an alias for backward compatibility
+// Add an alias export so that Chat.tsx can import it as useMobile
 export const useMobile = useIsMobile;
 
-// These type definitions are still needed for compatibility
+// Extend global interface for our debug helpers
 declare global {
   interface Window {
     __forceMobileView?: boolean;

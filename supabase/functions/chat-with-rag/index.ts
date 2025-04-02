@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -149,9 +148,9 @@ function extractTimePeriod(message: string): {startDate: Date | null, endDate: D
 // Enhanced function to handle top emotions query using the SQL function
 async function handleTopEmotionsQuery(userId: string, timeRange: {startDate: Date | null, endDate: Date | null, periodName: string}, isWhyQuery: boolean) {
   try {
-    // First check if chunks are available
-    const { data: chunksData, error: chunksError } = await supabase.rpc(
-      'get_top_emotions_by_chunks',
+    // Use the SQL function to get top emotions with sample entries
+    const { data: emotionsData, error } = await supabase.rpc(
+      'get_top_emotions_with_entries',
       {
         user_id_param: userId,
         start_date: timeRange.startDate?.toISOString() || null,
@@ -160,130 +159,64 @@ async function handleTopEmotionsQuery(userId: string, timeRange: {startDate: Dat
       }
     );
     
-    // If chunks available, use them
-    if (!chunksError && chunksData && chunksData.length > 0) {
-      console.log("Using chunked data for top emotions");
-      
-      // Extract relevant chunks for context
-      const relevantEntries: any[] = [];
-      const emotionSamples: Record<string, string[]> = {};
-      
-      chunksData.forEach(emotion => {
-        const sampleChunks = emotion.sample_chunks;
-        emotionSamples[emotion.emotion] = [];
-        
-        if (sampleChunks && Array.isArray(sampleChunks)) {
-          sampleChunks.forEach(chunk => {
-            relevantEntries.push({
-              id: chunk.entry_id,
-              chunk_id: chunk.chunk_id,
-              date: chunk.created_at,
-              snippet: chunk.content,
-              emotion: emotion.emotion,
-              score: emotion.score,
-              chunk_index: chunk.chunk_index
-            });
-            
-            emotionSamples[emotion.emotion].push(chunk.content);
-          });
-        }
-      });
-      
-      // Format the emotions for display
-      const formattedEmotions = chunksData.map(e => `${e.emotion} (${e.score})`).join(', ');
-      
-      // For 'why' queries, we'll use GPT to analyze the patterns
-      let emotionContext = '';
-      if (isWhyQuery) {
-        emotionContext = "Here are sample chunks for each emotion:\n\n";
-        
-        Object.entries(emotionSamples).forEach(([emotion, samples]) => {
-          emotionContext += `${emotion.toUpperCase()}:\n`;
-          samples.forEach((sample, i) => {
-            emotionContext += `Chunk ${i+1}: "${sample.substring(0, 200)}..."\n`;
-          });
-          emotionContext += '\n';
-        });
-      }
-      
+    if (error) {
+      console.error("Error fetching top emotions:", error);
+      return null;
+    }
+    
+    if (!emotionsData || emotionsData.length === 0) {
       return {
-        formattedEmotions,
-        emotionContext,
-        topEmotionsData: chunksData,
-        relevantEntries
-      };
-    } else {
-      // Fallback to full entries if chunks not available
-      console.log("Chunks not available, using full entries for top emotions");
-      const { data: emotionsData, error } = await supabase.rpc(
-        'get_top_emotions_with_entries',
-        {
-          user_id_param: userId,
-          start_date: timeRange.startDate?.toISOString() || null,
-          end_date: timeRange.endDate?.toISOString() || null,
-          limit_count: 3
-        }
-      );
-      
-      if (error) {
-        console.error("Error fetching top emotions:", error);
-        return null;
-      }
-      
-      if (!emotionsData || emotionsData.length === 0) {
-        return {
-          formattedEmotions: null,
-          relevantEntries: []
-        };
-      }
-      
-      // Extract relevant entries for context
-      const relevantEntries: any[] = [];
-      const emotionSamples: Record<string, string[]> = {};
-      
-      emotionsData.forEach(emotion => {
-        const sampleEntries = emotion.sample_entries;
-        emotionSamples[emotion.emotion] = [];
-        
-        if (sampleEntries && Array.isArray(sampleEntries)) {
-          sampleEntries.forEach(entry => {
-            relevantEntries.push({
-              id: entry.id,
-              date: entry.created_at,
-              snippet: entry.content,
-              emotion: emotion.emotion,
-              score: emotion.score
-            });
-            
-            emotionSamples[emotion.emotion].push(entry.content);
-          });
-        }
-      });
-      
-      // Format the emotions for display
-      const formattedEmotions = emotionsData.map(e => `${e.emotion} (${e.score})`).join(', ');
-      
-      // For 'why' queries, we'll use GPT to analyze the patterns
-      let emotionContext = '';
-      if (isWhyQuery) {
-        emotionContext = "Here are sample entries for each emotion:\n\n";
-        
-        Object.entries(emotionSamples).forEach(([emotion, samples]) => {
-          emotionContext += `${emotion.toUpperCase()}:\n`;
-          samples.forEach((sample, i) => {
-            emotionContext += `Entry ${i+1}: "${sample.substring(0, 200)}..."\n`;
-          });
-          emotionContext += '\n';
-        });
-      }
-      
-      return {
-        formattedEmotions,
-        emotionContext,
-        topEmotionsData: emotionsData,
-        relevantEntries
+        formattedEmotions: null,
+        relevantEntries: []
       };
     }
+    
+    // Extract relevant entries for context
+    const relevantEntries: any[] = [];
+    const emotionSamples: Record<string, string[]> = {};
+    
+    emotionsData.forEach(emotion => {
+      const sampleEntries = emotion.sample_entries;
+      emotionSamples[emotion.emotion] = [];
+      
+      if (sampleEntries && Array.isArray(sampleEntries)) {
+        sampleEntries.forEach(entry => {
+          relevantEntries.push({
+            id: entry.id,
+            date: entry.created_at,
+            snippet: entry.content,
+            emotion: emotion.emotion,
+            score: emotion.score
+          });
+          
+          emotionSamples[emotion.emotion].push(entry.content);
+        });
+      }
+    });
+    
+    // Format the emotions for display
+    const formattedEmotions = emotionsData.map(e => `${e.emotion} (${e.score})`).join(', ');
+    
+    // For 'why' queries, we'll use GPT to analyze the patterns
+    let emotionContext = '';
+    if (isWhyQuery) {
+      emotionContext = "Here are sample entries for each emotion:\n\n";
+      
+      Object.entries(emotionSamples).forEach(([emotion, samples]) => {
+        emotionContext += `${emotion.toUpperCase()}:\n`;
+        samples.forEach((sample, i) => {
+          emotionContext += `Entry ${i+1}: "${sample.substring(0, 200)}..."\n`;
+        });
+        emotionContext += '\n';
+      });
+    }
+    
+    return {
+      formattedEmotions,
+      emotionContext,
+      topEmotionsData: emotionsData,
+      relevantEntries
+    };
   } catch (error) {
     console.error("Error in handleTopEmotionsQuery:", error);
     return null;
@@ -359,150 +292,14 @@ async function searchEntriesByThemes(userId: string, themeKeywords: string[]) {
   }
 }
 
-// Search entries using chunked vector similarity
-async function searchChunksWithVector(
-  userId: string, 
-  queryEmbedding: any[], 
-  timeRange: {startDate: Date | null, endDate: Date | null} | null = null
-) {
-  try {
-    console.log(`Searching chunks with vector similarity for userId: ${userId}`);
-    
-    // Prepare RPC parameters
-    const rpcParams: any = {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.5,
-      match_count: 15, // Get more chunks as we're working with smaller text units
-      user_id_filter: userId
-    };
-    
-    // Add time range parameters if provided
-    if (timeRange) {
-      rpcParams.start_date = timeRange.startDate?.toISOString() || null;
-      rpcParams.end_date = timeRange.endDate?.toISOString() || null;
-    }
-    
-    console.log(`RPC params for match_chunks_with_date: ${JSON.stringify(rpcParams).substring(0, 100)}...`);
-    
-    // Call the RPC function for chunked search
-    const { data, error } = await supabase.rpc(
-      'match_chunks_with_date',
-      rpcParams
-    );
-    
-    if (error) {
-      console.error("Error in vector chunk search:", error);
-      
-      // Fall back to full entry search if chunk search fails
-      console.log("Falling back to full entry search");
-      return searchEntriesWithVector(userId, queryEmbedding, timeRange);
-    }
-    
-    if (!data || data.length === 0) {
-      console.log("No chunk search results found, falling back to full entries");
-      return searchEntriesWithVector(userId, queryEmbedding, timeRange);
-    }
-    
-    console.log(`Vector similarity search found ${data.length} chunks`);
-    
-    // Group chunks by entry ID to consolidate related chunks
-    const entriesMap = new Map();
-    data.forEach(chunk => {
-      const entryId = chunk.id; // This is the journal entry ID
-      
-      if (!entriesMap.has(entryId)) {
-        entriesMap.set(entryId, {
-          id: entryId,
-          created_at: chunk.created_at,
-          chunks: [],
-          best_chunk_similarity: 0,
-          themes: chunk.themes,
-          emotions: chunk.emotions
-        });
-      }
-      
-      const entryData = entriesMap.get(entryId);
-      
-      // Add this chunk to the entry's chunks
-      entryData.chunks.push({
-        chunk_id: chunk.chunk_id,
-        content: chunk.content,
-        similarity: chunk.similarity,
-        chunk_index: chunk.chunk_index,
-        total_chunks: chunk.total_chunks
-      });
-      
-      // Track the best similarity score across chunks
-      if (chunk.similarity > entryData.best_chunk_similarity) {
-        entryData.best_chunk_similarity = chunk.similarity;
-      }
-    });
-    
-    // Convert to array and sort by best chunk similarity
-    const consolidatedResults = Array.from(entriesMap.values())
-      .sort((a, b) => b.best_chunk_similarity - a.best_chunk_similarity)
-      .slice(0, 10); // Limit to top 10 most relevant entries
-    
-    // Format for the existing search results structure
-    return consolidatedResults.map(entry => {
-      // Sort chunks by similarity
-      const sortedChunks = entry.chunks.sort((a, b) => b.similarity - a.similarity);
-      
-      // Use the most relevant chunk as the main content
-      const bestChunk = sortedChunks[0];
-      
-      // For context, include up to 2 adjacent chunks if available
-      const contextChunks = [];
-      const chunkIndex = bestChunk.chunk_index;
-      
-      // Find adjacent chunks from the same entry
-      entry.chunks.forEach(chunk => {
-        if (chunk.chunk_id !== bestChunk.chunk_id && 
-            Math.abs(chunk.chunk_index - chunkIndex) <= 1) {
-          contextChunks.push(chunk);
-        }
-      });
-      
-      // Sort context chunks by index
-      contextChunks.sort((a, b) => a.chunk_index - b.chunk_index);
-      
-      // Get top 2 context chunks
-      const topContextChunks = contextChunks.slice(0, 2);
-      
-      // Combine best chunk with context
-      let enhancedContent = bestChunk.content;
-      if (topContextChunks.length > 0) {
-        // Add context with separators
-        enhancedContent = topContextChunks
-          .map(c => c.content)
-          .join(' [...] ') + ' [...] ' + enhancedContent;
-      }
-      
-      return {
-        id: entry.id,
-        created_at: entry.created_at,
-        content: enhancedContent,
-        similarity: entry.best_chunk_similarity,
-        themes: entry.themes,
-        emotions: entry.emotions,
-        chunks: sortedChunks
-      };
-    });
-  } catch (error) {
-    console.error("Error in searchChunksWithVector:", error);
-    // Fall back to full entry search
-    return searchEntriesWithVector(userId, queryEmbedding, timeRange);
-  }
-}
-
-// Legacy search for full entries using vector similarity
+// Search entries using vector similarity
 async function searchEntriesWithVector(
   userId: string, 
   queryEmbedding: any[], 
   timeRange: {startDate: Date | null, endDate: Date | null} | null = null
 ) {
   try {
-    console.log(`Searching full entries with vector similarity for userId: ${userId}`);
+    console.log(`Searching entries with vector similarity for userId: ${userId}`);
     
     // Prepare RPC parameters
     const rpcParams: any = {
@@ -569,8 +366,7 @@ serve(async (req) => {
       requiresPatternAnalysis = false,
       requiresSolutionFocus = false,
       themeKeywords = [],
-      timeRange: providedTimeRange = null,
-      preferChunks = true // New parameter to control whether to prefer chunk search
+      timeRange: providedTimeRange = null
     } = await req.json();
     
     if (!message) {
@@ -580,7 +376,6 @@ serve(async (req) => {
     console.log("Processing chat request for user:", userId);
     console.log("Message:", message.substring(0, 50) + "...");
     console.log("Include diagnostics:", includeDiagnostics ? "yes" : "no");
-    console.log("Prefer chunks:", preferChunks ? "yes" : "no");
     
     if (threadId) {
       console.log("Thread ID:", threadId);
@@ -682,33 +477,24 @@ serve(async (req) => {
           { startDate: new Date(providedTimeRange.startDate), endDate: new Date(providedTimeRange.endDate) } :
           { startDate: queryType.timeframe.startDate, endDate: queryType.timeframe.endDate };
         
-        // Use chunked search if preferred
-        const searchFunction = preferChunks ? searchChunksWithVector : searchEntriesWithVector;
-        const vectorResults = await searchFunction(userId, queryEmbedding, timeRangeObj);
+        const vectorResults = await searchEntriesWithVector(userId, queryEmbedding, timeRangeObj);
         
         if (vectorResults && vectorResults.length > 0) {
-          console.log(`Found ${vectorResults.length} relevant entries/chunks`);
+          console.log(`Found ${vectorResults.length} relevant entries`);
           
           // Add to relevant entries if not already included
           const existingIds = new Set(relevantEntries.map(e => e.id));
           
           vectorResults.forEach(entry => {
             if (!existingIds.has(entry.id)) {
-              const entryData = {
+              relevantEntries.push({
                 id: entry.id,
                 date: entry.created_at,
                 snippet: entry.content,
                 similarity: entry.similarity,
                 themes: entry.themes,
                 emotions: entry.emotions
-              };
-              
-              // Add chunks information if available
-              if (entry.chunks) {
-                entryData.chunks = entry.chunks;
-              }
-              
-              relevantEntries.push(entryData);
+              });
               existingIds.add(entry.id);
             }
           });
@@ -915,8 +701,7 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
       // Include relevant entries if found
       if (relevantEntries && relevantEntries.length > 0) {
         responseObject.diagnostics = { 
-          relevantEntries,
-          usedChunks: preferChunks && relevantEntries.some(e => e.chunks !== undefined)
+          relevantEntries 
         };
       }
       
