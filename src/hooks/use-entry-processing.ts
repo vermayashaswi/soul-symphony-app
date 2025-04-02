@@ -1,25 +1,36 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 
-// Import the supabase client without relying on type inference
+// Import the supabase client
 import { supabase } from '@/integrations/supabase/client';
 
-// Simple flat interface for journal entries
-type SimpleJournalEntry = {
+// Explicitly define the journal entry interface
+interface SimpleJournalEntry {
   id: number;
   "foreign key"?: string;
   "refined text"?: string;
   content?: string;
   themes?: string[];
   created_at: string;
-};
+}
+
+// Define explicit function types to avoid deep inference
+type FetchEntriesFunction = () => void;
+
+// Return type for the hook to break circular references
+interface EntryProcessingHook {
+  processingEntries: string[];
+  processedEntryIds: number[];
+  handleEntryRecording: (audioBlob: Blob, tempId?: string) => Promise<void>;
+  setProcessingEntries: React.Dispatch<React.SetStateAction<string[]>>;
+}
 
 export function useEntryProcessing(
   activeTab: string,
-  fetchEntries: () => void,
+  fetchEntries: FetchEntriesFunction,
   entries: SimpleJournalEntry[]
-) {
+): EntryProcessingHook {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
   
@@ -57,12 +68,26 @@ export function useEntryProcessing(
     }
   }, [entries, processingEntries]);
 
-  // Check if an entry has been processed - completely rewritten to avoid complex type inference
-  const checkEntryProcessed = async (tempId: string): Promise<boolean> => {
+  // Use memoized callbacks to avoid recreating functions on each render
+  const generateThemes = useCallback(async (text: string, entryId: number): Promise<void> => {
+    try {
+      await supabase.functions.invoke('generate-themes', {
+        body: {
+          text: text,
+          entryId: entryId
+        }
+      });
+    } catch (error) {
+      console.error('Error generating themes:', error);
+    }
+  }, []);
+
+  // Memoize this function to avoid recreating it on each render
+  const checkEntryProcessed = useCallback(async (tempId: string): Promise<boolean> => {
     try {
       console.log('Checking if entry is processed with temp ID:', tempId);
       
-      // Manual type handling for Supabase response
+      // Use type assertion for the response
       const { data, error } = await supabase
         .from('Journal Entries')
         .select('id, "refined text"')
@@ -77,9 +102,9 @@ export function useEntryProcessing(
         return false;
       }
       
-      // Safely access data with type assertions
-      const entryId = data[0].id as number;
-      const refinedText = data[0]["refined text"] as string | null;
+      // Safely access data with explicit type assertions
+      const entryId = data[0]?.id as number;
+      const refinedText = data[0]?.["refined text"] as string | null;
       
       console.log('New entry found:', entryId);
       
@@ -92,23 +117,9 @@ export function useEntryProcessing(
       console.error('Error checking for processed entry:', error);
       return false;
     }
-  };
-  
-  // Separate function to generate themes
-  const generateThemes = async (text: string, entryId: number): Promise<void> => {
-    try {
-      await supabase.functions.invoke('generate-themes', {
-        body: {
-          text: text,
-          entryId: entryId
-        }
-      });
-    } catch (error) {
-      console.error('Error generating themes:', error);
-    }
-  };
+  }, [generateThemes]);
 
-  const handleEntryRecording = async (audioBlob: Blob, tempId?: string) => {
+  const handleEntryRecording = useCallback(async (audioBlob: Blob, tempId?: string): Promise<void> => {
     if (!tempId) {
       console.error('No tempId provided for entry recording');
       return;
@@ -138,7 +149,7 @@ export function useEntryProcessing(
         toast.info('Entry processing is taking longer than expected. It should appear soon.');
       }
     }, 120000);
-  };
+  }, [checkEntryProcessed, fetchEntries, processingEntries]);
 
   return {
     processingEntries,
