@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
 import { toast } from 'sonner';
 
@@ -33,12 +34,13 @@ export function useRecordRTCRecorder({
   
   const recorderRef = useRef<RecordRTC | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyzerRef = useRef<AnalyserNode | null>(null);
-  const timerRef = useRef<number | null>(null);
   const audioLevelTimerRef = useRef<number | null>(null);
   const maxDurationTimerRef = useRef<number | null>(null);
-  
+
+  // Check microphone permission
   useEffect(() => {
     const checkMicPermission = async () => {
       try {
@@ -57,13 +59,19 @@ export function useRecordRTCRecorder({
       cleanupResources();
     };
   }, []);
-  
-  const cleanupResources = () => {
-    if (recorderRef.current) {
-      recorderRef.current.destroy();
-      recorderRef.current = null;
+
+  // Clean up ripples
+  useEffect(() => {
+    if (ripples.length > 0) {
+      const timer = setTimeout(() => {
+        setRipples(current => current.slice(1));
+      }, 2000);
+      
+      return () => clearTimeout(timer);
     }
-    
+  }, [ripples]);
+
+  const cleanupResources = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
@@ -90,9 +98,14 @@ export function useRecordRTCRecorder({
       }
       audioContextRef.current = null;
     }
-  };
+    
+    if (recorderRef.current) {
+      recorderRef.current.destroy();
+      recorderRef.current = null;
+    }
+  }, []);
 
-  const setupAudioProcessing = (stream: MediaStream) => {
+  const setupAudioProcessing = useCallback((stream: MediaStream) => {
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = audioContext;
@@ -102,32 +115,7 @@ export function useRecordRTCRecorder({
       analyzerRef.current = analyzerNode;
       
       const source = audioContext.createMediaStreamSource(stream);
-      
-      if (noiseReduction) {
-        const highpassFilter = audioContext.createBiquadFilter();
-        highpassFilter.type = 'highpass';
-        highpassFilter.frequency.value = 100;
-        highpassFilter.Q.value = 0.7;
-        
-        const lowpassFilter = audioContext.createBiquadFilter();
-        lowpassFilter.type = 'lowpass';
-        lowpassFilter.frequency.value = 12000;
-        lowpassFilter.Q.value = 0.7;
-        
-        const compressor = audioContext.createDynamicsCompressor();
-        compressor.threshold.value = -24;
-        compressor.knee.value = 30;
-        compressor.ratio.value = 12;
-        compressor.attack.value = 0.003;
-        compressor.release.value = 0.25;
-        
-        source.connect(highpassFilter);
-        highpassFilter.connect(lowpassFilter);
-        lowpassFilter.connect(compressor);
-        compressor.connect(analyzerNode);
-      } else {
-        source.connect(analyzerNode);
-      }
+      source.connect(analyzerNode);
       
       const dataArray = new Uint8Array(analyzerNode.frequencyBinCount);
       
@@ -155,8 +143,8 @@ export function useRecordRTCRecorder({
       console.error('Error setting up audio processing:', error);
       return null;
     }
-  };
-  
+  }, [isRecording]);
+
   const startRecording = async () => {
     try {
       setAudioBlob(null);
@@ -169,36 +157,27 @@ export function useRecordRTCRecorder({
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 48000,
-          sampleSize: 24,
-          channelCount: 2,
         }
       });
       
       toast.dismiss();
-      toast.success('Microphone accessed. Recording started!');
+      toast.success('Recording started!');
       
       streamRef.current = stream;
-      
       setupAudioProcessing(stream);
-      
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       
       const options = {
         type: 'audio',
-        mimeType: 'audio/webm;codecs=opus',
-        recorderType: StereoAudioRecorder,
+        mimeType: 'audio/wav',
         numberOfAudioChannels: 2,
-        desiredSampRate: 48000,
-        bufferSize: 16384,
-        checkForInactiveTracks: true,
-        disableLogs: false,
-        timeSlice: isMobile ? 1000 : 2000,
+        desiredSampRate: 96000,
+        recorderType: StereoAudioRecorder,
       };
       
-      recorderRef.current = new RecordRTC(stream, options);
+      const recorder = new RecordRTC(stream, options);
+      recorderRef.current = recorder;
+      recorder.startRecording();
       
-      recorderRef.current.startRecording();
       setIsRecording(true);
       
       timerRef.current = window.setInterval(() => {
@@ -207,35 +186,27 @@ export function useRecordRTCRecorder({
       
       if (maxDuration > 0) {
         maxDurationTimerRef.current = window.setTimeout(() => {
-          if (isRecording && recorderRef.current) {
-            console.log(`Max recording duration reached (${maxDuration}s), stopping automatically`);
+          if (isRecording) {
             stopRecording();
           }
         }, maxDuration * 1000);
       }
       
       setRipples([Date.now()]);
-      
     } catch (error) {
       console.error('Error accessing microphone:', error);
       toast.dismiss();
-      toast.error('Could not access microphone. Please check permissions and try again.');
+      toast.error('Could not access microphone. Please check permissions.');
       setHasPermission(false);
     }
   };
 
   const stopRecording = () => {
     if (recorderRef.current && isRecording) {
-      console.log("Stopping recording...");
-      
       recorderRef.current.stopRecording(() => {
-        console.log("Recording stopped, generating blob...");
         const blob = recorderRef.current!.getBlob();
-        console.log("Recording blob created:", blob.type, blob.size, "bytes");
-        
         setAudioBlob(blob);
         setIsRecording(false);
-        
         setRipples([]);
         
         if (streamRef.current) {
@@ -247,21 +218,14 @@ export function useRecordRTCRecorder({
           timerRef.current = null;
         }
         
-        if (audioLevelTimerRef.current) {
-          clearInterval(audioLevelTimerRef.current);
-          audioLevelTimerRef.current = null;
-        }
-        
         if (maxDurationTimerRef.current) {
           clearTimeout(maxDurationTimerRef.current);
           maxDurationTimerRef.current = null;
         }
-        
-        toast.success('Recording saved!');
       });
     }
   };
-  
+
   const requestPermissions = async () => {
     try {
       toast.loading('Requesting microphone permission...');
@@ -278,22 +242,10 @@ export function useRecordRTCRecorder({
   };
 
   const resetRecording = () => {
-    cleanupResources();
     setAudioBlob(null);
     setRecordingTime(0);
-    setAudioLevel(0);
-    setRipples([]);
+    cleanupResources();
   };
-
-  useEffect(() => {
-    if (ripples.length > 0) {
-      const timer = setTimeout(() => {
-        setRipples(current => current.slice(1));
-      }, 2000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [ripples]);
 
   return {
     isRecording,
