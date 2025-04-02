@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -71,8 +72,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Separated DebugTools component that will be rendered inside AuthProvider
-const DebugTools = () => {
+// Separated RouterAwareDebugTools component that has access to Router context
+const RouterAwareDebugTools = () => {
   const isMobile = useIsMobile();
   
   return (
@@ -82,10 +83,14 @@ const DebugTools = () => {
       ) : (
         <DebugPanel />
       )}
-      <MobileBrowserDebug />
     </>
   );
 };
+
+// Outside router DebugTools component
+const OutsideRouterDebugTools = () => (
+  <MobileBrowserDebug />
+);
 
 const AppRoutes = () => {
   const isMobile = useIsMobile();
@@ -175,6 +180,9 @@ const AppRoutes = () => {
       </Routes>
 
       {shouldShowMobileNav && <MobileNavbar />}
+      
+      {/* Debug tools inside Router context */}
+      <RouterAwareDebugTools />
     </>
   );
 };
@@ -197,8 +205,8 @@ function App() {
                   </BrowserRouter>
                 </div>
               </div>
-              {/* Debug tools now inside AuthProvider */}
-              <DebugTools />
+              {/* Debug tool that doesn't need Router context */}
+              <OutsideRouterDebugTools />
             </ThemeProvider>
           </AuthProvider>
         </TooltipProvider>

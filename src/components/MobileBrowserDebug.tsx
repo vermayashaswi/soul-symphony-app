@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, Bug, RotateCw, ArrowDown, ArrowUp } from "lucide-react";
-import { useLocation } from "react-router-dom";
 
 interface OperationStep {
   id: string;
@@ -23,10 +22,20 @@ export function MobileBrowserDebug() {
   const [currentOperation, setCurrentOperation] = useState<string | null>(null);
   const [errorCount, setErrorCount] = useState(0);
   const isMobile = useIsMobile();
-  const location = useLocation();
+  const [currentPath, setCurrentPath] = useState<string>('/');
   const [isExpanded, setIsExpanded] = useState(false);
   
   useEffect(() => {
+    // Get current path without using useLocation
+    setCurrentPath(window.location.pathname);
+    
+    // Setup a listener for path changes
+    const handlePathnameChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    
+    window.addEventListener('popstate', handlePathnameChange);
+    
     // Setup event listeners for journal operations
     const handleOperationStart = (e: any) => {
       const { operation, details } = e.detail;
@@ -189,7 +198,7 @@ export function MobileBrowserDebug() {
     };
     
     // Journal specific events
-    if (location.pathname.includes('journal')) {
+    if (currentPath.includes('journal')) {
       // Dispatch initial page load operation
       window.dispatchEvent(new CustomEvent('operation-complete', {
         detail: {
@@ -212,9 +221,10 @@ export function MobileBrowserDebug() {
       window.removeEventListener('operation-complete', handleOperationComplete); 
       window.removeEventListener('fetch-error', handleFetchError);
       window.removeEventListener('error', handleError);
+      window.removeEventListener('popstate', handlePathnameChange);
       window.fetch = originalFetch;
     };
-  }, [currentOperation, location.pathname]);
+  }, [currentOperation, currentPath]);
   
   const getStatusBadge = (status: string) => {
     switch(status) {

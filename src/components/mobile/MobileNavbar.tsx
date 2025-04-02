@@ -1,13 +1,40 @@
 
 import { Home, Book, BarChart2, MessageSquare, Settings } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
 
 const MobileNavbar = () => {
-  const location = useLocation();
   const { user } = useAuth();
+  const [currentPath, setCurrentPath] = useState<string>('/');
+  
+  useEffect(() => {
+    // Get initial path
+    setCurrentPath(window.location.pathname);
+    
+    // Listen for path changes
+    const handlePathnameChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    
+    window.addEventListener('popstate', handlePathnameChange);
+    
+    // Custom event for route changes via Link component
+    const handleRouteChange = () => {
+      setTimeout(() => {
+        setCurrentPath(window.location.pathname);
+      }, 50);
+    };
+    
+    window.addEventListener('routeChange', handleRouteChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePathnameChange);
+      window.removeEventListener('routeChange', handleRouteChange);
+    };
+  }, []);
   
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
@@ -18,7 +45,7 @@ const MobileNavbar = () => {
   ];
 
   // Only show the navbar if the user is logged in or on the home page
-  if (!user && location.pathname !== '/') {
+  if (!user && currentPath !== '/') {
     return null;
   }
 
@@ -43,7 +70,7 @@ const MobileNavbar = () => {
       transition={{ duration: 0.3 }}
     >
       {navItems.map(item => {
-        const isActive = location.pathname === item.path;
+        const isActive = currentPath === item.path;
         // Only preserve mobileDemo parameter if it's already present in the URL
         const navUrl = `${item.path}${mobileParam}`;
         
@@ -55,6 +82,10 @@ const MobileNavbar = () => {
               "flex flex-col items-center justify-center w-full h-full pt-1",
               isActive ? "text-primary" : "text-muted-foreground"
             )}
+            onClick={() => {
+              // Dispatch a custom event that we can listen to for route changes
+              window.dispatchEvent(new CustomEvent('routeChange'));
+            }}
           >
             <div className="relative">
               {isActive && (

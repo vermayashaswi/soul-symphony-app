@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { X, Smartphone, Info, AlertTriangle, Server, FileSearch } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLocation } from 'react-router-dom';
 
 interface ApiCall {
   url: string;
@@ -37,12 +37,22 @@ export default function SmartChatMobileDebug() {
   ]);
   const [activeTab, setActiveTab] = useState('logs');
   const isMobile = useIsMobile();
-  const location = useLocation();
+  const [currentPath, setCurrentPath] = useState<string>('/');
 
   useEffect(() => {
+    // Get current path without using useLocation
+    setCurrentPath(window.location.pathname);
+    
+    // Setup a listener for path changes
+    const handlePathnameChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    
+    window.addEventListener('popstate', handlePathnameChange);
+    
     // Log initial info
     addLog("Debug component mounted");
-    addLog(`Current route: ${location.pathname}`);
+    addLog(`Current route: ${currentPath}`);
     
     // Collect device and browser information
     const info = {
@@ -52,7 +62,7 @@ export default function SmartChatMobileDebug() {
       devicePixelRatio: window.devicePixelRatio,
       isMobileDetected: isMobile,
       timeStamp: new Date().toISOString(),
-      currentRoute: location.pathname
+      currentRoute: currentPath
     };
     
     setDeviceInfo(info);
@@ -64,7 +74,7 @@ export default function SmartChatMobileDebug() {
     // Test DOM elements conditionally based on route
     setTimeout(() => {
       // Only check for chat interface if on a chat-related route
-      if (location.pathname.includes('chat') || location.pathname.includes('smart-chat')) {
+      if (currentPath.includes('chat') || currentPath.includes('smart-chat')) {
         const chatInterface = document.querySelector('.smart-chat-interface, .mobile-chat-content');
         if (chatInterface) {
           addLog("Chat interface found in DOM");
@@ -86,10 +96,11 @@ export default function SmartChatMobileDebug() {
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('popstate', handlePathnameChange);
       // Cleanup fetch interceptor if needed
       cleanupFetchInterceptor();
     };
-  }, [isMobile, location]);
+  }, [isMobile, currentPath]);
   
   const addLog = (message: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
