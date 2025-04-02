@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +13,6 @@ import JournalSearch from '@/components/journal/JournalSearch';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { PostgrestSingleResponse } from '@supabase/supabase-js';
 
 interface SimpleJournalEntry {
   id: number;
@@ -124,13 +124,12 @@ const Journal = () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        const response = await supabase
+        // Use a simpler approach with explicit any casting to avoid complex type inference
+        const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
           .eq('"foreign key"', tempId)
-          .single();
-          
-        const { data, error } = response as PostgrestSingleResponse<SimpleJournalEntry>;
+          .single() as any;
           
         if (error) {
           console.error('Error fetching newly created entry:', error);
