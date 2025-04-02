@@ -70,7 +70,7 @@ export async function sendAudioForTranscription(
     console.error('Error in sendAudioForTranscription:', error);
     return {
       success: false,
-      error: error.message || 'Unknown error occurred'
+      error: error.message || 'Unknown error'
     };
   }
 }
