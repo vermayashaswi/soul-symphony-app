@@ -56,7 +56,7 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     try {
       setIsDeleting(true);
       
-      // Delete the entry from the database
+      // Delete the entry from the database - using 'Journal Entries' table
       const { error } = await supabase
         .from('Journal Entries')
         .delete()

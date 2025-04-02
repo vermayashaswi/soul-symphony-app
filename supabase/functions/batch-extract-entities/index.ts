@@ -123,7 +123,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
       userIdFilter: !!userId
     };
     
-    // Build the query
+    // Build the query - use 'Journal Entries' as the table name
     let query = supabase
       .from('Journal Entries')
       .select('id, "refined text"');

@@ -69,6 +69,7 @@ serve(async (req) => {
     }
 
     // Fetch all entries from the database that don't have sentiment analysis yet
+    // Using 'Journal Entries' as the table name
     const { data: entries, error: fetchError } = await supabase
       .from('Journal Entries')
       .select('id, "refined text"')

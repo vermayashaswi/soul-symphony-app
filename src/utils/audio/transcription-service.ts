@@ -32,7 +32,8 @@ export async function sendAudioForTranscription(
         audio: base64Audio,
         userId: userId || null,
         directTranscription: directTranscription,
-        highQuality: true // Add flag to indicate this is a high-quality recording
+        highQuality: true, // Add flag to indicate this is a high-quality recording
+        tableName: 'Journal Entries' // Explicitly specify the table name
       }
     });
 
