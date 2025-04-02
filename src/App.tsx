@@ -1,4 +1,5 @@
 
+import React, { useEffect, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -70,17 +71,18 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Load debug components with React.lazy to avoid early useLocation calls
+const LazySmartChatMobileDebug = React.lazy(() => import('./components/chat/SmartChatMobileDebug'));
+
 // Inside Router components - now moved inside AppRoutes
 const RouterAwareDebugTools = () => {
   const isMobile = useIsMobile();
   
   if (isMobile) {
-    // Dynamically import to avoid early useLocation calls
-    const SmartChatMobileDebug = React.lazy(() => import('./components/chat/SmartChatMobileDebug'));
     return (
-      <React.Suspense fallback={null}>
-        <SmartChatMobileDebug />
-      </React.Suspense>
+      <Suspense fallback={null}>
+        <LazySmartChatMobileDebug />
+      </Suspense>
     );
   }
   
