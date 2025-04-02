@@ -49,19 +49,25 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     try {
       console.log(`Processing journal entry ${entryId} for chunking`);
       
-      // Add timeout handling
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const { data, error } = await supabase.functions.invoke('process-journal', {
-        body: { entryId },
-        signal: controller.signal
+      // Create a promise with timeout instead of using AbortController signal
+      const timeoutPromise = new Promise<{success: false, error: string}>((_, reject) => {
+        setTimeout(() => reject(new Error('Function call timed out')), 10000);
       });
       
-      clearTimeout(timeoutId);
+      // Create the actual function call
+      const functionPromise = supabase.functions.invoke('process-journal', {
+        body: { entryId }
+      });
       
-      if (error) {
-        console.error('Error processing journal entry:', error);
+      // Race between the timeout and the actual call
+      const result = await Promise.race([functionPromise, timeoutPromise])
+        .catch(error => {
+          console.error('Error or timeout in process-journal function:', error);
+          return { success: false, error: error.message || 'Function call failed' };
+        });
+      
+      if (!result || 'error' in result) {
+        console.error('Error processing journal entry:', result?.error);
         // Track failures
         setProcessFailures(prev => ({
           ...prev,
@@ -71,7 +77,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         return false;
       }
       
-      console.log(`Successfully processed journal entry ${entryId} into ${data?.chunks_count || 0} chunks`);
+      console.log(`Successfully processed journal entry ${entryId} into ${result?.chunks_count || 0} chunks`);
       return true;
     } catch (error) {
       console.error('Error invoking process-journal function:', error);
