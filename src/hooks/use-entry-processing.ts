@@ -18,6 +18,12 @@ interface SimpleJournalEntry {
 // Define explicit function types to avoid deep inference
 type FetchEntriesFunction = () => void;
 
+// Define a simplified type for the Supabase response to avoid deep inference
+interface SupabaseEntryResponse {
+  id: number;
+  "refined text"?: string | null;
+}
+
 // Return type for the hook to break circular references
 interface EntryProcessingHook {
   processingEntries: string[];
@@ -87,11 +93,13 @@ export function useEntryProcessing(
     try {
       console.log('Checking if entry is processed with temp ID:', tempId);
       
-      // Use type assertion for the response
-      const { data, error } = await supabase
+      // Avoid type inference by using a basic Promise type with any
+      const response: { data: any, error: any } = await supabase
         .from('Journal Entries')
         .select('id, "refined text"')
         .eq('"foreign key"', tempId);
+      
+      const { data, error } = response;
       
       if (error) {
         console.error('Error fetching newly created entry:', error);
@@ -102,9 +110,10 @@ export function useEntryProcessing(
         return false;
       }
       
-      // Safely access data with explicit type assertions
-      const entryId = data[0]?.id as number;
-      const refinedText = data[0]?.["refined text"] as string | null;
+      // Safely access data with explicit type assertions and avoid deep type checking
+      const entryData = data[0] as unknown as SupabaseEntryResponse;
+      const entryId = entryData.id;
+      const refinedText = entryData["refined text"];
       
       console.log('New entry found:', entryId);
       
