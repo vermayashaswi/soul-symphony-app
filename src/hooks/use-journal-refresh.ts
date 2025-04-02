@@ -21,7 +21,7 @@ export function useJournalRefresh() {
     try {
       // Verify connectivity to Supabase
       const { error } = await supabase
-        .from('Journal_Entries') // Updated to use correct table name
+        .from('Journal Entries')
         .select('id')
         .limit(1);
         

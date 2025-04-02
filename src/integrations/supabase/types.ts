@@ -89,80 +89,7 @@ export type Database = {
         }
         Relationships: []
       }
-      journal_chunks: {
-        Row: {
-          chunk_index: number
-          chunk_size: number
-          content: string
-          created_at: string
-          embedding: string
-          id: number
-          journal_entry_id: number
-          total_chunks: number
-        }
-        Insert: {
-          chunk_index: number
-          chunk_size: number
-          content: string
-          created_at?: string
-          embedding: string
-          id?: number
-          journal_entry_id: number
-          total_chunks: number
-        }
-        Update: {
-          chunk_index?: number
-          chunk_size?: number
-          content?: string
-          created_at?: string
-          embedding?: string
-          id?: number
-          journal_entry_id?: number
-          total_chunks?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "journal_chunks_journal_entry_id_fkey"
-            columns: ["journal_entry_id"]
-            isOneToOne: false
-            referencedRelation: "Journal_Entries"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      journal_embeddings: {
-        Row: {
-          content: string
-          created_at: string
-          embedding: string
-          id: number
-          journal_entry_id: number
-        }
-        Insert: {
-          content: string
-          created_at?: string
-          embedding: string
-          id?: never
-          journal_entry_id: number
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          embedding?: string
-          id?: never
-          journal_entry_id?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "journal_embeddings_journal_entry_id_fkey"
-            columns: ["journal_entry_id"]
-            isOneToOne: false
-            referencedRelation: "Journal_Entries"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      Journal_Entries: {
+      "Journal Entries": {
         Row: {
           audio_url: string | null
           categories: string[] | null
@@ -220,6 +147,79 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_chunks: {
+        Row: {
+          chunk_index: number
+          chunk_size: number
+          content: string
+          created_at: string
+          embedding: string
+          id: number
+          journal_entry_id: number
+          total_chunks: number
+        }
+        Insert: {
+          chunk_index: number
+          chunk_size: number
+          content: string
+          created_at?: string
+          embedding: string
+          id?: number
+          journal_entry_id: number
+          total_chunks: number
+        }
+        Update: {
+          chunk_index?: number
+          chunk_size?: number
+          content?: string
+          created_at?: string
+          embedding?: string
+          id?: number
+          journal_entry_id?: number
+          total_chunks?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_chunks_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "Journal Entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_embeddings: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string
+          id: number
+          journal_entry_id: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding: string
+          id?: never
+          journal_entry_id: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string
+          id?: never
+          journal_entry_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_embeddings_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "Journal Entries"
             referencedColumns: ["id"]
           },
         ]

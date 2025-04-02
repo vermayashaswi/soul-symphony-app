@@ -26,7 +26,7 @@ BEGIN
       chunks.chunk_index,
       entries.created_at
     FROM 
-      "Journal_Entries" entries,
+      "Journal Entries" entries,
       jsonb_each(entries.emotions) e
     JOIN
       journal_chunks chunks ON entries.id = chunks.journal_entry_id

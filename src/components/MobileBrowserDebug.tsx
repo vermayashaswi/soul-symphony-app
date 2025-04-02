@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,6 +99,7 @@ export function MobileBrowserDebug() {
       }
     };
     
+    // Listen for fetch errors specifically
     const handleFetchError = (e: any) => {
       const { url, method, error } = e.detail;
       
@@ -117,17 +119,20 @@ export function MobileBrowserDebug() {
       console.error(`Debug: API error - ${method} ${url}`, error);
     };
     
+    // Setup interceptor for API calls
     const originalFetch = window.fetch;
     window.fetch = async function(input, init) {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       const method = init?.method || 'GET';
       const operation = `${method} ${new URL(url).pathname}`;
       
+      // Only track journal and process-journal related calls
       const isJournalCall = url.includes('Journal') || 
                           url.includes('journal') || 
                           url.includes('process-journal');
       
       if (isJournalCall) {
+        // Dispatch operation start event
         window.dispatchEvent(new CustomEvent('operation-start', {
           detail: {
             operation: `API: ${operation}`,
@@ -140,6 +145,7 @@ export function MobileBrowserDebug() {
         const response = await originalFetch(input, init);
         
         if (isJournalCall) {
+          // For journal operations, check status and dispatch result
           if (response.ok) {
             window.dispatchEvent(new CustomEvent('operation-complete', {
               detail: {
@@ -163,6 +169,7 @@ export function MobileBrowserDebug() {
         return response;
       } catch (error) {
         if (isJournalCall) {
+          // Dispatch error event for journal calls
           window.dispatchEvent(new CustomEvent('fetch-error', {
             detail: {
               url,
@@ -175,6 +182,7 @@ export function MobileBrowserDebug() {
       }
     };
     
+    // Global error handler
     const handleError = (event: ErrorEvent) => {
       const newStep: OperationStep = {
         id: Date.now().toString(),
@@ -189,7 +197,9 @@ export function MobileBrowserDebug() {
       setErrorCount(prev => prev + 1);
     };
     
+    // Journal specific events
     if (currentPath.includes('journal')) {
+      // Dispatch initial page load operation
       window.dispatchEvent(new CustomEvent('operation-complete', {
         detail: {
           operation: 'Page Load',
@@ -199,12 +209,14 @@ export function MobileBrowserDebug() {
       }));
     }
     
+    // Attach all listeners
     window.addEventListener('operation-start', handleOperationStart);
     window.addEventListener('operation-complete', handleOperationComplete);
     window.addEventListener('fetch-error', handleFetchError);
     window.addEventListener('error', handleError);
     
     return () => {
+      // Clean up
       window.removeEventListener('operation-start', handleOperationStart);
       window.removeEventListener('operation-complete', handleOperationComplete); 
       window.removeEventListener('fetch-error', handleFetchError);
@@ -232,6 +244,7 @@ export function MobileBrowserDebug() {
   };
   
   const runHealthCheck = () => {
+    // Test API health specifically for journal processing
     window.dispatchEvent(new CustomEvent('operation-start', {
       detail: {
         operation: 'Health Check',
@@ -239,6 +252,7 @@ export function MobileBrowserDebug() {
       }
     }));
     
+    // Try to access the process-journal health endpoint
     fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-journal/health`, {
       method: 'GET',
       headers: {
@@ -272,6 +286,7 @@ export function MobileBrowserDebug() {
     });
   };
   
+  // Always show a small indicator when debug panel is closed
   if (!isOpen) {
     return (
       <Button 
@@ -292,6 +307,7 @@ export function MobileBrowserDebug() {
     );
   }
   
+  // When open, show debug panel
   return (
     <Card 
       className={`fixed z-[9999] shadow-lg transition-all duration-300 ${
@@ -361,6 +377,7 @@ export function MobileBrowserDebug() {
   );
 }
 
+// Add global custom event types
 declare global {
   interface WindowEventMap {
     'operation-start': CustomEvent;

@@ -1,10 +1,9 @@
 
-import React, { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import Index from "./pages/Index";
 import Journal from "./pages/Journal";
@@ -22,7 +21,9 @@ import "./styles/mobile.css";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
 import MobileNavbar from "./components/mobile/MobileNavbar";
 import { useIsMobile } from "./hooks/use-mobile";
-import { AdvancedDebugger } from "./components/AdvancedDebugger";
+import { MobileBrowserDebug } from "./components/MobileBrowserDebug";
+import SmartChatMobileDebug from "./components/chat/SmartChatMobileDebug";
+import DebugPanel from "./components/DebugPanel";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,15 +43,15 @@ const MobileRouteWrapper = ({ children }: { children: React.ReactNode }) => {
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
-  const pathname = window.location.pathname;
+  const location = useLocation();
   
   useEffect(() => {
     if (!isLoading && !user) {
       console.log("Protected route: No user, should redirect to /auth", {
-        path: pathname
+        path: location.pathname
       });
     }
-  }, [user, isLoading, pathname]);
+  }, [user, isLoading, location]);
   
   if (isLoading) {
     return (
@@ -62,14 +63,34 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   
   if (!user) {
     const url = new URL(`/auth`, window.location.origin);
-    url.searchParams.set('redirectTo', pathname);
+    url.searchParams.set('redirectTo', location.pathname);
     
-    console.log("Redirecting to auth from protected route:", pathname);
+    console.log("Redirecting to auth from protected route:", location.pathname);
     return <Navigate to={url.pathname + url.search} replace />;
   }
   
   return <>{children}</>;
 };
+
+// Separated RouterAwareDebugTools component that has access to Router context
+const RouterAwareDebugTools = () => {
+  const isMobile = useIsMobile();
+  
+  return (
+    <>
+      {isMobile ? (
+        <SmartChatMobileDebug />
+      ) : (
+        <DebugPanel />
+      )}
+    </>
+  );
+};
+
+// Outside router DebugTools component
+const OutsideRouterDebugTools = () => (
+  <MobileBrowserDebug />
+);
 
 const AppRoutes = () => {
   const isMobile = useIsMobile();
@@ -160,7 +181,8 @@ const AppRoutes = () => {
 
       {shouldShowMobileNav && <MobileNavbar />}
       
-      <AdvancedDebugger />
+      {/* Debug tools inside Router context */}
+      <RouterAwareDebugTools />
     </>
   );
 };
@@ -169,9 +191,9 @@ function App() {
   return (
     <div className="app-container">
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <ThemeProvider>
-            <TooltipProvider>
+        <TooltipProvider>
+          <AuthProvider>
+            <ThemeProvider>
               <div className="relative min-h-screen">
                 <div className="relative z-10">
                   <Toaster />
@@ -183,9 +205,11 @@ function App() {
                   </BrowserRouter>
                 </div>
               </div>
-            </TooltipProvider>
-          </ThemeProvider>
-        </AuthProvider>
+              {/* Debug tool that doesn't need Router context */}
+              <OutsideRouterDebugTools />
+            </ThemeProvider>
+          </AuthProvider>
+        </TooltipProvider>
       </QueryClientProvider>
     </div>
   );

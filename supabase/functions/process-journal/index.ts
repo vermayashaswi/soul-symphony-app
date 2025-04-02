@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -22,7 +23,7 @@ async function processJournalEntry(entryId: number) {
     
     // First, retrieve the entry to make sure it exists and to get any necessary data
     const { data: entry, error } = await supabase
-      .from('Journal_Entries') // Updated table name
+      .from('Journal Entries')
       .select('id, "refined text", "transcription text", is_chunked, chunks_count')
       .eq('id', entryId)
       .single();
@@ -101,7 +102,7 @@ async function processJournalEntry(entryId: number) {
       
       // Re-fetch the entry to get the latest chunks_count
       const { data: updatedEntry, error: refetchError } = await supabase
-        .from('Journal_Entries')
+        .from('Journal Entries')
         .select('chunks_count')
         .eq('id', entryId)
         .single();

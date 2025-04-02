@@ -70,7 +70,7 @@ serve(async (req) => {
 
     // Fetch all entries from the database that don't have sentiment analysis yet
     const { data: entries, error: fetchError } = await supabase
-      .from('Journal_Entries') // Updated table name
+      .from('Journal Entries')
       .select('id, "refined text"')
       .eq('user_id', userId)
       .is('sentiment', null);
@@ -95,7 +95,7 @@ serve(async (req) => {
         
         // Update the database with the sentiment score as a number, not a string
         const { error: updateError } = await supabase
-          .from('Journal_Entries') // Updated table name
+          .from('Journal Entries')
           .update({ sentiment: sentimentScore })
           .eq('id', entry.id);
         

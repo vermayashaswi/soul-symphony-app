@@ -11,11 +11,11 @@ import {
   Legend
 } from 'recharts';
 import { cn } from '@/lib/utils';
-import { EmotionData, TimeRange, AggregatedEmotionData } from '@/hooks/use-insights-data';
+import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
 import { Sparkles } from 'lucide-react';
 
-type EmotionChartData = {
+type EmotionData = {
   day: string;
   [key: string]: number | string;
 };
@@ -99,7 +99,7 @@ export function EmotionChart({
     const emotionScores: Record<string, number> = {};
     
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
-      if (dataPoints && dataPoints.length > 0) {
+      if (dataPoints.length > 0) {
         const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
         if (totalScore > 0) {
           emotionScores[emotion] = totalScore;
@@ -156,19 +156,17 @@ export function EmotionChart({
     
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       // Only include emotions with positive values
-      if (dataPoints && dataPoints.length > 0) {
-        const totalValue = dataPoints.reduce((sum, point) => sum + point.value, 0);
-        if (totalValue > 0) {
-          emotionTotals[emotion] = totalValue;
-          
-          dataPoints.forEach(point => {
-            if (!dateMap.has(point.date)) {
-              dateMap.set(point.date, {});
-            }
-            const dateEntry = dateMap.get(point.date)!;
-            dateEntry[emotion] = point.value;
-          });
-        }
+      const totalValue = dataPoints.reduce((sum, point) => sum + point.value, 0);
+      if (totalValue > 0) {
+        emotionTotals[emotion] = totalValue;
+        
+        dataPoints.forEach(point => {
+          if (!dateMap.has(point.date)) {
+            dateMap.set(point.date, {});
+          }
+          const dateEntry = dateMap.get(point.date)!;
+          dateEntry[emotion] = point.value;
+        });
       }
     });
     
@@ -179,7 +177,7 @@ export function EmotionChart({
     
     return Array.from(dateMap.entries())
       .map(([date, emotions]) => {
-        const dataPoint: EmotionChartData = { 
+        const dataPoint: EmotionData = { 
           day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
         };
         

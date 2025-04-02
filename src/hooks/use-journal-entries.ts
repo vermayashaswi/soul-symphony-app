@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase, isChunkingSupported, checkEdgeFunctionsHealth, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from '@/integrations/supabase/client';
@@ -325,7 +324,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
       const { data, error, status } = await supabase
-        .from('Journal_Entries') // Updated table name reference
+        .from('Journal Entries')
         .select('*, is_chunked, chunks_count')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });

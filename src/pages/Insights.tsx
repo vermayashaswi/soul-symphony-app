@@ -19,7 +19,7 @@ export default function Insights() {
   const stickyThreshold = useRef<number>(0);
   const scrollPositionRef = useRef<number>(0);
   
-  const { insights, isLoading, error, refreshInsights } = useInsightsData();
+  const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
   const timeRanges = [
     { value: 'today', label: 'Today' },
@@ -93,12 +93,12 @@ export default function Insights() {
   );
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!loading) {
       setTimeout(() => {
         window.scrollTo({ top: scrollPositionRef.current });
       }, 100);
     }
-  }, [isLoading, insights]);
+  }, [loading, insightsData]);
 
   return (
     <div className="min-h-screen pb-20">
@@ -124,11 +124,11 @@ export default function Insights() {
           </div>
         </div>
         
-        {isLoading ? (
+        {loading ? (
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
-        ) : insights.entries?.length === 0 ? (
+        ) : insightsData.entries.length === 0 ? (
           <div className="bg-background rounded-xl p-8 text-center border">
             <h2 className="text-xl font-semibold mb-4">No journal data available</h2>
             <p className="text-muted-foreground mb-6">
@@ -153,13 +153,13 @@ export default function Insights() {
                     This {timeRange}
                   </span>
                 </div>
-                {insights.dominantMood ? (
+                {insightsData.dominantMood ? (
                   <div className="flex items-center gap-4">
                     <div className="h-16 w-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                      <span className="text-2xl">{insights.dominantMood.emoji}</span>
+                      <span className="text-2xl">{insightsData.dominantMood.emoji}</span>
                     </div>
                     <div>
-                      <h3 className="text-2xl font-bold capitalize">{insights.dominantMood.emotion}</h3>
+                      <h3 className="text-2xl font-bold capitalize">{insightsData.dominantMood.emotion}</h3>
                       <p className="text-muted-foreground text-sm">Appeared in most entries</p>
                     </div>
                   </div>
@@ -184,34 +184,34 @@ export default function Insights() {
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">Biggest Change</h2>
-                  {insights.biggestImprovement && (
+                  {insightsData.biggestImprovement && (
                     <span 
                       className={cn(
                         "px-2 py-1 rounded-full text-xs font-medium",
-                        insights.biggestImprovement.percentage >= 0 
+                        insightsData.biggestImprovement.percentage >= 0 
                           ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200" 
                           : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200"
                       )}
                     >
-                      {insights.biggestImprovement.percentage >= 0 ? '+' : ''}
-                      {insights.biggestImprovement.percentage}%
+                      {insightsData.biggestImprovement.percentage >= 0 ? '+' : ''}
+                      {insightsData.biggestImprovement.percentage}%
                     </span>
                   )}
                 </div>
-                {insights.biggestImprovement ? (
+                {insightsData.biggestImprovement ? (
                   <div className="flex items-center gap-4">
                     <div 
                       className={cn(
                         "h-16 w-16 rounded-full flex items-center justify-center",
-                        insights.biggestImprovement.percentage >= 0 
+                        insightsData.biggestImprovement.percentage >= 0 
                           ? "bg-green-100 dark:bg-green-900" 
                           : "bg-blue-100 dark:bg-blue-900"
                       )}
                     >
-                      {insights.biggestImprovement.percentage >= 0 ? (
+                      {insightsData.biggestImprovement.percentage >= 0 ? (
                         <ArrowUp className={cn(
                           "h-8 w-8",
-                          insights.biggestImprovement.percentage >= 0 
+                          insightsData.biggestImprovement.percentage >= 0 
                             ? "text-green-600 dark:text-green-300" 
                             : "text-blue-600 dark:text-blue-300"
                         )} />
@@ -220,9 +220,9 @@ export default function Insights() {
                       )}
                     </div>
                     <div>
-                      <h3 className="text-2xl font-bold capitalize">{insights.biggestImprovement.emotion}</h3>
+                      <h3 className="text-2xl font-bold capitalize">{insightsData.biggestImprovement.emotion}</h3>
                       <p className="text-muted-foreground text-sm">
-                        {insights.biggestImprovement.percentage >= 0 
+                        {insightsData.biggestImprovement.percentage >= 0 
                           ? "Increased significantly" 
                           : "Decreased significantly"}
                       </p>
@@ -249,9 +249,9 @@ export default function Insights() {
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">Journal Activity</h2>
-                  {insights.journalActivity.streak > 0 && (
+                  {insightsData.journalActivity.streak > 0 && (
                     <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded-full text-xs font-medium">
-                      {insights.journalActivity.streak} day streak
+                      {insightsData.journalActivity.streak} day streak
                     </span>
                   )}
                 </div>
@@ -260,7 +260,7 @@ export default function Insights() {
                     <Activity className="h-8 w-8 text-purple-600 dark:text-purple-300" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold">{insights.journalActivity.entryCount} entries</h3>
+                    <h3 className="text-2xl font-bold">{insightsData.journalActivity.entryCount} entries</h3>
                     <p className="text-muted-foreground text-sm capitalize">This {timeRange}</p>
                   </div>
                 </div>
@@ -276,7 +276,7 @@ export default function Insights() {
             >
               <EmotionChart 
                 timeframe={timeRange}
-                aggregatedData={insights.aggregatedEmotionData}
+                aggregatedData={insightsData.aggregatedEmotionData}
               />
             </motion.div>
             
@@ -287,7 +287,7 @@ export default function Insights() {
               className="mb-8"
             >
               <SentimentCalendar 
-                entries={insights.entries}
+                entries={insightsData.entries}
                 timeRange={timeRange}
               />
             </motion.div>
