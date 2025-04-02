@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import JournalSearch from '@/components/journal/JournalSearch';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
@@ -20,6 +22,7 @@ const Journal = () => {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const isMobile = useIsMobile();
   
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
@@ -43,12 +46,32 @@ const Journal = () => {
       console.log('Setting up polling for processing entries:', processingEntries);
       
       const pollingInterval = setInterval(() => {
+        console.log('Polling for entries updates...');
         fetchEntries();
       }, 5000);
       
       return () => clearInterval(pollingInterval);
     }
   }, [processingEntries, activeTab, fetchEntries]);
+
+  useEffect(() => {
+    const handleJournalEntryCreated = () => {
+      console.log('Journal entry created event received');
+      setRefreshKey(prev => prev + 1);
+      fetchEntries();
+      
+      // Auto-switch to entries tab on mobile
+      if (isMobile) {
+        setActiveTab('entries');
+      }
+    };
+    
+    window.addEventListener('journal-entry-created', handleJournalEntryCreated);
+    
+    return () => {
+      window.removeEventListener('journal-entry-created', handleJournalEntryCreated);
+    };
+  }, [fetchEntries, isMobile]);
 
   useEffect(() => {
     if (processingEntries.length > 0 && entries.length > 0) {
@@ -62,6 +85,7 @@ const Journal = () => {
       }
       
       if (newlyCompletedTempIds.length > 0) {
+        console.log('Found newly completed entries:', newlyCompletedTempIds);
         setProcessingEntries(prev => 
           prev.filter(id => !newlyCompletedTempIds.includes(id))
         );
@@ -104,14 +128,19 @@ const Journal = () => {
   };
 
   const onEntryRecorded = async (audioBlob: Blob, tempId?: string) => {
-    console.log('Entry recorded, adding to processing queue');
+    console.log('Entry recorded, adding to processing queue with temp ID:', tempId);
     
     if (tempId) {
       setProcessingEntries(prev => [...prev, tempId]);
     }
     
-    setActiveTab('entries');
+    // For mobile, switch immediately to entries tab to show progress
+    if (isMobile) {
+      setActiveTab('entries');
+    }
     
+    // Force a refresh to immediately see the "processing" indicator
+    setRefreshKey(prev => prev + 1);
     fetchEntries();
     
     const checkEntryProcessed = async () => {
@@ -162,6 +191,9 @@ const Journal = () => {
       if (processingEntries.includes(tempId || '')) {
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
         toast.info('Entry processing is taking longer than expected. It should appear soon.');
+        
+        // Try one more fetch after the timeout
+        fetchEntries();
       }
     }, 120000);
   };
@@ -189,23 +221,26 @@ const Journal = () => {
   
   const showEntries = activeTab === 'entries' && (!loading || entries.length > 0);
 
+  // Mobile UI has larger padding between tab container and tabs
+  const tabContainerClass = isMobile ? "container mx-auto px-4 py-4 max-w-5xl" : "container mx-auto px-4 py-6 max-w-5xl";
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
       
       <JournalHeader />
       
-      <div className="container mx-auto px-4 py-6 max-w-5xl">
+      <div className={tabContainerClass}>
         <Tabs defaultValue="record" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="record">Record Entry</TabsTrigger>
-            <TabsTrigger value="entries">Past Entries</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-4 md:mb-6">
+            <TabsTrigger value="record" className="text-sm md:text-base">Record Entry</TabsTrigger>
+            <TabsTrigger value="entries" className="text-sm md:text-base">Past Entries</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="record" className="mt-4">
+          <TabsContent value="record" className="mt-2 md:mt-4">
             <Card>
-              <CardHeader>
-                <CardTitle className="text-center">Record a New Journal Entry</CardTitle>
+              <CardHeader className="pb-2 md:pb-4">
+                <CardTitle className="text-center text-lg md:text-xl">Record a New Journal Entry</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col items-center">
@@ -221,7 +256,7 @@ const Journal = () => {
             )}
             
             {showLoading && (
-              <div className="flex flex-col items-center justify-center h-64">
+              <div className="flex flex-col items-center justify-center h-48 md:h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
                 <p className="text-muted-foreground">Loading your journal entries...</p>
               </div>

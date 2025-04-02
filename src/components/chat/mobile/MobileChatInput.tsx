@@ -1,10 +1,9 @@
 
-import React, { useState, useEffect } from "react";
-import { Send } from "lucide-react";
+import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { motion, AnimatePresence } from "framer-motion";
+import { Send, Mic, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string) => void;
@@ -12,71 +11,73 @@ interface MobileChatInputProps {
   userId?: string;
 }
 
-const MobileChatInput: React.FC<MobileChatInputProps> = ({ 
+export default function MobileChatInput({ 
   onSendMessage, 
   isLoading,
-  userId
-}) => {
+  userId 
+}: MobileChatInputProps) {
   const [message, setMessage] = useState("");
-  const [isFocused, setIsFocused] = useState(false);
-  const { toast } = useToast();
-
-  // Reset scroll position when input is focused
-  useEffect(() => {
-    if (isFocused) {
-      const chatContent = document.querySelector('.mobile-chat-content');
-      if (chatContent) {
-        chatContent.scrollTop = chatContent.scrollHeight;
-      }
-    }
-  }, [isFocused]);
-
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!message.trim()) return;
     
-    onSendMessage(message);
+    if (!userId) {
+      toast.error("Please sign in to chat");
+      return;
+    }
+    
+    onSendMessage(message.trim());
     setMessage("");
-    setIsFocused(false);
+    
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
   };
-
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+  
+  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value);
+    
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+  
   return (
-    <div className="w-full">
-      <form onSubmit={handleSubmit} className="relative flex items-end w-full gap-2">
-        <div className="flex items-center w-full relative">
-          <Textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Ask anything..."
-            className="min-h-[44px] max-h-[120px] text-sm resize-none rounded-full pl-4 pr-12 py-2.5 shadow-sm border-muted bg-background"
-            disabled={isLoading}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
-          />
-        </div>
-        
-        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-          {message.trim().length > 0 && (
-            <Button 
-              type="submit" 
-              size="sm"
-              className="rounded-full h-8 w-8 p-0 bg-primary text-primary-foreground"
-              disabled={isLoading || !message.trim()}
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit} className="flex gap-2 p-2">
+      <Textarea
+        ref={textareaRef}
+        value={message}
+        onChange={handleInput}
+        onKeyDown={handleKeyDown}
+        placeholder="Message Roha..."
+        className="min-h-[40px] max-h-[120px] resize-none text-base border-muted rounded-full px-4 py-2"
+        disabled={isLoading || !userId}
+      />
+      <Button 
+        type="submit" 
+        size="icon" 
+        disabled={isLoading || !message.trim() || !userId} 
+        className="rounded-full h-10 w-10 flex-shrink-0"
+      >
+        {isLoading ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : (
+          <Send className="h-5 w-5" />
+        )}
+      </Button>
+    </form>
   );
-};
-
-export default MobileChatInput;
+}
