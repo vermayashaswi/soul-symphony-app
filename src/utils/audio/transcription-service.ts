@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { ensureOpenAIApiKey } from '../api-key-setup';
+import { getOpenAIApiKey } from '../api-key-setup';
 
 interface TranscriptionResult {
   success: boolean;
@@ -24,9 +24,6 @@ export async function sendAudioForTranscription(
       throw new Error('No audio data provided');
     }
 
-    // Ensure OpenAI API key is set before proceeding
-    await ensureOpenAIApiKey();
-
     console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`Audio data size: ${base64Audio.length} characters`);
     
@@ -36,7 +33,8 @@ export async function sendAudioForTranscription(
         audio: base64Audio,
         userId: userId || null,
         directTranscription: directTranscription,
-        highQuality: true // Add flag to indicate this is a high-quality recording
+        highQuality: true, // Add flag to indicate this is a high-quality recording
+        apiKey: getOpenAIApiKey() // Pass the API key directly
       }
     });
 
