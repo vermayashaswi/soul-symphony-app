@@ -2,23 +2,26 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PostgrestResponse } from '@supabase/supabase-js';
 
-// Define simplified types to avoid excessive type inference
-interface JournalEntry {
+// Simplified interfaces for better type handling
+interface SimpleJournalEntry {
   id: number;
-  foreignKey?: string;
-  [key: string]: any;
+  "foreign key"?: string;
+  "refined text"?: string;
+  content?: string;
 }
 
-interface ProcessedEntry {
+interface SimpleProcessedEntry {
   id: number;
   "refined text"?: string;
 }
 
+// Main hook
 export function useEntryProcessing(
   activeTab: string,
   fetchEntries: () => void,
-  entries: JournalEntry[]
+  entries: SimpleJournalEntry[]
 ) {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
@@ -42,8 +45,9 @@ export function useEntryProcessing(
       const newlyCompletedTempIds: string[] = [];
       
       for (const entry of entries) {
-        if (entry.foreignKey && processingEntries.includes(entry.foreignKey)) {
-          newlyCompletedTempIds.push(entry.foreignKey);
+        const foreignKey = entry["foreign key"];
+        if (foreignKey && processingEntries.includes(foreignKey)) {
+          newlyCompletedTempIds.push(foreignKey);
           setProcessedEntryIds(prev => [...prev, entry.id]);
         }
       }
@@ -69,19 +73,20 @@ export function useEntryProcessing(
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        // Explicitly type the query response to avoid deep type instantiation
-        const response = await supabase
+        // Using raw response to avoid type instantiation issues
+        const rawResponse = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
-          .eq('"foreign key"', tempId);
-          
-        const data = response.data as ProcessedEntry[] | null;
-        const error = response.error;
+          .eq('"foreign key"', tempId || '');
         
-        if (error) {
-          console.error('Error fetching newly created entry:', error);
+        // Handle response errors manually
+        if (rawResponse.error) {
+          console.error('Error fetching newly created entry:', rawResponse.error);
           return false;
         }
+        
+        // Explicitly cast the response data
+        const data = rawResponse.data as SimpleProcessedEntry[] | null;
         
         if (data && data.length > 0) {
           const entryId = data[0].id;

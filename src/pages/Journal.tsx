@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,20 +19,20 @@ const Journal = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Use the profile check hook
   const { isProfileChecked } = useProfileCheck(user?.id);
   
-  // Use the journal entries hook
-  const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
+  const { 
+    entries, 
+    loading, 
+    fetchEntries 
+  } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
   
-  // Use the entry processing hook
   const { 
     processingEntries, 
     processedEntryIds, 
     handleEntryRecording 
   } = useEntryProcessing(activeTab, fetchEntries, entries);
 
-  // Fetch entries when tab changes
   useEffect(() => {
     if (activeTab === 'entries' && isProfileChecked) {
       console.log('Tab changed to entries, fetching entries...');
@@ -59,7 +58,7 @@ const Journal = () => {
     if (!searchQuery.trim()) return true;
     
     const query = searchQuery.toLowerCase();
-    const content = entry.content.toLowerCase();
+    const content = entry.content?.toLowerCase() || '';
     const themes = entry.themes?.join(' ').toLowerCase() || '';
     
     return content.includes(query) || themes.includes(query);

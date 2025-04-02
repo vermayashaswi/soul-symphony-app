@@ -3,34 +3,19 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
-import { Json } from '@/integrations/supabase/types';
-import { PostgrestResponse } from '@supabase/supabase-js';
 
-// Define a proper type for entity objects within the Json type
-interface Entity {
-  type: string;
-  name: string;
-  text: string;
-  [key: string]: any;
-}
-
+// Simple interface to handle raw database response
 interface JournalEntryRow {
   id: number;
   created_at: string;
   "refined text"?: string;
   "transcription text"?: string;
   audio_url?: string;
-  sentiment?: any;
+  sentiment?: string;
   master_themes?: string[];
   "foreign key"?: string;
-  entities?: Json;
-  categories?: string[];
-  chunks_count?: number;
-  duration?: number;
-  emotions?: Json;
-  is_chunked?: boolean;
+  entities?: any;
   user_id?: string;
-  [key: string]: any;
 }
 
 export function useJournalEntries(userId: string | undefined, refreshKey: number, isProfileChecked: boolean = false) {
@@ -61,24 +46,24 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const fetchStartTime = Date.now();
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
-      // Use the correct syntax for table with spaces in name and provide explicit typing
-      const response: PostgrestResponse<JournalEntryRow> = await supabase
+      // Simplify query to avoid type issues
+      const rawResponse = await supabase
         .from('Journal Entries')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       
-      const { data, error, status } = response;
-      
       const fetchEndTime = Date.now();
-      console.log(`[useJournalEntries] Fetch completed in ${fetchEndTime - fetchStartTime}ms with status: ${status}`);
-        
-      if (error) {
-        console.error('[useJournalEntries] Error fetching entries:', error);
+      console.log(`[useJournalEntries] Fetch completed in ${fetchEndTime - fetchStartTime}ms with status: ${rawResponse.status}`);
+      
+      if (rawResponse.error) {
+        console.error('[useJournalEntries] Error fetching entries:', rawResponse.error);
         toast.error('Failed to load journal entries');
-        throw error;
+        throw rawResponse.error;
       }
       
+      // Explicitly cast the data to avoid deep type instantiation
+      const data = rawResponse.data as JournalEntryRow[] | null;
       console.log(`[useJournalEntries] Fetched ${data?.length || 0} entries`);
       
       if (data && data.length > 0) {
@@ -91,34 +76,25 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         console.log('[useJournalEntries] No entries found for this user');
       }
       
-      // Parse entities safely with type checking
+      // Transform the raw data into our application's entry format
       const typedEntries: JournalEntry[] = (data || []).map(item => {
-        // Safely handle entities which could be string, array, or other JSON structure
-        let parsedEntities: Entity[] | undefined;
+        // Safely extract entities if present
+        let parsedEntities = undefined;
         
         if (item.entities) {
           try {
-            // If it's a string, try to parse it
-            const entitiesValue = typeof item.entities === 'string' 
-              ? JSON.parse(item.entities) 
-              : item.entities;
-            
-            // Ensure it's an array
-            if (Array.isArray(entitiesValue)) {
-              parsedEntities = entitiesValue.map(entity => ({
-                type: entity.type || 'unknown',
-                name: entity.name || '',
-                text: entity.text || ''
-              }));
+            if (typeof item.entities === 'string') {
+              parsedEntities = JSON.parse(item.entities);
+            } else {
+              parsedEntities = item.entities;
             }
           } catch (e) {
             console.error('Error parsing entities:', e);
-            parsedEntities = undefined;
           }
         }
         
         return {
-          id: Number(item.id), // Ensure id is a number
+          id: Number(item.id),
           content: item["refined text"] || item["transcription text"] || "",
           created_at: item.created_at,
           audio_url: item.audio_url,

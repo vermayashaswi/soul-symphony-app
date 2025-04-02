@@ -1,20 +1,23 @@
 
 /// <reference types="vite/client" />
 
-// Configure TypeScript to allow deeper type instantiation and provide better error messages
-interface TypeScriptConfig {
-  compilerOptions: {
-    typeInstantiationDepth: number;
-    noErrorTruncation: boolean;
-  };
+/**
+ * TypeScript configuration to increase type instantiation depth 
+ * and improve error messages for debugging complex types.
+ */
+interface ImportMetaEnv {
+  readonly VITE_APP_TITLE: string;
+  // Add other env variables as needed
 }
 
-// @ts-ignore
-declare namespace TSConfig {
-  interface CompilerOptions {
-    // Increase the maximum depth for type instantiation
-    typeInstantiationDepth: 100;
-    // Show full error messages without truncation
-    noErrorTruncation: true;
-  }
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
+// TypeScript compiler options for enhancing type handling
+interface CompilerOptions {
+  // Increase maximum type instantiation depth to handle complex types
+  typeInstantiationDepth: number;
+  // Show full error messages without truncation for better debugging
+  noErrorTruncation: boolean;
 }
