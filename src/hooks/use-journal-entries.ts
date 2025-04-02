@@ -4,6 +4,20 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { Json } from '@/integrations/supabase/types';
+import { PostgrestResponse } from '@supabase/supabase-js';
+
+interface JournalEntryRow {
+  id: number;
+  created_at: string;
+  "refined text"?: string;
+  "transcription text"?: string;
+  audio_url?: string;
+  sentiment?: any;
+  master_themes?: string[];
+  "foreign key"?: string;
+  entities?: any[];
+  [key: string]: any;
+}
 
 export function useJournalEntries(userId: string | undefined, refreshKey: number, isProfileChecked: boolean = false) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -33,12 +47,14 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const fetchStartTime = Date.now();
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
-      // Use the correct syntax for table with spaces in name
-      const { data, error, status } = await supabase
-        .from('Journal Entries')  // No double quotes, just the table name
+      // Use the correct syntax for table with spaces in name and provide explicit typing
+      const response: PostgrestResponse<JournalEntryRow> = await supabase
+        .from('Journal Entries')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
+      
+      const { data, error, status } = response;
       
       const fetchEndTime = Date.now();
       console.log(`[useJournalEntries] Fetch completed in ${fetchEndTime - fetchStartTime}ms with status: ${status}`);
