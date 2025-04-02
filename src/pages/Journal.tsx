@@ -13,14 +13,10 @@ import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PostgrestSingleResponse } from '@supabase/supabase-js';
-import { Json } from '@/integrations/supabase/types';
 
-interface JournalEntryRow {
+interface SimpleJournalEntry {
   id: number;
   "refined text"?: string;
-  "foreign key"?: string;
-  created_at?: string;
-  [key: string]: any;
 }
 
 const Journal = () => {
@@ -128,13 +124,13 @@ const Journal = () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        type JournalEntryRowMinimal = Pick<JournalEntryRow, 'id' | 'refined text'>;
-        
-        const { data, error } = await supabase
+        const response = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
           .eq('"foreign key"', tempId)
-          .single<JournalEntryRowMinimal>();
+          .single();
+          
+        const { data, error } = response as PostgrestSingleResponse<SimpleJournalEntry>;
           
         if (error) {
           console.error('Error fetching newly created entry:', error);
