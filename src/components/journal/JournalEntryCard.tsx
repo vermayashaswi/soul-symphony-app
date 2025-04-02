@@ -50,6 +50,15 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
+    
+    // Emit event for debugging
+    window.dispatchEvent(new CustomEvent('operation-complete', {
+      detail: {
+        operation: 'Toggle Entry',
+        success: true,
+        details: `Entry ${entry.id} ${!isExpanded ? 'expanded' : 'collapsed'}`
+      }
+    }));
   };
 
   const handleDelete = async () => {
@@ -58,6 +67,14 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     try {
       setIsDeleting(true);
       
+      // Emit start event for debugging
+      window.dispatchEvent(new CustomEvent('operation-start', {
+        detail: {
+          operation: 'Delete Entry',
+          details: `Deleting entry ID: ${entry.id}`
+        }
+      }));
+      
       // Delete the entry from the database
       const { error } = await supabase
         .from('Journal Entries')
@@ -65,8 +82,26 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         .eq('id', entry.id);
         
       if (error) {
+        // Emit error event
+        window.dispatchEvent(new CustomEvent('operation-complete', {
+          detail: {
+            operation: 'Delete Entry',
+            success: false,
+            error: error.message || 'Error deleting entry'
+          }
+        }));
+        
         throw error;
       }
+      
+      // Emit success event
+      window.dispatchEvent(new CustomEvent('operation-complete', {
+        detail: {
+          operation: 'Delete Entry',
+          success: true,
+          details: `Entry ${entry.id} deleted successfully`
+        }
+      }));
       
       // Close the dialog
       setOpen(false);

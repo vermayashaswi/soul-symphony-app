@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +29,13 @@ const Journal = () => {
 
   useEffect(() => {
     if (user?.id) {
+      window.dispatchEvent(new CustomEvent('operation-start', {
+        detail: {
+          operation: 'Check User Profile',
+          details: `Checking if profile exists for user: ${user.id.substring(0, 8)}...`
+        }
+      }));
+      
       checkUserProfile(user.id);
     }
   }, [user?.id]);
@@ -37,6 +43,14 @@ const Journal = () => {
   useEffect(() => {
     if (activeTab === 'entries' && isProfileChecked) {
       console.log('Tab changed to entries, fetching entries...');
+      
+      window.dispatchEvent(new CustomEvent('operation-start', {
+        detail: {
+          operation: 'Fetch Entries',
+          details: 'Loading journal entries from database'
+        }
+      }));
+      
       fetchEntries();
     }
   }, [activeTab, isProfileChecked, fetchEntries]);
@@ -60,7 +74,6 @@ const Journal = () => {
       setRefreshKey(prev => prev + 1);
       fetchEntries();
       
-      // Auto-switch to entries tab on mobile
       if (isMobile) {
         setActiveTab('entries');
       }
@@ -104,6 +117,13 @@ const Journal = () => {
       if (error || !profile) {
         console.log('Creating user profile...');
         
+        window.dispatchEvent(new CustomEvent('operation-start', {
+          detail: {
+            operation: 'Create Profile',
+            details: `Creating new profile for user: ${userId.substring(0, 8)}...`
+          }
+        }));
+        
         const { data: userData, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
         
@@ -117,12 +137,36 @@ const Journal = () => {
           }]);
           
         if (insertError) throw insertError;
-        console.log('Profile created successfully');
+        
+        window.dispatchEvent(new CustomEvent('operation-complete', {
+          detail: {
+            operation: 'Create Profile',
+            success: true,
+            details: 'User profile created successfully'
+          }
+        }));
+      } else {
+        window.dispatchEvent(new CustomEvent('operation-complete', {
+          detail: {
+            operation: 'Check User Profile',
+            success: true,
+            details: 'User profile exists'
+          }
+        }));
       }
       
       setIsProfileChecked(true);
     } catch (error: any) {
       console.error('Error checking/creating user profile:', error);
+      
+      window.dispatchEvent(new CustomEvent('operation-complete', {
+        detail: {
+          operation: error.message.includes('Creating') ? 'Create Profile' : 'Check User Profile',
+          success: false,
+          error: error.message || 'Unknown error'
+        }
+      }));
+      
       toast.error('Error setting up profile. Please try again.');
     }
   };
@@ -130,22 +174,43 @@ const Journal = () => {
   const onEntryRecorded = async (audioBlob: Blob, tempId?: string) => {
     console.log('Entry recorded, adding to processing queue with temp ID:', tempId);
     
+    window.dispatchEvent(new CustomEvent('operation-complete', {
+      detail: {
+        operation: 'Record Entry',
+        success: true,
+        details: `Recorded audio with temp ID: ${tempId}`
+      }
+    }));
+    
+    window.dispatchEvent(new CustomEvent('operation-start', {
+      detail: {
+        operation: 'Process Entry',
+        details: `Processing entry with temp ID: ${tempId}`
+      }
+    }));
+    
     if (tempId) {
       setProcessingEntries(prev => [...prev, tempId]);
     }
     
-    // For mobile, switch immediately to entries tab to show progress
     if (isMobile) {
       setActiveTab('entries');
     }
     
-    // Force a refresh to immediately see the "processing" indicator
     setRefreshKey(prev => prev + 1);
     fetchEntries();
     
     const checkEntryProcessed = async () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
+        
+        window.dispatchEvent(new CustomEvent('operation-start', {
+          detail: {
+            operation: 'Check Entry Status',
+            details: `Checking status for entry with temp ID: ${tempId}`
+          }
+        }));
+        
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
@@ -154,15 +219,55 @@ const Journal = () => {
           
         if (error) {
           console.error('Error fetching newly created entry:', error);
+          
+          window.dispatchEvent(new CustomEvent('operation-complete', {
+            detail: {
+              operation: 'Check Entry Status',
+              success: false,
+              error: error.message || 'Error fetching entry status'
+            }
+          }));
+          
           return false;
         } else if (data) {
           console.log('New entry found:', data.id);
+          
+          window.dispatchEvent(new CustomEvent('operation-complete', {
+            detail: {
+              operation: 'Check Entry Status',
+              success: true,
+              details: `Entry found with ID: ${data.id}`
+            }
+          }));
+          
+          window.dispatchEvent(new CustomEvent('operation-start', {
+            detail: {
+              operation: 'Generate Themes',
+              details: `Generating themes for entry ID: ${data.id}`
+            }
+          }));
           
           await supabase.functions.invoke('generate-themes', {
             body: {
               text: data["refined text"],
               entryId: data.id
             }
+          }).then(() => {
+            window.dispatchEvent(new CustomEvent('operation-complete', {
+              detail: {
+                operation: 'Generate Themes',
+                success: true,
+                details: 'Themes generated successfully'
+              }
+            }));
+          }).catch(error => {
+            window.dispatchEvent(new CustomEvent('operation-complete', {
+              detail: {
+                operation: 'Generate Themes',
+                success: false,
+                error: error.message || 'Error generating themes'
+              }
+            }));
           });
           
           return true;
@@ -170,6 +275,15 @@ const Journal = () => {
         return false;
       } catch (error) {
         console.error('Error checking for processed entry:', error);
+        
+        window.dispatchEvent(new CustomEvent('operation-complete', {
+          detail: {
+            operation: 'Check Entry Status',
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error checking entry status'
+          }
+        }));
+        
         return false;
       }
     };
@@ -182,6 +296,15 @@ const Journal = () => {
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
         setRefreshKey(prev => prev + 1);
         fetchEntries();
+        
+        window.dispatchEvent(new CustomEvent('operation-complete', {
+          detail: {
+            operation: 'Process Entry',
+            success: true,
+            details: 'Entry processed and stored successfully'
+          }
+        }));
+        
         toast.success('Journal entry processed successfully!');
       }
     }, 3000);
@@ -190,9 +313,18 @@ const Journal = () => {
       clearInterval(pollInterval);
       if (processingEntries.includes(tempId || '')) {
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
+        
+        window.dispatchEvent(new CustomEvent('operation-complete', {
+          detail: {
+            operation: 'Process Entry',
+            success: false,
+            details: 'Entry processing is taking longer than expected',
+            error: 'Processing timeout - the entry should appear soon'
+          }
+        }));
+        
         toast.info('Entry processing is taking longer than expected. It should appear soon.');
         
-        // Try one more fetch after the timeout
         fetchEntries();
       }
     }, 120000);
@@ -221,7 +353,6 @@ const Journal = () => {
   
   const showEntries = activeTab === 'entries' && (!loading || entries.length > 0);
 
-  // Mobile UI has larger padding between tab container and tabs
   const tabContainerClass = isMobile ? "container mx-auto px-4 py-4 max-w-5xl" : "container mx-auto px-4 py-6 max-w-5xl";
 
   return (
