@@ -124,29 +124,33 @@ const Journal = () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        // Avoid complex type inference by using a more direct approach
+        // Use a type assertion directly on the response to avoid deep type inference
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
           .eq('"foreign key"', tempId);
           
-        // Handle the result directly without complex type inference
         if (error) {
           console.error('Error fetching newly created entry:', error);
           return false;
         }
         
-        // Check if we have data and access the first item if it exists
+        // Simplify the type casting approach to avoid excessive type instantiation
         if (data && data.length > 0) {
-          const entryData = data[0] as SimpleJournalEntry;
-          console.log('New entry found:', entryData.id);
+          // Use a simple type assertion with a known structure
+          const entryId = data[0].id as number;
+          const refinedText = data[0]["refined text"] as string | undefined;
           
-          await supabase.functions.invoke('generate-themes', {
-            body: {
-              text: entryData["refined text"],
-              entryId: entryData.id
-            }
-          });
+          console.log('New entry found:', entryId);
+          
+          if (refinedText) {
+            await supabase.functions.invoke('generate-themes', {
+              body: {
+                text: refinedText,
+                entryId: entryId
+              }
+            });
+          }
           
           return true;
         }
