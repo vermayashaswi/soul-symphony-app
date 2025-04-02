@@ -1,3 +1,4 @@
+
 import React, { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -21,7 +22,7 @@ import "./styles/mobile.css";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
 import MobileNavbar from "./components/mobile/MobileNavbar";
 import { useIsMobile } from "./hooks/use-mobile";
-import DebugPanel from "./components/DebugPanel";
+import { AdvancedDebugger } from "./components/AdvancedDebugger";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,7 +42,7 @@ const MobileRouteWrapper = ({ children }: { children: React.ReactNode }) => {
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
-  const pathname = window.location.pathname; // Using native browser APIs instead of useLocation
+  const pathname = window.location.pathname;
   
   useEffect(() => {
     if (!isLoading && !user) {
@@ -68,22 +69,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   return <>{children}</>;
-};
-
-const LazySmartChatMobileDebug = React.lazy(() => import('./components/chat/SmartChatMobileDebug'));
-
-const RouterAwareDebugTools = () => {
-  const isMobile = useIsMobile();
-  
-  if (isMobile) {
-    return (
-      <Suspense fallback={null}>
-        <LazySmartChatMobileDebug />
-      </Suspense>
-    );
-  }
-  
-  return <DebugPanel />;
 };
 
 const AppRoutes = () => {
@@ -175,7 +160,7 @@ const AppRoutes = () => {
 
       {shouldShowMobileNav && <MobileNavbar />}
       
-      <RouterAwareDebugTools />
+      <AdvancedDebugger />
     </>
   );
 };
