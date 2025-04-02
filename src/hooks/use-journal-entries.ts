@@ -1,9 +1,18 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { Json } from '@/integrations/supabase/types';
 import { PostgrestResponse } from '@supabase/supabase-js';
+
+// Define a proper type for entity objects within the Json type
+interface Entity {
+  type: string;
+  name: string;
+  text: string;
+  [key: string]: any;
+}
 
 interface JournalEntryRow {
   id: number;
@@ -82,21 +91,43 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         console.log('[useJournalEntries] No entries found for this user');
       }
       
-      // Ensure proper typing for the entries
-      const typedEntries: JournalEntry[] = (data || []).map(item => ({
-        id: Number(item.id), // Ensure id is a number
-        content: item["refined text"] || item["transcription text"] || "",
-        created_at: item.created_at,
-        audio_url: item.audio_url,
-        sentiment: item.sentiment,
-        themes: item.master_themes,
-        foreignKey: item["foreign key"],
-        entities: item.entities ? (Array.isArray(item.entities) ? item.entities : []).map(entity => ({
-          type: entity.type,
-          name: entity.name,
-          text: entity.text
-        })) : undefined
-      }));
+      // Parse entities safely with type checking
+      const typedEntries: JournalEntry[] = (data || []).map(item => {
+        // Safely handle entities which could be string, array, or other JSON structure
+        let parsedEntities: Entity[] | undefined;
+        
+        if (item.entities) {
+          try {
+            // If it's a string, try to parse it
+            const entitiesValue = typeof item.entities === 'string' 
+              ? JSON.parse(item.entities) 
+              : item.entities;
+            
+            // Ensure it's an array
+            if (Array.isArray(entitiesValue)) {
+              parsedEntities = entitiesValue.map(entity => ({
+                type: entity.type || 'unknown',
+                name: entity.name || '',
+                text: entity.text || ''
+              }));
+            }
+          } catch (e) {
+            console.error('Error parsing entities:', e);
+            parsedEntities = undefined;
+          }
+        }
+        
+        return {
+          id: Number(item.id), // Ensure id is a number
+          content: item["refined text"] || item["transcription text"] || "",
+          created_at: item.created_at,
+          audio_url: item.audio_url,
+          sentiment: item.sentiment,
+          themes: item.master_themes,
+          foreignKey: item["foreign key"],
+          entities: parsedEntities
+        };
+      });
       
       setEntries(typedEntries);
       setLastFetchTime(new Date());
