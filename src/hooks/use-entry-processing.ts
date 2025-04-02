@@ -1,27 +1,19 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// Simple flat interfaces to avoid complex type inference
-interface SimpleJournalEntry {
+// Import the supabase client without relying on type inference
+import { supabase } from '@/integrations/supabase/client';
+
+// Simple flat interface for journal entries
+type SimpleJournalEntry = {
   id: number;
   "foreign key"?: string;
   "refined text"?: string;
   content?: string;
-}
-
-// Process entry response type
-interface ProcessEntryResponse {
-  id: number;
-  "refined text"?: string;
-}
-
-// Simple response type for Supabase query
-interface SimpleResponse {
-  data: ProcessEntryResponse[] | null;
-  error: { message: string } | null;
-}
+  themes?: string[];
+  created_at: string;
+};
 
 export function useEntryProcessing(
   activeTab: string,
@@ -65,41 +57,37 @@ export function useEntryProcessing(
     }
   }, [entries, processingEntries]);
 
-  // Check if an entry has been processed
+  // Check if an entry has been processed - completely rewritten to avoid complex type inference
   const checkEntryProcessed = async (tempId: string): Promise<boolean> => {
     try {
       console.log('Checking if entry is processed with temp ID:', tempId);
       
-      // Use explicit Promise type and cast response to avoid deep type inference
-      const response = await supabase
+      // Manual type handling for Supabase response
+      const { data, error } = await supabase
         .from('Journal Entries')
         .select('id, "refined text"')
         .eq('"foreign key"', tempId);
-      
-      // Manually handle response structure
-      const data = response.data as ProcessEntryResponse[] | null;
-      const error = response.error;
       
       if (error) {
         console.error('Error fetching newly created entry:', error);
         return false;
       }
       
-      if (data && data.length > 0) {
-        const entryId = data[0].id;
-        const refinedText = data[0]["refined text"];
-        
-        console.log('New entry found:', entryId);
-        
-        if (refinedText) {
-          // Handle theme generation separately to break up complex type chains
-          await generateThemes(refinedText, entryId);
-        }
-        
-        return true;
+      if (!data || data.length === 0) {
+        return false;
       }
       
-      return false;
+      // Safely access data with type assertions
+      const entryId = data[0].id as number;
+      const refinedText = data[0]["refined text"] as string | null;
+      
+      console.log('New entry found:', entryId);
+      
+      if (refinedText) {
+        await generateThemes(refinedText, entryId);
+      }
+      
+      return true;
     } catch (error) {
       console.error('Error checking for processed entry:', error);
       return false;
