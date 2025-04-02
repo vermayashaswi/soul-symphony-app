@@ -16,14 +16,19 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log("Chat-RAG function called");
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders });
   }
 
   // Handle ping request for availability check
   try {
     const requestData = await req.json();
+    console.log("Request data received:", JSON.stringify(requestData).substring(0, 200) + "...");
+    
     if (requestData.ping === true) {
       console.log("Received ping request");
       return new Response(
@@ -34,6 +39,8 @@ serve(async (req) => {
 
     // Regular processing
     const { message, userId, threadId = null, includeDiagnostics = false } = requestData;
+    
+    console.log(`Processing request for user ${userId?.substring(0, 8)}... with thread ${threadId?.substring(0, 8)}...`);
     
     if (!message) {
       console.error("No message provided");
@@ -110,6 +117,7 @@ serve(async (req) => {
         
       if (!profileError && profileData?.full_name) {
         firstName = profileData.full_name.split(' ')[0];
+        console.log("Found user's first name:", firstName);
       }
     } catch (error) {
       console.error("Error fetching user profile:", error);
@@ -128,6 +136,7 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
     
     try {
       // Send to GPT with context
+      console.log("Making API request to OpenAI");
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -149,6 +158,8 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
         }),
       });
 
+      console.log("OpenAI API response status:", response.status);
+      
       if (!response.ok) {
         const errorText = await response.text();
         console.error("GPT API error:", errorText);
@@ -167,7 +178,7 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
       const result = await response.json();
       const aiResponse = result.choices[0].message.content;
       
-      console.log("AI response generated successfully");
+      console.log("AI response generated successfully: ", aiResponse.substring(0, 100) + "...");
       
       // Prepare the response including diagnostic information if requested
       const responseData = { 
@@ -180,6 +191,7 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
         };
       }
       
+      console.log("Sending response back to client");
       return new Response(
         JSON.stringify(responseData),
         { 
