@@ -14,9 +14,11 @@ import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface SimpleJournalEntry {
+// Define a simple type for journal entry response instead of using complex inferencing
+interface JournalEntryResponse {
   id: number;
   "refined text"?: string;
+  [key: string]: any;
 }
 
 const Journal = () => {
@@ -124,7 +126,7 @@ const Journal = () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        // Fix the excessively deep type instantiation by avoiding complex types
+        // Use simplified typing to avoid excessive type instantiation
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
@@ -135,11 +137,12 @@ const Journal = () => {
           return false;
         }
         
-        // Avoid complex type inference by using simple property access
+        // Simplified type handling
         if (data && data.length > 0) {
-          // Access properties directly without complex typing
-          const entryId = data[0].id;
-          const refinedText = data[0]["refined text"];
+          // Explicitly type the response to avoid deep inference
+          const entry = data[0] as JournalEntryResponse;
+          const entryId = entry.id;
+          const refinedText = entry["refined text"];
           
           console.log('New entry found:', entryId);
           
