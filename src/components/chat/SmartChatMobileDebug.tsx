@@ -95,6 +95,12 @@ export default function SmartChatMobileDebug() {
         size="sm" 
         className="fixed bottom-4 left-4 z-50 bg-red-100 hover:bg-red-200 text-red-800"
         onClick={() => setIsOpen(true)}
+        style={{
+          opacity: 0.95,
+          border: '2px solid red',
+          padding: '8px',
+          bottom: "120px", // Position it higher on mobile to be visible above the navbar
+        }}
       >
         <Smartphone className="h-4 w-4 mr-2" />
         Debug
@@ -103,7 +109,7 @@ export default function SmartChatMobileDebug() {
   }
   
   return (
-    <Card className="fixed bottom-0 left-0 right-0 z-50 h-[60vh] m-2 shadow-lg">
+    <Card className="fixed bottom-16 left-0 right-0 z-50 h-[60vh] m-2 shadow-lg">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-sm">
           Mobile Diagnostics

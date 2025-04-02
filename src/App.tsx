@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -75,10 +74,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 // Separated DebugTools component that will be rendered inside AuthProvider
 const DebugTools = () => {
   const isMobile = useIsMobile();
-  
-  if (process.env.NODE_ENV !== 'development') {
-    return null;
-  }
   
   return (
     <>

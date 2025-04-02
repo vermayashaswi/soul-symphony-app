@@ -109,7 +109,7 @@ export function MobileBrowserDebug() {
         <Button 
           variant="outline" 
           size="sm" 
-          className="fixed bottom-4 right-4 z-[9999] bg-red-100 hover:bg-red-200 text-red-800 shadow-lg animate-pulse"
+          className="fixed bottom-20 right-4 z-[9999] bg-red-100 hover:bg-red-200 text-red-800 shadow-lg animate-pulse"
           onClick={() => setIsOpen(true)}
           style={{
             opacity: 0.95,
@@ -121,7 +121,7 @@ export function MobileBrowserDebug() {
           Debug ({renderCount})
         </Button>
       ) : (
-        <Card className="fixed bottom-0 left-0 right-0 z-[9999] h-[60vh] m-2 shadow-lg border-2 border-red-500">
+        <Card className="fixed bottom-16 left-0 right-0 z-[9999] h-[60vh] m-2 shadow-lg border-2 border-red-500">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm flex items-center">
               <Smartphone className="h-4 w-4 mr-2" />
