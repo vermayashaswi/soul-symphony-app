@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -69,9 +68,9 @@ serve(async (req) => {
     }
 
     // Fetch all entries from the database that don't have sentiment analysis yet
-    // Using 'Journal Entries' as the table name (with space)
+    // Using 'Journal_Entries' as the table name (with underscore)
     const { data: entries, error: fetchError } = await supabase
-      .from('Journal Entries')
+      .from('Journal_Entries')
       .select('id, "refined text"')
       .eq('user_id', userId)
       .is('sentiment', null);
@@ -96,7 +95,7 @@ serve(async (req) => {
         
         // Update the database with the sentiment score
         const { error: updateError } = await supabase
-          .from('Journal Entries')
+          .from('Journal_Entries')
           .update({ sentiment: sentimentScore.toString() })
           .eq('id', entry.id);
         

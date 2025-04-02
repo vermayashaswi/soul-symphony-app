@@ -26,7 +26,7 @@ BEGIN
   FROM
     journal_embeddings je
   JOIN
-    "Journal Entries" entries ON je.journal_entry_id = entries.id
+    "Journal_Entries" entries ON je.journal_entry_id = entries.id
   WHERE 
     1 - (je.embedding <=> query_embedding) > match_threshold
     AND entries.user_id = user_id_filter::text  -- Convert UUID to text to match the column type

@@ -118,7 +118,7 @@ const Journal = () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         const { data, error } = await supabase
-          .from('Journal Entries')
+          .from('Journal_Entries')
           .select('id, "refined text"')
           .eq('foreign key', tempId)
           .single();
