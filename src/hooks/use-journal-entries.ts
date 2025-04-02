@@ -50,7 +50,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.log(`Processing journal entry ${entryId} for chunking`);
       
       // Create a promise with timeout instead of using AbortController signal
-      const timeoutPromise = new Promise<{success: false, error: string}>((_, reject) => {
+      const timeoutPromise = new Promise<{success: false; error: string}>((_, reject) => {
         setTimeout(() => reject(new Error('Function call timed out')), 10000);
       });
       
@@ -77,7 +77,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         return false;
       }
       
-      console.log(`Successfully processed journal entry ${entryId} into ${result?.chunks_count || 0} chunks`);
+      // Type assertion to fix TypeScript error by ensuring chunks_count exists
+      const responseData = result as { success: boolean; chunks_count?: number };
+      console.log(`Successfully processed journal entry ${entryId} into ${responseData.chunks_count || 0} chunks`);
       return true;
     } catch (error) {
       console.error('Error invoking process-journal function:', error);

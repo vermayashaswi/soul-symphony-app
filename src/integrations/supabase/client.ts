@@ -19,9 +19,16 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       headers.set('x-client-version', '1.1.0');
       headers.set('x-chunking-enabled', 'true');
       
+      // Add request timeout
+      const timeoutController = new AbortController();
+      const timeoutId = setTimeout(() => timeoutController.abort(), 15000); // 15 second timeout
+      
       return fetch(url, { 
         ...fetchOptions,
-        headers 
+        headers,
+        signal: timeoutController.signal 
+      }).finally(() => {
+        clearTimeout(timeoutId);
       });
     }
   }
@@ -30,24 +37,33 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Helper function to check if chunking is supported on the server
 export async function isChunkingSupported(): Promise<boolean> {
   try {
-    // First, try to verify edge function availability
+    // First, try to verify edge function availability - use a simple GET request with timeout
     try {
-      const healthCheck = await supabase.functions.invoke('process-journal', {
-        body: { health: true },
-        method: 'GET'
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const healthResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-journal/health`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
       });
       
-      console.log('Edge function health check:', healthCheck);
-      if (healthCheck.error) {
-        console.warn('Edge function health check failed:', healthCheck.error);
+      clearTimeout(timeoutId);
+      
+      if (healthResponse.ok) {
+        console.log('Edge function health check passed');
+      } else {
+        console.warn('Edge function health check failed with status:', healthResponse.status);
       }
     } catch (healthError) {
       console.warn('Edge function health check failed:', healthError);
-      // Continue despite health check failure
+      // Continue despite health check failure - try the DB check
     }
     
-    // Check if the journal_chunks table exists
-    // Using a direct SQL query instead of rpc since table_exists is not in the types
+    // Check if the journal_chunks table exists by making a direct query
     const { data, error } = await supabase
       .from('journal_chunks')
       .select('id')
@@ -72,11 +88,26 @@ export async function checkEdgeFunctionsHealth(): Promise<Record<string, boolean
   
   for (const func of functionsToCheck) {
     try {
-      const { data, error } = await supabase.functions.invoke(`${func}/health`, {
-        method: 'GET'
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/${func}/health`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
       });
       
-      results[func] = !error && data?.status === 'healthy';
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        results[func] = data?.status === 'healthy';
+      } else {
+        results[func] = false;
+      }
     } catch (error) {
       console.error(`Health check failed for ${func}:`, error);
       results[func] = false;

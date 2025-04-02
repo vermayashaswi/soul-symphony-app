@@ -21,7 +21,7 @@ async function processJournalEntry(entryId: number) {
     // First, retrieve the entry to make sure it exists and to get any necessary data
     const { data: entry, error } = await supabase
       .from('Journal Entries')
-      .select('id, "refined text", "transcription text", is_chunked')
+      .select('id, "refined text", "transcription text", is_chunked, chunks_count')
       .eq('id', entryId)
       .single();
     
@@ -48,9 +48,10 @@ async function processJournalEntry(entryId: number) {
     
     // Add timeout handling
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
     
     try {
+      // Use direct fetch for more control over timeout and error handling
       const chunkResponse = await fetch(
         `${supabaseUrl}/functions/v1/chunk-and-embed`,
         {
@@ -129,15 +130,34 @@ serve(async (req) => {
     }
     
     let entryId: number | undefined;
+    let isHealthCheck: boolean = false;
     
     try {
       const body = await req.json();
       entryId = body.entryId;
+      isHealthCheck = !!body.health;
     } catch (jsonError) {
       console.error('Error parsing request JSON:', jsonError);
+      
+      // If it's a GET request, assume it's a health check
+      if (req.method === 'GET') {
+        return new Response(
+          JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: 'Invalid JSON in request body', success: false }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Handle health check requests specifically
+    if (isHealthCheck) {
+      return new Response(
+        JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     

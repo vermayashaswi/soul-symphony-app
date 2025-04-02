@@ -226,7 +226,43 @@ serve(async (req) => {
   }
 
   try {
-    const { entryId } = await req.json();
+    // Check if it's a health check
+    const url = new URL(req.url);
+    if (url.pathname.endsWith('/health')) {
+      return new Response(
+        JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    let entryId: number | undefined;
+    
+    try {
+      const body = await req.json();
+      entryId = body.entryId;
+      
+      // If it's a health check request
+      if (body.health === true) {
+        return new Response(
+          JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } catch (jsonError) {
+      // For GET requests without a body, treat as health check
+      if (req.method === 'GET') {
+        return new Response(
+          JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      console.error('Error parsing request JSON:', jsonError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     if (!entryId) {
       return new Response(
