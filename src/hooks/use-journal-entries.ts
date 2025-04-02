@@ -33,9 +33,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const fetchStartTime = Date.now();
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
-      // Make sure to use the correct table name with quotes
+      // Use the correct syntax for table with spaces in name
       const { data, error, status } = await supabase
-        .from('"Journal Entries"')  // Use quotes for table name with spaces
+        .from('Journal Entries')  // No double quotes, just the table name
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
@@ -61,8 +61,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         console.log('[useJournalEntries] No entries found for this user');
       }
       
+      // Ensure proper typing for the entries
       const typedEntries: JournalEntry[] = (data || []).map(item => ({
-        id: item.id,
+        id: Number(item.id), // Ensure id is a number
         content: item["refined text"] || item["transcription text"] || "",
         created_at: item.created_at,
         audio_url: item.audio_url,
