@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,21 +39,17 @@ export default function SmartChatMobileDebug() {
   const [currentPath, setCurrentPath] = useState<string>('/');
 
   useEffect(() => {
-    // Get current path without using useLocation
     setCurrentPath(window.location.pathname);
     
-    // Setup a listener for path changes
     const handlePathnameChange = () => {
       setCurrentPath(window.location.pathname);
     };
     
     window.addEventListener('popstate', handlePathnameChange);
     
-    // Log initial info
     addLog("Debug component mounted");
     addLog(`Current route: ${currentPath}`);
     
-    // Collect device and browser information
     const info = {
       userAgent: navigator.userAgent,
       screenWidth: window.innerWidth,
@@ -68,12 +63,9 @@ export default function SmartChatMobileDebug() {
     setDeviceInfo(info);
     addLog(`Device info collected: ${window.innerWidth}x${window.innerHeight}, Pixel ratio: ${window.devicePixelRatio}`);
     
-    // Setup fetch interceptor for API call monitoring
     setupFetchInterceptor();
     
-    // Test DOM elements conditionally based on route
     setTimeout(() => {
-      // Only check for chat interface if on a chat-related route
       if (currentPath.includes('chat') || currentPath.includes('smart-chat')) {
         const chatInterface = document.querySelector('.smart-chat-interface, .mobile-chat-content');
         if (chatInterface) {
@@ -88,7 +80,6 @@ export default function SmartChatMobileDebug() {
       }
     }, 500);
     
-    // Listener for resize events
     const handleResize = () => {
       addLog(`Window resized: ${window.innerWidth}x${window.innerHeight}`);
     };
@@ -97,7 +88,6 @@ export default function SmartChatMobileDebug() {
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('popstate', handlePathnameChange);
-      // Cleanup fetch interceptor if needed
       cleanupFetchInterceptor();
     };
   }, [isMobile, currentPath]);
@@ -107,32 +97,25 @@ export default function SmartChatMobileDebug() {
   };
   
   const setupFetchInterceptor = () => {
-    // Save the original fetch function
     const originalFetch = window.fetch;
     
-    // Override the fetch function to monitor API calls
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      // Extract the URL string correctly based on input type
       const url = typeof input === 'string' 
         ? input 
         : input instanceof Request 
           ? input.url 
-          : input.href; // Use href for URL objects
+          : input.href;
       
       const method = init?.method || 'GET';
       const startTime = performance.now();
       
       try {
-        // Log the outgoing request
         addLog(`API call started: ${method} ${url}`);
         
-        // Execute the original fetch
         const response = await originalFetch(input, init);
         
-        // Calculate duration
         const duration = performance.now() - startTime;
         
-        // Log the completed request
         const apiCall: ApiCall = {
           url,
           method,
@@ -141,16 +124,13 @@ export default function SmartChatMobileDebug() {
           timestamp: new Date().toISOString()
         };
         
-        setApiCalls(prev => [apiCall, ...prev].slice(0, 20)); // Keep last 20 calls
+        setApiCalls(prev => [apiCall, ...prev].slice(0, 20));
         addLog(`API call completed: ${method} ${url} - Status: ${response.status} (${Math.round(duration)}ms)`);
         
-        // Update RAG diagnostics if this is a RAG-related call
         if (url.includes('chat-with-rag') || url.includes('chat-rag')) {
           setRagSteps(prev => {
             const newSteps = [...prev];
-            // Update Query Understanding step
             newSteps[0] = { ...newSteps[0], status: 'success', timestamp: new Date().toLocaleTimeString() };
-            // Update other steps based on success
             if (response.status === 200) {
               newSteps[1] = { ...newSteps[1], status: 'success', timestamp: new Date().toLocaleTimeString() };
               newSteps[2] = { ...newSteps[2], status: 'success', timestamp: new Date().toLocaleTimeString() };
@@ -164,14 +144,11 @@ export default function SmartChatMobileDebug() {
           });
         }
         
-        // Clone the response since we've already used it
         return response.clone();
       } catch (error) {
-        // Log error
         const duration = performance.now() - startTime;
         addLog(`API call error: ${method} ${url} - ${error}`);
         
-        // Record the failed call
         const apiCall: ApiCall = {
           url,
           method,
@@ -182,7 +159,6 @@ export default function SmartChatMobileDebug() {
         
         setApiCalls(prev => [apiCall, ...prev].slice(0, 20));
         
-        // Update RAG diagnostics if this is a RAG-related call
         if (url.includes('chat-with-rag') || url.includes('chat-rag')) {
           setRagSteps(prev => {
             const newSteps = [...prev];
@@ -202,15 +178,12 @@ export default function SmartChatMobileDebug() {
   };
   
   const cleanupFetchInterceptor = () => {
-    // This function would restore the original fetch if needed
-    // Implementation depends on how interceptor was set up
     addLog("Fetch API interceptor removed");
   };
   
   const runTests = () => {
     addLog("Running manual diagnostics...");
     
-    // Test layout dimensions
     const chatContainer = document.querySelector('.smart-chat-container');
     if (chatContainer) {
       const rect = chatContainer.getBoundingClientRect();
@@ -219,20 +192,15 @@ export default function SmartChatMobileDebug() {
       addLog("ERROR: Chat container not found");
     }
     
-    // Test API connections
     testApiConnection();
     
-    // Test scroll positions
     addLog(`Scroll position: ${window.scrollX}x${window.scrollY}`);
     
-    // Test visibility
     const isVisible = document.visibilityState === 'visible';
     addLog(`Page visibility: ${isVisible ? 'visible' : 'hidden'}`);
     
-    // Simulate RAG process steps
     simulateRagProcess();
     
-    // Check for any errors in console
     if (window.console && console.error) {
       const originalError = console.error;
       console.error = function(...args) {
@@ -276,7 +244,6 @@ export default function SmartChatMobileDebug() {
   const simulateRagProcess = () => {
     addLog("Simulating RAG process...");
     
-    // Reset RAG steps
     setRagSteps([
       { id: 1, step: "Query Understanding", status: 'loading', timestamp: new Date().toLocaleTimeString() },
       { id: 2, step: "Vector Search", status: 'pending' },
@@ -284,7 +251,6 @@ export default function SmartChatMobileDebug() {
       { id: 4, step: "Response Generation", status: 'pending' }
     ]);
     
-    // Simulate each step with delays
     setTimeout(() => {
       setRagSteps(prev => {
         const newSteps = [...prev];
@@ -346,7 +312,7 @@ export default function SmartChatMobileDebug() {
           opacity: 0.95,
           border: '2px solid red',
           padding: '8px',
-          bottom: "120px", // Position it higher on mobile to be visible above the navbar
+          bottom: "120px",
         }}
       >
         <Smartphone className="h-4 w-4 mr-2" />
