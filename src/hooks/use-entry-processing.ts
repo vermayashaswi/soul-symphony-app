@@ -64,7 +64,7 @@ export function useEntryProcessing(
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        // Use explicit typing to avoid excessive type instantiation
+        // Use a simpler typed query with explicit type casting to avoid excessive inference
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
