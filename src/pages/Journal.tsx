@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -123,29 +124,33 @@ const Journal = () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        const response = await supabase
+        // Avoid complex type inference by using a more direct approach
+        const { data, error } = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
           .eq('"foreign key"', tempId);
           
-        const data = response.data?.[0] as SimpleJournalEntry | null;
-        const error = response.error;
-          
+        // Handle the result directly without complex type inference
         if (error) {
           console.error('Error fetching newly created entry:', error);
           return false;
-        } else if (data) {
-          console.log('New entry found:', data.id);
+        }
+        
+        // Check if we have data and access the first item if it exists
+        if (data && data.length > 0) {
+          const entryData = data[0] as SimpleJournalEntry;
+          console.log('New entry found:', entryData.id);
           
           await supabase.functions.invoke('generate-themes', {
             body: {
-              text: data["refined text"],
-              entryId: data.id
+              text: entryData["refined text"],
+              entryId: entryData.id
             }
           });
           
           return true;
         }
+        
         return false;
       } catch (error) {
         console.error('Error checking for processed entry:', error);
