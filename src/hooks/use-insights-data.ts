@@ -20,8 +20,9 @@ export type JournalInsight = {
   created_at: string;
   emotions?: Record<string, number>;
   themes?: string[];
-  sentiment?: number | {
+  sentiment?: number | string | {
     score: number;
+    sentiment?: string | number;
   };
 };
 
@@ -110,7 +111,7 @@ export function useInsightsData() {
       const entriesThisWeek = entriesData.filter(entry => new Date(entry.created_at) >= startOfWeek).length;
       
       // Calculate average sentiment
-      const validSentimentEntries = entriesData.filter(entry => typeof entry.sentiment === 'number');
+      const validSentimentEntries = entriesData.filter(entry => typeof entry.sentiment === 'number' || typeof entry.sentiment === 'string');
       const totalSentiment = validSentimentEntries.reduce((sum, entry) => {
         // Add type safety check for sentiment
         const sentimentValue = typeof entry.sentiment === 'string' ? 
@@ -153,7 +154,7 @@ export function useInsightsData() {
         created_at: entry.created_at,
         emotions: entry.emotions as Record<string, number> || {},
         themes: entry.master_themes || [],
-        sentiment: entry.sentiment
+        sentiment: entry.sentiment // Keep as is, we've updated the type definition
       }));
       
       // Generate mock dominant mood based on top emotions
