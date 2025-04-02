@@ -3,17 +3,22 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// Simple type for journal entry to avoid complex type inference
-interface JournalEntryResponse {
+// Define simplified types to avoid excessive type inference
+interface JournalEntry {
+  id: number;
+  foreignKey?: string;
+  [key: string]: any;
+}
+
+interface ProcessedEntry {
   id: number;
   "refined text"?: string;
-  [key: string]: any;
 }
 
 export function useEntryProcessing(
   activeTab: string,
   fetchEntries: () => void,
-  entries: any[]
+  entries: JournalEntry[]
 ) {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
@@ -34,7 +39,7 @@ export function useEntryProcessing(
   // Check for completed entries
   useEffect(() => {
     if (processingEntries.length > 0 && entries.length > 0) {
-      const newlyCompletedTempIds = [];
+      const newlyCompletedTempIds: string[] = [];
       
       for (const entry of entries) {
         if (entry.foreignKey && processingEntries.includes(entry.foreignKey)) {
@@ -64,22 +69,23 @@ export function useEntryProcessing(
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        // Use a simple query with explicit type casting to avoid deep type instantiation
-        const { data, error } = await supabase
+        // Explicitly type the query response to avoid deep type instantiation
+        const response = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
           .eq('"foreign key"', tempId);
           
+        const data = response.data as ProcessedEntry[] | null;
+        const error = response.error;
+        
         if (error) {
           console.error('Error fetching newly created entry:', error);
           return false;
         }
         
         if (data && data.length > 0) {
-          // Cast data[0] to our simple interface
-          const entry = data[0] as JournalEntryResponse;
-          const entryId = entry.id;
-          const refinedText = entry["refined text"];
+          const entryId = data[0].id;
+          const refinedText = data[0]["refined text"];
           
           console.log('New entry found:', entryId);
           
