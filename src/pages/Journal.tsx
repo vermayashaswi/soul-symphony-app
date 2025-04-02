@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -124,12 +123,13 @@ const Journal = () => {
       try {
         console.log('Checking if entry is processed with temp ID:', tempId);
         
-        // Use a simpler approach with explicit any casting to avoid complex type inference
-        const { data, error } = await supabase
+        const response = await supabase
           .from('Journal Entries')
           .select('id, "refined text"')
-          .eq('"foreign key"', tempId)
-          .single() as any;
+          .eq('"foreign key"', tempId);
+          
+        const data = response.data?.[0] as SimpleJournalEntry | null;
+        const error = response.error;
           
         if (error) {
           console.error('Error fetching newly created entry:', error);
