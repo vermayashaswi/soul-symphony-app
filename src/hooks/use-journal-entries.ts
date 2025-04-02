@@ -1,7 +1,6 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { supabase, isChunkingSupported, checkEdgeFunctionsHealth } from '@/integrations/supabase/client';
+import { supabase, isChunkingSupported, checkEdgeFunctionsHealth, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { Json } from '@/integrations/supabase/types';
 
@@ -92,15 +91,15 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
           });
           
           // Try a direct HTTP ping to diagnose CORS or network issues
-          // Fix: Use the proper method to get the function URL instead of accessing protected property
-          const functionUrl = `${supabase.functions.url}/process-journal/health`;
+          // Construct the function URL properly using the base URL
+          const functionUrl = `${SUPABASE_URL}/functions/v1/process-journal/health`;
           console.log(`Attempting direct health check to: ${functionUrl}`);
           
-          // Fix: Use the imported SUPABASE_PUBLISHABLE_KEY from the client
+          // Use the exported SUPABASE_PUBLISHABLE_KEY constant
           fetch(functionUrl, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${supabase.auth.anon_key}`,
+              'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
               'Content-Type': 'application/json'
             }
           }).then(response => {
