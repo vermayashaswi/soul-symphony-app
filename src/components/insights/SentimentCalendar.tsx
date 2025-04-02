@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Smile, Meh, Frown, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -22,7 +21,6 @@ type SentimentData = {
 const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRange }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   
-  // Process journal entries to get sentiment by date
   const sentimentByDate = useMemo(() => {
     const data: SentimentData = {};
     
@@ -34,7 +32,6 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
           data[dateStr] = { avgScore: 0, count: 0 };
         }
         
-        // Extract score from the sentiment object
         const sentimentScore = typeof entry.sentiment === 'string' 
           ? parseFloat(entry.sentiment) 
           : entry.sentiment.score;
@@ -47,28 +44,24 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     return data;
   }, [entries]);
 
-  // Helper function to get sentiment color
   const getSentimentColor = (score: number) => {
     if (score > 0.25) return "bg-green-500";
     if (score < -0.25) return "bg-red-500";
     return "bg-amber-500";
   };
 
-  // Helper function to get sentiment emoji
   const getSentimentEmoji = (score: number) => {
     if (score > 0.25) return <Smile className="h-5 w-5 text-white" />;
     if (score < -0.25) return <Frown className="h-5 w-5 text-white" />;
     return <Meh className="h-5 w-5 text-white" />;
   };
 
-  // Helper function to get sentiment label
   const getSentimentLabel = (score: number) => {
     if (score > 0.25) return "Positive";
     if (score < -0.25) return "Negative";
     return "Neutral";
   };
 
-  // Render emotion legends
   const renderLegends = () => (
     <div className="flex justify-center gap-6 mt-4">
       <div className="flex items-center gap-2">
@@ -98,7 +91,6 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     </div>
   );
 
-  // Render today's sentiment for "today" timeRange
   const renderTodaySentiment = () => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const todayData = sentimentByDate[today];
@@ -138,7 +130,6 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     );
   };
 
-  // Render week view
   const renderWeekSentiment = () => {
     const weekDays = Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
@@ -199,42 +190,36 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     );
   };
 
-  // Go to previous month
   const prevMonth = () => {
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() - 1);
     setCurrentDate(newDate);
   };
 
-  // Go to next month
   const nextMonth = () => {
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() + 1);
     setCurrentDate(newDate);
   };
 
-  // Helper function to get all days in a month for the calendar
   function getDaysInMonth(date: Date) {
     const year = date.getFullYear();
     const month = date.getMonth();
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
     
-    // Get the first day to display (might be from the previous month)
     const firstDayToDisplay = new Date(firstDayOfMonth);
-    const dayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const dayOfWeek = firstDayOfMonth.getDay();
     firstDayToDisplay.setDate(firstDayToDisplay.getDate() - dayOfWeek);
     
-    // Get all days to display (includes days from previous and next months)
     const days: Date[] = [];
-    const totalDaysToShow = 42; // 6 rows of 7 days
+    const totalDaysToShow = 42;
     
     for (let i = 0; i < totalDaysToShow; i++) {
       const day = new Date(firstDayToDisplay);
       day.setDate(day.getDate() + i);
       days.push(day);
       
-      // Stop if we've gone past the end of the month and filled a complete week
       if (day > lastDayOfMonth && day.getDay() === 6) {
         break;
       }
@@ -243,7 +228,6 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     return days;
   }
 
-  // Custom month view calendar
   const renderMonthCalendar = () => {
     const monthStr = format(currentDate, 'MMMM yyyy');
 
@@ -325,14 +309,12 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     );
   };
 
-  // Year view with one emoji per month
   const renderYearView = () => {
     const currentYear = new Date().getFullYear();
     const yearStart = startOfYear(new Date(currentYear, 0, 1));
     const yearEnd = endOfYear(new Date(currentYear, 0, 1));
     const months = eachMonthOfInterval({ start: yearStart, end: yearEnd });
 
-    // Get average sentiment for a month
     const getMonthSentiment = (month: Date) => {
       const monthNumber = getMonth(month);
       const entriesInMonth = entries.filter(entry => {
@@ -347,7 +329,6 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
 
       entriesInMonth.forEach(entry => {
         if (entry.sentiment) {
-          // Extract sentiment score, handling both string and object formats
           const score = typeof entry.sentiment === 'string' 
             ? parseFloat(entry.sentiment) 
             : entry.sentiment.score;
@@ -405,7 +386,6 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     );
   };
 
-  // Content based on timeRange
   const renderContent = () => {
     switch (timeRange) {
       case 'today':

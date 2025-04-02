@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -99,7 +98,7 @@ export function EmotionChart({
     const emotionScores: Record<string, number> = {};
     
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
-      if (dataPoints.length > 0) {
+      if (dataPoints && dataPoints.length > 0) {
         const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
         if (totalScore > 0) {
           emotionScores[emotion] = totalScore;
@@ -155,18 +154,20 @@ export function EmotionChart({
     const dateMap: Map<string, Record<string, number>> = new Map();
     
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
-      // Only include emotions with positive values
-      const totalValue = dataPoints.reduce((sum, point) => sum + point.value, 0);
-      if (totalValue > 0) {
-        emotionTotals[emotion] = totalValue;
-        
-        dataPoints.forEach(point => {
-          if (!dateMap.has(point.date)) {
-            dateMap.set(point.date, {});
-          }
-          const dateEntry = dateMap.get(point.date)!;
-          dateEntry[emotion] = point.value;
-        });
+      if (dataPoints && dataPoints.length > 0) {
+        // Only include emotions with positive values
+        const totalValue = dataPoints.reduce((sum, point) => sum + point.value, 0);
+        if (totalValue > 0) {
+          emotionTotals[emotion] = totalValue;
+          
+          dataPoints.forEach(point => {
+            if (!dateMap.has(point.date)) {
+              dateMap.set(point.date, {});
+            }
+            const dateEntry = dateMap.get(point.date)!;
+            dateEntry[emotion] = point.value;
+          });
+        }
       }
     });
     
