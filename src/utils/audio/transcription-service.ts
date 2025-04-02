@@ -34,10 +34,7 @@ export async function sendAudioForTranscription(
         directTranscription: directTranscription,
         highQuality: true // Add flag to indicate this is a high-quality recording
       },
-      // Set a reasonable timeout for the function call (20 seconds)
-      options: {
-        timeout: 60000 // 60 seconds timeout
-      }
+      // Remove invalid options parameter
     }).catch(error => {
       console.error('Error invoking transcribe-audio function:', error);
       throw new Error(`Failed to send request to edge function: ${error.message || 'Connection error'}`);

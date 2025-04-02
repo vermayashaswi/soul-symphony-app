@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -69,6 +70,26 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   return <>{children}</>;
+};
+
+// Separated DebugTools component that will be rendered inside AuthProvider
+const DebugTools = () => {
+  const isMobile = useIsMobile();
+  
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
+  }
+  
+  return (
+    <>
+      {isMobile ? (
+        <SmartChatMobileDebug />
+      ) : (
+        <DebugPanel />
+      )}
+      <MobileBrowserDebug />
+    </>
+  );
 };
 
 const AppRoutes = () => {
@@ -164,8 +185,6 @@ const AppRoutes = () => {
 };
 
 function App() {
-  const isMobile = useIsMobile();
-  
   return (
     <div className="app-container">
       <QueryClientProvider client={queryClient}>
@@ -183,22 +202,12 @@ function App() {
                   </BrowserRouter>
                 </div>
               </div>
+              {/* Debug tools now inside AuthProvider */}
+              <DebugTools />
             </ThemeProvider>
           </AuthProvider>
         </TooltipProvider>
       </QueryClientProvider>
-
-      {/* Add debugging tools - only visible in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <>
-          {isMobile ? (
-            <SmartChatMobileDebug />
-          ) : (
-            <DebugPanel />
-          )}
-          <MobileBrowserDebug />
-        </>
-      )}
     </div>
   );
 }
