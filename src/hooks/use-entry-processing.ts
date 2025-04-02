@@ -2,9 +2,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { PostgrestResponse } from '@supabase/supabase-js';
 
-// Simplified interfaces for better type handling
+// Simple flat interfaces to avoid complex type inference
 interface SimpleJournalEntry {
   id: number;
   "foreign key"?: string;
@@ -12,12 +11,18 @@ interface SimpleJournalEntry {
   content?: string;
 }
 
-interface SimpleProcessedEntry {
+// Process entry response type
+interface ProcessEntryResponse {
   id: number;
   "refined text"?: string;
 }
 
-// Main hook
+// Simple response type for Supabase query
+interface SimpleResponse {
+  data: ProcessEntryResponse[] | null;
+  error: { message: string } | null;
+}
+
 export function useEntryProcessing(
   activeTab: string,
   fetchEntries: () => void,
@@ -60,61 +65,74 @@ export function useEntryProcessing(
     }
   }, [entries, processingEntries]);
 
-  const handleEntryRecording = async (audioBlob: Blob, tempId?: string) => {
-    console.log('Entry recorded, adding to processing queue');
-    
-    if (tempId) {
-      setProcessingEntries(prev => [...prev, tempId]);
-    }
-    
-    fetchEntries();
-    
-    const checkEntryProcessed = async () => {
-      try {
-        console.log('Checking if entry is processed with temp ID:', tempId);
-        
-        // Using raw response to avoid type instantiation issues
-        const rawResponse = await supabase
-          .from('Journal Entries')
-          .select('id, "refined text"')
-          .eq('"foreign key"', tempId || '');
-        
-        // Handle response errors manually
-        if (rawResponse.error) {
-          console.error('Error fetching newly created entry:', rawResponse.error);
-          return false;
-        }
-        
-        // Explicitly cast the response data
-        const data = rawResponse.data as SimpleProcessedEntry[] | null;
-        
-        if (data && data.length > 0) {
-          const entryId = data[0].id;
-          const refinedText = data[0]["refined text"];
-          
-          console.log('New entry found:', entryId);
-          
-          if (refinedText) {
-            await supabase.functions.invoke('generate-themes', {
-              body: {
-                text: refinedText,
-                entryId: entryId
-              }
-            });
-          }
-          
-          return true;
-        }
-        
-        return false;
-      } catch (error) {
-        console.error('Error checking for processed entry:', error);
+  // Check if an entry has been processed
+  const checkEntryProcessed = async (tempId: string): Promise<boolean> => {
+    try {
+      console.log('Checking if entry is processed with temp ID:', tempId);
+      
+      // Use explicit Promise type and cast response to avoid deep type inference
+      const response = await supabase
+        .from('Journal Entries')
+        .select('id, "refined text"')
+        .eq('"foreign key"', tempId);
+      
+      // Manually handle response structure
+      const data = response.data as ProcessEntryResponse[] | null;
+      const error = response.error;
+      
+      if (error) {
+        console.error('Error fetching newly created entry:', error);
         return false;
       }
-    };
+      
+      if (data && data.length > 0) {
+        const entryId = data[0].id;
+        const refinedText = data[0]["refined text"];
+        
+        console.log('New entry found:', entryId);
+        
+        if (refinedText) {
+          // Handle theme generation separately to break up complex type chains
+          await generateThemes(refinedText, entryId);
+        }
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error checking for processed entry:', error);
+      return false;
+    }
+  };
+  
+  // Separate function to generate themes
+  const generateThemes = async (text: string, entryId: number): Promise<void> => {
+    try {
+      await supabase.functions.invoke('generate-themes', {
+        body: {
+          text: text,
+          entryId: entryId
+        }
+      });
+    } catch (error) {
+      console.error('Error generating themes:', error);
+    }
+  };
+
+  const handleEntryRecording = async (audioBlob: Blob, tempId?: string) => {
+    if (!tempId) {
+      console.error('No tempId provided for entry recording');
+      return;
+    }
+    
+    console.log('Entry recorded, adding to processing queue:', tempId);
+    
+    setProcessingEntries(prev => [...prev, tempId]);
+    fetchEntries();
     
     const pollInterval = setInterval(async () => {
-      const isProcessed = await checkEntryProcessed();
+      const isProcessed = await checkEntryProcessed(tempId);
       
       if (isProcessed) {
         clearInterval(pollInterval);
@@ -124,9 +142,10 @@ export function useEntryProcessing(
       }
     }, 3000);
     
+    // Set a timeout to prevent polling indefinitely
     setTimeout(() => {
       clearInterval(pollInterval);
-      if (processingEntries.includes(tempId || '')) {
+      if (processingEntries.includes(tempId)) {
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
         toast.info('Entry processing is taking longer than expected. It should appear soon.');
       }
