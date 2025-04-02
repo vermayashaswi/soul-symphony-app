@@ -13,9 +13,7 @@ RETURNS TABLE (
   content text,
   created_at timestamp with time zone,
   similarity float,
-  embedding vector(1536),
-  themes text[],           -- Adding themes from journal entries
-  emotions jsonb           -- Adding emotions data
+  embedding vector(1536)
 )
 LANGUAGE plpgsql
 AS $$
@@ -26,9 +24,7 @@ BEGIN
     je.content,
     entries.created_at,
     1 - (je.embedding <=> query_embedding) AS similarity,
-    je.embedding,
-    entries.master_themes,
-    entries.emotions
+    je.embedding
   FROM
     journal_embeddings je
   JOIN
