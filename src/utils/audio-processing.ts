@@ -3,7 +3,6 @@ import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
 import { supabase } from '@/integrations/supabase/client';
-import { getOpenAIApiKey } from './api-key-setup';
 
 /**
  * Processes an audio recording for transcription and analysis
@@ -29,8 +28,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     console.log('Processing audio:', {
       size: audioBlob?.size || 0,
       type: audioBlob?.type || 'unknown',
-      userId: userId || 'anonymous',
-      apiKeyAvailable: !!getOpenAIApiKey()
+      userId: userId || 'anonymous'
     });
     
     // Start processing in background

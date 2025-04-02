@@ -27,42 +27,20 @@ serve(async (req) => {
       throw new Error(`Key "${key}" is not allowed to be set via this endpoint`);
     }
     
-    console.log(`Verifying key: ${key}`);
+    console.log(`Setting secret: ${key}`);
     
     // For security, we don't log the actual value
     console.log(`Secret value length: ${value.length} characters`);
 
-    // Instead of setting an environment variable (which doesn't work in Edge Functions)
-    // we'll just validate and return success - the key will be passed directly in API calls
+    // Set the environment variable directly
+    Deno.env.set(key, value);
     
-    // Verify the API key by making a minimal test request to OpenAI
-    if (key === 'OPENAI_API_KEY') {
-      try {
-        const testResponse = await fetch('https://api.openai.com/v1/models', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${value}`,
-            'Content-Type': 'application/json',
-          }
-        });
-        
-        if (!testResponse.ok) {
-          throw new Error(`OpenAI API key verification failed: ${testResponse.status}`);
-        }
-        
-        console.log('OpenAI API key verification successful');
-      } catch (verifyError) {
-        console.error('API key verification error:', verifyError);
-        throw new Error(`Failed to verify API key: ${verifyError.message}`);
-      }
-    }
-    
-    console.log(`Key ${key} successfully validated`);
+    console.log(`Secret ${key} set successfully via Deno.env.set`);
     
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: `${key} has been successfully validated`
+        message: `${key} has been set successfully`
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

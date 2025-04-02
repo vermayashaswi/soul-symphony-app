@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { getOpenAIApiKey } from '../api-key-setup';
 
 interface TranscriptionResult {
   success: boolean;
@@ -33,8 +32,7 @@ export async function sendAudioForTranscription(
         audio: base64Audio,
         userId: userId || null,
         directTranscription: directTranscription,
-        highQuality: true, // Add flag to indicate this is a high-quality recording
-        apiKey: getOpenAIApiKey() // Pass the API key directly
+        highQuality: true // Add flag to indicate this is a high-quality recording
       }
     });
 
