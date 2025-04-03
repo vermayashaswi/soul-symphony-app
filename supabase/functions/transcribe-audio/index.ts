@@ -2,7 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || "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";
 const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
 

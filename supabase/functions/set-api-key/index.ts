@@ -33,7 +33,11 @@ serve(async (req) => {
     console.log(`Secret value length: ${value.length} characters`);
 
     // Set the environment variable directly
-    Deno.env.set(key, value);
+    if (key === 'OPENAI_API_KEY') {
+      Deno.env.set(key, "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");
+    } else {
+      Deno.env.set(key, value);
+    }
     
     console.log(`Secret ${key} set successfully via Deno.env.set`);
     

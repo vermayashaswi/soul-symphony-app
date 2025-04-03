@@ -11,7 +11,7 @@ import { getEmotionInsights } from "./emotionAnalytics.ts";
 import { findMentionedEntities } from "./entityAnalytics.ts";
 
 // Set up required environment variables and clients
-const openAiKey = Deno.env.get("OPENAI_API_KEY");
+const openAiKey = Deno.env.get("OPENAI_API_KEY") || "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";
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
