@@ -94,9 +94,13 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     }
     
     // 4. Get the URL for the uploaded audio - use signed URLs for private buckets
-    const { data: urlData, error: urlError } = await supabase.storage
+    // Fix the TypeScript error by using type assertion to simplify the type
+    const signUrlResponse = await supabase.storage
       .from(bucketName)
       .createSignedUrl(audioFilename, 60 * 60 * 24 * 7); // 7 day expiry
+      
+    const urlData = signUrlResponse.data;
+    const urlError = signUrlResponse.error;
       
     if (urlError) {
       console.error("Error creating signed URL:", urlError);
