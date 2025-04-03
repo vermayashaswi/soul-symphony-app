@@ -36,6 +36,7 @@ export function useEntryProcessing(
       const newlyCompletedTempIds: string[] = [];
       
       for (const entry of entries) {
+        // Use quotes for column names with spaces
         const foreignKey = entry["foreign key"];
         if (foreignKey && processingEntries.includes(foreignKey)) {
           newlyCompletedTempIds.push(foreignKey);
@@ -51,34 +52,33 @@ export function useEntryProcessing(
     }
   }, [entries, processingEntries]);
 
-  // Fix: Use a different approach for type handling in the Supabase query
+  // Fix: Use proper quoting for column names with spaces
   const checkEntryProcessed = useCallback(async (tempId: string): Promise<boolean> => {
     try {
       console.log('Checking if entry is processed with temp ID:', tempId);
       
-      // Use "any" temporarily to bypass TypeScript's deep type inference
-      const result: any = await supabase
+      const { data, error } = await supabase
         .from('Journal Entries')
         .select('id, "refined text"')
-        .eq('foreign key', tempId)
+        .eq('"foreign key"', tempId)
         .single();
       
-      if (result.error) {
-        console.error('Error fetching newly created entry:', result.error);
+      if (error) {
+        console.error('Error fetching newly created entry:', error);
         return false;
       }
       
-      if (!result.data) {
+      if (!data) {
         return false;
       }
       
-      console.log('New entry found:', result.data.id);
+      console.log('New entry found:', data.id);
       
-      if (result.data["refined text"]) {
+      if (data["refined text"]) {
         await supabase.functions.invoke('generate-themes', {
           body: {
-            text: result.data["refined text"],
-            entryId: result.data.id
+            text: data["refined text"],
+            entryId: data.id
           }
         });
       }

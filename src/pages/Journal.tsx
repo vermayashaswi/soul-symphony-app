@@ -1,7 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +10,7 @@ import JournalHeader from '@/components/journal/JournalHeader';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import JournalSearch from '@/components/journal/JournalSearch';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
+import { useEntryProcessing } from '@/hooks/use-entry-processing';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -17,13 +18,17 @@ const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
   const { user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
-  const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
-
-  const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
+  
+  // Use the hook for entry processing
+  const { 
+    processingEntries, 
+    processedEntryIds, 
+    handleEntryRecording 
+  } = useEntryProcessing(activeTab, fetchEntries, entries);
 
   useEffect(() => {
     if (user?.id) {
@@ -37,37 +42,6 @@ const Journal = () => {
       fetchEntries();
     }
   }, [activeTab, isProfileChecked, fetchEntries]);
-
-  useEffect(() => {
-    if (processingEntries.length > 0 && activeTab === 'entries') {
-      console.log('Setting up polling for processing entries:', processingEntries);
-      
-      const pollingInterval = setInterval(() => {
-        fetchEntries();
-      }, 5000);
-      
-      return () => clearInterval(pollingInterval);
-    }
-  }, [processingEntries, activeTab, fetchEntries]);
-
-  useEffect(() => {
-    if (processingEntries.length > 0 && entries.length > 0) {
-      const newlyCompletedTempIds = [];
-      
-      for (const entry of entries) {
-        if (entry.foreignKey && processingEntries.includes(entry.foreignKey)) {
-          newlyCompletedTempIds.push(entry.foreignKey);
-          setProcessedEntryIds(prev => [...prev, entry.id]);
-        }
-      }
-      
-      if (newlyCompletedTempIds.length > 0) {
-        setProcessingEntries(prev => 
-          prev.filter(id => !newlyCompletedTempIds.includes(id))
-        );
-      }
-    }
-  }, [entries, processingEntries]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -104,66 +78,15 @@ const Journal = () => {
   };
 
   const onEntryRecorded = async (audioBlob: Blob, tempId?: string) => {
-    console.log('Entry recorded, adding to processing queue');
-    
-    if (tempId) {
-      setProcessingEntries(prev => [...prev, tempId]);
+    if (!tempId) {
+      console.error('No tempId provided for entry recording');
+      return;
     }
     
     setActiveTab('entries');
     
-    fetchEntries();
-    
-    const checkEntryProcessed = async () => {
-      try {
-        console.log('Checking if entry is processed with temp ID:', tempId);
-        const { data, error } = await supabase
-          .from('Journal Entries')
-          .select('id, "refined text"')
-          .eq('foreign key', tempId)
-          .single();
-          
-        if (error) {
-          console.error('Error fetching newly created entry:', error);
-          return false;
-        } else if (data) {
-          console.log('New entry found:', data.id);
-          
-          await supabase.functions.invoke('generate-themes', {
-            body: {
-              text: data["refined text"],
-              entryId: data.id
-            }
-          });
-          
-          return true;
-        }
-        return false;
-      } catch (error) {
-        console.error('Error checking for processed entry:', error);
-        return false;
-      }
-    };
-    
-    const pollInterval = setInterval(async () => {
-      const isProcessed = await checkEntryProcessed();
-      
-      if (isProcessed) {
-        clearInterval(pollInterval);
-        setProcessingEntries(prev => prev.filter(id => id !== tempId));
-        setRefreshKey(prev => prev + 1);
-        fetchEntries();
-        toast.success('Journal entry processed successfully!');
-      }
-    }, 3000);
-    
-    setTimeout(() => {
-      clearInterval(pollInterval);
-      if (processingEntries.includes(tempId || '')) {
-        setProcessingEntries(prev => prev.filter(id => id !== tempId));
-        toast.info('Entry processing is taking longer than expected. It should appear soon.');
-      }
-    }, 120000);
+    // Delegate to the hook
+    await handleEntryRecording(audioBlob, tempId);
   };
 
   const handleDeleteEntry = (entryId: number) => {
