@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -90,12 +91,12 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       tempId
     };
 
-    // Avoid destructuring completely and use a simple approach
+    // Use type assertion to avoid TypeScript inferring complex types
     const functionResult = await supabase.functions.invoke('transcribe-audio', {
       body: funcBody
-    });
+    }) as { data: any, error: { message?: string } | null };
 
-    // Access properties after the call, without destructuring
+    // Access properties after the call, with simplified types
     if (functionResult.error) {
       console.error("Error invoking transcribe function:", functionResult.error);
       return {
