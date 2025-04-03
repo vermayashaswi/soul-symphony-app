@@ -1,7 +1,6 @@
 
 import React from 'react';
-import { JournalEntryCard } from './JournalEntryCard';
-import { JournalEntry } from '@/types/journal';
+import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, RefreshCw } from 'lucide-react';
 import EmptyJournalState from './EmptyJournalState';

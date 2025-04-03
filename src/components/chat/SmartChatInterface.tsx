@@ -43,10 +43,9 @@ export default function SmartChatInterface() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const { user, session } = useAuth();
+  const { user } = useAuth();
 
   const demoQuestions = [
     {
@@ -85,13 +84,7 @@ export default function SmartChatInterface() {
         .eq('thread_id', threadId)
         .order('created_at', { ascending: true });
         
-      if (error) {
-        if (error.code === 'PGRST301') {
-          setAuthError('You need to be signed in to access your chat messages.');
-          return;
-        }
-        throw error;
-      }
+      if (error) throw error;
       
       if (data && data.length > 0) {
         const formattedMessages = data.map((msg: DbChatMessage) => ({
@@ -110,11 +103,6 @@ export default function SmartChatInterface() {
       }
     } catch (error) {
       console.error("Error loading messages:", error);
-      toast({
-        title: "Failed to load messages",
-        description: "There was an error loading your chat history. Please try again.",
-        variant: "destructive"
-      });
     }
   };
 
@@ -143,12 +131,8 @@ export default function SmartChatInterface() {
         description: "Please sign in to use the chat feature.",
         variant: "destructive"
       });
-      setAuthError("Please sign in to use the chat feature.");
       return;
     }
-    
-    // Clear any previous auth errors
-    setAuthError(null);
     
     let threadId = currentThreadId;
     if (!threadId) {
@@ -164,14 +148,7 @@ export default function SmartChatInterface() {
             updated_at: new Date().toISOString()
           });
         
-        if (error) {
-          if (error.code === 'PGRST301') {
-            setAuthError('You need to be signed in to start a new conversation.');
-            return;
-          }
-          throw error;
-        }
-        
+        if (error) throw error;
         threadId = newThreadId;
         setCurrentThreadId(newThreadId);
         
@@ -218,13 +195,7 @@ export default function SmartChatInterface() {
           sender: 'user'
         });
         
-      if (msgError) {
-        if (msgError.code === 'PGRST301') {
-          setAuthError('Authentication required to save messages. Please sign in again.');
-          throw new Error('Authentication required');
-        }
-        throw msgError;
-      }
+      if (msgError) throw msgError;
       
       console.log("Desktop: Performing comprehensive query analysis");
       
@@ -240,13 +211,6 @@ export default function SmartChatInterface() {
       setProcessingStage("Searching for insights...");
       const response = await processChatMessage(userMessage, user.id, queryTypes, threadId);
       console.log("Desktop: Response received with references:", response.references?.length || 0);
-      
-      // Check for error responses that indicate auth issues
-      if (response.role === 'error' && response.content.includes('Authentication')) {
-        setAuthError(response.content);
-        // Don't add this error to chat, instead show auth UI
-        throw new Error(response.content);
-      }
       
       // Convert to UI-compatible message and filter out system/error roles
       const uiResponse: UIChatMessage = {
@@ -288,31 +252,21 @@ export default function SmartChatInterface() {
         .eq('id', threadId);
       
       setChatHistory(prev => [...prev, uiResponse]);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error sending message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to get a response. Please try again.",
+        variant: "destructive"
+      });
       
-      // Don't add auth errors to chat history
-      if (error.message && error.message.includes('Authentication')) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to continue using the chat.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to get a response. Please try again.",
-          variant: "destructive"
-        });
-        
-        setChatHistory(prev => [
-          ...prev, 
-          { 
-            role: 'assistant', 
-            content: "I'm having trouble processing your request. Please try again later."
-          }
-        ]);
-      }
+      setChatHistory(prev => [
+        ...prev, 
+        { 
+          role: 'assistant', 
+          content: "I'm having trouble processing your request. Please try again later."
+        }
+      ]);
     } finally {
       setIsLoading(false);
       setProcessingStage(null);
@@ -339,23 +293,7 @@ export default function SmartChatInterface() {
       </CardHeader>
       
       <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-        {authError ? (
-          <div className="flex flex-col items-center justify-center h-full w-full">
-            <div className="text-center max-w-lg mx-auto px-4">
-              <h1 className="text-2xl md:text-3xl font-bold mb-3 text-red-500">Authentication Required</h1>
-              <p className="text-muted-foreground mb-6">
-                {authError}
-              </p>
-              <Button
-                variant="default"
-                onClick={() => window.location.href = '/login'}
-                className="mt-2"
-              >
-                Sign In
-              </Button>
-            </div>
-          </div>
-        ) : chatHistory.length === 0 ? (
+        {chatHistory.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full w-full">
             <div className="text-center max-w-lg mx-auto px-4">
               <h1 className="text-2xl md:text-3xl font-bold mb-3">How can I help you?</h1>
@@ -409,7 +347,6 @@ export default function SmartChatInterface() {
           onSendMessage={handleSendMessage} 
           isLoading={isLoading} 
           userId={user?.id}
-          disabled={!!authError}
         />
       </CardFooter>
     </Card>

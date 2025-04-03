@@ -1,67 +1,68 @@
 
-import { useState, FormEvent, KeyboardEvent } from "react";
-import { SendHorizonal, Mic } from "lucide-react";
+import React, { useState } from "react";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
   isLoading: boolean;
   userId?: string;
-  disabled?: boolean;
 }
 
-const ChatInput = ({ onSendMessage, isLoading, userId, disabled = false }: ChatInputProps) => {
+const ChatInput: React.FC<ChatInputProps> = ({ 
+  onSendMessage, 
+  isLoading,
+  userId
+}) => {
   const [message, setMessage] = useState("");
+  const isMobile = useIsMobile();
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!message.trim()) return;
-    
-    if (!userId) {
-      toast.error("Please sign in to send messages");
-      return;
-    }
     
     onSendMessage(message);
     setMessage("");
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (!isLoading && message.trim()) {
-        handleSubmit(e);
-      }
-    }
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="w-full flex items-end gap-2">
-      <Textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Ask about your journal entries..."
-        className="min-h-[56px] resize-none max-h-28 pr-14"
-        disabled={isLoading || disabled}
-      />
-      <div className="flex-shrink-0">
-        <Button 
-          type="submit" 
-          disabled={!message.trim() || isLoading || disabled}
-          className="h-[56px] w-[56px] rounded-full"
-        >
-          {isLoading ? (
-            <div className="animate-spin h-5 w-5 border-b-2 border-white rounded-full" />
-          ) : (
-            <SendHorizonal className="h-5 w-5" />
+    <div className="w-full">
+      <form onSubmit={handleSubmit} className="relative flex items-end w-full">
+        <div className="flex items-center w-full relative">
+          <Textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Ask anything..."
+            className="min-h-[50px] md:min-h-[60px] text-sm md:text-base resize-none rounded-full pl-4 pr-16 py-3 shadow-sm border-muted bg-background"
+            disabled={isLoading}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
+          />
+        </div>
+        
+        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
+          {message.trim().length > 0 && (
+            <Button 
+              type="submit" 
+              size={isMobile ? "sm" : "default"}
+              className="rounded-full h-10 w-10 p-0 bg-primary text-primary-foreground"
+              disabled={isLoading || !message.trim()}
+            >
+              <Send className="h-5 w-5" />
+            </Button>
           )}
-        </Button>
-      </div>
-    </form>
+        </div>
+      </form>
+    </div>
   );
 };
 

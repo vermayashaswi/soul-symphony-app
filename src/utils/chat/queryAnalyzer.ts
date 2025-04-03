@@ -78,12 +78,6 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   // New pattern for why questions about emotions
   const whyEmotionsPattern = /(?:why|reason|cause|what made).*(?:feel|emotion|mood)/i;
   
-  // Filter pattern for detecting requests to filter by specific criteria
-  const filterPattern = /(?:filter|show|find|get|give me|display|list|search for)\s+(?:entries|journals|records|data|information)?\s+(?:where|with|that|when|which|containing|having|about|from|in|during|before|after|between)/i;
-  
-  // Additional pattern for filtering by date/time
-  const dateFilterPattern = /(?:in|from|during|before|after|between)\s+(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec|yesterday|today|this week|last week|this month|last month|this year|last year|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/i;
-  
   // Detect complex multi-part queries that should be broken down
   const complexQueryPatterns = [
     // Logical connectors
@@ -105,14 +99,36 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     /(?:first|second|third|lastly|finally|moreover|additionally)/i
   ];
   
-  // New pattern for entity-focused questions
-  const entityQuestionPattern = /(?:about|regarding|concerning|related to|mention|mentions|referencing|talking about|involves|involves|discussed)\s+(?:my|our|the)?\s*([A-Za-z\s]+)/i;
+  // Enhanced pattern detection for relationship-related queries
+  const relationshipPatterns = [
+    /\b(?:partner|spouse|boyfriend|girlfriend|husband|wife|relationship|marriage|married)\b/i,
+    /\b(?:fight|argue|conflict|disagreement|tension|problem)\b.*\b(?:partner|spouse|boyfriend|girlfriend|husband|wife)\b/i,
+    /\b(?:partner|spouse|boyfriend|girlfriend|husband|wife)\b.*\b(?:fight|argue|conflict|disagreement|tension|problem)\b/i,
+    /\b(?:improve|better|fix|work on|strengthen|enhance)\b.*\b(?:relationship|marriage|partner|spouse)\b/i
+  ];
   
-  // New pattern for advice-seeking questions
-  const adviceQuestionPattern = /(?:should|could|would|can|will|how to|what to do|advice|suggestion|recommend|best way|help me|guide me)/i;
+  // New pattern for "when" questions about specific events
+  const whenEventPatterns = [
+    /\bwhen\b.*\b(?:fight|argue|conflict|disagreement|fight with|argued with)\b/i,
+    /\bwhen\b.*\b(?:happened|occurred|took place|was there)\b/i,
+    /\bwhat time\b|\bwhich day\b|\bwhich date\b/i
+  ];
   
-  // New pattern for count queries
-  const countQueryPattern = /(?:how many|count|number of|total number|number|instances of)/i;
+  // Pattern for "how often" questions
+  const frequencyPatterns = [
+    /\bhow often\b|\bhow frequently\b|\bhow many times\b/i,
+    /\bdo i (?:usually|regularly|often|frequently|commonly)\b/i,
+    /\bam i (?:always|often|regularly|repeatedly)\b/i,
+    /\bfrequency of\b|\brate of\b|\bpattern of\b/i
+  ];
+  
+  // Pattern for improvement/advice questions
+  const improvementPatterns = [
+    /\bhow (?:can|could|should|do) i (?:improve|better|fix|work on|strengthen|enhance)\b/i,
+    /\bwhat (?:can|could|should|do) i (?:do|try|practice) to (?:improve|better|fix)\b/i,
+    /\b(?:improve|better|fix|enhance|strengthen)\b.*\b(?:how|ways|steps|methods)\b/i,
+    /\b(?:advice|suggestion|recommendation|tip)\b.*\b(?:for|about|on)\b/i
+  ];
   
   // Extract time range information
   const getTimeRange = (query: string): { timeframeType: string | null, startDate: Date | null, endDate: Date | null } => {
@@ -175,7 +191,27 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     return { timeframeType: null, startDate: null, endDate: null };
   };
   
-  // Create dynamic pattern for each emotion word
+  // Check for relationship-related queries
+  const isRelationshipQuery = relationshipPatterns.some(pattern => 
+    pattern.test(lowerQuery)
+  );
+  
+  // Check for "when" event questions
+  const isWhenEventQuery = whenEventPatterns.some(pattern => 
+    pattern.test(lowerQuery)
+  );
+  
+  // Check for frequency questions
+  const isFrequencyQuery = frequencyPatterns.some(pattern => 
+    pattern.test(lowerQuery)
+  );
+  
+  // Check for improvement/advice questions
+  const isImprovementQuery = improvementPatterns.some(pattern => 
+    pattern.test(lowerQuery)
+  );
+  
+  // Check for specific emotion quantification patterns
   const hasEmotionQuantification = emotionWords.some(emotion => {
     const pattern = new RegExp(emotionQuantificationPattern.source.replace('emotionWord', emotion), 'i');
     return pattern.test(lowerQuery);
@@ -209,22 +245,8 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   const isWhenQuestion = whenQuestionPattern.test(lowerQuery);
   const isWhyQuestion = whyQuestionPattern.test(lowerQuery);
   const hasWhyEmotionsPattern = whyEmotionsPattern.test(lowerQuery);
-  const isEntityQuestion = entityQuestionPattern.test(lowerQuery);
-  const isAdviceQuestion = adviceQuestionPattern.test(lowerQuery);
-  const isCountQuery = countQueryPattern.test(lowerQuery);
-  const hasFilterRequest = filterPattern.test(lowerQuery);
-  const hasDateFilter = dateFilterPattern.test(lowerQuery);
   
   const needsContext = /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b|\bmeaning\b|\binterpret\b/.test(lowerQuery);
-  
-  // Extract entity from query if it's an entity-focused question
-  let entityMatch = null;
-  if (isEntityQuestion) {
-    const match = lowerQuery.match(entityQuestionPattern);
-    if (match && match[1]) {
-      entityMatch = match[1].trim();
-    }
-  }
   
   // Check if query is complex and needs breakdown by components
   const isComplexQuery = complexQueryPatterns.some(pattern => pattern.test(lowerQuery)) ||
@@ -238,7 +260,6 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
                               hasEmotionChangePattern ||
                               hasHappinessRating ||
                               isComplexQuery ||
-                              isCountQuery ||
                               (hasEmotionWords && hasWhyEmotionsPattern) ||
                               (hasEmotionWords && (hasQuantitativeWords || hasNumbers || hasComparativeWords));
   
@@ -251,20 +272,48 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   // Extract time range
   const timeRange = getTimeRange(query);
   
+  // Set the emotion focused flag so we can use it in the search strategy
+  const isEmotionFocused = hasEmotionWords || hasTopEmotionsPattern || hasEmotionRankingPattern || hasEmotionQuantification || hasHappinessRating;
+  
+  // Set the temporal flag for use in the search strategy
+  const isTemporal = hasTemporalWords;
+  
+  // Enhanced search strategy determination
+  const determineSearchStrategy = () => {
+    if (isWhenEventQuery) {
+      return 'temporal_vector_search';
+    } 
+    if (isFrequencyQuery) {
+      return 'frequency_analysis';
+    }
+    if (isImprovementQuery) {
+      return 'contextual_advice';
+    }
+    if (hasTopEmotionsPattern) {
+      return 'emotion_aggregation';
+    }
+    if (isEmotionFocused && isWhyQuestion) {
+      return 'emotion_causal_analysis';
+    }
+    if (isRelationshipQuery && (isWhyQuestion || needsContext)) {
+      return 'relationship_analysis';
+    }
+    if (needsDataAggregation) {
+      return 'data_aggregation';
+    }
+    return 'vector_search';
+  };
+  
+  const hasExplicitHappinessRating = explicitHappinessRatingPattern.test(lowerQuery);
+  
   return {
-    isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification || hasHappinessRating || isCountQuery,
+    isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification || hasHappinessRating,
     
     isTemporal: hasTemporalWords,
     
     isComparative: hasComparativeWords || hasTopEmotionsPattern || hasEmotionChangePattern,
     
-    isEmotionFocused: hasEmotionWords || hasTopEmotionsPattern || hasEmotionRankingPattern || hasEmotionQuantification || hasHappinessRating,
-    
-    isEntityFocused: isEntityQuestion,
-    
-    isAdviceQuestion: isAdviceQuestion,
-    
-    entityMentioned: entityMatch,
+    isEmotionFocused,
     
     hasTopEmotionsPattern,
     
@@ -286,20 +335,25 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     
     isComplexQuery,
     
-    isCountQuery,
-    
-    hasExplicitHappinessRating: explicitHappinessRatingPattern.test(lowerQuery),
+    hasExplicitHappinessRating,
     
     requiresComponentAnalysis: isComplexQuery || hasHappinessRating || hasTopEmotionsPattern || hasWhyEmotionsPattern || 
                               (hasTemporalWords && hasEmotionWords && hasQuantitativeWords),
     
-    asksForNumber: hasNumbers || hasTopEmotionsPattern || hasHappinessRating || isCountQuery || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
+    asksForNumber: hasNumbers || hasTopEmotionsPattern || hasHappinessRating || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
     
     needsVectorSearch: needsVectorSearch,
     
     hasWhyEmotionsPattern,
     
-    requiresFiltering: hasFilterRequest || hasDateFilter,
+    isRelationshipQuery,
+    isWhenEventQuery,
+    isFrequencyQuery,
+    isImprovementQuery,
+    
+    searchStrategy: determineSearchStrategy(),
+    needsTimeRetrieval: isWhenEventQuery || (isRelationshipQuery && isTemporal),
+    needsThemeFiltering: isRelationshipQuery || isImprovementQuery,
     
     timeRange: {
       type: timeRange.timeframeType,

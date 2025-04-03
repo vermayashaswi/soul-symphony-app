@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 
@@ -24,295 +25,124 @@ export async function processChatMessage(
   }
 
   try {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !sessionData.session || !sessionData.session.user) {
-      console.error("Session verification failed:", sessionError);
-      return {
-        role: 'error',
-        content: "Authentication required. Please sign in again.",
-      };
-    }
-    
-    if (sessionData.session.user.id !== userId) {
-      console.error("User ID mismatch:", sessionData.session.user.id, userId);
-      return {
-        role: 'error',
-        content: "You cannot access another user's data.",
-      };
-    }
-  } catch (sessionCheckError) {
-    console.error("Error checking session:", sessionCheckError);
-    return {
-      role: 'error',
-      content: "Authentication verification failed. Please try signing in again.",
-    };
-  }
-
-  try {
     console.log("Processing message:", message);
+    // Use provided queryTypes or generate them
     const messageQueryTypes = queryTypes || analyzeQueryTypes(message);
     console.log("Query analysis results:", messageQueryTypes);
     
     let queryResponse: any = null;
     let retryAttempted = false;
+    let inProgressContent = "I'm thinking about your question..."; 
     
-    if (messageQueryTypes.requiresFiltering) {
-      console.log("Query requires filtering. Applying filters first...");
+    // First determine the search strategy based on query type
+    const searchStrategy = messageQueryTypes.searchStrategy || 'vector_search';
+    console.log("Selected search strategy:", searchStrategy);
+    
+    // Execute the appropriate search strategy
+    switch (searchStrategy) {
+      case 'temporal_vector_search':
+        // For "when" questions - vector search with temporal focus
+        console.log("Using temporal vector search strategy");
+        queryResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId);
+        break;
+        
+      case 'frequency_analysis':
+        // For "how often" questions - analyze frequency patterns
+        console.log("Using frequency analysis strategy");
+        queryResponse = await handleFrequencyAnalysis(message, userId, messageQueryTypes, threadId);
+        break;
+        
+      case 'emotion_aggregation':
+        // For emotion aggregation questions (top emotions)
+        console.log("Using emotion aggregation strategy");
+        queryResponse = await handleEmotionAggregation(message, userId, messageQueryTypes, threadId);
+        break;
+        
+      case 'emotion_causal_analysis':
+        // For emotion "why" questions
+        console.log("Using emotion causal analysis strategy");
+        queryResponse = await handleEmotionCausalAnalysis(message, userId, messageQueryTypes, threadId);
+        break;
+        
+      case 'relationship_analysis':
+        // For relationship-related queries
+        console.log("Using relationship analysis strategy");
+        queryResponse = await handleRelationshipAnalysis(message, userId, messageQueryTypes, threadId);
+        break;
+        
+      case 'contextual_advice':
+        // For improvement/advice questions
+        console.log("Using contextual advice strategy");
+        queryResponse = await handleContextualAdvice(message, userId, messageQueryTypes, threadId);
+        break;
+        
+      case 'data_aggregation':
+        // For queries needing data aggregation
+        console.log("Using data aggregation strategy");
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('smart-query-planner', {
+            body: { 
+              message, 
+              userId, 
+              includeDiagnostics: true,
+              enableQueryBreakdown: true,
+              generateSqlQueries: true,
+              analyzeComponents: true,
+              allowRetry: true,
+              requiresExplanation: messageQueryTypes.needsContext || message.toLowerCase().includes('why')
+            }
+          });
+          
+          if (error) {
+            console.error("Error using smart-query-planner:", error);
+          } else if (data && !data.fallbackToRag) {
+            console.log("Successfully used smart query planner");
+            queryResponse = data;
+          } else {
+            console.log("Smart query planner couldn't handle the query, falling back to RAG");
+            queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+          }
+        } catch (smartQueryError) {
+          console.error("Exception in smart-query-planner:", smartQueryError);
+          queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+        }
+        break;
+        
+      case 'vector_search':
+      default:
+        // Default case - standard vector search
+        console.log("Using standard vector search strategy");
+        queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+        break;
     }
     
-    if (messageQueryTypes.isQuantitative || messageQueryTypes.isEmotionFocused || messageQueryTypes.requiresFiltering) {
-      console.log("Using smart query planner for direct data query");
-      
-      try {
-        const { data, error } = await supabase.functions.invoke('smart-query-planner', {
-          body: { 
-            message, 
-            userId, 
-            includeDiagnostics: true,
-            enableQueryBreakdown: true,
-            generateSqlQueries: true,
-            analyzeComponents: true,
-            allowRetry: true,
-            requiresFiltering: messageQueryTypes.requiresFiltering,
-            requiresExplanation: messageQueryTypes.needsContext || message.toLowerCase().includes('why')
-          }
-        });
-        
-        if (error) {
-          if (typeof error === 'object' && error.message && error.message.includes('auth')) {
-            return {
-              role: 'error',
-              content: "Authentication required for accessing your data. Please sign in again.",
-            };
-          }
-          
-          console.error("Error using smart-query-planner:", error);
-        } else if (data && !data.fallbackToRag) {
-          console.log("Successfully used smart query planner");
-          queryResponse = data;
-          retryAttempted = data.retryAttempted || false;
-          
-          if (data.response === "I couldn't find a direct answer to your question using the available data. I will try a different approach." && !data.fallbackToRag) {
-            if (retryAttempted) {
-              data.response = "Based on your journal entries, " + data.response.toLowerCase();
-            }
-          }
-          
-          if (data.hasNumericResult && data.diagnostics && data.diagnostics.executionResults) {
-            const isEmotionData = messageQueryTypes.isEmotionFocused || 
-                                 message.toLowerCase().includes('emotion') || 
-                                 message.toLowerCase().includes('feel');
-            
-            const executionResults = data.diagnostics.executionResults;
-            const lastResult = executionResults[executionResults.length - 1];
-            
-            const hasOnlyNumericIds = data.response.includes("Here's what I found:") && 
-                data.response.split("Here's what I found:")[1].trim().match(/^\d+(,\s*\d+)*$/);
-            
-            if (hasOnlyNumericIds && lastResult && lastResult.result && Array.isArray(lastResult.result)) {
-              let formattedData = '';
-              
-              if (isEmotionData) {
-                const emotionCounts: {[key: string]: {count: number, total: number}} = {};
-                
-                if (lastResult.result[0] && (lastResult.result[0].emotion || lastResult.result[0].name)) {
-                  formattedData = lastResult.result.map((item: any) => {
-                    const emotion = item.emotion || item.name || Object.keys(item)[0];
-                    const score = item.score || (item[emotion] ? item[emotion] : null);
-                    return `${emotion}${score ? ` (${typeof score === 'number' ? score.toFixed(2) : score})` : ''}`;
-                  }).join(', ');
-                } else if (lastResult.result[0] && lastResult.result[0].emotions) {
-                  lastResult.result.forEach((entry: any) => {
-                    if (entry.emotions && typeof entry.emotions === 'object') {
-                      Object.entries(entry.emotions).forEach(([emotion, score]) => {
-                        if (!emotionCounts[emotion]) {
-                          emotionCounts[emotion] = { count: 0, total: 0 };
-                        }
-                        emotionCounts[emotion].count += 1;
-                        emotionCounts[emotion].total += Number(score);
-                      });
-                    }
-                  });
-                  
-                  const sortedEmotions = Object.entries(emotionCounts)
-                    .sort((a, b) => {
-                      if (b[1].count !== a[1].count) return b[1].count - a[1].count;
-                      return (b[1].total / b[1].count) - (a[1].total / a[1].count);
-                    })
-                    .slice(0, 3)
-                    .map(([emotion, stats]) => {
-                      const avgScore = (stats.total / stats.count).toFixed(2);
-                      return `${emotion} (${avgScore})`;
-                    });
-                  
-                  formattedData = sortedEmotions.join(', ');
-                } else if (Array.isArray(lastResult.result) && lastResult.result.every((item: any) => typeof item === 'number' || (typeof item === 'object' && item.id))) {
-                  const entryIds = lastResult.result.map((item: any) => 
-                    typeof item === 'number' ? item : item.id
-                  );
-                  
-                  const { data: entriesData, error: entriesError } = await supabase
-                    .from('Journal Entries')
-                    .select('id, "refined text", emotions')
-                    .in('id', entryIds);
-                    
-                  if (!entriesError && entriesData && entriesData.length > 0) {
-                    const emotionsData: {[key: string]: {count: number, total: number}} = {};
-                    
-                    entriesData.forEach(entry => {
-                      if (entry.emotions) {
-                        Object.entries(entry.emotions).forEach(([emotion, score]) => {
-                          if (!emotionsData[emotion]) {
-                            emotionsData[emotion] = { count: 0, total: 0 };
-                          }
-                          emotionsData[emotion].count += 1;
-                          emotionsData[emotion].total += Number(score);
-                        });
-                      }
-                    });
-                    
-                    const topEmotions = Object.entries(emotionsData)
-                      .sort((a, b) => {
-                        if (b[1].count !== a[1].count) return b[1].count - a[1].count;
-                        return (b[1].total / b[1].count) - (a[1].total / a[1].count);
-                      })
-                      .slice(0, 3);
-                    
-                    if (topEmotions.length > 0) {
-                      const emotionsList = topEmotions.map(([emotion, stats]) => {
-                        const avgScore = (stats.total / stats.count).toFixed(2);
-                        return `${emotion} (${avgScore})`;
-                      }).join(', ');
-                      
-                      data.response = `Based on your journal entries from last month, your top emotions were: ${emotionsList}.`;
-                      
-                      if (message.toLowerCase().includes('why')) {
-                        const { data: completionData } = await supabase.functions.invoke('chat-with-rag', {
-                          body: { 
-                            message: `Why did I experience these emotions last month: ${emotionsList}? Provide a short analysis based on my journal entries.`, 
-                            userId,
-                            includeDiagnostics: false
-                          }
-                        });
-                        
-                        if (completionData && completionData.response) {
-                          data.response += " " + completionData.response;
-                        }
-                      }
-                    }
-                  }
-                }
-                
-                if (formattedData) {
-                  if (data.response.includes("Here's what I found:")) {
-                    data.response = data.response.split("Here's what I found:")[0] + 
-                      "Here's what I found: " + formattedData;
-                  } else if (!data.response.includes(formattedData)) {
-                    data.response += " " + formattedData;
-                  }
-                }
-              }
-              
-              if (data.response.includes('[object Object]')) {
-                const emotionResults = data.diagnostics.executionResults.find(
-                  (result: any) => Array.isArray(result.result) && 
-                    result.result[0] && 
-                    typeof result.result[0] === 'object' && 
-                    (result.result[0].emotion || result.result[0].emotions)
-                );
-                
-                if (emotionResults && emotionResults.result) {
-                  const emotionData = emotionResults.result.map((item: any) => {
-                    const emotion = item.emotion || Object.keys(item)[0];
-                    const score = item.score || item[emotion];
-                    return `${emotion} (${typeof score === 'number' ? score.toFixed(2) : score})`;
-                  }).join(', ');
-                  
-                  data.response = data.response.replace(/\[object Object\](, \[object Object\])*/, emotionData);
-                }
-              }
-            }
-          }
-        } else {
-          console.log("Smart query planner couldn't handle the query, falling back to RAG");
-        }
-      } catch (smartQueryError) {
-        if (smartQueryError instanceof Error && 
-            smartQueryError.message && 
-            smartQueryError.message.includes('auth')) {
-          return {
-            role: 'error',
-            content: "Authentication issue when processing your request. Please sign in again.",
-          };
-        }
-        
-        console.error("Exception in smart-query-planner:", smartQueryError);
-      }
-    }
-    
-    if (!queryResponse || queryResponse.fallbackToRag) {
-      console.log("Using RAG approach for query");
-      
-      let timeRange = null;
-      
-      if (messageQueryTypes.timeRange && typeof messageQueryTypes.timeRange === 'object') {
-        timeRange = {
-          type: messageQueryTypes.timeRange.type,
-          startDate: messageQueryTypes.timeRange.startDate,
-          endDate: messageQueryTypes.timeRange.endDate
-        };
-      }
-      
-      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-        body: { 
-          message, 
-          userId,
-          threadId,
-          includeDiagnostics: true,
-          timeRange,
-          requiresFiltering: messageQueryTypes.requiresFiltering,
-          isComplexQuery: messageQueryTypes.isComplexQuery || message.toLowerCase().includes('why'),
-          requiresEmotionAnalysis: messageQueryTypes.isEmotionFocused
-        }
-      });
-      
-      if (error) {
-        if (typeof error === 'object' && error.message) {
-          if (error.message.includes('auth') || error.message.includes('Authentication')) {
-            return {
-              role: 'error',
-              content: "Authentication required for accessing your data. Please sign in again.",
-            };
-          }
-        }
-        
-        console.error("Error in chat-with-rag:", error);
-        return {
-          role: 'error',
-          content: "I'm having trouble connecting to the AI service. Please try again later.",
-        };
-      }
-      
-      queryResponse = data;
+    if (!queryResponse) {
+      console.log("No response from primary strategy, falling back to RAG");
+      queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
     }
     
     console.log("Response received:", queryResponse ? "yes" : "no");
     
+    // Construct final response
     const responseContent = queryResponse.response || "I couldn't find an answer to your question.";
     const chatResponse: ChatMessage = {
       role: 'assistant',
       content: responseContent,
     };
     
+    // Add references if available
     if (queryResponse.diagnostics && queryResponse.diagnostics.relevantEntries) {
       chatResponse.references = queryResponse.diagnostics.relevantEntries;
     }
     
+    // Add analysis data if available
     if (queryResponse.diagnostics) {
       chatResponse.analysis = queryResponse.diagnostics;
       chatResponse.diagnostics = queryResponse.diagnostics;
     }
     
+    // Set flag if we have a numeric result
     if (queryResponse.hasNumericResult) {
       chatResponse.hasNumericResult = true;
     }
@@ -320,20 +150,250 @@ export async function processChatMessage(
     return chatResponse;
   } catch (error) {
     console.error("Error processing chat message:", error);
-    
-    if (error instanceof Error && 
-        (error.message.includes('auth') || 
-         error.message.includes('Authentication') || 
-         error.message.includes('JWT'))) {
-      return {
-        role: 'error',
-        content: "Authentication required. Please sign in again to continue using the chat.",
-      };
-    }
-    
     return {
       role: 'error',
       content: "I apologize, but I encountered an error processing your request. Please try again.",
     };
   }
+}
+
+// Handler for standard vector search
+async function handleVectorSearch(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
+    ? {
+        type: queryTypes.timeRange.type,
+        startDate: queryTypes.timeRange.startDate,
+        endDate: queryTypes.timeRange.endDate
+      } 
+    : null;
+  
+  const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+    body: { 
+      message, 
+      userId,
+      threadId,
+      includeDiagnostics: true,
+      timeRange,
+      isComplexQuery: queryTypes.isComplexQuery || message.toLowerCase().includes('why'),
+      requiresEmotionAnalysis: queryTypes.isEmotionFocused
+    }
+  });
+  
+  if (error) {
+    console.error("Error in chat-with-rag:", error);
+    throw error;
+  }
+  
+  return data;
+}
+
+// Handler for temporal vector search (when questions)
+async function handleTemporalVectorSearch(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  console.log("Executing temporal vector search for 'when' question");
+  
+  // Include temporal parameters explicitly
+  const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+    body: { 
+      message, 
+      userId,
+      threadId,
+      includeDiagnostics: true,
+      isTemporalQuery: true,
+      needsTimeRetrieval: true,
+      isComplexQuery: false, // Usually "when" questions are straightforward
+      requiresEntryDates: true // Specifically request entry dates
+    }
+  });
+  
+  if (error) {
+    console.error("Error in temporal vector search:", error);
+    throw error;
+  }
+  
+  return data;
+}
+
+// Handler for frequency analysis (how often questions)
+async function handleFrequencyAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  console.log("Executing frequency analysis for 'how often' question");
+  
+  // Try smart-query-planner first as it might be able to do frequency counts
+  try {
+    const { data, error } = await supabase.functions.invoke('smart-query-planner', {
+      body: { 
+        message, 
+        userId, 
+        includeDiagnostics: true,
+        enableQueryBreakdown: true,
+        generateSqlQueries: true,
+        isFrequencyQuery: true
+      }
+    });
+    
+    if (error) {
+      console.error("Error using smart-query-planner for frequency:", error);
+    } else if (data && !data.fallbackToRag) {
+      console.log("Successfully used smart query planner for frequency analysis");
+      return data;
+    }
+  } catch (smartQueryError) {
+    console.error("Exception in smart-query-planner for frequency:", smartQueryError);
+  }
+  
+  // Fall back to vector search with frequency indicators
+  const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+    body: { 
+      message, 
+      userId,
+      threadId,
+      includeDiagnostics: true,
+      isFrequencyQuery: true,
+      requiresPatternAnalysis: true
+    }
+  });
+  
+  if (error) {
+    console.error("Error in frequency analysis vector search:", error);
+    throw error;
+  }
+  
+  return data;
+}
+
+// Handler for emotion aggregation (top emotions)
+async function handleEmotionAggregation(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  console.log("Executing emotion aggregation for top emotions question");
+  
+  // Extract time period from query or use default
+  const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
+    ? {
+        type: queryTypes.timeRange.type,
+        startDate: queryTypes.timeRange.startDate,
+        endDate: queryTypes.timeRange.endDate
+      } 
+    : {
+        type: 'month',
+        startDate: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString(),
+        endDate: new Date().toISOString()
+      };
+  
+  // Determine if this is a "why" question as well
+  const isWhyQuestion = queryTypes.isWhyQuestion || message.toLowerCase().includes('why');
+  
+  // Call the edge function with emotion aggregation parameters
+  const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+    body: { 
+      message, 
+      userId,
+      threadId,
+      includeDiagnostics: true,
+      timeRange,
+      isEmotionQuery: true,
+      isWhyEmotionQuery: isWhyQuestion,
+      topEmotionsCount: 3
+    }
+  });
+  
+  if (error) {
+    console.error("Error in emotion aggregation:", error);
+    throw error;
+  }
+  
+  return data;
+}
+
+// Handler for emotion causal analysis (why emotion questions)
+async function handleEmotionCausalAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  console.log("Executing emotion causal analysis");
+  
+  // Extract time period from query or use default
+  const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
+    ? {
+        type: queryTypes.timeRange.type,
+        startDate: queryTypes.timeRange.startDate,
+        endDate: queryTypes.timeRange.endDate
+      } 
+    : null;
+  
+  // Use the new edge function approach with emotion causal parameters
+  const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+    body: { 
+      message, 
+      userId,
+      threadId,
+      includeDiagnostics: true,
+      timeRange,
+      isEmotionQuery: true,
+      isWhyEmotionQuery: true,
+      requiresCausalAnalysis: true
+    }
+  });
+  
+  if (error) {
+    console.error("Error in emotion causal analysis:", error);
+    throw error;
+  }
+  
+  return data;
+}
+
+// Handler for relationship analysis
+async function handleRelationshipAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  console.log("Executing relationship analysis");
+  
+  // Extract time period from query or use default
+  const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
+    ? {
+        type: queryTypes.timeRange.type,
+        startDate: queryTypes.timeRange.startDate,
+        endDate: queryTypes.timeRange.endDate
+      } 
+    : null;
+  
+  // Use theme filtering and vector search
+  const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+    body: { 
+      message, 
+      userId,
+      threadId,
+      includeDiagnostics: true,
+      timeRange,
+      isRelationshipQuery: true,
+      requiresThemeFiltering: true,
+      themeKeywords: ['partner', 'spouse', 'husband', 'wife', 'boyfriend', 'girlfriend', 'relationship', 'marriage']
+    }
+  });
+  
+  if (error) {
+    console.error("Error in relationship analysis:", error);
+    throw error;
+  }
+  
+  return data;
+}
+
+// Handler for contextual advice (improvement questions)
+async function handleContextualAdvice(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  console.log("Executing contextual advice strategy");
+  
+  // For improvement questions, we need both context and a solution-oriented approach
+  const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+    body: { 
+      message, 
+      userId,
+      threadId,
+      includeDiagnostics: true,
+      isAdviceQuery: true,
+      requiresThemeFiltering: true,
+      requiresSolutionFocus: true,
+      themeKeywords: ['partner', 'spouse', 'husband', 'wife', 'boyfriend', 'girlfriend', 'relationship', 'marriage']
+    }
+  });
+  
+  if (error) {
+    console.error("Error in contextual advice strategy:", error);
+    throw error;
+  }
+  
+  return data;
 }

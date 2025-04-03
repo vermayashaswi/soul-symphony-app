@@ -1,8 +1,8 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { JournalEntry } from '@/types/journal';
+import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import { Json } from '@/integrations/supabase/types';
 
 export function useJournalEntries(userId: string | undefined, refreshKey: number, isProfileChecked: boolean = false) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -32,14 +32,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const fetchStartTime = Date.now();
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
-      // Use any to bypass TypeScript's deep type inference
-      const result: any = await supabase
+      const { data, error, status } = await supabase
         .from('Journal Entries')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
-      
-      const { data, error, status } = result;
       
       const fetchEndTime = Date.now();
       console.log(`[useJournalEntries] Fetch completed in ${fetchEndTime - fetchStartTime}ms with status: ${status}`);
@@ -62,22 +59,19 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         console.log('[useJournalEntries] No entries found for this user');
       }
       
-      // Make sure to properly access columns with spaces in their names
       const typedEntries: JournalEntry[] = (data || []).map(item => ({
         id: item.id,
         content: item["refined text"] || item["transcription text"] || "",
-        "refined text": item["refined text"],
         created_at: item.created_at,
         audio_url: item.audio_url,
         sentiment: item.sentiment,
-        master_themes: item.master_themes,
+        themes: item.master_themes,
         foreignKey: item["foreign key"],
         entities: item.entities ? (item.entities as any[]).map(entity => ({
           type: entity.type,
           name: entity.name,
           text: entity.text
-        })) : undefined,
-        emotions: item.emotions
+        })) : undefined
       }));
       
       setEntries(typedEntries);

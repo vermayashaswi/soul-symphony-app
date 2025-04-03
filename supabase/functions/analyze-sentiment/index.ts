@@ -30,11 +30,11 @@ serve(async (req) => {
         ? createClient(supabaseUrl, supabaseServiceKey)
         : null;
         
-      // Check for Google NL API key from the GOOGLE_API secret
-      let googleNlApiKey = Deno.env.get('GOOGLE_API');
+      // Check for Google NL API key directly
+      let googleNlApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
       let googleNlApiConfigured = !!googleNlApiKey;
       
-      console.log(`Google NL API key from env: ${googleNlApiConfigured ? 'Found' : 'Not found'}`);
+      console.log(`Google NL API key directly from env: ${googleNlApiConfigured ? 'Found' : 'Not found'}`);
       
       // Check for OpenAI API key
       const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -72,8 +72,8 @@ serve(async (req) => {
       throw new Error("No text provided for analysis");
     }
     
-    // Get the Google Natural Language API key from GOOGLE_API secret
-    const apiKey = Deno.env.get('GOOGLE_API');
+    // Get the Google Natural Language API key directly from environment
+    const apiKey = Deno.env.get('GOOGLE_NL_API_KEY');
     
     if (!apiKey) {
       throw new Error("Google Natural Language API key is not configured");

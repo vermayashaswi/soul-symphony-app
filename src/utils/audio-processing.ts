@@ -1,188 +1,212 @@
-
-// @ts-nocheck
-
-import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
+import { sendAudioForTranscription } from './audio/transcription-service';
+import { supabase } from '@/integrations/supabase/client';
 
-interface ProcessingResult {
+/**
+ * Processes an audio recording for transcription and analysis
+ * Returns immediately with a temporary ID while processing continues in background
+ */
+export async function processRecording(audioBlob: Blob | null, userId: string | undefined): Promise<{
   success: boolean;
   tempId?: string;
   error?: string;
-}
-
-/**
- * Process an audio recording by:
- * 1. Creating a temporary ID
- * 2. Inserting a placeholder entry in the database
- * 3. Uploading the audio to storage
- * 4. Getting the public URL
- * 5. Updating the database entry with the URL
- * 6. Calling the transcribe-audio edge function
- */
-export async function processRecording(audioBlob: Blob, userId?: string): Promise<ProcessingResult> {
+}> {
+  // 1. Validate the audio blob
+  const validation = validateAudioBlob(audioBlob);
+  if (!validation.isValid) {
+    toast.error(validation.errorMessage);
+    return { success: false, error: validation.errorMessage };
+  }
+  
   try {
-    // Verify authentication before proceeding
-    if (!userId) {
-      const { isAuthenticated, userId: authUserId, error: authError } = await verifyUserAuthentication();
-      if (!isAuthenticated || authError) {
-        console.error('Authentication error:', authError);
-        toast.error(authError || 'Authentication required for audio processing');
-        return { success: false, error: authError || 'Authentication required for audio processing' };
-      }
-      userId = authUserId;
-    }
-
-    // 1. Generate a temporary ID to track this recording
-    const tempId = uuidv4();
-    console.log(`Processing recording with temp ID: ${tempId}`);
-
-    // 2. Create a placeholder entry in the Journal Entries table
-    const { error: dbError } = await supabase
-      .from('Journal Entries')
-      .insert([
-        {
-          user_id: userId,
-          'foreign key': tempId,
-          'transcription text': 'Processing...',
-          'refined text': 'Your journal entry is being processed...'
-        }
-      ]);
-
-    if (dbError) {
-      console.error('Error creating database entry:', dbError);
-      toast.error(`Database error: ${dbError.message}`);
-      return { success: false, error: `Database error: ${dbError.message}` };
-    }
-
-    // 3. Upload audio file to storage
-    const bucketName = 'journal-audio-entries';
-    const audioFilename = `recordings/${userId}/${tempId}.webm`;
-
-    // Ensure file type is correct
-    const audioFile = new File([audioBlob], audioFilename, { 
-      type: audioBlob.type || 'audio/webm' 
+    // Generate a temporary ID for this recording
+    const tempId = `temp-${Date.now()}`;
+    
+    // Log the audio details
+    console.log('Processing audio:', {
+      size: audioBlob?.size || 0,
+      type: audioBlob?.type || 'unknown',
+      userId: userId || 'anonymous'
     });
-
-    // Check if bucket exists or create it
-    try {
-      const { data: buckets } = await supabase.storage.listBuckets();
-      if (!buckets?.find(b => b.name === bucketName)) {
-        console.log(`Creating bucket: ${bucketName}`);
-        await supabase.storage.createBucket(bucketName, {
-          public: true
-        });
-      }
-    } catch (bucketError) {
-      console.error('Error checking/creating bucket:', bucketError);
-      // Continue anyway as the bucket might exist but error due to permissions
-    }
-
-    // Upload the file
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(audioFilename, audioFile, {
-        contentType: audioFile.type,
-        cacheControl: '3600',
-        upsert: true
-      });
-
-    if (uploadError) {
-      console.error('Error uploading audio:', uploadError);
-      toast.error(`Upload error: ${uploadError.message}`);
-      return { success: false, error: `Upload error: ${uploadError.message}` };
-    }
-
-    // 4. Get the URL for the audio file
-    // Try getting a signed URL if public URL fails due to RLS restrictions
-    let audioUrl;
     
-    // First try getting public URL
-    const { data: publicUrlData } = await supabase
-      .storage
-      .from(bucketName)
-      .getPublicUrl(audioFilename);
+    // Start processing in background
+    toast.loading('Processing your journal entry with advanced AI...', {
+      id: tempId,
+      duration: Infinity, // Toast remains until explicitly dismissed
+    });
     
-    audioUrl = publicUrlData?.publicUrl;
+    // Launch the processing without awaiting it
+    processRecordingInBackground(audioBlob, userId, tempId);
     
-    // If no public URL (possibly due to RLS), try signed URL
-    if (!audioUrl) {
-      console.log('Public URL not available, trying signed URL...');
-      const { data: signedUrlData } = await supabase
-        .storage
-        .from(bucketName)
-        .createSignedUrl(audioFilename, 60 * 60 * 24); // 24 hours expiry
-      
-      audioUrl = signedUrlData?.signedUrl;
-    }
-
-    if (!audioUrl) {
-      console.error('Failed to get URL for audio file');
-      toast.error('Failed to get audio URL');
-      return { success: false, error: 'Failed to get audio URL' };
-    }
-
-    // 5. Update the database entry with the audio URL
-    const { error: updateError } = await supabase
-      .from('Journal Entries')
-      .update({ audio_url: audioUrl })
-      .eq('foreign key', tempId);
-
-    if (updateError) {
-      console.error('Error updating database entry with audio URL:', updateError);
-      toast.error(`Update error: ${updateError.message}`);
-      return { success: false, error: `Update error: ${updateError.message}` };
-    }
-
-    // 6. Convert the audio blob to base64 for the edge function
-    const base64Audio = await blobToBase64(audioBlob);
-
-    // 7. Call the transcribe-audio edge function
-    try {
-      console.log('Calling transcribe-audio edge function...');
-      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-        body: {
-          audio: base64Audio,
-          userId: userId,
-          tempId: tempId
-        }
-      });
-
-      if (error) {
-        console.error('Error calling transcribe-audio function:', error);
-        toast.error('Error processing audio. Please try again.');
-        return { success: false, error: `Transcription error: ${error.message}` };
-      }
-
-      console.log('Transcribe function completed successfully:', data?.success);
-      toast.success('Journal entry saved successfully!');
-      return { success: true, tempId };
-    } catch (funcError: any) {
-      console.error('Exception calling transcribe-audio function:', funcError);
-      toast.error('Error processing audio. Please try again.');
-      return { success: false, error: `Function error: ${funcError.message}` };
-    }
+    // Return immediately with the temp ID
+    return { success: true, tempId };
   } catch (error: any) {
-    console.error('Unexpected error in processRecording:', error);
-    toast.error('An unexpected error occurred. Please try again.');
-    return { success: false, error: error.message };
+    console.error('Error initiating recording process:', error);
+    toast.error(`Error initiating recording process: ${error.message || 'Unknown error'}`);
+    return { success: false, error: error.message || 'Unknown error' };
   }
 }
 
 /**
- * Convert a Blob to a base64 string
+ * Processes a recording in the background without blocking the UI
  */
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
-      const base64 = base64String.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+async function processRecordingInBackground(audioBlob: Blob | null, userId: string | undefined, toastId: string): Promise<void> {
+  try {
+    // Log the blob details for debugging
+    console.log('Audio blob details:', audioBlob?.type, audioBlob?.size);
+    
+    if (!audioBlob) {
+      toast.dismiss(toastId);
+      toast.error('No audio data to process');
+      return;
+    }
+    
+    // Check if audio blob is too small to be useful
+    if (audioBlob.size < 1000) {
+      toast.dismiss(toastId);
+      toast.error('Audio recording is too small to process. Please try recording again with more speech.');
+      return;
+    }
+    
+    // 1. Convert blob to base64
+    const base64Audio = await blobToBase64(audioBlob);
+    
+    // Validate base64 data
+    if (!base64Audio || base64Audio.length < 100) {
+      console.error('Invalid base64 audio data');
+      toast.dismiss(toastId);
+      toast.error('Invalid audio data. Please try again.');
+      return;
+    }
+    
+    // Log the base64 length for debugging
+    console.log(`Base64 audio data length: ${base64Audio.length}`);
+    
+    // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
+    const base64String = base64Audio.split(',')[1]; 
+    
+    // 2. Verify user authentication
+    const authStatus = await verifyUserAuthentication();
+    if (!authStatus.isAuthenticated) {
+      toast.dismiss(toastId);
+      toast.error(authStatus.error);
+      return;
+    }
+
+    // 3. Check if the user profile exists, and create one if it doesn't
+    await ensureUserProfileExists(authStatus.userId);
+
+    // Proceed directly with processing - skipping the quality test step
+    toast.loading('Processing with AI...', { id: toastId });
+    
+    // 4. Process the full journal entry
+    let result;
+    let retries = 0;
+    const maxRetries = 3;
+    
+    while (retries <= maxRetries) {
+      try {
+        // Set directTranscription to false to get full journal entry processing
+        result = await sendAudioForTranscription(base64String, authStatus.userId!, false);
+        if (result.success) break;
+        retries++;
+        if (retries <= maxRetries) {
+          console.log(`Transcription attempt ${retries} failed, retrying...`);
+          // Wait a bit before retrying
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      } catch (err) {
+        console.error(`Transcription attempt ${retries + 1} error:`, err);
+        retries++;
+        if (retries <= maxRetries) {
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+    }
+    
+    toast.dismiss(toastId);
+    
+    if (result?.success) {
+      console.log('Journal entry saved successfully:', result);
+      
+      // Verify the entry was saved by querying the database
+      if (result.data?.entryId) {
+        const { data: savedEntry, error: fetchError } = await supabase
+          .from('Journal Entries')
+          .select('id, "refined text", duration')
+          .eq('id', result.data.entryId)
+          .single();
+          
+        if (fetchError || !savedEntry) {
+          console.error('Failed to verify journal entry was saved:', fetchError);
+          toast.error('Journal entry processing completed but verification failed. Please check your entries.');
+        } else {
+          console.log('Journal entry verified in database:', savedEntry);
+          const duration = savedEntry.duration || 'unknown';
+          const text = savedEntry['refined text'] || '';
+          const snippet = text.length > 40 ? text.substring(0, 37) + '...' : text;
+          
+          toast.success(`Journal entry saved successfully! (${duration}s) "${snippet}"`);
+        }
+      } else {
+        toast.success('Journal entry processed, but no entry ID returned.');
+      }
+    } else {
+      console.error('Failed to process recording after multiple attempts:', result?.error);
+      toast.error(result?.error || 'Failed to process recording after multiple attempts');
+    }
+  } catch (error: any) {
+    console.error('Error processing recording in background:', error);
+    toast.dismiss(toastId);
+    toast.error(`Error processing recording: ${error.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Ensures that a user profile exists for the given user ID
+ * Creates one if it doesn't exist
+ */
+async function ensureUserProfileExists(userId: string | undefined): Promise<void> {
+  if (!userId) return;
+  
+  try {
+    // Check if user profile exists
+    const { data: profile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+      
+    // If profile doesn't exist, create one
+    if (fetchError || !profile) {
+      console.log('User profile not found, creating one...');
+      
+      // Get user data from auth
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      
+      // Create profile
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert([{ 
+          id: userId,
+          email: userData.user?.email,
+          full_name: userData.user?.user_metadata?.full_name || '',
+          avatar_url: userData.user?.user_metadata?.avatar_url || ''
+        }]);
+        
+      if (insertError) {
+        console.error('Error creating user profile:', insertError);
+        throw insertError;
+      }
+      
+      console.log('User profile created successfully');
+    }
+  } catch (error) {
+    console.error('Error ensuring user profile exists:', error);
+    // We don't throw here to allow the process to continue
+    // The foreign key constraint will fail later if this fails
+  }
 }
