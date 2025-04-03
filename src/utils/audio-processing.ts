@@ -9,6 +9,13 @@ interface ProcessingResult {
   tempId?: string;
 }
 
+// Add a type for the function response
+interface TranscribeResponse {
+  success?: boolean;
+  error?: string;
+  // Additional fields if needed
+}
+
 export async function processRecording(audioBlob: Blob, userId?: string): Promise<ProcessingResult> {
   if (!userId) {
     return {
@@ -91,7 +98,8 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       tempId
     };
     
-    const { error: fnError } = await supabase.functions.invoke('transcribe-audio', {
+    // Fix: Add explicit type parameter to avoid excessive type instantiation
+    const { error: fnError } = await supabase.functions.invoke<TranscribeResponse>('transcribe-audio', {
       body: funcBody
     });
     
