@@ -11,7 +11,7 @@ RETURNS TABLE (
   content text,
   similarity float,
   embedding vector(1536),
-  created_at timestamp with time zone  -- Adding created_at to the return values
+  created_at timestamp with time zone
 )
 LANGUAGE plpgsql
 AS $$
@@ -22,14 +22,14 @@ BEGIN
     je.content,
     1 - (je.embedding <=> query_embedding) AS similarity,
     je.embedding,
-    entries.created_at  -- Include created_at in the results
+    entries.created_at
   FROM
     journal_embeddings je
   JOIN
     "Journal Entries" entries ON je.journal_entry_id = entries.id
   WHERE 
     1 - (je.embedding <=> query_embedding) > match_threshold
-    AND entries.user_id = user_id_filter::text  -- Convert UUID to text to match the column type
+    AND entries.user_id = user_id_filter  -- Removed ::text cast to fix type mismatch
   ORDER BY
     je.embedding <=> query_embedding
   LIMIT match_count;

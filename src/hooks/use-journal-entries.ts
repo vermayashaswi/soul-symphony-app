@@ -1,8 +1,8 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
-import { Json } from '@/integrations/supabase/types';
 
 export function useJournalEntries(userId: string | undefined, refreshKey: number, isProfileChecked: boolean = false) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -16,8 +16,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
 
   const fetchEntries = useCallback(async () => {
     if (!userId) {
-      console.log('No user ID provided for fetching entries');
+      console.log('[useJournalEntries] No user ID provided for fetching entries');
       setLoading(false);
+      setEntries([]);
       return;
     }
     
@@ -31,6 +32,16 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoading(true);
       const fetchStartTime = Date.now();
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
+      
+      // Check session before making database query
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        console.error('[useJournalEntries] No active session found');
+        setEntries([]);
+        setLoading(false);
+        isFetchingRef.current = false;
+        return;
+      }
       
       const { data, error, status } = await supabase
         .from('Journal Entries')

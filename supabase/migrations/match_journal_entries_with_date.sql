@@ -14,8 +14,8 @@ RETURNS TABLE (
   created_at timestamp with time zone,
   similarity float,
   embedding vector(1536),
-  themes text[],           -- Adding themes from journal entries
-  emotions jsonb           -- Adding emotions data
+  themes text[],
+  emotions jsonb
 )
 LANGUAGE plpgsql
 AS $$
@@ -35,7 +35,7 @@ BEGIN
     "Journal Entries" entries ON je.journal_entry_id = entries.id
   WHERE 
     1 - (je.embedding <=> query_embedding) > match_threshold
-    AND entries.user_id = user_id_filter::text  -- Cast UUID to text to match column type
+    AND entries.user_id = user_id_filter  -- Removed ::text cast to fix type mismatch
     AND (start_date IS NULL OR entries.created_at >= start_date)
     AND (end_date IS NULL OR entries.created_at <= end_date)
   ORDER BY

@@ -216,13 +216,16 @@ serve(async (req) => {
       let entryId = null;
       if (transcribedText) {
         try {
+          // Convert userId to text format explicitly to match column type in DB table
+          const userIdForDb = userId ? userId : null;
+          
           const { data: entryData, error: insertError } = await supabase
             .from('Journal Entries')
             .insert([{ 
               "transcription text": transcribedText,
               "refined text": refinedText,
               "audio_url": audioUrl,
-              "user_id": userId || null,
+              "user_id": userIdForDb,
               "duration": audioDuration,
               "emotions": emotions,
               "sentiment": sentimentScore,

@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
@@ -91,12 +92,20 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     const authStatus = await verifyUserAuthentication();
     if (!authStatus.isAuthenticated) {
       toast.dismiss(toastId);
-      toast.error(authStatus.error);
+      toast.error(authStatus.error || 'User authentication failed');
       return;
     }
 
+    console.log('User authentication verified:', authStatus.userId);
+
     // 3. Check if the user profile exists, and create one if it doesn't
-    await ensureUserProfileExists(authStatus.userId);
+    if (authStatus.userId) {
+      await ensureUserProfileExists(authStatus.userId);
+    } else {
+      toast.dismiss(toastId);
+      toast.error('Cannot identify user ID. Please sign in again.');
+      return;
+    }
 
     // Proceed directly with processing - skipping the quality test step
     toast.loading('Processing with AI...', { id: toastId });
@@ -109,7 +118,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     while (retries <= maxRetries) {
       try {
         // Set directTranscription to false to get full journal entry processing
-        result = await sendAudioForTranscription(base64String, authStatus.userId!, false);
+        result = await sendAudioForTranscription(base64String, authStatus.userId, false);
         if (result.success) break;
         retries++;
         if (retries <= maxRetries) {

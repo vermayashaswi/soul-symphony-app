@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,7 +28,10 @@ const Journal = () => {
 
   useEffect(() => {
     if (user?.id) {
+      console.log("User authenticated, ID:", user.id);
       checkUserProfile(user.id);
+    } else {
+      console.warn("No user ID found, authentication may be needed");
     }
   }, [user?.id]);
   
@@ -71,6 +75,8 @@ const Journal = () => {
 
   const checkUserProfile = async (userId: string) => {
     try {
+      console.log('Checking user profile for ID:', userId);
+      
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('id')
@@ -83,6 +89,8 @@ const Journal = () => {
         const { data: userData, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
         
+        console.log('User data retrieved:', userData.user?.id);
+        
         const { error: insertError } = await supabase
           .from('profiles')
           .insert([{
@@ -92,8 +100,13 @@ const Journal = () => {
             avatar_url: userData.user?.user_metadata?.avatar_url || ''
           }]);
           
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('Error creating user profile:', insertError);
+          throw insertError;
+        }
         console.log('Profile created successfully');
+      } else {
+        console.log('Profile exists:', profile.id);
       }
       
       setIsProfileChecked(true);
@@ -104,7 +117,12 @@ const Journal = () => {
   };
 
   const onEntryRecorded = async (audioBlob: Blob, tempId?: string) => {
-    console.log('Entry recorded, adding to processing queue');
+    if (!user?.id) {
+      toast.error('You must be logged in to record journal entries.');
+      return;
+    }
+    
+    console.log('Entry recorded, adding to processing queue. User ID:', user.id);
     
     if (tempId) {
       setProcessingEntries(prev => [...prev, tempId]);
