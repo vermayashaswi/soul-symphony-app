@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Smile, Meh, Frown, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -26,19 +27,21 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
     const data: SentimentData = {};
     
     entries.forEach(entry => {
-      if (entry.sentiment) {
+      if (entry.sentiment !== undefined) {
         const dateStr = format(new Date(entry.created_at), 'yyyy-MM-dd');
         
         if (!data[dateStr]) {
           data[dateStr] = { avgScore: 0, count: 0 };
         }
         
-        // Extract score from the sentiment object
-        const sentimentScore = typeof entry.sentiment === 'string' 
-          ? parseFloat(entry.sentiment) 
-          : entry.sentiment.score;
+        // Extract sentiment value, handling different formats
+        const sentimentValue = typeof entry.sentiment === 'number' 
+          ? entry.sentiment 
+          : typeof entry.sentiment === 'object' && entry.sentiment !== null && 'score' in entry.sentiment
+            ? (entry.sentiment as any).score
+            : 0;
         
-        data[dateStr].avgScore = (data[dateStr].avgScore * data[dateStr].count + sentimentScore) / (data[dateStr].count + 1);
+        data[dateStr].avgScore = (data[dateStr].avgScore * data[dateStr].count + sentimentValue) / (data[dateStr].count + 1);
         data[dateStr].count += 1;
       }
     });
@@ -345,14 +348,16 @@ const SentimentCalendar: React.FC<SentimentCalendarProps> = ({ entries, timeRang
       let validEntries = 0;
 
       entriesInMonth.forEach(entry => {
-        if (entry.sentiment) {
-          // Extract sentiment score, handling both string and object formats
-          const score = typeof entry.sentiment === 'string' 
-            ? parseFloat(entry.sentiment) 
-            : entry.sentiment.score;
+        if (entry.sentiment !== undefined) {
+          // Extract sentiment value, handling different formats
+          const sentimentValue = typeof entry.sentiment === 'number' 
+            ? entry.sentiment 
+            : typeof entry.sentiment === 'object' && entry.sentiment !== null && 'score' in entry.sentiment
+              ? (entry.sentiment as any).score
+              : 0;
           
-          if (!isNaN(score)) {
-            totalSentiment += score;
+          if (!isNaN(sentimentValue)) {
+            totalSentiment += sentimentValue;
             validEntries++;
           }
         }

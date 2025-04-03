@@ -5,7 +5,7 @@ export interface JournalEntry {
   "refined text"?: string;
   created_at: string;
   audio_url?: string;
-  sentiment?: number;
+  sentiment?: number | { score: number } | any;
   master_themes?: string[];
   emotions?: Record<string, number>;
   foreignKey?: string;

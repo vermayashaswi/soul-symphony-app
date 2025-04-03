@@ -102,8 +102,8 @@ const Journal = () => {
     if (!searchQuery.trim()) return true;
     
     const query = searchQuery.toLowerCase();
-    const content = entry.content.toLowerCase();
-    const themes = entry.themes?.join(' ').toLowerCase() || '';
+    const content = entry.content?.toLowerCase() || '';
+    const themes = entry.master_themes?.join(' ').toLowerCase() || '';
     
     return content.includes(query) || themes.includes(query);
   });
