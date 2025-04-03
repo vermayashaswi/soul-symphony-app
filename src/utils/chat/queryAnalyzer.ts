@@ -99,6 +99,15 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     /(?:first|second|third|lastly|finally|moreover|additionally)/i
   ];
   
+  // New pattern for entity-focused questions
+  const entityQuestionPattern = /(?:about|regarding|concerning|related to|mention|mentions|referencing|talking about|involves|involves|discussed)\s+(?:my|our|the)?\s*([A-Za-z\s]+)/i;
+  
+  // New pattern for advice-seeking questions
+  const adviceQuestionPattern = /(?:should|could|would|can|will|how to|what to do|advice|suggestion|recommend|best way|help me|guide me)/i;
+  
+  // New pattern for count queries
+  const countQueryPattern = /(?:how many|count|number of|total number|number|instances of)/i;
+  
   // Extract time range information
   const getTimeRange = (query: string): { timeframeType: string | null, startDate: Date | null, endDate: Date | null } => {
     const lowerQuery = query.toLowerCase();
@@ -194,8 +203,20 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   const isWhenQuestion = whenQuestionPattern.test(lowerQuery);
   const isWhyQuestion = whyQuestionPattern.test(lowerQuery);
   const hasWhyEmotionsPattern = whyEmotionsPattern.test(lowerQuery);
+  const isEntityQuestion = entityQuestionPattern.test(lowerQuery);
+  const isAdviceQuestion = adviceQuestionPattern.test(lowerQuery);
+  const isCountQuery = countQueryPattern.test(lowerQuery);
   
   const needsContext = /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b|\bmeaning\b|\binterpret\b/.test(lowerQuery);
+  
+  // Extract entity from query if it's an entity-focused question
+  let entityMatch = null;
+  if (isEntityQuestion) {
+    const match = lowerQuery.match(entityQuestionPattern);
+    if (match && match[1]) {
+      entityMatch = match[1].trim();
+    }
+  }
   
   // Check if query is complex and needs breakdown by components
   const isComplexQuery = complexQueryPatterns.some(pattern => pattern.test(lowerQuery)) ||
@@ -209,6 +230,7 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
                               hasEmotionChangePattern ||
                               hasHappinessRating ||
                               isComplexQuery ||
+                              isCountQuery ||
                               (hasEmotionWords && hasWhyEmotionsPattern) ||
                               (hasEmotionWords && (hasQuantitativeWords || hasNumbers || hasComparativeWords));
   
@@ -222,13 +244,19 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   const timeRange = getTimeRange(query);
   
   return {
-    isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification || hasHappinessRating,
+    isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification || hasHappinessRating || isCountQuery,
     
     isTemporal: hasTemporalWords,
     
     isComparative: hasComparativeWords || hasTopEmotionsPattern || hasEmotionChangePattern,
     
     isEmotionFocused: hasEmotionWords || hasTopEmotionsPattern || hasEmotionRankingPattern || hasEmotionQuantification || hasHappinessRating,
+    
+    isEntityFocused: isEntityQuestion,
+    
+    isAdviceQuestion: isAdviceQuestion,
+    
+    entityMentioned: entityMatch,
     
     hasTopEmotionsPattern,
     
@@ -250,12 +278,14 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     
     isComplexQuery,
     
+    isCountQuery,
+    
     hasExplicitHappinessRating: explicitHappinessRatingPattern.test(lowerQuery),
     
     requiresComponentAnalysis: isComplexQuery || hasHappinessRating || hasTopEmotionsPattern || hasWhyEmotionsPattern || 
                               (hasTemporalWords && hasEmotionWords && hasQuantitativeWords),
     
-    asksForNumber: hasNumbers || hasTopEmotionsPattern || hasHappinessRating || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
+    asksForNumber: hasNumbers || hasTopEmotionsPattern || hasHappinessRating || isCountQuery || /how many|how much|what percentage|how often|frequency|count|number of/i.test(lowerQuery),
     
     needsVectorSearch: needsVectorSearch,
     
