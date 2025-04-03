@@ -91,10 +91,10 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       tempId
     };
 
-    // Use a completely non-typed approach to bypass TypeScript's type inference
+    // Bypass TypeScript's type inference completely
     let fnError = null;
     try {
-      // @ts-ignore - Bypass TypeScript's type checking for this call
+      // @ts-ignore
       await supabase.functions.invoke('transcribe-audio', {
         body: funcBody
       });
