@@ -17,7 +17,7 @@ async function analyzeSentiment(text: string) {
   try {
     console.log('Analyzing sentiment for text:', text.slice(0, 100) + '...');
     
-    const googleNLApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+    const googleNLApiKey = Deno.env.get('GOOGLE_API');
     
     if (!googleNLApiKey) {
       console.error('Google NL API key not found in environment');

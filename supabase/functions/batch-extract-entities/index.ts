@@ -13,14 +13,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Hardcoded API key
-const GOOGLE_NL_API_KEY = 'AIzaSyAwEtfHQl3N69phsxfkwuhmRKelNQfd_qs';
+// Get Google NL API key from Supabase secrets
+const GOOGLE_NL_API_KEY = Deno.env.get('GOOGLE_API');
 
 async function analyzeWithGoogleNL(text: string) {
   try {
     console.log('Analyzing text with Google NL API for entities:', text.slice(0, 100) + '...');
     
-    console.log('Using hardcoded Google NL API key');
+    if (!GOOGLE_NL_API_KEY) {
+      console.error('Google NL API key not found in environment');
+      throw new Error('Google API key is not configured in Supabase secrets');
+    }
+    
+    console.log('Using Google NL API key from Supabase secrets');
     
     // Using the correct endpoint for entity extraction
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${GOOGLE_NL_API_KEY}`, {
