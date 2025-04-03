@@ -1,9 +1,8 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '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';
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
 
@@ -56,7 +55,6 @@ serve(async (req) => {
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
     console.log("High quality mode:", highQuality ? "YES" : "NO");
     
-    // Ensure user profile exists before proceeding
     if (userId) {
       await createProfileIfNeeded(userId);
     }
@@ -126,13 +124,11 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: mimeType });
     formData.append('file', blob, `audio.${detectedFileType}`);
     
-    // Use the best Whisper model available 
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'json');
     
-    // Specify that we want high-fidelity transcription
     if (highQuality) {
-      formData.append('language', 'en'); // Specify language to help with accuracy
+      formData.append('language', 'en');
     }
 
     console.log("Sending to Whisper API for high-quality transcription using the latest model...");
@@ -158,7 +154,6 @@ serve(async (req) => {
       
       console.log("Transcription successful:", transcribedText);
 
-      // If we're in direct transcription mode, simply return the transcribed text
       if (directTranscription) {
         return new Response(
           JSON.stringify({
@@ -171,7 +166,6 @@ serve(async (req) => {
         );
       }
 
-      // Continue with the standard processing flow for journal entries
       const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -207,7 +201,6 @@ serve(async (req) => {
       const emotions = await analyzeEmotions(refinedText);
       console.log("Emotion analysis:", emotions);
       
-      // Use the analyze-sentiment endpoint to get both sentiment and entities
       const { sentiment: sentimentScore, entities } = await analyzeWithGoogleNL(refinedText);
       console.log("Sentiment analysis:", sentimentScore);
       console.log("Entity extraction:", entities);
@@ -239,7 +232,6 @@ serve(async (req) => {
             console.log("Journal entry saved to database:", entryData[0].id);
             entryId = entryData[0].id;
           
-            // Extract themes right after saving the entry
             if (refinedText && entryId) {
               EdgeRuntime.waitUntil(extractThemes(refinedText, entryId));
               console.log("Started background task to extract themes");
@@ -277,7 +269,6 @@ serve(async (req) => {
         throw new Error("Transcription failed - no text generated");
       }
 
-      // After successful database insertion, verify the entry was added
       try {
         if (entryId) {
           const { data: verifyEntry, error: verifyError } = await supabase
@@ -513,7 +504,6 @@ async function analyzeWithGoogleNL(text: string) {
   try {
     console.log('Analyzing text with Google NL API for sentiment and entities:', text.slice(0, 100) + '...');
     
-    // Using the correct endpoint for entity extraction
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${Deno.env.get('GOOGLE_NL_API_KEY') || ''}`, {
       method: 'POST',
       headers: {
@@ -536,16 +526,13 @@ async function analyzeWithGoogleNL(text: string) {
     const result = await response.json();
     console.log('Google NL API analysis complete');
     
-    // Since we're only using entity extraction endpoint, we'll use a default sentiment value
     const sentimentScore = "0";
     
-    // Process and format entities
     const formattedEntities = result.entities?.map(entity => ({
       type: mapEntityType(entity.type),
       name: entity.name
     })) || [];
     
-    // Remove duplicate entities
     const uniqueEntities = removeDuplicateEntities(formattedEntities);
     
     console.log(`Extracted ${uniqueEntities.length} entities and sentiment score: ${sentimentScore}`);
@@ -596,18 +583,15 @@ async function createProfileIfNeeded(userId: string) {
   
   try {
     console.log("Checking if profile exists for user:", userId);
-    // Check if user profile exists
     const { data: profile, error } = await supabase
       .from('profiles')
       .select('id')
       .eq('id', userId)
       .single();
       
-    // If profile doesn't exist, create one
     if (error || !profile) {
       console.log("Profile not found, creating one");
       
-      // Get user data from auth
       const { data: userData, error: userError } = await supabase.auth.getUser(userId);
       if (userError) {
         console.error("Error getting user data:", userError);
@@ -615,7 +599,6 @@ async function createProfileIfNeeded(userId: string) {
       }
       
       if (userData?.user) {
-        // Create profile
         const { error: insertError } = await supabase
           .from('profiles')
           .insert([{ 
@@ -643,7 +626,6 @@ async function extractThemes(text: string, entryId: number): Promise<void> {
   try {
     console.log(`Automatically extracting themes for entry ${entryId}`);
     
-    // Call the generate-themes function (we keep this for theme extraction only)
     const { data, error } = await supabase.functions.invoke('generate-themes', {
       body: { text, entryId }
     });

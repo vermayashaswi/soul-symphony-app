@@ -1,9 +1,8 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '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';
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -19,6 +18,12 @@ const corsHeaders = {
 async function generateEmbedding(text: string) {
   try {
     console.log("Generating embedding for query:", text.substring(0, 50) + "...");
+    
+    if (!openAIApiKey) {
+      console.error('OpenAI API key is missing or empty');
+      throw new Error('OpenAI API key is not configured in environment variables');
+    }
+    
     const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -266,6 +271,11 @@ serve(async (req) => {
     
     if (!message) {
       throw new Error('No message provided');
+    }
+
+    if (!openAIApiKey) {
+      console.error('OpenAI API key is missing or empty');
+      throw new Error('OpenAI API key is not configured in environment variables');
     }
 
     console.log("Processing chat request for user:", userId);
