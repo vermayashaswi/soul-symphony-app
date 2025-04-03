@@ -37,6 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           toast.success('Signed in successfully');
         } else if (event === 'SIGNED_OUT') {
           toast.info('Signed out');
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log('Auth token refreshed');
+        } else if (event === 'USER_UPDATED') {
+          console.log('User updated');
         }
       }
     );
@@ -158,6 +162,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      
+      if (currentSession) {
+        const { data, error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError && data.session) {
+          setSession(data.session);
+          setUser(data.session.user);
+        }
+      }
     } catch (error: any) {
       console.error('Error refreshing session:', error);
     }

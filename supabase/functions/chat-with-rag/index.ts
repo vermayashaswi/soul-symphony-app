@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -35,6 +34,30 @@ interface ChatResponse {
   hasNumericResult?: boolean;
 }
 
+// Verify user authentication
+async function verifyAuth(req: Request): Promise<{ userId: string | null; error: string | null }> {
+  try {
+    // Get JWT token from request header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return { userId: null, error: 'No authorization header provided' };
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      console.error('Auth error:', error);
+      return { userId: null, error: error?.message || 'Authentication failed' };
+    }
+
+    return { userId: user.id, error: null };
+  } catch (err) {
+    console.error('Error verifying auth:', err);
+    return { userId: null, error: 'Failed to verify authentication' };
+  }
+}
+
 // Main request handler
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -43,11 +66,28 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request
-    const { message: query, userId, queryTypes, threadId, requiresFiltering, timeRange: timeRangeInput } = await req.json();
+    // Verify authentication
+    const { userId, error: authError } = await verifyAuth(req);
     
-    if (!query || !userId) {
-      throw new Error("Missing required parameters: query or userId");
+    if (authError || !userId) {
+      console.error('Authentication error:', authError);
+      return new Response(
+        JSON.stringify({
+          role: "error",
+          content: `Authentication required: ${authError || 'User not authenticated'}`,
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Parse request
+    const { message: query, queryTypes, threadId, requiresFiltering, timeRange: timeRangeInput } = await req.json();
+    
+    if (!query) {
+      throw new Error("Missing required parameter: query");
     }
 
     console.log(`Processing query for user ${userId}: ${query}`);
@@ -384,9 +424,6 @@ function extractTargetEmotion(query: string) {
 
 // Extract named entity from the query
 function extractNamedEntity(query: string) {
-  // Simple pattern matching for entity extraction
-  // This is a basic implementation - could be improved with NLP
-  
   const lowerQuery = query.toLowerCase();
   
   // Look for patterns like "find entries about X" or "tell me about X"

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 
@@ -25,21 +24,42 @@ export async function processChatMessage(
   }
 
   try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session || !sessionData.session.user) {
+      console.error("Session verification failed:", sessionError);
+      return {
+        role: 'error',
+        content: "Authentication required. Please sign in again.",
+      };
+    }
+    
+    if (sessionData.session.user.id !== userId) {
+      console.error("User ID mismatch:", sessionData.session.user.id, userId);
+      return {
+        role: 'error',
+        content: "You cannot access another user's data.",
+      };
+    }
+  } catch (sessionCheckError) {
+    console.error("Error checking session:", sessionCheckError);
+    return {
+      role: 'error',
+      content: "Authentication verification failed. Please try signing in again.",
+    };
+  }
+
+  try {
     console.log("Processing message:", message);
-    // Use provided queryTypes or generate them
     const messageQueryTypes = queryTypes || analyzeQueryTypes(message);
     console.log("Query analysis results:", messageQueryTypes);
     
     let queryResponse: any = null;
     let retryAttempted = false;
     
-    // First check if the message requires filtering data
     if (messageQueryTypes.requiresFiltering) {
       console.log("Query requires filtering. Applying filters first...");
-      // The smart-query-planner will handle the filtering logic
     }
     
-    // First try using the smart query planner for direct data querying
     if (messageQueryTypes.isQuantitative || messageQueryTypes.isEmotionFocused || messageQueryTypes.requiresFiltering) {
       console.log("Using smart query planner for direct data query");
       
@@ -59,24 +79,26 @@ export async function processChatMessage(
         });
         
         if (error) {
+          if (typeof error === 'object' && error.message && error.message.includes('auth')) {
+            return {
+              role: 'error',
+              content: "Authentication required for accessing your data. Please sign in again.",
+            };
+          }
+          
           console.error("Error using smart-query-planner:", error);
         } else if (data && !data.fallbackToRag) {
           console.log("Successfully used smart query planner");
           queryResponse = data;
           retryAttempted = data.retryAttempted || false;
           
-          // If the system gave a fallback message but we don't want to actually fallback,
-          // replace it with something better
           if (data.response === "I couldn't find a direct answer to your question using the available data. I will try a different approach." && !data.fallbackToRag) {
-            // This means SQL retries ultimately succeeded
             if (retryAttempted) {
               data.response = "Based on your journal entries, " + data.response.toLowerCase();
             }
           }
           
-          // Format emotion data if present
           if (data.hasNumericResult && data.diagnostics && data.diagnostics.executionResults) {
-            // Determine if this is emotion data
             const isEmotionData = messageQueryTypes.isEmotionFocused || 
                                  message.toLowerCase().includes('emotion') || 
                                  message.toLowerCase().includes('feel');
@@ -84,29 +106,22 @@ export async function processChatMessage(
             const executionResults = data.diagnostics.executionResults;
             const lastResult = executionResults[executionResults.length - 1];
             
-            // Check if the response contains just numbers or IDs
             const hasOnlyNumericIds = data.response.includes("Here's what I found:") && 
                 data.response.split("Here's what I found:")[1].trim().match(/^\d+(,\s*\d+)*$/);
             
             if (hasOnlyNumericIds && lastResult && lastResult.result && Array.isArray(lastResult.result)) {
-              // We need to format this data properly
               let formattedData = '';
               
               if (isEmotionData) {
-                // Aggregate emotions from all results
                 const emotionCounts: {[key: string]: {count: number, total: number}} = {};
                 
-                // First check if we have direct emotion objects
                 if (lastResult.result[0] && (lastResult.result[0].emotion || lastResult.result[0].name)) {
                   formattedData = lastResult.result.map((item: any) => {
                     const emotion = item.emotion || item.name || Object.keys(item)[0];
                     const score = item.score || (item[emotion] ? item[emotion] : null);
                     return `${emotion}${score ? ` (${typeof score === 'number' ? score.toFixed(2) : score})` : ''}`;
                   }).join(', ');
-                }
-                // Check if we got journal entries with emotion data
-                else if (lastResult.result[0] && lastResult.result[0].emotions) {
-                  // Process emotions from entries
+                } else if (lastResult.result[0] && lastResult.result[0].emotions) {
                   lastResult.result.forEach((entry: any) => {
                     if (entry.emotions && typeof entry.emotions === 'object') {
                       Object.entries(entry.emotions).forEach(([emotion, score]) => {
@@ -119,126 +134,102 @@ export async function processChatMessage(
                     }
                   });
                   
-                  // Format emotion data
                   const sortedEmotions = Object.entries(emotionCounts)
                     .sort((a, b) => {
-                      // Sort by count first, then by average score
                       if (b[1].count !== a[1].count) return b[1].count - a[1].count;
                       return (b[1].total / b[1].count) - (a[1].total / a[1].count);
                     })
-                    .slice(0, 3) // Top 3 emotions
+                    .slice(0, 3)
                     .map(([emotion, stats]) => {
                       const avgScore = (stats.total / stats.count).toFixed(2);
                       return `${emotion} (${avgScore})`;
                     });
                   
                   formattedData = sortedEmotions.join(', ');
-                }
-                // If we have journal entry IDs but no emotions explicitly returned
-                else if (Array.isArray(lastResult.result) && lastResult.result.every((item: any) => typeof item === 'number' || (typeof item === 'object' && item.id))) {
-                  // This is a case where we only got journal entry IDs
-                  // We need to fetch emotion data for these entries
+                } else if (Array.isArray(lastResult.result) && lastResult.result.every((item: any) => typeof item === 'number' || (typeof item === 'object' && item.id))) {
                   const entryIds = lastResult.result.map((item: any) => 
                     typeof item === 'number' ? item : item.id
                   );
                   
-                  // Create a more meaningful response with emotional analysis
-                  data.response = "Based on your journal entries from last month, ";
-                  
-                  // Fetch the actual journal entries to analyze emotions
-                  try {
-                    const { data: entriesData, error: entriesError } = await supabase
-                      .from('Journal Entries')
-                      .select('id, "refined text", emotions')
-                      .in('id', entryIds);
+                  const { data: entriesData, error: entriesError } = await supabase
+                    .from('Journal Entries')
+                    .select('id, "refined text", emotions')
+                    .in('id', entryIds);
                     
-                    if (!entriesError && entriesData && entriesData.length > 0) {
-                      // Extract all emotions from the entries
-                      const emotionsData: {[key: string]: {count: number, total: number}} = {};
-                      
-                      entriesData.forEach(entry => {
-                        if (entry.emotions) {
-                          Object.entries(entry.emotions).forEach(([emotion, score]) => {
-                            if (!emotionsData[emotion]) {
-                              emotionsData[emotion] = { count: 0, total: 0 };
-                            }
-                            emotionsData[emotion].count += 1;
-                            emotionsData[emotion].total += Number(score);
-                          });
-                        }
-                      });
-                      
-                      // Get the top emotions
-                      const topEmotions = Object.entries(emotionsData)
-                        .sort((a, b) => {
-                          if (b[1].count !== a[1].count) return b[1].count - a[1].count;
-                          return (b[1].total / b[1].count) - (a[1].total / a[1].count);
-                        })
-                        .slice(0, 3);
-                      
-                      if (topEmotions.length > 0) {
-                        const emotionsList = topEmotions.map(([emotion, stats]) => {
-                          const avgScore = (stats.total / stats.count).toFixed(2);
-                          return `${emotion} (${avgScore})`;
-                        }).join(', ');
-                        
-                        formattedData = emotionsList;
-                        
-                        // Create a meaningful response
-                        data.response = `Based on your journal entries from last month, your top emotions were: ${emotionsList}.`;
-                        
-                        // Add context about why these emotions were dominant if the query asks for it
-                        if (message.toLowerCase().includes('why')) {
-                          const { data: completionData } = await supabase.functions.invoke('chat-with-rag', {
-                            body: { 
-                              message: `Why did I experience these emotions last month: ${emotionsList}? Provide a short analysis based on my journal entries.`, 
-                              userId,
-                              includeDiagnostics: false
-                            }
-                          });
-                          
-                          if (completionData && completionData.response) {
-                            data.response += " " + completionData.response;
+                  if (!entriesError && entriesData && entriesData.length > 0) {
+                    const emotionsData: {[key: string]: {count: number, total: number}} = {};
+                    
+                    entriesData.forEach(entry => {
+                      if (entry.emotions) {
+                        Object.entries(entry.emotions).forEach(([emotion, score]) => {
+                          if (!emotionsData[emotion]) {
+                            emotionsData[emotion] = { count: 0, total: 0 };
                           }
+                          emotionsData[emotion].count += 1;
+                          emotionsData[emotion].total += Number(score);
+                        });
+                      }
+                    });
+                    
+                    const topEmotions = Object.entries(emotionsData)
+                      .sort((a, b) => {
+                        if (b[1].count !== a[1].count) return b[1].count - a[1].count;
+                        return (b[1].total / b[1].count) - (a[1].total / a[1].count);
+                      })
+                      .slice(0, 3);
+                    
+                    if (topEmotions.length > 0) {
+                      const emotionsList = topEmotions.map(([emotion, stats]) => {
+                        const avgScore = (stats.total / stats.count).toFixed(2);
+                        return `${emotion} (${avgScore})`;
+                      }).join(', ');
+                      
+                      data.response = `Based on your journal entries from last month, your top emotions were: ${emotionsList}.`;
+                      
+                      if (message.toLowerCase().includes('why')) {
+                        const { data: completionData } = await supabase.functions.invoke('chat-with-rag', {
+                          body: { 
+                            message: `Why did I experience these emotions last month: ${emotionsList}? Provide a short analysis based on my journal entries.`, 
+                            userId,
+                            includeDiagnostics: false
+                          }
+                        });
+                        
+                        if (completionData && completionData.response) {
+                          data.response += " " + completionData.response;
                         }
                       }
                     }
-                  } catch (entriesError) {
-                    console.error("Error fetching journal entries:", entriesError);
                   }
                 }
                 
-                // Replace the IDs with formatted emotion data
                 if (formattedData) {
                   if (data.response.includes("Here's what I found:")) {
                     data.response = data.response.split("Here's what I found:")[0] + 
                       "Here's what I found: " + formattedData;
                   } else if (!data.response.includes(formattedData)) {
-                    // Only append the formatted data if it's not already in the response
                     data.response += " " + formattedData;
                   }
                 }
               }
-            }
-            
-            // Also check for [object Object] in the response
-            if (data.response.includes('[object Object]')) {
-              const emotionResults = data.diagnostics.executionResults.find(
-                (result: any) => Array.isArray(result.result) && 
-                  result.result[0] && 
-                  typeof result.result[0] === 'object' && 
-                  (result.result[0].emotion || result.result[0].emotions)
-              );
               
-              if (emotionResults && emotionResults.result) {
-                const emotionData = emotionResults.result.map((item: any) => {
-                  const emotion = item.emotion || Object.keys(item)[0];
-                  const score = item.score || item[emotion];
-                  return `${emotion} (${typeof score === 'number' ? score.toFixed(2) : score})`;
-                }).join(', ');
+              if (data.response.includes('[object Object]')) {
+                const emotionResults = data.diagnostics.executionResults.find(
+                  (result: any) => Array.isArray(result.result) && 
+                    result.result[0] && 
+                    typeof result.result[0] === 'object' && 
+                    (result.result[0].emotion || result.result[0].emotions)
+                );
                 
-                // Replace the response content with formatted emotion data
-                data.response = data.response.replace(/\[object Object\](, \[object Object\])*/, emotionData);
+                if (emotionResults && emotionResults.result) {
+                  const emotionData = emotionResults.result.map((item: any) => {
+                    const emotion = item.emotion || Object.keys(item)[0];
+                    const score = item.score || item[emotion];
+                    return `${emotion} (${typeof score === 'number' ? score.toFixed(2) : score})`;
+                  }).join(', ');
+                  
+                  data.response = data.response.replace(/\[object Object\](, \[object Object\])*/, emotionData);
+                }
               }
             }
           }
@@ -246,15 +237,22 @@ export async function processChatMessage(
           console.log("Smart query planner couldn't handle the query, falling back to RAG");
         }
       } catch (smartQueryError) {
+        if (smartQueryError instanceof Error && 
+            smartQueryError.message && 
+            smartQueryError.message.includes('auth')) {
+          return {
+            role: 'error',
+            content: "Authentication issue when processing your request. Please sign in again.",
+          };
+        }
+        
         console.error("Exception in smart-query-planner:", smartQueryError);
       }
     }
     
-    // If direct querying didn't work, use RAG
     if (!queryResponse || queryResponse.fallbackToRag) {
       console.log("Using RAG approach for query");
       
-      // Process time range if present
       let timeRange = null;
       
       if (messageQueryTypes.timeRange && typeof messageQueryTypes.timeRange === 'object') {
@@ -279,6 +277,15 @@ export async function processChatMessage(
       });
       
       if (error) {
+        if (typeof error === 'object' && error.message) {
+          if (error.message.includes('auth') || error.message.includes('Authentication')) {
+            return {
+              role: 'error',
+              content: "Authentication required for accessing your data. Please sign in again.",
+            };
+          }
+        }
+        
         console.error("Error in chat-with-rag:", error);
         return {
           role: 'error',
@@ -291,25 +298,21 @@ export async function processChatMessage(
     
     console.log("Response received:", queryResponse ? "yes" : "no");
     
-    // Construct final response
     const responseContent = queryResponse.response || "I couldn't find an answer to your question.";
     const chatResponse: ChatMessage = {
       role: 'assistant',
       content: responseContent,
     };
     
-    // Add references if available
     if (queryResponse.diagnostics && queryResponse.diagnostics.relevantEntries) {
       chatResponse.references = queryResponse.diagnostics.relevantEntries;
     }
     
-    // Add analysis data if available
     if (queryResponse.diagnostics) {
       chatResponse.analysis = queryResponse.diagnostics;
       chatResponse.diagnostics = queryResponse.diagnostics;
     }
     
-    // Set flag if we have a numeric result
     if (queryResponse.hasNumericResult) {
       chatResponse.hasNumericResult = true;
     }
@@ -317,6 +320,17 @@ export async function processChatMessage(
     return chatResponse;
   } catch (error) {
     console.error("Error processing chat message:", error);
+    
+    if (error instanceof Error && 
+        (error.message.includes('auth') || 
+         error.message.includes('Authentication') || 
+         error.message.includes('JWT'))) {
+      return {
+        role: 'error',
+        content: "Authentication required. Please sign in again to continue using the chat.",
+      };
+    }
+    
     return {
       role: 'error',
       content: "I apologize, but I encountered an error processing your request. Please try again.",
