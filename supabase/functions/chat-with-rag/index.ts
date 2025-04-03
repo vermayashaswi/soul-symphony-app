@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.3.0";
 import { v4 as uuidv4 } from "https://esm.sh/uuid@9.0.0";
-import { analyzeQueryTypes } from "../../src/utils/chat/queryAnalyzer.ts";
+import { analyzeQueryTypes } from "./queryAnalyzer.ts";
 import { calculateTopEmotions, findStrongestEmotionOccurrence, countKeywordOccurrences } from "./emotionAnalytics.ts";
 import { searchEntriesByEntity, analyzeEntitySentiment, findCommonEntities } from "./entityAnalytics.ts";
 

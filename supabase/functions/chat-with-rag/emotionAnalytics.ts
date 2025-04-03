@@ -1,8 +1,28 @@
 
-// Enhanced emotion analysis functions for voice journaling RAG chatbot
+// Emotion analysis functions for the voice journaling RAG chatbot
+
+// Helper function to load master list of emotions for normalization
+async function loadEmotionMasterList(supabase: any) {
+  try {
+    const { data, error } = await supabase
+      .from('emotions')
+      .select('name, category')
+      .order('name');
+      
+    if (error) {
+      console.error("Error loading emotion master list:", error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Exception loading emotion master list:", error);
+    return [];
+  }
+}
 
 // Helper function to normalize emotion names
-function normalizeEmotionName(emotionInput: string, masterList?: any[]) {
+function normalizeEmotionName(emotionInput: string, masterList: any[] = []) {
   // If no master list is available, return the input as is
   if (!masterList || masterList.length === 0) {
     return emotionInput;
@@ -57,17 +77,6 @@ function normalizeEmotionName(emotionInput: string, masterList?: any[]) {
   
   // Return original if no match found
   return emotionInput;
-}
-
-// Create a snippet with highlighted keyword
-function createSnippetWithKeyword(text: string, keyword: string) {
-  // Case insensitive search
-  const regex = new RegExp(`(.{0,40})(${keyword})(.{0,40})`, 'i');
-  const match = text.match(regex);
-  
-  if (!match) return text.substring(0, 80) + '...';
-  
-  return `...${match[1]}${match[2]}${match[3]}...`;
 }
 
 // Calculate average emotion score over a time period
@@ -154,26 +163,6 @@ async function calculateAverageEmotionScore(supabase: any, userId: string, emoti
   }
 }
 
-// Load master list of emotions for normalization
-async function loadEmotionMasterList(supabase: any) {
-  try {
-    const { data, error } = await supabase
-      .from('emotions')
-      .select('name, category')
-      .order('name');
-    
-    if (error) {
-      console.error("Error loading emotion master list:", error);
-      return [];
-    }
-    
-    return data || [];
-  } catch (error) {
-    console.error("Exception loading emotion master list:", error);
-    return [];
-  }
-}
-
 // Calculate top emotions over a time period
 async function calculateTopEmotions(supabase: any, userId: string, startDate = null, endDate = null, limit = 3) {
   try {
@@ -182,7 +171,7 @@ async function calculateTopEmotions(supabase: any, userId: string, startDate = n
     
     // Build query for entries within the time range
     let query = supabase.from('Journal Entries')
-      .select('emotions, created_at, "refined text" as content, sentiment, sentiment_score, entities')
+      .select('emotions, created_at, "refined text" as content, sentiment_score, entities')
       .eq('user_id', userId);
     
     if (startDate) {
@@ -298,14 +287,14 @@ async function calculateTopEmotions(supabase: any, userId: string, startDate = n
     
     // Calculate average for each emotion, sort, and limit
     const averagedEmotions = Object.entries(emotionScores)
-      .map(([emotion, data]) => ({
+      .map(([emotion, data]: [string, any]) => ({
         emotion,
         score: data.total / data.count,
         frequency: data.count,
         percentageOfEntries: (data.count / entries.length) * 100,
         highestOccurrence: data.highestScoreEntry,
         entries: emotionEntries[emotion]
-          .sort((a, b) => b.score - a.score)
+          ?.sort((a, b) => b.score - a.score)
           .slice(0, 3) // Keep only top 3 entries for each emotion
       }))
       .sort((a, b) => b.score - a.score)
@@ -332,6 +321,12 @@ async function calculateTopEmotions(supabase: any, userId: string, startDate = n
 // Find when a specific emotion was strongest
 async function findStrongestEmotionOccurrence(supabase: any, userId: string, emotionType: string, startDate = null, endDate = null) {
   try {
+    // Load master list of emotions for proper normalization
+    const emotionMasterList = await loadEmotionMasterList(supabase);
+    
+    // Normalize the emotion name
+    const normalizedEmotionType = normalizeEmotionName(emotionType, emotionMasterList);
+    
     // Build query for entries within the time range
     let query = supabase.from('Journal Entries')
       .select('emotions, created_at, "refined text" as content')
@@ -367,15 +362,25 @@ async function findStrongestEmotionOccurrence(supabase: any, userId: string, emo
     let highestScore = -1;
     
     entries.forEach((entry: any) => {
-      if (entry.emotions && typeof entry.emotions[emotionType] !== 'undefined') {
-        const score = parseFloat(entry.emotions[emotionType]);
-        if (score > highestScore) {
-          highestScore = score;
-          strongestOccurrence = {
-            date: entry.created_at,
-            score: score * 100, // Convert to percentage
-            content: entry.content
-          };
+      if (entry.emotions) {
+        // Check for both the normalized emotion name and the original input
+        const emotionKeys = Object.keys(entry.emotions).map(k => k.toLowerCase());
+        
+        for (const key of emotionKeys) {
+          const normalizedKey = normalizeEmotionName(key, emotionMasterList).toLowerCase();
+          
+          if (normalizedKey === normalizedEmotionType.toLowerCase() || 
+              key === emotionType.toLowerCase()) {
+            const score = parseFloat(entry.emotions[key]);
+            if (score > highestScore) {
+              highestScore = score;
+              strongestOccurrence = {
+                date: entry.created_at,
+                score: score * 100, // Convert to percentage
+                content: entry.content
+              };
+            }
+          }
         }
       }
     });
@@ -389,7 +394,7 @@ async function findStrongestEmotionOccurrence(supabase: any, userId: string, emo
     
     return {
       found: true,
-      emotion: emotionType,
+      emotion: normalizedEmotionType,
       strongestOccurrence,
       entryCount: entries.length
     };
@@ -400,6 +405,19 @@ async function findStrongestEmotionOccurrence(supabase: any, userId: string, emo
       error: error.message
     };
   }
+}
+
+// Create a snippet with highlighted keyword
+function createSnippetWithKeyword(text: string, keyword: string) {
+  if (!text) return "No content available";
+  
+  // Case insensitive search
+  const regex = new RegExp(`(.{0,40})(${keyword})(.{0,40})`, 'i');
+  const match = text.match(regex);
+  
+  if (!match) return text.substring(0, 80) + '...';
+  
+  return `...${match[1]}${match[2]}${match[3]}...`;
 }
 
 // Count occurrences of a keyword in journal entries
@@ -440,24 +458,26 @@ async function countKeywordOccurrences(supabase: any, userId: string, keyword: s
     
     // For more accurate counting, count actual occurrences in each entry
     let totalOccurrences = 0;
-    const entriesWithKeyword: any[] = [];
+    const entriesWithKeyword = [];
     
-    entries.forEach((entry: any) => {
-      // Case insensitive search
-      const regex = new RegExp(keyword, 'gi');
-      const matches = entry.content.match(regex);
-      const occurrences = matches ? matches.length : 0;
-      
-      if (occurrences > 0) {
-        totalOccurrences += occurrences;
-        entriesWithKeyword.push({
-          id: entry.id,
-          date: entry.created_at,
-          occurrences,
-          snippet: createSnippetWithKeyword(entry.content, keyword)
-        });
+    if (entries && entries.length > 0) {
+      for (const entry of entries) {
+        // Case insensitive search
+        const regex = new RegExp(keyword, 'gi');
+        const matches = entry.content.match(regex);
+        const occurrences = matches ? matches.length : 0;
+        
+        if (occurrences > 0) {
+          totalOccurrences += occurrences;
+          entriesWithKeyword.push({
+            id: entry.id,
+            date: entry.created_at,
+            occurrences,
+            snippet: createSnippetWithKeyword(entry.content, keyword)
+          });
+        }
       }
-    });
+    }
     
     return {
       keyword,
@@ -466,7 +486,7 @@ async function countKeywordOccurrences(supabase: any, userId: string, keyword: s
       entries: entriesWithKeyword
     };
   } catch (error) {
-    console.error("Error counting keyword occurrences:", error);
+    console.error("Error in countKeywordOccurrences:", error);
     return {
       count: 0,
       error: error.message
@@ -479,7 +499,5 @@ export {
   calculateAverageEmotionScore,
   calculateTopEmotions,
   findStrongestEmotionOccurrence,
-  countKeywordOccurrences,
-  normalizeEmotionName,
-  loadEmotionMasterList
+  countKeywordOccurrences
 };
