@@ -5,18 +5,12 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ThemeBoxes } from './ThemeBoxes';
+import ThemeBoxes from './ThemeBoxes';
+import { JournalEntry } from '@/types/journal';
 
 interface JournalEntryCardProps {
-  entry: {
-    id: number;
-    "refined text"?: string;
-    created_at: string;
-    audio_url?: string;
-    master_themes?: string[];
-    emotions?: Record<string, number>;
-  };
-  onDelete: (id: number) => void;
+  entry: JournalEntry;
+  onDelete?: (id: number) => void;
 }
 
 export const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry, onDelete }) => {
@@ -72,7 +66,7 @@ export const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ entry, onDel
       }
 
       toast.success('Journal entry deleted');
-      onDelete(entry.id);
+      if (onDelete) onDelete(entry.id);
     } catch (error) {
       console.error('Error in handleDelete:', error);
       toast.error('An unexpected error occurred');

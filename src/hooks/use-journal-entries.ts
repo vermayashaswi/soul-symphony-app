@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 
 export function useJournalEntries(userId: string | undefined, refreshKey: number, isProfileChecked: boolean = false) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -66,16 +66,18 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const typedEntries: JournalEntry[] = (data || []).map(item => ({
         id: item.id,
         content: item["refined text"] || item["transcription text"] || "",
+        "refined text": item["refined text"],
         created_at: item.created_at,
         audio_url: item.audio_url,
         sentiment: item.sentiment,
-        themes: item.master_themes,
+        master_themes: item.master_themes,
         foreignKey: item["foreign key"],
         entities: item.entities ? (item.entities as any[]).map(entity => ({
           type: entity.type,
           name: entity.name,
           text: entity.text
-        })) : undefined
+        })) : undefined,
+        emotions: item.emotions
       }));
       
       setEntries(typedEntries);

@@ -1,10 +1,9 @@
-
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Smile, Meh, Frown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isSameDay, isSameMonth, startOfYear, endOfYear, eachMonthOfInterval, getMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 import { TimeRange } from '@/hooks/use-insights-data';
 
 interface SentimentCalendarProps {
