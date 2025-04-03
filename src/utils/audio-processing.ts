@@ -94,7 +94,8 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     // Use a simpler try-catch approach to avoid TypeScript instantiation issues
     let fnError = null;
     try {
-      await supabase.functions.invoke('transcribe-audio', {
+      // Explicitly cast to any to bypass TypeScript's deep type resolution
+      (supabase.functions as any).invoke('transcribe-audio', {
         body: funcBody
       });
     } catch (error) {
