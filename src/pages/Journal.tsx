@@ -13,6 +13,7 @@ import JournalSearch from '@/components/journal/JournalSearch';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import JournalDebugPanel from '@/components/journal/JournalDebugPanel';
 
 const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
@@ -38,7 +39,38 @@ const Journal = () => {
   useEffect(() => {
     if (activeTab === 'entries' && isProfileChecked) {
       console.log('Tab changed to entries, fetching entries...');
-      fetchEntries();
+      
+      // Dispatch operation start event
+      const event = new CustomEvent('journalOperationStart', {
+        detail: {
+          type: 'loading',
+          message: 'Loading journal entries'
+        }
+      });
+      const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
+      
+      fetchEntries()
+        .then(() => {
+          if (opId) {
+            window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+              detail: {
+                id: opId,
+                status: 'success'
+              }
+            }));
+          }
+        })
+        .catch(error => {
+          if (opId) {
+            window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+              detail: {
+                id: opId,
+                status: 'error',
+                details: error.message
+              }
+            }));
+          }
+        });
     }
   }, [activeTab, isProfileChecked, fetchEntries]);
 
@@ -75,6 +107,15 @@ const Journal = () => {
 
   const checkUserProfile = async (userId: string) => {
     try {
+      // Dispatch operation start event
+      const event = new CustomEvent('journalOperationStart', {
+        detail: {
+          type: 'loading',
+          message: 'Checking user profile'
+        }
+      });
+      const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
+      
       console.log('Checking user profile for ID:', userId);
       
       const { data: profile, error } = await supabase
@@ -87,7 +128,18 @@ const Journal = () => {
         console.log('Creating user profile...');
         
         const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
+        if (userError) {
+          if (opId) {
+            window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+              detail: {
+                id: opId,
+                status: 'error',
+                details: `Auth error: ${userError.message}`
+              }
+            }));
+          }
+          throw userError;
+        }
         
         console.log('User data retrieved:', userData.user?.id);
         
@@ -102,6 +154,15 @@ const Journal = () => {
           
         if (insertError) {
           console.error('Error creating user profile:', insertError);
+          if (opId) {
+            window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+              detail: {
+                id: opId,
+                status: 'error',
+                details: `Insert error: ${insertError.message}`
+              }
+            }));
+          }
           throw insertError;
         }
         console.log('Profile created successfully');
@@ -110,6 +171,14 @@ const Journal = () => {
       }
       
       setIsProfileChecked(true);
+      if (opId) {
+        window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+          detail: {
+            id: opId,
+            status: 'success'
+          }
+        }));
+      }
     } catch (error: any) {
       console.error('Error checking/creating user profile:', error);
       toast.error('Error setting up profile. Please try again.');
@@ -122,10 +191,29 @@ const Journal = () => {
       return;
     }
     
+    // Dispatch operation start event
+    const event = new CustomEvent('journalOperationStart', {
+      detail: {
+        type: 'recording',
+        message: 'Processing new journal entry',
+        details: `Temp ID: ${tempId}`
+      }
+    });
+    const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
+    
     console.log('Entry recorded, adding to processing queue. User ID:', user.id);
     
     if (tempId) {
       setProcessingEntries(prev => [...prev, tempId]);
+      
+      if (opId) {
+        window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+          detail: {
+            id: opId,
+            message: 'Entry recorded, processing started'
+          }
+        }));
+      }
     }
     
     setActiveTab('entries');
@@ -143,22 +231,76 @@ const Journal = () => {
           
         if (error) {
           console.error('Error fetching newly created entry:', error);
+          
+          if (opId) {
+            window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+              detail: {
+                id: opId,
+                details: `Error checking entry: ${error.message}`
+              }
+            }));
+          }
+          
           return false;
         } else if (data) {
           console.log('New entry found:', data.id);
           
-          await supabase.functions.invoke('generate-themes', {
-            body: {
-              text: data["refined text"],
-              entryId: data.id
+          if (opId) {
+            window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+              detail: {
+                id: opId,
+                message: 'Entry processed, generating themes'
+              }
+            }));
+          }
+          
+          try {
+            await supabase.functions.invoke('generate-themes', {
+              body: {
+                text: data["refined text"],
+                entryId: data.id
+              }
+            });
+            
+            if (opId) {
+              window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+                detail: {
+                  id: opId,
+                  status: 'success',
+                  message: 'Entry fully processed'
+                }
+              }));
             }
-          });
+          } catch (themeError: any) {
+            console.error('Error generating themes:', themeError);
+            
+            if (opId) {
+              window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+                detail: {
+                  id: opId,
+                  status: 'error',
+                  details: `Theme generation error: ${themeError.message || 'Unknown error'}`
+                }
+              }));
+            }
+          }
           
           return true;
         }
         return false;
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error checking for processed entry:', error);
+        
+        if (opId) {
+          window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+            detail: {
+              id: opId,
+              status: 'error',
+              details: `Error checking entry: ${error.message}`
+            }
+          }));
+        }
+        
         return false;
       }
     };
@@ -180,13 +322,82 @@ const Journal = () => {
       if (processingEntries.includes(tempId || '')) {
         setProcessingEntries(prev => prev.filter(id => id !== tempId));
         toast.info('Entry processing is taking longer than expected. It should appear soon.');
+        
+        if (opId) {
+          window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+            detail: {
+              id: opId,
+              status: 'error',
+              message: 'Entry processing timeout',
+              details: 'Processing took longer than expected. The entry may still appear soon.'
+            }
+          }));
+        }
       }
     }, 120000);
   };
 
-  const handleDeleteEntry = (entryId: number) => {
-    console.log('Entry deleted, updating UI:', entryId);
-    setRefreshKey(prev => prev + 1);
+  const handleDeleteEntry = async (entryId: number) => {
+    // Dispatch operation start event
+    const event = new CustomEvent('journalOperationStart', {
+      detail: {
+        type: 'deletion',
+        message: `Deleting entry #${entryId}`
+      }
+    });
+    const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
+    
+    try {
+      const { error } = await supabase
+        .from('Journal Entries')
+        .delete()
+        .eq('id', entryId);
+        
+      if (error) {
+        console.error('Error deleting entry:', error);
+        
+        if (opId) {
+          window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+            detail: {
+              id: opId,
+              status: 'error',
+              details: `Deletion error: ${error.message}`
+            }
+          }));
+        }
+        
+        toast.error('Failed to delete entry');
+        return;
+      }
+      
+      console.log('Entry deleted, updating UI:', entryId);
+      
+      if (opId) {
+        window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+          detail: {
+            id: opId,
+            status: 'success'
+          }
+        }));
+      }
+      
+      setRefreshKey(prev => prev + 1);
+      toast.success('Entry deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting entry:', error);
+      
+      if (opId) {
+        window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+          detail: {
+            id: opId,
+            status: 'error',
+            details: error.message
+          }
+        }));
+      }
+      
+      toast.error('Failed to delete entry');
+    }
   };
 
   const handleSearch = (query: string) => {
@@ -258,6 +469,8 @@ const Journal = () => {
           </TabsContent>
         </Tabs>
       </div>
+      
+      <JournalDebugPanel />
     </div>
   );
 };
