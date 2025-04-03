@@ -98,10 +98,12 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       tempId
     };
     
-    // Fix: Add explicit type parameter to avoid excessive type instantiation
-    const { error: fnError } = await supabase.functions.invoke<TranscribeResponse>('transcribe-audio', {
+    // Use the most basic approach to avoid type inference issues
+    const functionResult = await supabase.functions.invoke('transcribe-audio', {
       body: funcBody
-    });
+    }) as { data: any; error: any };
+    
+    const fnError = functionResult.error;
     
     if (fnError) {
       console.error("Error invoking transcribe function:", fnError);
