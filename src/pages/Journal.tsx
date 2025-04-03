@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +22,6 @@ const Journal = () => {
   
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
   
-  // Use the hook for entry processing
   const { 
     processingEntries, 
     processedEntryIds, 
@@ -85,7 +83,6 @@ const Journal = () => {
     
     setActiveTab('entries');
     
-    // Delegate to the hook
     await handleEntryRecording(audioBlob, tempId);
   };
 

@@ -48,6 +48,40 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     }
     
     // 2. Upload the audio file to storage
+    // First, check if the bucket exists
+    const { data: buckets, error: bucketsError } = await supabase.storage
+      .listBuckets();
+      
+    if (bucketsError) {
+      console.error("Error listing buckets:", bucketsError);
+      return {
+        success: false,
+        error: `Storage error: ${bucketsError.message}`
+      };
+    }
+    
+    // Check if 'audio-recordings' bucket exists
+    const audioBucket = buckets?.find(b => b.name === 'audio-recordings');
+    
+    if (!audioBucket) {
+      console.error("Bucket 'audio-recordings' not found. Creating it now.");
+      
+      // Create the bucket if it doesn't exist
+      const { error: createBucketError } = await supabase.storage
+        .createBucket('audio-recordings', {
+          public: true
+        });
+        
+      if (createBucketError) {
+        console.error("Error creating bucket:", createBucketError);
+        return {
+          success: false,
+          error: `Bucket creation error: ${createBucketError.message}`
+        };
+      }
+    }
+    
+    // Now proceed with the upload
     const audioFilename = `recordings/${userId}/${tempId}.webm`;
     const { error: uploadError } = await supabase.storage
       .from('audio-recordings')
@@ -94,11 +128,19 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     // Using fetch API directly to bypass TypeScript type issues
     let fnError = null;
     try {
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/transcribe-audio`, {
+      // Get the Supabase project URL from the client
+      const { data: session } = await supabase.auth.getSession();
+      const accessToken = session?.session?.access_token || '';
+      
+      // Construct the full URL for the function
+      const url = new URL(supabase.supabaseUrl);
+      const functionUrl = `${url.origin}/functions/v1/transcribe-audio`;
+      
+      const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.getSession().then(({ data }) => data.session?.access_token || '')}`
+          'Authorization': `Bearer ${accessToken}`
         },
         body: JSON.stringify(funcBody)
       });
