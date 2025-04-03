@@ -25,64 +25,118 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
   }
   
   try {
-    console.log(`Processing audio recording: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
+    console.log(`Processing audio recording: ${audioBlob.size} bytes`);
     
     // Generate a unique ID for this recording
     const tempId = uuidv4();
     
-    // Convert the audio blob to base64
-    const base64Audio = await blobToBase64(audioBlob);
-    
-    // Call the process-audio edge function directly
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData?.session?.access_token || '';
-    
-    if (!accessToken) {
-      console.error("No access token available");
-      return {
-        success: false,
-        error: "Authentication required"
-      };
-    }
-    
-    // Log request details before making the call
-    console.log("Calling process-audio edge function with payload size:", 
-      base64Audio ? Math.round(base64Audio.length / 1024) + "KB" : "0KB");
-    
-    try {
-      const { data, error } = await supabase.functions.invoke("process-audio", {
-        body: {
-          audio: base64Audio,
-          userId,
-          tempId
-        },
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
+    // 1. Create a placeholder entry in the database
+    const { error: insertError } = await supabase
+      .from('Journal Entries')
+      .insert({
+        user_id: userId,
+        "foreign key": tempId
+        // Removed the status field as it doesn't exist in the database schema
       });
       
-      if (error) {
-        console.error("Error calling process-audio function:", error);
-        return {
-          success: false,
-          error: `Function error: ${error.message}`
-        };
-      }
-      
-      console.log("Edge function response:", data);
-      
-      // Return success along with the temporary ID for tracking
-      return {
-        success: true,
-        tempId
-      };
-    } catch (invocationError) {
-      console.error("Function invocation error:", invocationError);
+    if (insertError) {
+      console.error("Error creating placeholder entry:", insertError);
       return {
         success: false,
-        error: `Error invoking function: ${invocationError instanceof Error ? invocationError.message : String(invocationError)}`
+        error: `Database error: ${insertError.message}`
       };
     }
+    
+    // 2. Upload the audio file to storage
+    // Use the existing bucket "Journal Audio Entries" instead of creating a new one
+    const bucketName = 'Journal Audio Entries';
+    
+    // Now proceed with the upload
+    const audioFilename = `recordings/${userId}/${tempId}.webm`;
+    const { error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(audioFilename, audioBlob, {
+        contentType: audioBlob.type,
+        cacheControl: '3600'
+      });
+      
+    if (uploadError) {
+      console.error("Error uploading audio:", uploadError);
+      return {
+        success: false,
+        error: `Upload error: ${uploadError.message}`
+      };
+    }
+    
+    // 3. Get the public URL for the uploaded audio
+    // Fix the "excessively deep" type error by using a different approach to get the URL
+    const { data } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(audioFilename);
+      
+    const audioUrl = data.publicUrl;
+    
+    // 4. Update the placeholder entry with the audio URL
+    const { error: updateError } = await supabase
+      .from('Journal Entries')
+      .update({
+        audio_url: audioUrl
+      })
+      .eq('"foreign key"', tempId);
+      
+    if (updateError) {
+      console.error("Error updating entry with audio URL:", updateError);
+      // This is not a critical error, so we continue
+    }
+    
+    // 5. Call the transcribe-audio function to process the recording asynchronously
+    const funcBody = {
+      audioUrl,
+      userId,
+      tempId
+    };
+
+    // Using fetch API directly to bypass TypeScript type issues
+    let fnError = null;
+    try {
+      // Get the Supabase project URL and access token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || '';
+      
+      // Fix the protected property access error by using a hardcoded URL instead
+      // of accessing the protected supabaseUrl property
+      const supabaseUrl = "https://kwnwhgucnzqxndzjayyq.supabase.co";
+      const functionUrl = `${supabaseUrl}/functions/v1/transcribe-audio`;
+      
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(funcBody)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Function error: ${response.status} ${response.statusText}`);
+      }
+    } catch (invokeError) {
+      fnError = invokeError;
+      console.error("Error invoking transcribe function:", invokeError);
+    }
+
+    if (fnError) {
+      return {
+        success: false,
+        error: `Processing error: ${fnError instanceof Error ? fnError.message : String(fnError)}`
+      };
+    }
+    
+    // Return success along with the temporary ID for tracking
+    return {
+      success: true,
+      tempId
+    };
     
   } catch (error) {
     console.error("Unexpected error in processRecording:", error);
@@ -91,19 +145,4 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`
     };
   }
-}
-
-// Helper function to convert a Blob to base64
-async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = typeof reader.result === 'string' 
-        ? reader.result.split(',')[1] // Remove the data URL prefix
-        : '';
-      resolve(base64String);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
 }
