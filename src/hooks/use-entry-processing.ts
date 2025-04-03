@@ -19,6 +19,7 @@ export function useEntryProcessing(
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
   
+  // Poll for new entries when processing
   useEffect(() => {
     if (processingEntries.length > 0 && activeTab === 'entries') {
       console.log('Setting up polling for processing entries:', processingEntries);
@@ -31,6 +32,7 @@ export function useEntryProcessing(
     }
   }, [processingEntries, activeTab, fetchEntries]);
 
+  // Check if processing is complete
   useEffect(() => {
     if (processingEntries.length > 0 && entries.length > 0) {
       const newlyCompletedTempIds: string[] = [];
