@@ -83,7 +83,8 @@ export function useEntryProcessing(
       
       // Ensure proper handling of column names with spaces
       if (data["refined text"]) {
-        // Separate function call to avoid deep type inference
+        // Add @ts-ignore to bypass TypeScript's deep type instantiation error
+        // @ts-ignore - Bypassing TypeScript's excessive type depth checking
         const invokeResult = await supabase.functions.invoke('generate-themes', {
           body: {
             text: data["refined text"],
