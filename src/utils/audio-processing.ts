@@ -36,7 +36,6 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       .insert({
         user_id: userId,
         "foreign key": tempId
-        // Removed the status field as it doesn't exist in the database schema
       });
       
     if (insertError) {
@@ -47,17 +46,43 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       };
     }
     
-    // 2. Upload the audio file to storage
-    // Use the existing bucket "Journal Audio Entries" instead of creating a new one
+    // 2. Use the correct bucket name with proper casing
+    // The bucket name must match exactly as it appears in Supabase
     const bucketName = 'Journal Audio Entries';
     
-    // Now proceed with the upload
+    // Check if the bucket exists
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    
+    if (bucketsError) {
+      console.error("Error listing buckets:", bucketsError);
+      return {
+        success: false,
+        error: `Storage error: ${bucketsError.message}`
+      };
+    }
+    
+    const bucketExists = buckets?.some(bucket => 
+      bucket.name.toLowerCase() === bucketName.toLowerCase()
+    );
+    
+    if (!bucketExists) {
+      console.error(`Bucket "${bucketName}" not found. Available buckets:`, 
+        buckets?.map(b => b.name) || []);
+      return {
+        success: false,
+        error: `Storage bucket "${bucketName}" not found`
+      };
+    }
+    
+    // 3. Upload the audio file to storage
     const audioFilename = `recordings/${userId}/${tempId}.webm`;
     const { error: uploadError } = await supabase.storage
       .from(bucketName)
       .upload(audioFilename, audioBlob, {
         contentType: audioBlob.type,
-        cacheControl: '3600'
+        cacheControl: '3600',
+        // Use upsert to overwrite if file exists
+        upsert: true
       });
       
     if (uploadError) {
@@ -68,15 +93,19 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       };
     }
     
-    // 3. Get the public URL for the uploaded audio
-    // Fix the "excessively deep" type error by using a different approach to get the URL
-    const { data } = supabase.storage
+    // 4. Get the URL for the uploaded audio - use signed URLs for private buckets
+    const { data: urlData, error: urlError } = await supabase.storage
       .from(bucketName)
-      .getPublicUrl(audioFilename);
+      .createSignedUrl(audioFilename, 60 * 60 * 24 * 7); // 7 day expiry
       
-    const audioUrl = data.publicUrl;
+    if (urlError) {
+      console.error("Error creating signed URL:", urlError);
+      // Continue with the process, we'll update the URL later
+    }
     
-    // 4. Update the placeholder entry with the audio URL
+    const audioUrl = urlData?.signedUrl;
+    
+    // 5. Update the placeholder entry with the audio URL
     const { error: updateError } = await supabase
       .from('Journal Entries')
       .update({
@@ -89,7 +118,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       // This is not a critical error, so we continue
     }
     
-    // 5. Call the transcribe-audio function to process the recording asynchronously
+    // 6. Call the transcribe-audio function to process the recording asynchronously
     const funcBody = {
       audioUrl,
       userId,
@@ -103,8 +132,6 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token || '';
       
-      // Fix the protected property access error by using a hardcoded URL instead
-      // of accessing the protected supabaseUrl property
       const supabaseUrl = "https://kwnwhgucnzqxndzjayyq.supabase.co";
       const functionUrl = `${supabaseUrl}/functions/v1/transcribe-audio`;
       
@@ -118,7 +145,8 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       });
       
       if (!response.ok) {
-        throw new Error(`Function error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Function error: ${response.status} ${response.statusText} - ${errorText}`);
       }
     } catch (invokeError) {
       fnError = invokeError;
