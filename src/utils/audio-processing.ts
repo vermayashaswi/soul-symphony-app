@@ -2,6 +2,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { verifyUserAuthentication } from './audio/auth-utils';
 
 interface ProcessingResult {
   success: boolean;
@@ -20,6 +21,16 @@ interface ProcessingResult {
  */
 export async function processRecording(audioBlob: Blob, userId?: string): Promise<ProcessingResult> {
   try {
+    // Verify authentication before proceeding
+    if (!userId) {
+      const { isAuthenticated, userId: authUserId, error: authError } = await verifyUserAuthentication();
+      if (!isAuthenticated || authError) {
+        console.error('Authentication error:', authError);
+        return { success: false, error: authError || 'Authentication required for audio processing' };
+      }
+      userId = authUserId;
+    }
+
     // 1. Generate a temporary ID to track this recording
     const tempId = uuidv4();
     console.log(`Processing recording with temp ID: ${tempId}`);
@@ -43,19 +54,34 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
 
     // 3. Upload audio file to storage
     const bucketName = 'journal-audio-entries';
-    const audioFilename = `recordings/${userId || 'anonymous'}/${tempId}.webm`;
+    const audioFilename = `recordings/${userId}/${tempId}.webm`;
 
     // Ensure file type is correct
     const audioFile = new File([audioBlob], audioFilename, { 
       type: audioBlob.type || 'audio/webm' 
     });
 
+    // Check if bucket exists or create it
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      if (!buckets?.find(b => b.name === bucketName)) {
+        console.log(`Creating bucket: ${bucketName}`);
+        await supabase.storage.createBucket(bucketName, {
+          public: true
+        });
+      }
+    } catch (bucketError) {
+      console.error('Error checking/creating bucket:', bucketError);
+      // Continue anyway as the bucket might exist but error due to permissions
+    }
+
     // Upload the file
-    const { error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from(bucketName)
       .upload(audioFilename, audioFile, {
         contentType: audioFile.type,
-        cacheControl: '3600'
+        cacheControl: '3600',
+        upsert: true
       });
 
     if (uploadError) {
@@ -63,16 +89,31 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       return { success: false, error: `Upload error: ${uploadError.message}` };
     }
 
-    // 4. Get the public URL for the audio file
-    const { data: urlData } = await supabase
+    // 4. Get the URL for the audio file
+    // Try getting a signed URL if public URL fails due to RLS restrictions
+    let audioUrl;
+    
+    // First try getting public URL
+    const { data: publicUrlData } = await supabase
       .storage
       .from(bucketName)
       .getPublicUrl(audioFilename);
-
-    const audioUrl = urlData?.publicUrl;
+    
+    audioUrl = publicUrlData?.publicUrl;
+    
+    // If no public URL (possibly due to RLS), try signed URL
+    if (!audioUrl) {
+      console.log('Public URL not available, trying signed URL...');
+      const { data: signedUrlData } = await supabase
+        .storage
+        .from(bucketName)
+        .createSignedUrl(audioFilename, 60 * 60 * 24); // 24 hours expiry
+      
+      audioUrl = signedUrlData?.signedUrl;
+    }
 
     if (!audioUrl) {
-      console.error('Failed to get public URL for audio file');
+      console.error('Failed to get URL for audio file');
       return { success: false, error: 'Failed to get audio URL' };
     }
 
@@ -96,7 +137,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       const { data, error } = await supabase.functions.invoke('transcribe-audio', {
         body: {
           audio: base64Audio,
-          userId: userId || null,
+          userId: userId,
           tempId: tempId
         }
       });
