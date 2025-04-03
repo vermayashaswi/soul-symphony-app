@@ -9,13 +9,6 @@ interface ProcessingResult {
   tempId?: string;
 }
 
-// Add a type for the function response
-interface TranscribeResponse {
-  success?: boolean;
-  error?: string;
-  // Additional fields if needed
-}
-
 export async function processRecording(audioBlob: Blob, userId?: string): Promise<ProcessingResult> {
   if (!userId) {
     return {
@@ -98,15 +91,18 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       tempId
     };
     
-    // Use the most basic approach to avoid type inference issues
-    const functionResult = await supabase.functions.invoke('transcribe-audio', {
-      body: funcBody
-    }) as { data: any; error: any };
-    
-    const fnError = functionResult.error;
+    // Use a simpler try-catch approach to avoid TypeScript instantiation issues
+    let fnError = null;
+    try {
+      await supabase.functions.invoke('transcribe-audio', {
+        body: funcBody
+      });
+    } catch (error: any) {
+      fnError = error;
+      console.error("Error invoking transcribe function:", error);
+    }
     
     if (fnError) {
-      console.error("Error invoking transcribe function:", fnError);
       return {
         success: false,
         error: `Processing error: ${fnError.message}`
