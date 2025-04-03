@@ -1,3 +1,4 @@
+
 // Change the return type to allow nested objects for properties like timeRange
 export const analyzeQueryTypes = (query: string): Record<string, any> => {
   const lowerQuery = query.toLowerCase();
@@ -285,7 +286,7 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     if (hasTopEmotionsPattern) {
       return 'emotion_aggregation';
     }
-    if (isEmotionFocused && isWhyQuestion) {
+    if (hasEmotionWords && isWhyQuestion) {
       return 'emotion_causal_analysis';
     }
     if (isRelationshipQuery && (isWhyQuestion || needsContext)) {
@@ -299,7 +300,8 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   
   const hasExplicitHappinessRating = explicitHappinessRatingPattern.test(lowerQuery);
   
-  return {
+  // Create result object
+  const result = {
     isQuantitative: hasQuantitativeWords || hasNumbers || hasTopEmotionsPattern || hasEmotionQuantification || hasHappinessRating,
     
     isTemporal: hasTemporalWords,
@@ -345,7 +347,7 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     isImprovementQuery,
     
     searchStrategy: determineSearchStrategy(),
-    needsTimeRetrieval: isWhenEventQuery || (isRelationshipQuery && isTemporal),
+    needsTimeRetrieval: isWhenEventQuery || (isRelationshipQuery && hasTemporalWords),
     needsThemeFiltering: isRelationshipQuery || isImprovementQuery,
     
     timeRange: {
@@ -354,4 +356,6 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
       endDate: timeRange.endDate ? timeRange.endDate.toISOString() : null
     }
   };
+  
+  return result;
 };
