@@ -69,11 +69,11 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     }
     
     // 3. Get the public URL for the uploaded audio
-    const publicUrlResult = supabase.storage
+    const { data: publicUrlData } = supabase.storage
       .from(bucketName)
       .getPublicUrl(audioFilename);
       
-    const audioUrl = publicUrlResult.data.publicUrl;
+    const audioUrl = publicUrlData.publicUrl;
     
     // 4. Update the placeholder entry with the audio URL
     const { error: updateError } = await supabase
@@ -102,8 +102,10 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token || '';
       
-      // Extract the base URL from the supabaseUrl string
-      const baseUrl = new URL(supabase.supabaseUrl).origin;
+      // Get the Supabase URL from environment variables or constants
+      // Instead of accessing the protected supabaseUrl property
+      const supabaseUrlString = supabase.supabaseUrl || "https://kwnwhgucnzqxndzjayyq.supabase.co";
+      const baseUrl = new URL(supabaseUrlString).origin;
       const functionUrl = `${baseUrl}/functions/v1/transcribe-audio`;
       
       const response = await fetch(functionUrl, {
