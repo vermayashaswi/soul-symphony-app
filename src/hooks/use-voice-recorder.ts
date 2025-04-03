@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+
+import { useState, useRef, useEffect } from "react";
 import RecordRTC, { StereoAudioRecorder } from "recordrtc";
 
 interface UseVoiceRecorderProps {
@@ -18,7 +19,7 @@ export function useVoiceRecorder({
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const [startTime, setStartTime] = useState<number>(0);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
-  const timerInterval = useRef<number | null>(null);
+  const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startRecording = async () => {
     try {
@@ -167,6 +168,7 @@ export function useVoiceRecorder({
 
   const recordingTime = formatTime(elapsedTime);
 
+  // Clean up on unmount
   useEffect(() => {
     return () => {
       if (timerInterval.current) {

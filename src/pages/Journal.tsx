@@ -249,37 +249,54 @@ const Journal = () => {
             window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
               detail: {
                 id: opId,
-                message: 'Entry processed, generating themes'
+                message: 'Entry processed, generating themes and entities'
               }
             }));
           }
           
           try {
-            await supabase.functions.invoke('generate-themes', {
+            // Ensure themes are generated for the entry
+            const themesResult = await supabase.functions.invoke('generate-themes', {
               body: {
                 text: data["refined text"],
                 entryId: data.id
               }
             });
             
+            console.log('Themes generation result:', themesResult);
+
+            // Ensure entities are extracted for the entry
+            const entitiesResult = await supabase.functions.invoke('batch-extract-entities', {
+              body: {
+                userId: user.id,
+                processAll: false
+              }
+            });
+            
+            console.log('Entity extraction result:', entitiesResult);
+            
             if (opId) {
               window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
                 detail: {
                   id: opId,
                   status: 'success',
-                  message: 'Entry fully processed'
+                  message: 'Entry fully processed with themes and entities',
+                  details: JSON.stringify({
+                    themes: themesResult,
+                    entities: entitiesResult
+                  }, null, 2)
                 }
               }));
             }
-          } catch (themeError: any) {
-            console.error('Error generating themes:', themeError);
+          } catch (processingError: any) {
+            console.error('Error processing entry:', processingError);
             
             if (opId) {
               window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
                 detail: {
                   id: opId,
                   status: 'error',
-                  details: `Theme generation error: ${themeError.message || 'Unknown error'}`
+                  details: `Processing error: ${processingError.message || 'Unknown error'}`
                 }
               }));
             }

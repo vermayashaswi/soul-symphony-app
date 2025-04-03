@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -13,14 +12,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Hardcoded API key
-const GOOGLE_NL_API_KEY = 'AIzaSyAwEtfHQl3N69phsxfkwuhmRKelNQfd_qs';
+// Use the GOOGLE_API environment variable from Supabase secrets
+const GOOGLE_NL_API_KEY = Deno.env.get('GOOGLE_API') || '';
 
 async function analyzeWithGoogleNL(text: string) {
   try {
     console.log('Analyzing text with Google NL API for entities:', text.slice(0, 100) + '...');
     
-    console.log('Using hardcoded Google NL API key');
+    if (!GOOGLE_NL_API_KEY) {
+      console.error('Google NL API key missing from environment');
+      return { error: "API key missing. Please add the GOOGLE_API secret in Supabase Edge Function Secrets." };
+    }
+    
+    console.log('Using Google NL API key from environment variables');
     
     // Using the correct endpoint for entity extraction
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${GOOGLE_NL_API_KEY}`, {
@@ -110,8 +114,17 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
     console.log('Starting batch entity extraction process');
     const startTime = Date.now();
     
-    // We're using the hardcoded API key so no need to check environment
-    console.log('Using hardcoded Google NL API key');
+    if (!GOOGLE_NL_API_KEY) {
+      console.error('Google NL API key missing from environment');
+      return { 
+        success: false, 
+        error: "Google API key is missing from environment variables. Please set the GOOGLE_API secret.", 
+        processed: 0, 
+        total: 0
+      };
+    }
+    
+    console.log('Using Google NL API key from environment variables');
     
     // Diagnostic information to return
     const diagnosticInfo: any = {
@@ -119,7 +132,7 @@ async function processEntries(userId?: string, processAll: boolean = false, diag
       processAll: processAll,
       userId: userId || 'not provided',
       supabaseClientInitialized: !!supabase,
-      googleNLApiKeyConfigured: true,
+      googleNLApiKeyConfigured: !!GOOGLE_NL_API_KEY,
       userIdFilter: !!userId
     };
     

@@ -124,7 +124,7 @@ serve(async (req) => {
     
     // If an entry ID was provided, update the database
     if (entryId) {
-      console.log(`Updating entry ${entryId} with themes`);
+      console.log(`Updating entry ${entryId} with themes:`, themes);
       
       const updates: any = {};
       
@@ -141,7 +141,26 @@ serve(async (req) => {
         if (error) {
           console.error(`Error updating entry ${entryId}:`, error);
         } else {
-          console.log(`Successfully updated entry ${entryId} with themes`);
+          console.log(`Successfully updated entry ${entryId} with themes:`, themes);
+          
+          // After updating themes, also make sure entities are extracted
+          try {
+            console.log("Starting entity extraction for entry:", entryId);
+            const { error: invokeError } = await supabase.functions.invoke('batch-extract-entities', {
+              body: {
+                processAll: true,
+                diagnosticMode: false
+              }
+            });
+            
+            if (invokeError) {
+              console.error("Error invoking batch-extract-entities:", invokeError);
+            } else {
+              console.log("Successfully triggered entity extraction");
+            }
+          } catch (entityErr) {
+            console.error("Error starting entity extraction:", entityErr);
+          }
         }
       }
     }

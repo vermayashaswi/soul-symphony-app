@@ -11,6 +11,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Use environment variable from Supabase secrets for Google NL API
+const GOOGLE_NL_API_KEY = Deno.env.get('GOOGLE_API') || '';
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -243,8 +246,39 @@ serve(async (req) => {
           
             // Extract themes right after saving the entry
             if (refinedText && entryId) {
-              EdgeRuntime.waitUntil(extractThemes(refinedText, entryId));
-              console.log("Started background task to extract themes");
+              try {
+                // Use waitUntil to run in background but also log any errors
+                const themePromise = extractThemes(refinedText, entryId);
+                EdgeRuntime.waitUntil(
+                  themePromise.catch(err => {
+                    console.error("Background theme extraction failed:", err);
+                  })
+                );
+                console.log("Started background task to extract themes");
+              } catch (themeErr) {
+                console.error("Error starting theme extraction:", themeErr);
+              }
+            }
+            
+            // Call batch-extract-entities to ensure entities are extracted
+            try {
+              console.log("Starting entity extraction for entry:", entryId);
+              const entityExtractionPromise = supabase.functions.invoke('batch-extract-entities', {
+                body: {
+                  userId: userId,
+                  processAll: false,
+                  diagnosticMode: false
+                }
+              });
+              
+              EdgeRuntime.waitUntil(
+                entityExtractionPromise.catch(err => {
+                  console.error("Background entity extraction failed:", err);
+                })
+              );
+              console.log("Started background task for entity extraction");
+            } catch (entityErr) {
+              console.error("Error starting entity extraction:", entityErr);
             }
           
             try {
@@ -515,8 +549,13 @@ async function analyzeWithGoogleNL(text: string) {
   try {
     console.log('Analyzing text with Google NL API for sentiment and entities:', text.slice(0, 100) + '...');
     
+    if (!GOOGLE_NL_API_KEY) {
+      console.error('Google NL API key missing from environment');
+      return { sentiment: "0", entities: [] };
+    }
+    
     // Using the correct endpoint for entity extraction
-    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${Deno.env.get('GOOGLE_NL_API_KEY') || ''}`, {
+    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${GOOGLE_NL_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
