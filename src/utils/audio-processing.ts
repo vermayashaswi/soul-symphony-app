@@ -65,12 +65,12 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     }
     
     // 3. Get the public URL for the uploaded audio
-    // Fix the infinite type instantiation by using an explicit type annotation
-    const { data: publicUrlData } = supabase.storage
+    // Fix the infinite type instantiation by awaiting the result
+    const { data: publicUrlData } = await supabase.storage
       .from('audio-recordings')
       .getPublicUrl(audioFilename);
       
-    const audioUrl = publicUrlData?.publicUrl;
+    const audioUrl = publicUrlData.publicUrl;
     
     // 4. Update the placeholder entry with the audio URL
     const { error: updateError } = await supabase
@@ -92,7 +92,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       tempId
     };
     
-    // Fix for type instantiation issue - use explicit type annotation for the response
+    // Fix for type instantiation issue - use await for the function invocation
     const { error: fnError } = await supabase.functions.invoke('transcribe-audio', {
       body: funcBody
     });
