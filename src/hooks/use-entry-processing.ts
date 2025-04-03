@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { processRecording } from '@/utils/audio-processing';
 
 // Define simpler types to avoid complex type inference
 interface SimpleJournalEntry {
@@ -115,6 +116,17 @@ export function useEntryProcessing(
     console.log('Entry recorded, adding to processing queue:', tempId);
     
     setProcessingEntries(prev => [...prev, tempId]);
+    
+    // Use the new processRecording function from audio-processing.ts
+    const { success, error } = await processRecording(audioBlob, undefined);
+    
+    if (!success) {
+      console.error('Error processing recording:', error);
+      toast.error(`Failed to process recording: ${error}`);
+      setProcessingEntries(prev => prev.filter(id => id !== tempId));
+      return;
+    }
+    
     fetchEntries();
     
     const pollInterval = setInterval(async () => {

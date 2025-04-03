@@ -28,6 +28,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       const { isAuthenticated, userId: authUserId, error: authError } = await verifyUserAuthentication();
       if (!isAuthenticated || authError) {
         console.error('Authentication error:', authError);
+        toast.error(authError || 'Authentication required for audio processing');
         return { success: false, error: authError || 'Authentication required for audio processing' };
       }
       userId = authUserId;
@@ -51,6 +52,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
 
     if (dbError) {
       console.error('Error creating database entry:', dbError);
+      toast.error(`Database error: ${dbError.message}`);
       return { success: false, error: `Database error: ${dbError.message}` };
     }
 
@@ -88,6 +90,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
 
     if (uploadError) {
       console.error('Error uploading audio:', uploadError);
+      toast.error(`Upload error: ${uploadError.message}`);
       return { success: false, error: `Upload error: ${uploadError.message}` };
     }
 
@@ -116,6 +119,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
 
     if (!audioUrl) {
       console.error('Failed to get URL for audio file');
+      toast.error('Failed to get audio URL');
       return { success: false, error: 'Failed to get audio URL' };
     }
 
@@ -127,6 +131,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
 
     if (updateError) {
       console.error('Error updating database entry with audio URL:', updateError);
+      toast.error(`Update error: ${updateError.message}`);
       return { success: false, error: `Update error: ${updateError.message}` };
     }
 
@@ -151,13 +156,16 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       }
 
       console.log('Transcribe function completed successfully:', data?.success);
+      toast.success('Journal entry saved successfully!');
       return { success: true, tempId };
     } catch (funcError: any) {
       console.error('Exception calling transcribe-audio function:', funcError);
+      toast.error('Error processing audio. Please try again.');
       return { success: false, error: `Function error: ${funcError.message}` };
     }
   } catch (error: any) {
     console.error('Unexpected error in processRecording:', error);
+    toast.error('An unexpected error occurred. Please try again.');
     return { success: false, error: error.message };
   }
 }
