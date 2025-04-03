@@ -54,16 +54,21 @@ export function useEntryProcessing(
     }
   }, [entries, processingEntries]);
 
-  // Ensure proper quoting for column names with spaces in Supabase queries
+  // Fix the type inference issue with separate variable declarations
   const checkEntryProcessed = useCallback(async (tempId: string): Promise<boolean> => {
     try {
       console.log('Checking if entry is processed with temp ID:', tempId);
       
-      const { data, error } = await supabase
+      // Avoid deep type inference by separating the query and result handling
+      const result = await supabase
         .from('Journal Entries')
         .select('id, "refined text"')
         .eq('"foreign key"', tempId)
         .single();
+      
+      // Extract data and error separately to avoid excessive type depth
+      const data = result.data;
+      const error = result.error;
       
       if (error) {
         console.error('Error fetching newly created entry:', error);
@@ -78,12 +83,18 @@ export function useEntryProcessing(
       
       // Ensure proper handling of column names with spaces
       if (data["refined text"]) {
-        await supabase.functions.invoke('generate-themes', {
+        // Separate function call to avoid deep type inference
+        const invokeResult = await supabase.functions.invoke('generate-themes', {
           body: {
             text: data["refined text"],
             entryId: data.id
           }
         });
+
+        // We don't need to use the result directly
+        if (invokeResult.error) {
+          console.error('Error generating themes:', invokeResult.error);
+        }
       }
       
       return true;
