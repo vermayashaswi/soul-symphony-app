@@ -36,7 +36,7 @@ export function useEntryProcessing(
       const newlyCompletedTempIds: string[] = [];
       
       for (const entry of entries) {
-        // Use quotes for column names with spaces
+        // Use proper quotes for column names with spaces
         const foreignKey = entry["foreign key"];
         if (foreignKey && processingEntries.includes(foreignKey)) {
           newlyCompletedTempIds.push(foreignKey);
@@ -52,7 +52,7 @@ export function useEntryProcessing(
     }
   }, [entries, processingEntries]);
 
-  // Fix: Use proper quoting for column names with spaces
+  // Ensure proper quoting for column names with spaces in Supabase queries
   const checkEntryProcessed = useCallback(async (tempId: string): Promise<boolean> => {
     try {
       console.log('Checking if entry is processed with temp ID:', tempId);
@@ -74,6 +74,7 @@ export function useEntryProcessing(
       
       console.log('New entry found:', data.id);
       
+      // Ensure proper handling of column names with spaces
       if (data["refined text"]) {
         await supabase.functions.invoke('generate-themes', {
           body: {

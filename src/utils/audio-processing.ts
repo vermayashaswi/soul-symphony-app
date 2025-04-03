@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
@@ -133,6 +134,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       
       // Verify the entry was saved by querying the database
       if (result.data?.entryId) {
+        // Using proper quotes for column names with spaces
         const { data: savedEntry, error: fetchError } = await supabase
           .from('Journal Entries')
           .select('id, "refined text", duration')
@@ -145,6 +147,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         } else {
           console.log('Journal entry verified in database:', savedEntry);
           const duration = savedEntry.duration || 'unknown';
+          // Properly access column with spaces in name
           const text = savedEntry['refined text'] || '';
           const snippet = text.length > 40 ? text.substring(0, 37) + '...' : text;
           

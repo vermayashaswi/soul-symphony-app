@@ -2,514 +2,451 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.3.0";
 import { v4 as uuidv4 } from "https://esm.sh/uuid@9.0.0";
-import OpenAI from "https://esm.sh/openai@3.3.0";
 
-// Import local utility files - using local files instead of importing from src/utils
+// Use local versions of these modules instead of trying to import from src/utils
 import { analyzeQueryTypes } from "./queryAnalyzer.ts";
-import { calculateTopEmotions, getEmotionalInsights } from "./emotionAnalytics.ts";
+import { getEmotionInsights } from "./emotionAnalytics.ts";
 import { findMentionedEntities } from "./entityAnalytics.ts";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+// Set up required environment variables and clients
+const openAiKey = Deno.env.get("OPENAI_API_KEY");
+const supabaseUrl = Deno.env.get("SUPABASE_URL");
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-// Initialize Supabase client with service role key
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Initialize OpenAI and Supabase clients
+const configuration = new Configuration({ apiKey: openAiKey });
+const openai = new OpenAIApi(configuration);
+const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: openAIApiKey
-});
-
+// Set up CORS headers
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Generate embeddings using OpenAI
-async function generateEmbedding(text: string) {
-  try {
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key is not configured in environment variables');
-    }
-    
-    const response = await openai.createEmbedding({
-      model: 'text-embedding-ada-002',
-      input: text
-    });
-
-    return response.data.data[0].embedding;
-  } catch (error) {
-    console.error('Error in generateEmbedding:', error);
-    throw error;
-  }
+// Define types for the response
+interface ChatResponse {
+  role: string;
+  content: string;
+  references?: any[];
+  analysis?: any;
+  hasNumericResult?: boolean;
 }
 
-// Function to find similar journal entries based on query embedding
-async function findSimilarEntries(
-  userId: string, 
-  queryEmbedding: number[], 
-  threshold = 0.5, 
-  limit = 5,
-  timeRange: { startDate: string | null, endDate: string | null } = { startDate: null, endDate: null }
-) {
-  try {
-    let functionParams: any = {
-      query_embedding: queryEmbedding,
-      match_threshold: threshold,
-      match_count: limit,
-      user_id_filter: userId
-    };
-    
-    // Include date parameters if provided
-    if (timeRange.startDate) {
-      functionParams.start_date = timeRange.startDate;
-    }
-    
-    if (timeRange.endDate) {
-      functionParams.end_date = timeRange.endDate;
-    }
-    
-    const { data, error } = await supabase.rpc(
-      'match_journal_entries_with_date',
-      functionParams
-    );
-    
-    if (error) {
-      console.error("Error finding similar entries:", error);
-      return [];
-    }
-    
-    console.log(`Found ${data?.length || 0} similar entries`);
-    return data || [];
-  } catch (error) {
-    console.error("Error in findSimilarEntries:", error);
-    return [];
-  }
-}
-
-// Get full entry details including emotions data
-async function getEntriesDetails(entryIds: number[]) {
-  if (!entryIds.length) return [];
-  
-  try {
-    const { data, error } = await supabase
-      .from('Journal Entries')
-      .select('id, created_at, "refined text", emotions, master_themes')
-      .in('id', entryIds);
-      
-    if (error) {
-      console.error("Error retrieving entry details:", error);
-      return [];
-    }
-    
-    return data || [];
-  } catch (error) {
-    console.error("Error in getEntriesDetails:", error);
-    return [];
-  }
-}
-
-// Format journal entries for GPT context
-function formatJournalContext(entries: any[]) {
-  if (!entries.length) return "";
-  
-  // Sort by creation date (newest first)
-  entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  
-  return "Here are relevant entries from your journal:\n\n" + 
-    entries.map((entry, index) => {
-      const date = new Date(entry.created_at).toLocaleDateString();
-      const timeAgo = getRelativeTimeString(new Date(entry.created_at));
-      
-      // Format emotions if present
-      let emotionsText = "";
-      if (entry.emotions) {
-        const topEmotions = Object.entries(entry.emotions)
-          .sort(([, a], [, b]) => (b as number) - (a as number))
-          .slice(0, 3)
-          .map(([emotion, score]) => {
-            const percentage = Math.round((score as number) * 100);
-            return `${emotion} (${percentage}%)`;
-          })
-          .join(", ");
-          
-        emotionsText = `\nPrimary emotions: ${topEmotions}`;
-      }
-      
-      // Format themes if present
-      let themesText = "";
-      if (entry.master_themes && entry.master_themes.length > 0) {
-        themesText = `\nThemes: ${entry.master_themes.join(", ")}`;
-      }
-      
-      return `Entry ${index+1} (${date}, ${timeAgo}):\n${entry["refined text"]}${emotionsText}${themesText}`;
-    }).join('\n\n');
-}
-
-// Helper function to get relative time string
-function getRelativeTimeString(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSecs = Math.round(diffMs / 1000);
-  const diffMins = Math.round(diffSecs / 60);
-  const diffHours = Math.round(diffMins / 60);
-  const diffDays = Math.round(diffHours / 24);
-  const diffWeeks = Math.round(diffDays / 7);
-  const diffMonths = Math.round(diffDays / 30);
-  
-  if (diffMonths > 1) return `${diffMonths} months ago`;
-  if (diffMonths === 1) return `1 month ago`;
-  if (diffWeeks > 1) return `${diffWeeks} weeks ago`;
-  if (diffWeeks === 1) return `1 week ago`;
-  if (diffDays > 1) return `${diffDays} days ago`;
-  if (diffDays === 1) return `yesterday`;
-  if (diffHours > 1) return `${diffHours} hours ago`;
-  if (diffHours === 1) return `1 hour ago`;
-  if (diffMins > 1) return `${diffMins} minutes ago`;
-  
-  return `just now`;
-}
-
-// Store conversation to database
-async function storeMessage(userId: string, content: string, threadId: string, role: string, references?: any, analysis?: any) {
-  try {
-    const { error } = await supabase
-      .from('chat_messages')
-      .insert({
-        thread_id: threadId,
-        content: content,
-        sender: role,
-        reference_entries: references || null,
-        analysis_data: analysis || null
-      });
-      
-    if (error) {
-      console.error("Error storing message:", error);
-    }
-    
-    // Update thread updated_at timestamp
-    await supabase
-      .from('chat_threads')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', threadId);
-      
-  } catch (error) {
-    console.error("Error in storeMessage:", error);
-  }
-}
-
-// Store the user's query embedding for future reference
-async function storeUserQuery(userId: string, query: string, embedding: number[], threadId: string) {
-  try {
-    await supabase
-      .from('user_queries')
-      .insert({
-        user_id: userId,
-        query_text: query,
-        embedding: embedding,
-        thread_id: threadId
-      });
-  } catch (error) {
-    console.error("Error storing user query:", error);
-  }
-}
-
+// Main request handler
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { message, userId, queryTypes, threadId = null } = await req.json();
+    // Parse request
+    const { query, userId, queryTypes, threadId } = await req.json();
     
-    if (!message) {
-      throw new Error('No message provided');
+    if (!query || !userId) {
+      throw new Error("Missing required parameters: query or userId");
     }
 
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key is not configured in environment variables');
+    console.log(`Processing query for user ${userId}: ${query}`);
+    console.log("Query analysis:", queryTypes);
+
+    // Generate embedding for the query
+    const embeddingResponse = await openai.createEmbedding({
+      model: "text-embedding-ada-002",
+      input: query,
+    });
+
+    const queryEmbedding = embeddingResponse.data.data[0].embedding;
+    
+    // Store the query in the database
+    try {
+      await supabase.rpc("store_user_query", {
+        user_id: userId,
+        query_text: query,
+        query_embedding: queryEmbedding,
+        thread_id: threadId
+      });
+    } catch (error) {
+      // Non-critical error, log but continue
+      console.error("Error storing user query:", error);
     }
 
-    console.log("Processing chat request for user:", userId);
-    console.log("Message:", message.substring(0, 50) + "...");
-    
-    // Create a new thread ID if not provided
-    const chatThreadId = threadId || uuidv4();
-    
-    // Generate embedding for the user query
-    const queryEmbedding = await generateEmbedding(message);
-    
-    // Store the user query for future reference
-    await storeUserQuery(userId, message, queryEmbedding, chatThreadId);
-    
-    // Analyze query if not provided
-    const queryAnalysis = queryTypes || analyzeQueryTypes(message);
-    console.log("Query analysis:", JSON.stringify(queryAnalysis, null, 2));
-    
-    let responseContent = "";
+    // Determine time range from query analysis
+    const timeRange = prepareTimeRange(queryTypes.targetTimeRange);
+    console.log("Time range:", timeRange);
+
+    // Different retrieval strategies based on query type
     let references = [];
     let analysisData = null;
     let hasNumericResult = false;
-    
-    // Handle entity-specific queries
-    if (queryAnalysis.isEntityFocused && queryAnalysis.entityMentioned) {
-      console.log("Handling entity-focused query for:", queryAnalysis.entityMentioned);
-      
-      const entityResults = await findMentionedEntities(
-        supabase,
-        userId, 
-        queryAnalysis.entityMentioned,
-        queryAnalysis.timeRange
-      );
-      
-      if (entityResults.count > 0) {
-        const formattedEntityInfo = formatJournalContext(entityResults.entries);
-        
-        // Special GPT prompt for entity queries
-        const systemPromptEntity = `You are Roha, an AI assistant specialized in emotional wellbeing and journaling.
-The user has asked about "${queryAnalysis.entityMentioned}" which appears in their journal entries.
-Here's the relevant information I found:
-${formattedEntityInfo}
 
-Based on this information, provide a thoughtful analysis about this entity in the user's life.
-Include emotional patterns, frequency of mentions, and any insights you can derive.
-Keep your tone warm, supportive and conversational.`;
-
-        const completion = await openai.createChatCompletion({
-          model: 'gpt-4',
-          messages: [
-            { role: 'system', content: systemPromptEntity },
-            { role: 'user', content: message }
-          ],
-          temperature: 0.7,
-          max_tokens: 1000
-        });
-        
-        responseContent = completion.data.choices[0].message.content;
-        references = entityResults.entries.map(entry => ({
-          id: entry.id,
-          text: entry.text.substring(0, 200) + "...",
-          created_at: entry.created_at
-        }));
-        
-        analysisData = {
-          type: 'entity_analysis',
-          data: entityResults.summary
-        };
-      }
-    }
-    // Handle emotion-focused quantitative queries
-    else if (queryAnalysis.isEmotionFocused && queryAnalysis.isQuantitative) {
-      console.log("Handling quantitative emotion query");
+    // 1. Emotion-focused queries
+    if (queryTypes.isEmotionFocused) {
+      // Extract emotion from query
+      const emotion = extractTargetEmotion(query);
       
-      const emotionInsights = await getEmotionalInsights(
-        supabase,
-        userId,
-        queryAnalysis.timeRange
-      );
-      
-      if (!emotionInsights.error) {
-        // For explicit happiness rating query
-        if (queryAnalysis.hasHappinessRating || queryAnalysis.hasEmotionQuantification) {
-          const targetEmotion = queryAnalysis.hasHappinessRating ? 'happiness' : 
-                               (message.toLowerCase().match(/\b(joy|happiness|sadness|anger|fear|surprise|disgust|anxiety|love|contentment)\b/)?.[0] || 'happiness');
+      if (emotion) {
+        console.log(`Found emotion focus: ${emotion}`);
+        // Get emotional insights
+        const emotionInsights = await getEmotionInsights(
+          supabase, 
+          userId, 
+          emotion,
+          timeRange
+        );
+        
+        if (emotionInsights.entries && emotionInsights.entries.length > 0) {
+          references = emotionInsights.entries;
+          analysisData = {
+            type: "emotion",
+            data: emotionInsights
+          };
           
-          // Find the emotion score
-          const emotionData = emotionInsights.allEmotions.find(e => e.emotion.toLowerCase() === targetEmotion.toLowerCase());
-          
-          if (emotionData) {
-            const score = Math.round(emotionData.score * 100);
-            responseContent = `Based on your journal entries${queryAnalysis.timeRange.type ? ' from the ' + queryAnalysis.timeRange.type : ''}, your average ${targetEmotion} level is ${score} out of 100. `;
-            
-            // Add contextual information based on score
-            if (targetEmotion === 'happiness' || targetEmotion === 'joy' || targetEmotion === 'contentment') {
-              if (score >= 75) {
-                responseContent += "That's excellent! Your journal entries indicate very high levels of happiness. Would you like me to analyze what factors might be contributing to this positive state?";
-              } else if (score >= 50) {
-                responseContent += "That's a solid positive score. Your journal shows you're generally happy, though there might be some areas for improvement. Would you like me to help identify patterns that affect your happiness?";
-              } else {
-                responseContent += "This score suggests you might be experiencing some challenges with happiness lately. Would you like me to help identify patterns or suggest strategies to improve your mood?";
-              }
-            } else if (targetEmotion === 'sadness' || targetEmotion === 'anger' || targetEmotion === 'fear' || targetEmotion === 'anxiety') {
-              if (score >= 75) {
-                responseContent += "This is a high level of " + targetEmotion + ". Your journal entries indicate you've been experiencing significant " + targetEmotion + " recently. Would you like to explore coping strategies or examine what might be contributing to these feelings?";
-              } else if (score >= 50) {
-                responseContent += "This is a moderate level of " + targetEmotion + ". Would you like to discuss potential triggers or strategies to manage these feelings?";
-              } else {
-                responseContent += "This is a relatively low level of " + targetEmotion + ", which is generally positive. Your journal entries don't show overwhelming " + targetEmotion + ". Would you like to discuss maintaining this emotional balance?";
-              }
-            } else {
-              responseContent += "Would you like me to analyze what factors might be influencing this emotion in your life?";
-            }
-            
+          if (queryTypes.isQuantitative) {
             hasNumericResult = true;
-            analysisData = {
-              type: 'emotion_rating',
-              emotion: targetEmotion,
-              score: score,
-              timeframe: queryAnalysis.timeRange.type || 'all time',
-              entryCount: emotionInsights.overview.entryCount
-            };
-          }
-        } 
-        // For top emotions query
-        else if (queryAnalysis.hasTopEmotionsPattern) {
-          console.log("Handling top emotions query");
-          
-          const topPositive = emotionInsights.overview.groupedEmotions.positive.slice(0, 3);
-          const topNegative = emotionInsights.overview.groupedEmotions.negative.slice(0, 3);
-          
-          if (topPositive.length > 0 || topNegative.length > 0) {
-            responseContent = `Based on my analysis of your journal entries${queryAnalysis.timeRange.type ? ' from the ' + queryAnalysis.timeRange.type : ''}, here are your primary emotions:\n\n`;
-            
-            if (topPositive.length > 0) {
-              responseContent += "Top positive emotions:\n";
-              topPositive.forEach((emotion, i) => {
-                responseContent += `${i+1}. ${emotion.emotion} (${Math.round(emotion.score * 100)}%)\n`;
-              });
-              responseContent += "\n";
-            }
-            
-            if (topNegative.length > 0) {
-              responseContent += "Top negative emotions:\n";
-              topNegative.forEach((emotion, i) => {
-                responseContent += `${i+1}. ${emotion.emotion} (${Math.round(emotion.score * 100)}%)\n`;
-              });
-              responseContent += "\n";
-            }
-            
-            responseContent += `This analysis is based on ${emotionInsights.overview.entryCount} journal entries. Would you like me to provide more insights about any specific emotion?`;
-            
-            hasNumericResult = true;
-            analysisData = {
-              type: 'top_emotions',
-              data: {
-                positive: topPositive,
-                negative: topNegative,
-                timeframe: queryAnalysis.timeRange.type || 'all time',
-                entryCount: emotionInsights.overview.entryCount
-              }
-            };
           }
         }
       }
     }
     
-    // If we don't have a specific response yet, use vector search RAG
-    if (!responseContent) {
-      console.log("Using vector search for general RAG response");
+    // 2. Entity-focused queries
+    else if (queryTypes.isEntityFocused) {
+      // Extract entity from query
+      const entity = extractNamedEntity(query);
       
-      // Find similar entries
-      const similarEntries = await findSimilarEntries(
-        userId, 
-        queryEmbedding, 
-        0.5, 
-        5, 
+      if (entity) {
+        console.log(`Found entity focus: ${entity}`);
+        // Get entity insights
+        const entityInsights = await findMentionedEntities(
+          supabase,
+          userId,
+          entity,
+          timeRange
+        );
+        
+        if (entityInsights.entries && entityInsights.entries.length > 0) {
+          references = entityInsights.entries;
+          analysisData = {
+            type: "entity",
+            data: entityInsights
+          };
+          
+          if (queryTypes.isQuantitative) {
+            hasNumericResult = true;
+          }
+        }
+      }
+    }
+    
+    // 3. Default semantic search as fallback
+    if (references.length === 0) {
+      console.log("Using vector similarity search");
+      
+      const { data: vectorResults, error: vectorError } = await supabase.rpc(
+        "match_journal_entries_with_date",
         {
-          startDate: queryAnalysis.timeRange.startDate,
-          endDate: queryAnalysis.timeRange.endDate
+          query_embedding: queryEmbedding,
+          match_threshold: 0.5,
+          match_count: 5,
+          user_id_filter: userId,
+          start_date: timeRange.startDate,
+          end_date: timeRange.endDate
         }
       );
       
-      // Get detailed entry information
-      const entryIds = similarEntries.map(entry => entry.id);
-      const entriesDetails = await getEntriesDetails(entryIds);
-      
-      // Format context for GPT
-      const journalContext = formatJournalContext(entriesDetails);
-      const contextIntro = entriesDetails.length > 0 
-        ? journalContext 
-        : "I don't have access to journal entries that seem relevant to your question.";
-      
-      // Get user's first name for personalized response
-      let firstName = "";
-      try {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', userId)
-          .single();
-          
-        if (!profileError && profileData?.full_name) {
-          firstName = profileData.full_name.split(' ')[0];
-        }
-      } catch (error) {
-        console.error("Error fetching user profile:", error);
-      }
-      
-      const systemPrompt = `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
-${contextIntro}
-Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
-Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
-mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
-Focus on being helpful rather than diagnostic. 
-${firstName ? `Always address the user by their first name (${firstName}) in your responses.` : ""}`;
-
-      try {
-        const completion = await openai.createChatCompletion({
-          model: 'gpt-4',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: message }
-          ],
-          temperature: 0.7,
-          max_tokens: 1000
-        });
-        
-        responseContent = completion.data.choices[0].message.content;
-        
-        // Add references if we have them
-        if (entriesDetails.length > 0) {
-          references = entriesDetails.map(entry => ({
-            id: entry.id,
-            text: entry["refined text"].substring(0, 200) + "...",
-            created_at: entry.created_at,
-            themes: entry.master_themes
-          }));
-        }
-      } catch (apiError) {
-        console.error("OpenAI API error:", apiError);
-        throw apiError;
+      if (vectorError) {
+        console.error("Error in vector search:", vectorError);
+      } else if (vectorResults && vectorResults.length > 0) {
+        references = vectorResults;
       }
     }
+
+    console.log(`Found ${references.length} references`);
+
+    // Prepare prompt template based on query types and references
+    const systemPrompt = generateSystemPrompt(queryTypes, references);
     
-    // Store the assistant's response
-    await storeMessage(userId, message, chatThreadId, 'user');
-    await storeMessage(
-      userId, 
-      responseContent, 
-      chatThreadId, 
-      'assistant', 
-      references.length > 0 ? references : undefined,
-      analysisData
-    );
+    // Call OpenAI API with our tailored prompt
+    const response = await openai.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: query }
+      ],
+      temperature: 0.7,
+      max_tokens: 800
+    });
+
+    // Format references for the response
+    const formattedReferences = references.map((ref: any) => {
+      return {
+        id: ref.id,
+        content: ref.text || ref.content,
+        date: ref.created_at,
+        similarity: ref.similarity || null
+      };
+    });
+
+    // Prepare the final response
+    const chatResponse: ChatResponse = {
+      role: "assistant",
+      content: response.data.choices[0].message?.content || 
+               "I couldn't generate a response at this time.",
+      references: formattedReferences,
+      hasNumericResult
+    };
     
-    return new Response(
-      JSON.stringify({ 
-        role: 'assistant', 
-        content: responseContent,
-        references: references.length > 0 ? references : undefined,
-        analysis: analysisData,
-        hasNumericResult
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+    if (analysisData) {
+      chatResponse.analysis = analysisData;
+    }
+
+    // Return the formatted response
+    return new Response(JSON.stringify(chatResponse), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error("Error in chat-with-rag function:", error);
+    console.error("Error processing chat request:", error);
     
     return new Response(
-      JSON.stringify({ 
-        role: 'error', 
-        content: "I'm having trouble processing your request. Please try again later."
+      JSON.stringify({
+        role: "error",
+        content: `Error processing your request: ${error.message}`,
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
 });
+
+// Helper functions
+function prepareTimeRange(targetTimeRange: any) {
+  const now = new Date();
+  let startDate = null;
+  let endDate = null;
+  
+  if (targetTimeRange.type) {
+    switch (targetTimeRange.type) {
+      case 'today':
+        startDate = new Date(now.setHours(0, 0, 0, 0)).toISOString();
+        endDate = new Date().toISOString();
+        break;
+      case 'yesterday':
+        startDate = new Date(now.setDate(now.getDate() - 1)).toISOString();
+        startDate = new Date(new Date(startDate).setHours(0, 0, 0, 0)).toISOString();
+        endDate = new Date(new Date(startDate).setHours(23, 59, 59, 999)).toISOString();
+        break;
+      case 'week':
+        startDate = getStartOfWeek(now).toISOString();
+        endDate = new Date().toISOString();
+        break;
+      case 'lastWeek':
+        startDate = getStartOfWeek(new Date(now.setDate(now.getDate() - 7))).toISOString();
+        endDate = getEndOfWeek(new Date(startDate)).toISOString();
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        endDate = new Date().toISOString();
+        break;
+      case 'lastMonth':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).toISOString();
+        break;
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1).toISOString();
+        endDate = new Date().toISOString();
+        break;
+      case 'lastYear':
+        startDate = new Date(now.getFullYear() - 1, 0, 1).toISOString();
+        endDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999).toISOString();
+        break;
+      case 'recent': // Default to last 7 days
+        startDate = new Date(now.setDate(now.getDate() - 7)).toISOString();
+        endDate = new Date().toISOString();
+        break;
+      default:
+        // No specific time range mentioned
+        break;
+    }
+  }
+  
+  // If explicit dates were provided in the query analysis, use those
+  if (targetTimeRange.startDate) {
+    startDate = targetTimeRange.startDate;
+  }
+  if (targetTimeRange.endDate) {
+    endDate = targetTimeRange.endDate;
+  }
+  
+  return { type: targetTimeRange.type, startDate, endDate };
+}
+
+// Helper functions for date calculations
+function getStartOfWeek(date: Date) {
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+  return new Date(date.setDate(diff));
+}
+
+function getEndOfWeek(date: Date) {
+  const startOfWeek = getStartOfWeek(new Date(date));
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+  return endOfWeek;
+}
+
+// Extract target emotion from the query
+function extractTargetEmotion(query: string) {
+  const commonEmotions = [
+    'joy', 'happy', 'happiness', 'sad', 'sadness', 'anger', 'angry', 
+    'fear', 'afraid', 'scared', 'disgust', 'disgusted', 'surprise', 'surprised',
+    'love', 'loved', 'hate', 'hated', 'content', 'contented', 'calm',
+    'peaceful', 'anxious', 'anxiety', 'worried', 'worry', 'stress', 'stressed',
+    'depressed', 'depression', 'excited', 'excitement', 'guilt', 'guilty',
+    'shame', 'ashamed', 'proud', 'pride', 'grateful', 'gratitude',
+    'hopeful', 'hope', 'optimistic', 'optimism', 'pessimistic', 'pessimism',
+    'confident', 'confidence', 'insecure', 'insecurity', 'jealous', 'jealousy',
+    'envious', 'envy', 'lonely', 'loneliness', 'frustrated', 'frustration',
+    'bored', 'boredom', 'confused', 'confusion', 'disappointed', 'disappointment',
+    'embarrassed', 'embarrassment', 'satisfied', 'satisfaction'
+  ];
+  
+  const lowerQuery = query.toLowerCase();
+  
+  // First try direct match
+  for (const emotion of commonEmotions) {
+    if (lowerQuery.includes(emotion)) {
+      return emotion;
+    }
+  }
+  
+  // Look for patterns like "I feel X" or "how I felt"
+  const feelingPatterns = [
+    /how (?:do|did) i feel/i,
+    /my (?:feelings|emotions)/i,
+    /i (?:feel|felt|am feeling)/i,
+    /feeling (\w+)/i,
+    /emotion(?:s)? (?:of|like|such as) (\w+)/i
+  ];
+  
+  for (const pattern of feelingPatterns) {
+    if (pattern.test(lowerQuery)) {
+      return "general_emotion";
+    }
+  }
+  
+  return null;
+}
+
+// Extract named entity from the query
+function extractNamedEntity(query: string) {
+  // Simple pattern matching for entity extraction
+  // This is a basic implementation - could be improved with NLP
+  
+  const lowerQuery = query.toLowerCase();
+  
+  // Look for patterns like "find entries about X" or "tell me about X"
+  const entityPatterns = [
+    /(?:about|regarding|concerning|mentioning|involving) ([a-z0-9 ]+)/i,
+    /(?:find|search for|look for) ([a-z0-9 ]+)/i,
+    /(?:entries|posts|journals) (?:about|on|regarding) ([a-z0-9 ]+)/i
+  ];
+  
+  for (const pattern of entityPatterns) {
+    const match = lowerQuery.match(pattern);
+    if (match && match[1]) {
+      // Clean up the extracted entity
+      let entity = match[1].trim();
+      
+      // Remove common stopwords from the beginning
+      const stopwords = ['the', 'a', 'an', 'my', 'our', 'their', 'his', 'her'];
+      for (const stopword of stopwords) {
+        if (entity.startsWith(stopword + ' ')) {
+          entity = entity.substring(stopword.length + 1);
+        }
+      }
+      
+      return entity;
+    }
+  }
+  
+  // If no pattern match, check for quoted text which often indicates an entity
+  const quotedTextMatch = query.match(/"([^"]+)"|'([^']+)'/);
+  if (quotedTextMatch) {
+    return (quotedTextMatch[1] || quotedTextMatch[2]).trim();
+  }
+  
+  return null;
+}
+
+// Generate system prompt for the AI
+function generateSystemPrompt(queryTypes: any, references: any[]) {
+  let basePrompt = `You are a helpful assistant analyzing journal entries. Based on the user's query, I've found ${references.length} relevant entries.`;
+  
+  if (references.length > 0) {
+    basePrompt += `\n\nHere are the relevant journal entries (newest first):`;
+    
+    references.forEach((ref, index) => {
+      const date = new Date(ref.created_at || ref.date).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      
+      basePrompt += `\n\nEntry ${index + 1} (${date}):\n${ref.text || ref.content}`;
+    });
+  } else {
+    basePrompt += `\n\nI couldn't find any journal entries that are relevant to the query.`;
+  }
+  
+  // Add specific instructions based on query types
+  basePrompt += "\n\nIn your response:";
+  
+  if (queryTypes.isEmotionFocused) {
+    basePrompt += "\n- Focus on emotional patterns and feelings mentioned in the entries.";
+    
+    if (queryTypes.isQuantitative) {
+      basePrompt += "\n- Include quantitative analysis of emotions where possible (e.g., frequency, intensity).";
+    }
+  }
+  
+  if (queryTypes.isThemeFocused) {
+    basePrompt += "\n- Identify and discuss common themes or topics across the entries.";
+  }
+  
+  if (queryTypes.isTimeFocused) {
+    basePrompt += "\n- Pay attention to temporal patterns and changes over time.";
+  }
+  
+  if (queryTypes.isEntityFocused) {
+    basePrompt += "\n- Focus on the specific people, places, or things mentioned in the entries.";
+  }
+  
+  if (queryTypes.isWhyQuestion) {
+    basePrompt += "\n- Provide potential explanations or reasons based strictly on the content of the entries.";
+  }
+  
+  if (queryTypes.isHowQuestion) {
+    basePrompt += "\n- Explain processes or methods mentioned in the entries.";
+  }
+  
+  if (queryTypes.isComparison) {
+    basePrompt += "\n- Compare and contrast different aspects mentioned in the entries.";
+  }
+  
+  // General guidelines
+  basePrompt += `\n
+- Answer directly using information from the journal entries only.
+- If the entries don't contain information needed to answer the query, clearly state this.
+- DO NOT make up or invent information not present in the entries.
+- Keep your response clear, concise, and directly relevant to the user's query.
+- Reference specific entries by their number when appropriate.
+- If appropriate, briefly summarize key insights at the beginning of your response.`;
+  
+  return basePrompt;
+}

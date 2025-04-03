@@ -62,6 +62,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         console.log('[useJournalEntries] No entries found for this user');
       }
       
+      // Make sure to properly access columns with spaces in their names
       const typedEntries: JournalEntry[] = (data || []).map(item => ({
         id: item.id,
         content: item["refined text"] || item["transcription text"] || "",
