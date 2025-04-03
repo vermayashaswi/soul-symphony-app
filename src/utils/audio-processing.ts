@@ -97,7 +97,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       await supabase.functions.invoke('transcribe-audio', {
         body: funcBody
       });
-    } catch (error: any) {
+    } catch (error) {
       fnError = error;
       console.error("Error invoking transcribe function:", error);
     }
@@ -105,7 +105,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     if (fnError) {
       return {
         success: false,
-        error: `Processing error: ${fnError.message}`
+        error: `Processing error: ${fnError instanceof Error ? fnError.message : String(fnError)}`
       };
     }
     
@@ -115,11 +115,11 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       tempId
     };
     
-  } catch (error: any) {
+  } catch (error) {
     console.error("Unexpected error in processRecording:", error);
     return {
       success: false,
-      error: `Unexpected error: ${error.message}`
+      error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`
     };
   }
 }
