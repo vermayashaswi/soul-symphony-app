@@ -90,23 +90,18 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       userId,
       tempId
     };
-    
-    // Use a simpler try-catch approach to avoid TypeScript instantiation issues
-    let fnError = null;
-    try {
-      // Explicitly cast to any to bypass TypeScript's deep type resolution
-      (supabase.functions as any).invoke('transcribe-audio', {
-        body: funcBody
-      });
-    } catch (error) {
-      fnError = error;
-      console.error("Error invoking transcribe function:", error);
-    }
-    
-    if (fnError) {
+
+    // Avoid destructuring completely and use a simple approach
+    const functionResult = await supabase.functions.invoke('transcribe-audio', {
+      body: funcBody
+    });
+
+    // Access properties after the call, without destructuring
+    if (functionResult.error) {
+      console.error("Error invoking transcribe function:", functionResult.error);
       return {
         success: false,
-        error: `Processing error: ${fnError instanceof Error ? fnError.message : String(fnError)}`
+        error: `Processing error: ${functionResult.error.message || "Unknown error"}`
       };
     }
     
