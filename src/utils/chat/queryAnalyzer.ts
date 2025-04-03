@@ -78,6 +78,12 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   // New pattern for why questions about emotions
   const whyEmotionsPattern = /(?:why|reason|cause|what made).*(?:feel|emotion|mood)/i;
   
+  // Filter pattern for detecting requests to filter by specific criteria
+  const filterPattern = /(?:filter|show|find|get|give me|display|list|search for)\s+(?:entries|journals|records|data|information)?\s+(?:where|with|that|when|which|containing|having|about|from|in|during|before|after|between)/i;
+  
+  // Additional pattern for filtering by date/time
+  const dateFilterPattern = /(?:in|from|during|before|after|between)\s+(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec|yesterday|today|this week|last week|this month|last month|this year|last year|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/i;
+  
   // Detect complex multi-part queries that should be broken down
   const complexQueryPatterns = [
     // Logical connectors
@@ -206,6 +212,8 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
   const isEntityQuestion = entityQuestionPattern.test(lowerQuery);
   const isAdviceQuestion = adviceQuestionPattern.test(lowerQuery);
   const isCountQuery = countQueryPattern.test(lowerQuery);
+  const hasFilterRequest = filterPattern.test(lowerQuery);
+  const hasDateFilter = dateFilterPattern.test(lowerQuery);
   
   const needsContext = /\bwhy\b|\breason\b|\bcause\b|\bexplain\b|\bunderstand\b|\bmeaning\b|\binterpret\b/.test(lowerQuery);
   
@@ -290,6 +298,8 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     needsVectorSearch: needsVectorSearch,
     
     hasWhyEmotionsPattern,
+    
+    requiresFiltering: hasFilterRequest || hasDateFilter,
     
     timeRange: {
       type: timeRange.timeframeType,

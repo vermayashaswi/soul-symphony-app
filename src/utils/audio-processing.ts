@@ -85,15 +85,15 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     }
     
     // 5. Call the transcribe-audio function to process the recording asynchronously
-    const functionOptions = {
-      body: {
-        audioUrl,
-        userId,
-        tempId
-      }
+    const funcBody = {
+      audioUrl,
+      userId,
+      tempId
     };
     
-    const { error: fnError } = await supabase.functions.invoke('transcribe-audio', functionOptions);
+    const { error: fnError } = await supabase.functions.invoke('transcribe-audio', {
+      body: funcBody
+    });
     
     if (fnError) {
       console.error("Error invoking transcribe function:", fnError);

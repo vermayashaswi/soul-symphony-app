@@ -32,10 +32,15 @@ export async function processChatMessage(
     
     let queryResponse: any = null;
     let retryAttempted = false;
-    let inProgressContent = "I'm thinking about your question..."; 
+    
+    // First check if the message requires filtering data
+    if (messageQueryTypes.requiresFiltering) {
+      console.log("Query requires filtering. Applying filters first...");
+      // The smart-query-planner will handle the filtering logic
+    }
     
     // First try using the smart query planner for direct data querying
-    if (messageQueryTypes.isQuantitative || messageQueryTypes.isEmotionFocused) {
+    if (messageQueryTypes.isQuantitative || messageQueryTypes.isEmotionFocused || messageQueryTypes.requiresFiltering) {
       console.log("Using smart query planner for direct data query");
       
       try {
@@ -47,7 +52,8 @@ export async function processChatMessage(
             enableQueryBreakdown: true,
             generateSqlQueries: true,
             analyzeComponents: true,
-            allowRetry: true, // Add flag to indicate retries are allowed
+            allowRetry: true,
+            requiresFiltering: messageQueryTypes.requiresFiltering,
             requiresExplanation: messageQueryTypes.needsContext || message.toLowerCase().includes('why')
           }
         });
@@ -266,6 +272,7 @@ export async function processChatMessage(
           threadId,
           includeDiagnostics: true,
           timeRange,
+          requiresFiltering: messageQueryTypes.requiresFiltering,
           isComplexQuery: messageQueryTypes.isComplexQuery || message.toLowerCase().includes('why'),
           requiresEmotionAnalysis: messageQueryTypes.isEmotionFocused
         }

@@ -11,7 +11,7 @@ import { getEmotionInsights } from "./emotionAnalytics.ts";
 import { findMentionedEntities } from "./entityAnalytics.ts";
 
 // Set up required environment variables and clients
-const openAiKey = Deno.env.get("OPENAI_API_KEY") || "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";
+const openAiKey = Deno.env.get("OPENAI_API_KEY") || "";
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -44,14 +44,17 @@ serve(async (req) => {
 
   try {
     // Parse request
-    const { query, userId, queryTypes, threadId } = await req.json();
+    const { message: query, userId, queryTypes, threadId, requiresFiltering, timeRange: timeRangeInput } = await req.json();
     
     if (!query || !userId) {
       throw new Error("Missing required parameters: query or userId");
     }
 
     console.log(`Processing query for user ${userId}: ${query}`);
-    console.log("Query analysis:", queryTypes);
+    
+    // Analyze the query if queryTypes was not provided
+    const analyzedQueryTypes = queryTypes || analyzeQueryTypes(query);
+    console.log("Query analysis:", analyzedQueryTypes);
 
     // Generate embedding for the query
     const embeddingResponse = await openai.createEmbedding({
@@ -75,7 +78,7 @@ serve(async (req) => {
     }
 
     // Determine time range from query analysis
-    const timeRange = prepareTimeRange(queryTypes.targetTimeRange);
+    const timeRange = prepareTimeRange(timeRangeInput || analyzedQueryTypes.timeRange || {});
     console.log("Time range:", timeRange);
 
     // Different retrieval strategies based on query type
@@ -83,8 +86,44 @@ serve(async (req) => {
     let analysisData = null;
     let hasNumericResult = false;
 
+    // If filtering is required, filter journal entries first
+    if (requiresFiltering || analyzedQueryTypes.requiresFiltering) {
+      console.log("Applying filters to journal entries");
+      
+      let filteredEntriesQuery = supabase
+        .from('Journal Entries')
+        .select('id, "refined text", created_at, emotions, master_themes')
+        .eq('user_id', userId);
+      
+      // Apply time range filters if present
+      if (timeRange.startDate) {
+        filteredEntriesQuery = filteredEntriesQuery.gte('created_at', timeRange.startDate);
+      }
+      
+      if (timeRange.endDate) {
+        filteredEntriesQuery = filteredEntriesQuery.lte('created_at', timeRange.endDate);
+      }
+      
+      // Execute the query to get filtered entries
+      const { data: filteredEntries, error } = await filteredEntriesQuery;
+      
+      if (!error && filteredEntries && filteredEntries.length > 0) {
+        console.log(`Found ${filteredEntries.length} entries after filtering`);
+        
+        // Prepare references
+        references = filteredEntries.map(entry => ({
+          id: entry.id,
+          text: entry["refined text"],
+          created_at: entry.created_at,
+          emotions: entry.emotions,
+          master_themes: entry.master_themes
+        }));
+      } else {
+        console.log("No entries found after filtering or error occurred:", error);
+      }
+    }
     // 1. Emotion-focused queries
-    if (queryTypes.isEmotionFocused) {
+    else if (analyzedQueryTypes.isEmotionFocused) {
       // Extract emotion from query
       const emotion = extractTargetEmotion(query);
       
@@ -105,7 +144,7 @@ serve(async (req) => {
             data: emotionInsights
           };
           
-          if (queryTypes.isQuantitative) {
+          if (analyzedQueryTypes.isQuantitative) {
             hasNumericResult = true;
           }
         }
@@ -113,7 +152,7 @@ serve(async (req) => {
     }
     
     // 2. Entity-focused queries
-    else if (queryTypes.isEntityFocused) {
+    else if (analyzedQueryTypes.isEntityFocused) {
       // Extract entity from query
       const entity = extractNamedEntity(query);
       
@@ -134,7 +173,7 @@ serve(async (req) => {
             data: entityInsights
           };
           
-          if (queryTypes.isQuantitative) {
+          if (analyzedQueryTypes.isQuantitative) {
             hasNumericResult = true;
           }
         }
@@ -167,7 +206,7 @@ serve(async (req) => {
     console.log(`Found ${references.length} references`);
 
     // Prepare prompt template based on query types and references
-    const systemPrompt = generateSystemPrompt(queryTypes, references);
+    const systemPrompt = generateSystemPrompt(analyzedQueryTypes, references);
     
     // Call OpenAI API with our tailored prompt
     const response = await openai.createChatCompletion({
@@ -229,7 +268,7 @@ function prepareTimeRange(targetTimeRange: any) {
   let startDate = null;
   let endDate = null;
   
-  if (targetTimeRange.type) {
+  if (targetTimeRange && targetTimeRange.type) {
     switch (targetTimeRange.type) {
       case 'today':
         startDate = new Date(now.setHours(0, 0, 0, 0)).toISOString();
@@ -275,14 +314,14 @@ function prepareTimeRange(targetTimeRange: any) {
   }
   
   // If explicit dates were provided in the query analysis, use those
-  if (targetTimeRange.startDate) {
+  if (targetTimeRange && targetTimeRange.startDate) {
     startDate = targetTimeRange.startDate;
   }
-  if (targetTimeRange.endDate) {
+  if (targetTimeRange && targetTimeRange.endDate) {
     endDate = targetTimeRange.endDate;
   }
   
-  return { type: targetTimeRange.type, startDate, endDate };
+  return { type: targetTimeRange && targetTimeRange.type, startDate, endDate };
 }
 
 // Helper functions for date calculations
@@ -415,12 +454,8 @@ function generateSystemPrompt(queryTypes: any, references: any[]) {
     }
   }
   
-  if (queryTypes.isThemeFocused) {
-    basePrompt += "\n- Identify and discuss common themes or topics across the entries.";
-  }
-  
-  if (queryTypes.isTimeFocused) {
-    basePrompt += "\n- Pay attention to temporal patterns and changes over time.";
+  if (queryTypes.requiresFiltering || queryTypes.isTimeFocused || queryTypes.isTemporal) {
+    basePrompt += "\n- Pay attention to temporal patterns and changes over time in the filtered entries.";
   }
   
   if (queryTypes.isEntityFocused) {
@@ -429,10 +464,6 @@ function generateSystemPrompt(queryTypes: any, references: any[]) {
   
   if (queryTypes.isWhyQuestion) {
     basePrompt += "\n- Provide potential explanations or reasons based strictly on the content of the entries.";
-  }
-  
-  if (queryTypes.isHowQuestion) {
-    basePrompt += "\n- Explain processes or methods mentioned in the entries.";
   }
   
   if (queryTypes.isComparison) {
@@ -446,7 +477,8 @@ function generateSystemPrompt(queryTypes: any, references: any[]) {
 - DO NOT make up or invent information not present in the entries.
 - Keep your response clear, concise, and directly relevant to the user's query.
 - Reference specific entries by their number when appropriate.
-- If appropriate, briefly summarize key insights at the beginning of your response.`;
+- If appropriate, briefly summarize key insights at the beginning of your response.
+- If you need to calculate numbers or aggregations, calculate them accurately based on the entries provided.`;
   
   return basePrompt;
 }
