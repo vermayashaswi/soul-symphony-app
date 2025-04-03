@@ -35,8 +35,8 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       .from('Journal Entries')
       .insert({
         user_id: userId,
-        "foreign key": tempId,
-        status: 'processing'
+        "foreign key": tempId
+        // Removed the status field as it doesn't exist in the database schema
       });
       
     if (insertError) {
@@ -91,15 +91,20 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       tempId
     };
 
-    // Using the any type to completely bypass TypeScript type checking for this call
+    // Using fetch API directly to bypass TypeScript type issues
     let fnError = null;
     try {
-      const functionResponse = await (supabase.functions as any).invoke('transcribe-audio', {
-        body: funcBody
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/transcribe-audio`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.auth.getSession().then(({ data }) => data.session?.access_token || '')}`
+        },
+        body: JSON.stringify(funcBody)
       });
       
-      if (functionResponse?.error) {
-        throw new Error(functionResponse.error.message || 'Unknown error from function');
+      if (!response.ok) {
+        throw new Error(`Function error: ${response.status} ${response.statusText}`);
       }
     } catch (invokeError) {
       fnError = invokeError;
