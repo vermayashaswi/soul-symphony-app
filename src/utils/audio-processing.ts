@@ -25,7 +25,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
   }
   
   try {
-    console.log(`Processing audio recording: ${audioBlob.size} bytes`);
+    console.log(`Processing audio recording: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
     
     // Generate a unique ID for this recording
     const tempId = uuidv4();
@@ -38,40 +38,51 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     const accessToken = sessionData?.session?.access_token || '';
     
     if (!accessToken) {
+      console.error("No access token available");
       return {
         success: false,
         error: "Authentication required"
       };
     }
     
-    // Call the Supabase edge function
-    console.log("Calling process-audio edge function...");
-    const { data, error } = await supabase.functions.invoke("process-audio", {
-      body: {
-        audio: base64Audio,
-        userId,
-        tempId
-      },
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
+    // Log request details before making the call
+    console.log("Calling process-audio edge function with payload size:", 
+      base64Audio ? Math.round(base64Audio.length / 1024) + "KB" : "0KB");
     
-    if (error) {
-      console.error("Error calling process-audio function:", error);
+    try {
+      const { data, error } = await supabase.functions.invoke("process-audio", {
+        body: {
+          audio: base64Audio,
+          userId,
+          tempId
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+      
+      if (error) {
+        console.error("Error calling process-audio function:", error);
+        return {
+          success: false,
+          error: `Function error: ${error.message}`
+        };
+      }
+      
+      console.log("Edge function response:", data);
+      
+      // Return success along with the temporary ID for tracking
+      return {
+        success: true,
+        tempId
+      };
+    } catch (invocationError) {
+      console.error("Function invocation error:", invocationError);
       return {
         success: false,
-        error: `Function error: ${error.message}`
+        error: `Error invoking function: ${invocationError instanceof Error ? invocationError.message : String(invocationError)}`
       };
     }
-    
-    console.log("Edge function response:", data);
-    
-    // Return success along with the temporary ID for tracking
-    return {
-      success: true,
-      tempId
-    };
     
   } catch (error) {
     console.error("Unexpected error in processRecording:", error);

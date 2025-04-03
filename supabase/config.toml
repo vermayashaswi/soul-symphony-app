@@ -1,1 +1,5 @@
+
 project_id = "kwnwhgucnzqxndzjayyq"
+
+[functions.process-audio]
+verify_jwt = true
