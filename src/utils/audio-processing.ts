@@ -91,13 +91,16 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       tempId
     };
 
-    // Bypass TypeScript's type inference completely
+    // Using the any type to completely bypass TypeScript type checking for this call
     let fnError = null;
     try {
-      // @ts-ignore
-      await supabase.functions.invoke('transcribe-audio', {
+      const functionResponse = await (supabase.functions as any).invoke('transcribe-audio', {
         body: funcBody
       });
+      
+      if (functionResponse?.error) {
+        throw new Error(functionResponse.error.message || 'Unknown error from function');
+      }
     } catch (invokeError) {
       fnError = invokeError;
       console.error("Error invoking transcribe function:", invokeError);
