@@ -69,11 +69,12 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     }
     
     // 3. Get the public URL for the uploaded audio
-    const { data: publicUrlData } = supabase.storage
+    // Fix the "excessively deep" type error by using a different approach to get the URL
+    const { data } = supabase.storage
       .from(bucketName)
       .getPublicUrl(audioFilename);
       
-    const audioUrl = publicUrlData.publicUrl;
+    const audioUrl = data.publicUrl;
     
     // 4. Update the placeholder entry with the audio URL
     const { error: updateError } = await supabase
@@ -102,11 +103,10 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token || '';
       
-      // Get the Supabase URL from environment variables or constants
-      // Instead of accessing the protected supabaseUrl property
-      const supabaseUrlString = supabase.supabaseUrl || "https://kwnwhgucnzqxndzjayyq.supabase.co";
-      const baseUrl = new URL(supabaseUrlString).origin;
-      const functionUrl = `${baseUrl}/functions/v1/transcribe-audio`;
+      // Fix the protected property access error by using a hardcoded URL instead
+      // of accessing the protected supabaseUrl property
+      const supabaseUrl = "https://kwnwhgucnzqxndzjayyq.supabase.co";
+      const functionUrl = `${supabaseUrl}/functions/v1/transcribe-audio`;
       
       const response = await fetch(functionUrl, {
         method: 'POST',
