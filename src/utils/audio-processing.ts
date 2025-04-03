@@ -48,43 +48,13 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     }
     
     // 2. Upload the audio file to storage
-    // First, check if the bucket exists
-    const { data: buckets, error: bucketsError } = await supabase.storage
-      .listBuckets();
-      
-    if (bucketsError) {
-      console.error("Error listing buckets:", bucketsError);
-      return {
-        success: false,
-        error: `Storage error: ${bucketsError.message}`
-      };
-    }
-    
-    // Check if 'audio-recordings' bucket exists
-    const audioBucket = buckets?.find(b => b.name === 'audio-recordings');
-    
-    if (!audioBucket) {
-      console.error("Bucket 'audio-recordings' not found. Creating it now.");
-      
-      // Create the bucket if it doesn't exist
-      const { error: createBucketError } = await supabase.storage
-        .createBucket('audio-recordings', {
-          public: true
-        });
-        
-      if (createBucketError) {
-        console.error("Error creating bucket:", createBucketError);
-        return {
-          success: false,
-          error: `Bucket creation error: ${createBucketError.message}`
-        };
-      }
-    }
+    // Use the existing bucket "Journal Audio Entries" instead of creating a new one
+    const bucketName = 'Journal Audio Entries';
     
     // Now proceed with the upload
     const audioFilename = `recordings/${userId}/${tempId}.webm`;
     const { error: uploadError } = await supabase.storage
-      .from('audio-recordings')
+      .from(bucketName)
       .upload(audioFilename, audioBlob, {
         contentType: audioBlob.type,
         cacheControl: '3600'
@@ -100,7 +70,7 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     
     // 3. Get the public URL for the uploaded audio
     const publicUrlResult = supabase.storage
-      .from('audio-recordings')
+      .from(bucketName)
       .getPublicUrl(audioFilename);
       
     const audioUrl = publicUrlResult.data.publicUrl;
@@ -128,13 +98,13 @@ export async function processRecording(audioBlob: Blob, userId?: string): Promis
     // Using fetch API directly to bypass TypeScript type issues
     let fnError = null;
     try {
-      // Get the Supabase project URL from the client
-      const { data: session } = await supabase.auth.getSession();
-      const accessToken = session?.session?.access_token || '';
+      // Get the Supabase project URL and access token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || '';
       
-      // Construct the full URL for the function
-      const url = new URL(supabase.supabaseUrl);
-      const functionUrl = `${url.origin}/functions/v1/transcribe-audio`;
+      // Extract the base URL from the supabaseUrl string
+      const baseUrl = new URL(supabase.supabaseUrl).origin;
+      const functionUrl = `${baseUrl}/functions/v1/transcribe-audio`;
       
       const response = await fetch(functionUrl, {
         method: 'POST',
