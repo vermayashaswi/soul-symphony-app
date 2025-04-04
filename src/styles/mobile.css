@@ -67,7 +67,10 @@
     align-items: center;
   }
   
-  /* Remove the extra styling for the journal search that was causing scrolling issues */
+  /* Language animation optimization for mobile */
+  .language-animation-container {
+    transform: scale(0.8);
+  }
   
   /* Add some bounce animations for mobile interactions */
   @keyframes mobile-bounce {
@@ -213,4 +216,53 @@
 .dark .sticky {
   background-color: hsl(var(--background));
   border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Add new animations for language elements */
+@keyframes float-in {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-around {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.float-in {
+  animation: float-in 0.8s ease-out forwards;
+}
+
+.float-around {
+  animation: float-around 5s ease-in-out infinite;
+}
+
+/* Add language animation related styles */
+.language-animation-word {
+  transition: all 0.3s ease;
+  opacity: 0.8;
+}
+
+.language-animation-word:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* 3D perspective for language animation */
+.language-animation-container {
+  perspective: 1000px;
+}
+
+.language-animation-3d {
+  transform-style: preserve-3d;
 }

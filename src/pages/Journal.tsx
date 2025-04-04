@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -445,7 +446,7 @@ const Journal = () => {
                 <CardTitle className="text-center">Record a New Journal Entry</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center overflow-hidden relative">
                   <VoiceRecorder onRecordingComplete={onEntryRecorded} />
                 </div>
               </CardContent>
