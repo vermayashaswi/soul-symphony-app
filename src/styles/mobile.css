@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -24,8 +25,9 @@
   }
   
   /* Adjust padding for header sections in mobile */
-  .py-8 {
-    padding-top: 4px !important;
+  .py-8, .py-4 {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
   }
   
   /* Increase touch targets */
@@ -56,8 +58,8 @@
   
   /* Adjust card headers on home page */
   .card .card-header {
-    padding-top: 1rem;
-    padding-bottom: 0.5rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.25rem;
   }
   
   /* Compact card titles and icons */
@@ -72,8 +74,18 @@
   }
   
   /* Voice recorder container height optimization */
-  [class*="min-h-[200px]"] {
-    min-height: 180px !important;
+  [class*="min-h-[160px]"] {
+    min-height: 140px !important;
+  }
+  
+  /* Make card padding smaller on mobile */
+  .card-content {
+    padding-top: 0.75rem !important;
+  }
+  
+  /* Reduce the size of the language animation background */
+  .language-animation-container {
+    height: 120px !important;
   }
   
   /* Add some bounce animations for mobile interactions */

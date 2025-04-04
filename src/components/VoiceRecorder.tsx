@@ -116,7 +116,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     <div className={cn("flex flex-col items-center relative z-10 w-full", className)}>
       <audio ref={audioRef} className="hidden" />
       
-      <div className="relative w-full h-full min-h-[200px] flex flex-col items-center justify-center overflow-hidden">
+      <div className="relative w-full h-full min-h-[160px] flex flex-col items-center justify-center overflow-hidden">
         {!isRecording && !audioBlob && (
           <div className="absolute inset-0 w-full h-full overflow-hidden">
             <LanguageBackground contained={true} />
@@ -137,7 +137,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           </div>
         )}
         
-        <div className="relative z-10">
+        <div className="relative z-10 mt-2">
           <RecordingButton
             isRecording={isRecording}
             isProcessing={isProcessing}

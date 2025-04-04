@@ -25,10 +25,10 @@ export function RecordingButton({
     return (
       <motion.button
         onClick={onPermissionRequest}
-        className="relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg bg-red-500 border-red-600 w-20 h-20"
+        className="relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg bg-red-500 border-red-600 w-16 h-16"
         whileTap={{ scale: 0.95 }}
       >
-        <Mic className="w-8 h-8 text-white" />
+        <Mic className="w-7 h-7 text-white" />
       </motion.button>
     );
   }
@@ -40,10 +40,10 @@ export function RecordingButton({
       className={cn(
         "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
         isRecording 
-          ? "bg-red-500 border-red-600 w-20 h-20" // Increased size during recording from 16 to 20
+          ? "bg-red-500 border-red-600 w-16 h-16" 
           : isProcessing 
-            ? "bg-gray-400 border-gray-500 w-20 h-20 opacity-50 cursor-not-allowed" // Grey when processing
-            : "bg-primary hover:bg-primary/90 border-primary/20 w-20 h-20",
+            ? "bg-gray-400 border-gray-500 w-16 h-16 opacity-50 cursor-not-allowed" 
+            : "bg-primary hover:bg-primary/90 border-primary/20 w-16 h-16",
       )}
       whileTap={{ scale: 0.95 }}
       animate={isRecording ? 
@@ -58,9 +58,9 @@ export function RecordingButton({
       }
     >
       {isRecording ? (
-        <Square className="w-7 h-7 text-white" />
+        <Square className="w-6 h-6 text-white" />
       ) : (
-        <Mic className="w-8 h-8 text-white" />
+        <Mic className="w-7 h-7 text-white" />
       )}
     </motion.button>
   );
