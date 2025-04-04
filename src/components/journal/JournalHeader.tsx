@@ -23,16 +23,16 @@ const JournalHeader = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-1">
           <div className="w-full">
             <motion.h1 
-              className="text-4xl sm:text-4xl md:text-5xl font-bold flex items-center gap-2 flex-wrap"
+              className="text-3xl sm:text-3xl md:text-4xl font-bold flex items-center gap-2 flex-wrap"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <Sparkles className="h-7 w-7 sm:h-8 sm:w-8 text-amber-500 shrink-0" />
+              <Sparkles className="h-6 w-6 sm:h-7 sm:w-7 text-amber-500 shrink-0" />
               <span className="inline-block">Your <SouloLogo className="inline-flex" useColorTheme={true} /> Journal</span>
             </motion.h1>
             <motion.p 
-              className="text-muted-foreground mt-1.5 text-lg sm:text-lg"
+              className="text-muted-foreground mt-0.5 text-base sm:text-lg"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
@@ -55,7 +54,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
           "max-w-[85%] md:max-w-[75%] rounded-2xl p-4 text-sm md:text-base shadow-sm",
           message.role === 'user' 
             ? 'bg-primary text-primary-foreground rounded-tr-none' 
-            : 'dark:bg-muted/30 bg-muted/60 border border-border/50 rounded-tl-none dark:text-foreground'
+            : 'bg-muted/60 border border-border/50 rounded-tl-none'
         )}
       >
         {message.role === 'assistant' ? (
@@ -74,7 +73,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
             {message.analysis.requiresSql && (
               <>
                 <div className="font-semibold mt-1">SQL Query:</div>
-                <pre className={`${isMobile ? 'text-[10px]' : 'text-xs'} dark:bg-black/30 bg-black/10 p-1 rounded overflow-x-auto`}>
+                <pre className={`${isMobile ? 'text-[10px]' : 'text-xs'} bg-black/10 p-1 rounded overflow-x-auto`}>
                   {message.analysis.sqlQuery}
                 </pre>
               </>
@@ -152,7 +151,7 @@ const renderDiagnostics = (diagnostics: any, isMobile: boolean) => {
     <div className="mt-3 text-xs">
       <Separator className="my-2" />
       <div className="font-semibold">Query Diagnostics:</div>
-      <div className={`max-h-40 md:max-h-60 overflow-y-auto mt-1 dark:bg-slate-900 bg-slate-800 p-2 rounded dark:text-slate-200 text-slate-200 ${isMobile ? 'text-[9px]' : 'text-xs'}`}>
+      <div className={`max-h-40 md:max-h-60 overflow-y-auto mt-1 bg-slate-800 p-2 rounded text-slate-200 ${isMobile ? 'text-[9px]' : 'text-xs'}`}>
         {diagnostics.query_plan && (
           <div>
             <div className="font-medium">Sample Answer:</div>
