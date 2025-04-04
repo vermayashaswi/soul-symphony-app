@@ -9,14 +9,15 @@ import { Badge } from "@/components/ui/badge";
 interface JournalSearchProps {
   entries: JournalEntry[];
   onSelectEntry: (entry: JournalEntry) => void;
+  onSearchResults: (filteredEntries: JournalEntry[]) => void;
 }
 
-const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry }) => {
+const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, onSearchResults }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
 
   useEffect(() => {
-    const filteredEntries = entries.filter(entry => {
+    const filtered = entries.filter(entry => {
       const content = (entry.content || '').toLowerCase();
       const query = searchQuery.toLowerCase();
       
@@ -65,8 +66,9 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry })
       return false;
     });
 
-    setFilteredEntries(filteredEntries);
-  }, [searchQuery, entries]);
+    setFilteredEntries(filtered);
+    onSearchResults(filtered); // Pass filtered entries back to parent
+  }, [searchQuery, entries, onSearchResults]);
 
   return (
     <Card className="w-full sticky top-0 z-10 bg-background shadow-sm">

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +15,7 @@ import { toast } from 'sonner';
 import JournalDebugPanel from '@/components/journal/JournalDebugPanel';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
 const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
@@ -24,6 +24,7 @@ const Journal = () => {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const journalRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ const Journal = () => {
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -78,6 +80,18 @@ const Journal = () => {
         });
     }
   }, [activeTab, isProfileChecked, fetchEntries]);
+
+  const handleSearchResults = (results: JournalEntry[]) => {
+    setFilteredEntries(results);
+    setIsSearchActive(!!searchQuery);
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'entries') {
+      setIsSearchActive(false);
+      setFilteredEntries([]);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (processingEntries.length > 0 && activeTab === 'entries') {
@@ -427,6 +441,8 @@ const Journal = () => {
   
   const showEntries = activeTab === 'entries' && (!loading || entries.length > 0);
 
+  const displayEntries = isSearchActive ? filteredEntries : entries;
+
   return (
     <div className="flex flex-col min-h-screen bg-background" ref={journalRef}>
       <Navbar />
@@ -458,6 +474,7 @@ const Journal = () => {
               <JournalSearch 
                 entries={entries}
                 onSelectEntry={handleSelectEntry}
+                onSearchResults={handleSearchResults}
               />
             )}
             
@@ -470,7 +487,7 @@ const Journal = () => {
             
             {showEntries && (
               <JournalEntriesList 
-                entries={entries}
+                entries={displayEntries}
                 loading={loading}
                 processingEntries={processingEntries}
                 processedEntryIds={processedEntryIds}
