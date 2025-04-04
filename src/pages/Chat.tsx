@@ -12,7 +12,7 @@ const Chat = () => {
   const chatRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background" ref={chatRef}>
+    <div className="flex flex-col min-h-screen bg-background dark:bg-background" ref={chatRef}>
       <Navbar />
       
       <div className="container mx-auto flex-1 p-4 pt-0 flex flex-col">
