@@ -12,7 +12,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { Json } from "@/integrations/supabase/types";
-import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -60,21 +59,6 @@ export default function MobileChatInterface({
   const [sheetOpen, setSheetOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  useSwipeGesture(containerRef, {
-    onSwipeRight: () => {
-      if (!sheetOpen) {
-        setSheetOpen(true);
-        if (onSwipeRight) onSwipeRight();
-      }
-    },
-    onSwipeLeft: () => {
-      if (sheetOpen) {
-        setSheetOpen(false);
-        if (onSwipeLeft) onSwipeLeft();
-      }
-    }
-  });
 
   useEffect(() => {
     if (propThreadId) {

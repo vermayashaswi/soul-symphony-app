@@ -13,7 +13,6 @@ import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import JournalDebugPanel from '@/components/journal/JournalDebugPanel';
-import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 

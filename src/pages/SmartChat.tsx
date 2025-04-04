@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -14,7 +15,6 @@ import Navbar from "@/components/Navbar";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
-import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
 
 export default function SmartChat() {
   const isMobile = useIsMobile();
@@ -29,20 +29,6 @@ export default function SmartChat() {
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldRenderMobile = isMobile || mobileDemo;
-  
-  // Add swipe gesture for sidebar toggling
-  useSwipeGesture(chatContainerRef, {
-    onSwipeRight: () => {
-      if (shouldRenderMobile) {
-        setShowSidebar(true);
-      }
-    },
-    onSwipeLeft: () => {
-      if (shouldRenderMobile && showSidebar) {
-        setShowSidebar(false);
-      }
-    }
-  });
 
   useEffect(() => {
     document.title = "Roha | SOULo";
@@ -207,12 +193,6 @@ export default function SmartChat() {
             onSelectThread={handleSelectThread}
             onCreateNewThread={createNewThread}
             userId={user?.id}
-            onSwipeRight={() => setShowSidebar(true)}
-            onSwipeLeft={() => {
-              if (showSidebar) {
-                setShowSidebar(false);
-              }
-            }}
           />
         </div>
       </motion.div>
