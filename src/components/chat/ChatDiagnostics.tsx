@@ -5,6 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ReactNode } from 'react';
+
+// Define types for better TypeScript support
+export interface FunctionExecution {
+  name: string;
+  success: boolean;
+  executionTime?: number;
+  params?: Record<string, any>;
+  result?: Record<string, any>;
+}
 
 interface ChatDiagnosticsProps {
   queryText: string;
@@ -17,7 +27,7 @@ interface ChatDiagnosticsProps {
     timestamp?: string;
   }[];
   references?: any[];
-  similarityScores?: {id: number, score: number}[];
+  similarityScores?: {id: number | string, score: number}[];
   queryAnalysis?: {
     queryType: string;
     emotion: string | null;
@@ -29,7 +39,7 @@ interface ChatDiagnosticsProps {
     };
     isWhenQuestion: boolean;
   };
-  functionExecutions?: any[];
+  functionExecutions?: FunctionExecution[];
 }
 
 export default function ChatDiagnostics({
@@ -172,7 +182,7 @@ export default function ChatDiagnostics({
                       <div key={index} className="p-1.5 border rounded bg-background text-[10px]">
                         <div className="flex justify-between items-start mb-1">
                           <span className="font-medium">
-                            Entry ID: {ref.id.substring(0, 8)}...
+                            Entry ID: {ref.id.toString().substring(0, 8)}...
                           </span>
                           <Badge 
                             variant="outline" 

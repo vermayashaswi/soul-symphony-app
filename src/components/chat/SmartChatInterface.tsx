@@ -11,6 +11,7 @@ import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/c
 import { motion } from "framer-motion";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
+import ChatDiagnostics from './ChatDiagnostics';
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
