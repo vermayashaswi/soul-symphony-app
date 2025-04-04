@@ -20,7 +20,7 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3 pointer-events-auto", isMobile ? "w-full" : "", className)}
+      className={cn("p-3 pointer-events-auto bg-background", isMobile ? "w-full" : "", className)}
       classNames={{
         months: "flex flex-col space-y-4",
         month: "space-y-4 w-full",
