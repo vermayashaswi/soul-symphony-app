@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,16 @@ interface SentimentCalendarProps {
     sentiment: number;
   }[];
   timeRange: 'today' | 'week' | 'month' | 'year';
+}
+
+// Define the chart data types to avoid TypeScript errors
+interface BaseChartDataPoint {
+  time: string;
+  sentiment: number | null;
+}
+
+interface ChartDataPointWithDate extends BaseChartDataPoint {
+  fullDate?: string;
 }
 
 function getEmoji(sentiment: number): string {
@@ -156,7 +167,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         return {
           time: `${hour}:00`,
           sentiment: data ? data.total / data.count : null
-        };
+        } as ChartDataPointWithDate;
       }).filter(item => item.sentiment !== null);
     } 
     
@@ -167,9 +178,9 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         const dateStr = format(date, 'yyyy-MM-dd');
         return {
           time: format(date, 'EEE'),
-          fullDate: format(date, 'yyyy-MM-dd'),
+          fullDate: dateStr,
           sentiment: dailySentiment.get(dateStr) || null
-        };
+        } as ChartDataPointWithDate;
       });
     } 
     
@@ -184,7 +195,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           time: format(date, 'd'),
           fullDate: dateStr,
           sentiment: dailySentiment.get(dateStr) || null
-        };
+        } as ChartDataPointWithDate;
       });
     }
     
@@ -206,8 +217,9 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         const data = monthlyData.get(month);
         return {
           time: format(date, 'MMM'),
+          fullDate: format(date, 'yyyy-MM-dd'),
           sentiment: data ? data.total / data.count : null
-        };
+        } as ChartDataPointWithDate;
       });
     }
     
