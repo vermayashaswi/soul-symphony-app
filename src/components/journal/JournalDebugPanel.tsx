@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Bug, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,11 +28,6 @@ const JournalDebugPanel = () => {
     const handleOperationStart = (event: CustomEvent) => {
       const detail = event.detail || {};
       const id = detail.id || generateId();
-      
-      // If id is already set, use it; otherwise, add a generated one
-      if (!detail.id) {
-        event.detail = { ...detail, id };
-      }
       
       const newOperation: Operation = {
         id,
@@ -86,7 +80,6 @@ const JournalDebugPanel = () => {
     };
   }, []);
   
-  // Auto-open on error
   useEffect(() => {
     const hasErrors = operations.some(op => op.status === 'error');
     if (hasErrors && !isOpen) {
@@ -94,9 +87,9 @@ const JournalDebugPanel = () => {
     }
   }, [operations, isOpen]);
   
-  // Test functions for debugging
   const testFetchEntities = async () => {
     const testId = generateId();
+    
     window.dispatchEvent(new CustomEvent('journalOperationStart', {
       detail: {
         id: testId,
@@ -184,7 +177,6 @@ const JournalDebugPanel = () => {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
-      // Check if OpenAI API key is configured
       const openaiResult = await supabase.functions.invoke('generate-themes', {
         body: { 
           text: "Test",
@@ -192,7 +184,6 @@ const JournalDebugPanel = () => {
         }
       });
       
-      // Check if Google API key is configured
       const googleResult = await supabase.functions.invoke('batch-extract-entities', {
         body: { 
           diagnosticMode: true,
