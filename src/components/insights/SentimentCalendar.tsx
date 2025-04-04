@@ -27,9 +27,12 @@ interface SentimentCalendarProps {
 }
 
 // Define the chart data types to avoid TypeScript errors
-interface ChartDataPointWithDate {
+interface BaseChartDataPoint {
   time: string;
   sentiment: number | null;
+}
+
+interface ChartDataPointWithDate extends BaseChartDataPoint {
   fullDate?: string;
 }
 
@@ -58,12 +61,6 @@ function getEmojiTextColor(sentiment: number): string {
   if (sentiment >= -0.1) return "text-black dark:text-white"; 
   return "text-white"; 
 }
-
-const getSentimentLineColor = (value: number): string => {
-  if (value >= 0.2) return '#48BB78'; // Green for positive
-  if (value <= -0.1) return '#F56565'; // Red for negative
-  return '#FBBF24'; // Yellow for neutral
-};
 
 type ViewMode = 'calendar' | 'graph';
 
@@ -504,109 +501,121 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   };
 
   const renderYearView = () => {
-    const months = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    
-    const monthlyAverages = React.useMemo(() => {
-      const monthData = new Map<number, { total: number, count: number }>();
-      
-      filteredData.forEach(item => {
-        const month = item.date.getMonth();
-        if (!monthData.has(month)) {
-          monthData.set(month, { total: 0, count: 0 });
-        }
-        const current = monthData.get(month)!;
-        current.total += item.sentiment;
-        current.count += 1;
-      });
-      
-      const result = new Map<number, number>();
-      monthData.forEach((value, month) => {
-        result.set(month, value.total / value.count);
-      });
-      
-      return result;
-    }, [filteredData]);
-    
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const date = new Date();
+      date.setMonth(i);
+      return date;
+    });
+
     return (
-      <div className="py-4">
-        <div className="grid grid-cols-6 md:grid-cols-12 gap-2">
-          {months.map((month, index) => {
-            const avgSentiment = monthlyAverages.get(index);
-            const hasData = avgSentiment !== undefined;
-            const monthDate = new Date(today.getFullYear(), index, 1);
-            const isCurrentMonth = today.getMonth() === index;
-            
-            const emoji = hasData ? getEmoji(avgSentiment) : "😶";
-            const colorClass = hasData ? getEmojiColor(avgSentiment) : "bg-muted";
-            const textColorClass = hasData ? getEmojiTextColor(avgSentiment) : "";
-            
-            return (
-              <motion.div 
-                key={index}
-                className={cn(
-                  "aspect-square rounded-md flex flex-col items-center justify-center p-1 cursor-pointer",
-                  isCurrentMonth && "ring-2 ring-primary",
-                  colorClass
-                )}
-                whileHover={{ scale: 1.05 }}
-                onClick={() => handleDayClick(monthDate)}
-              >
-                <div className={cn(
-                  "text-xs font-medium mb-1 text-center",
-                  textColorClass
-                )}>
-                  {month.substring(0, 3)}
-                </div>
-                <div className="text-3xl">
-                  {emoji}
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-        
-        <AnimatePresence>
-          {selectedDay && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {months.map((month, index) => {
+          const monthStart = startOfMonth(month);
+          const monthName = format(month, 'MMMM');
+          
+          const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+          const days = Array.from({ length: daysInMonth }, (_, i) => {
+            const day = new Date(month.getFullYear(), month.getMonth(), i + 1);
+            return day;
+          });
+          
+          let monthSentiment = 0;
+          let dayCount = 0;
+          
+          days.forEach(day => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            if (dailySentiment.has(dateKey)) {
+              monthSentiment += dailySentiment.get(dateKey)!;
+              dayCount++;
+            }
+          });
+          
+          const avgMonthSentiment = dayCount > 0 ? monthSentiment / dayCount : null;
+          const hasData = dayCount > 0;
+          
+          return (
+            <motion.div 
+              key={index}
+              className="bg-card rounded-lg overflow-hidden border shadow-sm"
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="mt-4 p-3 bg-background rounded-lg shadow border"
+              transition={{ duration: 0.3, delay: index * 0.05 }}
             >
-              <div className="text-center mb-1 font-medium">
-                {format(selectedDay, 'MMMM yyyy')}
+              <div className="p-3 bg-muted/30 border-b">
+                <h3 className="font-medium text-center">{monthName}</h3>
               </div>
               
-              {(() => {
-                const month = selectedDay.getMonth();
-                const avgSentiment = monthlyAverages.get(month);
+              <div className="p-3">
+                <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
+                    <div key={i} className="text-xs font-medium text-muted-foreground">
+                      {day}
+                    </div>
+                  ))}
+                </div>
                 
-                if (avgSentiment !== undefined) {
-                  const emoji = getEmoji(avgSentiment);
-                  return (
-                    <div className="flex justify-center items-center space-x-2">
-                      <span className="text-2xl">{emoji}</span>
-                      <span className="text-sm">
-                        Average Mood: {avgSentiment >= 0.3 ? 'Happy' : 
-                            avgSentiment >= -0.3 ? 'Neutral' : 'Sad'}
-                        ({avgSentiment.toFixed(2)})
+                <div className="grid grid-cols-7 gap-1">
+                  {Array.from({ length: (monthStart.getDay() === 0 ? 6 : monthStart.getDay() - 1) }, (_, i) => (
+                    <div key={`empty-${i}`} className="aspect-square"></div>
+                  ))}
+                  
+                  {days.map(day => {
+                    const dateKey = format(day, 'yyyy-MM-dd');
+                    const daySentiment = sentimentInfo.get(dateKey);
+                    const isToday = isSameDay(day, today);
+                    
+                    return (
+                      <div 
+                        key={dateKey}
+                        className={cn(
+                          "aspect-square rounded-md flex flex-col items-center justify-center p-1 cursor-pointer text-xs",
+                          isToday && "ring-1 ring-primary",
+                          daySentiment ? daySentiment.colorClass : "bg-transparent hover:bg-muted/30"
+                        )}
+                        onClick={() => handleDayClick(day)}
+                      >
+                        <span className={cn(
+                          "font-medium mb-0.5",
+                          daySentiment && daySentiment.textColorClass
+                        )}>
+                          {day.getDate()}
+                        </span>
+                        
+                        {daySentiment && (
+                          <span className="text-[10px]">
+                            {daySentiment.emoji}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {hasData ? (
+                  <div className="mt-3 flex items-center justify-center">
+                    <div 
+                      className={cn(
+                        "px-3 py-1 rounded-full text-xs flex items-center gap-1.5",
+                        getEmojiColor(avgMonthSentiment!)
+                      )}
+                    >
+                      <span className={getEmojiTextColor(avgMonthSentiment!)}>
+                        {getEmoji(avgMonthSentiment!)}
+                      </span>
+                      <span className={getEmojiTextColor(avgMonthSentiment!)}>
+                        Avg Mood: {avgMonthSentiment!.toFixed(1)}
                       </span>
                     </div>
-                  );
-                } else {
-                  return (
-                    <div className="text-sm text-muted-foreground text-center">
-                      No mood data recorded for this month
-                    </div>
-                  );
-                }
-              })()}
+                  </div>
+                ) : (
+                  <div className="mt-3 text-center text-xs text-muted-foreground">
+                    No data for this month
+                  </div>
+                )}
+              </div>
             </motion.div>
-          )}
-        </AnimatePresence>
+          );
+        })}
       </div>
     );
   };
@@ -658,68 +667,13 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 return label;
               }}
             />
-            
-            <Line
-              type="monotone"
-              connectNulls
-              strokeWidth={3}
-              dot={false}
-              activeDot={{ r: 6, stroke: theme === 'dark' ? '#fff' : '#000', strokeWidth: 1 }}
-              isAnimationActive={false}
-              dataKey={(dataPoint: any) => 
-                dataPoint.sentiment !== null && dataPoint.sentiment >= 0.2 
-                  ? dataPoint.sentiment 
-                  : null
-              }
-              stroke="#48BB78" // Green for positive
-              name="Positive"
-            />
-            <Line
-              type="monotone"
-              connectNulls
-              strokeWidth={3}
-              dot={false}
-              activeDot={{ r: 6, stroke: theme === 'dark' ? '#fff' : '#000', strokeWidth: 1 }}
-              isAnimationActive={false}
-              dataKey={(dataPoint: any) => 
-                dataPoint.sentiment !== null && dataPoint.sentiment > -0.1 && dataPoint.sentiment < 0.2
-                  ? dataPoint.sentiment 
-                  : null
-              }
-              stroke="#FBBF24" // Yellow for neutral
-              name="Neutral"
-            />
-            <Line
-              type="monotone"
-              connectNulls
-              strokeWidth={3}
-              dot={false}
-              activeDot={{ r: 6, stroke: theme === 'dark' ? '#fff' : '#000', strokeWidth: 1 }}
-              isAnimationActive={false}
-              dataKey={(dataPoint: any) => 
-                dataPoint.sentiment !== null && dataPoint.sentiment <= -0.1
-                  ? dataPoint.sentiment 
-                  : null
-              }
-              stroke="#F56565" // Red for negative
-              name="Negative"
-            />
-            
             <Line
               type="monotone"
               dataKey="sentiment"
-              stroke="transparent"
-              strokeWidth={0}
-              dot={{ 
-                r: 4, 
-                strokeWidth: 2, 
-                fill: theme === 'dark' ? '#1e293b' : 'white',
-                stroke: '#888',
-                strokeOpacity: 1,
-                strokeDasharray: ''
-              }}
-              activeDot={false}
-              isAnimationActive={false}
+              stroke="#4299E1"
+              strokeWidth={3}
+              dot={{ r: 4, strokeWidth: 2, fill: theme === 'dark' ? '#1e293b' : 'white' }}
+              activeDot={{ r: 6, stroke: theme === 'dark' ? '#fff' : '#000', strokeWidth: 1 }}
             />
           </RechartsLineChart>
         </ResponsiveContainer>
@@ -727,15 +681,15 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         <div className="flex justify-center gap-6 mt-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-green-400"></div>
-            <span className="text-sm">Positive (≥ 0.2)</span>
+            <span className="text-sm">Positive</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-yellow-300"></div>
-            <span className="text-sm">Neutral (-0.1 to 0.2)</span>
+            <span className="text-sm">Neutral</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-400"></div>
-            <span className="text-sm">Negative (≤ -0.1)</span>
+            <span className="text-sm">Negative</span>
           </div>
         </div>
       </div>
@@ -785,8 +739,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           <>
             {timeRange === 'today' && renderTodayView()}
             {timeRange === 'week' && renderWeekView()}
-            {timeRange === 'month' && renderMonthYearView()}
-            {timeRange === 'year' && renderYearView()}
+            {(timeRange === 'month' || timeRange === 'year') && renderMonthYearView()}
           </>
         )}
         {viewMode === 'graph' && renderGraphView()}
