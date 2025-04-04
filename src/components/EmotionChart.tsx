@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -201,14 +200,11 @@ export function EmotionChart({
       });
   }, [aggregatedData]);
 
-  // Custom label component for emotion lines
   const EmotionLineLabel = (props: any) => {
     const { x, y, stroke, value, index, data, dataKey } = props;
     
-    // Only show the label at the last data point
     if (index !== data.length - 1) return null;
     
-    // Get the emotion name and capitalize first letter
     const emotionName = dataKey.charAt(0).toUpperCase() + dataKey.slice(1);
     
     return (
@@ -237,7 +233,6 @@ export function EmotionChart({
     
     const emotions = Object.keys(lineData[0]).filter(key => key !== 'day');
     
-    // Check if we have any emotional data points
     if (emotions.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
@@ -289,17 +284,15 @@ export function EmotionChart({
                 dot={{ r: isMobile ? 3 : 4 }}
                 activeDot={{ r: isMobile ? 5 : 6 }}
                 name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
-                label={isMobile ? null : <EmotionLineLabel />}
+                label={<EmotionLineLabel />}
               />
             ))}
           </LineChart>
         </ResponsiveContainer>
         
-        {!isMobile && (
-          <div className="mt-4 text-center text-xs text-muted-foreground">
-            * Showing top 5 emotions by score
-          </div>
-        )}
+        <div className="mt-4 text-center text-xs text-muted-foreground">
+          * Showing top 5 emotions by score
+        </div>
       </div>
     );
   };
