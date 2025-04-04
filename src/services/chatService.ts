@@ -161,7 +161,6 @@ export async function processChatMessage(
   }
 }
 
-// Handler for standard vector search
 async function handleVectorSearch(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
     ? {
@@ -191,7 +190,6 @@ async function handleVectorSearch(message: string, userId: string, queryTypes: R
   return data;
 }
 
-// Handler for temporal vector search (when questions)
 async function handleTemporalVectorSearch(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing temporal vector search for 'when' question");
   
@@ -217,7 +215,6 @@ async function handleTemporalVectorSearch(message: string, userId: string, query
   return data;
 }
 
-// Handler for frequency analysis (how often questions)
 async function handleFrequencyAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing frequency analysis for 'how often' question");
   
@@ -264,7 +261,6 @@ async function handleFrequencyAnalysis(message: string, userId: string, queryTyp
   return data;
 }
 
-// Handler for emotion aggregation (top emotions)
 async function handleEmotionAggregation(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing emotion aggregation for top emotions question");
   
@@ -306,7 +302,6 @@ async function handleEmotionAggregation(message: string, userId: string, queryTy
   return data;
 }
 
-// Handler for emotion causal analysis (why emotion questions)
 async function handleEmotionCausalAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing emotion causal analysis");
   
@@ -341,7 +336,6 @@ async function handleEmotionCausalAnalysis(message: string, userId: string, quer
   return data;
 }
 
-// Handler for relationship analysis
 async function handleRelationshipAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing relationship analysis");
   
@@ -376,7 +370,6 @@ async function handleRelationshipAnalysis(message: string, userId: string, query
   return data;
 }
 
-// Handler for contextual advice (improvement questions)
 async function handleContextualAdvice(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing contextual advice strategy");
   
@@ -402,7 +395,6 @@ async function handleContextualAdvice(message: string, userId: string, queryType
   return data;
 }
 
-// Handler for correlation analysis (pattern questions)
 async function handleCorrelationAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing correlation analysis for pattern question", {
     emotions: queryTypes.targetEmotions,
