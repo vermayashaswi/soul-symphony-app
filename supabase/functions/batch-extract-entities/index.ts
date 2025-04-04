@@ -1,10 +1,12 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
+// Use proper API key from Supabase secrets
+const googleApiKey = Deno.env.get('GOOGLE_API') || '';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
+// Initialize Supabase client with service role key
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
@@ -12,22 +14,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Use the GOOGLE_API environment variable from Supabase secrets
-const GOOGLE_NL_API_KEY = Deno.env.get('GOOGLE_API') || '';
+// Function to extract entities from text using Google NL API
+async function extractEntities(text) {
+  if (!googleApiKey) {
+    console.error("Google API key not configured");
+    return { error: "Google API key not configured" };
+  }
 
-async function analyzeWithGoogleNL(text: string) {
   try {
-    console.log('Analyzing text with Google NL API for entities:', text.slice(0, 100) + '...');
+    console.log("Extracting entities from text:", text.substring(0, 50) + "...");
     
-    if (!GOOGLE_NL_API_KEY) {
-      console.error('Google NL API key missing from environment');
-      return { error: "API key missing. Please add the GOOGLE_API secret in Supabase Edge Function Secrets." };
-    }
-    
-    console.log('Using Google NL API key from environment variables');
-    
-    // Using the correct endpoint for entity extraction
-    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${GOOGLE_NL_API_KEY}`, {
+    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${googleApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -35,286 +32,64 @@ async function analyzeWithGoogleNL(text: string) {
       body: JSON.stringify({
         document: {
           type: 'PLAIN_TEXT',
-          content: text,
+          content: text
         },
-      }),
+        encodingType: 'UTF8'
+      })
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error analyzing with Google NL API:', errorText);
-      
-      // Try to parse the error to check if it's a permission/quota error
-      try {
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error && errorJson.error.status === "PERMISSION_DENIED") {
-          return { error: "API access denied. The API key may not have access to the Natural Language API or has reached its quota." };
-        }
-      } catch (e) {
-        // Ignore parsing error
-      }
-      
-      return { error: `API error (${response.status}): ${errorText.substring(0, 100)}...` };
+      const errorData = await response.json();
+      console.error("Google NL API error:", errorData);
+      return { error: errorData };
     }
 
     const result = await response.json();
-    console.log('Google NL API analysis complete');
-    
-    // Process and format entities
-    const formattedEntities = result.entities?.map(entity => ({
-      type: mapEntityType(entity.type),
-      name: entity.name
-    })) || [];
-    
-    // Remove duplicate entities
-    const uniqueEntities = removeDuplicateEntities(formattedEntities);
-    
-    console.log(`Extracted ${uniqueEntities.length} entities`);
-    
-    return { entities: uniqueEntities };
+    console.log("Entity extraction successful, found", result.entities?.length || 0, "entities");
+    return { entities: result.entities || [] };
   } catch (error) {
-    console.error('Error in analyzeWithGoogleNL:', error);
+    console.error("Error in entity extraction:", error);
     return { error: error.message };
   }
 }
 
-function mapEntityType(googleEntityType: string): string {
-  switch (googleEntityType) {
-    case 'PERSON':
-      return 'person';
-    case 'LOCATION':
-    case 'ADDRESS':
-      return 'place';
-    case 'ORGANIZATION':
-    case 'CONSUMER_GOOD':
-    case 'WORK_OF_ART':
-      return 'organization';
-    case 'EVENT':
-      return 'event';
-    case 'OTHER':
-    default:
-      return 'other';
-  }
-}
+// Function to process a batch of journal entries
+async function processJournalEntries(entries, diagnosticMode = false) {
+  const results = [];
 
-function removeDuplicateEntities(entities: Array<{type: string, name: string}>): Array<{type: string, name: string}> {
-  const seen = new Set();
-  return entities.filter(entity => {
-    const key = `${entity.type}:${entity.name.toLowerCase()}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
-}
+  for (const entry of entries) {
+    try {
+      console.log(`Processing entry ID: ${entry.id}`);
+      const { entities, error } = await extractEntities(entry.text);
 
-async function processEntries(userId?: string, processAll: boolean = false, diagnosticMode: boolean = false) {
-  try {
-    console.log('Starting batch entity extraction process');
-    const startTime = Date.now();
-    
-    if (!GOOGLE_NL_API_KEY) {
-      console.error('Google NL API key missing from environment');
-      return { 
-        success: false, 
-        error: "Google API key is missing from environment variables. Please set the GOOGLE_API secret.", 
-        processed: 0, 
-        total: 0
-      };
-    }
-    
-    console.log('Using Google NL API key from environment variables');
-    
-    // Diagnostic information to return
-    const diagnosticInfo: any = {
-      startTime: new Date().toISOString(),
-      processAll: processAll,
-      userId: userId || 'not provided',
-      supabaseClientInitialized: !!supabase,
-      googleNLApiKeyConfigured: !!GOOGLE_NL_API_KEY,
-      userIdFilter: !!userId
-    };
-    
-    // Build the query
-    let query = supabase
-      .from('Journal Entries')
-      .select('id, "refined text"');
-    
-    // If processAll is false, only process entries with null entities
-    if (!processAll) {
-      query = query.is('entities', null);
-    }
-    
-    // Add user filter if provided and requested - now optional
-    if (userId) {
-      console.log(`Filtering entries for user ID: ${userId}`);
-      query = query.eq('user_id', userId);
-    } else {
-      console.log('Processing entries for ALL users');
-    }
-    
-    // Order by most recent first
-    query = query.order('created_at', { ascending: false });
-
-    // In diagnostic mode, limit to a few entries to avoid unnecessary processing
-    if (diagnosticMode) {
-      query = query.limit(5);
-    }
-    
-    // Execute the query
-    const { data: entries, error } = await query;
-    
-    diagnosticInfo.querySuccess = !error;
-    diagnosticInfo.queryError = error ? error.message : null;
-    diagnosticInfo.entriesFound = entries?.length || 0;
-    
-    if (error) {
-      console.error('Error fetching entries:', error);
-      return { 
-        success: false, 
-        error: error.message, 
-        processed: 0, 
-        total: 0,
-        diagnosticInfo
-      };
-    }
-    
-    console.log(`Found ${entries?.length || 0} entries to process`);
-    
-    let processed = 0;
-    let failed = 0;
-    const processingDetails: any[] = [];
-    const errors: any[] = [];
-    
-    // Exit early if no entries to process
-    if (!entries || entries.length === 0) {
-      console.log('No entries to process');
-      return { 
-        success: true, 
-        processed: 0, 
-        total: 0, 
-        processingTime: "0 seconds",
-        diagnosticInfo
-      };
-    }
-    
-    for (const entry of entries) {
-      if (!entry["refined text"]) {
-        console.log(`Skipping entry ${entry.id} - no refined text`);
-        processingDetails.push({
-          entryId: entry.id,
-          skipped: true,
-          reason: 'No refined text'
-        });
+      if (error) {
+        console.error(`Error extracting entities for entry ID ${entry.id}:`, error);
+        results.push({ id: entry.id, success: false, error: error });
         continue;
       }
-      
-      try {
-        console.log(`Processing entry ${entry.id}`);
-        
-        // Extract entities using Google NL API
-        const result = await analyzeWithGoogleNL(entry["refined text"]);
-        
-        const entryDetails: any = {
-          entryId: entry.id,
-          hasRefinedText: true,
-          textLength: entry["refined text"].length,
-          textSample: entry["refined text"].substring(0, 100) + '...'
-        };
-        
-        // Handle API error
-        if (result.error) {
-          console.error(`API error for entry ${entry.id}:`, result.error);
-          entryDetails.error = result.error;
-          errors.push({
-            entryId: entry.id,
-            error: result.error
-          });
-          failed++;
-          processingDetails.push(entryDetails);
-          continue;
-        }
-        
-        const entities = result.entities || [];
-        
-        entryDetails.entitiesExtracted = entities.length;
-        entryDetails.entities = entities;
-        entryDetails.entityTypes = entities.map(e => e.type);
-        entryDetails.entityNames = entities.map(e => e.name);
-        processingDetails.push(entryDetails);
-        
-        if (entities && entities.length > 0) {
-          console.log(`Extracted ${entities.length} entities for entry ${entry.id}:`, JSON.stringify(entities));
-        } else {
-          console.log(`No entities found for entry ${entry.id}`);
-        }
-        
-        // Only update if not in diagnostic mode
-        if (!diagnosticMode) {
-          const { error: updateError } = await supabase
-            .from('Journal Entries')
-            .update({ entities: entities })
-            .eq('id', entry.id);
-            
-          if (updateError) {
-            console.error(`Error updating entry ${entry.id}:`, updateError);
-            entryDetails.updateError = updateError.message;
-            failed++;
-          } else {
-            processed++;
-            if (entities && entities.length > 0) {
-              console.log(`Updated entry ${entry.id} with ${entities.length} entities`);
-            } else {
-              console.log(`Updated entry ${entry.id} with empty entities array`);
-            }
-          }
-        } else {
-          // In diagnostic mode, simulate success
-          processed++;
-        }
-      } catch (entryError) {
-        console.error(`Error processing entry ${entry.id}:`, entryError);
-        processingDetails.push({
-          entryId: entry.id,
-          error: entryError.message
-        });
-        failed++;
+
+      // Update the journal entry with extracted entities
+      const { error: updateError } = await supabase
+        .from('Journal Entries')
+        .update({ entities: entities })
+        .eq('id', entry.id);
+
+      if (updateError) {
+        console.error(`Error updating entry ID ${entry.id}:`, updateError);
+        results.push({ id: entry.id, success: false, error: updateError.message });
+        continue;
       }
-      
-      // Add a small delay to prevent rate limiting
-      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      console.log(`Successfully processed entry ID: ${entry.id}`);
+      results.push({ id: entry.id, success: true, entityCount: entities?.length || 0 });
+
+    } catch (error) {
+      console.error(`Unexpected error processing entry ID ${entry.id}:`, error);
+      results.push({ id: entry.id, success: false, error: error.message });
     }
-    
-    diagnosticInfo.processingDetails = processingDetails;
-    diagnosticInfo.errors = errors;
-    const endTime = Date.now();
-    const processingTime = (endTime - startTime) / 1000;
-    
-    console.log(`Processed ${processed} entries in ${processingTime.toFixed(3)} seconds`);
-    
-    return { 
-      success: true, 
-      processed, 
-      failed,
-      total: entries?.length || 0,
-      processingTime: `${processingTime.toFixed(3)} seconds`,
-      diagnosticInfo,
-      errors: errors.length > 0 ? errors.slice(0, 5) : []
-    };
-  } catch (error) {
-    console.error('Fatal error in processEntries:', error);
-    return { 
-      success: false, 
-      error: error.message, 
-      processed: 0, 
-      total: 0,
-      diagnosticInfo: {
-        error: error.message,
-        stack: error.stack
-      }
-    };
   }
+
+  return results;
 }
 
 serve(async (req) => {
@@ -324,49 +99,97 @@ serve(async (req) => {
   }
 
   try {
-    // Get the request body if any
-    let userId = undefined;
-    let processAll = true; // Default to processing all entries
-    let diagnosticMode = false;
-    
-    try {
-      if (req.method === 'POST') {
-        const body = await req.json();
-        userId = body.userId; // Make userId optional
-        processAll = body.processAll === true || body.processAll === undefined; // Default to true
-        diagnosticMode = body.diagnosticMode === true;
+    const { diagnosticMode = false, checkApiKeyOnly = false } = await req.json();
+
+    if (checkApiKeyOnly) {
+      if (!googleApiKey) {
+        return new Response(
+          JSON.stringify({
+            message: "GOOGLE_API key is not configured.",
+            configured: false
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+          }
+        );
+      } else {
+        return new Response(
+          JSON.stringify({
+            message: "GOOGLE_API key is configured.",
+            configured: true
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
       }
-    } catch (e) {
-      console.log('No request body or invalid JSON:', e);
     }
-    
-    console.log('Request parameters:', { 
-      userId, 
-      processAll, 
-      diagnosticMode
-    });
-    
-    const result = await processEntries(userId, processAll, diagnosticMode);
-    
-    return new Response(
-      JSON.stringify(result),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
-    
-  } catch (error) {
-    console.error('Error in batch-extract-entities function:', error);
-    
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message 
-      }),
-      {
-        status: 500,
+
+    console.log("Starting batch entity extraction...");
+
+    // Fetch journal entries without entities
+    const { data: entries, error: fetchError } = await supabase
+      .from('Journal Entries')
+      .select('id, text')
+      .is('entities', null)
+      .limit(50);
+
+    if (fetchError) {
+      console.error("Error fetching journal entries:", fetchError);
+      return new Response(JSON.stringify({ error: 'Failed to fetch journal entries' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+        status: 500,
+      });
+    }
+
+    if (!entries || entries.length === 0) {
+      console.log("No entries found to process.");
+      return new Response(JSON.stringify({ message: 'No entries found to process' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
+    console.log(`Fetched ${entries.length} entries for processing.`);
+
+    // Process the entries
+    const results = await processJournalEntries(entries, diagnosticMode);
+
+    const successCount = results.filter(r => r.success).length;
+    const errorCount = results.filter(r => !r.success).length;
+
+    console.log(`Batch processing completed. Success: ${successCount}, Errors: ${errorCount}`);
+
+    // Diagnostic mode response
+    if (diagnosticMode) {
+      return new Response(
+        JSON.stringify({
+          message: `Batch processing completed. Success: ${successCount}, Errors: ${errorCount}`,
+          results: results
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    } else {
+      // Standard response
+      return new Response(
+        JSON.stringify({ message: `Batch processing completed. Success: ${successCount}, Errors: ${errorCount}` }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+  } catch (error) {
+    console.error("Unexpected error in batch entity extraction:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
 });

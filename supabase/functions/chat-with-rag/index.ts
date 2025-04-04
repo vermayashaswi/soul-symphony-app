@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -224,6 +223,41 @@ async function handleTopEmotionsQuery(userId: string, timeRange: {startDate: Dat
   }
 }
 
+// Store chat message in the database
+async function storeMessage(threadId: string, role: 'user' | 'assistant', content: string, references?: any[]) {
+  try {
+    console.log(`Storing ${role} message in thread ${threadId}`);
+    
+    const messageData = {
+      thread_id: threadId,
+      sender: role,
+      content: content,
+      created_at: new Date().toISOString(),
+      reference_entries: references && references.length > 0 ? references : null
+    };
+    
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .insert(messageData);
+    
+    if (error) {
+      console.error("Error storing message:", error);
+      return null;
+    }
+    
+    // Update thread timestamp
+    await supabase
+      .from('chat_threads')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', threadId);
+    
+    return data;
+  } catch (error) {
+    console.error("Error in storeMessage:", error);
+    return null;
+  }
+}
+
 // Search for entries by entity type and name
 async function searchEntriesByEntity(userId: string, entityType: string, entityName: string | null = null) {
   try {
@@ -380,6 +414,14 @@ serve(async (req) => {
     
     if (threadId) {
       console.log("Thread ID:", threadId);
+    } else {
+      console.error("No thread ID provided - messages won't be saved properly");
+    }
+    
+    // Store user message first
+    if (threadId) {
+      await storeMessage(threadId, 'user', message);
+      console.log("User message stored in database");
     }
     
     // Determine query type and approach
@@ -681,6 +723,12 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
       
       console.log("AI response generated successfully");
       
+      // Store assistant message in DB if thread exists
+      if (threadId) {
+        await storeMessage(threadId, 'assistant', aiResponse, relevantEntries);
+        console.log("Assistant response stored in database");
+      }
+      
       // Prepare response object
       const responseObject: any = { 
         response: aiResponse,
@@ -689,6 +737,12 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
       
       // Include relevant entries if found
       if (relevantEntries && relevantEntries.length > 0) {
+        responseObject.references = relevantEntries.map(entry => ({
+          id: entry.id,
+          date: entry.date,
+          snippet: entry.snippet.substring(0, 200) + (entry.snippet.length > 200 ? '...' : '')
+        }));
+        
         responseObject.diagnostics = { 
           relevantEntries 
         };

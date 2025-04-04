@@ -1,12 +1,13 @@
-
 import React, { useState } from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Bot, User, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ChatMessageProps {
   message: {
@@ -23,6 +24,7 @@ interface ChatMessageProps {
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis }) => {
   const isMobile = useIsMobile();
   const [showReferences, setShowReferences] = useState(false);
+  const { user } = useAuth();
   
   // Format content if it contains object notation
   const formattedContent = React.useMemo(() => {
@@ -74,9 +76,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
       className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
     >
       {message.role === 'assistant' && (
-        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Bot className="h-5 w-5 text-primary" />
-        </div>
+        <Avatar className="h-10 w-10 border border-primary/20">
+          <AvatarImage 
+            src="/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png" 
+            alt="Roha"
+            className="bg-primary/10"
+          />
+          <AvatarFallback className="bg-primary/10 text-primary">R</AvatarFallback>
+        </Avatar>
       )}
       
       <div
@@ -157,9 +164,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
       </div>
       
       {message.role === 'user' && (
-        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-          <User className="h-5 w-5 text-primary" />
-        </div>
+        <Avatar className="h-10 w-10 border border-primary/20">
+          <AvatarImage 
+            src={user?.user_metadata?.avatar_url} 
+            alt="User"
+            className="bg-primary/20"
+          />
+          <AvatarFallback className="bg-primary/20 text-primary">
+            {user?.user_metadata?.full_name ? 
+              user.user_metadata.full_name.charAt(0) : 
+              user?.email?.charAt(0) || 'U'}
+          </AvatarFallback>
+        </Avatar>
       )}
     </motion.div>
   );

@@ -1,12 +1,13 @@
-
 import React from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
-import { Bot, User, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MobileChatMessageProps {
   message: {
@@ -17,11 +18,12 @@ interface MobileChatMessageProps {
     diagnostics?: any;
     hasNumericResult?: boolean;
   };
-  showAnalysis?: boolean; // Make this prop optional
+  showAnalysis?: boolean;
 }
 
-const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false }) => { // Add default value
+const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false }) => {
   const [showReferences, setShowReferences] = useState(false);
+  const { user } = useAuth();
   
   const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
   
@@ -75,9 +77,14 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       className={`relative flex items-start gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
     >
       {message.role === 'assistant' && (
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Bot className="h-4 w-4 text-primary" />
-        </div>
+        <Avatar className="w-8 h-8 border border-primary/20">
+          <AvatarImage 
+            src="/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png" 
+            alt="Roha"
+            className="bg-primary/10"
+          />
+          <AvatarFallback className="bg-primary/10 text-primary text-xs">R</AvatarFallback>
+        </Avatar>
       )}
       
       <div
@@ -156,9 +163,18 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       </div>
       
       {message.role === 'user' && (
-        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-          <User className="h-4 w-4 text-primary" />
-        </div>
+        <Avatar className="w-8 h-8 border border-primary/20">
+          <AvatarImage 
+            src={user?.user_metadata?.avatar_url} 
+            alt="User"
+            className="bg-primary/20"
+          />
+          <AvatarFallback className="bg-primary/20 text-primary text-xs">
+            {user?.user_metadata?.full_name ? 
+              user.user_metadata.full_name.charAt(0) : 
+              user?.email?.charAt(0) || 'U'}
+          </AvatarFallback>
+        </Avatar>
       )}
     </motion.div>
   );

@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Bug, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Bug, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { useNavigate } from 'react-router-dom';
 
 interface Operation {
   id: string;
@@ -19,6 +21,7 @@ const JournalDebugPanel = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
   const operationsRef = useRef<Operation[]>([]);
   const [lastOperationId, setLastOperationId] = useState<string | null>(null);
+  const navigate = useNavigate();
   
   const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -214,6 +217,74 @@ const JournalDebugPanel = () => {
     }
   };
   
+  const testChatMessagesStorage = async () => {
+    const testId = generateId();
+    window.dispatchEvent(new CustomEvent('journalOperationStart', {
+      detail: {
+        id: testId,
+        type: 'test',
+        message: 'Checking chat messages persistence'
+      }
+    }));
+    
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Check for existing threads
+      const { data: threads, error: threadsError } = await supabase
+        .from('chat_threads')
+        .select('id, title, updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(5);
+      
+      if (threadsError) {
+        throw new Error(`Error fetching threads: ${threadsError.message}`);
+      }
+      
+      let messagesData = [];
+      
+      if (threads && threads.length > 0) {
+        // Get messages from first thread
+        const { data: messages, error: messagesError } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('thread_id', threads[0].id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+          
+        if (messagesError) {
+          throw new Error(`Error fetching messages: ${messagesError.message}`);
+        }
+        
+        messagesData = messages || [];
+      }
+      
+      window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+        detail: {
+          id: testId,
+          status: 'success',
+          message: 'Chat persistence check completed',
+          details: JSON.stringify({
+            threads: threads || [],
+            messages: messagesData,
+            messageCount: messagesData.length,
+            hasUserMessages: messagesData.some(m => m.sender === 'user'),
+            hasAssistantMessages: messagesData.some(m => m.sender === 'assistant')
+          }, null, 2)
+        }
+      }));
+    } catch (error) {
+      window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+        detail: {
+          id: testId,
+          status: 'error',
+          message: 'Chat persistence check failed',
+          details: error instanceof Error ? error.message : String(error)
+        }
+      }));
+    }
+  };
+  
   if (!isOpen) {
     return (
       <Button 
@@ -258,6 +329,11 @@ const JournalDebugPanel = () => {
         <Button size="sm" variant="outline" onClick={testFetchEntities}>Test Entity Extraction</Button>
         <Button size="sm" variant="outline" onClick={testGenerateThemes}>Test Theme Generation</Button>
         <Button size="sm" variant="outline" onClick={testCheckApiKeys}>Check API Keys</Button>
+        <Button size="sm" variant="outline" onClick={testChatMessagesStorage}>Check Chat Storage</Button>
+        <Button size="sm" variant="outline" onClick={() => navigate('/chat')}>
+          <MessageSquare className="h-4 w-4 mr-1" />
+          Go to Chat
+        </Button>
       </div>
       
       <ScrollArea className="flex-1 p-2">
