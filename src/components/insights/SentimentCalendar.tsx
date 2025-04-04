@@ -52,7 +52,7 @@ export default function SentimentCalendar({ sentimentData }: SentimentCalendarPr
           caption: "px-4 py-2",
           month: "space-y-1",
           cell: cn(
-            "relative p-0 h-11 w-11",
+            "relative p-0 h-9 w-9",
             "focus-within:relative focus-within:z-20"
           ),
           day: cn(
@@ -85,17 +85,20 @@ export default function SentimentCalendar({ sentimentData }: SentimentCalendarPr
                 )}
                 {...props}
               >
-                {/* Date number always at the top */}
-                <span className="absolute top-1 w-full text-center text-xs">
-                  {date.getDate()}
-                </span>
-                
-                {/* Emoji slightly below the date number, with more vertical spacing */}
-                {sentimentInfo && (
-                  <span className="absolute bottom-0.5 w-full text-center text-sm">
-                    {sentimentInfo.emoji}
+                {/* Fixed layout: use absolute positioning with proper spacing */}
+                <div className="flex flex-col items-center justify-center h-full w-full">
+                  {/* Date number at the top */}
+                  <span className="text-xs mb-1">
+                    {date.getDate()}
                   </span>
-                )}
+                  
+                  {/* Emoji below with proper spacing */}
+                  {sentimentInfo && (
+                    <span className="text-xs">
+                      {sentimentInfo.emoji}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           },

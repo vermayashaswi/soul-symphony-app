@@ -30,12 +30,31 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
 }) => {
   const isMobile = useIsMobile();
   const [showPercentage, setShowPercentage] = useState(false);
+  const timeoutRef = useRef<number | null>(null);
   
   useEffect(() => {
     if (isHighlighted) {
       setShowPercentage(true);
     }
   }, [isHighlighted]);
+  
+  useEffect(() => {
+    if (showPercentage && !isHighlighted) {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+      }
+      
+      timeoutRef.current = window.setTimeout(() => {
+        setShowPercentage(false);
+      }, 1000);
+    }
+    
+    return () => {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [showPercentage, isHighlighted]);
 
   const calculateFontSize = () => {
     let baseSize;
@@ -104,7 +123,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   };
 
   const handleBubbleClick = () => {
-    setShowPercentage(prev => !prev);
+    setShowPercentage(true);
     
     if (onClick && name && name !== '•') {
       onClick(name);

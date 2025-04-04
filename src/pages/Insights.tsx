@@ -16,7 +16,7 @@ export default function Insights() {
   const [isSticky, setIsSticky] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const timeToggleRef = useRef<HTMLDivElement>(null);
-  const stickyThreshold = useRef<number>(0);
+  const navbarHeight = 64;
   const scrollPositionRef = useRef<number>(0);
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
@@ -32,14 +32,8 @@ export default function Insights() {
     const handleScroll = () => {
       scrollPositionRef.current = window.scrollY;
       
-      if (!timeToggleRef.current) return;
-      
-      if (!stickyThreshold.current) {
-        const rect = timeToggleRef.current.getBoundingClientRect();
-        stickyThreshold.current = rect.top + window.scrollY - 16;
-      }
-      
-      setIsSticky(window.scrollY > stickyThreshold.current);
+      const scrollThreshold = 90;
+      setIsSticky(window.scrollY > scrollThreshold);
     };
 
     window.addEventListener('scroll', handleScroll);
@@ -114,14 +108,14 @@ export default function Insights() {
       <Navbar />
       
       {isSticky && (
-        <div className="fixed top-16 left-0 right-0 z-10 py-3 px-4 bg-background border-b shadow-sm flex justify-center">
+        <div className="fixed top-0 left-0 right-0 z-40 py-3 px-4 bg-background border-b shadow-sm flex justify-center">
           <div className="max-w-5xl w-full flex justify-end">
             {renderTimeToggle()}
           </div>
         </div>
       )}
       
-      <div className="max-w-5xl mx-auto px-4 pt-4 md:pt-8">
+      <div className="max-w-5xl mx-auto px-4 pt-4 md:pt-8 mt-16">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Insights</h1>
