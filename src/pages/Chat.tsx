@@ -4,8 +4,8 @@ import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 import Navbar from '@/components/Navbar';
-import { SmartChatInterface } from '@/components/chat/SmartChatInterface';
-import { MobileChatInterface } from '@/components/chat/mobile/MobileChatInterface';
+import SmartChatInterface from '@/components/chat/SmartChatInterface';
+import MobileChatInterface from '@/components/chat/mobile/MobileChatInterface';
 
 const Chat = () => {
   const navigate = useNavigate();
