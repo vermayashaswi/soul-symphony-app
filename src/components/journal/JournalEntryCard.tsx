@@ -95,29 +95,27 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     return 0;
   };
 
-  // Get sentiment emoji and color based on score
+  // Get sentiment emoji with appropriate color
   const getSentimentEmoji = () => {
     const score = getSentimentScore();
     
     if (score >= 0.3) {
-      return { emoji: '😊', color: 'text-green-600 dark:text-green-400' };
+      return <span role="img" aria-label="positive sentiment" className="text-2xl" style={{ color: '#4ade80' }}>😊</span>;
     } else if (score >= -0.1) {
-      return { emoji: '😐', color: 'text-yellow-600 dark:text-yellow-400' };
+      return <span role="img" aria-label="neutral sentiment" className="text-2xl" style={{ color: '#facc15' }}>😐</span>;
     } else {
-      return { emoji: '😔', color: 'text-red-600 dark:text-red-400' };
+      return <span role="img" aria-label="negative sentiment" className="text-2xl" style={{ color: '#ef4444' }}>😔</span>;
     }
   };
-
-  const { emoji, color } = getSentimentEmoji();
 
   return (
     <Card className="bg-background shadow-md">
       <div className="flex justify-between items-start p-3 md:p-4">
         <div>
           <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-          <p className={`text-lg md:text-xl ${color}`}>
-            {emoji}
-          </p>
+          <div className="mt-1">
+            {getSentimentEmoji()}
+          </div>
         </div>
 
         <div className="flex items-center space-x-1 md:space-x-2">
