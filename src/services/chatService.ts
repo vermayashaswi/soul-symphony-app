@@ -1,6 +1,5 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
+import { analyzeQueryTypes, segmentQuery, extractEmotionKeywords } from "@/utils/chat/queryAnalyzer";
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'error';
@@ -26,130 +25,169 @@ export async function processChatMessage(
 
   try {
     console.log("Processing message:", message);
-    // Use provided queryTypes or generate them
-    const messageQueryTypes = queryTypes || analyzeQueryTypes(message);
-    console.log("Query analysis results:", messageQueryTypes);
     
-    let queryResponse: any = null;
-    let retryAttempted = false;
-    let inProgressContent = "I'm thinking about your question..."; 
+    // Step 1: Segment the query if it's complex
+    let segments: string[] = [];
+    let segmentResults: any[] = [];
+    let finalResponse: any = null;
     
-    // First determine the search strategy based on query type
-    const searchStrategy = messageQueryTypes.searchStrategy || 'vector_search';
-    console.log("Selected search strategy:", searchStrategy);
+    try {
+      segments = await segmentQuery(message, userId);
+      console.log("Query segments:", segments);
+    } catch (segmentError) {
+      console.error("Error during query segmentation:", segmentError);
+      // If segmentation fails, treat as a single query
+      segments = [message];
+    }
     
-    // Execute the appropriate search strategy
-    switch (searchStrategy) {
-      case 'temporal_vector_search':
-        // For "when" questions - vector search with temporal focus
-        console.log("Using temporal vector search strategy");
-        queryResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId);
-        break;
+    // Step 2: Process each segment individually
+    const multiSegment = segments.length > 1;
+    
+    if (multiSegment) {
+      console.log("Processing multi-segment query with", segments.length, "segments");
+      
+      // Process each segment
+      for (const segment of segments) {
+        console.log("Processing segment:", segment);
+        // Use provided queryTypes or generate them for this segment
+        const segmentQueryTypes = analyzeQueryTypes(segment);
         
-      case 'time_pattern_analysis':
-        // New strategy for time-of-day pattern analysis
-        console.log("Using time pattern analysis strategy");
-        queryResponse = await handleTimePatternAnalysis(message, userId, messageQueryTypes, threadId);
-        break;
+        // Determine the search strategy for this segment
+        const searchStrategy = segmentQueryTypes.searchStrategy || 'vector_search';
+        console.log("Segment search strategy:", searchStrategy);
         
-      case 'frequency_analysis':
-        // For "how often" questions - analyze frequency patterns
-        console.log("Using frequency analysis strategy");
-        queryResponse = await handleFrequencyAnalysis(message, userId, messageQueryTypes, threadId);
-        break;
-        
-      case 'emotion_aggregation':
-        // For emotion aggregation questions (top emotions)
-        console.log("Using emotion aggregation strategy");
-        queryResponse = await handleEmotionAggregation(message, userId, messageQueryTypes, threadId);
-        break;
-        
-      case 'emotion_causal_analysis':
-        // For emotion "why" questions
-        console.log("Using emotion causal analysis strategy");
-        queryResponse = await handleEmotionCausalAnalysis(message, userId, messageQueryTypes, threadId);
-        break;
-        
-      case 'relationship_analysis':
-        // For relationship-related queries
-        console.log("Using relationship analysis strategy");
-        queryResponse = await handleRelationshipAnalysis(message, userId, messageQueryTypes, threadId);
-        break;
-        
-      case 'contextual_advice':
-        // For improvement/advice questions
-        console.log("Using contextual advice strategy");
-        queryResponse = await handleContextualAdvice(message, userId, messageQueryTypes, threadId);
-        break;
-        
-      case 'data_aggregation':
-        // For queries needing data aggregation
-        console.log("Using data aggregation strategy");
-        
+        // Execute the appropriate search strategy for this segment
+        let segmentResponse = null;
         try {
-          const { data, error } = await supabase.functions.invoke('smart-query-planner', {
-            body: { 
-              message, 
-              userId, 
-              includeDiagnostics: true,
-              enableQueryBreakdown: true,
-              generateSqlQueries: true,
-              analyzeComponents: true,
-              allowRetry: true,
-              requiresExplanation: messageQueryTypes.needsContext || message.toLowerCase().includes('why')
-            }
-          });
-          
-          if (error) {
-            console.error("Error using smart-query-planner:", error);
-          } else if (data && !data.fallbackToRag) {
-            console.log("Successfully used smart query planner");
-            queryResponse = data;
-          } else {
-            console.log("Smart query planner couldn't handle the query, falling back to RAG");
-            queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+          switch (searchStrategy) {
+            case 'temporal_vector_search':
+              segmentResponse = await handleTemporalVectorSearch(segment, userId, segmentQueryTypes, threadId);
+              break;
+            case 'time_pattern_analysis':
+              segmentResponse = await handleTimePatternAnalysis(segment, userId, segmentQueryTypes, threadId);
+              break;
+            case 'frequency_analysis':
+              segmentResponse = await handleFrequencyAnalysis(segment, userId, segmentQueryTypes, threadId);
+              break;
+            case 'emotion_aggregation':
+              segmentResponse = await handleEmotionAggregation(segment, userId, segmentQueryTypes, threadId);
+              break;
+            case 'emotion_causal_analysis':
+              segmentResponse = await handleEmotionCausalAnalysis(segment, userId, segmentQueryTypes, threadId);
+              break;
+            case 'relationship_analysis':
+              segmentResponse = await handleRelationshipAnalysis(segment, userId, segmentQueryTypes, threadId);
+              break;
+            case 'contextual_advice':
+              segmentResponse = await handleContextualAdvice(segment, userId, segmentQueryTypes, threadId);
+              break;
+            case 'data_aggregation':
+              segmentResponse = await handleDataAggregation(segment, userId, segmentQueryTypes, threadId);
+              break;
+            case 'vector_search':
+            default:
+              segmentResponse = await handleVectorSearch(segment, userId, segmentQueryTypes, threadId);
+              break;
           }
-        } catch (smartQueryError) {
-          console.error("Exception in smart-query-planner:", smartQueryError);
-          queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+          
+          if (segmentResponse) {
+            segmentResults.push({
+              segment,
+              response: segmentResponse.response || "No answer found for this part of your question.",
+              relevantEntries: segmentResponse.diagnostics?.relevantEntries || []
+            });
+          } else {
+            segmentResults.push({
+              segment,
+              response: "No answer found for this part of your question.",
+              relevantEntries: []
+            });
+          }
+        } catch (segmentError) {
+          console.error("Error processing segment:", segment, segmentError);
+          segmentResults.push({
+            segment,
+            response: "I encountered an error processing this part of your question.",
+            error: segmentError.message
+          });
         }
-        break;
-        
-      case 'vector_search':
-      default:
-        // Default case - standard vector search
-        console.log("Using standard vector search strategy");
-        queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
-        break;
+      }
+      
+      // Step 3: Combine segment results for a final comprehensive answer
+      finalResponse = await combineSegmentResults(message, segmentResults, userId, threadId);
+      
+    } else {
+      // Single segment (or segmentation failed), process normally
+      console.log("Processing single segment query");
+      
+      // Use provided queryTypes or generate them
+      const messageQueryTypes = queryTypes || analyzeQueryTypes(message);
+      console.log("Query analysis results:", messageQueryTypes);
+      
+      // Determine the search strategy based on query type
+      const searchStrategy = messageQueryTypes.searchStrategy || 'vector_search';
+      console.log("Selected search strategy:", searchStrategy);
+      
+      // Execute the appropriate search strategy
+      switch (searchStrategy) {
+        case 'temporal_vector_search':
+          finalResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId);
+          break;
+        case 'time_pattern_analysis':
+          finalResponse = await handleTimePatternAnalysis(message, userId, messageQueryTypes, threadId);
+          break;
+        case 'frequency_analysis':
+          finalResponse = await handleFrequencyAnalysis(message, userId, messageQueryTypes, threadId);
+          break;
+        case 'emotion_aggregation':
+          finalResponse = await handleEmotionAggregation(message, userId, messageQueryTypes, threadId);
+          break;
+        case 'emotion_causal_analysis':
+          finalResponse = await handleEmotionCausalAnalysis(message, userId, messageQueryTypes, threadId);
+          break;
+        case 'relationship_analysis':
+          finalResponse = await handleRelationshipAnalysis(message, userId, messageQueryTypes, threadId);
+          break;
+        case 'contextual_advice':
+          finalResponse = await handleContextualAdvice(message, userId, messageQueryTypes, threadId);
+          break;
+        case 'data_aggregation':
+          finalResponse = await handleDataAggregation(message, userId, messageQueryTypes, threadId);
+          break;
+        case 'vector_search':
+        default:
+          finalResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+          break;
+      }
     }
     
-    if (!queryResponse) {
+    if (!finalResponse) {
       console.log("No response from primary strategy, falling back to RAG");
-      queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+      finalResponse = await handleVectorSearch(message, userId, queryTypes || {}, threadId);
     }
     
-    console.log("Response received:", queryResponse ? "yes" : "no");
+    console.log("Response received:", finalResponse ? "yes" : "no");
     
     // Construct final response
-    const responseContent = queryResponse.response || "I couldn't find an answer to your question.";
+    const responseContent = finalResponse.response || "I couldn't find an answer to your question.";
     const chatResponse: ChatMessage = {
       role: 'assistant',
       content: responseContent,
     };
     
     // Add references if available
-    if (queryResponse.diagnostics && queryResponse.diagnostics.relevantEntries) {
-      chatResponse.references = queryResponse.diagnostics.relevantEntries;
+    if (finalResponse.diagnostics && finalResponse.diagnostics.relevantEntries) {
+      chatResponse.references = finalResponse.diagnostics.relevantEntries;
     }
     
     // Add analysis data if available
-    if (queryResponse.diagnostics) {
-      chatResponse.analysis = queryResponse.diagnostics;
-      chatResponse.diagnostics = queryResponse.diagnostics;
+    if (finalResponse.diagnostics) {
+      chatResponse.analysis = finalResponse.diagnostics;
+      chatResponse.diagnostics = finalResponse.diagnostics;
     }
     
     // Set flag if we have a numeric result
-    if (queryResponse.hasNumericResult) {
+    if (finalResponse.hasNumericResult) {
       chatResponse.hasNumericResult = true;
     }
     
@@ -160,6 +198,120 @@ export async function processChatMessage(
       role: 'error',
       content: "I apologize, but I encountered an error processing your request. Please try again.",
     };
+  }
+}
+
+// New function to combine segment results into a comprehensive answer
+async function combineSegmentResults(
+  originalQuery: string, 
+  segmentResults: Array<{segment: string, response: string, relevantEntries?: any[], error?: string}>,
+  userId: string,
+  threadId?: string
+): Promise<any> {
+  try {
+    console.log("Combining results from", segmentResults.length, "segments");
+    
+    // Format segment results for GPT
+    const formattedSegments = segmentResults.map((result, index) => {
+      return `Segment ${index + 1}: "${result.segment}"\nAnswer: ${result.response}`;
+    }).join("\n\n");
+    
+    // If there's only one segment with an error, return that error
+    if (segmentResults.length === 1 && segmentResults[0].error) {
+      return {
+        response: `I encountered an error processing your question: ${segmentResults[0].error}`,
+        diagnostics: { relevantEntries: segmentResults[0].relevantEntries || [] }
+      };
+    }
+    
+    // Use GPT to create a final comprehensive answer
+    const { data, error } = await supabase.functions.invoke('combine-segment-responses', {
+      body: { 
+        originalQuery,
+        segmentResults: segmentResults.map(result => ({
+          segment: result.segment,
+          response: result.response
+        })),
+        userId
+      }
+    });
+    
+    if (error) {
+      console.error("Error combining segment responses:", error);
+      // Fallback: concatenate all segment responses
+      const fallbackResponse = segmentResults.map((result, i) => 
+        `Part ${i+1}: ${result.response}`
+      ).join("\n\n");
+      
+      return {
+        response: fallbackResponse,
+        diagnostics: {
+          relevantEntries: segmentResults.flatMap(result => result.relevantEntries || [])
+        }
+      };
+    }
+    
+    // Collect all relevant entries from all segments
+    const allRelevantEntries = segmentResults.flatMap(result => result.relevantEntries || []);
+    
+    return {
+      response: data.response,
+      diagnostics: {
+        relevantEntries: allRelevantEntries,
+        segments: segmentResults.map(result => ({
+          query: result.segment,
+          response: result.response
+        }))
+      }
+    };
+    
+  } catch (error) {
+    console.error("Error combining segment results:", error);
+    
+    // Fallback: concatenate all segment responses
+    const fallbackResponse = segmentResults.map((result, i) => 
+      `Part ${i+1}: ${result.response}`
+    ).join("\n\n");
+    
+    return {
+      response: fallbackResponse,
+      diagnostics: {
+        relevantEntries: segmentResults.flatMap(result => result.relevantEntries || [])
+      }
+    };
+  }
+}
+
+// Handler for data aggregation
+async function handleDataAggregation(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  console.log("Using data aggregation strategy");
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('smart-query-planner', {
+      body: { 
+        message, 
+        userId, 
+        includeDiagnostics: true,
+        enableQueryBreakdown: true,
+        generateSqlQueries: true,
+        analyzeComponents: true,
+        allowRetry: true,
+        requiresExplanation: queryTypes.needsContext || message.toLowerCase().includes('why')
+      }
+    });
+    
+    if (error) {
+      console.error("Error using smart-query-planner:", error);
+    } else if (data && !data.fallbackToRag) {
+      console.log("Successfully used smart query planner");
+      return data;
+    } else {
+      console.log("Smart query planner couldn't handle the query, falling back to RAG");
+      return await handleVectorSearch(message, userId, queryTypes, threadId);
+    }
+  } catch (smartQueryError) {
+    console.error("Exception in smart-query-planner:", smartQueryError);
+    return await handleVectorSearch(message, userId, queryTypes, threadId);
   }
 }
 
