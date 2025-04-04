@@ -75,17 +75,24 @@
   
   /* Voice recorder container height optimization */
   [class*="min-h-[160px]"] {
-    min-height: 140px !important;
+    min-height: 120px !important;
+  }
+  
+  /* Voice recorder container position adjustment to stay above mobile navbar */
+  .min-h-\[120px\] {
+    min-height: 100px !important;
+    margin-bottom: 16px;
   }
   
   /* Make card padding smaller on mobile */
   .card-content {
     padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
   }
   
   /* Reduce the size of the language animation background */
   .language-animation-container {
-    height: 120px !important;
+    height: 100px !important;
   }
   
   /* Add some bounce animations for mobile interactions */
@@ -225,6 +232,20 @@
   
   .insights-container {
     padding-top: 0 !important;
+  }
+  
+  /* Optimize spacing for voice recorder on mobile */
+  .journal-container .card-content {
+    padding: 0.5rem !important;
+  }
+  
+  .journal-container .card-header {
+    padding-bottom: 0 !important;
+  }
+  
+  .journal-container .card-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
   }
 }
 
