@@ -24,9 +24,9 @@ interface AnimatedWordProps {
 
 // Individual word animation component with randomized movement
 const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
-  // Calculate random positions to cover the entire container
-  const randomX = Math.random() * 200 - 100; // Random value between -100% and 100% from center
-  const randomY = Math.random() * 200 - 100; // Random value between -100% and 100% from center
+  // Calculate random position across the entire container (not just around center)
+  const randomX = Math.random() * 100; // Random value 0-100%
+  const randomY = Math.random() * 100; // Random value 0-100%
   
   // Create more dramatic off-screen starting positions
   const startX = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 300 + 200);
@@ -45,8 +45,8 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
   const delay = index * 0.05 + Math.random() * 0.2;
   
   // Create random floating effect with wider range for more scattered distribution
-  const floatX = Math.random() * 80 - 40; // Random value between -40 and 40
-  const floatY = Math.random() * 80 - 40; // Random value between -40 and 40
+  const floatX = Math.random() * 100 - 50; // Random value between -50 and 50
+  const floatY = Math.random() * 100 - 50; // Random value between -50 and 50
   const floatDuration = 3 + Math.random() * 7; // Random duration between 3-10s
   
   return (
@@ -60,8 +60,9 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
         rotate: Math.random() * 20 - 10,
       }}
       animate={{ 
-        x: [randomX, randomX + floatX, randomX, randomX - floatX, randomX], // Random position with floating
-        y: [randomY, randomY + floatY, randomY, randomY - floatY, randomY], // Random position with floating
+        // Position across the full container width/height (percentage-based)
+        x: `${randomX}%`, 
+        y: `${randomY}%`,
         scale: 0.8 + Math.random() * 0.4,
         opacity,
         rotate: Math.random() * 10 - 5,
@@ -90,6 +91,11 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
       }}
       className="absolute select-none pointer-events-none"
       style={{ 
+        // Use absolute positioning with percentages
+        left: `${randomX}%`,
+        top: `${randomY}%`,
+        // Subtract half of element size to center it at the position
+        transform: `translate(-50%, -50%)`,
         zIndex, 
         fontFamily: "var(--font-sans)",
         fontWeight: Math.random() > 0.6 ? 700 : 400,
@@ -112,7 +118,7 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
     // Display more languages to cover the container space better
     const updateWords = () => {
       // Increased word count for better distribution
-      const wordCount = contained ? (22 + Math.floor(Math.random() * 10)) : (30 + Math.floor(Math.random() * 15));
+      const wordCount = contained ? (35 + Math.floor(Math.random() * 10)) : (45 + Math.floor(Math.random() * 15));
       const newWords: string[] = [];
       
       // Create a set to avoid duplicates
@@ -141,7 +147,7 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
       className={`${contained ? 'absolute inset-0 overflow-hidden' : 'fixed inset-0 overflow-hidden'} w-full h-full pointer-events-none`}
       style={{ zIndex: 0 }}
     >
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 w-full h-full">
         <AnimatePresence>
           {visibleWords.map((word, index) => (
             <AnimatedWord 
