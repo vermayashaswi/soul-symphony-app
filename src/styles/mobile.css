@@ -1,7 +1,5 @@
-
 /* Mobile-specific styles */
 @media (max-width: 768px) {
-  /* ... keep existing code (mobile styles) */
   /* Rounded corners for mobile UI elements */
   .mobile-chat-interface .rounded-full {
     border-radius: 24px;
@@ -72,12 +70,12 @@
   
   /* Voice recorder container height optimization */
   [class*="min-h-[160px]"], [class*="min-h-[185px]"] {
-    min-height: 150px !important;
+    min-height: 170px !important;
   }
   
   /* Voice recorder container position adjustment to stay above mobile navbar */
   .min-h-\[185px\] {
-    min-height: 150px !important;
+    min-height: 170px !important;
     margin-bottom: 0;
     position: relative;
     bottom: 0;
@@ -119,12 +117,6 @@
     padding-bottom: 0 !important;
   }
   
-  /* Make the record button smaller */
-  .journal-container .rounded-full.w-36 {
-    width: 6.75rem !important;
-    height: 6.75rem !important;
-  }
-  
   /* Position the recorder at the bottom */
   .journal-container .card {
     margin-bottom: 0 !important;
@@ -142,160 +134,6 @@
   /* Adjust spacing of journal tabs container */
   .journal-container .container {
     padding: 0.5rem 1rem !important;
-  }
-
-  /* ... keep existing code (animations and other styles) */
-  /* Add some bounce animations for mobile interactions */
-  @keyframes mobile-bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-  }
-  
-  .mobile-animation-bounce {
-    animation: mobile-bounce 0.5s ease;
-  }
-  
-  /* Mobile-friendly scrolling */
-  .mobile-chat-interface .overflow-y-auto,
-  .smart-chat-interface .overflow-y-auto {
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
-  }
-  
-  /* Mobile-friendly input */
-  .mobile-chat-interface textarea,
-  .smart-chat-interface textarea {
-    font-size: 16px; /* Prevents iOS zoom on focus */
-    padding: 0.5rem 0.75rem !important;
-  }
-  
-  /* Message bubbles styling */
-  .mobile-chat-interface .bg-muted,
-  .smart-chat-interface .bg-muted {
-    background-color: rgba(var(--muted), 0.7);
-  }
-  
-  /* Suggestion chips */
-  .mobile-chat-interface .suggestion-chip {
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-  
-  .mobile-chat-interface .suggestion-chip:active {
-    transform: scale(0.98);
-  }
-  
-  /* Message animation */
-  .message-appear {
-    animation: message-appear 0.3s cubic-bezier(0.25, 0.1, 0.25, 1.0);
-  }
-  
-  @keyframes message-appear {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  /* Reduce excess space in mobile chat interface */
-  .smart-chat-container {
-    gap: 0.5rem !important;
-  }
-  
-  /* Optimize vertical space */
-  .smart-chat-interface h1,
-  .mobile-chat-interface h1,
-  .smart-chat-interface h2,
-  .mobile-chat-interface h2,
-  .smart-chat-interface h3,
-  .mobile-chat-interface h3 {
-    margin-bottom: 0.5rem !important;
-  }
-  
-  /* Fix for flickering journal entries */
-  .journal-container .opacity-0 {
-    transition: opacity 0.3s ease-in;
-  }
-  
-  .journal-container .opacity-100 {
-    transition: opacity 0.3s ease-in;
-  }
-  
-  /* Recording animation */
-  .recording-indicator {
-    animation: pulse 2s infinite;
-  }
-  
-  @keyframes pulse {
-    0% {
-      transform: scale(0.95);
-      box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.7);
-    }
-    
-    70% {
-      transform: scale(1);
-      box-shadow: 0 0 0 10px rgba(255, 82, 82, 0);
-    }
-    
-    100% {
-      transform: scale(0.95);
-      box-shadow: 0 0 0 0 rgba(255, 82, 82, 0);
-    }
-  }
-  
-  /* Fixed header and input bar for mobile chat */
-  .mobile-chat-header {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    background-color: white;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  }
-  
-  .mobile-chat-input-container {
-    position: fixed;
-    bottom: 4rem; /* Position above the navbar which is 4rem tall */
-    left: 0;
-    right: 0;
-    z-index: 40;
-    background-color: white;
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
-    padding: 0.5rem;
-    margin-bottom: 0 !important;
-  }
-  
-  /* Ensure proper content area height in chat */
-  .mobile-chat-content {
-    height: calc(100vh - 180px); /* Adjust based on header, input and navbar heights */
-    overflow-y: auto;
-    padding-bottom: 4rem !important; /* Add more padding at the bottom */
-  }
-  
-  /* Remove extra spacing on journal and insights pages */
-  .journal-container {
-    padding-top: 0 !important;
-  }
-  
-  .insights-container {
-    padding-top: 0 !important;
-  }
-  
-  /* Optimize spacing for voice recorder on mobile */
-  .journal-container .card-content {
-    padding: 0.5rem !important;
-  }
-  
-  .journal-container .card-header {
-    padding-bottom: 0 !important;
-  }
-  
-  .journal-container .card-title {
-    font-size: 1.25rem !important;
-    margin-bottom: 0.25rem;
   }
 }
 
