@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 
@@ -26,7 +25,6 @@ export async function processChatMessage(
 
   try {
     console.log("Processing message:", message);
-    // Use provided queryTypes or generate them
     const messageQueryTypes = queryTypes || analyzeQueryTypes(message);
     console.log("Query analysis results:", messageQueryTypes);
     
@@ -34,50 +32,41 @@ export async function processChatMessage(
     let retryAttempted = false;
     let inProgressContent = "I'm thinking about your question..."; 
     
-    // First determine the search strategy based on query type
     const searchStrategy = messageQueryTypes.searchStrategy || 'vector_search';
     console.log("Selected search strategy:", searchStrategy);
     
-    // Execute the appropriate search strategy
     switch (searchStrategy) {
       case 'temporal_vector_search':
-        // For "when" questions - vector search with temporal focus
         console.log("Using temporal vector search strategy");
         queryResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId);
         break;
         
       case 'frequency_analysis':
-        // For "how often" questions - analyze frequency patterns
         console.log("Using frequency analysis strategy");
         queryResponse = await handleFrequencyAnalysis(message, userId, messageQueryTypes, threadId);
         break;
         
       case 'emotion_aggregation':
-        // For emotion aggregation questions (top emotions)
         console.log("Using emotion aggregation strategy");
         queryResponse = await handleEmotionAggregation(message, userId, messageQueryTypes, threadId);
         break;
         
       case 'emotion_causal_analysis':
-        // For emotion "why" questions
         console.log("Using emotion causal analysis strategy");
         queryResponse = await handleEmotionCausalAnalysis(message, userId, messageQueryTypes, threadId);
         break;
         
       case 'relationship_analysis':
-        // For relationship-related queries
         console.log("Using relationship analysis strategy");
         queryResponse = await handleRelationshipAnalysis(message, userId, messageQueryTypes, threadId);
         break;
         
       case 'contextual_advice':
-        // For improvement/advice questions
         console.log("Using contextual advice strategy");
         queryResponse = await handleContextualAdvice(message, userId, messageQueryTypes, threadId);
         break;
         
       case 'data_aggregation':
-        // For queries needing data aggregation
         console.log("Using data aggregation strategy");
         
         try {
@@ -111,12 +100,10 @@ export async function processChatMessage(
         
       case 'vector_search':
       default:
-        // Default case - standard vector search
         console.log("Using standard vector search strategy");
         queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
         break;
       case 'correlation_analysis':
-        // For pattern questions about emotional behaviors
         console.log("Using correlation analysis strategy");
         queryResponse = await handleCorrelationAnalysis(message, userId, messageQueryTypes, threadId);
         break;
@@ -129,25 +116,21 @@ export async function processChatMessage(
     
     console.log("Response received:", queryResponse ? "yes" : "no");
     
-    // Construct final response
     const responseContent = queryResponse.response || "I couldn't find an answer to your question.";
     const chatResponse: ChatMessage = {
       role: 'assistant',
       content: responseContent,
     };
     
-    // Add references if available
     if (queryResponse.diagnostics && queryResponse.diagnostics.relevantEntries) {
       chatResponse.references = queryResponse.diagnostics.relevantEntries;
     }
     
-    // Add analysis data if available
     if (queryResponse.diagnostics) {
       chatResponse.analysis = queryResponse.diagnostics;
       chatResponse.diagnostics = queryResponse.diagnostics;
     }
     
-    // Set flag if we have a numeric result
     if (queryResponse.hasNumericResult) {
       chatResponse.hasNumericResult = true;
     }
@@ -194,7 +177,6 @@ async function handleVectorSearch(message: string, userId: string, queryTypes: R
 async function handleTemporalVectorSearch(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing temporal vector search for 'when' question");
   
-  // Include temporal parameters explicitly
   const { data, error } = await supabase.functions.invoke('chat-with-rag', {
     body: { 
       message, 
@@ -203,8 +185,8 @@ async function handleTemporalVectorSearch(message: string, userId: string, query
       includeDiagnostics: true,
       isTemporalQuery: true,
       needsTimeRetrieval: true,
-      isComplexQuery: false, // Usually "when" questions are straightforward
-      requiresEntryDates: true // Specifically request entry dates
+      isComplexQuery: false,
+      requiresEntryDates: true
     }
   });
   
@@ -219,7 +201,6 @@ async function handleTemporalVectorSearch(message: string, userId: string, query
 async function handleFrequencyAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing frequency analysis for 'how often' question");
   
-  // Try smart-query-planner first as it might be able to do frequency counts
   try {
     const { data, error } = await supabase.functions.invoke('smart-query-planner', {
       body: { 
@@ -242,7 +223,6 @@ async function handleFrequencyAnalysis(message: string, userId: string, queryTyp
     console.error("Exception in smart-query-planner for frequency:", smartQueryError);
   }
   
-  // Fall back to vector search with frequency indicators
   const { data, error } = await supabase.functions.invoke('chat-with-rag', {
     body: { 
       message, 
@@ -265,7 +245,6 @@ async function handleFrequencyAnalysis(message: string, userId: string, queryTyp
 async function handleEmotionAggregation(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing emotion aggregation for top emotions question");
   
-  // Extract time period from query or use default
   const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
     ? {
         type: queryTypes.timeRange.type,
@@ -278,10 +257,8 @@ async function handleEmotionAggregation(message: string, userId: string, queryTy
         endDate: new Date().toISOString()
       };
   
-  // Determine if this is a "why" question as well
   const isWhyQuestion = queryTypes.isWhyQuestion || message.toLowerCase().includes('why');
   
-  // Call the edge function with emotion aggregation parameters
   const { data, error } = await supabase.functions.invoke('chat-with-rag', {
     body: { 
       message, 
@@ -306,7 +283,6 @@ async function handleEmotionAggregation(message: string, userId: string, queryTy
 async function handleEmotionCausalAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing emotion causal analysis");
   
-  // Extract time period from query or use default
   const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
     ? {
         type: queryTypes.timeRange.type,
@@ -315,7 +291,6 @@ async function handleEmotionCausalAnalysis(message: string, userId: string, quer
       } 
     : null;
   
-  // Use the new edge function approach with emotion causal parameters
   const { data, error } = await supabase.functions.invoke('chat-with-rag', {
     body: { 
       message, 
@@ -340,7 +315,6 @@ async function handleEmotionCausalAnalysis(message: string, userId: string, quer
 async function handleRelationshipAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing relationship analysis");
   
-  // Extract time period from query or use default
   const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
     ? {
         type: queryTypes.timeRange.type,
@@ -349,7 +323,6 @@ async function handleRelationshipAnalysis(message: string, userId: string, query
       } 
     : null;
   
-  // Use theme filtering and vector search
   const { data, error } = await supabase.functions.invoke('chat-with-rag', {
     body: { 
       message, 
@@ -374,7 +347,6 @@ async function handleRelationshipAnalysis(message: string, userId: string, query
 async function handleContextualAdvice(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing contextual advice strategy");
   
-  // For improvement questions, we need both context and a solution-oriented approach
   const { data, error } = await supabase.functions.invoke('chat-with-rag', {
     body: { 
       message, 
@@ -404,7 +376,6 @@ async function handleCorrelationAnalysis(message: string, userId: string, queryT
   });
   
   try {
-    // First, get relevant entries with specified emotions
     const { data: emotionEntries, error: entriesError } = await supabase
       .from('Journal Entries')
       .select('id, "refined text", created_at, emotions, entities')
@@ -428,34 +399,24 @@ async function handleCorrelationAnalysis(message: string, userId: string, queryT
       };
     }
     
-    // Target emotions from the query
     const targetEmotions = queryTypes.targetEmotions || [];
-    // Target behaviors from the query
     const targetBehaviors = queryTypes.targetBehaviors || [];
-    // Related entities (like "partner") from the query
     const relationshipEntity = queryTypes.relatedEntities?.[0] || null;
     
-    // Filter entries with target emotions
     const entriesWithTargetEmotions = emotionEntries.filter(entry => {
       if (!entry.emotions) return false;
       return targetEmotions.some(emotion => {
         const emotionScore = entry.emotions[emotion];
-        return emotionScore !== undefined && emotionScore > 0.3; // Consider emotion present if score > 0.3
+        return emotionScore !== undefined && emotionScore > 0.3;
       });
     });
     
-    console.log(`Found ${entriesWithTargetEmotions.length} entries with target emotions`);
-    
-    // From those entries, look for mentions of the behavior
     const correlatedEntries = entriesWithTargetEmotions.filter(entry => {
       if (!entry["refined text"]) return false;
       const text = entry["refined text"].toLowerCase();
       return targetBehaviors.some(behavior => text.includes(behavior.toLowerCase()));
     });
     
-    console.log(`Found ${correlatedEntries.length} entries with both emotions and behaviors`);
-    
-    // If relationshipEntity is specified, further filter
     const entityEntries = relationshipEntity ? 
       correlatedEntries.filter(entry => {
         if (!entry["refined text"]) return false;
@@ -463,13 +424,9 @@ async function handleCorrelationAnalysis(message: string, userId: string, queryT
       }) : 
       correlatedEntries;
     
-    console.log(`Found ${entityEntries.length} entries with emotions, behaviors, and specific relationship entity`);
-    
-    // Calculate correlation statistics
     const correlationRate = entriesWithTargetEmotions.length > 0 ? 
       entityEntries.length / entriesWithTargetEmotions.length : 0;
     
-    // Prepare evidence context for the LLM
     const evidenceContext = entityEntries.map((entry, i) => {
       const date = new Date(entry.created_at).toLocaleDateString();
       const emotionStr = Object.entries(entry.emotions || {})
@@ -480,16 +437,13 @@ async function handleCorrelationAnalysis(message: string, userId: string, queryT
       return `Entry ${i+1} (${date}):\nText: ${entry["refined text"]}\nEmotions: ${emotionStr}`;
     }).join("\n\n");
     
-    // Determine if there's a significant correlation
-    const correlationFound = correlationRate > 0.2; // 20% threshold for significance
+    const correlationFound = correlationRate > 0.2;
     
-    // If no correlation or not enough evidence, use standard RAG approach as fallback
     if (!correlationFound || entityEntries.length < 2) {
       console.log("No significant correlation found, falling back to standard RAG");
       return handleVectorSearch(message, userId, queryTypes, threadId);
     }
     
-    // For significant correlations, use the edge function with specialized prompting
     const { data, error } = await supabase.functions.invoke('chat-with-rag', {
       body: { 
         message,
@@ -514,7 +468,6 @@ async function handleCorrelationAnalysis(message: string, userId: string, queryT
       throw error;
     }
     
-    // Add correlation data to the diagnostics
     if (data) {
       data.analysis = {
         type: "correlation",
