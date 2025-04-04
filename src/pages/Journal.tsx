@@ -21,6 +21,7 @@ const Journal = () => {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedEntry, setSelectedEntry] = useState<any>(null);
   
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
@@ -411,19 +412,9 @@ const Journal = () => {
     }
   };
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
+  const handleSelectEntry = (entry: any) => {
+    setSelectedEntry(entry);
   };
-
-  const filteredEntries = entries.filter(entry => {
-    if (!searchQuery.trim()) return true;
-    
-    const query = searchQuery.toLowerCase();
-    const content = entry.content.toLowerCase();
-    const themes = entry.themes?.join(' ').toLowerCase() || '';
-    
-    return content.includes(query) || themes.includes(query);
-  });
 
   const showLoading = loading && activeTab === 'entries' && !entries.length;
   
@@ -458,9 +449,8 @@ const Journal = () => {
           <TabsContent value="entries">
             {activeTab === 'entries' && (
               <JournalSearch 
-                onSearch={handleSearch} 
-                totalEntries={entries.length}
-                filteredCount={filteredEntries.length}
+                entries={entries}
+                onSelectEntry={handleSelectEntry}
               />
             )}
             
@@ -473,7 +463,7 @@ const Journal = () => {
             
             {showEntries && (
               <JournalEntriesList 
-                entries={filteredEntries} 
+                entries={entries}
                 loading={loading}
                 processingEntries={processingEntries}
                 processedEntryIds={processedEntryIds}
