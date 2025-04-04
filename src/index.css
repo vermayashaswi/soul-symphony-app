@@ -27,6 +27,9 @@
     --radius: 0.75rem;
     --color-theme: #3b82f6; /* Calm/Blue as default */
     --chart-bg: 0 0% 100%; /* New variable for chart backgrounds */
+    --primary-h: 217; /* For direct HSL usage */
+    --primary-s: 91.2%; /* For direct HSL usage */
+    --primary-l: 59.8%; /* For direct HSL usage */
   }
  
   .dark {
@@ -50,6 +53,9 @@
     --input: 240 3.7% 15.9%;
     --ring: 217 91.2% 59.8%; /* Match primary */
     --chart-bg: 240 10% 3.9%; /* Match background in dark mode */
+    --primary-h: 217; /* For direct HSL usage */
+    --primary-s: 91.2%; /* For direct HSL usage */
+    --primary-l: 59.8%; /* For direct HSL usage */
   }
 }
  
@@ -59,6 +65,41 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Global theme color utilities */
+@layer utilities {
+  .theme-text {
+    color: var(--color-theme);
+  }
+  
+  .theme-bg {
+    background-color: var(--color-theme);
+  }
+  
+  .theme-border {
+    border-color: var(--color-theme);
+  }
+  
+  .theme-fill {
+    fill: var(--color-theme);
+  }
+  
+  .theme-stroke {
+    stroke: var(--color-theme);
+  }
+  
+  .hover-theme-bg:hover {
+    background-color: var(--color-theme);
+  }
+  
+  .hover-theme-text:hover {
+    color: var(--color-theme);
+  }
+  
+  .hover-theme-border:hover {
+    border-color: var(--color-theme);
   }
 }
 
