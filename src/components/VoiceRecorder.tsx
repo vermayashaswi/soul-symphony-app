@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -117,10 +116,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     <div className={cn("flex flex-col items-center relative z-10", className)}>
       <audio ref={audioRef} className="hidden" />
       
-      {/* Add the language background animation contained within the card when not recording and no audio blob */}
-      <div className="relative w-full h-full min-h-[250px] flex flex-col items-center justify-center overflow-hidden">
+      <div className="relative w-full h-full min-h-[300px] flex flex-col items-center justify-center overflow-hidden">
         {!isRecording && !audioBlob && (
-          <LanguageBackground contained={true} />
+          <div className="absolute inset-0 w-full h-full overflow-hidden">
+            <LanguageBackground contained={true} />
+          </div>
         )}
         
         <RecordingVisualizer 
@@ -130,17 +130,21 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         />
         
         {!isRecording && !audioBlob && hasPermission !== false && (
-          <MultilingualTextAnimation />
+          <div className="relative z-10">
+            <MultilingualTextAnimation />
+          </div>
         )}
         
-        <RecordingButton
-          isRecording={isRecording}
-          isProcessing={isProcessing}
-          hasPermission={hasPermission}
-          onRecordingStart={startRecording}
-          onRecordingStop={stopRecording}
-          onPermissionRequest={requestPermissions}
-        />
+        <div className="relative z-10">
+          <RecordingButton
+            isRecording={isRecording}
+            isProcessing={isProcessing}
+            hasPermission={hasPermission}
+            onRecordingStart={startRecording}
+            onRecordingStop={stopRecording}
+            onPermissionRequest={requestPermissions}
+          />
+        </div>
         
         <AnimatePresence mode="wait">
           {isRecording ? (
@@ -176,7 +180,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="text-center text-muted-foreground"
+              className="text-center text-muted-foreground relative z-10"
             >
               Microphone access is required for recording
             </motion.p>
@@ -186,7 +190,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="text-center text-muted-foreground"
+              className="text-center text-muted-foreground relative z-10"
             >
               Tap the microphone to start recording
             </motion.p>
@@ -197,7 +201,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2"
+            className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2 relative z-10"
           >
             <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <div>{recordingError}</div>
@@ -205,7 +209,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         )}
         
         {isProcessing && (
-          <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground relative z-10">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>Processing with AI...</span>
             <ChevronRight className="w-4 h-4" />
