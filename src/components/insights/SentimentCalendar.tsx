@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -6,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DayProps } from "react-day-picker";
 import { subDays, startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format, isSameDay, isSameMonth, isSameWeek, addDays, getMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CalendarDays, Calendar as CalendarIcon, LineChart } from "lucide-react";
+import { CalendarDays, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from "lucide-react";
 import {
   Line,
   LineChart as RechartsLineChart,
@@ -15,6 +14,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceArea,
 } from 'recharts';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -24,16 +24,6 @@ interface SentimentCalendarProps {
     sentiment: number;
   }[];
   timeRange: 'today' | 'week' | 'month' | 'year';
-}
-
-// Define the chart data types to avoid TypeScript errors
-interface BaseChartDataPoint {
-  time: string;
-  sentiment: number | null;
-}
-
-interface ChartDataPointWithDate extends BaseChartDataPoint {
-  fullDate?: string;
 }
 
 function getEmoji(sentiment: number): string {
@@ -637,6 +627,29 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
+            
+            <ReferenceArea 
+              y1={0.2} 
+              y2={1} 
+              fill="#F2FCE2" 
+              fillOpacity={theme === 'dark' ? 0.2 : 0.5} 
+              strokeOpacity={0}
+            />
+            <ReferenceArea 
+              y1={-0.1} 
+              y2={0.2} 
+              fill="#FEF7CD" 
+              fillOpacity={theme === 'dark' ? 0.2 : 0.5} 
+              strokeOpacity={0}
+            />
+            <ReferenceArea 
+              y1={-1} 
+              y2={-0.1} 
+              fill="#ea384c" 
+              fillOpacity={theme === 'dark' ? 0.1 : 0.15} 
+              strokeOpacity={0}
+            />
+            
             <XAxis 
               dataKey="time" 
               stroke={theme === 'dark' ? '#888' : '#666'} 
