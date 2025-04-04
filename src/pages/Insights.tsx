@@ -291,6 +291,7 @@ export default function Insights() {
             >
               <SentimentCalendar 
                 sentimentData={getSentimentData()}
+                timeRange={timeRange}
               />
             </motion.div>
           </>
