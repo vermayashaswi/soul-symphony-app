@@ -1,85 +1,72 @@
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, RefObject } from 'react';
 
-interface SwipeOptions {
+export interface SwipeOptions {
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
   onSwipeUp?: () => void;
   onSwipeDown?: () => void;
-  threshold?: number;
+  minDistance?: number;
 }
 
-export function useSwipeGesture(ref: React.RefObject<HTMLElement>, options: SwipeOptions = {}) {
-  const {
-    onSwipeLeft,
-    onSwipeRight,
-    onSwipeUp,
-    onSwipeDown,
-    threshold = 50
-  } = options;
-
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
-  
-  // Store whether custom handlers were triggered
-  const [handlerTriggered, setHandlerTriggered] = useState(false);
-
-  const handleTouchStart = useCallback((e: TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-    setHandlerTriggered(false);
-  }, []);
-
-  const handleTouchEnd = useCallback((e: TouchEvent) => {
-    if (touchStartX.current === null || touchStartY.current === null) {
-      return;
-    }
-
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    
-    const deltaX = touchEndX - touchStartX.current;
-    const deltaY = touchEndY - touchStartY.current;
-    
-    // Only trigger if the horizontal swipe is greater than the vertical to avoid
-    // conflicts with scrolling
-    const isHorizontalSwipe = Math.abs(deltaX) > Math.abs(deltaY);
-    
-    // Handle horizontal swipes
-    if (isHorizontalSwipe) {
-      if (deltaX > threshold && onSwipeRight) {
-        onSwipeRight();
-        setHandlerTriggered(true);
-      } else if (deltaX < -threshold && onSwipeLeft) {
-        onSwipeLeft();
-        setHandlerTriggered(true);
-      }
-    } 
-    // Handle vertical swipes
-    else {
-      if (deltaY > threshold && onSwipeDown) {
-        onSwipeDown();
-        setHandlerTriggered(true);
-      } else if (deltaY < -threshold && onSwipeUp) {
-        onSwipeUp();
-        setHandlerTriggered(true);
-      }
-    }
-    
-    touchStartX.current = null;
-    touchStartY.current = null;
-  }, [onSwipeLeft, onSwipeRight, onSwipeUp, onSwipeDown, threshold]);
-
+export function useSwipeGesture(
+  elementRef: RefObject<HTMLElement>,
+  options: SwipeOptions
+) {
   useEffect(() => {
-    const element = ref.current;
+    const element = elementRef.current;
     if (!element) return;
 
-    element.addEventListener('touchstart', handleTouchStart);
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    const minSwipeDistance = options.minDistance || 50;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      touchEndX = e.touches[0].clientX;
+      touchEndY = e.touches[0].clientY;
+    };
+
+    const handleTouchEnd = () => {
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+      
+      // Only handle horizontal or vertical swipes, not diagonal
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        // Horizontal swipe detection
+        if (Math.abs(deltaX) > minSwipeDistance) {
+          if (deltaX > 0 && options.onSwipeRight) {
+            options.onSwipeRight();
+          } else if (deltaX < 0 && options.onSwipeLeft) {
+            options.onSwipeLeft();
+          }
+        }
+      } else {
+        // Vertical swipe detection
+        if (Math.abs(deltaY) > minSwipeDistance) {
+          if (deltaY > 0 && options.onSwipeDown) {
+            options.onSwipeDown();
+          } else if (deltaY < 0 && options.onSwipeUp) {
+            options.onSwipeUp();
+          }
+        }
+      }
+    };
+
+    element.addEventListener('touchstart', handleTouchStart, { passive: true });
+    element.addEventListener('touchmove', handleTouchMove, { passive: true });
     element.addEventListener('touchend', handleTouchEnd);
 
     return () => {
       element.removeEventListener('touchstart', handleTouchStart);
+      element.removeEventListener('touchmove', handleTouchMove);
       element.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [ref, handleTouchStart, handleTouchEnd]);
+  }, [elementRef, options]);
 }

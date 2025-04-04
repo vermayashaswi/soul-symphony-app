@@ -435,6 +435,7 @@ const Journal = () => {
 
   const handleSelectEntry = (entry: any) => {
     setSelectedEntry(entry);
+    setSearchQuery('');
   };
 
   const showLoading = loading && activeTab === 'entries' && !entries.length;
@@ -467,7 +468,7 @@ const Journal = () => {
             </Card>
           </TabsContent>
           
-          <TabsContent value="entries">
+          <TabsContent value="entries" className="relative">
             {activeTab === 'entries' && (
               <JournalSearch 
                 entries={entries}
