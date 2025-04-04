@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 
@@ -114,6 +113,11 @@ export async function processChatMessage(
         // Default case - standard vector search
         console.log("Using standard vector search strategy");
         queryResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+        break;
+      case 'correlation_analysis':
+        // For pattern questions about emotional behaviors
+        console.log("Using correlation analysis strategy");
+        queryResponse = await handleCorrelationAnalysis(message, userId, messageQueryTypes, threadId);
         break;
     }
     
@@ -396,4 +400,143 @@ async function handleContextualAdvice(message: string, userId: string, queryType
   }
   
   return data;
+}
+
+// Handler for correlation analysis (pattern questions)
+async function handleCorrelationAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  console.log("Executing correlation analysis for pattern question", {
+    emotions: queryTypes.targetEmotions,
+    behaviors: queryTypes.targetBehaviors,
+    entities: queryTypes.relatedEntities
+  });
+  
+  try {
+    // First, get relevant entries with specified emotions
+    const { data: emotionEntries, error: entriesError } = await supabase
+      .from('Journal Entries')
+      .select('id, "refined text", created_at, emotions, entities')
+      .eq('user_id', userId)
+      .filter('emotions', 'not.is.null');
+    
+    if (entriesError) {
+      console.error("Error getting journal entries:", entriesError);
+      throw entriesError;
+    }
+    
+    if (!emotionEntries || emotionEntries.length < 3) {
+      console.log("Not enough journal entries for correlation analysis");
+      return {
+        response: "I don't have enough journal entries with emotion data to analyze this pattern. Continue journaling regularly to build up enough data for this kind of analysis.",
+        diagnostics: {
+          type: "correlation",
+          insufficientData: true,
+          entriesFound: emotionEntries?.length || 0
+        }
+      };
+    }
+    
+    // Target emotions from the query
+    const targetEmotions = queryTypes.targetEmotions || [];
+    // Target behaviors from the query
+    const targetBehaviors = queryTypes.targetBehaviors || [];
+    // Related entities (like "partner") from the query
+    const relationshipEntity = queryTypes.relatedEntities?.[0] || null;
+    
+    // Filter entries with target emotions
+    const entriesWithTargetEmotions = emotionEntries.filter(entry => {
+      if (!entry.emotions) return false;
+      return targetEmotions.some(emotion => {
+        const emotionScore = entry.emotions[emotion];
+        return emotionScore !== undefined && emotionScore > 0.3; // Consider emotion present if score > 0.3
+      });
+    });
+    
+    console.log(`Found ${entriesWithTargetEmotions.length} entries with target emotions`);
+    
+    // From those entries, look for mentions of the behavior
+    const correlatedEntries = entriesWithTargetEmotions.filter(entry => {
+      if (!entry["refined text"]) return false;
+      const text = entry["refined text"].toLowerCase();
+      return targetBehaviors.some(behavior => text.includes(behavior.toLowerCase()));
+    });
+    
+    console.log(`Found ${correlatedEntries.length} entries with both emotions and behaviors`);
+    
+    // If relationshipEntity is specified, further filter
+    const entityEntries = relationshipEntity ? 
+      correlatedEntries.filter(entry => {
+        if (!entry["refined text"]) return false;
+        return entry["refined text"].toLowerCase().includes(relationshipEntity.toLowerCase());
+      }) : 
+      correlatedEntries;
+    
+    console.log(`Found ${entityEntries.length} entries with emotions, behaviors, and specific relationship entity`);
+    
+    // Calculate correlation statistics
+    const correlationRate = entriesWithTargetEmotions.length > 0 ? 
+      entityEntries.length / entriesWithTargetEmotions.length : 0;
+    
+    // Prepare evidence context for the LLM
+    const evidenceContext = entityEntries.map((entry, i) => {
+      const date = new Date(entry.created_at).toLocaleDateString();
+      const emotionStr = Object.entries(entry.emotions || {})
+        .filter(([_, score]) => score > 0.3)
+        .map(([emotion, score]) => `${emotion}: ${Math.round(Number(score) * 100)}%`)
+        .join(", ");
+      
+      return `Entry ${i+1} (${date}):\nText: ${entry["refined text"]}\nEmotions: ${emotionStr}`;
+    }).join("\n\n");
+    
+    // Determine if there's a significant correlation
+    const correlationFound = correlationRate > 0.2; // 20% threshold for significance
+    
+    // If no correlation or not enough evidence, use standard RAG approach as fallback
+    if (!correlationFound || entityEntries.length < 2) {
+      console.log("No significant correlation found, falling back to standard RAG");
+      return handleVectorSearch(message, userId, queryTypes, threadId);
+    }
+    
+    // For significant correlations, use the edge function with specialized prompting
+    const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+      body: { 
+        message,
+        userId,
+        threadId,
+        includeDiagnostics: true,
+        isCorrelationQuery: true,
+        correlationData: {
+          emotions: targetEmotions,
+          behaviors: targetBehaviors,
+          entity: relationshipEntity,
+          correlationRate: correlationRate,
+          matchingEntryCount: entityEntries.length,
+          totalEmotionEntryCount: entriesWithTargetEmotions.length,
+          evidence: evidenceContext
+        }
+      }
+    });
+    
+    if (error) {
+      console.error("Error in correlation analysis with edge function:", error);
+      throw error;
+    }
+    
+    // Add correlation data to the diagnostics
+    if (data) {
+      data.analysis = {
+        type: "correlation",
+        correlationRate: correlationRate,
+        matchingEntryCount: entityEntries.length,
+        totalEmotionEntryCount: entriesWithTargetEmotions.length,
+        targetEmotions,
+        targetBehaviors,
+        relationshipEntity
+      };
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Error in correlation analysis:", error);
+    return handleVectorSearch(message, userId, queryTypes, threadId);
+  }
 }
