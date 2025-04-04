@@ -1,12 +1,21 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { DayProps } from "react-day-picker";
-import { subDays, startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format, isSameDay, isSameMonth, isSameWeek } from "date-fns";
+import { subDays, startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format, isSameDay, isSameMonth, isSameWeek, addDays, getMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CalendarDays, Calendar as CalendarIcon } from "lucide-react";
+import { CalendarDays, Calendar as CalendarIcon, LineChart } from "lucide-react";
+import {
+  Line,
+  LineChart as RechartsLineChart,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+import { useTheme } from '@/hooks/use-theme';
 
 interface SentimentCalendarProps {
   sentimentData: {
@@ -42,12 +51,15 @@ function getEmojiTextColor(sentiment: number): string {
   return "text-white"; 
 }
 
+type ViewMode = 'calendar' | 'graph';
+
 export default function SentimentCalendar({ sentimentData, timeRange }: SentimentCalendarProps) {
   const isMobile = useIsMobile();
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const today = new Date();
+  const [viewMode, setViewMode] = useState<ViewMode>('calendar');
+  const { theme } = useTheme();
   
-  // Filter data based on timeRange and create a map for quick lookup
   const filteredData = React.useMemo(() => {
     const now = new Date();
     let fromDate: Date;
@@ -72,7 +84,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     return sentimentData.filter(item => item.date >= fromDate && item.date <= endOfDay(now));
   }, [sentimentData, timeRange]);
 
-  // Aggregate sentiment by day (for cases where multiple entries exist per day)
   const dailySentiment = React.useMemo(() => {
     const sentimentMap = new Map<string, { total: number, count: number }>();
     
@@ -86,7 +97,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       current.count += 1;
     });
     
-    // Convert to average sentiment
     const result = new Map<string, number>();
     sentimentMap.forEach((value, key) => {
       result.set(key, value.total / value.count);
@@ -95,7 +105,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     return result;
   }, [filteredData]);
 
-  // Create a map with sentiment info for each day
   const sentimentInfo = React.useMemo(() => {
     const infoMap = new Map<string, {
       sentiment: number;
@@ -124,7 +133,87 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     }
   };
 
-  // Render different calendar views based on timeRange
+  const lineChartData = React.useMemo(() => {
+    if (filteredData.length === 0) {
+      return [];
+    }
+
+    if (timeRange === 'today') {
+      const hourlyData = new Map<number, { total: number, count: number }>();
+      
+      filteredData.forEach(item => {
+        const hour = item.date.getHours();
+        if (!hourlyData.has(hour)) {
+          hourlyData.set(hour, { total: 0, count: 0 });
+        }
+        const current = hourlyData.get(hour)!;
+        current.total += item.sentiment;
+        current.count += 1;
+      });
+      
+      return Array.from({ length: 24 }, (_, hour) => {
+        const data = hourlyData.get(hour);
+        return {
+          time: `${hour}:00`,
+          sentiment: data ? data.total / data.count : null
+        };
+      }).filter(item => item.sentiment !== null);
+    } 
+    
+    if (timeRange === 'week') {
+      const startOfWeekDate = startOfWeek(today, { weekStartsOn: 1 });
+      return Array.from({ length: 7 }, (_, i) => {
+        const date = addDays(startOfWeekDate, i);
+        const dateStr = format(date, 'yyyy-MM-dd');
+        return {
+          time: format(date, 'EEE'),
+          fullDate: format(date, 'yyyy-MM-dd'),
+          sentiment: dailySentiment.get(dateStr) || null
+        };
+      });
+    } 
+    
+    if (timeRange === 'month') {
+      const startOfMonthDate = startOfMonth(today);
+      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      
+      return Array.from({ length: daysInMonth }, (_, i) => {
+        const date = new Date(today.getFullYear(), today.getMonth(), i + 1);
+        const dateStr = format(date, 'yyyy-MM-dd');
+        return {
+          time: format(date, 'd'),
+          fullDate: dateStr,
+          sentiment: dailySentiment.get(dateStr) || null
+        };
+      });
+    }
+    
+    if (timeRange === 'year') {
+      const monthlyData = new Map<number, { total: number, count: number }>();
+      
+      filteredData.forEach(item => {
+        const month = item.date.getMonth();
+        if (!monthlyData.has(month)) {
+          monthlyData.set(month, { total: 0, count: 0 });
+        }
+        const current = monthlyData.get(month)!;
+        current.total += item.sentiment;
+        current.count += 1;
+      });
+      
+      return Array.from({ length: 12 }, (_, month) => {
+        const date = new Date(today.getFullYear(), month, 1);
+        const data = monthlyData.get(month);
+        return {
+          time: format(date, 'MMM'),
+          sentiment: data ? data.total / data.count : null
+        };
+      });
+    }
+    
+    return [];
+  }, [filteredData, timeRange, dailySentiment, today]);
+
   const renderTodayView = () => {
     const todayKey = format(today, 'yyyy-MM-dd');
     const todaySentiment = sentimentInfo.get(todayKey);
@@ -266,7 +355,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   };
 
   const renderMonthYearView = () => {
-    // For year view, we'll display multiple month calendars
     if (timeRange === 'year') {
       return renderYearView();
     }
@@ -324,7 +412,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   onClick={() => handleDayClick(date)}
                   {...props}
                 >
-                  {/* Mood background */}
                   {info && (
                     <motion.div 
                       className={cn(
@@ -337,12 +424,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                     />
                   )}
                   
-                  {/* Date content */}
                   <div className={cn(
                     "flex flex-col items-center justify-center h-full w-full z-10",
                     info && info.textColorClass
                   )}>
-                    {/* Date number */}
                     <span className={cn(
                       "text-sm md:text-base font-medium",
                       info && info.textColorClass
@@ -350,7 +435,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                       {date.getDate()}
                     </span>
                     
-                    {/* Emoji display */}
                     {info && (
                       <motion.span 
                         className="text-base md:text-lg"
@@ -363,7 +447,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                     )}
                   </div>
                   
-                  {/* Day details popup */}
                   <AnimatePresence>
                     {isClickedDay && (
                       <motion.div
@@ -405,7 +488,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     );
   };
 
-  // New Year View with months display
   const renderYearView = () => {
     const months = Array.from({ length: 12 }, (_, i) => {
       const date = new Date();
@@ -419,14 +501,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           const monthStart = startOfMonth(month);
           const monthName = format(month, 'MMMM');
           
-          // Get days in this month
           const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
           const days = Array.from({ length: daysInMonth }, (_, i) => {
             const day = new Date(month.getFullYear(), month.getMonth(), i + 1);
             return day;
           });
           
-          // Calculate the month's average sentiment
           let monthSentiment = 0;
           let dayCount = 0;
           
@@ -463,12 +543,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 </div>
                 
                 <div className="grid grid-cols-7 gap-1">
-                  {/* Empty cells for days before the first of the month */}
                   {Array.from({ length: (monthStart.getDay() === 0 ? 6 : monthStart.getDay() - 1) }, (_, i) => (
                     <div key={`empty-${i}`} className="aspect-square"></div>
                   ))}
                   
-                  {/* Actual days */}
                   {days.map(day => {
                     const dateKey = format(day, 'yyyy-MM-dd');
                     const daySentiment = sentimentInfo.get(dateKey);
@@ -530,6 +608,82 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     );
   };
 
+  const renderGraphView = () => {
+    if (lineChartData.length === 0) {
+      return (
+        <div className="flex items-center justify-center py-20 text-muted-foreground">
+          No sentiment data available for this time period
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full mt-4 py-6">
+        <ResponsiveContainer width="100%" height={300}>
+          <RechartsLineChart
+            data={lineChartData.filter(item => item.sentiment !== null)}
+            margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
+            <XAxis 
+              dataKey="time" 
+              stroke={theme === 'dark' ? '#888' : '#666'} 
+              fontSize={12}
+              tickMargin={10}
+            />
+            <YAxis 
+              domain={[-1, 1]} 
+              ticks={[-1, -0.5, 0, 0.5, 1]}
+              stroke={theme === 'dark' ? '#888' : '#666'} 
+              fontSize={12}
+              tickMargin={10}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: theme === 'dark' ? 'hsl(var(--card))' : 'rgba(255, 255, 255, 0.8)',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                border: '1px solid hsl(var(--border))',
+                color: theme === 'dark' ? 'hsl(var(--card-foreground))' : 'inherit'
+              }}
+              formatter={(value: any) => [`${parseFloat(value).toFixed(2)}`, 'Sentiment']}
+              labelFormatter={(label) => {
+                const item = lineChartData.find(d => d.time === label);
+                if (timeRange === 'month' || timeRange === 'week') {
+                  return item?.fullDate ? format(new Date(item.fullDate), 'MMM d, yyyy') : label;
+                }
+                return label;
+              }}
+            />
+            <Line
+              type="monotone"
+              dataKey="sentiment"
+              stroke="#4299E1"
+              strokeWidth={3}
+              dot={{ r: 4, strokeWidth: 2, fill: theme === 'dark' ? '#1e293b' : 'white' }}
+              activeDot={{ r: 6, stroke: theme === 'dark' ? '#fff' : '#000', strokeWidth: 1 }}
+            />
+          </RechartsLineChart>
+        </ResponsiveContainer>
+
+        <div className="flex justify-center gap-6 mt-4">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-400"></div>
+            <span className="text-sm">Positive</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-yellow-300"></div>
+            <span className="text-sm">Neutral</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-400"></div>
+            <span className="text-sm">Negative</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -540,20 +694,43 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center space-x-2">
           <CalendarDays className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold">Mood Calendar</h2>
+          <h2 className="text-xl font-semibold">Mood</h2>
         </div>
-        <div className="text-sm font-medium text-muted-foreground">
-          {timeRange === 'today' && 'Today'}
-          {timeRange === 'week' && 'This Week'}
-          {timeRange === 'month' && 'This Month'}
-          {timeRange === 'year' && 'This Year'}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={cn(
+              "px-3 py-1 rounded-full text-sm",
+              viewMode === 'calendar'
+                ? "bg-primary text-white"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Calendar
+          </button>
+          <button
+            onClick={() => setViewMode('graph')}
+            className={cn(
+              "px-3 py-1 rounded-full text-sm",
+              viewMode === 'graph'
+                ? "bg-primary text-white"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Graph
+          </button>
         </div>
       </div>
       
       <div className="p-4">
-        {timeRange === 'today' && renderTodayView()}
-        {timeRange === 'week' && renderWeekView()}
-        {(timeRange === 'month' || timeRange === 'year') && renderMonthYearView()}
+        {viewMode === 'calendar' && (
+          <>
+            {timeRange === 'today' && renderTodayView()}
+            {timeRange === 'week' && renderWeekView()}
+            {(timeRange === 'month' || timeRange === 'year') && renderMonthYearView()}
+          </>
+        )}
+        {viewMode === 'graph' && renderGraphView()}
       </div>
     </motion.div>
   );
