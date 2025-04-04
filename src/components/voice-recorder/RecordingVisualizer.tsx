@@ -23,7 +23,7 @@ export function RecordingVisualizer({
             animate={{ scale: 2, opacity: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 2, ease: "easeOut" }}
-            className="absolute rounded-full bg-primary/30"
+            className="absolute rounded-full bg-primary/30 w-full"
             style={{ width: '100%', height: '100%' }}
           />
         ))}
@@ -31,7 +31,7 @@ export function RecordingVisualizer({
       
       {isRecording && (
         <motion.div 
-          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          className="absolute inset-0 flex items-center justify-center pointer-events-none w-full"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
