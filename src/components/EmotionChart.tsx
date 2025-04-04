@@ -142,7 +142,7 @@ export function EmotionChart({
       
       setSelectedEmotionInfo({
         name: emotion,
-        percentage
+        percentage: Math.round(percentage * 10) / 10 // Round to 1 decimal place
       });
       
       // Auto-hide after 2 seconds
@@ -314,7 +314,7 @@ export function EmotionChart({
   return (
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Themes</h3>
+        <h3 className="text-xl font-semibold">Emotions</h3>
         <div className="flex gap-2">
           {chartTypes.map((type) => (
             <button
@@ -356,7 +356,7 @@ export function EmotionChart({
               </>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                No themes data available for this timeframe
+                No emotions data available for this timeframe
               </div>
             )}
           </div>
