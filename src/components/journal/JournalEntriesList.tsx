@@ -2,9 +2,8 @@
 import React from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, RefreshCw } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import EmptyJournalState from './EmptyJournalState';
-import { Card } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface JournalEntriesListProps {
@@ -38,35 +37,8 @@ export default function JournalEntriesList({
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
 
-  // Check if there are any entries still being processed that haven't been found yet
-  const pendingEntries = processingEntries.filter(id => 
-    !entries.some(entry => entry.foreignKey === id)
-  );
-  
-  // Only show processing message when there are pending entries
-  const showProcessingMessage = pendingEntries.length > 0;
-
   return (
     <div>
-      {showProcessingMessage && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
-          className="mb-6"
-        >
-          <Card className="p-4 bg-primary/5 border-primary/20">
-            <div className="flex items-center gap-2 text-primary">
-              <RefreshCw className="h-5 w-5 animate-spin" />
-              <div>
-                <p className="font-medium">Processing your recording...</p>
-                <p className="text-sm text-muted-foreground">This may take a minute or two.</p>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-      )}
-
       <div className="space-y-4 mb-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Your Journal</h2>
