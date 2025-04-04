@@ -397,3 +397,53 @@ async function handleContextualAdvice(message: string, userId: string, queryType
   
   return data;
 }
+
+// IMPORTANT: Adding the missing handleCorrelationAnalysis function
+// This function was likely missing or incomplete, causing the TypeScript error
+async function handleCorrelationAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  console.log("Executing correlation analysis");
+  
+  try {
+    // Try using the smart query planner for correlation analysis
+    const { data, error } = await supabase.functions.invoke('smart-query-planner', {
+      body: { 
+        message, 
+        userId, 
+        includeDiagnostics: true,
+        enableQueryBreakdown: true,
+        generateSqlQueries: true,
+        isCorrelationQuery: true
+      }
+    });
+    
+    if (error) {
+      console.error("Error using smart-query-planner for correlation:", error);
+    } else if (data && !data.fallbackToRag) {
+      console.log("Successfully used smart query planner for correlation analysis");
+      return data;
+    }
+  } catch (smartQueryError) {
+    console.error("Exception in smart-query-planner for correlation:", smartQueryError);
+    // Fix: Add the missing threadId parameter here
+    return await handleVectorSearch(message, userId, queryTypes, threadId);
+  }
+  
+  // Fall back to vector search with correlation indicators
+  const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+    body: { 
+      message, 
+      userId,
+      threadId,
+      includeDiagnostics: true,
+      isCorrelationQuery: true,
+      requiresPatternAnalysis: true
+    }
+  });
+  
+  if (error) {
+    console.error("Error in correlation analysis vector search:", error);
+    throw error;
+  }
+  
+  return data;
+}
