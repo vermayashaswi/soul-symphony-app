@@ -24,9 +24,9 @@ interface AnimatedWordProps {
 
 // Individual word animation component with randomized movement
 const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
-  // Calculate random positions within container
-  const randomX = Math.random() * 100 - 50; // Random value between -50% and 50% from center
-  const randomY = Math.random() * 100 - 50; // Random value between -50% and 50% from center
+  // Calculate random positions to cover the entire container
+  const randomX = Math.random() * 200 - 100; // Random value between -100% and 100% from center
+  const randomY = Math.random() * 200 - 100; // Random value between -100% and 100% from center
   
   // Create more dramatic off-screen starting positions
   const startX = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 300 + 200);
@@ -38,15 +38,15 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
   
   // Randomly determine opacity and size for variety
   const opacity = 0.6 + Math.random() * 0.4;
-  const fontSize = 12 + Math.floor(Math.random() * 10); // Random font size between 12-22px
+  const fontSize = 12 + Math.floor(Math.random() * 14); // Random font size between 12-26px
   
   // Use different animation timing for each word to create staggered effect
   const duration = 0.8 + Math.random() * 1.2;
   const delay = index * 0.05 + Math.random() * 0.2;
   
-  // Create random floating effect for more organic movement
-  const floatX = Math.random() * 40 - 20; // Random value between -20 and 20
-  const floatY = Math.random() * 40 - 20; // Random value between -20 and 20
+  // Create random floating effect with wider range for more scattered distribution
+  const floatX = Math.random() * 80 - 40; // Random value between -40 and 40
+  const floatY = Math.random() * 80 - 40; // Random value between -40 and 40
   const floatDuration = 3 + Math.random() * 7; // Random duration between 3-10s
   
   return (
@@ -109,10 +109,10 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
   const containerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    // Display a subset of languages at any given time
+    // Display more languages to cover the container space better
     const updateWords = () => {
-      // Select a good number of words to show based on container size
-      const wordCount = contained ? (12 + Math.floor(Math.random() * 8)) : (20 + Math.floor(Math.random() * 12));
+      // Increased word count for better distribution
+      const wordCount = contained ? (22 + Math.floor(Math.random() * 10)) : (30 + Math.floor(Math.random() * 15));
       const newWords: string[] = [];
       
       // Create a set to avoid duplicates
