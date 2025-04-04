@@ -3,6 +3,7 @@ import React from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { DayProps } from "react-day-picker";
 
 interface SentimentCalendarProps {
   sentimentData: {
@@ -65,16 +66,22 @@ export default function SentimentCalendar({ sentimentData }: SentimentCalendarPr
           caption_label: "text-base",
         }}
         components={{
-          Day: ({ date, displayMonth, selected, ...props }) => {
+          Day: (props: DayProps) => {
+            const { date } = props;
             // Extract the ISO date string for comparison
             const formattedDate = date.toISOString().split('T')[0];
             const sentimentInfo = sentimentMap.get(formattedDate);
+            
+            // Check if this date is in our selected dates
+            const isSelected = sentimentData.some(
+              d => d.date.toISOString().split('T')[0] === formattedDate
+            );
             
             return (
               <div
                 className={cn(
                   "h-9 w-9 relative flex items-center justify-center hover:bg-primary/10 rounded-md transition-colors",
-                  selected && "font-medium text-primary"
+                  isSelected && "font-medium text-primary"
                 )}
                 {...props}
               >
