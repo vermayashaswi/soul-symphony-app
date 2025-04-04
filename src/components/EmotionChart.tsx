@@ -18,6 +18,7 @@ import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
 import { Sparkles } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type EmotionData = {
   day: string;
@@ -89,6 +90,7 @@ export function EmotionChart({
   const [bubbleKey, setBubbleKey] = useState(0); // Add key for forcing re-render
   const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
   const { theme } = useTheme();
+  const isMobile = useIsMobile();
   
   const chartTypes = [
     { id: 'line', label: 'Line' },
@@ -235,22 +237,38 @@ export function EmotionChart({
     
     const emotions = Object.keys(lineData[0]).filter(key => key !== 'day');
     
+    // Check if we have any emotional data points
+    if (emotions.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">No emotional data found</p>
+        </div>
+      );
+    }
+    
     return (
       <div className="flex flex-col h-full">
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
           <LineChart
             data={lineData}
-            margin={{ top: 20, right: 60, left: 0, bottom: 10 }}
+            margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-            <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
+            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
+            <XAxis 
+              dataKey="day" 
+              stroke="#888" 
+              fontSize={isMobile ? 10 : 12} 
+              tickMargin={10}
+              tick={{ fontSize: isMobile ? 10 : 12 }}
+            />
             <YAxis 
               stroke="#888" 
-              fontSize={12} 
-              tickMargin={10} 
+              fontSize={isMobile ? 10 : 12} 
+              tickMargin={isMobile ? 5 : 10} 
               domain={[0, 1]} 
-              ticks={[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}
+              ticks={isMobile ? [0, 0.25, 0.5, 0.75, 1.0] : [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}
               tickFormatter={(value) => value.toFixed(1)}
+              width={isMobile ? 25 : 40}
             />
             <Tooltip 
               contentStyle={{ 
@@ -267,19 +285,21 @@ export function EmotionChart({
                 type="monotone"
                 dataKey={emotion}
                 stroke={getEmotionColor(emotion, index)}
-                strokeWidth={3}
-                dot={{ r: 4 }}
-                activeDot={{ r: 6 }}
+                strokeWidth={2}
+                dot={{ r: isMobile ? 3 : 4 }}
+                activeDot={{ r: isMobile ? 5 : 6 }}
                 name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
-                label={<EmotionLineLabel />}
+                label={isMobile ? null : <EmotionLineLabel />}
               />
             ))}
           </LineChart>
         </ResponsiveContainer>
         
-        <div className="mt-4 text-center text-xs text-muted-foreground">
-          * Showing top 5 emotions by score
-        </div>
+        {!isMobile && (
+          <div className="mt-4 text-center text-xs text-muted-foreground">
+            * Showing top 5 emotions by score
+          </div>
+        )}
       </div>
     );
   };
@@ -335,8 +355,6 @@ export function EmotionChart({
           </div>
         )}
       </div>
-      
-      {/* Removing the legend below the line chart */}
     </div>
   );
 }
