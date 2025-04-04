@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
@@ -23,4 +24,11 @@ export const useScrollRestoration = () => {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, [pathname, hash]);
+};
+
+/**
+ * Utility function to scroll to the top of the page
+ */
+export const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 };
