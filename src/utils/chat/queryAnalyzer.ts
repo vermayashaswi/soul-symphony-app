@@ -1,4 +1,7 @@
+
 // Add the missing type definitions for this file's exports and functions
+import { supabase } from "@/integrations/supabase/client";
+
 type QueryTypes = {
   isTemporalQuery: boolean;
   isTimePatternQuery: boolean;

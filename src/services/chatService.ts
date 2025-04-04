@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { analyzeQueryTypes, segmentQuery, extractEmotionKeywords } from "@/utils/chat/queryAnalyzer";
+import { analyzeQueryTypes, segmentQuery } from "@/utils/chat/queryAnalyzer";
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'error';
