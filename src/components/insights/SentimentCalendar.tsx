@@ -25,16 +25,6 @@ interface SentimentCalendarProps {
   timeRange: 'today' | 'week' | 'month' | 'year';
 }
 
-// Define the chart data types to avoid TypeScript errors
-interface BaseChartDataPoint {
-  time: string;
-  sentiment: number | null;
-}
-
-interface ChartDataPointWithDate extends BaseChartDataPoint {
-  fullDate?: string;
-}
-
 function getEmoji(sentiment: number): string {
   if (sentiment >= 0.7) return "😄";      // Very happy
   if (sentiment >= 0.3) return "🙂";      // Happy
@@ -506,13 +496,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   };
 
   const renderYearView = () => {
-    // Create monthly data for the year view
     const months = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
     
-    // Calculate monthly sentiment averages
     const monthlyAverages = React.useMemo(() => {
       const monthData = new Map<number, { total: number, count: number }>();
       
@@ -543,7 +531,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             const monthDate = new Date(today.getFullYear(), index, 1);
             const isCurrentMonth = today.getMonth() === index;
             
-            // Get emotion info for this month if data exists
             const emoji = hasData ? getEmoji(avgSentiment) : "😶";
             const colorClass = hasData ? getEmojiColor(avgSentiment) : "bg-muted";
             const textColorClass = hasData ? getEmojiTextColor(avgSentiment) : "";
@@ -719,10 +706,9 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 r: 4, 
                 strokeWidth: 2, 
                 fill: theme === 'dark' ? '#1e293b' : 'white',
-                stroke: (dataPoint: any) => {
-                  if (dataPoint.sentiment === null) return '#888';
-                  return getSentimentLineColor(dataPoint.sentiment);
-                }
+                stroke: '#888',
+                strokeOpacity: 1,
+                strokeDasharray: ''
               }}
               activeDot={false}
               isAnimationActive={false}
