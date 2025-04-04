@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,13 @@ interface SentimentCalendarProps {
     sentiment: number;
   }[];
   timeRange: 'today' | 'week' | 'month' | 'year';
+}
+
+// Define the chart data types to avoid TypeScript errors
+interface ChartDataPointWithDate {
+  time: string;
+  sentiment: number | null;
+  fullDate?: string;
 }
 
 function getEmoji(sentiment: number): string {
