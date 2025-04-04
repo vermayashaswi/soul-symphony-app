@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -10,7 +11,7 @@
   .journal-container,
   .insights-container,
   .settings-container {
-    padding-bottom: 4rem !important;
+    padding-bottom: 3.5rem !important;
   }
   
   /* Remove extra space at the top of mobile pages */
@@ -31,33 +32,33 @@
   
   /* Increase touch targets */
   .mobile-chat-interface button {
-    min-height: 40px;
+    min-height: 36px;
   }
   
   /* Optimize space usage in chat interface */
   .smart-chat-interface .prose,
   .mobile-chat-interface .prose {
-    font-size: 0.95rem;
-    line-height: 1.4;
+    font-size: 0.9rem;
+    line-height: 1.3;
     margin: 0.5rem 0;
   }
   
   /* Reduce padding in chat messages */
   .smart-chat-interface .p-4,
   .mobile-chat-interface .p-4 {
-    padding: 0.75rem !important;
+    padding: 0.5rem !important;
   }
   
   /* Reduce margins between chat messages */
   .smart-chat-interface .space-y-4,
   .mobile-chat-interface .space-y-4 {
-    margin-top: 0.5rem !important;
-    margin-bottom: 0.5rem !important;
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.25rem !important;
   }
   
   /* Adjust card headers on home page */
   .card .card-header {
-    padding-top: 0.75rem;
+    padding-top: 0.5rem;
     padding-bottom: 0.25rem;
   }
   
@@ -65,11 +66,13 @@
   .card .card-title {
     display: inline-flex;
     align-items: center;
+    font-size: 1rem !important;
   }
   
   /* Language animation optimization for mobile */
   .language-animation-container {
-    transform: scale(0.8);
+    transform: scale(0.7);
+    height: 70px !important;
   }
   
   /* Voice recorder container height optimization */
@@ -85,23 +88,28 @@
   
   /* Make card padding smaller on mobile */
   .card-content {
-    padding-top: 0.75rem !important;
-    padding-bottom: 0.75rem !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
   }
   
-  /* Reduce the size of the language animation background */
-  .language-animation-container {
-    height: 100px !important;
+  /* Journal-specific optimizations */
+  .journal-container .tabs-content {
+    margin-top: 0.25rem !important; 
+  }
+  
+  /* Reduce tab list spacing */
+  .tabs-list {
+    margin-bottom: 0.5rem !important;
   }
   
   /* Add some bounce animations for mobile interactions */
   @keyframes mobile-bounce {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
+    50% { transform: translateY(-3px); }
   }
   
   .mobile-animation-bounce {
-    animation: mobile-bounce 0.5s ease;
+    animation: mobile-bounce 0.4s ease;
   }
   
   /* Mobile-friendly scrolling */
@@ -142,7 +150,7 @@
   @keyframes message-appear {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(6px);
     }
     to {
       opacity: 1;
@@ -152,7 +160,7 @@
   
   /* Reduce excess space in mobile chat interface */
   .smart-chat-container {
-    gap: 0.5rem !important;
+    gap: 0.25rem !important;
   }
   
   /* Optimize vertical space */
@@ -162,16 +170,17 @@
   .mobile-chat-interface h2,
   .smart-chat-interface h3,
   .mobile-chat-interface h3 {
-    margin-bottom: 0.5rem !important;
+    margin-bottom: 0.25rem !important;
+    font-size: 1.125rem !important;
   }
   
   /* Fix for flickering journal entries */
   .journal-container .opacity-0 {
-    transition: opacity 0.3s ease-in;
+    transition: opacity 0.2s ease-in;
   }
   
   .journal-container .opacity-100 {
-    transition: opacity 0.3s ease-in;
+    transition: opacity 0.2s ease-in;
   }
   
   /* Recording animation */
@@ -213,15 +222,15 @@
     z-index: 40;
     background-color: white;
     border-top: 1px solid rgba(0, 0, 0, 0.1);
-    padding: 0.5rem;
+    padding: 0.25rem;
     margin-bottom: 0 !important;
   }
   
   /* Ensure proper content area height in chat */
   .mobile-chat-content {
-    height: calc(100vh - 180px); /* Adjust based on header, input and navbar heights */
+    height: calc(100vh - 160px); /* Adjust based on header, input and navbar heights */
     overflow-y: auto;
-    padding-bottom: 4rem !important; /* Add more padding at the bottom */
+    padding-bottom: 3.5rem !important; /* Add more padding at the bottom */
   }
   
   /* Remove extra spacing on journal and insights pages */
@@ -235,16 +244,30 @@
   
   /* Optimize spacing for voice recorder on mobile */
   .journal-container .card-content {
-    padding: 0.5rem !important;
+    padding: 0.25rem !important;
   }
   
   .journal-container .card-header {
     padding-bottom: 0 !important;
+    padding-top: 0.25rem !important;
   }
   
   .journal-container .card-title {
-    font-size: 1.1rem;
-    margin-bottom: 0.5rem;
+    font-size: 1rem !important;
+    margin-bottom: 0.25rem;
+  }
+  
+  /* Reduce font size for journal entries */
+  .journal-container .text-base {
+    font-size: 0.875rem !important;
+  }
+  
+  .journal-container .text-sm {
+    font-size: 0.75rem !important;
+  }
+  
+  .journal-container .text-xs {
+    font-size: 0.7rem !important;
   }
 }
 
@@ -258,7 +281,7 @@
 @keyframes float-in {
   0% {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px);
   }
   100% {
     opacity: 1;
@@ -271,32 +294,32 @@
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-5px);
+    transform: translateY(-3px);
   }
 }
 
 .float-in {
-  animation: float-in 0.8s ease-out forwards;
+  animation: float-in 0.6s ease-out forwards;
 }
 
 .float-around {
-  animation: float-around 5s ease-in-out infinite;
+  animation: float-around 3s ease-in-out infinite;
 }
 
 /* Add language animation related styles */
 .language-animation-word {
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   opacity: 0.8;
 }
 
 .language-animation-word:hover {
   opacity: 1;
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 /* 3D perspective for language animation */
 .language-animation-container {
-  perspective: 1000px;
+  perspective: 800px;
 }
 
 .language-animation-3d {

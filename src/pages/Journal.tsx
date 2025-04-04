@@ -449,19 +449,19 @@ const Journal = () => {
       
       <JournalHeader />
       
-      <div className="container mx-auto px-4 py-6 max-w-5xl">
+      <div className="container mx-auto px-3 py-2 max-w-5xl">
         <Tabs defaultValue="record" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="record">Record Entry</TabsTrigger>
-            <TabsTrigger value="entries">Past Entries</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-3">
+            <TabsTrigger value="record" className="text-xs sm:text-sm">Record Entry</TabsTrigger>
+            <TabsTrigger value="entries" className="text-xs sm:text-sm">Past Entries</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="record" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-center">Record a New Journal Entry</CardTitle>
+          <TabsContent value="record" className="mt-2">
+            <Card className="border shadow-sm">
+              <CardHeader className="py-2">
+                <CardTitle className="text-center text-base">Record a New Journal Entry</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="py-2">
                 <div className="flex flex-col items-center overflow-hidden relative">
                   <VoiceRecorder onRecordingComplete={onEntryRecorded} />
                 </div>
@@ -479,9 +479,9 @@ const Journal = () => {
             )}
             
             {showLoading && (
-              <div className="flex flex-col items-center justify-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-                <p className="text-muted-foreground">Loading your journal entries...</p>
+              <div className="flex flex-col items-center justify-center h-40">
+                <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
+                <p className="text-muted-foreground text-sm">Loading your journal entries...</p>
               </div>
             )}
             

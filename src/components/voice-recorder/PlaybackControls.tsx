@@ -32,32 +32,33 @@ export function PlaybackControls({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="flex flex-col items-center gap-3 w-full max-w-xs"
+      className="flex flex-col items-center gap-2 w-full max-w-xs"
     >
       <div className="w-full">
         <Button 
           onClick={onTogglePlayback} 
           variant="outline"
           disabled={isProcessing}
-          className="rounded-full h-10 px-4 flex items-center gap-2 w-full mb-2"
+          className="rounded-full h-8 px-3 flex items-center gap-1.5 w-full mb-1 text-xs"
+          size="sm"
         >
           {isPlaying ? (
             <>
-              <Pause className="w-4 h-4" />
+              <Pause className="w-3 h-3" />
               <span>Pause</span>
             </>
           ) : (
             <>
-              <Play className="w-4 h-4" />
+              <Play className="w-3 h-3" />
               <span>Play Recording</span>
             </>
           )}
         </Button>
         
         {/* Playback progress indicator */}
-        <div className="w-full space-y-1">
-          <Progress value={playbackProgress} className="h-2" />
-          <div className="flex justify-between text-xs text-muted-foreground">
+        <div className="w-full space-y-0.5">
+          <Progress value={playbackProgress} className="h-1.5" />
+          <div className="flex justify-between text-[0.65rem] text-muted-foreground">
             <span>
               {formatTime(Math.floor((playbackProgress / 100) * (audioDuration || 0)))}
             </span>
@@ -69,7 +70,8 @@ export function PlaybackControls({
       <Button 
         onClick={onSaveEntry}
         disabled={isProcessing}
-        className="w-full mt-2 rounded-lg flex items-center justify-center gap-2"
+        className="w-full mt-1 rounded-lg flex items-center justify-center gap-1.5 h-8 text-xs"
+        size="sm"
       >
         <span>Save Entry</span>
       </Button>

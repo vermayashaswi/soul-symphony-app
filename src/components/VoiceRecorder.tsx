@@ -9,7 +9,6 @@ import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingVisualizer } from '@/components/voice-recorder/RecordingVisualizer';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
-import { LanguageBackground } from '@/components/voice-recorder/MultilingualTextAnimation';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -117,13 +116,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       <audio ref={audioRef} className="hidden" />
       
       <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-center overflow-hidden">
-        {!isRecording && !audioBlob && (
-          <div className="absolute inset-0 w-full h-full overflow-hidden">
-            <LanguageBackground contained={true} />
-          </div>
-        )}
-        
-        <div className="w-full px-4 sm:px-6">
+        <div className="w-full px-2 sm:px-4">
           <RecordingVisualizer 
             isRecording={isRecording}
             audioLevel={audioLevel}
@@ -131,7 +124,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           />
         </div>
         
-        <div className="relative z-10 mt-2">
+        <div className="relative z-10 mt-1">
           <RecordingButton
             isRecording={isRecording}
             isProcessing={isProcessing}
@@ -163,10 +156,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               <Button
                 onClick={handleRestart}
                 variant="outline"
-                className="mt-3 flex items-center gap-2"
+                className="mt-2 flex items-center gap-2 text-xs h-8"
                 disabled={isProcessing}
+                size="sm"
               >
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className="w-3 h-3" />
                 <span>Start Over</span>
               </Button>
             </div>
@@ -176,7 +170,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="text-center text-muted-foreground relative z-10"
+              className="text-center text-muted-foreground relative z-10 text-xs"
             >
               Microphone access is required for recording
             </motion.p>
@@ -189,18 +183,18 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2 relative z-10"
+            className="mt-2 p-1.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs flex items-start gap-1.5 relative z-10"
           >
-            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
             <div>{recordingError}</div>
           </motion.div>
         )}
         
         {isProcessing && (
-          <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground relative z-10">
-            <Loader2 className="w-4 h-4 animate-spin" />
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground relative z-10">
+            <Loader2 className="w-3 h-3 animate-spin" />
             <span>Processing with AI...</span>
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3 h-3" />
           </div>
         )}
       </div>
