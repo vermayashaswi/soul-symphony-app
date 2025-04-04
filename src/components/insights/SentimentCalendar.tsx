@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -643,21 +642,21 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               y1={0.2} 
               y2={1} 
               fill="#F2FCE2" 
-              fillOpacity={theme === 'dark' ? 0.2 : 0.5} 
+              fillOpacity={theme === 'dark' ? 0.75 : 0.75} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-0.1} 
               y2={0.2} 
               fill="#FEF7CD" 
-              fillOpacity={theme === 'dark' ? 0.2 : 0.5} 
+              fillOpacity={theme === 'dark' ? 0.75 : 0.75} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-1} 
               y2={-0.1} 
               fill="#ea384c" 
-              fillOpacity={theme === 'dark' ? 0.1 : 0.15} 
+              fillOpacity={theme === 'dark' ? 0.75 : 0.75} 
               strokeOpacity={0}
             />
             
