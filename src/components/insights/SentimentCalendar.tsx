@@ -65,25 +65,25 @@ export default function SentimentCalendar({ sentimentData }: SentimentCalendarPr
           caption_label: "text-base",
         }}
         components={{
-          Day: ({ day, ...props }) => {
+          Day: ({ date, displayMonth, selected, ...props }) => {
             // Extract the ISO date string for comparison
-            const formattedDate = day.date.toISOString().split('T')[0];
+            const formattedDate = date.toISOString().split('T')[0];
             const sentimentInfo = sentimentMap.get(formattedDate);
             
             return (
               <div
                 className={cn(
                   "h-9 w-9 relative flex items-center justify-center hover:bg-primary/10 rounded-md transition-colors",
-                  props.selected && "font-medium text-primary"
+                  selected && "font-medium text-primary"
                 )}
                 {...props}
               >
                 {/* Date number always at the top */}
-                <span className="absolute top-1.5 w-full text-center text-xs">
-                  {day.date.getDate()}
+                <span className="absolute top-1 w-full text-center text-xs">
+                  {date.getDate()}
                 </span>
                 
-                {/* Emoji slightly below the date number, with more space */}
+                {/* Emoji slightly below the date number, with more vertical spacing */}
                 {sentimentInfo && (
                   <span className="absolute bottom-0.5 w-full text-center text-sm">
                     {sentimentInfo.emoji}
