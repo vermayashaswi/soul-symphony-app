@@ -185,15 +185,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               Microphone access is required for recording
             </motion.p>
           ) : (
-            <motion.p
-              key="instruction"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="text-center text-muted-foreground relative z-10"
-            >
-              Tap the microphone to start recording
-            </motion.p>
+            <></>
           )}
         </AnimatePresence>
         
