@@ -466,6 +466,10 @@ export type Database = {
               id: number
               content: string
               similarity: number
+              embedding: string
+              created_at: string
+              themes: string[]
+              emotions: Json
             }[]
           }
       match_journal_entries_by_emotion: {
