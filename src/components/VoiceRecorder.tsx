@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,7 +13,6 @@ import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { LanguageBackground } from '@/components/voice-recorder/MultilingualTextAnimation';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -118,11 +116,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       <audio ref={audioRef} className="hidden" />
       
       <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-between overflow-hidden pt-6 pb-4">
-        {/* Language animation background */}
-        <div className="absolute inset-0 w-full h-full overflow-hidden">
-          <LanguageBackground contained={true} />
-        </div>
-        
         <div className="w-full px-4 sm:px-6 relative z-10">
           <RecordingVisualizer 
             isRecording={isRecording}
@@ -139,6 +132,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             onRecordingStart={startRecording}
             onRecordingStop={stopRecording}
             onPermissionRequest={requestPermissions}
+            audioLevel={audioLevel}
           />
         </div>
         
