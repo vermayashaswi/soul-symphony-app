@@ -8,7 +8,10 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Legend
+  Legend,
+  Label,
+  ReferenceLine,
+  Text
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
@@ -196,6 +199,31 @@ export function EmotionChart({
       });
   }, [aggregatedData]);
 
+  // Custom label component for emotion lines
+  const EmotionLineLabel = (props: any) => {
+    const { x, y, stroke, value, index, data, dataKey } = props;
+    
+    // Only show the label at the last data point
+    if (index !== data.length - 1) return null;
+    
+    // Get the emotion name and capitalize first letter
+    const emotionName = dataKey.charAt(0).toUpperCase() + dataKey.slice(1);
+    
+    return (
+      <text 
+        x={x + 5} 
+        y={y} 
+        dy={4} 
+        fill={stroke} 
+        fontSize={12} 
+        textAnchor="start"
+        fontWeight="500"
+      >
+        {emotionName}
+      </text>
+    );
+  };
+
   const renderLineChart = () => {
     if (lineData.length === 0) {
       return (
@@ -212,7 +240,7 @@ export function EmotionChart({
         <ResponsiveContainer width="100%" height={300}>
           <LineChart
             data={lineData}
-            margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
+            margin={{ top: 20, right: 60, left: 0, bottom: 10 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
             <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
@@ -233,7 +261,6 @@ export function EmotionChart({
                 color: theme === 'dark' ? 'hsl(var(--card-foreground))' : 'inherit'
               }} 
             />
-            <Legend verticalAlign="bottom" height={36} />
             {emotions.map((emotion, index) => (
               <Line
                 key={emotion}
@@ -244,6 +271,7 @@ export function EmotionChart({
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
                 name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+                label={<EmotionLineLabel />}
               />
             ))}
           </LineChart>
@@ -308,21 +336,7 @@ export function EmotionChart({
         )}
       </div>
       
-      {chartType === 'line' && lineData.length > 0 && (
-        <div className="flex flex-wrap justify-start gap-4 mt-4 text-sm">
-          {Object.keys(lineData[0])
-            .filter(key => key !== 'day')
-            .map((emotion, index) => (
-              <div key={emotion} className="flex items-center gap-2">
-                <div 
-                  className="w-3 h-3 rounded-full" 
-                  style={{ backgroundColor: getEmotionColor(emotion, index) }}
-                ></div>
-                <span className="font-medium">{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
-              </div>
-            ))}
-        </div>
-      )}
+      {/* Removing the legend below the line chart */}
     </div>
   );
 }
