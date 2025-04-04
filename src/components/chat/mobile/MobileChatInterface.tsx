@@ -71,8 +71,7 @@ export default function MobileChatInterface({
     onSwipeLeft: () => {
       if (sheetOpen) {
         setSheetOpen(false);
-      } else if (onSwipeLeft) {
-        onSwipeLeft();
+        if (onSwipeLeft) onSwipeLeft();
       }
     }
   });

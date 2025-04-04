@@ -1,6 +1,5 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 interface SwipeOptions {
   onSwipeLeft?: () => void;
@@ -8,9 +7,6 @@ interface SwipeOptions {
   onSwipeUp?: () => void;
   onSwipeDown?: () => void;
   threshold?: number;
-  navigateOnEdge?: boolean;
-  navigateLeftTo?: string;
-  navigateRightTo?: string;
 }
 
 export function useSwipeGesture(ref: React.RefObject<HTMLElement>, options: SwipeOptions = {}) {
@@ -19,17 +15,13 @@ export function useSwipeGesture(ref: React.RefObject<HTMLElement>, options: Swip
     onSwipeRight,
     onSwipeUp,
     onSwipeDown,
-    threshold = 50,
-    navigateOnEdge = false,
-    navigateLeftTo,
-    navigateRightTo
+    threshold = 50
   } = options;
 
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
-  const navigate = useNavigate();
   
-  // Store whether custom handlers were triggered to avoid double navigation
+  // Store whether custom handlers were triggered
   const [handlerTriggered, setHandlerTriggered] = useState(false);
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
@@ -74,19 +66,9 @@ export function useSwipeGesture(ref: React.RefObject<HTMLElement>, options: Swip
       }
     }
     
-    // If no custom handler was triggered and navigation on edge is enabled,
-    // navigate between pages based on swipe direction
-    if (!handlerTriggered && navigateOnEdge && isHorizontalSwipe) {
-      if (deltaX > threshold * 2 && navigateRightTo) {
-        navigate(navigateRightTo);
-      } else if (deltaX < -threshold * 2 && navigateLeftTo) {
-        navigate(navigateLeftTo);
-      }
-    }
-    
     touchStartX.current = null;
     touchStartY.current = null;
-  }, [onSwipeLeft, onSwipeRight, onSwipeUp, onSwipeDown, threshold, navigate, navigateOnEdge, navigateLeftTo, navigateRightTo, handlerTriggered]);
+  }, [onSwipeLeft, onSwipeRight, onSwipeUp, onSwipeDown, threshold]);
 
   useEffect(() => {
     const element = ref.current;

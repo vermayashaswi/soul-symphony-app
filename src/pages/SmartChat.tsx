@@ -30,27 +30,18 @@ export default function SmartChat() {
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldRenderMobile = isMobile || mobileDemo;
   
-  // Add swipe gesture for navigation
+  // Add swipe gesture for sidebar toggling
   useSwipeGesture(chatContainerRef, {
     onSwipeRight: () => {
       if (shouldRenderMobile) {
         setShowSidebar(true);
-      } else {
-        // Navigate to previous page in bottom nav
-        navigate('/journal');
       }
     },
     onSwipeLeft: () => {
       if (shouldRenderMobile && showSidebar) {
         setShowSidebar(false);
-      } else {
-        // Navigate to next page in bottom nav
-        navigate('/settings');
       }
-    },
-    navigateOnEdge: true,
-    navigateLeftTo: '/settings',
-    navigateRightTo: '/journal',
+    }
   });
 
   useEffect(() => {
@@ -220,8 +211,6 @@ export default function SmartChat() {
             onSwipeLeft={() => {
               if (showSidebar) {
                 setShowSidebar(false);
-              } else {
-                navigate('/settings');
               }
             }}
           />
