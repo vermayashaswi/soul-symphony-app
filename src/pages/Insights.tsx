@@ -100,6 +100,15 @@ export default function Insights() {
     }
   }, [loading, insightsData]);
 
+  const getSentimentData = () => {
+    if (!insightsData.entries) return [];
+    
+    return insightsData.entries.map(entry => ({
+      date: new Date(entry.created_at),
+      sentiment: parseFloat(entry.sentiment || 0)
+    }));
+  };
+
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
@@ -287,8 +296,7 @@ export default function Insights() {
               className="mb-8"
             >
               <SentimentCalendar 
-                entries={insightsData.entries}
-                timeRange={timeRange}
+                sentimentData={getSentimentData()}
               />
             </motion.div>
           </>

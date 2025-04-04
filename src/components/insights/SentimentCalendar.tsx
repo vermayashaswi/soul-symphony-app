@@ -65,9 +65,9 @@ export default function SentimentCalendar({ sentimentData }: SentimentCalendarPr
           caption_label: "text-base",
         }}
         components={{
-          Day: ({ date, ...props }) => {
+          Day: ({ day, ...props }) => {
             // Extract the ISO date string for comparison
-            const formattedDate = date.toISOString().split('T')[0];
+            const formattedDate = day.date.toISOString().split('T')[0];
             const sentimentInfo = sentimentMap.get(formattedDate);
             
             return (
@@ -80,12 +80,12 @@ export default function SentimentCalendar({ sentimentData }: SentimentCalendarPr
               >
                 {/* Date number always at the top */}
                 <span className="absolute top-1.5 w-full text-center text-xs">
-                  {date.getDate()}
+                  {day.date.getDate()}
                 </span>
                 
-                {/* Emoji slightly below the date number */}
+                {/* Emoji slightly below the date number, with more space */}
                 {sentimentInfo && (
-                  <span className="absolute bottom-1 w-full text-center text-sm">
+                  <span className="absolute bottom-0.5 w-full text-center text-sm">
                     {sentimentInfo.emoji}
                   </span>
                 )}
