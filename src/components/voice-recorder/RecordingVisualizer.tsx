@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -28,24 +27,6 @@ export function RecordingVisualizer({
             />
           ))}
         </AnimatePresence>
-        
-        {isRecording && (
-          <motion.div 
-            className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <div className="h-full w-full rounded-full border-4 border-transparent relative">
-              <div className="absolute inset-0 rounded-full"
-                style={{
-                  background: `conic-gradient(rgba(147, 51, 234, ${Math.min(0.8, audioLevel / 100 + 0.1)}) ${audioLevel}%, transparent ${audioLevel}%)`,
-                  transform: 'rotate(-90deg)',
-                  transition: 'all 0.2s ease'
-                }}
-              />
-            </div>
-          </motion.div>
-        )}
       </div>
     </div>
   );
