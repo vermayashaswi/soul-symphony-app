@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -181,23 +182,42 @@ export function EmotionChart({
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
-    return Array.from(dateMap.entries())
-      .map(([date, emotions]) => {
-        const dataPoint: EmotionData = { 
-          day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
-        };
-        
-        topEmotions.forEach(emotion => {
-          dataPoint[emotion] = emotions[emotion] || 0;
+    // Safety check: if no dateMap entries, return empty array
+    if (dateMap.size === 0) {
+      console.log('[EmotionChart] No date entries found for line chart');
+      return [];
+    }
+    
+    try {
+      // Convert the data to the format expected by the line chart
+      const chartData = Array.from(dateMap.entries())
+        .map(([date, emotions]) => {
+          const dataPoint: EmotionData = { 
+            day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+          };
+          
+          topEmotions.forEach(emotion => {
+            dataPoint[emotion] = emotions[emotion] || 0;
+          });
+          
+          return dataPoint;
+        })
+        .sort((a, b) => {
+          const dateA = new Date(a.day);
+          const dateB = new Date(b.day);
+          return dateA.getTime() - dateB.getTime();
         });
         
-        return dataPoint;
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.day);
-        const dateB = new Date(b.day);
-        return dateA.getTime() - dateB.getTime();
+      console.log('[EmotionChart] Line data processed successfully', {
+        points: chartData.length,
+        firstPoint: chartData.length > 0 ? chartData[0] : null
       });
+        
+      return chartData;
+    } catch (error) {
+      console.error('[EmotionChart] Error processing line data:', error);
+      return []; // Return empty array in case of error
+    }
   }, [aggregatedData]);
 
   const EmotionLineLabel = (props: any) => {
@@ -223,10 +243,20 @@ export function EmotionChart({
   };
 
   const renderLineChart = () => {
-    if (lineData.length === 0) {
+    // Check if there's any data to render
+    if (!lineData || lineData.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">No data available for this timeframe</p>
+        </div>
+      );
+    }
+    
+    // Safety check: if first entry is undefined or doesn't have expected properties
+    if (!lineData[0]) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Error processing chart data</p>
         </div>
       );
     }
