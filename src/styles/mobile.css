@@ -1,4 +1,3 @@
-
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -75,12 +74,12 @@
   
   /* Voice recorder container height optimization */
   [class*="min-h-[160px]"] {
-    min-height: 120px !important;
+    min-height: 140px !important;
   }
   
   /* Voice recorder container position adjustment to stay above mobile navbar */
-  .min-h-\[120px\] {
-    min-height: 100px !important;
+  .min-h-\[140px\] {
+    min-height: 140px !important;
     margin-bottom: 16px;
   }
   

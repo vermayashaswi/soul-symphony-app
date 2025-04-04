@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -117,7 +116,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     <div className={cn("flex flex-col items-center relative z-10 w-full", className)}>
       <audio ref={audioRef} className="hidden" />
       
-      <div className="relative w-full h-full min-h-[120px] flex flex-col items-center justify-center overflow-hidden">
+      <div className="relative w-full h-full min-h-[140px] flex flex-col items-center justify-center overflow-hidden">
         {!isRecording && !audioBlob && (
           <div className="absolute inset-0 w-full h-full overflow-hidden">
             <LanguageBackground contained={true} />
