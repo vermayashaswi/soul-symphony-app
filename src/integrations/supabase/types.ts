@@ -528,6 +528,21 @@ export type Database = {
           similarity: number
         }[]
       }
+      match_journal_entries_fixed: {
+        Args: {
+          query_embedding: string
+          match_threshold: number
+          match_count: number
+          user_id_filter: string
+        }
+        Returns: {
+          id: number
+          content: string
+          similarity: number
+          embedding: string
+          created_at: string
+        }[]
+      }
       match_journal_entries_with_date: {
         Args: {
           query_embedding: string

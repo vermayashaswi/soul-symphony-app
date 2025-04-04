@@ -430,7 +430,7 @@ async function searchEntriesByThemes(userId: string, themeKeywords: string[]) {
   }
 }
 
-// Search entries using vector similarity
+// Search entries using vector similarity with our new fixed function
 async function searchEntriesWithVector(
   userId: string, 
   queryEmbedding: any[], 
@@ -439,26 +439,15 @@ async function searchEntriesWithVector(
   try {
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
     
-    // Prepare RPC parameters
-    const rpcParams: any = {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.5,
-      match_count: 10,
-      user_id_filter: userId
-    };
-    
-    // Add time range parameters if provided
-    if (timeRange) {
-      rpcParams.start_date = timeRange.startDate?.toISOString() || null;
-      rpcParams.end_date = timeRange.endDate?.toISOString() || null;
-    }
-    
-    console.log(`RPC params for match_journal_entries_with_date: ${JSON.stringify(rpcParams).substring(0, 100)}...`);
-    
-    // Call the RPC function
+    // Use the fixed function we just created
     const { data, error } = await supabase.rpc(
-      'match_journal_entries_with_date',
-      rpcParams
+      'match_journal_entries_fixed',
+      {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.5,
+        match_count: 10,
+        user_id_filter: userId
+      }
     );
     
     if (error) {
