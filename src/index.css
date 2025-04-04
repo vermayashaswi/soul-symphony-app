@@ -26,6 +26,7 @@
     --ring: 217 91.2% 59.8%; /* Match primary */
     --radius: 0.75rem;
     --color-theme: #3b82f6; /* Calm/Blue as default */
+    --chart-bg: 0 0% 100%; /* New variable for chart backgrounds */
   }
  
   .dark {
@@ -48,6 +49,7 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 217 91.2% 59.8%; /* Match primary */
+    --chart-bg: 240 10% 3.9%; /* Match background in dark mode */
   }
 }
  
@@ -58,4 +60,25 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Add custom styles for scroll to top behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Dark mode styles for chart components */
+.dark .recharts-surface,
+.dark .recharts-default-tooltip {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+}
+
+.dark .recharts-tooltip-cursor {
+  fill: hsl(var(--muted)) !important;
+}
+
+.dark .recharts-tooltip-item-name,
+.dark .recharts-tooltip-item-value {
+  color: hsl(var(--foreground)) !important;
 }

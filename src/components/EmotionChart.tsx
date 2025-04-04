@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
 import { Sparkles } from 'lucide-react';
+import { useTheme } from '@/hooks/use-theme';
 
 type EmotionData = {
   day: string;
@@ -84,6 +85,7 @@ export function EmotionChart({
   const [chartType, setChartType] = useState<ChartType>('bubble');
   const [bubbleKey, setBubbleKey] = useState(0); // Add key for forcing re-render
   const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
+  const { theme } = useTheme();
   
   const chartTypes = [
     { id: 'line', label: 'Line' },
@@ -224,10 +226,11 @@ export function EmotionChart({
             />
             <Tooltip 
               contentStyle={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.8)', 
+                backgroundColor: theme === 'dark' ? 'hsl(var(--card))' : 'rgba(255, 255, 255, 0.8)', 
                 borderRadius: '8px',
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
-                border: 'none' 
+                border: 'none',
+                color: theme === 'dark' ? 'hsl(var(--card-foreground))' : 'inherit'
               }} 
             />
             <Legend verticalAlign="bottom" height={36} />
@@ -275,7 +278,7 @@ export function EmotionChart({
         </div>
       </div>
       
-      <div className="bg-white p-4 rounded-xl shadow-sm relative">
+      <div className="bg-card p-4 rounded-xl shadow-sm relative">
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && (
           <div className="w-full h-[350px]" key={bubbleKey}>

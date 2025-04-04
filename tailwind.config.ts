@@ -69,6 +69,9 @@ export default {
 					peach: '#FFF1E6',
 					green: '#E2F0CB',
 					lavender: '#E9D8FD'
+				},
+				chart: {
+					bg: 'hsl(var(--chart-bg))'
 				}
 			},
 			borderRadius: {
