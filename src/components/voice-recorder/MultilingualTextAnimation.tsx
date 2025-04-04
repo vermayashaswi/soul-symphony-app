@@ -101,6 +101,7 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
         fontWeight: Math.random() > 0.6 ? 700 : 400,
         fontSize: `${fontSize}px`,
         filter: Math.random() > 0.8 ? "blur(0.5px)" : "none", // Occasional blur for depth
+        opacity: 0.2 + Math.random() * 0.3, // Very subtle opacity
       }}
     >
       {text}

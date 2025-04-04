@@ -14,6 +14,7 @@ import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { LanguageBackground } from '@/components/voice-recorder/MultilingualTextAnimation';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -117,7 +118,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       <audio ref={audioRef} className="hidden" />
       
       <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-between overflow-hidden pt-6 pb-4">
-        <div className="w-full px-4 sm:px-6">
+        {/* Language animation background */}
+        <div className="absolute inset-0 w-full h-full overflow-hidden">
+          <LanguageBackground contained={true} />
+        </div>
+        
+        <div className="w-full px-4 sm:px-6 relative z-10">
           <RecordingVisualizer 
             isRecording={isRecording}
             audioLevel={audioLevel}
@@ -125,7 +131,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           />
         </div>
         
-        <div className="relative z-10 mt-4 flex justify-center w-full">
+        <div className="relative z-10 flex justify-center w-full mt-auto mb-10">
           <RecordingButton
             isRecording={isRecording}
             isProcessing={isProcessing}
@@ -143,7 +149,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               recordingTime={recordingTime} 
             />
           ) : audioBlob ? (
-            <div className="flex flex-col items-center w-full">
+            <div className="flex flex-col items-center w-full relative z-10">
               <PlaybackControls
                 audioBlob={audioBlob}
                 isPlaying={isPlaying}
@@ -157,7 +163,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               <Button
                 onClick={handleRestart}
                 variant="outline"
-                className="mt-3 flex items-center gap-2"
+                className="mt-3 flex items-center gap-2 bg-background/80 backdrop-blur-sm"
                 disabled={isProcessing}
               >
                 <RotateCcw className="w-4 h-4" />

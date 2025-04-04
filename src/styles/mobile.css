@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -68,14 +69,14 @@
     font-size: 1.25rem !important;
   }
   
-  /* Voice recorder container height optimization */
+  /* Voice recorder container height - making it fill more space */
   [class*="min-h-[160px]"], [class*="min-h-[185px]"] {
-    min-height: 170px !important;
+    min-height: 350px !important; /* Increased to fill the green area */
   }
   
   /* Voice recorder container position adjustment to stay above mobile navbar */
   .min-h-\[185px\] {
-    min-height: 170px !important;
+    min-height: 350px !important; /* Increased to fill the green area */
     margin-bottom: 0;
     position: relative;
     bottom: 0;
@@ -129,6 +130,7 @@
     border-left: none;
     border-right: none;
     border-bottom: none;
+    height: calc(100vh - 210px); /* Make the container fill most of the available space */
   }
   
   /* Adjust spacing of journal tabs container */
