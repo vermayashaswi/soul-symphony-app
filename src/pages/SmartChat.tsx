@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -25,7 +24,6 @@ export default function SmartChat() {
   const [showSidebar, setShowSidebar] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   
-  // Check if we're in mobile preview mode
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldRenderMobile = isMobile || mobileDemo;
@@ -33,18 +31,15 @@ export default function SmartChat() {
   useEffect(() => {
     document.title = "Roha | SOULo";
     
-    // Force proper viewport setup for mobile
     const metaViewport = document.querySelector('meta[name="viewport"]');
     if (metaViewport) {
       metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
     }
     
-    // Check for active thread or create one
     const checkOrCreateThread = async () => {
       if (!user?.id) return;
 
       try {
-        // Get most recent thread
         const { data: threads, error } = await supabase
           .from('chat_threads')
           .select('*')
@@ -56,14 +51,12 @@ export default function SmartChat() {
 
         if (threads && threads.length > 0) {
           setCurrentThreadId(threads[0].id);
-          // Dispatch event to notify SmartChatInterface about the selected thread
           window.dispatchEvent(
             new CustomEvent('threadSelected', { 
               detail: { threadId: threads[0].id } 
             })
           );
         } else {
-          // Create a new thread if none exists
           await createNewThread();
         }
       } catch (error) {
@@ -71,7 +64,16 @@ export default function SmartChat() {
       }
     };
 
+    const handleCloseSidebar = () => {
+      setShowSidebar(false);
+    };
+    
+    window.addEventListener('closeChatSidebar', handleCloseSidebar);
     checkOrCreateThread();
+    
+    return () => {
+      window.removeEventListener('closeChatSidebar', handleCloseSidebar);
+    };
   }, [isMobile, mobileDemo, user]);
 
   const hasEnoughEntries = !loading && entries.length > 0;
@@ -94,7 +96,6 @@ export default function SmartChat() {
       if (error) throw error;
       setCurrentThreadId(newThreadId);
       
-      // Dispatch event to notify SmartChatInterface about the new thread
       window.dispatchEvent(
         new CustomEvent('threadSelected', { 
           detail: { threadId: newThreadId } 
@@ -107,7 +108,6 @@ export default function SmartChat() {
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);
-    // Dispatch event to notify SmartChatInterface about the selected thread
     window.dispatchEvent(
       new CustomEvent('threadSelected', { 
         detail: { threadId: threadId } 
@@ -115,7 +115,6 @@ export default function SmartChat() {
     );
   };
 
-  // Desktop content
   const desktopContent = (
     <>
       <Navbar />
@@ -160,7 +159,6 @@ export default function SmartChat() {
     </>
   );
 
-  // Mobile content
   const mobileContent = (
     <div className="flex flex-col h-full" ref={chatContainerRef}>
       <motion.div
@@ -199,9 +197,7 @@ export default function SmartChat() {
     </div>
   );
   
-  // Decide which content to render based on mobile status
   const content = shouldRenderMobile ? mobileContent : desktopContent;
   
-  // If we're in mobile demo mode, wrap the content in the MobilePreviewFrame
   return mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content;
 }

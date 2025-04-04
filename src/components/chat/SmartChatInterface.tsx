@@ -275,7 +275,7 @@ export default function SmartChatInterface() {
 
   return (
     <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b sticky top-0 z-10">
         <div className="flex items-center">
           <h2 className="text-xl font-semibold">Roha</h2>
         </div>
