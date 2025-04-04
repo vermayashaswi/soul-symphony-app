@@ -71,35 +71,48 @@
 /* Global theme color utilities */
 @layer utilities {
   .theme-text {
-    color: var(--color-theme);
+    color: var(--color-theme) !important;
   }
   
   .theme-bg {
-    background-color: var(--color-theme);
+    background-color: var(--color-theme) !important;
   }
   
   .theme-border {
-    border-color: var(--color-theme);
+    border-color: var(--color-theme) !important;
   }
   
   .theme-fill {
-    fill: var(--color-theme);
+    fill: var(--color-theme) !important;
   }
   
   .theme-stroke {
-    stroke: var(--color-theme);
+    stroke: var(--color-theme) !important;
   }
   
   .hover-theme-bg:hover {
-    background-color: var(--color-theme);
+    background-color: var(--color-theme) !important;
   }
   
   .hover-theme-text:hover {
-    color: var(--color-theme);
+    color: var(--color-theme) !important;
   }
   
   .hover-theme-border:hover {
-    border-color: var(--color-theme);
+    border-color: var(--color-theme) !important;
+  }
+  
+  /* Special utility classes for text-theme and bg-theme */
+  .text-theme, .text-theme-color {
+    color: var(--color-theme) !important;
+  }
+  
+  .bg-theme, .bg-theme-color {
+    background-color: var(--color-theme) !important;
+  }
+  
+  .border-theme, .border-theme-color {
+    border-color: var(--color-theme) !important;
   }
 }
 

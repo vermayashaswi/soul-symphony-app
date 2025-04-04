@@ -78,6 +78,20 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         .focus\\:ring-theme-color:focus { --tw-ring-color: ${primaryHex} !important; }
         .stroke-theme-color { stroke: ${primaryHex} !important; }
         .fill-theme-color { fill: ${primaryHex} !important; }
+        
+        /* For button elements */
+        button.bg-theme-color { background-color: ${primaryHex} !important; }
+        button.text-theme-color { color: ${primaryHex} !important; }
+        button.border-theme-color { border-color: ${primaryHex} !important; }
+        
+        /* For special icons that need theme colors */
+        .icon-theme-color { color: ${primaryHex} !important; }
+        .icon-theme-color svg { color: ${primaryHex} !important; }
+        
+        /* For headings and text elements */
+        h1.text-theme-color, h2.text-theme-color, h3.text-theme-color, 
+        h4.text-theme-color, h5.text-theme-color, h6.text-theme-color,
+        p.text-theme-color, span.text-theme-color { color: ${primaryHex} !important; }
       `;
       document.head.appendChild(style);
       

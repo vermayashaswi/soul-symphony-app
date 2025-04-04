@@ -44,10 +44,9 @@ export function RecordingButton({
   // Subtle color shift based on audio level
   const getButtonColor = () => {
     if (isProcessing) return "bg-gray-400 border-gray-500";
-    if (!isRecording) return "bg-primary hover:bg-primary/90 border-primary/20";
+    if (!isRecording) return "bg-theme-color hover:bg-theme-color/90 border-theme-color/20";
     
     // When recording, shift color based on audio level
-    const intensity = Math.min(100, audioLevel * 1.2);
     return `bg-red-500 border-red-600`;
   };
   
