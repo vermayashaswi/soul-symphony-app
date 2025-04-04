@@ -457,7 +457,11 @@ const Journal = () => {
           
           <TabsContent value="entries">
             {activeTab === 'entries' && (
-              <JournalSearch onSearch={handleSearch} />
+              <JournalSearch 
+                onSearch={handleSearch} 
+                totalEntries={entries.length}
+                filteredCount={filteredEntries.length}
+              />
             )}
             
             {showLoading && (

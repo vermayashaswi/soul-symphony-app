@@ -67,6 +67,18 @@
     align-items: center;
   }
   
+  /* Journal search sticky positioning for mobile */
+  .journal-container .sticky {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background-color: var(--background);
+    padding: 0.75rem 1rem;
+    margin: 0 -1rem;
+    width: calc(100% + 2rem);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  
   /* Add some bounce animations for mobile interactions */
   @keyframes mobile-bounce {
     0%, 100% { transform: translateY(0); }
