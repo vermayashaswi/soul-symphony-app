@@ -176,8 +176,8 @@ export function MultilingualTextAnimation() {
   }, []);
   
   return (
-    <div className="flex flex-col items-center justify-center py-2 overflow-hidden">
-      <div className="text-center relative h-8">
+    <div className="flex flex-col items-center justify-center w-full py-2 overflow-hidden">
+      <div className="text-center relative h-8 w-full">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}

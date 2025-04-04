@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -113,7 +114,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   };
 
   return (
-    <div className={cn("flex flex-col items-center relative z-10", className)}>
+    <div className={cn("flex flex-col items-center relative z-10 w-full", className)}>
       <audio ref={audioRef} className="hidden" />
       
       <div className="relative w-full h-full min-h-[300px] flex flex-col items-center justify-center overflow-hidden">
@@ -123,14 +124,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           </div>
         )}
         
-        <RecordingVisualizer 
-          isRecording={isRecording}
-          audioLevel={audioLevel}
-          ripples={ripples}
-        />
+        <div className="w-full px-4 sm:px-8 md:px-12">
+          <RecordingVisualizer 
+            isRecording={isRecording}
+            audioLevel={audioLevel}
+            ripples={ripples}
+          />
+        </div>
         
         {!isRecording && !audioBlob && hasPermission !== false && (
-          <div className="relative z-10">
+          <div className="relative z-10 w-full">
             <MultilingualTextAnimation />
           </div>
         )}
