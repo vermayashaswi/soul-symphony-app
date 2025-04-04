@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 
@@ -484,7 +483,6 @@ async function handleCorrelationAnalysis(message: string, userId: string, queryT
     return data;
   } catch (error) {
     console.error("Error in correlation analysis:", error);
-    // Fixed: Adding the missing threadId parameter to the function call
     return handleVectorSearch(message, userId, queryTypes, threadId);
   }
 }
