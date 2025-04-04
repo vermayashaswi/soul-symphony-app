@@ -5,6 +5,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import Navbar from '@/components/Navbar';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import MobileChatInterface from '@/components/chat/mobile/MobileChatInterface';
+import JournalDebugPanel from '@/components/journal/JournalDebugPanel';
 
 const Chat = () => {
   const navigate = useNavigate();
@@ -22,6 +23,9 @@ const Chat = () => {
           <SmartChatInterface />
         )}
       </div>
+      
+      {/* Add debug panel */}
+      <JournalDebugPanel />
     </div>
   );
 };
