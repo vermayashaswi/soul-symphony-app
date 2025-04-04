@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -245,7 +244,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, type: "spring" }}
           >
-            <span className="text-6xl">{todaySentiment.emoji}</span>
+            <span className={cn("text-6xl", todaySentiment.textColorClass)}>{todaySentiment.emoji}</span>
           </motion.div>
         ) : (
           <motion.div 
@@ -317,7 +316,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 )}>
                   {format(day, 'd')}
                 </div>
-                <div className="text-2xl">
+                <div className={cn(
+                  "text-2xl",
+                  daySentiment && daySentiment.textColorClass
+                )}>
                   {daySentiment ? daySentiment.emoji : "😶"}
                 </div>
               </motion.div>
@@ -450,7 +452,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                     
                     {info && (
                       <motion.span 
-                        className="text-base md:text-lg"
+                        className={cn(
+                          "text-base md:text-lg",
+                          info && info.textColorClass
+                        )}
                         initial={{ scale: 0.5 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.1, duration: 0.2 }}
@@ -559,7 +564,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 )}>
                   {month}
                 </div>
-                <div className="text-2xl">
+                <div className={cn(
+                  "text-2xl",
+                  monthSentiment !== undefined && getEmojiTextColor(monthSentiment)
+                )}>
                   {monthSentiment !== undefined 
                     ? getEmoji(monthSentiment) 
                     : "😶"}
@@ -601,7 +609,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 )}>
                   {month}
                 </div>
-                <div className="text-2xl">
+                <div className={cn(
+                  "text-2xl",
+                  monthSentiment !== undefined && getEmojiTextColor(monthSentiment)
+                )}>
                   {monthSentiment !== undefined 
                     ? getEmoji(monthSentiment) 
                     : "😶"}
