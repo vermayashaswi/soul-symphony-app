@@ -77,7 +77,7 @@
   /* Voice recorder container position adjustment to stay above mobile navbar */
   .min-h-\[185px\] {
     min-height: 185px !important;
-    margin-bottom: 60px;
+    margin-bottom: 0;
   }
   
   /* Make card padding smaller on mobile */
@@ -97,6 +97,41 @@
     font-weight: 500;
   }
   
+  /* Journal header text size adjustments */
+  .journal-container h1.text-2xl {
+    font-size: 1.75rem !important;
+  }
+  
+  .journal-container p.text-sm {
+    font-size: 1rem !important;
+  }
+  
+  /* Voice recorder component adjustments */
+  .mb-20 {
+    margin-bottom: 4rem !important;
+  }
+  
+  /* Card header and content spacing */
+  .journal-container .card-header {
+    padding-bottom: 0 !important;
+  }
+  
+  /* Make the record button bigger */
+  .journal-container .rounded-full.w-36 {
+    width: 9rem !important;
+    height: 9rem !important;
+  }
+  
+  /* Make the card more compact vertically */
+  .journal-container .card {
+    margin-bottom: 0.25rem !important;
+  }
+  
+  /* Adjust spacing of journal tabs container */
+  .journal-container .container {
+    padding: 0.5rem 1rem !important;
+  }
+
   /* Add some bounce animations for mobile interactions */
   @keyframes mobile-bounce {
     0%, 100% { transform: translateY(0); }
@@ -248,11 +283,6 @@
   .journal-container .card-title {
     font-size: 1.25rem !important;
     margin-bottom: 0.25rem;
-  }
-  
-  /* Position the voice recorder closer to the bottom navbar */
-  .mb-20 {
-    margin-bottom: 5rem !important;
   }
 }
 

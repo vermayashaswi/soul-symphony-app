@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,7 +9,6 @@ import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingVisualizer } from '@/components/voice-recorder/RecordingVisualizer';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
-import { LanguageBackground } from '@/components/voice-recorder/MultilingualTextAnimation';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -114,16 +112,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   };
 
   return (
-    <div className={cn("flex flex-col items-center relative z-10 w-full mb-20", className)}>
+    <div className={cn("flex flex-col items-center relative z-10 w-full mb-[4.1rem]", className)}>
       <audio ref={audioRef} className="hidden" />
       
-      <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-center overflow-hidden">
-        {!isRecording && !audioBlob && (
-          <div className="absolute inset-0 w-full h-full overflow-hidden">
-            <LanguageBackground contained={true} />
-          </div>
-        )}
-        
+      <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-between overflow-hidden pt-12 pb-4">
         <div className="w-full px-4 sm:px-6">
           <RecordingVisualizer 
             isRecording={isRecording}
@@ -132,7 +124,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           />
         </div>
         
-        <div className="relative z-10 mt-2 flex justify-center w-full">
+        <div className="relative z-10 mt-8 flex justify-center w-full">
           <RecordingButton
             isRecording={isRecording}
             isProcessing={isProcessing}
