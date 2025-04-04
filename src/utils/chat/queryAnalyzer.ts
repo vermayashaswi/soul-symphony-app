@@ -16,6 +16,12 @@ type QueryTypes = {
   needsVectorSearch: boolean;
   searchStrategy: string;
   querySegments?: string[];
+  isThemeFocused?: boolean;
+  emotion?: string;
+  theme?: string;
+  isWhenQuestion?: boolean;
+  startDate?: string;
+  endDate?: string;
   timeRange?: {
     type: 'day' | 'week' | 'month' | 'year' | 'custom';
     startDate?: string;

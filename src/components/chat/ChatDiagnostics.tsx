@@ -1,291 +1,290 @@
 
 import { useState } from 'react';
-import { 
-  Collapsible, 
-  CollapsibleContent, 
-  CollapsibleTrigger 
-} from '@/components/ui/collapsible';
-import { Check, X, Loader2, ChevronRight, ChevronDown, Code } from 'lucide-react';
-import { MessageReference } from './ChatArea';
-import { format } from 'date-fns';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-interface DiagnosticsStep {
-  id: number;
-  step: string;
-  status: 'pending' | 'success' | 'error' | 'loading';
-  details?: string;
-  timestamp?: string;
-}
-
-interface QueryAnalysis {
-  queryType: 'emotional' | 'temporal' | 'thematic' | 'general';
-  emotion: string | null;
-  theme: string | null;
-  timeframe: {
-    timeType: string | null;
-    startDate: string | null;
-    endDate: string | null;
-  };
-  isWhenQuestion: boolean;
-}
-
-export interface FunctionExecution {
-  name: string;
-  params?: Record<string, any>;
-  result?: any;
-  executionTime?: number;
-  success: boolean;
-}
+import { AlertCircle, Info, ChevronDown, ChevronUp, Clock, Search, Database, Bot } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface ChatDiagnosticsProps {
   queryText: string;
   isVisible: boolean;
-  ragSteps: DiagnosticsStep[];
-  references: MessageReference[] | null;
-  similarityScores: {id: number, score: number}[] | null;
-  queryAnalysis?: QueryAnalysis | null;
-  functionExecutions?: FunctionExecution[] | null;
+  ragSteps: {
+    id: number;
+    step: string;
+    status: 'pending' | 'success' | 'error' | 'loading' | 'warning';
+    details?: string;
+    timestamp?: string;
+  }[];
+  references?: any[];
+  similarityScores?: {id: number, score: number}[];
+  queryAnalysis?: {
+    queryType: string;
+    emotion: string | null;
+    theme: string | null;
+    timeframe: {
+      timeType: any;
+      startDate: string | null;
+      endDate: string | null;
+    };
+    isWhenQuestion: boolean;
+  };
+  functionExecutions?: any[];
 }
 
-export default function ChatDiagnostics({ 
-  queryText, 
-  isVisible, 
-  ragSteps, 
+export default function ChatDiagnostics({
+  queryText,
+  isVisible,
+  ragSteps,
   references,
   similarityScores,
   queryAnalysis,
   functionExecutions
 }: ChatDiagnosticsProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState('process');
-
+  const [showDetails, setShowDetails] = useState(false);
+  
   if (!isVisible) return null;
-
-  const getStepIcon = (status: string) => {
-    switch (status) {
-      case 'success':
-        return <Check className="h-4 w-4 text-green-500" />;
-      case 'error':
-        return <X className="h-4 w-4 text-red-500" />;
-      case 'loading':
-        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-      default:
-        return <div className="h-4 w-4 rounded-full bg-gray-200"></div>;
-    }
-  };
-
+  
   return (
-    <div className="px-4 pb-4 border-t bg-gray-50/50 space-y-2">
-      <Collapsible 
-        open={expanded} 
-        onOpenChange={setExpanded}
-        className="w-full"
-      >
-        <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-2 text-sm font-medium text-left">
-          <div className="flex items-center">
-            {expanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-            <span>RAG Process Diagnostics</span>
-          </div>
-          <div className="text-xs text-gray-500">
-            {ragSteps.filter(step => step.status === 'success').length} / {ragSteps.length} steps completed
-          </div>
-        </CollapsibleTrigger>
-        
-        <CollapsibleContent className="space-y-4 mt-2">
-          <div className="rounded border p-3 text-xs">
-            <div className="font-medium mb-1">Query:</div>
-            <div className="italic">{queryText}</div>
-            
-            {queryAnalysis && (
-              <div className="mt-3 space-y-1">
-                <div className="font-medium">Query Analysis:</div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  <div>Query Type:</div>
-                  <div className="font-medium capitalize">{queryAnalysis.queryType}</div>
-                  
-                  {queryAnalysis.emotion && (
-                    <>
-                      <div>Emotion:</div>
-                      <div className="font-medium capitalize">{queryAnalysis.emotion}</div>
-                    </>
-                  )}
-                  
-                  {queryAnalysis.theme && (
-                    <>
-                      <div>Theme:</div>
-                      <div className="font-medium capitalize">{queryAnalysis.theme}</div>
-                    </>
-                  )}
-                  
-                  {queryAnalysis.timeframe.timeType && (
-                    <>
-                      <div>Time Range:</div>
-                      <div className="font-medium capitalize">{queryAnalysis.timeframe.timeType}</div>
-                      
-                      <div>Start Date:</div>
-                      <div>{queryAnalysis.timeframe.startDate ? 
-                        format(new Date(queryAnalysis.timeframe.startDate), 'MMM d, yyyy h:mm a') : 
-                        'Not specified'}</div>
-                      
-                      <div>End Date:</div>
-                      <div>{queryAnalysis.timeframe.endDate ? 
-                        format(new Date(queryAnalysis.timeframe.endDate), 'MMM d, yyyy h:mm a') : 
-                        'Not specified'}</div>
-                    </>
-                  )}
-                  
-                  <div>Question Type:</div>
-                  <div>{queryAnalysis.isWhenQuestion ? 'Temporal (When)' : 'General'}</div>
-                </div>
-              </div>
-            )}
+    <Card className="bg-muted/20 border-dashed mt-4">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+            <span>RAG Processing Debug</span>
+            <Badge variant="outline" className="ml-2 text-xs bg-amber-100 text-amber-800">
+              DIAGNOSTICS
+            </Badge>
+          </CardTitle>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0"
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            {showDetails ? 
+              <ChevronUp className="h-4 w-4" /> : 
+              <ChevronDown className="h-4 w-4" />
+            }
+          </Button>
+        </div>
+      </CardHeader>
+      
+      {showDetails && (
+        <CardContent className="pt-0 text-xs">
+          <div className="mb-2 p-2 bg-background rounded border">
+            <p className="font-mono break-words">
+              <span className="text-muted-foreground mr-1">Query:</span> 
+              {queryText}
+            </p>
           </div>
           
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-3 mb-2">
-              <TabsTrigger value="process">Process Steps</TabsTrigger>
-              <TabsTrigger value="functions">Supabase Functions</TabsTrigger>
-              <TabsTrigger value="entries">Retrieved Entries</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="process" className="space-y-2">
-              {ragSteps.map((step) => (
-                <div 
-                  key={step.id}
-                  className={`flex items-start p-2 rounded ${
-                    step.status === 'error' 
-                      ? 'bg-red-50' 
-                      : step.status === 'success' 
-                        ? 'bg-green-50' 
-                        : 'bg-gray-50'
-                  }`}
-                >
-                  <div className="mt-0.5 mr-2">{getStepIcon(step.status)}</div>
-                  <div className="flex-1">
-                    <div className="text-xs font-medium">{step.step}</div>
-                    {step.details && (
-                      <div className="text-xs mt-1 text-gray-600">{step.details}</div>
-                    )}
-                  </div>
-                  {step.timestamp && (
-                    <div className="text-xs text-gray-500">{step.timestamp}</div>
-                  )}
+          <Accordion type="single" collapsible className="w-full" defaultValue="steps">
+            <AccordionItem value="steps">
+              <AccordionTrigger className="py-2 text-xs font-medium">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5" />
+                  Process Steps
                 </div>
-              ))}
-            </TabsContent>
-            
-            <TabsContent value="functions">
-              <div className="space-y-2 text-xs">
-                {functionExecutions && functionExecutions.length > 0 ? (
-                  functionExecutions.map((func, idx) => (
-                    <div 
-                      key={idx} 
-                      className={`border rounded p-2 ${func.success ? 'border-green-200' : 'border-red-200'}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium flex items-center">
-                          <Code className="h-3 w-3 mr-1" />
-                          {func.name}
-                        </div>
-                        <Badge variant={func.success ? "success" : "destructive"} className="text-[10px] h-5">
-                          {func.success ? 'Success' : 'Failed'}
-                          {func.executionTime && ` (${func.executionTime}ms)`}
-                        </Badge>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {ragSteps.map((step) => (
+                    <div key={step.id} className="flex items-start py-1 border-b border-dashed border-muted last:border-0">
+                      <div 
+                        className={`h-3.5 w-3.5 rounded-full mt-0.5 mr-2 ${
+                          step.status === 'success' ? 'bg-green-500' : 
+                          step.status === 'error' ? 'bg-red-500' : 
+                          step.status === 'warning' ? 'bg-amber-500' : 
+                          'bg-blue-500 animate-pulse'
+                        }`}
+                      />
+                      <div>
+                        <p className="font-medium">{step.step}</p>
+                        {step.details && <p className="text-muted-foreground text-[10px]">{step.details}</p>}
+                        {step.timestamp && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{step.timestamp}</p>
+                        )}
                       </div>
-                      
-                      {func.params && (
-                        <div className="mt-2">
-                          <div className="text-muted-foreground mb-1">Parameters:</div>
-                          <pre className="bg-slate-800 text-white p-1 rounded text-[10px] overflow-x-auto">
-                            {JSON.stringify(func.params, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                      
-                      {func.result && (
-                        <div className="mt-2">
-                          <div className="text-muted-foreground mb-1">Result:</div>
-                          <pre className="bg-slate-800 text-white p-1 rounded text-[10px] overflow-x-auto">
-                            {typeof func.result === 'object' 
-                              ? JSON.stringify(func.result, null, 2) 
-                              : func.result}
-                          </pre>
-                        </div>
-                      )}
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-4 text-muted-foreground">
-                    No function execution data available
-                  </div>
-                )}
-              </div>
-            </TabsContent>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
             
-            <TabsContent value="entries">
-              {references && references.length > 0 ? (
-                <ScrollArea className="h-52 rounded border">
-                  <div className="p-3 space-y-3">
-                    {references.map((ref, idx) => (
-                      <div key={idx} className="text-xs border-l-2 border-primary pl-2 py-1">
-                        <div className="flex items-center justify-between">
-                          <div className="font-medium">{format(new Date(ref.date), 'MMM d, yyyy h:mm a')}</div>
-                          <div className="flex items-center gap-1">
-                            {ref.type && (
-                              <Badge variant="outline" className="text-[10px] h-5">
-                                {ref.type}
-                              </Badge>
-                            )}
-                            {ref.similarity !== undefined && (
-                              <Badge 
-                                variant="secondary" 
-                                className="text-[10px] h-5"
-                              >
-                                Score: {(ref.similarity * 100).toFixed(1)}%
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        <div className="mt-1">{ref.snippet}</div>
-                        {ref.emotions && Object.keys(ref.emotions).length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {Object.entries(ref.emotions)
-                              .sort(([, a], [, b]) => b - a)
-                              .slice(0, 3)
-                              .map(([emotion, score]) => (
-                                <span key={emotion} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px]">
-                                  {emotion}: {Math.round(score * 100)}%
-                                </span>
-                              ))
-                            }
+            {queryAnalysis && (
+              <AccordionItem value="analysis">
+                <AccordionTrigger className="py-2 text-xs font-medium">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-3.5 w-3.5" />
+                    Query Analysis
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-1.5">
+                    <div>
+                      <span className="font-medium">Type:</span> {queryAnalysis.queryType}
+                    </div>
+                    {queryAnalysis.emotion && (
+                      <div>
+                        <span className="font-medium">Emotion:</span> {queryAnalysis.emotion}
+                      </div>
+                    )}
+                    {queryAnalysis.theme && (
+                      <div>
+                        <span className="font-medium">Theme:</span> {queryAnalysis.theme}
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-medium">Is When Question:</span> {queryAnalysis.isWhenQuestion ? 'Yes' : 'No'}
+                    </div>
+                    {queryAnalysis.timeframe && (
+                      <div>
+                        <span className="font-medium">Timeframe:</span> {queryAnalysis.timeframe.timeType?.type || 'Not specified'}
+                        {queryAnalysis.timeframe.startDate && (
+                          <div className="ml-3 text-[10px]">
+                            <span className="font-medium">From:</span> {new Date(queryAnalysis.timeframe.startDate).toLocaleDateString()}
                           </div>
                         )}
-                        {ref.themes && ref.themes.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            <span className="text-[10px] text-muted-foreground">Themes: </span>
-                            {ref.themes.map((theme) => (
-                              <span key={theme} className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px]">
-                                {theme}
-                              </span>
+                        {queryAnalysis.timeframe.endDate && (
+                          <div className="ml-3 text-[10px]">
+                            <span className="font-medium">To:</span> {new Date(queryAnalysis.timeframe.endDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+            
+            {references && references.length > 0 && (
+              <AccordionItem value="references">
+                <AccordionTrigger className="py-2 text-xs font-medium">
+                  <div className="flex items-center gap-2">
+                    <Search className="h-3.5 w-3.5" />
+                    Retrieved Entries ({references.length})
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {references.map((ref, index) => (
+                      <div key={index} className="p-1.5 border rounded bg-background text-[10px]">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-medium">
+                            Entry ID: {ref.id.substring(0, 8)}...
+                          </span>
+                          <Badge 
+                            variant="outline" 
+                            className={`text-[9px] ${
+                              ref.similarity ? 
+                                (ref.similarity > 0.8 ? 'bg-green-100 text-green-800' : 
+                                ref.similarity > 0.6 ? 'bg-amber-100 text-amber-800' : 
+                                'bg-red-100 text-red-800') : 
+                                'bg-muted'
+                            }`}
+                          >
+                            {ref.similarity ? `Match: ${(ref.similarity * 100).toFixed(1)}%` : ref.type || 'Entry'}
+                          </Badge>
+                        </div>
+                        <p className="text-muted-foreground mb-1">
+                          Date: {new Date(ref.date).toLocaleDateString()}
+                        </p>
+                        <div className="line-clamp-2 mb-1">{ref.snippet}</div>
+                        {ref.emotions && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {Object.entries(ref.emotions).slice(0, 3).map(([emotion, value], i) => (
+                              <Badge key={i} variant="secondary" className="text-[8px]">
+                                {emotion}: {typeof value === 'number' ? (value * 100).toFixed(0) : value}%
+                              </Badge>
                             ))}
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  No entries were retrieved for this query
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+            
+            {functionExecutions && functionExecutions.length > 0 && (
+              <AccordionItem value="functions">
+                <AccordionTrigger className="py-2 text-xs font-medium">
+                  <div className="flex items-center gap-2">
+                    <Database className="h-3.5 w-3.5" />
+                    Function Executions ({functionExecutions.length})
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {functionExecutions.map((func, index) => (
+                      <div key={index} className="p-1.5 border rounded bg-background text-[10px]">
+                        <div className="flex justify-between mb-1">
+                          <span className="font-medium">{func.name}</span>
+                          <Badge variant={func.success ? "success" : "destructive"} className="text-[9px]">
+                            {func.success ? 'Success' : 'Failed'}
+                          </Badge>
+                        </div>
+                        {func.executionTime && (
+                          <div className="text-muted-foreground">
+                            Time: {func.executionTime}ms
+                          </div>
+                        )}
+                        {func.params && Object.keys(func.params).length > 0 && (
+                          <div className="mt-1">
+                            <span className="font-medium">Params:</span>
+                            <pre className="text-[9px] bg-muted p-1 rounded mt-0.5 overflow-x-auto">
+                              {JSON.stringify(func.params, null, 1)}
+                            </pre>
+                          </div>
+                        )}
+                        {func.result && Object.keys(func.result).length > 0 && (
+                          <div className="mt-1">
+                            <span className="font-medium">Result:</span>
+                            <pre className="text-[9px] bg-muted p-1 rounded mt-0.5 overflow-x-auto">
+                              {JSON.stringify(func.result, null, 1)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+            
+            {similarityScores && similarityScores.length > 0 && (
+              <AccordionItem value="scores">
+                <AccordionTrigger className="py-2 text-xs font-medium">
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-3.5 w-3.5" />
+                    Similarity Scores
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-1">
+                    {similarityScores.map((score, index) => (
+                      <div key={index} className="flex justify-between items-center py-0.5 border-b last:border-0">
+                        <span>Entry ID: {score.id.toString().substring(0, 8)}...</span>
+                        <Badge 
+                          variant="outline" 
+                          className={`${
+                            score.score > 0.8 ? 'bg-green-100 text-green-800' : 
+                            score.score > 0.6 ? 'bg-amber-100 text-amber-800' : 
+                            'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {(score.score * 100).toFixed(1)}%
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+          </Accordion>
+        </CardContent>
+      )}
+    </Card>
   );
 }

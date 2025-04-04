@@ -12,7 +12,6 @@ import { motion } from "framer-motion";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 
-// Create a type that includes only the roles allowed in the chat UI
 type UIChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -22,7 +21,6 @@ type UIChatMessage = {
   hasNumericResult?: boolean;
 }
 
-// Define a type for the chat message from the database
 type DbChatMessage = {
   content: string;
   created_at: string;
@@ -30,7 +28,6 @@ type DbChatMessage = {
   reference_entries: any;
   sender: string;
   thread_id: string;
-  // Add optional fields that might not be present in all database records
   analysis_data?: any;
   has_numeric_result?: boolean;
 }
@@ -267,14 +264,14 @@ export default function SmartChatInterface() {
         ...prev,
         queryAnalysis: {
           queryType: queryTypes.isEmotionFocused ? 'emotional' : 'general',
-          emotion: queryTypes.isEmotionFocused ? queryTypes.emotion : null,
-          theme: queryTypes.isThemeFocused ? queryTypes.theme : null,
+          emotion: queryTypes.isEmotionFocused ? queryTypes.emotion || null : null,
+          theme: queryTypes.isThemeFocused ? queryTypes.theme || null : null,
           timeframe: {
             timeType: queryTypes.timeRange,
-            startDate: queryTypes.startDate,
-            endDate: queryTypes.endDate
+            startDate: queryTypes.startDate || null,
+            endDate: queryTypes.endDate || null
           },
-          isWhenQuestion: queryTypes.isWhenQuestion
+          isWhenQuestion: queryTypes.isWhenQuestion || false
         }
       }));
       

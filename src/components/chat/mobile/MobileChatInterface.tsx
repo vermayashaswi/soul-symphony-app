@@ -258,14 +258,14 @@ export default function MobileChatInterface({
         ...prev,
         queryAnalysis: {
           queryType: queryTypes.isEmotionFocused ? 'emotional' : 'general',
-          emotion: queryTypes.isEmotionFocused ? queryTypes.emotion : null,
-          theme: queryTypes.isThemeFocused ? queryTypes.theme : null,
+          emotion: queryTypes.isEmotionFocused ? queryTypes.emotion || null : null,
+          theme: queryTypes.isThemeFocused ? queryTypes.theme || null : null,
           timeframe: {
             timeType: queryTypes.timeRange,
-            startDate: queryTypes.startDate,
-            endDate: queryTypes.endDate
+            startDate: queryTypes.startDate || null,
+            endDate: queryTypes.endDate || null
           },
-          isWhenQuestion: queryTypes.isWhenQuestion
+          isWhenQuestion: queryTypes.isWhenQuestion || false
         }
       }));
       
