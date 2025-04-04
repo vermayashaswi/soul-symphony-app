@@ -1,90 +1,138 @@
+import { serve } from 'std/server';
+import { cors } from '../_shared/cors.ts';
+import { supabase } from '../_shared/supabase.ts';
+import { OpenAI } from 'openai';
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const apiKey = Deno.env.get('OPENAI_API_KEY');
+const openai = new OpenAI({ apiKey: apiKey || '' });
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: cors(req.headers) });
   }
 
   try {
-    const { query, userId } = await req.json();
-    
-    if (!query) {
-      return new Response(
-        JSON.stringify({ error: 'No query provided' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const { query: userQuery, userId, timeRange } = await req.json();
+
+    if (!userQuery || !userId) {
+      console.error('Missing user query or user ID');
+      return new Response(JSON.stringify({ error: 'Missing user query or user ID' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...cors(req.headers) },
+      });
     }
-    
-    // Use GPT to break down the complex query into logical segments
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { 
-            role: 'system', 
-            content: `You are an AI assistant that breaks down complex user queries into logical segments 
-                      that can be processed separately and then combined for a final answer. 
-                      Focus on segmenting queries that contain multiple questions, prioritization requests, 
-                      or complex analysis needs. For each segment, maintain the original intent and ensure
-                      it can stand alone as a coherent question. Return only the segments, no other text.` 
-          },
-          {
-            role: 'user',
-            content: `Break down this query into logical segments that can be processed separately: "${query}"
-                      Return ONLY the segments as a JSON array of strings, no explanation, just the segments.
-                      For example: ["What are my negative traits?", "What should I work on in order of intensity?"]`
-          }
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" }
-      }),
+
+    console.log(`Received query: ${userQuery} for user ID: ${userId}`);
+
+    // 1. Generate embedding for the user query
+    console.log('Generating embedding for the user query');
+    const embeddingResponse = await openai.embeddings.create({
+      model: 'text-embedding-ada-002',
+      input: userQuery,
     });
-    
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+
+    if (!embeddingResponse.data || embeddingResponse.data.length === 0) {
+      console.error('Failed to generate embedding for the query');
+      return new Response(JSON.stringify({ error: 'Failed to generate embedding for the query' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...cors(req.headers) },
+      });
     }
-    
-    const result = await response.json();
-    let segments = [];
-    
-    try {
-      const content = JSON.parse(result.choices[0].message.content);
-      if (content && Array.isArray(content.segments)) {
-        segments = content.segments;
-      } else {
-        // Fallback if the format isn't as expected
-        segments = [query];
-      }
-    } catch (parseError) {
-      console.error("Error parsing GPT response:", parseError);
-      segments = [query];
-    }
-    
-    return new Response(
-      JSON.stringify({ segments }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-    
+
+    const queryEmbedding = embeddingResponse.data[0].embedding;
+
+    // 2. Search for relevant journal entries
+    console.log('Searching for relevant journal entries');
+    const entries = await searchJournalEntries(userId, queryEmbedding, timeRange);
+
+    // 3. Segment the complex query based on journal entries
+    console.log('Segmenting the complex query based on journal entries');
+    const segmentedQuery = await segmentComplexQuery(userQuery, entries);
+
+    // 4. Return the segmented query
+    console.log('Returning the segmented query');
+    return new Response(JSON.stringify({ data: segmentedQuery }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...cors(req.headers) },
+    });
   } catch (error) {
-    console.error('Error in segment-complex-query function:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error('Error processing request:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...cors(req.headers) },
+    });
   }
 });
+
+// Update any function that searches journal entries using vector similarity
+async function searchJournalEntries(
+  userId: string, 
+  queryEmbedding: any[],
+  timeRange?: { startDate?: Date; endDate?: Date }
+) {
+  try {
+    console.log(`Searching journal entries for userId: ${userId}`);
+    
+    // Use the fixed function we created
+    const { data, error } = await supabase.rpc(
+      'match_journal_entries_fixed',
+      {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.5,
+        match_count: 10,
+        user_id_filter: userId
+      }
+    );
+    
+    if (error) {
+      console.error(`Error in vector search: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`Found ${data?.length || 0} entries with vector similarity`);
+    return data || [];
+  } catch (error) {
+    console.error('Error searching journal entries:', error);
+    throw error;
+  }
+}
+
+async function segmentComplexQuery(userQuery: string, entries: any[]) {
+  try {
+    console.log('Starting query segmentation');
+
+    const prompt = `You are an AI assistant that segments complex user queries into simpler questions based on provided journal entries.
+      User Query: ${userQuery}
+      Relevant Journal Entries: ${JSON.stringify(entries)}
+      Instructions:
+      1. Analyze the user query and identify its main components.
+      2. Break down the complex query into simpler, more specific questions that can be answered using the journal entries.
+      3. Ensure each segmented question is clear, concise, and directly related to the original query.
+      4. Provide the segmented questions in a JSON array format.
+      Example:
+      [
+        "What were the main topics discussed in the journal entries?",
+        "How did the user feel about these topics?",
+        "Were there any specific actions or decisions made regarding these topics?"
+      ]`;
+
+    console.log('Calling OpenAI to segment the query');
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'system', content: prompt }],
+      temperature: 0.7,
+    });
+
+    if (!completion.choices || completion.choices.length === 0) {
+      console.error('Failed to segment the query');
+      return 'Failed to segment the query';
+    }
+
+    const segmentedQuery = completion.choices[0].message.content;
+    console.log(`Segmented query: ${segmentedQuery}`);
+    return segmentedQuery;
+  } catch (error) {
+    console.error('Error segmenting complex query:', error);
+    throw error;
+  }
+}

@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -283,6 +282,39 @@ function detectEmotionQuantitativeQuery(message: string) {
     isTopEmotionsQuery,
     topCount
   };
+}
+
+// Update the function that searches journal entries using vector similarity
+async function searchJournalEntriesWithVector(
+  userId: string, 
+  queryEmbedding: any[],
+  timeRange?: { startDate?: Date; endDate?: Date }
+) {
+  try {
+    console.log(`Searching journal entries with vector for userId: ${userId}`);
+    
+    // Use the fixed function we created
+    const { data, error } = await supabase.rpc(
+      'match_journal_entries_fixed',
+      {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.5,
+        match_count: 10,
+        user_id_filter: userId
+      }
+    );
+    
+    if (error) {
+      console.error(`Error in vector search: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`Found ${data?.length || 0} entries with vector similarity`);
+    return data || [];
+  } catch (error) {
+    console.error('Error searching journal entries with vector:', error);
+    throw error;
+  }
 }
 
 serve(async (req) => {
@@ -573,22 +605,17 @@ serve(async (req) => {
     });
     
     const startSearchTime = Date.now();
-    const { data: similarEntries, error: searchError } = await supabase.rpc(
-      'match_journal_entries',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 5,
-        user_id_filter: userId
-      }
+    const { data: similarEntries, error: searchError } = await searchJournalEntriesWithVector(
+      userId,
+      queryEmbedding
     );
     
     const searchExecution: FunctionExecution = {
-      name: "match_journal_entries",
+      name: "match_journal_entries_fixed",
       params: {
         match_threshold: 0.5,
-        match_count: 5,
-        user_id_filter: "***"
+        match_count: 10,
+        user_id_filter: userId
       },
       result: searchError ? { error: searchError.message } : { count: similarEntries?.length || 0 },
       executionTime: Date.now() - startSearchTime,
