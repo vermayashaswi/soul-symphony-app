@@ -46,6 +46,12 @@ export async function processChatMessage(
         queryResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId);
         break;
         
+      case 'time_pattern_analysis':
+        // New strategy for time-of-day pattern analysis
+        console.log("Using time pattern analysis strategy");
+        queryResponse = await handleTimePatternAnalysis(message, userId, messageQueryTypes, threadId);
+        break;
+        
       case 'frequency_analysis':
         // For "how often" questions - analyze frequency patterns
         console.log("Using frequency analysis strategy");
@@ -211,6 +217,103 @@ async function handleTemporalVectorSearch(message: string, userId: string, query
   }
   
   return data;
+}
+
+// NEW: Handler for time pattern analysis (time of day questions)
+async function handleTimePatternAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
+  console.log("Executing time pattern analysis for time-of-day question");
+  
+  // Extract emotion being asked about (e.g., "happy" in "When am I usually happy?")
+  const emotionKeywords = extractEmotionKeywords(message);
+  const timeRange = queryTypes.timeRange && typeof queryTypes.timeRange === 'object' 
+    ? {
+        type: queryTypes.timeRange.type,
+        startDate: queryTypes.timeRange.startDate,
+        endDate: queryTypes.timeRange.endDate
+      } 
+    : null;
+    
+  console.log("Analyzing time patterns for emotions:", emotionKeywords);
+  
+  try {
+    // First try using smart-query-planner for SQL-based analysis
+    const { data: plannerData, error: plannerError } = await supabase.functions.invoke('smart-query-planner', {
+      body: { 
+        message, 
+        userId, 
+        includeDiagnostics: true,
+        enableQueryBreakdown: true,
+        generateSqlQueries: true,
+        analyzeTimeComponents: true,
+        emotionKeywords,
+        timeRange
+      }
+    });
+    
+    if (!plannerError && plannerData && !plannerData.fallbackToRag) {
+      console.log("Successfully used smart query planner for time pattern analysis");
+      return plannerData;
+    }
+    
+    // If smart-query-planner fails or suggests fallback, use RAG with time analysis parameters
+    const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+      body: { 
+        message, 
+        userId,
+        threadId,
+        includeDiagnostics: true,
+        isTimePatternQuery: true,
+        requiresTimeAnalysis: true,
+        analyzeHourPatterns: true,
+        emotionKeywords,
+        timeRange,
+        requiresEntryDates: true
+      }
+    });
+    
+    if (error) {
+      console.error("Error in time pattern analysis:", error);
+      throw error;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Error in time pattern analysis:", error);
+    // Fall back to standard temporal search as a last resort
+    return handleTemporalVectorSearch(message, userId, queryTypes, threadId);
+  }
+}
+
+// Helper function to extract emotion keywords from a query
+function extractEmotionKeywords(message: string): string[] {
+  const lowerMessage = message.toLowerCase();
+  
+  // Common emotion words to look for
+  const emotionWords = [
+    'happy', 'sad', 'angry', 'frustrated', 'excited', 'anxious', 'calm', 
+    'stressed', 'relaxed', 'motivated', 'tired', 'energetic', 'joyful', 
+    'depressed', 'content', 'optimistic', 'pessimistic', 'hopeful'
+  ];
+  
+  // Find any emotion words in the message
+  const foundEmotions = emotionWords.filter(emotion => lowerMessage.includes(emotion));
+  
+  // If no specific emotions found, include general emotional state keywords
+  if (foundEmotions.length === 0) {
+    // Check for general emotional state references
+    if (lowerMessage.includes('feel good') || lowerMessage.includes('positive')) {
+      foundEmotions.push('positive');
+    }
+    if (lowerMessage.includes('feel bad') || lowerMessage.includes('negative')) {
+      foundEmotions.push('negative');
+    }
+    if (foundEmotions.length === 0) {
+      // Default to searching for all emotions if none specified
+      foundEmotions.push('emotion');
+    }
+  }
+  
+  return foundEmotions;
 }
 
 // Handler for frequency analysis (how often questions)
@@ -398,8 +501,7 @@ async function handleContextualAdvice(message: string, userId: string, queryType
   return data;
 }
 
-// IMPORTANT: Adding the missing handleCorrelationAnalysis function
-// This function was likely missing or incomplete, causing the TypeScript error
+// Handler for correlation analysis
 async function handleCorrelationAnalysis(message: string, userId: string, queryTypes: Record<string, any>, threadId?: string) {
   console.log("Executing correlation analysis");
   
@@ -424,7 +526,6 @@ async function handleCorrelationAnalysis(message: string, userId: string, queryT
     }
   } catch (smartQueryError) {
     console.error("Exception in smart-query-planner for correlation:", smartQueryError);
-    // Fix: Add the missing threadId parameter here
     return await handleVectorSearch(message, userId, queryTypes, threadId);
   }
   

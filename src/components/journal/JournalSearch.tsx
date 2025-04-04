@@ -18,7 +18,9 @@ const PLACEHOLDER_EXAMPLES = [
   "friend",
   "manager",
   "vacation",
-  "cigarettes"
+  "cigarettes",
+  "time of day",
+  "morning"
 ];
 
 const JournalSearch: React.FC<JournalSearchProps> = ({ onSearch, totalEntries, filteredCount }) => {
