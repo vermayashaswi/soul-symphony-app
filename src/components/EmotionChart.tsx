@@ -182,49 +182,33 @@ export function EmotionChart({
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
-    // Safety check: if no dateMap entries, return empty array
-    if (dateMap.size === 0) {
-      console.log('[EmotionChart] No date entries found for line chart');
-      return [];
-    }
-    
-    try {
-      // Convert the data to the format expected by the line chart
-      const chartData = Array.from(dateMap.entries())
-        .map(([date, emotions]) => {
-          const dataPoint: EmotionData = { 
-            day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
-          };
-          
-          topEmotions.forEach(emotion => {
-            dataPoint[emotion] = emotions[emotion] || 0;
-          });
-          
-          return dataPoint;
-        })
-        .sort((a, b) => {
-          const dateA = new Date(a.day);
-          const dateB = new Date(b.day);
-          return dateA.getTime() - dateB.getTime();
+    return Array.from(dateMap.entries())
+      .map(([date, emotions]) => {
+        const dataPoint: EmotionData = { 
+          day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+        };
+        
+        topEmotions.forEach(emotion => {
+          dataPoint[emotion] = emotions[emotion] || 0;
         });
         
-      console.log('[EmotionChart] Line data processed successfully', {
-        points: chartData.length,
-        firstPoint: chartData.length > 0 ? chartData[0] : null
+        return dataPoint;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.day);
+        const dateB = new Date(b.day);
+        return dateA.getTime() - dateB.getTime();
       });
-        
-      return chartData;
-    } catch (error) {
-      console.error('[EmotionChart] Error processing line data:', error);
-      return []; // Return empty array in case of error
-    }
   }, [aggregatedData]);
 
+  // Custom label component for emotion lines
   const EmotionLineLabel = (props: any) => {
     const { x, y, stroke, value, index, data, dataKey } = props;
     
+    // Only show the label at the last data point
     if (index !== data.length - 1) return null;
     
+    // Get the emotion name and capitalize first letter
     const emotionName = dataKey.charAt(0).toUpperCase() + dataKey.slice(1);
     
     return (
@@ -243,8 +227,7 @@ export function EmotionChart({
   };
 
   const renderLineChart = () => {
-    // Check if there's any data to render
-    if (!lineData || lineData.length === 0) {
+    if (lineData.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">No data available for this timeframe</p>
@@ -252,17 +235,9 @@ export function EmotionChart({
       );
     }
     
-    // Safety check: if first entry is undefined or doesn't have expected properties
-    if (!lineData[0]) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">Error processing chart data</p>
-        </div>
-      );
-    }
-    
     const emotions = Object.keys(lineData[0]).filter(key => key !== 'day');
     
+    // Check if we have any emotional data points
     if (emotions.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
@@ -314,15 +289,17 @@ export function EmotionChart({
                 dot={{ r: isMobile ? 3 : 4 }}
                 activeDot={{ r: isMobile ? 5 : 6 }}
                 name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
-                label={<EmotionLineLabel />}
+                label={isMobile ? null : <EmotionLineLabel />}
               />
             ))}
           </LineChart>
         </ResponsiveContainer>
         
-        <div className="mt-4 text-center text-xs text-muted-foreground">
-          * Showing top 5 emotions by score
-        </div>
+        {!isMobile && (
+          <div className="mt-4 text-center text-xs text-muted-foreground">
+            * Showing top 5 emotions by score
+          </div>
+        )}
       </div>
     );
   };
