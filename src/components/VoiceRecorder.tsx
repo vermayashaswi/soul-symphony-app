@@ -115,101 +115,103 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
 
   return (
     <div className={cn("flex flex-col items-center relative z-10", className)}>
-      {/* Add the language background animation when not recording and no audio blob */}
-      {!isRecording && !audioBlob && (
-        <LanguageBackground />
-      )}
-      
       <audio ref={audioRef} className="hidden" />
       
-      <RecordingVisualizer 
-        isRecording={isRecording}
-        audioLevel={audioLevel}
-        ripples={ripples}
-      />
-      
-      {!isRecording && !audioBlob && hasPermission !== false && (
-        <MultilingualTextAnimation />
-      )}
-      
-      <RecordingButton
-        isRecording={isRecording}
-        isProcessing={isProcessing}
-        hasPermission={hasPermission}
-        onRecordingStart={startRecording}
-        onRecordingStop={stopRecording}
-        onPermissionRequest={requestPermissions}
-      />
-      
-      <AnimatePresence mode="wait">
-        {isRecording ? (
-          <RecordingStatus 
-            isRecording={isRecording} 
-            recordingTime={recordingTime} 
-          />
-        ) : audioBlob ? (
-          <div className="flex flex-col items-center w-full">
-            <PlaybackControls
-              audioBlob={audioBlob}
-              isPlaying={isPlaying}
-              isProcessing={isProcessing}
-              playbackProgress={playbackProgress}
-              audioDuration={audioDuration}
-              onTogglePlayback={togglePlayback}
-              onSaveEntry={handleSaveEntry}
-            />
-            
-            <Button
-              onClick={handleRestart}
-              variant="outline"
-              className="mt-4 flex items-center gap-2"
-              disabled={isProcessing}
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Start Over</span>
-            </Button>
-          </div>
-        ) : hasPermission === false ? (
-          <motion.p
-            key="permission"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="text-center text-muted-foreground"
-          >
-            Microphone access is required for recording
-          </motion.p>
-        ) : (
-          <motion.p
-            key="instruction"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="text-center text-muted-foreground"
-          >
-            Tap the microphone to start recording
-          </motion.p>
+      {/* Add the language background animation contained within the card when not recording and no audio blob */}
+      <div className="relative w-full h-full min-h-[250px] flex flex-col items-center justify-center overflow-hidden">
+        {!isRecording && !audioBlob && (
+          <LanguageBackground contained={true} />
         )}
-      </AnimatePresence>
-      
-      {recordingError && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2"
-        >
-          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <div>{recordingError}</div>
-        </motion.div>
-      )}
-      
-      {isProcessing && (
-        <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          <span>Processing with AI...</span>
-          <ChevronRight className="w-4 h-4" />
-        </div>
-      )}
+        
+        <RecordingVisualizer 
+          isRecording={isRecording}
+          audioLevel={audioLevel}
+          ripples={ripples}
+        />
+        
+        {!isRecording && !audioBlob && hasPermission !== false && (
+          <MultilingualTextAnimation />
+        )}
+        
+        <RecordingButton
+          isRecording={isRecording}
+          isProcessing={isProcessing}
+          hasPermission={hasPermission}
+          onRecordingStart={startRecording}
+          onRecordingStop={stopRecording}
+          onPermissionRequest={requestPermissions}
+        />
+        
+        <AnimatePresence mode="wait">
+          {isRecording ? (
+            <RecordingStatus 
+              isRecording={isRecording} 
+              recordingTime={recordingTime} 
+            />
+          ) : audioBlob ? (
+            <div className="flex flex-col items-center w-full">
+              <PlaybackControls
+                audioBlob={audioBlob}
+                isPlaying={isPlaying}
+                isProcessing={isProcessing}
+                playbackProgress={playbackProgress}
+                audioDuration={audioDuration}
+                onTogglePlayback={togglePlayback}
+                onSaveEntry={handleSaveEntry}
+              />
+              
+              <Button
+                onClick={handleRestart}
+                variant="outline"
+                className="mt-4 flex items-center gap-2"
+                disabled={isProcessing}
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Start Over</span>
+              </Button>
+            </div>
+          ) : hasPermission === false ? (
+            <motion.p
+              key="permission"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="text-center text-muted-foreground"
+            >
+              Microphone access is required for recording
+            </motion.p>
+          ) : (
+            <motion.p
+              key="instruction"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="text-center text-muted-foreground"
+            >
+              Tap the microphone to start recording
+            </motion.p>
+          )}
+        </AnimatePresence>
+        
+        {recordingError && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2"
+          >
+            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div>{recordingError}</div>
+          </motion.div>
+        )}
+        
+        {isProcessing && (
+          <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Processing with AI...</span>
+            <ChevronRight className="w-4 h-4" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
