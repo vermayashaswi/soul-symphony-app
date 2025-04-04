@@ -24,7 +24,7 @@ async function analyzeSentiment(text: string) {
       throw new Error('Google Natural Language API key is not configured');
     }
     
-    // Call the Google Natural Language API
+    // Call the Google Natural Language API - specifying analyzeSentiment endpoint
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${googleNLApiKey}`, {
       method: 'POST',
       headers: {

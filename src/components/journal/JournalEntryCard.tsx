@@ -23,10 +23,10 @@ export interface JournalEntry {
   content: string;
   created_at: string;
   audio_url?: string;
-  sentiment?: {
+  sentiment?: string | {
     sentiment: string;
     score: number;
-  } | string;
+  };
   themes?: string[];
   entities?: {
     text: string;
@@ -85,19 +85,37 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
 
   const createdAtFormatted = formatRelativeTime(entry.created_at);
 
-  // Format sentiment without showing the score on mobile
+  // Format sentiment for display with proper sentiment labeling
   const formattedSentiment = () => {
     if (typeof entry.sentiment === 'string') {
-      return entry.sentiment;
+      // If sentiment is a string, convert it to a number and format
+      const score = parseFloat(entry.sentiment);
+      return formatSentimentLabel(score);
     } else if (entry.sentiment) {
-      // On mobile, just show the sentiment without the score
-      if (isMobile) {
-        return entry.sentiment.sentiment;
-      }
-      // On desktop, show both sentiment and score
-      return `${entry.sentiment.sentiment} (${entry.sentiment.score})`;
+      // If sentiment is an object, use the score property
+      return formatSentimentLabel(entry.sentiment.score);
     }
     return 'No sentiment data';
+  };
+
+  // Helper function to format sentiment score as a label
+  const formatSentimentLabel = (score: number) => {
+    if (score >= 0.5) return 'Very Positive';
+    if (score >= 0.1) return 'Positive';
+    if (score > -0.1) return 'Neutral';
+    if (score > -0.5) return 'Negative';
+    return 'Very Negative';
+  };
+
+  // Get sentiment color based on score
+  const getSentimentColor = () => {
+    const score = typeof entry.sentiment === 'string' 
+      ? parseFloat(entry.sentiment) 
+      : entry.sentiment?.score || 0;
+      
+    if (score >= 0.1) return "text-green-600 dark:text-green-400";
+    if (score >= -0.1) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-600 dark:text-red-400";
   };
 
   return (
@@ -105,7 +123,7 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
       <div className="flex justify-between items-start p-3 md:p-4">
         <div>
           <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-          <p className="text-xs md:text-sm text-muted-foreground">
+          <p className={`text-xs md:text-sm ${getSentimentColor()}`}>
             {formattedSentiment()}
           </p>
         </div>

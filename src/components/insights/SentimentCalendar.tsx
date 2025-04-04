@@ -82,8 +82,8 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       className="rounded-xl border shadow-sm bg-card overflow-hidden"
     >
       <div className={cn(
-        "overflow-x-auto pb-2",
-        isMobile && "max-w-full" // Ensure it doesn't overflow on mobile
+        "max-w-full overflow-x-auto pb-2",
+        isMobile && "max-h-[500px]" // Ensure it doesn't overflow on mobile
       )}>
         <Calendar
           mode="multiple"

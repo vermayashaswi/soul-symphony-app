@@ -554,8 +554,10 @@ async function analyzeWithGoogleNL(text: string) {
       return { sentiment: "0", entities: [] };
     }
     
-    // Using the correct endpoint for entity extraction
-    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${GOOGLE_NL_API_KEY}`, {
+    // Make two separate API calls - one for sentiment analysis and one for entity extraction
+    
+    // 1. Sentiment Analysis
+    const sentimentResponse = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${GOOGLE_NL_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -568,20 +570,43 @@ async function analyzeWithGoogleNL(text: string) {
       }),
     });
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Error analyzing with Google NL API:', error);
+    // 2. Entity Extraction
+    const entityResponse = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${GOOGLE_NL_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        document: {
+          type: 'PLAIN_TEXT',
+          content: text,
+        },
+      }),
+    });
+
+    if (!sentimentResponse.ok) {
+      const error = await sentimentResponse.text();
+      console.error('Error analyzing sentiment with Google NL API:', error);
       return { sentiment: "0", entities: [] };
     }
 
-    const result = await response.json();
-    console.log('Google NL API analysis complete');
+    if (!entityResponse.ok) {
+      const error = await entityResponse.text();
+      console.error('Error analyzing entities with Google NL API:', error);
+      return { sentiment: "0", entities: [] };
+    }
+
+    const sentimentResult = await sentimentResponse.json();
+    const entityResult = await entityResponse.json();
     
-    // Since we're only using entity extraction endpoint, we'll use a default sentiment value
-    const sentimentScore = "0";
+    console.log('Google NL API sentiment analysis complete');
+    console.log('Google NL API entity analysis complete');
     
-    // Process and format entities
-    const formattedEntities = result.entities?.map(entity => ({
+    // Get sentiment score from sentiment analysis response
+    const sentimentScore = sentimentResult.documentSentiment?.score?.toString() || "0";
+    
+    // Process and format entities from entity analysis response
+    const formattedEntities = entityResult.entities?.map(entity => ({
       type: mapEntityType(entity.type),
       name: entity.name
     })) || [];

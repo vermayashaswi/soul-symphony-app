@@ -81,7 +81,7 @@ serve(async (req) => {
     
     console.log('Analyzing sentiment for text:', text.slice(0, 100) + '...');
     
-    // Call the Google Natural Language API
+    // Call the Google Natural Language API specifically for sentiment analysis
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${apiKey}`, {
       method: 'POST',
       headers: {
