@@ -343,6 +343,9 @@ serve(async (req) => {
           );
         }
       }
+      
+      // If we couldn't handle the quantitative query as expected, fall back to the general approach
+      console.log("Couldn't process quantitative query with direct method, falling back to general approach");
     }
     
     // Generate embedding for the user query
@@ -410,6 +413,8 @@ serve(async (req) => {
             const emotionsText = formatEmotions(entry.emotions);
             return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
           }).join('\n\n') + "\n\n";
+      } else {
+        console.log("No recent entries found either, proceeding with empty context");
       }
     }
     

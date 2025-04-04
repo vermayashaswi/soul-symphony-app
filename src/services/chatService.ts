@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeQueryTypes, segmentQuery } from "@/utils/chat/queryAnalyzer";
 
@@ -90,6 +91,12 @@ export async function processChatMessage(
               break;
           }
           
+          // MODIFICATION: Add explicit fallback to vector search if the strategy fails
+          if (!segmentResponse) {
+            console.log(`Strategy ${searchStrategy} failed, falling back to vector search for segment: ${segment}`);
+            segmentResponse = await handleVectorSearch(segment, userId, segmentQueryTypes, threadId);
+          }
+          
           if (segmentResponse) {
             segmentResults.push({
               segment,
@@ -105,11 +112,33 @@ export async function processChatMessage(
           }
         } catch (segmentError) {
           console.error("Error processing segment:", segment, segmentError);
-          segmentResults.push({
-            segment,
-            response: "I encountered an error processing this part of your question.",
-            error: segmentError.message
-          });
+          
+          // MODIFICATION: Added explicit fallback to vector search on error
+          try {
+            console.log("Error in primary strategy, falling back to vector search for segment:", segment);
+            const fallbackResponse = await handleVectorSearch(segment, userId, segmentQueryTypes, threadId);
+            
+            if (fallbackResponse) {
+              segmentResults.push({
+                segment,
+                response: fallbackResponse.response || "I found some relevant information, but couldn't fully answer this part of your question.",
+                relevantEntries: fallbackResponse.diagnostics?.relevantEntries || []
+              });
+            } else {
+              segmentResults.push({
+                segment,
+                response: "I encountered an error processing this part of your question.",
+                error: segmentError.message
+              });
+            }
+          } catch (fallbackError) {
+            console.error("Fallback vector search also failed:", fallbackError);
+            segmentResults.push({
+              segment,
+              response: "I encountered an error processing this part of your question.",
+              error: segmentError.message
+            });
+          }
         }
       }
       
@@ -129,71 +158,98 @@ export async function processChatMessage(
       console.log("Selected search strategy:", searchStrategy);
       
       // Execute the appropriate search strategy
-      switch (searchStrategy) {
-        case 'temporal_vector_search':
-          finalResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId);
-          break;
-        case 'time_pattern_analysis':
-          finalResponse = await handleTimePatternAnalysis(message, userId, messageQueryTypes, threadId);
-          break;
-        case 'frequency_analysis':
-          finalResponse = await handleFrequencyAnalysis(message, userId, messageQueryTypes, threadId);
-          break;
-        case 'emotion_aggregation':
-          finalResponse = await handleEmotionAggregation(message, userId, messageQueryTypes, threadId);
-          break;
-        case 'emotion_causal_analysis':
-          finalResponse = await handleEmotionCausalAnalysis(message, userId, messageQueryTypes, threadId);
-          break;
-        case 'relationship_analysis':
-          finalResponse = await handleRelationshipAnalysis(message, userId, messageQueryTypes, threadId);
-          break;
-        case 'contextual_advice':
-          finalResponse = await handleContextualAdvice(message, userId, messageQueryTypes, threadId);
-          break;
-        case 'data_aggregation':
-          finalResponse = await handleDataAggregation(message, userId, messageQueryTypes, threadId);
-          break;
-        case 'vector_search':
-        default:
-          finalResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
-          break;
+      try {
+        switch (searchStrategy) {
+          case 'temporal_vector_search':
+            finalResponse = await handleTemporalVectorSearch(message, userId, messageQueryTypes, threadId);
+            break;
+          case 'time_pattern_analysis':
+            finalResponse = await handleTimePatternAnalysis(message, userId, messageQueryTypes, threadId);
+            break;
+          case 'frequency_analysis':
+            finalResponse = await handleFrequencyAnalysis(message, userId, messageQueryTypes, threadId);
+            break;
+          case 'emotion_aggregation':
+            finalResponse = await handleEmotionAggregation(message, userId, messageQueryTypes, threadId);
+            break;
+          case 'emotion_causal_analysis':
+            finalResponse = await handleEmotionCausalAnalysis(message, userId, messageQueryTypes, threadId);
+            break;
+          case 'relationship_analysis':
+            finalResponse = await handleRelationshipAnalysis(message, userId, messageQueryTypes, threadId);
+            break;
+          case 'contextual_advice':
+            finalResponse = await handleContextualAdvice(message, userId, messageQueryTypes, threadId);
+            break;
+          case 'data_aggregation':
+            finalResponse = await handleDataAggregation(message, userId, messageQueryTypes, threadId);
+            break;
+          case 'vector_search':
+          default:
+            finalResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
+            break;
+        }
+      } catch (strategyError) {
+        console.error(`Error in ${searchStrategy} strategy:`, strategyError);
+        // MODIFICATION: Added explicit try/catch with fallback to vector search
+        console.log("Primary strategy failed, falling back to vector search");
+        finalResponse = await handleVectorSearch(message, userId, messageQueryTypes, threadId);
       }
     }
     
+    // MODIFICATION: Final safeguard fallback to RAG if all else fails
     if (!finalResponse) {
-      console.log("No response from primary strategy, falling back to RAG");
+      console.log("No response from any strategy, using vector search as ultimate fallback");
       finalResponse = await handleVectorSearch(message, userId, queryTypes || {}, threadId);
     }
     
     console.log("Response received:", finalResponse ? "yes" : "no");
     
     // Construct final response
-    const responseContent = finalResponse.response || "I couldn't find an answer to your question.";
+    const responseContent = finalResponse && finalResponse.response ? 
+      finalResponse.response : "I couldn't find an answer to your question.";
+      
     const chatResponse: ChatMessage = {
       role: 'assistant',
       content: responseContent,
     };
     
     // Add references if available
-    if (finalResponse.diagnostics && finalResponse.diagnostics.relevantEntries) {
+    if (finalResponse && finalResponse.diagnostics && finalResponse.diagnostics.relevantEntries) {
       chatResponse.references = finalResponse.diagnostics.relevantEntries;
     }
     
     // Add analysis data if available
-    if (finalResponse.diagnostics) {
+    if (finalResponse && finalResponse.diagnostics) {
       chatResponse.analysis = finalResponse.diagnostics;
       chatResponse.diagnostics = finalResponse.diagnostics;
     }
     
     // Set flag if we have a numeric result
-    if (finalResponse.hasNumericResult) {
+    if (finalResponse && finalResponse.hasNumericResult) {
       chatResponse.hasNumericResult = true;
     }
     
     return chatResponse;
   } catch (error) {
     console.error("Error processing chat message:", error);
+    // MODIFICATION: Even in the main error handler, try vector search as last resort
+    try {
+      console.log("Critical error in processing, attempting ultimate vector search fallback");
+      const fallbackResponse = await handleVectorSearch(message, userId, {}, threadId);
+      if (fallbackResponse) {
+        return {
+          role: 'assistant',
+          content: fallbackResponse.response || "I found some information, but encountered an issue processing your full request.",
+          references: fallbackResponse.diagnostics?.relevantEntries,
+          analysis: fallbackResponse.diagnostics,
+          diagnostics: fallbackResponse.diagnostics,
+        };
+      }
+    } catch (fallbackError) {
+      console.error("Ultimate fallback also failed:", fallbackError);
+    }
+    
     return {
       role: 'error',
       content: "I apologize, but I encountered an error processing your request. Please try again.",
