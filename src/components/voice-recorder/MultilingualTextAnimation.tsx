@@ -21,7 +21,7 @@ export function MultilingualTextAnimation() {
   }, []);
   
   return (
-    <div className="flex flex-col items-center justify-center py-4 overflow-hidden">
+    <div className="flex flex-col items-center justify-center py-2 overflow-hidden">
       <div className="text-center relative h-8">
         <AnimatePresence mode="wait">
           <motion.div
@@ -36,14 +36,6 @@ export function MultilingualTextAnimation() {
           </motion.div>
         </AnimatePresence>
       </div>
-      <motion.div 
-        className="text-xs text-muted-foreground mt-2"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
-      >
-        Record in any language of your choice
-      </motion.div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -122,6 +123,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         ripples={ripples}
       />
       
+      {!isRecording && !audioBlob && hasPermission !== false && (
+        <MultilingualTextAnimation />
+      )}
+      
       <RecordingButton
         isRecording={isRecording}
         isProcessing={isProcessing}
@@ -181,10 +186,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           </motion.p>
         )}
       </AnimatePresence>
-      
-      {!isRecording && !audioBlob && hasPermission !== false && (
-        <MultilingualTextAnimation />
-      )}
       
       {recordingError && (
         <motion.div
