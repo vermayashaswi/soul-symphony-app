@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import ParticleBackground from '@/components/ParticleBackground';
 import SouloLogo from '@/components/SouloLogo';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -364,7 +366,11 @@ const Index = () => {
       <Navbar />
       
       <motion.main
-        className={`flex-1 container mx-auto px-4 py-8 pt-24 relative z-10 ${shouldRenderMobile ? 'max-w-md' : ''} ${shouldRenderMobile ? 'pb-16' : ''}`}
+        className={cn(
+          "flex-1 container mx-auto px-4 py-8 relative z-10",
+          shouldRenderMobile ? "max-w-md" : "",
+          shouldRenderMobile ? "pb-16 pt-16" : "pt-24"
+        )}
         initial="hidden"
         animate="visible"
         variants={containerVariants}

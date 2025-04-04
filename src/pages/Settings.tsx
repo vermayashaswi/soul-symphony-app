@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useNavigate } from 'react-router-dom';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -47,6 +48,7 @@ export default function Settings() {
   const [streakDays, setStreakDays] = useState(0);
   const { entries } = useJournalEntries(user?.id, 0, !!user);
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   
   const colorThemes = [
     { name: 'Default', color: 'bg-violet-600' },
@@ -153,7 +155,7 @@ export default function Settings() {
     <div className="min-h-screen pb-20">
       <Navbar />
       
-      <div className="max-w-3xl mx-auto px-4 pt-28">
+      <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-16" : "pt-28")}>
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2 text-foreground">Settings</h1>
           <p className="text-muted-foreground">Personalize your Feelosophy experience</p>
