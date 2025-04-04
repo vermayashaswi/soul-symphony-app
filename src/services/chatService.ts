@@ -470,7 +470,7 @@ async function handleTimePatternAnalysis(message: string, userId: string, queryT
         userId,
         threadId,
         includeDiagnostics: true,
-        isTimePatternQuery: true,
+        isTimePatternQuery: true, // FIX: changed from function call to boolean property
         requiresTimeAnalysis: true,
         analyzeHourPatterns: true,
         emotionKeywords,
