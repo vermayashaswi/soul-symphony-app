@@ -266,15 +266,17 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   };
 
   const renderMonthYearView = () => {
+    // For year view, we'll display multiple month calendars
+    if (timeRange === 'year') {
+      return renderYearView();
+    }
+    
     return (
-      <div className={cn(
-        "max-w-full overflow-x-auto pb-4",
-        isMobile && "max-h-[500px]" // Ensure it doesn't overflow on mobile
-      )}>
+      <div className="max-w-full overflow-visible pb-4">
         <Calendar
           mode="multiple"
           selected={filteredData.map(d => d.date)}
-          className="p-0 rounded-xl"
+          className="p-0 rounded-xl w-full"
           defaultMonth={filteredData.length > 0 ? filteredData[0].date : undefined}
           classNames={{
             day_today: "bg-primary/5 text-primary font-medium",
@@ -285,7 +287,8 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             day_hidden: "invisible",
             caption: "px-6 py-4 text-lg font-semibold",
             month: "space-y-1",
-            months: isMobile ? "flex flex-col space-y-4" : "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+            months: "flex flex-col space-y-4",
+            table: "w-full border-collapse",
             cell: cn(
               "relative p-0 h-12 w-12 md:h-14 md:w-14",
               "focus-within:relative focus-within:z-20"
@@ -294,10 +297,9 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               "h-12 w-12 md:h-14 md:w-14 p-0 font-normal aria-selected:opacity-100 hover:bg-primary/10 transition-all duration-200"
             ),
             nav_button: "hover:bg-primary/10 p-2 rounded-full transition-all duration-200 h-10 w-10",
-            table: "mt-4",
-            row: "flex-1",
-            head_cell: "text-muted-foreground rounded-md w-12 md:w-14 font-medium text-[0.9rem]",
-            head_row: "flex",
+            head_row: "flex w-full",
+            head_cell: "text-muted-foreground rounded-md w-9 md:w-14 font-medium text-[0.9rem]",
+            row: "flex w-full mt-2",
             caption_label: "text-lg",
           }}
           components={{
@@ -399,6 +401,131 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             },
           }}
         />
+      </div>
+    );
+  };
+
+  // New Year View with months display
+  const renderYearView = () => {
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const date = new Date();
+      date.setMonth(i);
+      return date;
+    });
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {months.map((month, index) => {
+          const monthStart = startOfMonth(month);
+          const monthName = format(month, 'MMMM');
+          
+          // Get days in this month
+          const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+          const days = Array.from({ length: daysInMonth }, (_, i) => {
+            const day = new Date(month.getFullYear(), month.getMonth(), i + 1);
+            return day;
+          });
+          
+          // Calculate the month's average sentiment
+          let monthSentiment = 0;
+          let dayCount = 0;
+          
+          days.forEach(day => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            if (dailySentiment.has(dateKey)) {
+              monthSentiment += dailySentiment.get(dateKey)!;
+              dayCount++;
+            }
+          });
+          
+          const avgMonthSentiment = dayCount > 0 ? monthSentiment / dayCount : null;
+          const hasData = dayCount > 0;
+          
+          return (
+            <motion.div 
+              key={index}
+              className="bg-card rounded-lg overflow-hidden border shadow-sm"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
+            >
+              <div className="p-3 bg-muted/30 border-b">
+                <h3 className="font-medium text-center">{monthName}</h3>
+              </div>
+              
+              <div className="p-3">
+                <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
+                    <div key={i} className="text-xs font-medium text-muted-foreground">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-7 gap-1">
+                  {/* Empty cells for days before the first of the month */}
+                  {Array.from({ length: (monthStart.getDay() === 0 ? 6 : monthStart.getDay() - 1) }, (_, i) => (
+                    <div key={`empty-${i}`} className="aspect-square"></div>
+                  ))}
+                  
+                  {/* Actual days */}
+                  {days.map(day => {
+                    const dateKey = format(day, 'yyyy-MM-dd');
+                    const daySentiment = sentimentInfo.get(dateKey);
+                    const isToday = isSameDay(day, today);
+                    
+                    return (
+                      <div 
+                        key={dateKey}
+                        className={cn(
+                          "aspect-square rounded-md flex flex-col items-center justify-center p-1 cursor-pointer text-xs",
+                          isToday && "ring-1 ring-primary",
+                          daySentiment ? daySentiment.colorClass : "bg-transparent hover:bg-muted/30"
+                        )}
+                        onClick={() => handleDayClick(day)}
+                      >
+                        <span className={cn(
+                          "font-medium mb-0.5",
+                          daySentiment && daySentiment.textColorClass
+                        )}>
+                          {day.getDate()}
+                        </span>
+                        
+                        {daySentiment && (
+                          <span className="text-[10px]">
+                            {daySentiment.emoji}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {hasData ? (
+                  <div className="mt-3 flex items-center justify-center">
+                    <div 
+                      className={cn(
+                        "px-3 py-1 rounded-full text-xs flex items-center gap-1.5",
+                        getEmojiColor(avgMonthSentiment!)
+                      )}
+                    >
+                      <span className={getEmojiTextColor(avgMonthSentiment!)}>
+                        {getEmoji(avgMonthSentiment!)}
+                      </span>
+                      <span className={getEmojiTextColor(avgMonthSentiment!)}>
+                        Avg Mood: {avgMonthSentiment!.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 text-center text-xs text-muted-foreground">
+                    No data for this month
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
     );
   };
