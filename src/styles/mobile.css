@@ -1,4 +1,3 @@
-
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -70,6 +69,11 @@
   /* Language animation optimization for mobile */
   .language-animation-container {
     transform: scale(0.8);
+  }
+  
+  /* Voice recorder container height optimization */
+  [class*="min-h-[200px]"] {
+    min-height: 180px !important;
   }
   
   /* Add some bounce animations for mobile interactions */

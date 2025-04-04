@@ -16,11 +16,11 @@ const JournalHeader = () => {
   
   return (
     <div className={cn(
-      "bg-muted/30 py-4 md:py-8 border-b",
-      shouldAdjustForMobile ? "mt-0" : "mt-8 md:mt-12"
+      "bg-muted/30 py-2 md:py-4 border-b",
+      shouldAdjustForMobile ? "mt-0" : "mt-4 md:mt-6"
     )}>
       <div className="container mx-auto px-4 max-w-5xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
           <div className="w-full">
             <motion.h1 
               className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center gap-2 flex-wrap"
@@ -32,7 +32,7 @@ const JournalHeader = () => {
               <span className="inline-block">Your <SouloLogo className="inline-flex" useColorTheme={true} /> Journal</span>
             </motion.h1>
             <motion.p 
-              className="text-muted-foreground mt-2 text-sm sm:text-base"
+              className="text-muted-foreground mt-1 text-sm sm:text-base"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}
