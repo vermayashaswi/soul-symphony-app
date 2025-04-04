@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,6 +9,7 @@ import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingVisualizer } from '@/components/voice-recorder/RecordingVisualizer';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
+import { MultilingualTextAnimation } from '@/components/voice-recorder/MultilingualTextAnimation';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -181,6 +181,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           </motion.p>
         )}
       </AnimatePresence>
+      
+      {!isRecording && !audioBlob && hasPermission !== false && (
+        <MultilingualTextAnimation />
+      )}
       
       {recordingError && (
         <motion.div

@@ -34,34 +34,54 @@ export function RecordingButton({
   }
   
   return (
-    <motion.button
-      onClick={isRecording ? onRecordingStop : onRecordingStart}
-      disabled={isProcessing}
-      className={cn(
-        "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
-        isRecording 
-          ? "bg-red-500 border-red-600 w-20 h-20" // Increased size during recording from 16 to 20
-          : isProcessing 
-            ? "bg-gray-400 border-gray-500 w-20 h-20 opacity-50 cursor-not-allowed" // Grey when processing
-            : "bg-primary hover:bg-primary/90 border-primary/20 w-20 h-20",
-      )}
-      whileTap={{ scale: 0.95 }}
-      animate={isRecording ? 
-        { 
-          scale: [1, 1.1, 1], 
-          transition: { 
-            repeat: Infinity, 
-            duration: 1.2,
-            ease: "easeInOut"
-          } 
-        } : {}
-      }
-    >
-      {isRecording ? (
-        <Square className="w-7 h-7 text-white" />
-      ) : (
-        <Mic className="w-8 h-8 text-white" />
-      )}
-    </motion.button>
+    <div className="flex flex-col items-center">
+      <motion.div
+        className="text-sm text-primary font-medium mb-2"
+        animate={{
+          textShadow: [
+            "0 0 4px rgba(124, 58, 237, 0.5)",
+            "0 0 8px rgba(124, 58, 237, 0.8)",
+            "0 0 4px rgba(124, 58, 237, 0.5)"
+          ],
+          opacity: [0.7, 1, 0.7]
+        }}
+        transition={{
+          duration: 2,
+          repeat: Infinity,
+          repeatType: "reverse"
+        }}
+      >
+        in any language
+      </motion.div>
+      <motion.button
+        onClick={isRecording ? onRecordingStop : onRecordingStart}
+        disabled={isProcessing}
+        className={cn(
+          "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
+          isRecording 
+            ? "bg-red-500 border-red-600 w-20 h-20" // Increased size during recording from 16 to 20
+            : isProcessing 
+              ? "bg-gray-400 border-gray-500 w-20 h-20 opacity-50 cursor-not-allowed" // Grey when processing
+              : "bg-primary hover:bg-primary/90 border-primary/20 w-20 h-20",
+        )}
+        whileTap={{ scale: 0.95 }}
+        animate={isRecording ? 
+          { 
+            scale: [1, 1.1, 1], 
+            transition: { 
+              repeat: Infinity, 
+              duration: 1.2,
+              ease: "easeInOut"
+            } 
+          } : {}
+        }
+      >
+        {isRecording ? (
+          <Square className="w-7 h-7 text-white" />
+        ) : (
+          <Mic className="w-8 h-8 text-white" />
+        )}
+      </motion.button>
+    </div>
   );
 }
