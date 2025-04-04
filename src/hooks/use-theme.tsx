@@ -48,10 +48,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     
     // Apply color theme to CSS variables
     const root = window.document.documentElement;
-    root.style.setProperty('--color-theme', getColorHex(colorTheme));
+    const primaryHex = getColorHex(colorTheme);
+    root.style.setProperty('--color-theme', primaryHex);
     
     // Update primary color based on the selected theme
-    const primaryHex = getColorHex(colorTheme);
     const primaryRgb = hexToRgb(primaryHex);
     
     if (primaryRgb) {
@@ -59,6 +59,19 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       const [h, s, l] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
       root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
       root.style.setProperty('--ring', `${h} ${s}% ${l}%`); // Also update ring color
+      
+      // Add CSS variable for colored text
+      root.style.setProperty('--theme-color', primaryHex);
+      
+      // Add CSS classes for text colors
+      const style = document.getElementById('theme-colors-style') || document.createElement('style');
+      style.id = 'theme-colors-style';
+      style.textContent = `
+        .text-theme-color { color: ${primaryHex}; }
+        .border-theme-color { border-color: ${primaryHex}; }
+        .bg-theme-color { background-color: ${primaryHex}; }
+      `;
+      document.head.appendChild(style);
     }
   }, [colorTheme]);
 

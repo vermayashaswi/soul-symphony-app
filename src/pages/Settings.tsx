@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut } from 'lucide-react';
@@ -131,6 +132,23 @@ export default function Settings() {
     }
   };
   
+  // Get the style variables for the current theme
+  const getThemeStyle = () => {
+    const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
+    return { 
+      color: themeColor, 
+      borderColor: themeColor
+    };
+  };
+  
+  // Get the lighter version of theme color for backgrounds
+  const getThemeBgStyle = () => {
+    const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
+    return { 
+      backgroundColor: `${themeColor}20` // Adding 20% opacity
+    };
+  };
+  
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
@@ -260,7 +278,14 @@ export default function Settings() {
                           <CheckIcon className="h-5 w-5 text-white" />
                         )}
                       </div>
-                      <span className="text-xs text-foreground">{themeOption.name}</span>
+                      <span className={cn(
+                        "text-xs",
+                        colorTheme === themeOption.name 
+                          ? "text-theme-color font-medium" 
+                          : "text-foreground"
+                      )}>
+                        {themeOption.name}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -302,7 +327,7 @@ export default function Settings() {
               <Button variant="outline" size="lg" className="h-auto py-6 rounded-xl justify-start">
                 <div className="flex flex-col items-start text-left">
                   <div className="flex items-center gap-2 mb-1">
-                    <HelpCircle className="h-4 w-4" />
+                    <HelpCircle className="h-4 w-4 text-theme-color" />
                     <span className="font-medium text-foreground">FAQ</span>
                   </div>
                   <p className="text-xs text-muted-foreground">Frequently asked questions</p>
@@ -312,7 +337,7 @@ export default function Settings() {
               <Button variant="outline" size="lg" className="h-auto py-6 rounded-xl justify-start">
                 <div className="flex flex-col items-start text-left">
                   <div className="flex items-center gap-2 mb-1">
-                    <Shield className="h-4 w-4" />
+                    <Shield className="h-4 w-4 text-theme-color" />
                     <span className="font-medium text-foreground">Privacy Policy</span>
                   </div>
                   <p className="text-xs text-muted-foreground">How we protect your data</p>
@@ -321,7 +346,11 @@ export default function Settings() {
             </div>
             
             <div className="mt-6 text-center">
-              <Button variant="default" className="gap-2" onClick={handleContactSupport}>
+              <Button 
+                variant="default" 
+                className="gap-2 bg-theme-color hover:bg-theme-color/90" 
+                onClick={handleContactSupport}
+              >
                 <Mail className="h-4 w-4" />
                 Contact Support
               </Button>
