@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +39,6 @@ const Journal = () => {
     if (activeTab === 'entries' && isProfileChecked) {
       console.log('Tab changed to entries, fetching entries...');
       
-      // Dispatch operation start event
       const event = new CustomEvent('journalOperationStart', {
         detail: {
           type: 'loading',
@@ -98,6 +96,7 @@ const Journal = () => {
       }
       
       if (newlyCompletedTempIds.length > 0) {
+        console.log('Completed processing entries:', newlyCompletedTempIds);
         setProcessingEntries(prev => 
           prev.filter(id => !newlyCompletedTempIds.includes(id))
         );
@@ -107,7 +106,6 @@ const Journal = () => {
 
   const checkUserProfile = async (userId: string) => {
     try {
-      // Dispatch operation start event
       const event = new CustomEvent('journalOperationStart', {
         detail: {
           type: 'loading',
@@ -191,7 +189,6 @@ const Journal = () => {
       return;
     }
     
-    // Dispatch operation start event
     const event = new CustomEvent('journalOperationStart', {
       detail: {
         type: 'recording',
@@ -255,7 +252,6 @@ const Journal = () => {
           }
           
           try {
-            // Ensure themes are generated for the entry
             const themesResult = await supabase.functions.invoke('generate-themes', {
               body: {
                 text: data["refined text"],
@@ -265,7 +261,6 @@ const Journal = () => {
             
             console.log('Themes generation result:', themesResult);
 
-            // Ensure entities are extracted for the entry
             const entitiesResult = await supabase.functions.invoke('batch-extract-entities', {
               body: {
                 userId: user.id,
@@ -355,7 +350,6 @@ const Journal = () => {
   };
 
   const handleDeleteEntry = async (entryId: number) => {
-    // Dispatch operation start event
     const event = new CustomEvent('journalOperationStart', {
       detail: {
         type: 'deletion',
@@ -476,7 +470,7 @@ const Journal = () => {
             {showEntries && (
               <JournalEntriesList 
                 entries={filteredEntries} 
-                loading={false}
+                loading={loading}
                 processingEntries={processingEntries}
                 processedEntryIds={processedEntryIds}
                 onStartRecording={() => setActiveTab('record')}

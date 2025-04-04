@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/utils/format-time';
-import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import ThemeBoxes from './ThemeBoxes';
 import { 
   Dialog, 
@@ -17,6 +17,7 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { motion } from 'framer-motion';
 
 export interface JournalEntry {
   id: number;
@@ -108,6 +109,52 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     }
   };
 
+  // Animated dots for expand/collapse trigger
+  const ExpandToggleDots = () => (
+    <motion.div 
+      className="flex items-center space-x-1.5 cursor-pointer"
+      onClick={toggleExpanded}
+      whileHover={{ scale: 1.1 }}
+    >
+      <motion.div
+        animate={{ 
+          y: isExpanded ? [0, -3, 0] : [0, 3, 0],
+        }}
+        transition={{ 
+          repeat: Infinity, 
+          repeatType: "mirror",
+          duration: 1.2,
+          delay: 0
+        }}
+        className="w-2.5 h-2.5 rounded-full bg-blue-400"
+      />
+      <motion.div
+        animate={{ 
+          y: isExpanded ? [0, -4, 0] : [0, 4, 0],
+        }}
+        transition={{ 
+          repeat: Infinity, 
+          repeatType: "mirror",
+          duration: 1.5,
+          delay: 0.2
+        }}
+        className="w-2.5 h-2.5 rounded-full bg-green-400"
+      />
+      <motion.div
+        animate={{ 
+          y: isExpanded ? [0, -3, 0] : [0, 3, 0],
+        }}
+        transition={{ 
+          repeat: Infinity, 
+          repeatType: "mirror",
+          duration: 1.3,
+          delay: 0.4
+        }}
+        className="w-2.5 h-2.5 rounded-full bg-purple-400"
+      />
+    </motion.div>
+  );
+
   return (
     <Card className="bg-background shadow-md">
       <div className="flex justify-between items-start p-3 md:p-4">
@@ -118,14 +165,8 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
           </div>
         </div>
 
-        <div className="flex items-center space-x-1 md:space-x-2">
-          <Button variant="ghost" size={isMobile ? "sm" : "icon"} onClick={toggleExpanded} className={isMobile ? "h-8 w-8 p-0" : ""}>
-            {isExpanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
+        <div className="flex items-center space-x-2 md:space-x-3">
+          <ExpandToggleDots />
 
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>

@@ -24,9 +24,8 @@ export default function JournalEntriesList({
   onStartRecording, 
   onDeleteEntry 
 }: JournalEntriesListProps) {
-  // We've moved primary loading state to the Journal page,
-  // but keep this as a fallback
-  if (loading) {
+  // Show primary loading state only when loading and no entries exist
+  if (loading && entries.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
@@ -40,8 +39,12 @@ export default function JournalEntriesList({
   }
 
   // Check if there are any entries still being processed that haven't been found yet
-  const showProcessingMessage = processingEntries.length > 0 && 
-    !processingEntries.every(id => entries.some(entry => entry.foreignKey === id));
+  const pendingEntries = processingEntries.filter(id => 
+    !entries.some(entry => entry.foreignKey === id)
+  );
+  
+  // Only show processing message when there are pending entries
+  const showProcessingMessage = pendingEntries.length > 0;
 
   return (
     <div>
@@ -49,6 +52,7 @@ export default function JournalEntriesList({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
           className="mb-6"
         >
           <Card className="p-4 bg-primary/5 border-primary/20">
