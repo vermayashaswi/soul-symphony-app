@@ -1,3 +1,4 @@
+
 // Change the return type to allow nested objects for properties like timeRange
 export const analyzeQueryTypes = (query: string): Record<string, any> => {
   const lowerQuery = query.toLowerCase();
@@ -129,19 +130,6 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     /\b(?:advice|suggestion|recommendation|tip)\b.*\b(?:for|about|on)\b/i
   ];
   
-  // Pattern recognition patterns for correlation questions
-  const patternIndicators = [
-    /do i (tend|usually|always|typically|often)/i,
-    /tendency to/i,
-    /pattern of/i,
-    /correlation between/i,
-    /relationship between/i,
-    /whenever I/i,
-    /associated with/i,
-    /leads to/i,
-    /results in/i
-  ];
-  
   // Extract time range information
   const getTimeRange = (query: string): { timeframeType: string | null, startDate: Date | null, endDate: Date | null } => {
     const lowerQuery = query.toLowerCase();
@@ -202,68 +190,6 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     // Default to null if no specific timeframe is detected
     return { timeframeType: null, startDate: null, endDate: null };
   };
-  
-  // New function to extract emotions from query
-  const extractEmotionsFromQuery = (text: string): string[] => {
-    const emotionMatches: string[] = [];
-    
-    emotionWords.forEach(emotion => {
-      const regex = new RegExp(`\\b${emotion}\\b`, 'i');
-      if (regex.test(text)) {
-        emotionMatches.push(emotion);
-      }
-    });
-    
-    return emotionMatches;
-  };
-  
-  // New function to extract behaviors from query
-  const extractBehaviorsFromQuery = (text: string): string[] => {
-    const behaviorKeywords = [
-      'fight', 'argue', 'arguing', 'fighting', 'yell', 'yelling', 
-      'scream', 'screaming', 'conflict', 'confrontation', 'disagreement',
-      'talk back', 'silent treatment', 'ignore', 'avoiding', 'avoid',
-      'criticize', 'blame', 'accuse', 'withdraw', 'shutdown', 'shut down'
-    ];
-    
-    const behaviorMatches: string[] = [];
-    
-    behaviorKeywords.forEach(behavior => {
-      const regex = new RegExp(`\\b${behavior}\\b`, 'i');
-      if (regex.test(text)) {
-        behaviorMatches.push(behavior);
-      }
-    });
-    
-    return behaviorMatches;
-  };
-  
-  // New function to extract relationship entities from query
-  const extractEntitiesFromQuery = (text: string): string[] => {
-    const relationshipEntities = [
-      'partner', 'spouse', 'husband', 'wife', 'boyfriend', 'girlfriend',
-      'significant other', 'fiancé', 'fiancée', 'lover', 'relationship',
-      'marriage', 'family', 'friend', 'colleague', 'coworker', 'boss',
-      'manager', 'parent', 'child', 'mother', 'father', 'brother', 'sister'
-    ];
-    
-    const entityMatches: string[] = [];
-    
-    relationshipEntities.forEach(entity => {
-      const regex = new RegExp(`\\b${entity}\\b`, 'i');
-      if (regex.test(text)) {
-        entityMatches.push(entity);
-      }
-    });
-    
-    return entityMatches;
-  };
-  
-  // Check for pattern questions (correlation between emotions and behaviors)
-  const isPatternQuestion = patternIndicators.some(pattern => pattern.test(lowerQuery));
-  const targetEmotions = isPatternQuestion ? extractEmotionsFromQuery(lowerQuery) : [];
-  const targetBehaviors = isPatternQuestion ? extractBehaviorsFromQuery(lowerQuery) : [];
-  const relatedEntities = isPatternQuestion ? extractEntitiesFromQuery(lowerQuery) : [];
   
   // Check for relationship-related queries
   const isRelationshipQuery = relationshipPatterns.some(pattern => 
@@ -369,9 +295,6 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
     if (needsDataAggregation) {
       return 'data_aggregation';
     }
-    if (isPatternQuestion && targetEmotions.length > 0 && targetBehaviors.length > 0) {
-      return 'correlation_analysis';
-    }
     return 'vector_search';
   };
   
@@ -431,12 +354,7 @@ export const analyzeQueryTypes = (query: string): Record<string, any> => {
       type: timeRange.timeframeType,
       startDate: timeRange.startDate ? timeRange.startDate.toISOString() : null,
       endDate: timeRange.endDate ? timeRange.endDate.toISOString() : null
-    },
-    
-    isPatternQuestion,
-    targetEmotions: targetEmotions.length > 0 ? targetEmotions : null,
-    targetBehaviors: targetBehaviors.length > 0 ? targetBehaviors : null,
-    relatedEntities: relatedEntities.length > 0 ? relatedEntities : null
+    }
   };
   
   return result;
