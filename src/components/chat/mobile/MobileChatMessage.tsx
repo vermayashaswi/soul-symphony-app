@@ -1,3 +1,4 @@
+
 import React from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
@@ -55,7 +56,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
           "min-w-0 max-w-[85%] rounded-2xl p-3.5 text-sm shadow-sm",
           message.role === 'user' 
             ? 'bg-primary text-primary-foreground rounded-tr-none' 
-            : 'bg-muted/60 border border-border/50 rounded-tl-none'
+            : 'dark:bg-muted/30 bg-muted/60 border border-border/50 rounded-tl-none dark:text-foreground'
         )}
       >
         {message.role === 'assistant' ? (
@@ -74,7 +75,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             {message.analysis.requiresSql && (
               <>
                 <div className="font-semibold mt-1">SQL Query:</div>
-                <pre className="text-[10px] bg-black/10 p-1 rounded overflow-x-auto">
+                <pre className="text-[10px] dark:bg-black/30 bg-black/10 p-1 rounded overflow-x-auto">
                   {message.analysis.sqlQuery}
                 </pre>
               </>
