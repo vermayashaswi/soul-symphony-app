@@ -74,12 +74,12 @@
   
   /* Voice recorder container height optimization */
   [class*="min-h-[160px]"] {
-    min-height: 140px !important;
+    min-height: 185px !important;
   }
   
   /* Voice recorder container position adjustment to stay above mobile navbar */
-  .min-h-\[140px\] {
-    min-height: 140px !important;
+  .min-h-\[185px\] {
+    min-height: 185px !important;
     margin-bottom: 16px;
   }
   
