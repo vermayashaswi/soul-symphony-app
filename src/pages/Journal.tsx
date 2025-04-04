@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import VoiceRecorder from '@/components/VoiceRecorder';
@@ -458,10 +458,7 @@ const Journal = () => {
           
           <TabsContent value="record" className="mt-2">
             <Card className="mb-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-center text-xl sm:text-2xl">Record a New Journal Entry</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
+              <CardContent className="pt-2">
                 <div className="flex flex-col items-center overflow-hidden relative">
                   <VoiceRecorder onRecordingComplete={onEntryRecorded} />
                 </div>

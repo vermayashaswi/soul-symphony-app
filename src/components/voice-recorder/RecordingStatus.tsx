@@ -14,10 +14,10 @@ export function RecordingStatus({ isRecording, recordingTime }: RecordingStatusP
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="flex items-center gap-2 mt-6"
+      className="flex items-center gap-2 mt-4"
     >
       <motion.div 
-        className="w-5 h-5 rounded-full bg-red-500"
+        className="w-4 h-4 rounded-full bg-red-500"
         animate={{ 
           opacity: [1, 0.4, 1],
           scale: [1, 1.1, 1]
@@ -28,7 +28,7 @@ export function RecordingStatus({ isRecording, recordingTime }: RecordingStatusP
           ease: "easeInOut"
         }}
       />
-      <span className="text-2xl font-medium">{formatTime(recordingTime)}</span>
+      <span className="text-xl font-medium">{formatTime(recordingTime)}</span>
     </motion.div>
   );
 }

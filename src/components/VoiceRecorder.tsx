@@ -112,10 +112,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   };
 
   return (
-    <div className={cn("flex flex-col items-center relative z-10 w-full mb-[4.1rem]", className)}>
+    <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
       <audio ref={audioRef} className="hidden" />
       
-      <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-between overflow-hidden pt-12 pb-4">
+      <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-between overflow-hidden pt-6 pb-4">
         <div className="w-full px-4 sm:px-6">
           <RecordingVisualizer 
             isRecording={isRecording}
@@ -124,7 +124,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           />
         </div>
         
-        <div className="relative z-10 mt-8 flex justify-center w-full">
+        <div className="relative z-10 mt-4 flex justify-center w-full">
           <RecordingButton
             isRecording={isRecording}
             isProcessing={isProcessing}

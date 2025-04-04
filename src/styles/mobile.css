@@ -1,6 +1,7 @@
 
 /* Mobile-specific styles */
 @media (max-width: 768px) {
+  /* ... keep existing code (mobile styles) */
   /* Rounded corners for mobile UI elements */
   .mobile-chat-interface .rounded-full {
     border-radius: 24px;
@@ -71,13 +72,15 @@
   
   /* Voice recorder container height optimization */
   [class*="min-h-[160px]"], [class*="min-h-[185px]"] {
-    min-height: 185px !important;
+    min-height: 150px !important;
   }
   
   /* Voice recorder container position adjustment to stay above mobile navbar */
   .min-h-\[185px\] {
-    min-height: 185px !important;
+    min-height: 150px !important;
     margin-bottom: 0;
+    position: relative;
+    bottom: 0;
   }
   
   /* Make card padding smaller on mobile */
@@ -108,7 +111,7 @@
   
   /* Voice recorder component adjustments */
   .mb-20 {
-    margin-bottom: 4rem !important;
+    margin-bottom: 4.5rem !important;
   }
   
   /* Card header and content spacing */
@@ -116,15 +119,24 @@
     padding-bottom: 0 !important;
   }
   
-  /* Make the record button bigger */
+  /* Make the record button smaller */
   .journal-container .rounded-full.w-36 {
-    width: 9rem !important;
-    height: 9rem !important;
+    width: 6.75rem !important;
+    height: 6.75rem !important;
   }
   
-  /* Make the card more compact vertically */
+  /* Position the recorder at the bottom */
   .journal-container .card {
-    margin-bottom: 0.25rem !important;
+    margin-bottom: 0 !important;
+    position: fixed;
+    bottom: 4rem;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
   }
   
   /* Adjust spacing of journal tabs container */
@@ -132,6 +144,7 @@
     padding: 0.5rem 1rem !important;
   }
 
+  /* ... keep existing code (animations and other styles) */
   /* Add some bounce animations for mobile interactions */
   @keyframes mobile-bounce {
     0%, 100% { transform: translateY(0); }
