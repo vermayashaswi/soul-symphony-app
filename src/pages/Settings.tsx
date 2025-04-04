@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -13,6 +13,7 @@ import { setupJournalReminder, initializeCapacitorNotifications } from '@/servic
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
+import { useNavigate } from 'react-router-dom';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -41,9 +42,10 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 export default function Settings() {
   const { theme, setTheme, colorTheme, setColorTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [streakDays, setStreakDays] = useState(0);
   const { entries } = useJournalEntries(user?.id, 0, !!user);
+  const navigate = useNavigate();
   
   const colorThemes = [
     { name: 'Default', color: 'bg-violet-600' },
@@ -119,6 +121,16 @@ export default function Settings() {
     window.open(mailtoLink, '_blank');
   };
   
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast.success('Logged out successfully');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast.error('Failed to log out');
+    }
+  };
+  
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
@@ -159,6 +171,11 @@ export default function Settings() {
                     <p className="text-xl font-medium text-foreground">{streakDays} days</p>
                   </div>
                 </div>
+                
+                <Button variant="destructive" className="gap-2" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Button>
               </div>
             </div>
           </motion.div>
