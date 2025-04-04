@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -60,12 +61,6 @@ function getEmojiTextColor(sentiment: number): string {
   if (sentiment >= -0.1) return "text-black dark:text-white"; 
   return "text-white"; 
 }
-
-const getSentimentLineColor = (value: number): string => {
-  if (value >= 0.2) return '#48BB78'; // Green for positive
-  if (value <= -0.1) return '#F56565'; // Red for negative
-  return '#FBBF24'; // Yellow for neutral
-};
 
 type ViewMode = 'calendar' | 'graph';
 
@@ -672,70 +667,13 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 return label;
               }}
             />
-            
             <Line
               type="monotone"
               dataKey="sentiment"
-              stroke="#48BB78"
-              connectNulls
+              stroke="#4299E1"
               strokeWidth={3}
-              dot={false}
+              dot={{ r: 4, strokeWidth: 2, fill: theme === 'dark' ? '#1e293b' : 'white' }}
               activeDot={{ r: 6, stroke: theme === 'dark' ? '#fff' : '#000', strokeWidth: 1 }}
-              isAnimationActive={false}
-              name="Positive"
-              dataKey={(dataPoint: any) => 
-                dataPoint.sentiment !== null && dataPoint.sentiment >= 0.2 
-                  ? dataPoint.sentiment 
-                  : null
-              }
-            />
-            <Line
-              type="monotone"
-              dataKey="sentiment"
-              stroke="#FBBF24"
-              connectNulls
-              strokeWidth={3}
-              dot={false}
-              activeDot={{ r: 6, stroke: theme === 'dark' ? '#fff' : '#000', strokeWidth: 1 }}
-              isAnimationActive={false}
-              name="Neutral"
-              dataKey={(dataPoint: any) => 
-                dataPoint.sentiment !== null && dataPoint.sentiment > -0.1 && dataPoint.sentiment < 0.2
-                  ? dataPoint.sentiment 
-                  : null
-              }
-            />
-            <Line
-              type="monotone"
-              dataKey="sentiment"
-              stroke="#F56565"
-              connectNulls
-              strokeWidth={3}
-              dot={false}
-              activeDot={{ r: 6, stroke: theme === 'dark' ? '#fff' : '#000', strokeWidth: 1 }}
-              isAnimationActive={false}
-              name="Negative"
-              dataKey={(dataPoint: any) => 
-                dataPoint.sentiment !== null && dataPoint.sentiment <= -0.1
-                  ? dataPoint.sentiment 
-                  : null
-              }
-            />
-            
-            <Line
-              type="monotone"
-              dataKey="sentiment"
-              stroke="transparent"
-              strokeWidth={0}
-              dot={{ 
-                r: 4, 
-                strokeWidth: 2, 
-                fill: theme === 'dark' ? '#1e293b' : 'white',
-                stroke: (dataPoint: any) => 
-                  dataPoint.sentiment !== null ? getSentimentLineColor(dataPoint.sentiment) : '#888'
-              }}
-              activeDot={false}
-              isAnimationActive={false}
             />
           </RechartsLineChart>
         </ResponsiveContainer>
@@ -743,15 +681,15 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         <div className="flex justify-center gap-6 mt-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-green-400"></div>
-            <span className="text-sm">Positive (≥ 0.2)</span>
+            <span className="text-sm">Positive</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-yellow-300"></div>
-            <span className="text-sm">Neutral (-0.1 to 0.2)</span>
+            <span className="text-sm">Neutral</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-400"></div>
-            <span className="text-sm">Negative (≤ -0.1)</span>
+            <span className="text-sm">Negative</span>
           </div>
         </div>
       </div>

@@ -274,17 +274,17 @@ export default function SmartChatInterface() {
   };
 
   return (
-    <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background dark:bg-background">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 dark:bg-muted/10 border-b">
+    <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b">
         <div className="flex items-center">
-          <h2 className="text-xl font-semibold dark:text-foreground">Roha</h2>
+          <h2 className="text-xl font-semibold">Roha</h2>
         </div>
         {chatHistory.length > 0 && (
           <Button 
             variant="outline" 
             size="sm"
             onClick={() => setShowAnalysis(!showAnalysis)}
-            className="flex items-center gap-1 text-sm dark:text-foreground dark:border-muted"
+            className="flex items-center gap-1 text-sm"
           >
             <BarChart4 className="h-4 w-4" />
             {showAnalysis ? "Hide Analysis" : "Show Analysis"}
@@ -296,7 +296,7 @@ export default function SmartChatInterface() {
         {chatHistory.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full w-full">
             <div className="text-center max-w-lg mx-auto px-4">
-              <h1 className="text-2xl md:text-3xl font-bold mb-3 dark:text-foreground">How can I help you?</h1>
+              <h1 className="text-2xl md:text-3xl font-bold mb-3">How can I help you?</h1>
               <p className="text-muted-foreground mb-6">
                 Hey, I am Roha, your personal AI assistant. You can ask me anything about your mental well-being and I will answer your queries basis your own journal insights.
               </p>
@@ -313,7 +313,7 @@ export default function SmartChatInterface() {
                       key={index}
                       variant="outline"
                       size="default"
-                      className="px-4 py-3 h-auto flex items-center justify-start text-left bg-muted/50 dark:bg-muted/20 hover:bg-muted dark:hover:bg-muted/30 dark:text-foreground"
+                      className="px-4 py-3 h-auto flex items-center justify-start text-left bg-muted/50 hover:bg-muted"
                       onClick={() => handleSendMessage(question.text)}
                     >
                       {question.icon}
@@ -333,7 +333,7 @@ export default function SmartChatInterface() {
         )}
         
         {isLoading && (
-          <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5 dark:bg-primary/10">
+          <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">{processingStage || "Processing..."}</p>
           </div>
@@ -342,7 +342,7 @@ export default function SmartChatInterface() {
         <div ref={messagesEndRef} />
       </CardContent>
       
-      <CardFooter className="border-t bg-muted/30 dark:bg-muted/10 p-4 md:p-6">
+      <CardFooter className="border-t bg-muted/30 p-4 md:p-6">
         <ChatInput 
           onSendMessage={handleSendMessage} 
           isLoading={isLoading} 
