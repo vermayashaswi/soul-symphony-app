@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -13,8 +12,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { Json } from "@/integrations/supabase/types";
+import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
 
-// Create a type that includes only the roles allowed in the chat UI
 type UIChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -24,7 +23,6 @@ type UIChatMessage = {
   hasNumericResult?: boolean;
 }
 
-// Define a type for the chat message from database with all expected fields
 type ChatMessageFromDB = {
   content: string;
   created_at: string;
@@ -41,13 +39,17 @@ interface MobileChatInterfaceProps {
   onSelectThread?: (threadId: string) => void;
   onCreateNewThread?: () => Promise<void>;
   userId?: string;
+  onSwipeLeft?: () => void;
+  onSwipeRight?: () => void;
 }
 
 export default function MobileChatInterface({
   currentThreadId: propThreadId,
   onSelectThread,
   onCreateNewThread,
-  userId
+  userId,
+  onSwipeLeft,
+  onSwipeRight
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,6 +59,23 @@ export default function MobileChatInterface({
   const { user } = useAuth();
   const [sheetOpen, setSheetOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useSwipeGesture(containerRef, {
+    onSwipeRight: () => {
+      if (!sheetOpen) {
+        setSheetOpen(true);
+        if (onSwipeRight) onSwipeRight();
+      }
+    },
+    onSwipeLeft: () => {
+      if (sheetOpen) {
+        setSheetOpen(false);
+      } else if (onSwipeLeft) {
+        onSwipeLeft();
+      }
+    }
+  });
 
   useEffect(() => {
     if (propThreadId) {
@@ -168,13 +187,11 @@ export default function MobileChatInterface({
       }
     }
     
-    // Add user message to UI immediately
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setLoading(true);
     setProcessingStage("Analyzing your question...");
     
     try {
-      // Store user message in database
       const { error: msgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -185,13 +202,11 @@ export default function MobileChatInterface({
         
       if (msgError) throw msgError;
       
-      // Begin RAG pipeline - Step 1: Query Analysis
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
       setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
       console.log("[Mobile] Query analysis result:", queryTypes);
       
-      // Step 2-10: Process message through RAG pipeline
       setProcessingStage("Searching for insights...");
       const response = await processChatMessage(message, user.id, queryTypes, threadId);
       console.log("[Mobile] Response received:", {
@@ -203,7 +218,6 @@ export default function MobileChatInterface({
         errorState: response.role === 'error'
       });
       
-      // Step 11: Convert to UI-compatible message and filter out system/error roles
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
         content: response.content,
@@ -212,12 +226,10 @@ export default function MobileChatInterface({
         ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
       };
       
-      // Check if the response indicates an error or failed retrieval
       if (response.role === 'error' || response.content.includes("issue retrieving")) {
         console.error("[Mobile] Received error response:", response.content);
       }
       
-      // Store assistant response in database
       const { error: storeError } = await supabase
         .from('chat_messages')
         .insert({
@@ -233,7 +245,6 @@ export default function MobileChatInterface({
         console.error("[Mobile] Error storing assistant response:", storeError);
       }
       
-      // For new threads, set a title based on first message
       if (messages.length === 0) {
         const truncatedTitle = message.length > 30 
           ? message.substring(0, 30) + "..." 
@@ -248,13 +259,11 @@ export default function MobileChatInterface({
           .eq('id', threadId);
       }
       
-      // Update thread's last activity timestamp
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
       
-      // Step 12: Update UI with assistant response
       setMessages(prev => [...prev, uiResponse]);
     } catch (error) {
       console.error("[Mobile] Error sending message:", error);
@@ -289,7 +298,7 @@ export default function MobileChatInterface({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" ref={containerRef}>
       <div className="mobile-chat-header flex items-center justify-between py-2 px-3">
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>

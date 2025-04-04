@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -9,12 +9,16 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import { useMobile } from '@/hooks/use-mobile';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import MobilePreviewFrame from '@/components/MobilePreviewFrame';
+import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
+import { useNavigate } from 'react-router-dom';
 
 export default function Chat() {
   const { user } = useAuth();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const isMobile = useMobile();
   const [showSidebar, setShowSidebar] = useState(!isMobile);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Check if we're in mobile preview mode
   const urlParams = new URLSearchParams(window.location.search);
@@ -28,6 +32,28 @@ export default function Chat() {
     }
   }, [isMobile, mobileDemo]);
 
+  // Add swipe gesture for sidebar toggling
+  useSwipeGesture(chatContainerRef, {
+    onSwipeRight: () => {
+      // Open sidebar on swipe right
+      if ((isMobile || mobileDemo) && !showSidebar) {
+        setShowSidebar(true);
+      }
+    },
+    onSwipeLeft: () => {
+      // Close sidebar on swipe left if it's open
+      if ((isMobile || mobileDemo) && showSidebar) {
+        setShowSidebar(false);
+      } else {
+        // If sidebar is already closed, navigate to next page
+        navigate('/insights');
+      }
+    },
+    navigateOnEdge: true,
+    navigateLeftTo: '/insights',
+    navigateRightTo: '/journal',
+  });
+
   useEffect(() => {
     document.title = "Chat | SOULo";
     
@@ -39,6 +65,26 @@ export default function Chat() {
     
     console.log("Chat page mounted, mobile:", isMobile, "width:", window.innerWidth, "mobileDemo:", mobileDemo);
   }, [isMobile, mobileDemo]);
+
+  // Add event listener to close sidebar when clicking outside
+  useEffect(() => {
+    if (!isMobile && !mobileDemo) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showSidebar && chatContainerRef.current) {
+        // Check if click is outside the sidebar
+        const sidebar = document.querySelector('.chat-sidebar');
+        if (sidebar && !sidebar.contains(event.target as Node)) {
+          setShowSidebar(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSidebar, isMobile, mobileDemo]);
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);
@@ -59,7 +105,7 @@ export default function Chat() {
 
   // Content for both desktop and mobile views
   const chatContent = (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
+    <div className="flex flex-col h-screen overflow-hidden bg-background" ref={chatContainerRef}>
       <Navbar />
       
       <div className="flex-1 pt-16 flex w-full h-[calc(100vh-4rem)]">
@@ -76,7 +122,7 @@ export default function Chat() {
                 defaultSize={20} 
                 minSize={15} 
                 maxSize={30}
-                className="bg-background/50 backdrop-blur-sm"
+                className="bg-background/50 backdrop-blur-sm chat-sidebar"
               >
                 <ChatThreadList 
                   userId={user?.id}

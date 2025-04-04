@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
 import { motion } from "framer-motion";
@@ -15,6 +14,7 @@ import Navbar from "@/components/Navbar";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
+import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
 
 export default function SmartChat() {
   const isMobile = useIsMobile();
@@ -22,12 +22,37 @@ export default function SmartChat() {
   const { entries, loading } = useJournalEntries(user?.id, 0, true);
   const navigate = useNavigate();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   
   // Check if we're in mobile preview mode
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldRenderMobile = isMobile || mobileDemo;
   
+  // Add swipe gesture for navigation
+  useSwipeGesture(chatContainerRef, {
+    onSwipeRight: () => {
+      if (shouldRenderMobile) {
+        setShowSidebar(true);
+      } else {
+        // Navigate to previous page in bottom nav
+        navigate('/journal');
+      }
+    },
+    onSwipeLeft: () => {
+      if (shouldRenderMobile && showSidebar) {
+        setShowSidebar(false);
+      } else {
+        // Navigate to next page in bottom nav
+        navigate('/settings');
+      }
+    },
+    navigateOnEdge: true,
+    navigateLeftTo: '/settings',
+    navigateRightTo: '/journal',
+  });
+
   useEffect(() => {
     document.title = "Roha | SOULo";
     
@@ -121,10 +146,11 @@ export default function SmartChat() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="smart-chat-container w-full h-[calc(100vh-4rem)] flex pt-16" // Added pt-16 to create space below navbar
+        className="smart-chat-container w-full h-[calc(100vh-4rem)] flex pt-16"
+        ref={chatContainerRef}
       >
         {!hasEnoughEntries && !loading && (
-          <Alert className="absolute z-10 top-20 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800"> {/* Adjusted top position */}
+          <Alert className="absolute z-10 top-20 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>No journal entries found</AlertTitle>
             <AlertDescription className="mt-2">
@@ -159,7 +185,7 @@ export default function SmartChat() {
 
   // Mobile content
   const mobileContent = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" ref={chatContainerRef}>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -190,6 +216,14 @@ export default function SmartChat() {
             onSelectThread={handleSelectThread}
             onCreateNewThread={createNewThread}
             userId={user?.id}
+            onSwipeRight={() => setShowSidebar(true)}
+            onSwipeLeft={() => {
+              if (showSidebar) {
+                setShowSidebar(false);
+              } else {
+                navigate('/settings');
+              }
+            }}
           />
         </div>
       </motion.div>
