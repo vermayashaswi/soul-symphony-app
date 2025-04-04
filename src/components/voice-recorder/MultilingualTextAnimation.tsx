@@ -44,10 +44,8 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
   const duration = 0.8 + Math.random() * 1.2;
   const delay = index * 0.05 + Math.random() * 0.2;
   
-  // Create random floating effect with wider range for more scattered distribution
-  const floatX = Math.random() * 100 - 50; // Random value between -50 and 50
-  const floatY = Math.random() * 100 - 50; // Random value between -50 and 50
-  const floatDuration = 3 + Math.random() * 7; // Random duration between 3-10s
+  // Create linear motion paths for constant velocity
+  const floatDuration = 10 + Math.random() * 5; // Longer duration for slower, more constant movement
   
   return (
     <motion.div
@@ -77,19 +75,21 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
       transition={{ 
         duration,
         delay,
-        ease: "easeOut",
+        ease: "linear", // Use linear easing for constant velocity
         x: {
           duration: floatDuration,
           repeat: Infinity,
-          ease: "easeInOut"
+          repeatType: "reverse", // Smooth back and forth movement
+          ease: "linear" // Constant velocity
         },
         y: {
           duration: floatDuration + 1.5, // Slightly different timing for more organic movement
           repeat: Infinity,
-          ease: "easeInOut"
+          repeatType: "reverse", // Smooth back and forth movement
+          ease: "linear" // Constant velocity
         }
       }}
-      className="absolute select-none pointer-events-none"
+      className="absolute select-none pointer-events-none text-foreground dark:text-foreground"
       style={{ 
         // Use absolute positioning with percentages
         left: `${randomX}%`,
@@ -101,7 +101,6 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
         fontWeight: Math.random() > 0.6 ? 700 : 400,
         fontSize: `${fontSize}px`,
         filter: Math.random() > 0.8 ? "blur(0.5px)" : "none", // Occasional blur for depth
-        color: Math.random() > 0.8 ? "var(--color-theme)" : "currentColor", // Occasional themed words
       }}
     >
       {text}
@@ -184,10 +183,10 @@ export function MultilingualTextAnimation() {
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -20, opacity: 0 }}
-            transition={{ duration: 0.5, ease: "easeInOut" }}
+            transition={{ duration: 0.5, ease: "linear" }} 
             className="absolute inset-0 flex items-center justify-center"
           >
-            <span className="text-muted-foreground">{languages[currentIndex]}</span>
+            <span className="text-foreground">{languages[currentIndex]}</span>
           </motion.div>
         </AnimatePresence>
       </div>
