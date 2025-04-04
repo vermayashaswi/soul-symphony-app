@@ -78,21 +78,6 @@ const Journal = () => {
     }
   }, [activeTab, isProfileChecked, fetchEntries]);
 
-  useSwipeGesture(journalRef, {
-    onSwipeLeft: () => {
-      if (activeTab === 'record') {
-        setActiveTab('entries');
-      } else {
-        navigate('/insights');
-      }
-    },
-    onSwipeRight: () => {
-      if (activeTab === 'entries') {
-        setActiveTab('record');
-      }
-    },
-  });
-
   useEffect(() => {
     if (processingEntries.length > 0 && activeTab === 'entries') {
       console.log('Setting up polling for processing entries:', processingEntries);
