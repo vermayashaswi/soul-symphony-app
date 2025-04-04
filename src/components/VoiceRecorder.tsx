@@ -9,7 +9,7 @@ import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingVisualizer } from '@/components/voice-recorder/RecordingVisualizer';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
-import { MultilingualTextAnimation, LanguageBackground } from '@/components/voice-recorder/MultilingualTextAnimation';
+import { LanguageBackground } from '@/components/voice-recorder/MultilingualTextAnimation';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -130,12 +130,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             ripples={ripples}
           />
         </div>
-        
-        {!isRecording && !audioBlob && hasPermission !== false && (
-          <div className="relative z-10 w-full">
-            <MultilingualTextAnimation />
-          </div>
-        )}
         
         <div className="relative z-10 mt-2">
           <RecordingButton
