@@ -104,6 +104,18 @@ serve(async (req) => {
         } else {
           processedCount++;
           console.log(`Updated sentiment for entry ${entry.id}: ${sentimentScore}`);
+          
+          // Categorize the sentiment
+          let sentimentCategory;
+          if (sentimentScore >= 0.3) {
+            sentimentCategory = "positive";
+          } else if (sentimentScore >= -0.1) {
+            sentimentCategory = "neutral";
+          } else {
+            sentimentCategory = "negative";
+          }
+          
+          console.log(`Sentiment category for entry ${entry.id}: ${sentimentCategory}`);
         }
       } catch (error) {
         console.error(`Error processing entry ${entry.id}:`, error);

@@ -85,46 +85,38 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
 
   const createdAtFormatted = formatRelativeTime(entry.created_at);
 
-  // Format sentiment for display with proper sentiment labeling
-  const formattedSentiment = () => {
+  // Get sentiment score
+  const getSentimentScore = (): number => {
     if (typeof entry.sentiment === 'string') {
-      // If sentiment is a string, convert it to a number and format
-      const score = parseFloat(entry.sentiment);
-      return formatSentimentLabel(score);
+      return parseFloat(entry.sentiment);
     } else if (entry.sentiment) {
-      // If sentiment is an object, use the score property
-      return formatSentimentLabel(entry.sentiment.score);
+      return entry.sentiment.score;
     }
-    return 'No sentiment data';
+    return 0;
   };
 
-  // Helper function to format sentiment score as a label
-  const formatSentimentLabel = (score: number) => {
-    if (score >= 0.5) return 'Very Positive';
-    if (score >= 0.1) return 'Positive';
-    if (score > -0.1) return 'Neutral';
-    if (score > -0.5) return 'Negative';
-    return 'Very Negative';
+  // Get sentiment emoji and color based on score
+  const getSentimentEmoji = () => {
+    const score = getSentimentScore();
+    
+    if (score >= 0.3) {
+      return { emoji: '😊', color: 'text-green-600 dark:text-green-400' };
+    } else if (score >= -0.1) {
+      return { emoji: '😐', color: 'text-yellow-600 dark:text-yellow-400' };
+    } else {
+      return { emoji: '😔', color: 'text-red-600 dark:text-red-400' };
+    }
   };
 
-  // Get sentiment color based on score
-  const getSentimentColor = () => {
-    const score = typeof entry.sentiment === 'string' 
-      ? parseFloat(entry.sentiment) 
-      : entry.sentiment?.score || 0;
-      
-    if (score >= 0.1) return "text-green-600 dark:text-green-400";
-    if (score >= -0.1) return "text-yellow-600 dark:text-yellow-400";
-    return "text-red-600 dark:text-red-400";
-  };
+  const { emoji, color } = getSentimentEmoji();
 
   return (
     <Card className="bg-background shadow-md">
       <div className="flex justify-between items-start p-3 md:p-4">
         <div>
           <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-          <p className={`text-xs md:text-sm ${getSentimentColor()}`}>
-            {formattedSentiment()}
+          <p className={`text-lg md:text-xl ${color}`}>
+            {emoji}
           </p>
         </div>
 

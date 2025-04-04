@@ -107,9 +107,24 @@ serve(async (req) => {
     console.log('Sentiment analysis result:', result);
     console.log('Sentiment score:', sentimentScore);
     
+    // Categorize the sentiment according to the specified ranges
+    let sentimentCategory;
+    const score = parseFloat(sentimentScore);
+    
+    if (score >= 0.3) {
+      sentimentCategory = "positive";
+    } else if (score >= -0.1) {
+      sentimentCategory = "neutral";
+    } else {
+      sentimentCategory = "negative";
+    }
+    
+    console.log('Sentiment category:', sentimentCategory);
+    
     return new Response(
       JSON.stringify({ 
         sentiment: sentimentScore,
+        category: sentimentCategory,
         success: true 
       }),
       { 
