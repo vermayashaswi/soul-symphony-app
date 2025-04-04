@@ -67,16 +67,7 @@
     align-items: center;
   }
   
-  /* Journal search sticky positioning for mobile */
-  .journal-container .sticky,
-  .sticky {
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    background-color: hsl(var(--background));
-    border-bottom: 1px solid hsl(var(--border));
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  }
+  /* Remove the extra styling for the journal search that was causing scrolling issues */
   
   /* Add some bounce animations for mobile interactions */
   @keyframes mobile-bounce {

@@ -4,9 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useIsMobile } from '@/hooks/use-mobile';
-import { scrollToTop } from '@/hooks/use-scroll-restoration';
 import { Badge } from "@/components/ui/badge";
 
 interface JournalSearchProps {
@@ -17,7 +14,6 @@ interface JournalSearchProps {
 const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     const filteredEntries = entries.filter(entry => {
@@ -72,12 +68,8 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry })
     setFilteredEntries(filteredEntries);
   }, [searchQuery, entries]);
 
-  const handleSearchFocus = () => {
-    scrollToTop();
-  };
-
   return (
-    <Card className="w-full sticky top-0 z-10 bg-background">
+    <Card className="w-full sticky top-0 z-10 bg-background shadow-sm">
       <CardContent className="p-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -86,7 +78,6 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry })
             placeholder="Search journal entries..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={handleSearchFocus}
             className="w-full pl-9"
           />
         </div>
@@ -98,9 +89,6 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry })
                 <Badge variant="secondary" className="mb-2">
                   {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} found
                 </Badge>
-                <div className="text-sm text-muted-foreground">
-                  Select an entry from the list below to view it
-                </div>
               </div>
             ) : (
               <div className="text-muted-foreground">No entries found.</div>
