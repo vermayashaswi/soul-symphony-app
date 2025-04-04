@@ -31,10 +31,10 @@ serve(async (req) => {
         : null;
         
       // Check for Google NL API key directly
-      let googleNlApiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+      let googleNlApiKey = Deno.env.get('GOOGLE_API');
       let googleNlApiConfigured = !!googleNlApiKey;
       
-      console.log(`Google NL API key directly from env: ${googleNlApiConfigured ? 'Found' : 'Not found'}`);
+      console.log(`Google API key from env: ${googleNlApiConfigured ? 'Found' : 'Not found'}`);
       
       // Check for OpenAI API key
       const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -73,10 +73,10 @@ serve(async (req) => {
     }
     
     // Get the Google Natural Language API key directly from environment
-    const apiKey = Deno.env.get('GOOGLE_NL_API_KEY');
+    const apiKey = Deno.env.get('GOOGLE_API');
     
     if (!apiKey) {
-      throw new Error("Google Natural Language API key is not configured");
+      throw new Error("Google API key is not configured");
     }
     
     console.log('Analyzing sentiment for text:', text.slice(0, 100) + '...');
@@ -103,6 +103,9 @@ serve(async (req) => {
 
     const result = await response.json();
     const sentimentScore = result.documentSentiment?.score?.toString() || "0";
+    
+    console.log('Sentiment analysis result:', result);
+    console.log('Sentiment score:', sentimentScore);
     
     return new Response(
       JSON.stringify({ 

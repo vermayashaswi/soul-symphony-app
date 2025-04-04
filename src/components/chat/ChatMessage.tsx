@@ -28,43 +28,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
   
   // Format content if it contains object notation
   const formattedContent = React.useMemo(() => {
-    if (message.role === 'assistant' && message.content.includes('[object Object]')) {
-      try {
-        // Try to extract and format emotion data from the content
-        const regex = /Here's what I found: (.*)/;
-        const match = message.content.match(regex);
-        
-        if (match && match[1]) {
-          // If there's emotion data, we'll replace it with a formatted version
-          let formattedData = message.content;
-          
-          // Check if we have JSON data in diagnostics
-          if (message.diagnostics && message.diagnostics.executionResults) {
-            const emotionResults = message.diagnostics.executionResults.find(
-              (result: any) => Array.isArray(result.result) && 
-                result.result[0] && 
-                typeof result.result[0] === 'object' && 
-                (result.result[0].emotion || result.result[0].emotions)
-            );
-            
-            if (emotionResults && emotionResults.result) {
-              const emotionData = emotionResults.result.map((item: any) => {
-                const emotion = item.emotion || Object.keys(item)[0];
-                const score = item.score || item[emotion];
-                return `${emotion} (${typeof score === 'number' ? score.toFixed(2) : score})`;
-              }).join(', ');
-              
-              formattedData = formattedData.replace(match[1], emotionData);
-            }
-          }
-          
-          return formattedData;
-        }
-      } catch (error) {
-        console.error("Error formatting emotion data:", error);
-      }
-    }
-    
     return message.content;
   }, [message]);
   
