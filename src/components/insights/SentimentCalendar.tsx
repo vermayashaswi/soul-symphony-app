@@ -4,9 +4,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { DayProps } from "react-day-picker";
-import { subDays, startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format } from "date-fns";
+import { subDays, startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format, isSameDay, isSameMonth, isSameWeek } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Calendar as CalendarIcon } from "lucide-react";
 
 interface SentimentCalendarProps {
   sentimentData: {
@@ -45,8 +45,9 @@ function getEmojiTextColor(sentiment: number): string {
 export default function SentimentCalendar({ sentimentData, timeRange }: SentimentCalendarProps) {
   const isMobile = useIsMobile();
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const today = new Date();
   
-  // Filter data based on timeRange
+  // Filter data based on timeRange and create a map for quick lookup
   const filteredData = React.useMemo(() => {
     const now = new Date();
     let fromDate: Date;
@@ -71,50 +72,201 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     return sentimentData.filter(item => item.date >= fromDate && item.date <= endOfDay(now));
   }, [sentimentData, timeRange]);
 
-  // Create a map for easier lookup
-  const sentimentMap = new Map(
-    filteredData.map(item => [
-      item.date.toISOString().split('T')[0],
-      { 
-        sentiment: item.sentiment, 
-        emoji: getEmoji(item.sentiment),
-        colorClass: getEmojiColor(item.sentiment),
-        textColorClass: getEmojiTextColor(item.sentiment)
+  // Aggregate sentiment by day (for cases where multiple entries exist per day)
+  const dailySentiment = React.useMemo(() => {
+    const sentimentMap = new Map<string, { total: number, count: number }>();
+    
+    filteredData.forEach(item => {
+      const dateKey = format(item.date, 'yyyy-MM-dd');
+      if (!sentimentMap.has(dateKey)) {
+        sentimentMap.set(dateKey, { total: 0, count: 0 });
       }
-    ])
-  );
+      const current = sentimentMap.get(dateKey)!;
+      current.total += item.sentiment;
+      current.count += 1;
+    });
+    
+    // Convert to average sentiment
+    const result = new Map<string, number>();
+    sentimentMap.forEach((value, key) => {
+      result.set(key, value.total / value.count);
+    });
+    
+    return result;
+  }, [filteredData]);
 
-  // Determine if we need a more compact view for mobile
-  const calendarMode = isMobile ? (timeRange === 'year' ? 'year' : 'month') : 'month';
+  // Create a map with sentiment info for each day
+  const sentimentInfo = React.useMemo(() => {
+    const infoMap = new Map<string, {
+      sentiment: number;
+      emoji: string;
+      colorClass: string;
+      textColorClass: string;
+    }>();
+    
+    dailySentiment.forEach((avgSentiment, dateKey) => {
+      infoMap.set(dateKey, {
+        sentiment: avgSentiment,
+        emoji: getEmoji(avgSentiment),
+        colorClass: getEmojiColor(avgSentiment),
+        textColorClass: getEmojiTextColor(avgSentiment)
+      });
+    });
+    
+    return infoMap;
+  }, [dailySentiment]);
   
   const handleDayClick = (day: Date) => {
-    if (selectedDay && day.toDateString() === selectedDay.toDateString()) {
+    if (selectedDay && isSameDay(day, selectedDay)) {
       setSelectedDay(null);
     } else {
       setSelectedDay(day);
     }
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="rounded-xl border shadow-sm bg-card overflow-hidden"
-    >
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center space-x-2">
-          <CalendarDays className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold">Mood Calendar</h2>
-        </div>
-        <div className="text-sm font-medium text-muted-foreground">
-          {timeRange === 'today' && 'Today'}
-          {timeRange === 'week' && 'This Week'}
-          {timeRange === 'month' && 'This Month'}
-          {timeRange === 'year' && 'This Year'}
+  // Render different calendar views based on timeRange
+  const renderTodayView = () => {
+    const todayKey = format(today, 'yyyy-MM-dd');
+    const todaySentiment = sentimentInfo.get(todayKey);
+    
+    return (
+      <div className="flex flex-col items-center justify-center py-10">
+        <div className="text-2xl font-semibold mb-4">Today's Mood</div>
+        
+        {todaySentiment ? (
+          <motion.div 
+            className={cn(
+              "rounded-full p-12 flex items-center justify-center",
+              todaySentiment.colorClass
+            )}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.5, type: "spring" }}
+          >
+            <span className="text-6xl">{todaySentiment.emoji}</span>
+          </motion.div>
+        ) : (
+          <motion.div 
+            className="rounded-full bg-muted p-12 flex items-center justify-center"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.5, type: "spring" }}
+          >
+            <span className="text-6xl">🤔</span>
+          </motion.div>
+        )}
+        
+        <div className="mt-6 text-lg">
+          {todaySentiment ? (
+            <div className="text-center">
+              <div className="font-medium">{format(today, 'MMMM d, yyyy')}</div>
+              <div className="text-muted-foreground mt-1">
+                Average mood: {todaySentiment.sentiment.toFixed(2)}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-muted-foreground">
+              No mood data recorded for today
+            </div>
+          )}
         </div>
       </div>
-      
+    );
+  };
+
+  const renderWeekView = () => {
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + i);
+      return date;
+    });
+    
+    return (
+      <div className="py-4">
+        <div className="grid grid-cols-7 gap-1 text-center mb-2">
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+            <div key={day} className="text-xs font-medium text-muted-foreground">
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1">
+          {days.map((day) => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const daySentiment = sentimentInfo.get(dateKey);
+            const isToday = isSameDay(day, today);
+            
+            return (
+              <motion.div 
+                key={dateKey}
+                className={cn(
+                  "aspect-square rounded-md flex flex-col items-center justify-center p-1 cursor-pointer",
+                  isToday && "ring-2 ring-primary",
+                  daySentiment ? daySentiment.colorClass : "bg-muted"
+                )}
+                whileHover={{ scale: 1.05 }}
+                onClick={() => handleDayClick(day)}
+              >
+                <div className={cn(
+                  "text-xs font-medium mb-1",
+                  daySentiment && daySentiment.textColorClass
+                )}>
+                  {format(day, 'd')}
+                </div>
+                <div className="text-2xl">
+                  {daySentiment ? daySentiment.emoji : "😶"}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+        
+        <AnimatePresence>
+          {selectedDay && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="mt-4 p-3 bg-background rounded-lg shadow border"
+            >
+              <div className="text-center mb-1 font-medium">
+                {format(selectedDay, 'MMMM d, yyyy')}
+              </div>
+              
+              {(() => {
+                const dateKey = format(selectedDay, 'yyyy-MM-dd');
+                const daySentiment = sentimentInfo.get(dateKey);
+                
+                if (daySentiment) {
+                  return (
+                    <div className="flex justify-center items-center space-x-2">
+                      <span className="text-2xl">{daySentiment.emoji}</span>
+                      <span className="text-sm">
+                        Mood: {daySentiment.sentiment >= 0.3 ? 'Happy' : 
+                            daySentiment.sentiment >= -0.3 ? 'Neutral' : 'Sad'}
+                        ({daySentiment.sentiment.toFixed(2)})
+                      </span>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="text-sm text-muted-foreground text-center">
+                      No mood data recorded for this day
+                    </div>
+                  );
+                }
+              })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
+  const renderMonthYearView = () => {
+    return (
       <div className={cn(
         "max-w-full overflow-x-auto pb-4",
         isMobile && "max-h-[500px]" // Ensure it doesn't overflow on mobile
@@ -151,16 +303,14 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           components={{
             Day: (props: DayProps) => {
               const { date } = props;
-              // Extract the ISO date string for comparison
-              const formattedDate = date.toISOString().split('T')[0];
-              const sentimentInfo = sentimentMap.get(formattedDate);
+              const formattedDate = format(date, 'yyyy-MM-dd');
+              const info = sentimentInfo.get(formattedDate);
               
-              // Check if this date is in our selected dates
               const isSelected = filteredData.some(
-                d => d.date.toISOString().split('T')[0] === formattedDate
+                d => isSameDay(d.date, date)
               );
               
-              const isClickedDay = selectedDay && date.toDateString() === selectedDay.toDateString();
+              const isClickedDay = selectedDay && isSameDay(date, selectedDay);
               
               return (
                 <div
@@ -173,11 +323,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   {...props}
                 >
                   {/* Mood background */}
-                  {sentimentInfo && (
+                  {info && (
                     <motion.div 
                       className={cn(
                         "absolute inset-1 rounded-md opacity-80",
-                        sentimentInfo.colorClass
+                        info.colorClass
                       )}
                       initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 0.8 }}
@@ -188,32 +338,32 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   {/* Date content */}
                   <div className={cn(
                     "flex flex-col items-center justify-center h-full w-full z-10",
-                    sentimentInfo && sentimentInfo.textColorClass
+                    info && info.textColorClass
                   )}>
                     {/* Date number */}
                     <span className={cn(
                       "text-sm md:text-base font-medium",
-                      sentimentInfo && sentimentInfo.textColorClass
+                      info && info.textColorClass
                     )}>
                       {date.getDate()}
                     </span>
                     
                     {/* Emoji display */}
-                    {sentimentInfo && (
+                    {info && (
                       <motion.span 
                         className="text-base md:text-lg"
                         initial={{ scale: 0.5 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.1, duration: 0.2 }}
                       >
-                        {sentimentInfo.emoji}
+                        {info.emoji}
                       </motion.span>
                     )}
                   </div>
                   
                   {/* Day details popup */}
                   <AnimatePresence>
-                    {isClickedDay && sentimentInfo && (
+                    {isClickedDay && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -223,13 +373,21 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                         <div className="text-center mb-1 font-medium">
                           {format(date, 'MMMM d, yyyy')}
                         </div>
-                        <div className="flex justify-center items-center space-x-2">
-                          <span className="text-2xl">{sentimentInfo.emoji}</span>
-                          <span className="text-sm">
-                            Mood: {sentimentInfo.sentiment >= 0.3 ? 'Happy' : 
-                                   sentimentInfo.sentiment >= -0.3 ? 'Neutral' : 'Sad'}
-                          </span>
-                        </div>
+                        
+                        {info ? (
+                          <div className="flex justify-center items-center space-x-2">
+                            <span className="text-2xl">{info.emoji}</span>
+                            <span className="text-sm">
+                              Mood: {info.sentiment >= 0.3 ? 'Happy' : 
+                                    info.sentiment >= -0.3 ? 'Neutral' : 'Sad'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-center text-muted-foreground">
+                            No mood data for this day
+                          </div>
+                        )}
+                        
                         <div className="text-xs text-center mt-2 text-muted-foreground">
                           Click again to close
                         </div>
@@ -241,6 +399,34 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             },
           }}
         />
+      </div>
+    );
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="rounded-xl border shadow-sm bg-card overflow-hidden"
+    >
+      <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center space-x-2">
+          <CalendarDays className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold">Mood Calendar</h2>
+        </div>
+        <div className="text-sm font-medium text-muted-foreground">
+          {timeRange === 'today' && 'Today'}
+          {timeRange === 'week' && 'This Week'}
+          {timeRange === 'month' && 'This Month'}
+          {timeRange === 'year' && 'This Year'}
+        </div>
+      </div>
+      
+      <div className="p-4">
+        {timeRange === 'today' && renderTodayView()}
+        {timeRange === 'week' && renderWeekView()}
+        {(timeRange === 'month' || timeRange === 'year') && renderMonthYearView()}
       </div>
     </motion.div>
   );

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
@@ -17,7 +18,6 @@ export default function Insights() {
   const [isSticky, setIsSticky] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const timeToggleRef = useRef<HTMLDivElement>(null);
-  const navbarHeight = 64;
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
   
@@ -97,7 +97,7 @@ export default function Insights() {
   }, [loading, insightsData]);
 
   const getSentimentData = () => {
-    if (!insightsData.entries) return [];
+    if (!insightsData.entries || insightsData.entries.length === 0) return [];
     
     return insightsData.entries.map(entry => ({
       date: new Date(entry.created_at),
