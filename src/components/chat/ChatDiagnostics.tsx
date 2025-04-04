@@ -205,7 +205,7 @@ export default function ChatDiagnostics({
                           <div className="flex flex-wrap gap-1 mt-1">
                             {Object.entries(ref.emotions).slice(0, 3).map(([emotion, value], i) => (
                               <Badge key={i} variant="secondary" className="text-[8px]">
-                                {emotion}: {typeof value === 'number' ? (value * 100).toFixed(0) : value}%
+                                {emotion}: {typeof value === 'number' ? (value * 100).toFixed(0) : String(value)}%
                               </Badge>
                             ))}
                           </div>
