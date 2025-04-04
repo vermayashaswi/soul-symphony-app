@@ -113,7 +113,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   };
 
   return (
-    <div className={cn("flex flex-col items-center relative z-10", className)}>
+    <div className={cn("flex flex-col items-center relative z-10 w-full", className)}>
       <audio ref={audioRef} className="hidden" />
       
       <div className="relative w-full h-full min-h-[300px] flex flex-col items-center justify-center overflow-hidden">
@@ -130,7 +130,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         />
         
         {!isRecording && !audioBlob && hasPermission !== false && (
-          <div className="relative z-10">
+          <div className="relative z-10 w-full">
             <MultilingualTextAnimation />
           </div>
         )}

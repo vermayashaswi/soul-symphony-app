@@ -14,7 +14,7 @@ export function RecordingVisualizer({
   ripples 
 }: RecordingVisualizerProps) {
   return (
-    <div className="relative flex items-center justify-center my-8">
+    <div className="relative flex items-center justify-center my-8 w-full max-w-md mx-auto">
       <AnimatePresence>
         {ripples.map((id) => (
           <motion.div
