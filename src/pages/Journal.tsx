@@ -92,9 +92,6 @@ const Journal = () => {
         setActiveTab('record');
       }
     },
-    navigateOnEdge: true,
-    navigateLeftTo: '/insights',
-    navigateRightTo: '/smart-chat',
   });
 
   useEffect(() => {
