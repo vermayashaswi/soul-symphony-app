@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -65,33 +66,35 @@
   .card .card-title {
     display: inline-flex;
     align-items: center;
-  }
-  
-  /* Language animation optimization for mobile */
-  .language-animation-container {
-    transform: scale(0.8);
+    font-size: 1.25rem !important;
   }
   
   /* Voice recorder container height optimization */
-  [class*="min-h-[160px]"] {
-    min-height: 140px !important;
+  [class*="min-h-[160px]"], [class*="min-h-[185px]"] {
+    min-height: 185px !important;
   }
   
   /* Voice recorder container position adjustment to stay above mobile navbar */
-  .min-h-\[140px\] {
-    min-height: 140px !important;
-    margin-bottom: 16px;
+  .min-h-\[185px\] {
+    min-height: 185px !important;
+    margin-bottom: 60px;
   }
   
   /* Make card padding smaller on mobile */
   .card-content {
-    padding-top: 0.75rem !important;
+    padding-top: 0.5rem !important;
     padding-bottom: 0.75rem !important;
   }
   
-  /* Reduce the size of the language animation background */
-  .language-animation-container {
-    height: 100px !important;
+  /* Tabs should be more compact */
+  .tabs {
+    margin-bottom: 0.5rem !important;
+  }
+  
+  /* Make the tab text more readable */
+  .tab {
+    font-size: 1rem !important;
+    font-weight: 500;
   }
   
   /* Add some bounce animations for mobile interactions */
@@ -243,8 +246,13 @@
   }
   
   .journal-container .card-title {
-    font-size: 1.1rem;
-    margin-bottom: 0.5rem;
+    font-size: 1.25rem !important;
+    margin-bottom: 0.25rem;
+  }
+  
+  /* Position the voice recorder closer to the bottom navbar */
+  .mb-20 {
+    margin-bottom: 5rem !important;
   }
 }
 
