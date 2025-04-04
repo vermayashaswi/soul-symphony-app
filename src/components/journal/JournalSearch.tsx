@@ -17,6 +17,13 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
 
   useEffect(() => {
+    // When search query is empty, pass all entries
+    if (!searchQuery.trim()) {
+      setFilteredEntries(entries);
+      onSearchResults(entries);
+      return;
+    }
+
     const filtered = entries.filter(entry => {
       const content = (entry.content || '').toLowerCase();
       const query = searchQuery.toLowerCase();
@@ -70,6 +77,11 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     onSearchResults(filtered); // Pass filtered entries back to parent
   }, [searchQuery, entries, onSearchResults]);
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+  };
+
   return (
     <Card className="w-full sticky top-0 z-10 bg-background shadow-sm">
       <CardContent className="p-4">
@@ -79,24 +91,32 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
             type="text"
             placeholder="Search journal entries..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearchChange}
             className="w-full pl-9"
           />
         </div>
 
-        {searchQuery && (
-          <div className="mt-4">
-            {filteredEntries.length > 0 ? (
-              <div className="py-2">
-                <Badge variant="secondary" className="mb-2">
-                  {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} found
-                </Badge>
-              </div>
-            ) : (
-              <div className="text-muted-foreground">No entries found.</div>
-            )}
-          </div>
-        )}
+        <div className="mt-4">
+          {searchQuery ? (
+            <>
+              {filteredEntries.length > 0 ? (
+                <div className="py-2">
+                  <Badge variant="secondary" className="mb-2">
+                    {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} found
+                  </Badge>
+                </div>
+              ) : (
+                <div className="text-muted-foreground">No entries found.</div>
+              )}
+            </>
+          ) : (
+            <div className="py-2">
+              <Badge variant="secondary" className="mb-2">
+                {entries.length} total {entries.length === 1 ? 'entry' : 'entries'}
+              </Badge>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

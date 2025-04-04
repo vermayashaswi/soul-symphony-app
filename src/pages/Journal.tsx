@@ -83,15 +83,15 @@ const Journal = () => {
 
   const handleSearchResults = (results: JournalEntry[]) => {
     setFilteredEntries(results);
-    setIsSearchActive(!!searchQuery);
+    setIsSearchActive(results.length !== entries.length);
   };
 
   useEffect(() => {
     if (activeTab !== 'entries') {
       setIsSearchActive(false);
-      setFilteredEntries([]);
+      setFilteredEntries(entries);
     }
-  }, [activeTab]);
+  }, [activeTab, entries]);
 
   useEffect(() => {
     if (processingEntries.length > 0 && activeTab === 'entries') {
@@ -441,7 +441,7 @@ const Journal = () => {
   
   const showEntries = activeTab === 'entries' && (!loading || entries.length > 0);
 
-  const displayEntries = isSearchActive ? filteredEntries : entries;
+  const displayEntries = filteredEntries.length > 0 ? filteredEntries : entries;
 
   return (
     <div className="flex flex-col min-h-screen bg-background" ref={journalRef}>
