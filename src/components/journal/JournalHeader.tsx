@@ -6,10 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SouloLogo from '@/components/SouloLogo';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/use-theme';
 
 const JournalHeader = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const { colorTheme } = useTheme();
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldAdjustForMobile = isMobile || mobileDemo;
@@ -23,7 +25,7 @@ const JournalHeader = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-1">
           <div className="w-full">
             <motion.h1 
-              className="text-2xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2 flex-wrap"
+              className="text-2xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2 flex-wrap text-theme-color"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
