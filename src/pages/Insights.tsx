@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Insights() {
   const { user } = useAuth();
@@ -18,6 +20,7 @@ export default function Insights() {
   const timeToggleRef = useRef<HTMLDivElement>(null);
   const navbarHeight = 64;
   const scrollPositionRef = useRef<number>(0);
+  const isMobile = useIsMobile();
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
@@ -115,7 +118,10 @@ export default function Insights() {
         </div>
       )}
       
-      <div className="max-w-5xl mx-auto px-4 pt-4 md:pt-8 mt-16">
+      <div className={cn(
+        "max-w-5xl mx-auto px-4 pt-4 md:pt-8",
+        isMobile ? "mt-2" : "mt-16"
+      )}>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Insights</h1>
