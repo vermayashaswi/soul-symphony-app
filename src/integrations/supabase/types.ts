@@ -11,24 +11,30 @@ export type Database = {
     Tables: {
       chat_messages: {
         Row: {
+          analysis_data: Json | null
           content: string
           created_at: string
+          has_numeric_result: boolean | null
           id: string
           reference_entries: Json | null
           sender: string
           thread_id: string
         }
         Insert: {
+          analysis_data?: Json | null
           content: string
           created_at?: string
+          has_numeric_result?: boolean | null
           id?: string
           reference_entries?: Json | null
           sender: string
           thread_id: string
         }
         Update: {
+          analysis_data?: Json | null
           content?: string
           created_at?: string
+          has_numeric_result?: boolean | null
           id?: string
           reference_entries?: Json | null
           sender?: string
