@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -720,8 +719,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 r: 4, 
                 strokeWidth: 2, 
                 fill: theme === 'dark' ? '#1e293b' : 'white',
-                stroke: (dataPoint: any) => 
-                  dataPoint.sentiment !== null ? getSentimentLineColor(dataPoint.sentiment) : '#888'
+                stroke: (dataPoint: any) => {
+                  if (dataPoint.sentiment === null) return '#888';
+                  return getSentimentLineColor(dataPoint.sentiment);
+                }
               }}
               activeDot={false}
               isAnimationActive={false}
