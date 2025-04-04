@@ -51,9 +51,16 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry })
         }
       }
       
-      // Check themes for match
+      // Check themes for match - use both themes and master_themes for compatibility
       if (entry.themes && Array.isArray(entry.themes)) {
         return entry.themes.some(theme => 
+          theme.toLowerCase().includes(query)
+        );
+      }
+      
+      // Also check master_themes if themes is not available
+      if (entry.master_themes && Array.isArray(entry.master_themes)) {
+        return entry.master_themes.some(theme => 
           theme.toLowerCase().includes(query)
         );
       }
