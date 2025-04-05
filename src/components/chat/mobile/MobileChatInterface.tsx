@@ -545,7 +545,7 @@ export default function MobileChatInterface({
         <div ref={messagesEndRef} />
       </div>
       
-      <div className="mobile-chat-input-container sticky bottom-16 bg-background border-t">
+      <div className="mobile-chat-input-container fixed bottom-16 left-0 right-0 bg-background border-t">
         <MobileChatInput 
           onSendMessage={handleSendMessage} 
           isLoading={loading}

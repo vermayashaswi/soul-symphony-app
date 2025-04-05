@@ -42,7 +42,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
   };
 
   return (
-    <div className="w-full py-2 px-2">
+    <div className="w-full py-2 px-3">
       <form onSubmit={handleSubmit} className="relative flex items-end w-full gap-2">
         <div className="flex items-center w-full relative">
           <Textarea
