@@ -17,6 +17,8 @@ import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SouloLogo from '@/components/SouloLogo';
 import { ColorPicker } from '@/components/settings/ColorPicker';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -50,6 +52,9 @@ export default function Settings() {
   const { entries } = useJournalEntries(user?.id, 0, !!user);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  
+  const [showFAQ, setShowFAQ] = useState(false);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   
   const colorThemes = [
     { name: 'Default', color: 'bg-blue-500' },
@@ -355,7 +360,12 @@ export default function Settings() {
             <h2 className="text-xl font-semibold mb-4 text-theme-color">Help & Support</h2>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Button variant="outline" size="lg" className="h-auto py-6 rounded-xl justify-start">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="h-auto py-6 rounded-xl justify-start"
+                onClick={() => setShowFAQ(true)}
+              >
                 <div className="flex flex-col items-start text-left">
                   <div className="flex items-center gap-2 mb-1">
                     <HelpCircle className="h-4 w-4 text-theme-color" />
@@ -365,7 +375,12 @@ export default function Settings() {
                 </div>
               </Button>
               
-              <Button variant="outline" size="lg" className="h-auto py-6 rounded-xl justify-start">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="h-auto py-6 rounded-xl justify-start"
+                onClick={() => setShowPrivacyPolicy(true)}
+              >
                 <div className="flex flex-col items-start text-left">
                   <div className="flex items-center gap-2 mb-1">
                     <Shield className="h-4 w-4 text-theme-color" />
@@ -395,6 +410,219 @@ export default function Settings() {
           </div>
         </div>
       </div>
+      
+      <Dialog open={showFAQ} onOpenChange={setShowFAQ}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-theme-color">Frequently Asked Questions</DialogTitle>
+            <DialogDescription>
+              Find answers to common questions about Feelosophy
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-6 py-2">
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">What is Feelosophy?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Feelosophy is an AI-powered journaling app designed to help you track, analyze, and understand your emotions through voice recordings and text entries. Our app creates a safe space for self-reflection and personal growth.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">How do I create a journal entry?</h3>
+                <p className="text-sm text-muted-foreground">
+                  You can create a journal entry by navigating to the Journal tab and clicking on the "+" button. You can either type your entry or use the voice recording feature, which will automatically transcribe and analyze your spoken thoughts.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Is my data private?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Yes, your privacy is our top priority. All journal entries are encrypted and only accessible to you. We do not share or sell your personal data with third parties. See our Privacy Policy for more details.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">How does the emotion analysis work?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Our AI technology analyzes the text and tone of your journal entries to identify emotions and themes. It recognizes patterns in your writing or speech to provide insights about your emotional state and recurring topics.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Can I export my journal entries?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Currently, we're working on an export feature. In the meantime, you can access all your entries through the Journal tab, where they're organized chronologically.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">What is a journal streak?</h3>
+                <p className="text-sm text-muted-foreground">
+                  A journal streak represents the number of consecutive days you've created at least one journal entry. It's a way to track your consistency and build a regular journaling habit.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">How do I set up daily reminders?</h3>
+                <p className="text-sm text-muted-foreground">
+                  You can enable daily reminders by toggling on the Notifications option in the Settings page. You'll need to grant notification permissions to the app for this feature to work.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Can I use Feelosophy offline?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Some features of Feelosophy require an internet connection, especially voice recording and AI analysis. However, you can view your past entries and create text entries offline. They'll sync once you're back online.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">How do I delete my account?</h3>
+                <p className="text-sm text-muted-foreground">
+                  If you wish to delete your account, please contact our support team through the "Contact Support" button in the Settings page. We'll process your request and permanently delete all your data within 30 days.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Is Feelosophy available on all devices?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Feelosophy is available as a web application that works on all modern browsers. We're currently developing native mobile applications for iOS and Android to provide an enhanced experience on mobile devices.
+                </p>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={showPrivacyPolicy} onOpenChange={setShowPrivacyPolicy}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-theme-color">Privacy Policy</DialogTitle>
+            <DialogDescription>
+              How we protect your data and respect your privacy
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-6 py-2">
+              <p className="text-sm text-muted-foreground">Last Updated: April 5, 2025</p>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Introduction</h3>
+                <p className="text-sm text-muted-foreground">
+                  Welcome to Feelosophy ("we," "our," or "us"). We are committed to protecting your privacy and handling your data with transparency and care. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our journaling application.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Information We Collect</h3>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Account Information:</strong> When you create an account, we collect your email address, name, and password.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Journal Entries:</strong> We store the content of your journal entries, including text and voice recordings.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Usage Data:</strong> We collect information about how you interact with our application, such as features used, time spent, and actions taken.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Device Information:</strong> We collect information about your device, including IP address, browser type, and operating system.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">How We Use Your Information</h3>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Provide and Improve Services:</strong> We use your information to deliver our journaling features, analyze your entries, and generate insights.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Personalization:</strong> We personalize your experience based on your preferences and usage patterns.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Communication:</strong> We may send you notifications, updates, and support messages.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Research and Development:</strong> We use anonymized data to improve our AI algorithms and develop new features.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Data Security</h3>
+                <p className="text-sm text-muted-foreground">
+                  We implement appropriate technical and organizational measures to protect your personal information:
+                </p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground ml-4 space-y-1">
+                  <li>Encryption of sensitive data at rest and in transit</li>
+                  <li>Regular security assessments and audits</li>
+                  <li>Access controls and authentication mechanisms</li>
+                  <li>Regular backups to prevent data loss</li>
+                </ul>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Data Sharing</h3>
+                <p className="text-sm text-muted-foreground">
+                  We do not sell your personal information. We may share your information in the following limited circumstances:
+                </p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground ml-4 space-y-1">
+                  <li>With service providers who help us deliver our services</li>
+                  <li>When required by law or government authorities</li>
+                  <li>To protect our rights, property, or safety</li>
+                  <li>In connection with a business transaction (e.g., merger or acquisition)</li>
+                </ul>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Your Choices and Rights</h3>
+                <p className="text-sm text-muted-foreground">
+                  You have several rights regarding your personal information:
+                </p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground ml-4 space-y-1">
+                  <li>Access and download your data</li>
+                  <li>Correct inaccurate information</li>
+                  <li>Delete your account and associated data</li>
+                  <li>Object to certain data processing activities</li>
+                  <li>Opt out of marketing communications</li>
+                </ul>
+                <p className="text-sm text-muted-foreground mt-2">
+                  To exercise these rights, please contact us using the information provided at the end of this policy.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Cookies and Tracking Technologies</h3>
+                <p className="text-sm text-muted-foreground">
+                  We use cookies and similar technologies to improve your experience, understand usage patterns, and deliver personalized content. You can manage your cookie preferences through your browser settings.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Children's Privacy</h3>
+                <p className="text-sm text-muted-foreground">
+                  Our service is not intended for individuals under the age of 13. We do not knowingly collect personal information from children. If we discover that we have collected personal information from a child, we will delete it promptly.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Changes to This Policy</h3>
+                <p className="text-sm text-muted-foreground">
+                  We may update this Privacy Policy from time to time. We will notify you of any significant changes by posting the updated policy on our website or through the application.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Contact Us</h3>
+                <p className="text-sm text-muted-foreground">
+                  If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us at:
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Email: verma.yashaswi@gmail.com
+                </p>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
