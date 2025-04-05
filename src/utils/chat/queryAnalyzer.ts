@@ -1,3 +1,4 @@
+
 // Add the missing type definitions for this file's exports and functions
 import { supabase } from "@/integrations/supabase/client";
 
@@ -82,6 +83,9 @@ export function analyzeQueryTypes(queryText: string): QueryTypes {
   
   // Determine if we need more context for this query
   const needsMoreContext = isWhyQuestion || isComplexQuery;
+  
+  // Extract time range from query
+  const timeRange = extractTimeRange(lowerQuery);
   
   // Determine search strategy
   let searchStrategy = determineSearchStrategy(lowerQuery, {
