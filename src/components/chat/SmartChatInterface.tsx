@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
@@ -11,8 +12,8 @@ import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/c
 import { motion } from "framer-motion";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
-import ChatDiagnostics from './ChatDiagnostics';
 
+// Create a type that includes only the roles allowed in the chat UI
 type UIChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -22,6 +23,7 @@ type UIChatMessage = {
   hasNumericResult?: boolean;
 }
 
+// Define a type for the chat message from the database
 type DbChatMessage = {
   content: string;
   created_at: string;
@@ -29,6 +31,7 @@ type DbChatMessage = {
   reference_entries: any;
   sender: string;
   thread_id: string;
+  // Add optional fields that might not be present in all database records
   analysis_data?: any;
   has_numeric_result?: boolean;
 }
@@ -40,16 +43,6 @@ export default function SmartChatInterface() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
-  const [ragDiagnostics, setRagDiagnostics] = useState<any>({
-    steps: [],
-    isActive: false,
-    error: null,
-    queryText: '',
-    references: null,
-    similarityScores: null,
-    queryAnalysis: null,
-    functionExecutions: null
-  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -131,22 +124,6 @@ export default function SmartChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const addRagDiagnosticStep = (step: string, status: 'pending' | 'success' | 'error' | 'loading', details?: string) => {
-    setRagDiagnostics(prev => ({
-      ...prev,
-      steps: [
-        ...prev.steps,
-        {
-          id: prev.steps.length + 1,
-          step,
-          status,
-          details,
-          timestamp: new Date().toLocaleTimeString()
-        }
-      ]
-    }));
-  };
-
   const handleSendMessage = async (userMessage: string) => {
     if (!user?.id) {
       toast({
@@ -157,24 +134,9 @@ export default function SmartChatInterface() {
       return;
     }
     
-    setRagDiagnostics({
-      steps: [],
-      isActive: true,
-      error: null,
-      queryText: userMessage,
-      references: null,
-      similarityScores: null,
-      queryAnalysis: null,
-      functionExecutions: null
-    });
-    
-    addRagDiagnosticStep("Initializing chat request", "success", "Starting to process your query");
-    
     let threadId = currentThreadId;
     if (!threadId) {
       try {
-        addRagDiagnosticStep("Creating new thread", "loading");
-        
         const newThreadId = uuidv4();
         const { error } = await supabase
           .from('chat_threads')
@@ -186,12 +148,7 @@ export default function SmartChatInterface() {
             updated_at: new Date().toISOString()
           });
         
-        if (error) {
-          addRagDiagnosticStep("Creating new thread", "error", error.message);
-          throw error;
-        }
-        
-        addRagDiagnosticStep("Creating new thread", "success", `Thread created with ID: ${newThreadId}`);
+        if (error) throw error;
         threadId = newThreadId;
         setCurrentThreadId(newThreadId);
         
@@ -202,7 +159,6 @@ export default function SmartChatInterface() {
         );
       } catch (error) {
         console.error("Error creating thread:", error);
-        addRagDiagnosticStep("Creating new thread", "error", error instanceof Error ? error.message : "Unknown error");
         toast({
           title: "Error",
           description: "Failed to create new conversation",
@@ -216,7 +172,19 @@ export default function SmartChatInterface() {
     setIsLoading(true);
     setShowSuggestions(false);
     
-    addRagDiagnosticStep("Saving user message", "loading");
+    // Analyze the query to provide more specific processing stages
+    const queryTypes = analyzeQueryTypes(userMessage);
+    
+    // Set initial processing stage based on query analysis
+    if (queryTypes.isQuantitative && queryTypes.isEmotionFocused) {
+      setProcessingStage("Analyzing your emotions and calculating results...");
+    } else if (queryTypes.isWhyQuestion) {
+      setProcessingStage("Analyzing your question and looking for explanations...");
+    } else if (queryTypes.isEmotionFocused) {
+      setProcessingStage("Analyzing emotion patterns in your journal...");
+    } else {
+      setProcessingStage("Analyzing your question...");
+    }
     
     try {
       const { error: msgError } = await supabase
@@ -227,107 +195,31 @@ export default function SmartChatInterface() {
           sender: 'user'
         });
         
-      if (msgError) {
-        addRagDiagnosticStep("Saving user message", "error", msgError.message);
-        throw msgError;
-      }
+      if (msgError) throw msgError;
       
-      addRagDiagnosticStep("Saving user message", "success");
+      console.log("Desktop: Performing comprehensive query analysis");
       
-      const queryTypes = analyzeQueryTypes(userMessage);
-      
-      addRagDiagnosticStep("Analyzing query intent", "loading");
-      addRagDiagnosticStep("Analyzing query intent", "success", 
-        `Detected: ${JSON.stringify({
-          isEmotionFocused: queryTypes.isEmotionFocused,
-          isQuantitative: queryTypes.isQuantitative,
-          isWhyQuestion: queryTypes.isWhyQuestion,
-          needsVectorSearch: queryTypes.needsVectorSearch
-        })}`);
-      
-      if (queryTypes.isQuantitative && queryTypes.isEmotionFocused) {
-        setProcessingStage("Analyzing your emotions and calculating results...");
-      } else if (queryTypes.isWhyQuestion) {
-        setProcessingStage("Analyzing your question and looking for explanations...");
-      } else if (queryTypes.isEmotionFocused) {
-        setProcessingStage("Analyzing emotion patterns in your journal...");
-      } else {
-        setProcessingStage("Analyzing your question...");
-      }
-      
+      // Update processing stage based on query progress
       if (queryTypes.needsDataAggregation) {
         setProcessingStage("Aggregating data from your journal entries...");
       } else if (queryTypes.needsVectorSearch) {
         setProcessingStage("Searching for related entries in your journal...");
       }
       
-      setRagDiagnostics(prev => ({
-        ...prev,
-        queryAnalysis: {
-          queryType: queryTypes.isEmotionFocused ? 'emotional' : 'general',
-          emotion: queryTypes.isEmotionFocused ? queryTypes.emotion || null : null,
-          theme: queryTypes.isThemeFocused ? queryTypes.theme || null : null,
-          timeframe: {
-            timeType: queryTypes.timeRange,
-            startDate: queryTypes.startDate || null,
-            endDate: queryTypes.endDate || null
-          },
-          isWhenQuestion: queryTypes.isWhenQuestion || false
-        }
-      }));
+      console.log("Desktop: Query analysis result:", queryTypes);
       
-      addRagDiagnosticStep("Processing with RAG service", "loading");
       setProcessingStage("Searching for insights...");
-      const response = await processChatMessage(
-        userMessage, 
-        user.id, 
-        queryTypes, 
-        threadId, 
-        true
-      );
+      const response = await processChatMessage(userMessage, user.id, queryTypes, threadId);
+      console.log("Desktop: Response received with references:", response.references?.length || 0);
       
-      if (response.diagnostics) {
-        if (response.diagnostics.steps) {
-          response.diagnostics.steps.forEach((step: any) => {
-            addRagDiagnosticStep(step.name, step.status, step.details);
-          });
-        }
-        
-        if (response.diagnostics.functionCalls) {
-          setRagDiagnostics(prev => ({
-            ...prev,
-            functionExecutions: response.diagnostics.functionCalls
-          }));
-        }
-        
-        if (response.diagnostics.similarityScores) {
-          setRagDiagnostics(prev => ({
-            ...prev,
-            similarityScores: response.diagnostics.similarityScores
-          }));
-        }
-      }
-      
-      if (response.references) {
-        setRagDiagnostics(prev => ({
-          ...prev,
-          references: response.references
-        }));
-      }
-      
-      addRagDiagnosticStep("Processing with RAG service", "success", 
-        `Received response with ${response.references?.length || 0} references`);
-      
+      // Convert to UI-compatible message and filter out system/error roles
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
         content: response.content,
         ...(response.references && { references: response.references }),
         ...(response.analysis && { analysis: response.analysis }),
-        ...(response.diagnostics && { diagnostics: response.diagnostics }),
         ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
       };
-      
-      addRagDiagnosticStep("Saving assistant response", "loading");
       
       await supabase
         .from('chat_messages')
@@ -340,11 +232,7 @@ export default function SmartChatInterface() {
           analysis_data: response.analysis || null
         });
       
-      addRagDiagnosticStep("Saving assistant response", "success");
-      
       if (chatHistory.length === 0) {
-        addRagDiagnosticStep("Updating thread title", "loading");
-        
         const truncatedTitle = userMessage.length > 30 
           ? userMessage.substring(0, 30) + "..." 
           : userMessage;
@@ -356,8 +244,6 @@ export default function SmartChatInterface() {
             updated_at: new Date().toISOString()
           })
           .eq('id', threadId);
-          
-        addRagDiagnosticStep("Updating thread title", "success");
       }
       
       await supabase
@@ -365,18 +251,9 @@ export default function SmartChatInterface() {
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
       
-      addRagDiagnosticStep("Processing complete", "success", "All steps completed successfully");
-      
       setChatHistory(prev => [...prev, uiResponse]);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error sending message:", error);
-      
-      addRagDiagnosticStep("Processing error", "error", error?.message || "Unknown error");
-      setRagDiagnostics(prev => ({
-        ...prev,
-        error: error?.message || "Unknown error"
-      }));
-      
       toast({
         title: "Error",
         description: "Failed to get a response. Please try again.",
@@ -387,8 +264,7 @@ export default function SmartChatInterface() {
         ...prev, 
         { 
           role: 'assistant', 
-          content: "I'm having trouble processing your request. Please try again later. " + 
-                   (error?.message ? `Error: ${error.message}` : "")
+          content: "I'm having trouble processing your request. Please try again later."
         }
       ]);
     } finally {
@@ -398,35 +274,22 @@ export default function SmartChatInterface() {
   };
 
   return (
-    <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b sticky top-0 z-10">
+    <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b">
         <div className="flex items-center">
           <h2 className="text-xl font-semibold">Roha</h2>
         </div>
-        <div className="flex items-center gap-2">
-          {chatHistory.length > 0 && (
-            <>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setShowAnalysis(!showAnalysis)}
-                className="flex items-center gap-1 text-sm"
-              >
-                <BarChart4 className="h-4 w-4" />
-                {showAnalysis ? "Hide Analysis" : "Show Analysis"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setRagDiagnostics(prev => ({ ...prev, isActive: !prev.isActive }))}
-                className="flex items-center gap-1 text-sm"
-              >
-                <Brain className="h-4 w-4" />
-                {ragDiagnostics.isActive ? "Hide Debug" : "Show Debug"}
-              </Button>
-            </>
-          )}
-        </div>
+        {chatHistory.length > 0 && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowAnalysis(!showAnalysis)}
+            className="flex items-center gap-1 text-sm"
+          >
+            <BarChart4 className="h-4 w-4" />
+            {showAnalysis ? "Hide Analysis" : "Show Analysis"}
+          </Button>
+        )}
       </CardHeader>
       
       <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
@@ -464,26 +327,8 @@ export default function SmartChatInterface() {
         ) : (
           <>
             {chatHistory.map((msg, idx) => (
-              <ChatMessage 
-                key={idx} 
-                message={msg} 
-                showAnalysis={showAnalysis} 
-              />
+              <ChatMessage key={idx} message={msg} showAnalysis={showAnalysis} />
             ))}
-            
-            {ragDiagnostics.isActive && ragDiagnostics.steps.length > 0 && ragDiagnostics.queryText && (
-              <div className="mt-4">
-                <ChatDiagnostics 
-                  queryText={ragDiagnostics.queryText}
-                  isVisible={ragDiagnostics.isActive}
-                  ragSteps={ragDiagnostics.steps}
-                  references={ragDiagnostics.references}
-                  similarityScores={ragDiagnostics.similarityScores}
-                  queryAnalysis={ragDiagnostics.queryAnalysis}
-                  functionExecutions={ragDiagnostics.functionExecutions}
-                />
-              </div>
-            )}
           </>
         )}
         

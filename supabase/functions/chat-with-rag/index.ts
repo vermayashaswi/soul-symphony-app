@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -86,22 +85,6 @@ function isEmotionWhyQuery(message: string): boolean {
          isTopEmotionsQuery(message);
 }
 
-// NEW: Analyze if query is about time patterns
-function isTimePatternQuery(message: string): boolean {
-  const lowerMessage = message.toLowerCase();
-  const timePatterns = [
-    /what time/i,
-    /when.*usually/i,
-    /time of day/i,
-    /morning|afternoon|evening|night/i,
-    /hour|o'clock/i,
-    /time.*most/i,
-    /most.*time/i
-  ];
-  
-  return timePatterns.some(pattern => pattern.test(lowerMessage));
-}
-
 // Extract time period from query
 function extractTimePeriod(message: string): {startDate: Date | null, endDate: Date | null, periodName: string} {
   const lowerMessage = message.toLowerCase();
@@ -160,92 +143,6 @@ function extractTimePeriod(message: string): {startDate: Date | null, endDate: D
   }
   
   return { startDate, endDate, periodName };
-}
-
-// NEW: Analyze time of day patterns in entries
-async function analyzeTimePatterns(entriesWithEmotions: any[], emotionKeywords: string[] = []): Promise<any> {
-  if (!entriesWithEmotions || entriesWithEmotions.length === 0) {
-    return { timePatterns: null };
-  }
-  
-  // Define time periods
-  const timePeriods = {
-    earlyMorning: { start: 5, end: 8, count: 0, entries: [] },
-    morning: { start: 9, end: 11, count: 0, entries: [] },
-    afternoon: { start: 12, end: 16, count: 0, entries: [] },
-    evening: { start: 17, end: 20, count: 0, entries: [] },
-    night: { start: 21, end: 23, count: 0, entries: [] },
-    lateNight: { start: 0, end: 4, count: 0, entries: [] }
-  };
-  
-  // Count entries by time period and emotion if specified
-  for (const entry of entriesWithEmotions) {
-    if (!entry.date) continue;
-    
-    const entryDate = new Date(entry.date);
-    const hour = entryDate.getHours();
-    
-    // Check if entry has the specified emotion(s) if keywords provided
-    let includeEntry = true;
-    if (emotionKeywords && emotionKeywords.length > 0 && entry.emotions) {
-      includeEntry = false;
-      for (const keyword of emotionKeywords) {
-        // Check if the keyword is a direct key in the emotions object
-        for (const [emotion, value] of Object.entries(entry.emotions)) {
-          if (emotion.toLowerCase().includes(keyword.toLowerCase()) && (value as number) > 0.3) {
-            includeEntry = true;
-            break;
-          }
-        }
-        if (includeEntry) break;
-      }
-    }
-    
-    if (!includeEntry) continue;
-    
-    // Determine which time period this entry belongs to
-    for (const [periodName, period] of Object.entries(timePeriods)) {
-      if ((period.start <= hour && hour <= period.end) || 
-          (period.start > period.end && (hour >= period.start || hour <= period.end))) {
-        period.count++;
-        period.entries.push({
-          id: entry.id,
-          date: entry.date,
-          hour: hour,
-          emotions: entry.emotions,
-          snippet: entry.snippet
-        });
-      }
-    }
-  }
-  
-  // Find the most common time period(s)
-  let maxCount = 0;
-  let topPeriods = [];
-  
-  for (const [periodName, period] of Object.entries(timePeriods)) {
-    if (period.count > maxCount) {
-      maxCount = period.count;
-      topPeriods = [{ name: periodName, ...period }];
-    } else if (period.count === maxCount && maxCount > 0) {
-      topPeriods.push({ name: periodName, ...period });
-    }
-  }
-  
-  // Calculate percentage distribution across time periods
-  const totalEntries = entriesWithEmotions.length;
-  const distribution = Object.entries(timePeriods).map(([name, period]) => ({
-    period: name,
-    percentage: totalEntries > 0 ? Math.round((period.count / totalEntries) * 100) : 0,
-    count: period.count
-  }));
-  
-  return {
-    topPeriods,
-    distribution,
-    totalEntriesAnalyzed: totalEntries,
-    hasTimePatterns: maxCount > 0
-  };
 }
 
 // Enhanced function to handle top emotions query using the SQL function
@@ -430,7 +327,7 @@ async function searchEntriesByThemes(userId: string, themeKeywords: string[]) {
   }
 }
 
-// Search entries using vector similarity with our new fixed function
+// Search entries using vector similarity
 async function searchEntriesWithVector(
   userId: string, 
   queryEmbedding: any[], 
@@ -439,15 +336,26 @@ async function searchEntriesWithVector(
   try {
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
     
-    // Use the fixed function we just created
+    // Prepare RPC parameters
+    const rpcParams: any = {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.5,
+      match_count: 10,
+      user_id_filter: userId
+    };
+    
+    // Add time range parameters if provided
+    if (timeRange) {
+      rpcParams.start_date = timeRange.startDate?.toISOString() || null;
+      rpcParams.end_date = timeRange.endDate?.toISOString() || null;
+    }
+    
+    console.log(`RPC params for match_journal_entries_with_date: ${JSON.stringify(rpcParams).substring(0, 100)}...`);
+    
+    // Call the RPC function
     const { data, error } = await supabase.rpc(
-      'match_journal_entries_fixed',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 10,
-        user_id_filter: userId
-      }
+      'match_journal_entries_with_date',
+      rpcParams
     );
     
     if (error) {
@@ -482,7 +390,6 @@ serve(async (req) => {
       includeDiagnostics = false, 
       requiresEmotionAnalysis = false,
       isTemporalQuery = false,
-      isTimePatternQuery = false,
       isFrequencyQuery = false,
       isEmotionQuery = false,
       isWhyEmotionQuery = false,
@@ -490,9 +397,6 @@ serve(async (req) => {
       isAdviceQuery = false,
       requiresThemeFiltering = false,
       requiresEntryDates = false,
-      requiresTimeAnalysis = false,
-      analyzeHourPatterns = false,
-      emotionKeywords = [],
       requiresCausalAnalysis = false,
       requiresPatternAnalysis = false,
       requiresSolutionFocus = false,
@@ -522,8 +426,7 @@ serve(async (req) => {
     
     // Determine query type and approach
     const queryType = {
-      queryType: isTimePatternQuery ? "time_pattern" :
-                isTemporalQuery ? "temporal" :
+      queryType: isTemporalQuery ? "temporal" :
                 isFrequencyQuery ? "frequency" :
                 isEmotionQuery ? "emotion" :
                 isRelationshipQuery ? "relationship" :
@@ -533,8 +436,7 @@ serve(async (req) => {
       entityType: isRelationshipQuery ? "person" : null,
       entityName: null,
       timeframe: providedTimeRange || extractTimePeriod(message),
-      isWhenQuestion: isTemporalQuery,
-      isTimePatternQuery: isTimePatternQuery || isTimePatternQuery(message)
+      isWhenQuestion: isTemporalQuery
     };
     
     console.log("Query analysis:", JSON.stringify(queryType));
@@ -645,14 +547,6 @@ serve(async (req) => {
       }
     }
     
-    // NEW: Analyze time patterns if requested
-    let timePatternAnalysis = null;
-    if (queryType.isTimePatternQuery || requiresTimeAnalysis || analyzeHourPatterns) {
-      console.log("Performing time pattern analysis");
-      timePatternAnalysis = await analyzeTimePatterns(relevantEntries, emotionKeywords);
-      console.log("Time pattern analysis results:", timePatternAnalysis?.hasTimePatterns ? "patterns found" : "no patterns");
-    }
-    
     // Get user's first name for personalized response
     let firstName = "";
     try {
@@ -705,13 +599,11 @@ serve(async (req) => {
       journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n";
       
       relevantEntries.slice(0, 5).forEach((entry, index) => {
-        const date = new Date(entry.date);
-        const formattedDate = date.toLocaleDateString();
-        const formattedTime = date.toTimeString().substring(0, 5); // HH:MM format
+        const date = new Date(entry.date).toLocaleDateString();
         const emotionsText = entry.emotions ? formatEmotions(entry.emotions) : "No emotion data";
         const themesText = entry.themes && Array.isArray(entry.themes) ? entry.themes.join(", ") : "No themes";
         
-        journalContext += `Entry ${index+1} (${formattedDate} at ${formattedTime}):\n${entry.snippet}\n`;
+        journalContext += `Entry ${index+1} (${date}):\n${entry.snippet}\n`;
         
         if (isEmotionQuery || requiresEmotionAnalysis) {
           journalContext += `Primary emotions: ${emotionsText}\n`;
@@ -721,8 +613,8 @@ serve(async (req) => {
           journalContext += `Themes: ${themesText}\n`;
         }
         
-        if (isTemporalQuery || requiresEntryDates || queryType.isTimePatternQuery) {
-          journalContext += `Time: ${formattedTime}\n`;
+        if (isTemporalQuery || requiresEntryDates) {
+          journalContext += `Date: ${date}\n`;
         }
         
         journalContext += "\n";
@@ -757,47 +649,6 @@ Keep your response conversational and supportive.
       }
     }
     
-    // NEW: For time pattern queries, prepare time analysis context
-    let timePatternPrompt = "";
-    if (timePatternAnalysis && timePatternAnalysis.hasTimePatterns) {
-      const emotionContext = emotionKeywords.length > 0 ? 
-        ` when feeling ${emotionKeywords.join(", ")}` : 
-        "";
-      
-      timePatternPrompt = `The user is asking about time patterns in their journal${emotionContext}.
-Based on their journal entries, I've analyzed when they typically write entries${emotionContext}:
-
-`;
-      
-      // Add distribution data
-      timePatternAnalysis.distribution.sort((a, b) => b.percentage - a.percentage).forEach(period => {
-        if (period.count > 0) {
-          timePatternPrompt += `- ${formatTimePeriodName(period.period)}: ${period.percentage}% of entries (${period.count} entries)\n`;
-        }
-      });
-      
-      // Add top period insights if available
-      if (timePatternAnalysis.topPeriods.length > 0) {
-        timePatternPrompt += `\nThe most common time period${timePatternAnalysis.topPeriods.length > 1 ? 's' : ''} ${timePatternAnalysis.topPeriods.length > 1 ? 'are' : 'is'} `;
-        timePatternPrompt += timePatternAnalysis.topPeriods.map(p => formatTimePeriodName(p.name)).join(" and ");
-        timePatternPrompt += `.\n\n`;
-        
-        // Include example entries from top periods
-        timePatternPrompt += `Here are some entries from these peak times:\n`;
-        timePatternAnalysis.topPeriods.forEach(period => {
-          if (period.entries && period.entries.length > 0) {
-            const sampleEntry = period.entries[0];
-            const entryTime = new Date(sampleEntry.date);
-            timePatternPrompt += `- At ${entryTime.toTimeString().substring(0, 5)} (${formatTimePeriodName(period.name)}): "${sampleEntry.snippet.substring(0, 100)}..."\n`;
-          }
-        });
-      }
-      
-      timePatternPrompt += `\nAnalyze these patterns and provide insights about why the user might be journaling at these specific times${emotionContext}. Consider their daily routine, emotional patterns, and possible explanations for these time preferences.
-Keep your response conversational and supportive.
-`;
-    }
-    
     // Prepare query-specific instructions for GPT
     let querySpecificInstructions = "";
     
@@ -805,11 +656,6 @@ Keep your response conversational and supportive.
       querySpecificInstructions = `
 The user is asking WHEN something happened. Focus on identifying and highlighting the specific dates or time periods
 when the events they're asking about occurred. Make sure to include these dates prominently in your response.
-`;
-    } else if (queryType.isTimePatternQuery || isTimePatternQuery) {
-      querySpecificInstructions = `
-The user is asking about WHAT TIME OF DAY certain patterns occur. Focus on identifying hour-based patterns in their journal entries
-and provide insights about when they typically experience certain emotions or events during the day. Include specific time ranges in your answer.
 `;
     } else if (isFrequencyQuery) {
       querySpecificInstructions = `
@@ -830,7 +676,7 @@ existing strengths and address their specific challenges.
     }
     
     // Prepare system prompt with context
-    const systemPrompt = timePatternPrompt || emotionPrompt || `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
+    const systemPrompt = emotionPrompt || `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
 ${journalContext}
 ${conversationContext}
 ${querySpecificInstructions}
@@ -911,16 +757,6 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
         responseObject.hasNumericResult = true;
       }
       
-      // Include time pattern analysis if available
-      if (timePatternAnalysis && timePatternAnalysis.hasTimePatterns) {
-        responseObject.analysis = {
-          ...responseObject.analysis || {},
-          type: responseObject.analysis ? 'combined_analysis' : 'time_patterns',
-          timePatterns: timePatternAnalysis
-        };
-        responseObject.hasNumericResult = true;
-      }
-      
       return new Response(
         JSON.stringify(responseObject),
         { 
@@ -960,23 +796,3 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
     );
   }
 });
-
-// Helper function to format time period names for display
-function formatTimePeriodName(periodName: string): string {
-  switch (periodName) {
-    case 'earlyMorning':
-      return 'Early Morning (5-8am)';
-    case 'morning':
-      return 'Morning (9-11am)';
-    case 'afternoon':
-      return 'Afternoon (12-4pm)';
-    case 'evening':
-      return 'Evening (5-8pm)';
-    case 'night':
-      return 'Night (9-11pm)';
-    case 'lateNight':
-      return 'Late Night/Early Morning (12-4am)';
-    default:
-      return periodName;
-  }
-}

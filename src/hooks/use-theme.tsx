@@ -63,43 +63,15 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       // Add CSS variable for colored text
       root.style.setProperty('--theme-color', primaryHex);
       
-      // Create theme CSS variables for text, border and background
+      // Add CSS classes for text colors
       const style = document.getElementById('theme-colors-style') || document.createElement('style');
       style.id = 'theme-colors-style';
-      
-      // Apply more comprehensive color utility classes for different states and components
       style.textContent = `
-        .text-theme-color { color: ${primaryHex} !important; }
-        .border-theme-color { border-color: ${primaryHex} !important; }
-        .bg-theme-color { background-color: ${primaryHex} !important; }
-        .hover\\:bg-theme-color:hover { background-color: ${primaryHex} !important; }
-        .hover\\:text-theme-color:hover { color: ${primaryHex} !important; }
-        .hover\\:border-theme-color:hover { border-color: ${primaryHex} !important; }
-        .focus\\:ring-theme-color:focus { --tw-ring-color: ${primaryHex} !important; }
-        .stroke-theme-color { stroke: ${primaryHex} !important; }
-        .fill-theme-color { fill: ${primaryHex} !important; }
-        
-        /* For button elements */
-        button.bg-theme-color { background-color: ${primaryHex} !important; }
-        button.text-theme-color { color: ${primaryHex} !important; }
-        button.border-theme-color { border-color: ${primaryHex} !important; }
-        
-        /* For special icons that need theme colors */
-        .icon-theme-color { color: ${primaryHex} !important; }
-        .icon-theme-color svg { color: ${primaryHex} !important; }
-        
-        /* For headings and text elements */
-        h1.text-theme-color, h2.text-theme-color, h3.text-theme-color, 
-        h4.text-theme-color, h5.text-theme-color, h6.text-theme-color,
-        p.text-theme-color, span.text-theme-color { color: ${primaryHex} !important; }
+        .text-theme-color { color: ${primaryHex}; }
+        .border-theme-color { border-color: ${primaryHex}; }
+        .bg-theme-color { background-color: ${primaryHex}; }
       `;
       document.head.appendChild(style);
-      
-      // Apply CSS custom properties for components that use HSL values directly
-      const [h2, s2, l2] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
-      document.documentElement.style.setProperty('--primary-h', `${h2}`);
-      document.documentElement.style.setProperty('--primary-s', `${s2}%`);
-      document.documentElement.style.setProperty('--primary-l', `${l2}%`);
     }
   }, [colorTheme]);
 

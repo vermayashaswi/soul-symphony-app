@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -7,17 +8,12 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Legend,
-  Label,
-  ReferenceLine,
-  Text
+  Legend
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
 import { Sparkles } from 'lucide-react';
-import { useTheme } from '@/hooks/use-theme';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 type EmotionData = {
   day: string;
@@ -88,8 +84,6 @@ export function EmotionChart({
   const [chartType, setChartType] = useState<ChartType>('bubble');
   const [bubbleKey, setBubbleKey] = useState(0); // Add key for forcing re-render
   const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
-  const { theme } = useTheme();
-  const isMobile = useIsMobile();
   
   const chartTypes = [
     { id: 'line', label: 'Line' },
@@ -142,7 +136,7 @@ export function EmotionChart({
       
       setSelectedEmotionInfo({
         name: emotion,
-        percentage: Math.round(percentage * 10) / 10 // Round to 1 decimal place
+        percentage
       });
       
       // Auto-hide after 2 seconds
@@ -200,28 +194,6 @@ export function EmotionChart({
       });
   }, [aggregatedData]);
 
-  const EmotionLineLabel = (props: any) => {
-    const { x, y, stroke, value, index, data, dataKey } = props;
-    
-    if (index !== data.length - 1) return null;
-    
-    const emotionName = dataKey.charAt(0).toUpperCase() + dataKey.slice(1);
-    
-    return (
-      <text 
-        x={x + 5} 
-        y={y} 
-        dy={4} 
-        fill={stroke} 
-        fontSize={12} 
-        textAnchor="start"
-        fontWeight="500"
-      >
-        {emotionName}
-      </text>
-    );
-  };
-
   const renderLineChart = () => {
     if (lineData.length === 0) {
       return (
@@ -233,80 +205,50 @@ export function EmotionChart({
     
     const emotions = Object.keys(lineData[0]).filter(key => key !== 'day');
     
-    if (emotions.length === 0) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">No emotional data found</p>
-        </div>
-      );
-    }
-    
     return (
       <div className="flex flex-col h-full">
-        <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
+        <ResponsiveContainer width="100%" height={300}>
           <LineChart
             data={lineData}
-            margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
+            margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
-            <XAxis 
-              dataKey="day" 
-              stroke="#888" 
-              fontSize={isMobile ? 10 : 12} 
-              tickMargin={10}
-              tick={{ fontSize: isMobile ? 10 : 12 }}
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+            <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
             <YAxis 
               stroke="#888" 
-              fontSize={isMobile ? 10 : 12} 
-              tickMargin={isMobile ? 5 : 10} 
+              fontSize={12} 
+              tickMargin={10} 
               domain={[0, 1]} 
-              ticks={isMobile ? [0, 0.25, 0.5, 0.75, 1.0] : [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}
+              ticks={[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}
               tickFormatter={(value) => value.toFixed(1)}
-              width={isMobile ? 25 : 40}
             />
             <Tooltip 
               contentStyle={{ 
-                backgroundColor: theme === 'dark' ? 'hsl(var(--card))' : 'rgba(255, 255, 255, 0.8)', 
+                backgroundColor: 'rgba(255, 255, 255, 0.8)', 
                 borderRadius: '8px',
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
-                border: 'none',
-                color: theme === 'dark' ? 'hsl(var(--card-foreground))' : 'inherit'
+                border: 'none' 
               }} 
             />
+            <Legend verticalAlign="bottom" height={36} />
             {emotions.map((emotion, index) => (
               <Line
                 key={emotion}
                 type="monotone"
                 dataKey={emotion}
                 stroke={getEmotionColor(emotion, index)}
-                strokeWidth={2}
-                dot={{ r: isMobile ? 3 : 4 }}
-                activeDot={{ r: isMobile ? 5 : 6 }}
+                strokeWidth={3}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
                 name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
-                label={isMobile ? null : <EmotionLineLabel />}
               />
             ))}
           </LineChart>
         </ResponsiveContainer>
         
-        <div className="flex flex-wrap justify-center gap-4 mt-6 px-2">
-          {emotions.map((emotion, index) => (
-            <div key={emotion} className="flex items-center gap-2">
-              <div 
-                className="w-3 h-3 rounded-full" 
-                style={{ backgroundColor: getEmotionColor(emotion, index) }}
-              ></div>
-              <span className="text-sm">{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
-            </div>
-          ))}
+        <div className="mt-4 text-center text-xs text-muted-foreground">
+          * Showing top 5 emotions by score
         </div>
-        
-        {!isMobile && (
-          <div className="mt-4 text-center text-xs text-muted-foreground">
-            * Showing top 5 emotions by score
-          </div>
-        )}
       </div>
     );
   };
@@ -314,7 +256,7 @@ export function EmotionChart({
   return (
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Emotions</h3>
+        <h3 className="text-xl font-semibold">Themes</h3>
         <div className="flex gap-2">
           {chartTypes.map((type) => (
             <button
@@ -333,7 +275,7 @@ export function EmotionChart({
         </div>
       </div>
       
-      <div className="bg-card p-4 rounded-xl shadow-sm relative">
+      <div className="bg-white p-4 rounded-xl shadow-sm relative">
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && (
           <div className="w-full h-[350px]" key={bubbleKey}>
@@ -356,12 +298,28 @@ export function EmotionChart({
               </>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                No emotions data available for this timeframe
+                No themes data available for this timeframe
               </div>
             )}
           </div>
         )}
       </div>
+      
+      {chartType === 'line' && lineData.length > 0 && (
+        <div className="flex flex-wrap justify-start gap-4 mt-4 text-sm">
+          {Object.keys(lineData[0])
+            .filter(key => key !== 'day')
+            .map((emotion, index) => (
+              <div key={emotion} className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: getEmotionColor(emotion, index) }}
+                ></div>
+                <span className="font-medium">{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
+              </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -33,6 +33,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       const fetchStartTime = Date.now();
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
+      // Check session before making database query
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
         console.error('[useJournalEntries] No active session found');

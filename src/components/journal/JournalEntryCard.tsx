@@ -28,13 +28,10 @@ export interface JournalEntry {
     sentiment: string;
     score: number;
   };
-  // Update to match database column name
   themes?: string[];
-  master_themes?: string[]; // Keep for backward compatibility
   entities?: {
     text: string;
     type: string;
-    name?: string; // Added name property for entities
   }[];
   foreignKey?: string;
 }

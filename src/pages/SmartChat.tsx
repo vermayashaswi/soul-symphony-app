@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from "react";
+
+import { useEffect, useState } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
 import { motion } from "framer-motion";
@@ -21,25 +22,27 @@ export default function SmartChat() {
   const { entries, loading } = useJournalEntries(user?.id, 0, true);
   const navigate = useNavigate();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
-  const [showSidebar, setShowSidebar] = useState(false);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
   
+  // Check if we're in mobile preview mode
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldRenderMobile = isMobile || mobileDemo;
-
+  
   useEffect(() => {
     document.title = "Roha | SOULo";
     
+    // Force proper viewport setup for mobile
     const metaViewport = document.querySelector('meta[name="viewport"]');
     if (metaViewport) {
       metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
     }
     
+    // Check for active thread or create one
     const checkOrCreateThread = async () => {
       if (!user?.id) return;
 
       try {
+        // Get most recent thread
         const { data: threads, error } = await supabase
           .from('chat_threads')
           .select('*')
@@ -51,12 +54,14 @@ export default function SmartChat() {
 
         if (threads && threads.length > 0) {
           setCurrentThreadId(threads[0].id);
+          // Dispatch event to notify SmartChatInterface about the selected thread
           window.dispatchEvent(
             new CustomEvent('threadSelected', { 
               detail: { threadId: threads[0].id } 
             })
           );
         } else {
+          // Create a new thread if none exists
           await createNewThread();
         }
       } catch (error) {
@@ -64,16 +69,7 @@ export default function SmartChat() {
       }
     };
 
-    const handleCloseSidebar = () => {
-      setShowSidebar(false);
-    };
-    
-    window.addEventListener('closeChatSidebar', handleCloseSidebar);
     checkOrCreateThread();
-    
-    return () => {
-      window.removeEventListener('closeChatSidebar', handleCloseSidebar);
-    };
   }, [isMobile, mobileDemo, user]);
 
   const hasEnoughEntries = !loading && entries.length > 0;
@@ -96,6 +92,7 @@ export default function SmartChat() {
       if (error) throw error;
       setCurrentThreadId(newThreadId);
       
+      // Dispatch event to notify SmartChatInterface about the new thread
       window.dispatchEvent(
         new CustomEvent('threadSelected', { 
           detail: { threadId: newThreadId } 
@@ -108,6 +105,7 @@ export default function SmartChat() {
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);
+    // Dispatch event to notify SmartChatInterface about the selected thread
     window.dispatchEvent(
       new CustomEvent('threadSelected', { 
         detail: { threadId: threadId } 
@@ -115,6 +113,7 @@ export default function SmartChat() {
     );
   };
 
+  // Desktop content
   const desktopContent = (
     <>
       <Navbar />
@@ -122,11 +121,10 @@ export default function SmartChat() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="smart-chat-container w-full h-[calc(100vh-4rem)] flex pt-16"
-        ref={chatContainerRef}
+        className="smart-chat-container w-full h-[calc(100vh-4rem)] flex pt-16" // Added pt-16 to create space below navbar
       >
         {!hasEnoughEntries && !loading && (
-          <Alert className="absolute z-10 top-20 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800">
+          <Alert className="absolute z-10 top-20 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800"> {/* Adjusted top position */}
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>No journal entries found</AlertTitle>
             <AlertDescription className="mt-2">
@@ -159,8 +157,9 @@ export default function SmartChat() {
     </>
   );
 
+  // Mobile content
   const mobileContent = (
-    <div className="flex flex-col h-full" ref={chatContainerRef}>
+    <div className="flex flex-col h-full">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -197,7 +196,9 @@ export default function SmartChat() {
     </div>
   );
   
+  // Decide which content to render based on mobile status
   const content = shouldRenderMobile ? mobileContent : desktopContent;
   
+  // If we're in mobile demo mode, wrap the content in the MobilePreviewFrame
   return mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content;
 }

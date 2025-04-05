@@ -25,9 +25,8 @@
   }
   
   /* Adjust padding for header sections in mobile */
-  .py-8, .py-4 {
-    padding-top: 2px !important;
-    padding-bottom: 2px !important;
+  .py-8 {
+    padding-top: 4px !important;
   }
   
   /* Increase touch targets */
@@ -58,138 +57,164 @@
   
   /* Adjust card headers on home page */
   .card .card-header {
-    padding-top: 0.75rem;
-    padding-bottom: 0.25rem;
+    padding-top: 1rem;
+    padding-bottom: 0.5rem;
   }
   
   /* Compact card titles and icons */
   .card .card-title {
     display: inline-flex;
     align-items: center;
-    font-size: 1.25rem !important;
   }
   
-  /* Voice recorder container height - making it fill more space */
-  [class*="min-h-[160px]"], [class*="min-h-[185px]"] {
-    min-height: 350px !important; /* Increased to fill the green area */
+  /* Journal search sticky positioning for mobile */
+  .journal-container .sticky {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background-color: var(--background);
+    padding: 0.75rem 1rem;
+    margin: 0 -1rem;
+    width: calc(100% + 2rem);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
   
-  /* Voice recorder container position adjustment to stay above mobile navbar */
-  .min-h-\[185px\] {
-    min-height: 350px !important; /* Increased to fill the green area */
-    margin-bottom: 0;
-    position: relative;
-    bottom: 0;
+  /* Add some bounce animations for mobile interactions */
+  @keyframes mobile-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
   }
   
-  /* Make card padding smaller on mobile */
-  .card-content {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.75rem !important;
+  .mobile-animation-bounce {
+    animation: mobile-bounce 0.5s ease;
   }
   
-  /* Tabs should be more compact */
-  .tabs {
+  /* Mobile-friendly scrolling */
+  .mobile-chat-interface .overflow-y-auto,
+  .smart-chat-interface .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Mobile-friendly input */
+  .mobile-chat-interface textarea,
+  .smart-chat-interface textarea {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+    padding: 0.5rem 0.75rem !important;
+  }
+  
+  /* Message bubbles styling */
+  .mobile-chat-interface .bg-muted,
+  .smart-chat-interface .bg-muted {
+    background-color: rgba(var(--muted), 0.7);
+  }
+  
+  /* Suggestion chips */
+  .mobile-chat-interface .suggestion-chip {
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  
+  .mobile-chat-interface .suggestion-chip:active {
+    transform: scale(0.98);
+  }
+  
+  /* Message animation */
+  .message-appear {
+    animation: message-appear 0.3s cubic-bezier(0.25, 0.1, 0.25, 1.0);
+  }
+  
+  @keyframes message-appear {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Reduce excess space in mobile chat interface */
+  .smart-chat-container {
+    gap: 0.5rem !important;
+  }
+  
+  /* Optimize vertical space */
+  .smart-chat-interface h1,
+  .mobile-chat-interface h1,
+  .smart-chat-interface h2,
+  .mobile-chat-interface h2,
+  .smart-chat-interface h3,
+  .mobile-chat-interface h3 {
     margin-bottom: 0.5rem !important;
   }
   
-  /* Make the tab text more readable */
-  .tab {
-    font-size: 1rem !important;
-    font-weight: 500;
+  /* Fix for flickering journal entries */
+  .journal-container .opacity-0 {
+    transition: opacity 0.3s ease-in;
   }
   
-  /* Journal header text size adjustments */
-  .journal-container h1.text-2xl {
-    font-size: 1.75rem !important;
+  .journal-container .opacity-100 {
+    transition: opacity 0.3s ease-in;
   }
   
-  .journal-container p.text-sm {
-    font-size: 1rem !important;
+  /* Recording animation */
+  .recording-indicator {
+    animation: pulse 2s infinite;
   }
   
-  /* Voice recorder component adjustments */
-  .mb-20 {
-    margin-bottom: 4.5rem !important;
+  @keyframes pulse {
+    0% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.7);
+    }
+    
+    70% {
+      transform: scale(1);
+      box-shadow: 0 0 0 10px rgba(255, 82, 82, 0);
+    }
+    
+    100% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(255, 82, 82, 0);
+    }
   }
   
-  /* Card header and content spacing */
-  .journal-container .card-header {
-    padding-bottom: 0 !important;
+  /* Fixed header and input bar for mobile chat */
+  .mobile-chat-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background-color: white;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   }
   
-  /* Position the recorder at the bottom */
-  .journal-container .card {
-    margin-bottom: 0 !important;
+  .mobile-chat-input-container {
     position: fixed;
-    bottom: 4rem;
+    bottom: 4rem; /* Position above the navbar which is 4rem tall */
     left: 0;
     right: 0;
     z-index: 40;
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
-    height: calc(100vh - 210px); /* Make the container fill most of the available space */
+    background-color: white;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 0.5rem;
+    margin-bottom: 0 !important;
   }
   
-  /* Adjust spacing of journal tabs container */
-  .journal-container .container {
-    padding: 0.5rem 1rem !important;
+  /* Ensure proper content area height in chat */
+  .mobile-chat-content {
+    height: calc(100vh - 180px); /* Adjust based on header, input and navbar heights */
+    overflow-y: auto;
+    padding-bottom: 4rem !important; /* Add more padding at the bottom */
   }
-}
-
-/* Dark mode support for sticky elements */
-.dark .sticky {
-  background-color: hsl(var(--background));
-  border-bottom: 1px solid hsl(var(--border));
-}
-
-/* Add new animations for language elements */
-@keyframes float-in {
-  0% {
-    opacity: 0;
-    transform: translateY(20px);
+  
+  /* Remove extra spacing on journal and insights pages */
+  .journal-container {
+    padding-top: 0 !important;
   }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
+  
+  .insights-container {
+    padding-top: 0 !important;
   }
-}
-
-@keyframes float-around {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-5px);
-  }
-}
-
-.float-in {
-  animation: float-in 0.8s ease-out forwards;
-}
-
-.float-around {
-  animation: float-around 5s ease-in-out infinite;
-}
-
-/* Add language animation related styles */
-.language-animation-word {
-  transition: all 0.3s ease;
-  opacity: 0.8;
-}
-
-.language-animation-word:hover {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
-/* 3D perspective for language animation */
-.language-animation-container {
-  perspective: 1000px;
-}
-
-.language-animation-3d {
-  transform-style: preserve-3d;
 }

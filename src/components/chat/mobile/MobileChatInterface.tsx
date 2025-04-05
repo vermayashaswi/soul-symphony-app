@@ -1,7 +1,8 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Brain } from "lucide-react";
+import { Menu } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
@@ -11,9 +12,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
-import ChatDiagnostics from "@/components/chat/ChatDiagnostics";
 import { Json } from "@/integrations/supabase/types";
 
+// Create a type that includes only the roles allowed in the chat UI
 type UIChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -23,6 +24,7 @@ type UIChatMessage = {
   hasNumericResult?: boolean;
 }
 
+// Define a type for the chat message from database with all expected fields
 type ChatMessageFromDB = {
   content: string;
   created_at: string;
@@ -39,38 +41,22 @@ interface MobileChatInterfaceProps {
   onSelectThread?: (threadId: string) => void;
   onCreateNewThread?: () => Promise<void>;
   userId?: string;
-  onSwipeLeft?: () => void;
-  onSwipeRight?: () => void;
 }
 
 export default function MobileChatInterface({
   currentThreadId: propThreadId,
   onSelectThread,
   onCreateNewThread,
-  userId,
-  onSwipeLeft,
-  onSwipeRight
+  userId
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
-  const [showDebug, setShowDebug] = useState(false);
-  const [ragDiagnostics, setRagDiagnostics] = useState<any>({
-    steps: [],
-    isActive: false,
-    error: null,
-    queryText: '',
-    references: null,
-    similarityScores: null,
-    queryAnalysis: null,
-    functionExecutions: null
-  });
   const { toast } = useToast();
   const { user } = useAuth();
   const [sheetOpen, setSheetOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (propThreadId) {
@@ -100,22 +86,6 @@ export default function MobileChatInterface({
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const addRagDiagnosticStep = (step: string, status: 'pending' | 'success' | 'error' | 'loading', details?: string) => {
-    setRagDiagnostics(prev => ({
-      ...prev,
-      steps: [
-        ...prev.steps,
-        {
-          id: prev.steps.length + 1,
-          step,
-          status,
-          details,
-          timestamp: new Date().toLocaleTimeString()
-        }
-      ]
-    }));
   };
 
   const loadThreadMessages = async (threadId: string) => {
@@ -165,24 +135,9 @@ export default function MobileChatInterface({
       return;
     }
 
-    setRagDiagnostics({
-      steps: [],
-      isActive: true,
-      error: null,
-      queryText: message,
-      references: null,
-      similarityScores: null,
-      queryAnalysis: null,
-      functionExecutions: null
-    });
-    
-    addRagDiagnosticStep("Initializing chat request", "success", "Starting to process your query");
-
     let threadId = currentThreadId;
     if (!threadId) {
       try {
-        addRagDiagnosticStep("Creating new thread", "loading");
-        
         if (onCreateNewThread) {
           await onCreateNewThread();
           return; // The event listener will trigger loadThreadMessages
@@ -198,18 +153,12 @@ export default function MobileChatInterface({
               updated_at: new Date().toISOString()
             });
           
-          if (error) {
-            addRagDiagnosticStep("Creating new thread", "error", error.message);
-            throw error;
-          }
-          
-          addRagDiagnosticStep("Creating new thread", "success", `Thread created with ID: ${newThreadId}`);
+          if (error) throw error;
           threadId = newThreadId;
           setCurrentThreadId(newThreadId);
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error("[Mobile] Error creating thread:", error);
-        addRagDiagnosticStep("Creating new thread", "error", error.message);
         toast({
           title: "Error",
           description: "Failed to create new conversation",
@@ -219,13 +168,13 @@ export default function MobileChatInterface({
       }
     }
     
+    // Add user message to UI immediately
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setLoading(true);
     setProcessingStage("Analyzing your question...");
     
-    addRagDiagnosticStep("Saving user message", "loading");
-    
     try {
+      // Store user message in database
       const { error: msgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -234,83 +183,17 @@ export default function MobileChatInterface({
           sender: 'user'
         });
         
-      if (msgError) {
-        addRagDiagnosticStep("Saving user message", "error", msgError.message);
-        throw msgError;
-      }
+      if (msgError) throw msgError;
       
-      addRagDiagnosticStep("Saving user message", "success");
-      
-      addRagDiagnosticStep("Analyzing query intent", "loading");
+      // Begin RAG pipeline - Step 1: Query Analysis
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
       setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
-      addRagDiagnosticStep("Analyzing query intent", "success", 
-        `Detected: ${JSON.stringify({
-          isEmotionFocused: queryTypes.isEmotionFocused,
-          isQuantitative: queryTypes.isQuantitative,
-          isWhyQuestion: queryTypes.isWhyQuestion,
-          needsVectorSearch: queryTypes.needsVectorSearch
-        })}`);
       console.log("[Mobile] Query analysis result:", queryTypes);
       
-      setRagDiagnostics(prev => ({
-        ...prev,
-        queryAnalysis: {
-          queryType: queryTypes.isEmotionFocused ? 'emotional' : 'general',
-          emotion: queryTypes.isEmotionFocused ? queryTypes.emotion || null : null,
-          theme: queryTypes.isThemeFocused ? queryTypes.theme || null : null,
-          timeframe: {
-            timeType: queryTypes.timeRange,
-            startDate: queryTypes.startDate || null,
-            endDate: queryTypes.endDate || null
-          },
-          isWhenQuestion: queryTypes.isWhenQuestion || false
-        }
-      }));
-      
-      addRagDiagnosticStep("Processing with RAG service", "loading");
+      // Step 2-10: Process message through RAG pipeline
       setProcessingStage("Searching for insights...");
-      const response = await processChatMessage(
-        message, 
-        user.id, 
-        queryTypes, 
-        threadId,
-        true // Enable diagnostics mode
-      );
-      
-      if (response.diagnostics) {
-        if (response.diagnostics.steps) {
-          response.diagnostics.steps.forEach((step: any) => {
-            addRagDiagnosticStep(step.name, step.status, step.details);
-          });
-        }
-        
-        if (response.diagnostics.functionCalls) {
-          setRagDiagnostics(prev => ({
-            ...prev,
-            functionExecutions: response.diagnostics.functionCalls
-          }));
-        }
-        
-        if (response.diagnostics.similarityScores) {
-          setRagDiagnostics(prev => ({
-            ...prev,
-            similarityScores: response.diagnostics.similarityScores
-          }));
-        }
-      }
-      
-      if (response.references) {
-        setRagDiagnostics(prev => ({
-          ...prev,
-          references: response.references
-        }));
-      }
-      
-      addRagDiagnosticStep("Processing with RAG service", "success", 
-        `Received response with ${response.references?.length || 0} references`);
-      
+      const response = await processChatMessage(message, user.id, queryTypes, threadId);
       console.log("[Mobile] Response received:", {
         role: response.role,
         hasReferences: !!response.references?.length,
@@ -320,6 +203,7 @@ export default function MobileChatInterface({
         errorState: response.role === 'error'
       });
       
+      // Step 11: Convert to UI-compatible message and filter out system/error roles
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
         content: response.content,
@@ -328,13 +212,12 @@ export default function MobileChatInterface({
         ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
       };
       
+      // Check if the response indicates an error or failed retrieval
       if (response.role === 'error' || response.content.includes("issue retrieving")) {
         console.error("[Mobile] Received error response:", response.content);
-        addRagDiagnosticStep("Processing error", "error", response.content);
       }
       
-      addRagDiagnosticStep("Saving assistant response", "loading");
-      
+      // Store assistant response in database
       const { error: storeError } = await supabase
         .from('chat_messages')
         .insert({
@@ -348,14 +231,10 @@ export default function MobileChatInterface({
         
       if (storeError) {
         console.error("[Mobile] Error storing assistant response:", storeError);
-        addRagDiagnosticStep("Saving assistant response", "error", storeError.message);
-      } else {
-        addRagDiagnosticStep("Saving assistant response", "success");
       }
       
+      // For new threads, set a title based on first message
       if (messages.length === 0) {
-        addRagDiagnosticStep("Updating thread title", "loading");
-        
         const truncatedTitle = message.length > 30 
           ? message.substring(0, 30) + "..." 
           : message;
@@ -367,32 +246,23 @@ export default function MobileChatInterface({
             updated_at: new Date().toISOString()
           })
           .eq('id', threadId);
-          
-        addRagDiagnosticStep("Updating thread title", "success");
       }
       
+      // Update thread's last activity timestamp
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
       
-      addRagDiagnosticStep("Processing complete", "success", "All steps completed successfully");
-      
+      // Step 12: Update UI with assistant response
       setMessages(prev => [...prev, uiResponse]);
-    } catch (error: any) {
+    } catch (error) {
       console.error("[Mobile] Error sending message:", error);
-      addRagDiagnosticStep("Processing error", "error", error?.message || "Unknown error");
-      setRagDiagnostics(prev => ({
-        ...prev,
-        error: error?.message || "Unknown error"
-      }));
-      
       setMessages(prev => [
         ...prev, 
         { 
           role: 'assistant', 
-          content: "I'm having trouble processing your request. Please try again later. " + 
-                   (error?.message ? `Error: ${error.message}` : "")
+          content: "I'm having trouble processing your request. Please try again later."
         }
       ]);
     } finally {
@@ -419,8 +289,8 @@ export default function MobileChatInterface({
   };
 
   return (
-    <div className="flex flex-col h-full" ref={containerRef}>
-      <div className="mobile-chat-header flex items-center justify-between py-2 px-3 sticky top-0 z-10 bg-background border-b">
+    <div className="flex flex-col h-full">
+      <div className="mobile-chat-header flex items-center justify-between py-2 px-3">
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="mr-1 h-8 w-8">
@@ -428,34 +298,16 @@ export default function MobileChatInterface({
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 sm:max-w-sm w-[85vw]">
-            <div className="flex justify-end p-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-9 w-9" 
-                onClick={() => setSheetOpen(false)}
-              >
-                <X className="h-6 w-6" />
-              </Button>
-            </div>
             <ChatThreadList 
               userId={userId || user?.id} 
               onSelectThread={handleSelectThread}
               onStartNewThread={handleStartNewThread}
               currentThreadId={currentThreadId}
-              newChatButtonWidth="half"
             />
           </SheetContent>
         </Sheet>
         <h2 className="text-lg font-semibold flex-1 text-center">Roha</h2>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8"
-          onClick={() => setShowDebug(!showDebug)}
-        >
-          <Brain className="h-5 w-5" />
-        </Button>
+        <div className="w-8"></div>
       </div>
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3">
@@ -481,18 +333,6 @@ export default function MobileChatInterface({
             <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
             <p className="text-sm text-muted-foreground">{processingStage || "Processing..."}</p>
           </div>
-        )}
-        
-        {showDebug && ragDiagnostics.steps.length > 0 && (
-          <ChatDiagnostics
-            queryText={ragDiagnostics.queryText}
-            isVisible={showDebug}
-            ragSteps={ragDiagnostics.steps}
-            references={ragDiagnostics.references}
-            similarityScores={ragDiagnostics.similarityScores}
-            queryAnalysis={ragDiagnostics.queryAnalysis}
-            functionExecutions={ragDiagnostics.functionExecutions}
-          />
         )}
         
         <div ref={messagesEndRef} />

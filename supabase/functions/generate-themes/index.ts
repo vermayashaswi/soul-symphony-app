@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -105,6 +106,7 @@ async function extract_themes(text: string) {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -120,6 +122,7 @@ serve(async (req) => {
     
     const { themes } = await extract_themes(text);
     
+    // If an entry ID was provided, update the database
     if (entryId) {
       console.log(`Updating entry ${entryId} with themes:`, themes);
       
@@ -140,6 +143,7 @@ serve(async (req) => {
         } else {
           console.log(`Successfully updated entry ${entryId} with themes:`, themes);
           
+          // After updating themes, also make sure entities are extracted
           try {
             console.log("Starting entity extraction for entry:", entryId);
             const { error: invokeError } = await supabase.functions.invoke('batch-extract-entities', {
