@@ -64,8 +64,8 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
       style={{
         width: "100%",
         height: "100%",
-        left: "40%", // Shifted to the left by 10% (was 50%)
-        top: "50%",
+        left: "65%", // Shifted right by 15% (from 50%)
+        top: "65%", // Shifted down by 15% (from 50%)
         transform: "translate(-50%, -50%)",
         opacity: 0.8,
       }}
