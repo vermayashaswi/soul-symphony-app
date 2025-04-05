@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -27,7 +26,12 @@ serve(async (req) => {
   }
 
   try {
-    const { query: userQuery, userId, timeRange } = await req.json();
+    const { 
+      query: userQuery, 
+      userId, 
+      timeRange,
+      vectorSearch = { matchThreshold: 0.5, matchCount: 10 } // Default values for vector search
+    } = await req.json();
 
     if (!userQuery || !userId) {
       console.error('Missing user query or user ID');
@@ -73,9 +77,15 @@ serve(async (req) => {
 
     const queryEmbedding = embeddingData.data[0].embedding;
 
-    // 2. Search for relevant journal entries
+    // 2. Search for relevant journal entries with configurable parameters
     console.log('Searching for relevant journal entries');
-    const entries = await searchJournalEntries(userId, queryEmbedding, timeRange);
+    const entries = await searchJournalEntries(
+      userId, 
+      queryEmbedding, 
+      vectorSearch.matchThreshold, 
+      vectorSearch.matchCount,
+      timeRange
+    );
 
     // 3. Segment the complex query based on journal entries
     console.log('Segmenting the complex query based on journal entries');
@@ -99,18 +109,21 @@ serve(async (req) => {
 async function searchJournalEntries(
   userId: string, 
   queryEmbedding: any[],
+  matchThreshold: number = 0.5,
+  matchCount: number = 10,
   timeRange?: { startDate?: Date; endDate?: Date }
 ) {
   try {
     console.log(`Searching journal entries for userId: ${userId}`);
+    console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
     
-    // Use the fixed function we created
+    // Use the fixed function with configurable parameters
     const { data, error } = await supabase.rpc(
       'match_journal_entries_fixed',
       {
         query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 10,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
         user_id_filter: userId
       }
     );

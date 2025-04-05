@@ -20,7 +20,13 @@ export const processChatMessage = async (
   console.log("Processing chat message:", message.substring(0, 30) + "...");
   
   try {
-    // Call the Supabase Edge Function
+    // Determine match threshold and count based on query complexity
+    const matchThreshold = queryTypes.isSpecificQuery ? 0.65 : 0.5;
+    const matchCount = queryTypes.needsMoreContext ? 15 : 8;
+    
+    console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
+    
+    // Call the Supabase Edge Function with dynamic vector search parameters
     const { data, error } = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,
@@ -28,6 +34,10 @@ export const processChatMessage = async (
         queryTypes,
         threadId,
         includeDiagnostics: enableDiagnostics,
+        vectorSearch: {
+          matchThreshold,
+          matchCount
+        },
         isEmotionQuery: queryTypes.isEmotionFocused,
         isWhyEmotionQuery: queryTypes.isWhyQuestion && queryTypes.isEmotionFocused,
         isTimePatternQuery: queryTypes.isTimePatternQuery,

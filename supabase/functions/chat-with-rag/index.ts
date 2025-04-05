@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -430,40 +429,41 @@ async function searchEntriesByThemes(userId: string, themeKeywords: string[]) {
   }
 }
 
-// Search entries using vector similarity with our new fixed function
+// Search entries using vector similarity with dynamic parameters
 async function searchEntriesWithVector(
   userId: string, 
   queryEmbedding: any[], 
+  vectorSearch: { matchThreshold?: number, matchCount?: number } = {},
   timeRange: {startDate: Date | null, endDate: Date | null} | null = null
 ) {
   try {
-    console.log(`Searching entries with vector similarity for userId: ${userId}`);
+    // Use provided parameters or fallback to defaults
+    const matchThreshold = vectorSearch.matchThreshold || 0.5;
+    const matchCount = vectorSearch.matchCount || 10;
     
-    // Use the fixed function we just created
+    console.log(`Searching entries with vector similarity for userId: ${userId}`);
+    console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
+    
+    // Use the fixed function with dynamic parameters
     const { data, error } = await supabase.rpc(
       'match_journal_entries_fixed',
       {
         query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 10,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
         user_id_filter: userId
       }
     );
     
     if (error) {
-      console.error("Error in vector search:", error);
+      console.error(`Error in vector search: ${error.message}`);
       throw error;
     }
     
-    if (!data || data.length === 0) {
-      console.log("No vector search results found");
-      return [];
-    }
-    
-    console.log(`Vector similarity search found ${data.length} entries`);
-    return data;
+    console.log(`Found ${data?.length || 0} entries with vector similarity`);
+    return data || [];
   } catch (error) {
-    console.error("Error in searchEntriesWithVector:", error);
+    console.error('Error searching entries with vector:', error);
     throw error;
   }
 }
@@ -481,6 +481,7 @@ serve(async (req) => {
       threadId = null, 
       includeDiagnostics = false, 
       queryTypes = {},
+      vectorSearch = {}, // New parameter for vector search configuration
       requiresEmotionAnalysis = false,
       isTemporalQuery = false,
       isFrequencyQuery = false,
@@ -612,16 +613,21 @@ serve(async (req) => {
     
     // Generate embedding for the user query
     const queryEmbedding = await generateEmbedding(message);
-    console.log("Using embedding for search");
+    console.log("Using embedding for search with dynamic parameters");
     
-    // Search for relevant journal entries using vector similarity
+    // Search for relevant journal entries using vector similarity with dynamic parameters
     if (!emotionAnalysisData || relevantEntries.length < 3) {
       try {
         const timeRangeObj = providedTimeRange ? 
           { startDate: new Date(providedTimeRange.startDate), endDate: new Date(providedTimeRange.endDate) } :
           { startDate: queryType.timeframe.startDate, endDate: queryType.timeframe.endDate };
         
-        const vectorResults = await searchEntriesWithVector(userId, queryEmbedding, timeRangeObj);
+        const vectorResults = await searchEntriesWithVector(
+          userId, 
+          queryEmbedding, 
+          vectorSearch, // Pass through the vector search parameters
+          timeRangeObj
+        );
         
         if (vectorResults && vectorResults.length > 0) {
           console.log(`Found ${vectorResults.length} relevant entries`);
