@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { cors } from '../_shared/cors.ts';
 import { supabase } from '../_shared/supabase.ts';
 import { OpenAI } from "https://deno.land/x/openai@v1.3.0/mod.ts";
 
