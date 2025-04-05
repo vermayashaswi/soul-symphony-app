@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -5,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DayProps } from "react-day-picker";
 import { subDays, startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format, isSameDay, isSameMonth, isSameWeek, addDays, getMonth } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CalendarDays, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from "lucide-react";
+import { CalendarDays, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
 import {
   Line,
   LineChart as RechartsLineChart,
@@ -77,7 +78,7 @@ type ViewMode = 'calendar' | 'graph';
 export default function SentimentCalendar({ sentimentData, timeRange }: SentimentCalendarProps) {
   const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
-  const { theme } = useTheme();
+  const { theme, colorTheme, customColor } = useTheme();
   
   const filteredData = React.useMemo(() => {
     const now = new Date();
@@ -305,7 +306,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 key={dateKey}
                 className={cn(
                   "aspect-square rounded-md flex flex-col items-center justify-center p-1",
-                  isToday && "ring-2 ring-primary"
+                  isToday && "ring-2 ring-theme hover:ring-theme"
                 )}
               >
                 <div className="text-xs font-medium mb-1">
@@ -383,7 +384,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   className={cn(
                     "relative flex items-center justify-center hover:bg-primary/10 rounded-md transition-all duration-200",
                     isSelected && "font-medium",
-                    isToday && "font-bold"
+                    isToday && "font-bold ring-2 ring-theme"
                   )}
                   {...props}
                 >
@@ -441,6 +442,8 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       monthlyAverages.set(month, value.total / value.count);
     });
 
+    const currentMonth = today.getMonth();
+
     return (
       <div className="py-4">
         <div className="grid grid-cols-6 gap-0 text-center mb-2">
@@ -454,11 +457,15 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         <div className="grid grid-cols-6 gap-0 mb-4">
           {months.slice(0, 6).map((month, index) => {
             const monthSentiment = monthlyAverages.get(index);
+            const isCurrentMonth = index === currentMonth;
             
             return (
               <div 
                 key={month}
-                className="aspect-square rounded-md flex flex-col items-center justify-center p-1"
+                className={cn(
+                  "aspect-square rounded-md flex flex-col items-center justify-center p-1",
+                  isCurrentMonth && "ring-2 ring-theme hover:ring-theme"
+                )}
               >
                 <div className="text-xs font-medium mb-1">
                   {month}
@@ -490,11 +497,15 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           {months.slice(6, 12).map((month, index) => {
             const actualIndex = index + 6;
             const monthSentiment = monthlyAverages.get(actualIndex);
+            const isCurrentMonth = actualIndex === currentMonth;
             
             return (
               <div 
                 key={month}
-                className="aspect-square rounded-md flex flex-col items-center justify-center p-1"
+                className={cn(
+                  "aspect-square rounded-md flex flex-col items-center justify-center p-1",
+                  isCurrentMonth && "ring-2 ring-theme hover:ring-theme"
+                )}
               >
                 <div className="text-xs font-medium mb-1">
                   {month}
@@ -668,3 +679,4 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     </motion.div>
   );
 }
+
