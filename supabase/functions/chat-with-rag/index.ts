@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -57,15 +58,20 @@ serve(async (req) => {
       references: []
     };
     
+    // Safely check properties before using them
+    const safeQueryTypes = {
+      isEmotionQuery: isEmotionQuery || false,
+      isWhyEmotionQuery: isWhyEmotionQuery || false,
+      isTemporalQuery: isTemporalQuery || false,
+      timeRange: timeRange ? 
+        `${timeRange.startDate || 'unspecified'} to ${timeRange.endDate || 'unspecified'}` : 
+        "none"
+    };
+    
     diagnostics.steps.push(createDiagnosticStep(
       "Query Type Analysis", 
       "success", 
-      JSON.stringify({
-        isEmotionQuery,
-        isWhyEmotionQuery,
-        isTemporalQuery,
-        timeRange: timeRange ? `${timeRange.startDate} to ${timeRange.endDate}` : "none"
-      })
+      JSON.stringify(safeQueryTypes)
     ));
     
     // 1. Generate embedding for the message
@@ -156,7 +162,16 @@ serve(async (req) => {
 
     // 5. Return response
     return new Response(
-      JSON.stringify({ data: { response: responseContent, diagnostics: diagnostics } }),
+      JSON.stringify({ 
+        response: responseContent, 
+        diagnostics: includeDiagnostics ? diagnostics : undefined,
+        references: entries.map(entry => ({
+          id: entry.id,
+          content: entry.content,
+          created_at: entry.created_at,
+          similarity: entry.similarity
+        }))
+      }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } catch (error) {

@@ -51,6 +51,9 @@ export default function ChatDiagnostics({
   
   if (!isVisible) return null;
   
+  // Safely check if ragSteps is defined and non-empty
+  const hasSteps = Array.isArray(ragSteps) && ragSteps.length > 0;
+  
   return (
     <Card className="bg-muted/20 border-dashed mt-4">
       <CardHeader className="pb-2">
@@ -81,32 +84,38 @@ export default function ChatDiagnostics({
           <div className="mb-2 p-2 bg-background rounded border">
             <p className="font-mono break-words">
               <span className="text-muted-foreground mr-1">Query:</span> 
-              {queryText}
+              {queryText || "No query text available"}
             </p>
           </div>
           
-          <div className="space-y-1 max-h-60 overflow-y-auto">
-            {ragSteps.map((step) => (
-              <div key={step.id} className="flex items-start p-2 border-b border-dashed border-muted last:border-0 bg-background rounded-sm mb-1">
-                <div 
-                  className={`h-3.5 w-3.5 rounded-full mt-0.5 mr-2 ${
-                    step.status === 'success' ? 'bg-green-500' : 
-                    step.status === 'error' ? 'bg-red-500' : 
-                    step.status === 'warning' ? 'bg-amber-500' : 
-                    'bg-blue-500 animate-pulse'
-                  }`}
-                />
-                <div className="flex-1">
-                  <p className="font-medium">{step.step}</p>
-                  {step.details && (
-                    <div className="text-muted-foreground mt-1 bg-muted/30 p-1 rounded">
-                      {step.details}
-                    </div>
-                  )}
+          {hasSteps ? (
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              {ragSteps.map((step) => (
+                <div key={step.id} className="flex items-start p-2 border-b border-dashed border-muted last:border-0 bg-background rounded-sm mb-1">
+                  <div 
+                    className={`h-3.5 w-3.5 rounded-full mt-0.5 mr-2 ${
+                      step.status === 'success' ? 'bg-green-500' : 
+                      step.status === 'error' ? 'bg-red-500' : 
+                      step.status === 'warning' ? 'bg-amber-500' : 
+                      'bg-blue-500 animate-pulse'
+                    }`}
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium">{step.step}</p>
+                    {step.details && (
+                      <div className="text-muted-foreground mt-1 bg-muted/30 p-1 rounded">
+                        {step.details}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-2 text-center text-muted-foreground">
+              No processing steps available
+            </div>
+          )}
         </CardContent>
       )}
     </Card>

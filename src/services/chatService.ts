@@ -26,31 +26,38 @@ export const processChatMessage = async (
     
     console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
     
-    // Extract time range if this is a temporal query
+    // Extract time range if this is a temporal query and ensure it's not undefined
     let timeRange = null;
-    if (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion) {
-      timeRange = queryTypes.timeRange;
+    if (queryTypes && (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion)) {
+      timeRange = queryTypes.timeRange || null;
       console.log("Temporal query detected, using time range:", timeRange);
     }
+    
+    // Safely check properties before passing them
+    const isEmotionQuery = queryTypes && queryTypes.isEmotionFocused ? true : false;
+    const isWhyEmotionQuery = queryTypes && queryTypes.isWhyQuestion && queryTypes.isEmotionFocused ? true : false;
+    const isTimePatternQuery = queryTypes && queryTypes.isTimePatternQuery ? true : false;
+    const isTemporalQuery = queryTypes && (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion) ? true : false;
+    const requiresTimeAnalysis = queryTypes && queryTypes.requiresTimeAnalysis ? true : false;
     
     // Call the Supabase Edge Function with fixed vector search parameters
     const { data, error } = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,
         userId,
-        queryTypes,
+        queryTypes: queryTypes || {},
         threadId,
         includeDiagnostics: enableDiagnostics,
         vectorSearch: {
           matchThreshold,
           matchCount
         },
-        isEmotionQuery: queryTypes.isEmotionFocused,
-        isWhyEmotionQuery: queryTypes.isWhyQuestion && queryTypes.isEmotionFocused,
-        isTimePatternQuery: queryTypes.isTimePatternQuery,
-        isTemporalQuery: queryTypes.isTemporalQuery || queryTypes.isWhenQuestion,
-        requiresTimeAnalysis: queryTypes.requiresTimeAnalysis,
-        timeRange: timeRange
+        isEmotionQuery,
+        isWhyEmotionQuery,
+        isTimePatternQuery,
+        isTemporalQuery,
+        requiresTimeAnalysis,
+        timeRange
       }
     });
 
