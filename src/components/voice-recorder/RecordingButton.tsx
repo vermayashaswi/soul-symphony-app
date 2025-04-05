@@ -35,10 +35,10 @@ export function RecordingButton({
     );
   }
   
-  // Calculate scale based on audio level
-  const maxScale = 1.2;
+  // Calculate scale based on audio level - making it 3x more prominent
+  const maxScale = 1.6; // Increased from 1.2 to make the effect more prominent
   const scaleAmount = isRecording 
-    ? 1 + ((audioLevel / 100) * (maxScale - 1)) 
+    ? 1 + ((audioLevel / 100) * (maxScale - 1) * 3) // Multiplied by 3 to make it three times more prominent
     : 1;
     
   // Subtle color shift based on audio level
@@ -50,8 +50,8 @@ export function RecordingButton({
     return `bg-red-500 border-red-600`;
   };
   
-  // Dynamic glow effect based on audio level
-  const glowSize = isRecording ? Math.max(4, Math.min(20, audioLevel / 5)) : 0;
+  // Dynamic glow effect based on audio level - increased by 3x
+  const glowSize = isRecording ? Math.max(12, Math.min(60, audioLevel / 5 * 3)) : 0; // Tripled the values
   
   return (
     <motion.button
@@ -63,7 +63,7 @@ export function RecordingButton({
         isRecording ? "w-20 h-20" : isProcessing ? "w-20 h-20 opacity-50 cursor-not-allowed" : "w-20 h-20",
       )}
       style={{
-        boxShadow: isRecording ? `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.6)` : undefined
+        boxShadow: isRecording ? `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.8)` : undefined // Increased opacity from 0.6 to 0.8
       }}
       whileTap={{ scale: 0.95 }}
       animate={{ 

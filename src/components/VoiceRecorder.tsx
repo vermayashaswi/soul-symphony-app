@@ -116,33 +116,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       <audio ref={audioRef} className="hidden" />
       
       <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-between overflow-hidden pt-6 pb-4">
-        {/* Concentric circle pulse animations */}
-        {isRecording && (
-          <div className="relative flex items-center justify-center w-full my-4">
-            <AnimatePresence>
-              {ripples.map((id) => (
-                <motion.div
-                  key={id}
-                  initial={{ scale: 0.5, opacity: 0.8 }}
-                  animate={{ scale: 2.5, opacity: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 2.5, ease: "easeOut" }}
-                  className="absolute rounded-full border-4 border-red-500"
-                  style={{
-                    width: '160px',
-                    height: '160px',
-                    margin: 'auto',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                  }}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
+        {/* Removed concentric circles animation completely */}
         
         <div className="w-full px-4 sm:px-6 relative z-10">
           {/* No RecordingVisualizer component */}
