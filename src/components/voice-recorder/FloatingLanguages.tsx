@@ -38,7 +38,7 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
         initialY,
         
         // Target animation positions - farther from center in same angle
-        targetX: Math.cos(angle) * animateDistance - 50, // Reverted back to -50 (25% shift left)
+        targetX: Math.cos(angle) * animateDistance - 50, // Using -50 (25% shift left)
         targetY: Math.sin(angle) * animateDistance,
         
         // Visual properties
@@ -54,12 +54,12 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
 
   const positions = React.useMemo(() => generateRadialPositions(), []);
 
-  // Updated container styles to match voice recorder dimensions
+  // Updated container styles with significantly increased height
   const containerSize = {
     width: size === "sm" ? "100%" : "100%",
     height: size === "sm" ? "100%" : "100%",
     maxWidth: size === "sm" ? "300px" : "320px", // Match the width of the voice recorder
-    minHeight: size === "sm" ? "185px" : "185px", // Match the min-height of voice recorder
+    minHeight: size === "sm" ? "300px" : "340px", // Significantly increased from 185px
   };
 
   return (

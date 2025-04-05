@@ -128,10 +128,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
       <audio ref={audioRef} className="hidden" />
       
-      {/* Removed the inner border div and kept only the outer container */}
+      {/* Increased the min-height to give more vertical space for animation */}
       <div className={cn(
         "relative w-full h-full flex flex-col items-center justify-between overflow-hidden pt-6 pb-4 rounded-2xl border border-slate-200/20",
-        isMobile ? "min-h-[calc(70vh-160px)]" : "min-h-[185px]"
+        isMobile ? "min-h-[calc(80vh-160px)]" : "min-h-[400px]"
       )}>
         <div className="w-full px-4 sm:px-6 relative z-10">
           {/* No RecordingVisualizer component */}
