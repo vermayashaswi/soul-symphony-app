@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = 'light' | 'dark' | 'system';
@@ -15,6 +14,7 @@ interface ThemeContextType {
   setColorTheme: (theme: ColorTheme) => void;
   customColor: string;
   setCustomColor: (color: string) => void;
+  systemTheme: 'light' | 'dark';
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -22,131 +22,75 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = localStorage.getItem('feelosophy-theme');
-    return (savedTheme as Theme) || 'light';
+    return (savedTheme as Theme) || 'system';
   });
   
-  // Changed default color theme to 'Calm'
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(
+    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  );
+  
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
     const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
-    return (savedColorTheme as ColorTheme) || 'Calm'; // Default to 'Calm'
+    return (savedColorTheme as ColorTheme) || 'Calm';
   });
 
   const [customColor, setCustomColor] = useState<string>(() => {
     const savedCustomColor = localStorage.getItem('feelosophy-custom-color');
-    return savedCustomColor || '#3b82f6'; // Default to blue
+    return savedCustomColor || '#3b82f6';
   });
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      setSystemTheme(e.matches ? 'dark' : 'light');
+      if (theme === 'system') {
+        const root = window.document.documentElement;
+        root.classList.remove('light', 'dark');
+        root.classList.add(e.matches ? 'dark' : 'light');
+      }
+    };
+    
+    setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
+    mediaQuery.addEventListener('change', handleChange);
+    
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, [theme]);
 
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
     
     if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       root.classList.add(systemTheme);
     } else {
       root.classList.add(theme);
     }
     
     localStorage.setItem('feelosophy-theme', theme);
-  }, [theme]);
+  }, [theme, systemTheme]);
   
-  useEffect(() => {
-    localStorage.setItem('feelosophy-color-theme', colorTheme);
-    
-    // Apply color theme to CSS variables
-    const root = window.document.documentElement;
-    const primaryHex = getColorHex(colorTheme);
-    root.style.setProperty('--color-theme', primaryHex);
-    
-    // Update primary color based on the selected theme
-    const primaryRgb = hexToRgb(primaryHex);
-    
-    if (primaryRgb) {
-      // Convert RGB to HSL for primary color
-      const [h, s, l] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
-      root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
-      root.style.setProperty('--ring', `${h} ${s}% ${l}%`); // Also update ring color
-      
-      // Add CSS variable for colored text
-      root.style.setProperty('--theme-color', primaryHex);
-      
-      // Create theme CSS variables for text, border and background
-      const style = document.getElementById('theme-colors-style') || document.createElement('style');
-      style.id = 'theme-colors-style';
-      
-      // Apply more comprehensive color utility classes for different states and components
-      style.textContent = `
-        .text-theme-color { color: ${primaryHex} !important; }
-        .border-theme-color { border-color: ${primaryHex} !important; }
-        .bg-theme-color { background-color: ${primaryHex} !important; }
-        .hover\\:bg-theme-color:hover { background-color: ${primaryHex} !important; }
-        .hover\\:text-theme-color:hover { color: ${primaryHex} !important; }
-        .hover\\:border-theme-color:hover { border-color: ${primaryHex} !important; }
-        .focus\\:ring-theme-color:focus { --tw-ring-color: ${primaryHex} !important; }
-        .stroke-theme-color { stroke: ${primaryHex} !important; }
-        .fill-theme-color { fill: ${primaryHex} !important; }
-        
-        /* For button elements */
-        button.bg-theme-color { background-color: ${primaryHex} !important; }
-        button.text-theme-color { color: ${primaryHex} !important; }
-        button.border-theme-color { border-color: ${primaryHex} !important; }
-        
-        /* For special icons that need theme colors */
-        .icon-theme-color { color: ${primaryHex} !important; }
-        .icon-theme-color svg { color: ${primaryHex} !important; }
-        
-        /* For headings and text elements */
-        h1.text-theme-color, h2.text-theme-color, h3.text-theme-color, 
-        h4.text-theme-color, h5.text-theme-color, h6.text-theme-color,
-        p.text-theme-color, span.text-theme-color { color: ${primaryHex} !important; }
-      `;
-      document.head.appendChild(style);
-      
-      // Apply CSS custom properties for components that use HSL values directly
-      const [h2, s2, l2] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
-      document.documentElement.style.setProperty('--primary-h', `${h2}`);
-      document.documentElement.style.setProperty('--primary-s', `${s2}%`);
-      document.documentElement.style.setProperty('--primary-l', `${l2}%`);
-    }
-  }, [colorTheme, customColor]);
-
-  // Save custom color to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('feelosophy-custom-color', customColor);
-    // If colorTheme is Custom, update the CSS variables
-    if (colorTheme === 'Custom') {
-      const root = window.document.documentElement;
-      root.style.setProperty('--color-theme', customColor);
-      
-      const primaryRgb = hexToRgb(customColor);
-      if (primaryRgb) {
-        const [h, s, l] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
-        root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
-        root.style.setProperty('--ring', `${h} ${s}% ${l}%`);
-      }
-    }
-  }, [customColor, colorTheme]);
-
   const getColorHex = (theme: ColorTheme): string => {
     switch (theme) {
       case 'Default':
-        return '#3b82f6'; // Changed Default to blue-500 (same as Calm)
+        return '#3b82f6';
       case 'Calm':
-        return '#8b5cf6'; // Changed Calm to violet-500 (what was previously Soothing)
+        return '#8b5cf6';
       case 'Soothing':
-        return '#FFDEE2'; // Changed to light pink
+        return '#FFDEE2';
       case 'Energy':
-        return '#f59e0b'; // amber-500
+        return '#f59e0b';
       case 'Focus':
-        return '#10b981'; // emerald-500
+        return '#10b981';
       case 'Custom':
-        return customColor; // Return custom color
+        return customColor;
       default:
-        return '#3b82f6'; // Default fallback to blue
+        return '#3b82f6';
     }
   };
   
-  // Utility function to convert hex to RGB
   const hexToRgb = (hex: string): { r: number, g: number, b: number } | null => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
@@ -156,7 +100,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     } : null;
   };
   
-  // Utility function to convert RGB to HSL
   const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => {
     r /= 255;
     g /= 255;
@@ -183,6 +126,69 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
   };
 
+  useEffect(() => {
+    localStorage.setItem('feelosophy-color-theme', colorTheme);
+    
+    const root = window.document.documentElement;
+    const primaryHex = getColorHex(colorTheme);
+    root.style.setProperty('--color-theme', primaryHex);
+    
+    const primaryRgb = hexToRgb(primaryHex);
+    
+    if (primaryRgb) {
+      const [h, s, l] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+      root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
+      root.style.setProperty('--ring', `${h} ${s}% ${l}%`);
+      
+      const style = document.getElementById('theme-colors-style') || document.createElement('style');
+      style.id = 'theme-colors-style';
+      
+      style.textContent = `
+        .text-theme-color { color: ${primaryHex} !important; }
+        .border-theme-color { border-color: ${primaryHex} !important; }
+        .bg-theme-color { background-color: ${primaryHex} !important; }
+        .hover\\:bg-theme-color:hover { background-color: ${primaryHex} !important; }
+        .hover\\:text-theme-color:hover { color: ${primaryHex} !important; }
+        .hover\\:border-theme-color:hover { border-color: ${primaryHex} !important; }
+        .focus\\:ring-theme-color:focus { --tw-ring-color: ${primaryHex} !important; }
+        .stroke-theme-color { stroke: ${primaryHex} !important; }
+        .fill-theme-color { fill: ${primaryHex} !important; }
+        
+        button.bg-theme-color { background-color: ${primaryHex} !important; }
+        button.text-theme-color { color: ${primaryHex} !important; }
+        button.border-theme-color { border-color: ${primaryHex} !important; }
+        
+        .icon-theme-color { color: ${primaryHex} !important; }
+        .icon-theme-color svg { color: ${primaryHex} !important; }
+        
+        h1.text-theme-color, h2.text-theme-color, h3.text-theme-color, 
+        h4.text-theme-color, h5.text-theme-color, h6.text-theme-color,
+        p.text-theme-color, span.text-theme-color { color: ${primaryHex} !important; }
+      `;
+      document.head.appendChild(style);
+      
+      document.documentElement.style.setProperty('--primary-h', `${h}`);
+      document.documentElement.style.setProperty('--primary-s', `${s}%`);
+      document.documentElement.style.setProperty('--primary-l', `${l}%`);
+    }
+  }, [colorTheme, customColor]);
+
+  useEffect(() => {
+    localStorage.setItem('feelosophy-custom-color', customColor);
+    
+    if (colorTheme === 'Custom') {
+      const root = window.document.documentElement;
+      root.style.setProperty('--color-theme', customColor);
+      
+      const primaryRgb = hexToRgb(customColor);
+      if (primaryRgb) {
+        const [h, s, l] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+        root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
+        root.style.setProperty('--ring', `${h} ${s}% ${l}%`);
+      }
+    }
+  }, [customColor, colorTheme]);
+
   return (
     <ThemeContext.Provider value={{ 
       theme, 
@@ -190,7 +196,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       colorTheme, 
       setColorTheme, 
       customColor, 
-      setCustomColor 
+      setCustomColor,
+      systemTheme 
     }}>
       {children}
     </ThemeContext.Provider>

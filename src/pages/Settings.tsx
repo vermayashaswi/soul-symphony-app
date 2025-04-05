@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -44,7 +43,7 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 }
 
 export default function Settings() {
-  const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor } = useTheme();
+  const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { user, signOut } = useAuth();
   const [streakDays, setStreakDays] = useState(0);
@@ -55,10 +54,10 @@ export default function Settings() {
   const colorThemes = [
     { name: 'Default', color: 'bg-blue-500' },
     { name: 'Calm', color: 'bg-violet-500' },
-    { name: 'Soothing', color: 'bg-pink-200' }, // Updated to a light pink color class
+    { name: 'Soothing', color: 'bg-pink-200' },
     { name: 'Energy', color: 'bg-amber-400' },
     { name: 'Focus', color: 'bg-emerald-400' },
-    { name: 'Custom', color: 'custom' }, // Added custom theme option
+    { name: 'Custom', color: 'custom' },
   ];
 
   useEffect(() => {
@@ -152,7 +151,6 @@ export default function Settings() {
     };
   };
 
-  // Get custom color style
   const getCustomStyle = (themeName: string) => {
     if (themeName === 'Custom') {
       return { backgroundColor: customColor };
@@ -257,9 +255,15 @@ export default function Settings() {
                       theme === 'system' ? "bg-background shadow-sm" : "hover:text-foreground text-muted-foreground"
                     )}
                   >
-                    <span>System</span>
+                    <Monitor className="h-4 w-4 mr-1" />
+                    <span>System {theme === 'system' && `(${systemTheme})`}</span>
                   </button>
                 </div>
+                {theme === 'system' && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Using your device's {systemTheme} theme preference
+                  </p>
+                )}
               </div>
               
               <div>
