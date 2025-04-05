@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -369,7 +368,7 @@ const Index = () => {
         className={cn(
           "flex-1 container mx-auto px-4 py-8 relative z-10",
           shouldRenderMobile ? "max-w-md" : "",
-          shouldRenderMobile ? "pb-16 pt-16" : "pt-24"
+          shouldRenderMobile ? "pb-16 pt-64" : "pt-64"
         )}
         initial="hidden"
         animate="visible"
