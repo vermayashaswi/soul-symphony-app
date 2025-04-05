@@ -137,9 +137,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         </div>
         
         <div className="relative z-10 flex flex-col items-center justify-center w-full h-full">
-          <div className="flex-grow"></div>
-          
-          <div className="relative z-10 flex justify-center w-full mt-auto mb-24">
+          <div className="relative z-10 flex justify-center items-center w-full h-full">
             <RecordingButton
               isRecording={isRecording}
               isProcessing={isProcessing}
@@ -154,8 +152,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               showAnimation={false}
             />
           </div>
-          
-          <div className="flex-grow"></div>
 
           <AnimatePresence mode="wait">
             {isRecording ? (
@@ -164,7 +160,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
                 recordingTime={recordingTime} 
               />
             ) : audioBlob ? (
-              <div className="flex flex-col items-center w-full relative z-10">
+              <div className="flex flex-col items-center w-full relative z-10 mt-auto mb-8">
                 <PlaybackControls
                   audioBlob={audioBlob}
                   isPlaying={isPlaying}
@@ -191,7 +187,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="text-center text-muted-foreground relative z-10"
+                className="text-center text-muted-foreground relative z-10 mt-auto mb-8"
               >
                 Microphone access is required for recording
               </motion.p>
@@ -204,7 +200,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2 relative z-10"
+              className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2 relative z-10 absolute bottom-8"
             >
               <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div>{recordingError}</div>
@@ -212,7 +208,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           )}
           
           {isProcessing && (
-            <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground relative z-10">
+            <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground relative z-10 absolute bottom-4">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span>Processing with AI...</span>
               <ChevronRight className="w-4 h-4" />

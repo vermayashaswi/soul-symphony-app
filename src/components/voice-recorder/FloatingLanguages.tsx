@@ -54,14 +54,6 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
 
   const positions = React.useMemo(() => generateRadialPositions(), []);
 
-  // Updated container styles with significantly increased height
-  const containerSize = {
-    width: size === "sm" ? "100%" : "100%",
-    height: size === "sm" ? "100%" : "100%",
-    maxWidth: size === "sm" ? "400px" : "800px", 
-    minHeight: size === "sm" ? "400px" : "600px",
-  };
-
   return (
     <div
       className={cn(
@@ -70,7 +62,8 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
         "will-change-transform"
       )}
       style={{
-        ...containerSize,
+        width: "100%",
+        height: "100%",
         left: "50%",
         top: "50%",
         transform: "translate(-50%, -50%)",

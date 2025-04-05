@@ -149,15 +149,7 @@ export default function SmartChat() {
           .eq('thread_id', previousThreadIdRef.current);
         
         if (!error && data && data.length > 0) {
-          const title = await generateThreadTitle(previousThreadIdRef.current, user?.id);
-          if (title) {
-            // Dispatch event to update thread title in ChatThreadList
-            window.dispatchEvent(
-              new CustomEvent('threadTitleUpdated', { 
-                detail: { threadId: previousThreadIdRef.current, title } 
-              })
-            );
-          }
+          await generateThreadTitle(previousThreadIdRef.current, user?.id);
         }
         
         // Update the previous thread ID
@@ -171,7 +163,7 @@ export default function SmartChat() {
   const hasEnoughEntries = !loading && entries.length > 0;
 
   const createNewThread = async () => {
-    if (!user?.id) return;
+    if (!user?.id) return null;
     
     try {
       const newThreadId = uuidv4();

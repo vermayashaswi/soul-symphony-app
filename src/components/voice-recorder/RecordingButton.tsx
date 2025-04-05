@@ -48,7 +48,7 @@ export function RecordingButton({
   };
   
   return (
-    <div className="relative w-full h-full flex items-center justify-center">
+    <div className="relative flex items-center justify-center">
       {showAnimation && (
         <div className="absolute inset-0 flex items-center justify-center">
           <FloatingLanguages size="md" />
