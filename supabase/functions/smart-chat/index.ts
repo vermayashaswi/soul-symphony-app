@@ -12,9 +12,15 @@ if (!apiKey) {
 
 const openai = new OpenAI(apiKey);
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return cors(req, new Response('ok'));
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -62,19 +68,19 @@ serve(async (req) => {
     const responseContent = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
 
     // 5. Return response
-    return cors(req, new Response(
+    return new Response(
       JSON.stringify({ data: responseContent }),
-      { headers: { 'Content-Type': 'application/json' } }
-    ));
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+    );
   } catch (error) {
     console.error('Error:', error);
-    return cors(req, new Response(
+    return new Response(
       JSON.stringify({ error: error.message }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       }
-    ));
+    );
   }
 });
 

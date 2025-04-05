@@ -12,9 +12,15 @@ if (!apiKey) {
 
 const openai = new OpenAI(apiKey);
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: cors(req.headers) });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -24,7 +30,7 @@ serve(async (req) => {
       console.error('Missing user query or user ID');
       return new Response(JSON.stringify({ error: 'Missing user query or user ID' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...cors(req.headers) },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
@@ -41,7 +47,7 @@ serve(async (req) => {
       console.error('Failed to generate embedding for the query');
       return new Response(JSON.stringify({ error: 'Failed to generate embedding for the query' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...cors(req.headers) },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
@@ -59,13 +65,13 @@ serve(async (req) => {
     console.log('Returning the segmented query');
     return new Response(JSON.stringify({ data: segmentedQuery }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', ...cors(req.headers) },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   } catch (error) {
     console.error('Error processing request:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...cors(req.headers) },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 });
