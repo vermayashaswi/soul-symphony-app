@@ -200,13 +200,17 @@ export default function MobileChatInterface({
     addRagDiagnosticStep("Initializing chat request", "success", "Starting to process your query");
 
     let threadId = currentThreadId;
+    let isFirstMessage = false;
+    
     if (!threadId) {
       try {
         addRagDiagnosticStep("Creating new thread", "loading");
         
         if (onCreateNewThread) {
-          await onCreateNewThread();
-          return; // The event listener will trigger loadThreadMessages
+          threadId = await onCreateNewThread();
+          if (!threadId) {
+            throw new Error("Failed to create new thread");
+          }
         } else {
           const newThreadId = uuidv4();
           const { error } = await supabase
@@ -238,6 +242,13 @@ export default function MobileChatInterface({
         });
         return;
       }
+    } else {
+      const { count, error } = await supabase
+        .from('chat_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('thread_id', threadId);
+        
+      isFirstMessage = !error && count === 0;
     }
     
     setMessages(prev => [...prev, { role: 'user', content: message }]);
@@ -259,6 +270,16 @@ export default function MobileChatInterface({
         addRagDiagnosticStep("Saving user message", "error", msgError.message);
         throw msgError;
       }
+      
+      window.dispatchEvent(
+        new CustomEvent('messageCreated', { 
+          detail: { 
+            threadId, 
+            isFirstMessage,
+            content: message
+          } 
+        })
+      );
       
       addRagDiagnosticStep("Saving user message", "success");
       

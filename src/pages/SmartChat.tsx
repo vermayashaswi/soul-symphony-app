@@ -14,6 +14,8 @@ import Navbar from "@/components/Navbar";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
+import { generateThreadTitle } from "@/utils/chat/threadUtils";
+import { useToast } from "@/hooks/use-toast";
 
 const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
 
@@ -25,6 +27,8 @@ export default function SmartChat() {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const previousThreadIdRef = useRef<string | null>(null);
   
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -56,6 +60,7 @@ export default function SmartChat() {
             
           if (data && !error) {
             setCurrentThreadId(lastActiveThreadId);
+            previousThreadIdRef.current = lastActiveThreadId;
             window.dispatchEvent(
               new CustomEvent('threadSelected', { 
                 detail: { threadId: lastActiveThreadId } 
@@ -81,6 +86,7 @@ export default function SmartChat() {
 
         if (threads && threads.length > 0) {
           setCurrentThreadId(threads[0].id);
+          previousThreadIdRef.current = threads[0].id;
           localStorage.setItem(THREAD_ID_STORAGE_KEY, threads[0].id);
           window.dispatchEvent(
             new CustomEvent('threadSelected', { 
@@ -99,13 +105,68 @@ export default function SmartChat() {
       setShowSidebar(false);
     };
     
+    // Handle message creation events for title generation
+    const handleMessageCreated = async (event: CustomEvent) => {
+      if (event.detail?.threadId && event.detail?.isFirstMessage) {
+        // Wait a moment for the first message to be processed
+        setTimeout(async () => {
+          const title = await generateThreadTitle(event.detail.threadId, user?.id);
+          if (title) {
+            // Dispatch event to update thread title in ChatThreadList
+            window.dispatchEvent(
+              new CustomEvent('threadTitleUpdated', { 
+                detail: { threadId: event.detail.threadId, title } 
+              })
+            );
+          }
+        }, 1000);
+      }
+    };
+    
     window.addEventListener('closeChatSidebar', handleCloseSidebar);
+    window.addEventListener('messageCreated' as any, handleMessageCreated);
+    
     checkOrCreateThread();
     
     return () => {
       window.removeEventListener('closeChatSidebar', handleCloseSidebar);
+      window.removeEventListener('messageCreated' as any, handleMessageCreated);
     };
   }, [isMobile, mobileDemo, user]);
+  
+  // Generate title when switching away from a thread
+  useEffect(() => {
+    // If we have a previous thread ID and it's different from the current one
+    const generateTitleForPreviousThread = async () => {
+      if (previousThreadIdRef.current && 
+          previousThreadIdRef.current !== currentThreadId &&
+          user?.id) {
+        
+        // Check if the thread has messages
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select('count')
+          .eq('thread_id', previousThreadIdRef.current);
+        
+        if (!error && data && data.length > 0) {
+          const title = await generateThreadTitle(previousThreadIdRef.current, user?.id);
+          if (title) {
+            // Dispatch event to update thread title in ChatThreadList
+            window.dispatchEvent(
+              new CustomEvent('threadTitleUpdated', { 
+                detail: { threadId: previousThreadIdRef.current, title } 
+              })
+            );
+          }
+        }
+        
+        // Update the previous thread ID
+        previousThreadIdRef.current = currentThreadId;
+      }
+    };
+    
+    generateTitleForPreviousThread();
+  }, [currentThreadId, user?.id]);
 
   const hasEnoughEntries = !loading && entries.length > 0;
 
@@ -126,6 +187,7 @@ export default function SmartChat() {
       
       if (error) throw error;
       setCurrentThreadId(newThreadId);
+      previousThreadIdRef.current = newThreadId;
       localStorage.setItem(THREAD_ID_STORAGE_KEY, newThreadId);
       
       window.dispatchEvent(
@@ -133,8 +195,16 @@ export default function SmartChat() {
           detail: { threadId: newThreadId } 
         })
       );
+      
+      return newThreadId;
     } catch (error) {
       console.error("Error creating thread:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create new conversation",
+        variant: "destructive"
+      });
+      return null;
     }
   };
 

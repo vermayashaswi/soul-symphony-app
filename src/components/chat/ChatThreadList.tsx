@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   PlusCircle, 
   MessageCircle, 
   Search, 
   Trash2,
-  ChevronRight
+  ChevronRight,
+  Edit2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,8 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from '@/integrations/supabase/client';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatThreadListProps {
   userId?: string;
@@ -34,6 +37,10 @@ export default function ChatThreadList({
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [threadToDelete, setThreadToDelete] = useState<string | null>(null);
+  const [editingThread, setEditingThread] = useState<string | null>(null);
+  const [newTitle, setNewTitle] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
   
   useEffect(() => {
     const fetchThreads = async () => {
@@ -59,7 +66,32 @@ export default function ChatThreadList({
     };
 
     fetchThreads();
+    
+    // Listen for thread title updates
+    const handleTitleUpdated = (event: CustomEvent) => {
+      if (event.detail?.threadId && event.detail?.title) {
+        setThreads(prevThreads => 
+          prevThreads.map(thread => 
+            thread.id === event.detail.threadId 
+              ? { ...thread, title: event.detail.title } 
+              : thread
+          )
+        );
+      }
+    };
+    
+    window.addEventListener('threadTitleUpdated' as any, handleTitleUpdated);
+    
+    return () => {
+      window.removeEventListener('threadTitleUpdated' as any, handleTitleUpdated);
+    };
   }, [userId]);
+
+  useEffect(() => {
+    if (editingThread && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingThread]);
 
   const filteredThreads = threads.filter(thread =>
     thread.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -82,13 +114,77 @@ export default function ChatThreadList({
 
       if (error) {
         console.error("Error deleting thread:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete conversation",
+          variant: "destructive"
+        });
       } else {
         setThreads(threads.filter(thread => thread.id !== threadToDelete));
+        toast({
+          title: "Success",
+          description: "Conversation deleted",
+        });
+        
+        // If current thread was deleted, trigger new thread creation
+        if (currentThreadId === threadToDelete) {
+          onStartNewThread();
+        }
       }
     } catch (error) {
       console.error("Error deleting thread:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete conversation",
+        variant: "destructive"
+      });
     } finally {
       setThreadToDelete(null);
+    }
+  };
+  
+  const startEditingThread = (thread: any) => {
+    setEditingThread(thread.id);
+    setNewTitle(thread.title);
+  };
+  
+  const handleUpdateThreadTitle = async (threadId: string) => {
+    if (!newTitle.trim()) {
+      setEditingThread(null);
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('chat_threads')
+        .update({ 
+          title: newTitle.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', threadId);
+        
+      if (error) {
+        console.error("Error updating thread title:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update conversation title",
+          variant: "destructive"
+        });
+      } else {
+        setThreads(threads.map(thread => 
+          thread.id === threadId 
+            ? { ...thread, title: newTitle.trim() } 
+            : thread
+        ));
+        toast({
+          title: "Success",
+          description: "Conversation title updated",
+        });
+      }
+    } catch (error) {
+      console.error("Error updating thread title:", error);
+    } finally {
+      setEditingThread(null);
     }
   };
 
@@ -137,37 +233,90 @@ export default function ChatThreadList({
         ) : (
           <div className="space-y-1 py-2">
             {filteredThreads.map((thread) => (
-              <Button
-                key={thread.id}
-                variant="ghost"
-                className={cn(
-                  "w-full justify-start relative pr-10 py-6 h-auto text-left",
-                  thread.id === currentThreadId && "bg-muted"
-                )}
-                onClick={() => onSelectThread(thread.id)}
-              >
-                <div className="flex-1 truncate">
-                  <div className="flex items-center">
-                    <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
-                    <span className="truncate">{thread.title}</span>
+              <div key={thread.id} className="relative group">
+                {editingThread === thread.id ? (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+                    <Input
+                      ref={editInputRef}
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleUpdateThreadTitle(thread.id);
+                        } else if (e.key === 'Escape') {
+                          setEditingThread(null);
+                        }
+                      }}
+                      className="h-8"
+                      maxLength={30}
+                    />
+                    <div className="flex gap-1">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 px-2"
+                        onClick={() => handleUpdateThreadTitle(thread.id)}
+                      >
+                        Save
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-8 px-2"
+                        onClick={() => setEditingThread(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {format(new Date(thread.updated_at), 'MMM d, h:mm a')}
-                  </p>
-                </div>
-                
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setThreadToDelete(thread.id);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </Button>
+                ) : (
+                  <Button
+                    key={thread.id}
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start relative pr-16 py-6 h-auto text-left",
+                      thread.id === currentThreadId && "bg-muted"
+                    )}
+                    onClick={() => onSelectThread(thread.id)}
+                  >
+                    <div className="flex-1 truncate">
+                      <div className="flex items-center">
+                        <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
+                        <span className="truncate">{thread.title}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {format(new Date(thread.updated_at), 'MMM d, h:mm a')}
+                      </p>
+                    </div>
+                    
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditingThread(thread);
+                        }}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setThreadToDelete(thread.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </Button>
+                )}
+              </div>
             ))}
           </div>
         )}
