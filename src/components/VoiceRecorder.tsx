@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,6 +13,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
+import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -53,12 +53,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     reset: resetPlayback
   } = useAudioPlayback({ audioBlob });
 
-  // Control animation visibility based on recording state
   useEffect(() => {
     if (isRecording) {
       setShowAnimation(false);
     }
-    // We intentionally don't turn the animation back on when recording stops
   }, [isRecording]);
 
   useEffect(() => {
@@ -119,7 +117,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     resetRecording();
     resetPlayback();
     setRecordingError(null);
-    // Don't re-enable the animation
     toast.info("Recording discarded. Ready to start a new recording.");
   };
 
@@ -127,7 +124,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
       <audio ref={audioRef} className="hidden" />
       
-      {/* Single container with only one border */}
       <div className={cn(
         "relative w-full h-full flex flex-col items-center justify-between overflow-hidden rounded-2xl border border-slate-200/20",
         isMobile ? "min-h-[calc(80vh-160px)]" : "min-h-[500px]"
@@ -156,7 +152,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
                 onRecordingStop={stopRecording}
                 onPermissionRequest={requestPermissions}
                 audioLevel={audioLevel}
-                showAnimation={false} // We're now handling the animation at the container level
+                showAnimation={false}
               />
             </div>
             
