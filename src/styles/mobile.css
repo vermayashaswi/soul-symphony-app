@@ -69,21 +69,40 @@
     font-size: 1.25rem !important;
   }
   
-  /* Chat thread list buttons should always be visible */
-  .chat-thread-list .flex-shrink-0 {
+  /* IMPROVED: Chat thread list buttons - always visible and more obvious */
+  .chat-thread-list .chat-thread-buttons {
     display: flex !important;
     opacity: 1 !important;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 0 0.375rem 0.375rem 0;
+    padding: 8px 2px;
+    margin-left: auto;
+    height: 100%;
   }
   
-  /* Ensure the edit and delete buttons have adequate spacing */
-  .chat-thread-list .flex-shrink-0 button {
+  /* Ensure the thread buttons have adequate spacing */
+  .chat-thread-list .thread-edit-button,
+  .chat-thread-list .thread-delete-button {
     margin: 0 2px !important;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
   }
   
-  /* Make buttons more touchable on mobile */
+  /* Make thread buttons more touchable on mobile */
   .chat-thread-list .h-8.w-8 {
-    min-height: 40px;
+    min-height: 36px;
     min-width: 36px;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Ensure the thread buttons are not hidden */
+  .chat-thread-list .flex-shrink-0,
+  .chat-thread-list .chat-thread-buttons {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
   
   /* Voice recorder container height - making it fit the green box outline */

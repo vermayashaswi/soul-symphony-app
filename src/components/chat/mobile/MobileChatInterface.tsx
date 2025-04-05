@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, X, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
-import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
+import { processChatMessage } from "@/services/chatService";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,9 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import ChatDiagnostics from "@/components/chat/ChatDiagnostics";
-import { Json } from "@/integrations/supabase/types";
 import { motion } from "framer-motion";
-import EmptyChatState from "@/components/chat/EmptyChatState";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';

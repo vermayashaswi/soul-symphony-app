@@ -4,7 +4,6 @@ import {
   MessageCircle, 
   Search, 
   Trash2,
-  ChevronRight,
   Edit2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,9 +11,8 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from '@/integrations/supabase/client';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChatThreadListProps {
@@ -270,7 +268,7 @@ export default function ChatThreadList({
                       key={thread.id}
                       variant="ghost"
                       className={cn(
-                        "flex-1 justify-start relative h-auto py-4 text-left rounded-r-none",
+                        "flex-1 justify-start relative h-auto py-3 px-2 text-left rounded-r-none",
                         thread.id === currentThreadId && "bg-muted"
                       )}
                       onClick={() => onSelectThread(thread.id)}
@@ -286,11 +284,11 @@ export default function ChatThreadList({
                       </div>
                     </Button>
                     
-                    <div className="flex flex-shrink-0 pr-1">
+                    <div className="flex items-center pr-1 chat-thread-buttons">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-8 w-8 thread-edit-button"
                         onClick={(e) => {
                           e.stopPropagation();
                           startEditingThread(thread);
@@ -303,7 +301,7 @@ export default function ChatThreadList({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-8 w-8 thread-delete-button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setThreadToDelete(thread.id);
