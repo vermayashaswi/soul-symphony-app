@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { cn } from '@/lib/utils';
 import { Check as CheckIcon } from 'lucide-react';
+import { Input } from "@/components/ui/input";
 
 interface ColorPickerProps {
   value: string;
@@ -12,31 +13,83 @@ interface ColorPickerProps {
 
 export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   const [hue, setHue] = useState(0);
+  const [saturation, setSaturation] = useState(80);
+  const [lightness, setLightness] = useState(60);
   const [currentColor, setCurrentColor] = useState(value || '#3b82f6');
+  const [hexInput, setHexInput] = useState(value || '#3b82f6');
   const colorCircleRef = useRef<HTMLDivElement>(null);
+  const spectrumRef = useRef<HTMLDivElement>(null);
 
   // Initialize hue from input value
   useEffect(() => {
     if (value) {
       const rgb = hexToRgb(value);
       if (rgb) {
-        const [h] = rgbToHsl(rgb.r, rgb.g, rgb.b);
+        const [h, s, l] = rgbToHsl(rgb.r, rgb.g, rgb.b);
         setHue(h);
+        setSaturation(s);
+        setLightness(l);
+        setHexInput(value);
       }
     }
   }, [value]);
 
-  // Update color when hue changes
+  // Update color when HSL changes
   useEffect(() => {
-    const hslColor = `hsl(${hue}, 80%, 60%)`;
-    const hexColor = hslToHex(hue, 80, 60);
+    const hexColor = hslToHex(hue, saturation, lightness);
     setCurrentColor(hexColor);
-  }, [hue]);
+    setHexInput(hexColor);
+  }, [hue, saturation, lightness]);
 
   const handleHueChange = (newHue: number[]) => {
     setHue(newHue[0]);
-    const hexColor = hslToHex(newHue[0], 80, 60);
+    updateColor(newHue[0], saturation, lightness);
+  };
+
+  const handleSaturationChange = (newSaturation: number[]) => {
+    setSaturation(newSaturation[0]);
+    updateColor(hue, newSaturation[0], lightness);
+  };
+
+  const handleLightnessChange = (newLightness: number[]) => {
+    setLightness(newLightness[0]);
+    updateColor(hue, saturation, newLightness[0]);
+  };
+
+  const updateColor = (h: number, s: number, l: number) => {
+    const hexColor = hslToHex(h, s, l);
+    setCurrentColor(hexColor);
+    setHexInput(hexColor);
     onChange(hexColor);
+  };
+
+  const handleHexInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newHex = e.target.value;
+    setHexInput(newHex);
+    
+    // Only update if it's a valid hex color
+    if (/^#[0-9A-F]{6}$/i.test(newHex)) {
+      const rgb = hexToRgb(newHex);
+      if (rgb) {
+        const [h, s, l] = rgbToHsl(rgb.r, rgb.g, rgb.b);
+        setHue(h);
+        setSaturation(s);
+        setLightness(l);
+        setCurrentColor(newHex);
+        onChange(newHex);
+      }
+    }
+  };
+
+  const handleSpectrumClick = (e: React.MouseEvent) => {
+    if (spectrumRef.current) {
+      const rect = spectrumRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const width = rect.width;
+      const newHue = Math.round((x / width) * 360);
+      setHue(newHue);
+      updateColor(newHue, saturation, lightness);
+    }
   };
 
   // Convert HSL to Hex
@@ -92,7 +145,7 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   const generateSpectrumBackground = () => {
     let gradient = 'linear-gradient(to right, ';
     for (let i = 0; i <= 360; i += 30) {
-      gradient += `hsl(${i}, 80%, 60%) ${i/3.6}%, `;
+      gradient += `hsl(${i}, ${saturation}%, ${lightness}%) ${i/3.6}%, `;
     }
     // Remove trailing comma and space
     gradient = gradient.slice(0, -2);
@@ -100,49 +153,94 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
     return gradient;
   };
 
+  // Generate saturation gradient background
+  const generateSaturationBackground = () => {
+    return `linear-gradient(to right, hsl(${hue}, 0%, ${lightness}%), hsl(${hue}, 100%, ${lightness}%))`;
+  };
+
+  // Generate lightness gradient background
+  const generateLightnessBackground = () => {
+    return `linear-gradient(to right, hsl(${hue}, ${saturation}%, 0%), hsl(${hue}, ${saturation}%, 50%), hsl(${hue}, ${saturation}%, 100%))`;
+  };
+
   return (
     <div className={cn("flex flex-col space-y-4", className)}>
-      <div 
-        className="w-full h-24 rounded-xl overflow-hidden relative cursor-pointer"
-        style={{ background: generateSpectrumBackground() }}
-        onClick={(e) => {
-          if (colorCircleRef.current) {
-            const rect = colorCircleRef.current.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const width = rect.width;
-            const newHue = Math.round((x / width) * 360);
-            setHue(newHue);
-            handleHueChange([newHue]);
-          }
-        }}
-        ref={colorCircleRef}
-      >
+      {/* Color preview */}
+      <div className="flex items-center gap-3 mb-2">
         <div 
-          className="absolute top-0 bottom-0 w-1 bg-white border-2 border-gray-800 transform -translate-x-1/2"
-          style={{ 
-            left: `${hue / 3.6}%`,
-            boxShadow: '0 0 0 2px rgba(255,255,255,0.5)'
-          }}
+          className="h-12 w-12 rounded-full border-2 border-gray-200"
+          style={{ backgroundColor: currentColor }}
+        />
+        <div className="flex-1">
+          <Input
+            value={hexInput}
+            onChange={handleHexInputChange}
+            className="font-mono uppercase"
+            maxLength={7}
+          />
+        </div>
+      </div>
+      
+      {/* Hue spectrum slider */}
+      <div>
+        <label className="text-sm font-medium text-foreground mb-2 block">Hue</label>
+        <div 
+          className="w-full h-8 rounded-lg overflow-hidden relative cursor-pointer mb-2"
+          style={{ background: generateSpectrumBackground() }}
+          onClick={handleSpectrumClick}
+          ref={spectrumRef}
+        >
+          <div 
+            className="absolute top-0 bottom-0 w-1 bg-white border-2 border-gray-800 transform -translate-x-1/2"
+            style={{ 
+              left: `${hue / 3.6}%`,
+              boxShadow: '0 0 0 2px rgba(255,255,255,0.5)'
+            }}
+          />
+        </div>
+        
+        <Slider
+          value={[hue]}
+          min={0}
+          max={360}
+          step={1}
+          onValueChange={handleHueChange}
+          className="w-full"
         />
       </div>
       
-      <Slider
-        value={[hue]}
-        min={0}
-        max={360}
-        step={1}
-        onValueChange={handleHueChange}
-        className="w-full"
-      />
-
-      <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-2">
-          <div 
-            className="h-8 w-8 rounded-full border-2 border-gray-200"
-            style={{ backgroundColor: currentColor }}
-          />
-          <span className="text-sm font-medium text-foreground">{currentColor.toUpperCase()}</span>
-        </div>
+      {/* Saturation slider */}
+      <div>
+        <label className="text-sm font-medium text-foreground mb-2 block">Saturation</label>
+        <div 
+          className="w-full h-8 rounded-lg overflow-hidden relative mb-2"
+          style={{ background: generateSaturationBackground() }}
+        />
+        <Slider
+          value={[saturation]}
+          min={0}
+          max={100}
+          step={1}
+          onValueChange={handleSaturationChange}
+          className="w-full"
+        />
+      </div>
+      
+      {/* Lightness slider */}
+      <div>
+        <label className="text-sm font-medium text-foreground mb-2 block">Lightness</label>
+        <div 
+          className="w-full h-8 rounded-lg overflow-hidden relative mb-2"
+          style={{ background: generateLightnessBackground() }}
+        />
+        <Slider
+          value={[lightness]}
+          min={10}
+          max={90}
+          step={1}
+          onValueChange={handleLightnessChange}
+          className="w-full"
+        />
       </div>
     </div>
   );

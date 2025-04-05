@@ -307,7 +307,7 @@ export default function Settings() {
                 </div>
 
                 {colorTheme === 'Custom' && (
-                  <div className="mt-4">
+                  <div className="mt-6">
                     <label className="text-sm font-medium mb-2 block text-foreground">
                       Customize Your Color
                     </label>
