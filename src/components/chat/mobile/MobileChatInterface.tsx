@@ -39,7 +39,7 @@ type ChatMessageFromDB = {
 interface MobileChatInterfaceProps {
   currentThreadId?: string | null;
   onSelectThread?: (threadId: string) => void;
-  onCreateNewThread?: () => Promise<void>;
+  onCreateNewThread?: () => Promise<string | null>;
   userId?: string;
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
@@ -207,10 +207,11 @@ export default function MobileChatInterface({
         addRagDiagnosticStep("Creating new thread", "loading");
         
         if (onCreateNewThread) {
-          threadId = await onCreateNewThread();
-          if (!threadId) {
+          const newThreadId = await onCreateNewThread();
+          if (!newThreadId) {
             throw new Error("Failed to create new thread");
           }
+          threadId = newThreadId;
         } else {
           const newThreadId = uuidv4();
           const { error } = await supabase

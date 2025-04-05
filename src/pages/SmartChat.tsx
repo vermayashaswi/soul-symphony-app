@@ -162,7 +162,7 @@ export default function SmartChat() {
 
   const hasEnoughEntries = !loading && entries.length > 0;
 
-  const createNewThread = async () => {
+  const createNewThread = async (): Promise<string | null> => {
     if (!user?.id) return null;
     
     try {
