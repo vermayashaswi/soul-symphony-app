@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   PlusCircle, 
@@ -266,34 +265,37 @@ export default function ChatThreadList({
                     </div>
                   </div>
                 ) : (
-                  <Button
-                    key={thread.id}
-                    variant="ghost"
-                    className={cn(
-                      "w-full justify-start relative pr-16 py-6 h-auto text-left",
-                      thread.id === currentThreadId && "bg-muted"
-                    )}
-                    onClick={() => onSelectThread(thread.id)}
-                  >
-                    <div className="flex-1 truncate">
-                      <div className="flex items-center">
-                        <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
-                        <span className="truncate">{thread.title}</span>
+                  <div className="flex items-center">
+                    <Button
+                      key={thread.id}
+                      variant="ghost"
+                      className={cn(
+                        "flex-1 justify-start relative pr-20 py-6 h-auto text-left",
+                        thread.id === currentThreadId && "bg-muted"
+                      )}
+                      onClick={() => onSelectThread(thread.id)}
+                    >
+                      <div className="flex-1 truncate">
+                        <div className="flex items-center">
+                          <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
+                          <span className="truncate">{thread.title}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {format(new Date(thread.updated_at), 'MMM d, h:mm a')}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {format(new Date(thread.updated_at), 'MMM d, h:mm a')}
-                      </p>
-                    </div>
+                    </Button>
                     
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                    <div className="flex gap-1 mr-2">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-8 w-8 shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           startEditingThread(thread);
                         }}
+                        title="Edit conversation title"
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -301,16 +303,17 @@ export default function ChatThreadList({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-8 w-8 shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           setThreadToDelete(thread.id);
                         }}
+                        title="Delete conversation"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                  </Button>
+                  </div>
                 )}
               </div>
             ))}
