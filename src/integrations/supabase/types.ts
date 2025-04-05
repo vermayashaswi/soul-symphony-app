@@ -557,6 +557,8 @@ export type Database = {
           content: string
           created_at: string
           similarity: number
+          themes: string[]
+          emotions: Json
         }[]
       }
       store_user_query:
