@@ -1,16 +1,20 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { supabase } from '../_shared/supabase.ts';
-import { OpenAI } from "https://deno.land/x/openai@v1.3.0/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
+// Define Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Get OpenAI API key from environment variable
 const apiKey = Deno.env.get('OPENAI_API_KEY');
 if (!apiKey) {
   console.error('OPENAI_API_KEY is not set');
   Deno.exit(1);
 }
 
-const openai = new OpenAI(apiKey);
-
+// Define CORS headers directly in the function
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -34,11 +38,25 @@ serve(async (req) => {
     }
 
     // 1. Generate embedding for the message
-    const embeddingData = await openai.embeddings.create({
-      model: 'text-embedding-ada-002',
-      input: message,
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: message,
+      }),
     });
 
+    if (!embeddingResponse.ok) {
+      const error = await embeddingResponse.text();
+      console.error('Failed to generate embedding:', error);
+      throw new Error('Could not generate embedding for the message');
+    }
+
+    const embeddingData = await embeddingResponse.json();
     if (!embeddingData.data || embeddingData.data.length === 0) {
       throw new Error('Could not generate embedding for the message');
     }
@@ -59,12 +77,26 @@ serve(async (req) => {
       Keep your answers concise and to the point. Focus on providing actionable insights and support.`;
 
     // 4. Call OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'system', content: prompt }],
+    const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'system', content: prompt }],
+      }),
     });
 
-    const responseContent = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+    if (!completionResponse.ok) {
+      const error = await completionResponse.text();
+      console.error('Failed to get completion:', error);
+      throw new Error('Failed to generate response');
+    }
+
+    const completionData = await completionResponse.json();
+    const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
 
     // 5. Return response
     return new Response(

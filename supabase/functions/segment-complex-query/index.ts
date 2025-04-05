@@ -1,15 +1,20 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { supabase } from '../_shared/supabase.ts';
-import { OpenAI } from "https://deno.land/x/openai@v1.3.0/mod.ts";
 
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+
+// Define Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Get OpenAI API key from environment variable
 const apiKey = Deno.env.get('OPENAI_API_KEY');
 if (!apiKey) {
   console.error('OPENAI_API_KEY is not set');
   Deno.exit(1);
 }
 
-const openai = new OpenAI(apiKey);
-
+// Define CORS headers directly in the function
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -36,12 +41,29 @@ serve(async (req) => {
 
     // 1. Generate embedding for the user query
     console.log('Generating embedding for the user query');
-    const embeddingResponse = await openai.embeddings.create({
-      model: 'text-embedding-ada-002',
-      input: userQuery,
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: userQuery,
+      }),
     });
 
-    if (!embeddingResponse.data || embeddingResponse.data.length === 0) {
+    if (!embeddingResponse.ok) {
+      const error = await embeddingResponse.text();
+      console.error('Failed to generate embedding for the query:', error);
+      return new Response(JSON.stringify({ error: 'Failed to generate embedding for the query' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    const embeddingData = await embeddingResponse.json();
+    if (!embeddingData.data || embeddingData.data.length === 0) {
       console.error('Failed to generate embedding for the query');
       return new Response(JSON.stringify({ error: 'Failed to generate embedding for the query' }), {
         status: 500,
@@ -49,7 +71,7 @@ serve(async (req) => {
       });
     }
 
-    const queryEmbedding = embeddingResponse.data[0].embedding;
+    const queryEmbedding = embeddingData.data[0].embedding;
 
     // 2. Search for relevant journal entries
     console.log('Searching for relevant journal entries');
@@ -57,7 +79,7 @@ serve(async (req) => {
 
     // 3. Segment the complex query based on journal entries
     console.log('Segmenting the complex query based on journal entries');
-    const segmentedQuery = await segmentComplexQuery(userQuery, entries);
+    const segmentedQuery = await segmentComplexQuery(userQuery, entries, apiKey);
 
     // 4. Return the segmented query
     console.log('Returning the segmented query');
@@ -106,7 +128,7 @@ async function searchJournalEntries(
   }
 }
 
-async function segmentComplexQuery(userQuery: string, entries: any[]) {
+async function segmentComplexQuery(userQuery: string, entries: any[], apiKey: string) {
   try {
     console.log('Starting query segmentation');
 
@@ -126,18 +148,32 @@ async function segmentComplexQuery(userQuery: string, entries: any[]) {
       ]`;
 
     console.log('Calling OpenAI to segment the query');
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'system', content: prompt }],
-      temperature: 0.7,
+    const completion = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'system', content: prompt }],
+        temperature: 0.7,
+      }),
     });
 
-    if (!completion.choices || completion.choices.length === 0) {
+    if (!completion.ok) {
+      const error = await completion.text();
+      console.error('Failed to segment the query:', error);
+      return 'Failed to segment the query';
+    }
+
+    const completionData = await completion.json();
+    if (!completionData.choices || completionData.choices.length === 0) {
       console.error('Failed to segment the query');
       return 'Failed to segment the query';
     }
 
-    const segmentedQuery = completion.choices[0].message.content;
+    const segmentedQuery = completionData.choices[0].message.content;
     console.log(`Segmented query: ${segmentedQuery}`);
     return segmentedQuery;
   } catch (error) {
