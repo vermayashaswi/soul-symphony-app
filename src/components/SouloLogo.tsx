@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -11,6 +11,7 @@ interface SouloLogoProps {
   textClassName?: string;
   smileyClassName?: string;
   useColorTheme?: boolean;
+  animate?: boolean;
 }
 
 const SouloLogo = ({
@@ -18,9 +19,11 @@ const SouloLogo = ({
   size = "normal",
   textClassName = "",
   smileyClassName = "",
-  useColorTheme = true
+  useColorTheme = true,
+  animate = false
 }: SouloLogoProps) => {
   const { colorTheme } = useTheme();
+  const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
   
   // Size classes for the smiley
   const sizeClasses = {
@@ -32,10 +35,25 @@ const SouloLogo = ({
   
   // Apply color theme if useColorTheme is true
   const themeTextClass = useColorTheme ? "text-primary" : "";
+
+  useEffect(() => {
+    if (!animate) return;
+
+    const animationInterval = setInterval(() => {
+      setAnimationState((prev) => {
+        if (prev === 'full') return 'soul';
+        if (prev === 'soul') return 'none';
+        return 'full';
+      });
+    }, 800); // Animation cycle
+
+    return () => clearInterval(animationInterval);
+  }, [animate]);
   
   return (
     <span className={cn("font-semibold inline-flex items-center", themeTextClass, textClassName, className)}>
-      S<span className="mx-[0.5px]">O</span>
+      <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>S</span>
+      <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>O</span>
       <span className={cn("relative inline-block", sizeClasses[size], smileyClassName)}>
         {/* U-shaped character instead of circle */}
         <span className="absolute inset-0 flex items-center justify-center">
@@ -49,8 +67,8 @@ const SouloLogo = ({
           </span>
         </span>
       </span>
-      <span className="mx-[0.5px]">L</span>
-      <span className="mx-[0.5px]">O</span>
+      <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>L</span>
+      <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>O</span>
     </span>
   );
 };
