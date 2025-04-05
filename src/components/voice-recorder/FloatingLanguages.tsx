@@ -15,15 +15,28 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
     "স্বাগতম", "Namaste", "Hello", "Hi", "Hey",
   ];
 
-  // Generate random positions for each word
+  // Generate random positions with wider movement range
   const generateRandomPositions = () => {
-    return languageWords.map((_, index) => ({
-      x: Math.random() * 200 - 100, // Range from -100 to 100
-      y: Math.random() * 200 - 100, // Range from -100 to 100
-      scale: 0.8 + Math.random() * 0.4, // Range from 0.8 to 1.2
+    return languageWords.map(() => ({
+      // Initial positions - spread words more evenly across container
+      initialX: Math.random() * 160 - 80, // Range from -80 to 80
+      initialY: Math.random() * 160 - 80, // Range from -80 to 80
+      
+      // Movement ranges - larger values for more pronounced movement
+      moveRangeX: 40 + Math.random() * 60, // Range from 40 to 100
+      moveRangeY: 40 + Math.random() * 60, // Range from 40 to 100
+      
+      // Visual properties
+      scale: 0.7 + Math.random() * 0.6, // Range from 0.7 to 1.3
       opacity: 0.4 + Math.random() * 0.6, // Range from 0.4 to 1.0
-      delay: index * 0.1, // Staggered delay for each word
-      duration: 5 + Math.random() * 10 // Different durations for more natural movement
+      
+      // Timing properties
+      duration: 12 + Math.random() * 20, // Longer durations (12-32s) for smoother motion
+      delay: Math.random() * 5, // Random delay for more natural feel
+      
+      // Direction control 
+      directionX: Math.random() > 0.5 ? 1 : -1, // Random initial direction
+      directionY: Math.random() > 0.5 ? 1 : -1  // Random initial direction
     }));
   };
 
@@ -49,6 +62,29 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
         {languageWords.map((word, index) => {
           const position = positions[index];
           
+          // Create multiple random waypoints for more natural movement
+          const getRandomWaypoints = () => {
+            // Create 3-5 waypoints for each axis
+            const numPoints = 3 + Math.floor(Math.random() * 3);
+            const points = [];
+            
+            for (let i = 0; i < numPoints; i++) {
+              // Random point within the movement range
+              const factor = Math.random() * 2 - 1; // -1 to 1
+              points.push(position.initialX + (position.moveRangeX * factor * position.directionX));
+            }
+            
+            // Always return to somewhere near the initial position to create a loop
+            return [
+              position.initialX, 
+              ...points,
+              position.initialX + (Math.random() * 20 - 10)
+            ];
+          };
+          
+          const xWaypoints = getRandomWaypoints();
+          const yWaypoints = getRandomWaypoints();
+          
           return (
             <motion.span
               key={index}
@@ -58,14 +94,14 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
                 top: "50%",
               }}
               initial={{
-                x: position.x * 2,
-                y: position.y * 2,
+                x: position.initialX * 1.5,
+                y: position.initialY * 1.5,
                 scale: 0,
                 opacity: 0
               }}
               animate={{
-                x: [position.x, position.x + 15, position.x - 10, position.x],
-                y: [position.y, position.y - 10, position.y + 15, position.y],
+                x: xWaypoints,
+                y: yWaypoints,
                 scale: position.scale,
                 opacity: position.opacity
               }}
@@ -75,14 +111,16 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
                   repeat: Infinity,
                   repeatType: "reverse",
                   ease: "easeInOut",
-                  delay: position.delay
+                  delay: position.delay,
+                  times: Array(xWaypoints.length).fill(0).map((_, i) => i / (xWaypoints.length - 1))
                 },
                 y: {
                   duration: position.duration * 1.2, // Slightly different duration for x and y
                   repeat: Infinity,
                   repeatType: "reverse",
                   ease: "easeInOut", 
-                  delay: position.delay
+                  delay: position.delay,
+                  times: Array(yWaypoints.length).fill(0).map((_, i) => i / (yWaypoints.length - 1))
                 },
                 opacity: {
                   duration: 1,
