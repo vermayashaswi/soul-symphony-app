@@ -119,8 +119,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       <audio ref={audioRef} className="hidden" />
       
       <div className={cn(
-        "relative w-full h-full flex flex-col items-center justify-between overflow-hidden pt-6 pb-4",
-        isMobile ? "min-h-[calc(100vh-160px)]" : "min-h-[185px]"
+        "relative w-full h-full flex flex-col items-center justify-between overflow-hidden pt-6 pb-4 rounded-2xl border border-slate-200/20",
+        isMobile ? "min-h-[calc(70vh-160px)]" : "min-h-[185px]"
       )}>
         <LanguageBackground contained={true} />
         

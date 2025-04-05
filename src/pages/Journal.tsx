@@ -459,8 +459,8 @@ const Journal = () => {
           </TabsList>
           
           <TabsContent value="record" className="mt-2">
-            <Card className="mb-2">
-              <CardContent className="pt-2">
+            <Card className="mb-2 rounded-2xl overflow-hidden border-slate-200/20">
+              <CardContent className="pt-2 px-1 sm:px-3">
                 <div className="flex flex-col items-center overflow-hidden relative">
                   <VoiceRecorder onRecordingComplete={onEntryRecorded} />
                 </div>

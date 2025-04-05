@@ -69,17 +69,21 @@
     font-size: 1.25rem !important;
   }
   
-  /* Voice recorder container height - making it fill more space */
+  /* Voice recorder container height - making it fit the green box outline */
   [class*="min-h-[160px]"], [class*="min-h-[185px]"] {
-    min-height: calc(100vh - 160px) !important; /* Adjust to fill space above navbar */
+    min-height: calc(70vh - 160px) !important; /* Adjusted to better fit the green box */
+    max-height: calc(100vh - 260px) !important;
+    margin-bottom: 0.5rem !important;
+    border-radius: 1rem !important;
   }
   
   /* Voice recorder container position adjustment to stay above mobile navbar */
   .min-h-\[185px\] {
-    min-height: calc(100vh - 160px) !important; /* Adjust to fill space above navbar */
+    min-height: calc(70vh - 160px) !important; /* Adjusted to better fit the green box */
     margin-bottom: 0;
     position: relative;
     bottom: 0;
+    border-radius: 1rem !important;
   }
   
   /* Make card padding smaller on mobile */
@@ -125,21 +129,34 @@
     left: 0;
     right: 0;
     z-index: 40;
-    border-radius: 0;
+    border-radius: 16px; /* Add consistent rounded corners */
     border-left: none;
     border-right: none;
     border-bottom: none;
     height: auto; /* Let it size naturally */
   }
   
-  /* Make recording card fill available height */
+  /* Make recording card fit within the green box */
   .journal-container .tabs-content > div > .card {
-    min-height: calc(100vh - 180px); /* Adjusted to account for header and navbar */
+    min-height: calc(70vh - 180px); /* Adjusted to better fit the green box */
+    max-height: calc(100vh - 270px);
+    border-radius: 16px !important;
+    margin: 0 8px !important;
   }
   
   /* Adjust spacing of journal tabs container */
   .journal-container .container {
     padding: 0.5rem 1rem !important;
+  }
+  
+  /* Make voice recorder component fit the green box */
+  .journal-container .tabs-content {
+    overflow: visible;
+  }
+  
+  /* Make voice recorder fit within bounds */
+  .journal-container .card-content {
+    padding: 0.5rem !important;
   }
   
   /* Calendar specific mobile adjustments */
