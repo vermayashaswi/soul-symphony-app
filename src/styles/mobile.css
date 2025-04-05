@@ -137,6 +137,49 @@
   .journal-container .container {
     padding: 0.5rem 1rem !important;
   }
+  
+  /* Calendar specific mobile adjustments */
+  .rdp-caption {
+    padding: 0 !important;
+  }
+  
+  .rdp-nav {
+    padding: 0 !important;
+  }
+  
+  .rdp-months {
+    justify-content: center !important;
+  }
+  
+  .rdp-month {
+    width: 100% !important;
+  }
+  
+  .rdp-table {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .rdp-cell {
+    padding: 0 !important;
+    width: calc(100% / 7) !important;
+  }
+  
+  .rdp-head_cell {
+    width: calc(100% / 7) !important;
+    font-size: 0.7rem !important;
+  }
+  
+  .rdp-day {
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    aspect-ratio: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
 }
 
 /* Dark mode support for sticky elements */

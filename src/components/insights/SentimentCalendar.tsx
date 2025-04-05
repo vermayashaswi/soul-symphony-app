@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -271,7 +270,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     
     return (
       <div className="py-4">
-        <div className="grid grid-cols-7 gap-1 text-center mb-2">
+        <div className="grid grid-cols-7 gap-0 text-center mb-2">
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
             <div key={day} className="text-xs font-medium text-muted-foreground">
               {day}
@@ -279,7 +278,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           ))}
         </div>
         
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-0">
           {days.map((day) => {
             const dateKey = format(day, 'yyyy-MM-dd');
             const daySentiment = sentimentInfo.get(dateKey);
@@ -364,7 +363,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         <Calendar
           mode="multiple"
           selected={filteredData.map(d => d.date)}
-          className="p-0 rounded-xl w-full"
+          className="rounded-xl w-full"
           defaultMonth={filteredData.length > 0 ? filteredData[0].date : undefined}
           classNames={{
             day_today: "bg-primary/5 text-primary font-medium",
@@ -373,22 +372,22 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             day_outside: "text-muted-foreground opacity-50",
             day_range_middle: "aria-selected:bg-transparent",
             day_hidden: "invisible",
-            caption: "px-6 py-4 text-lg font-semibold",
+            caption: "px-4 py-3 text-lg font-semibold",
             month: "space-y-1",
-            months: "flex flex-col space-y-4",
-            table: "w-full border-collapse",
+            months: "flex flex-col space-y-2",
+            table: "w-full border-collapse space-y-1",
             head_row: "flex w-full justify-between",
-            head_cell: "text-muted-foreground rounded-md w-9 md:w-14 font-medium text-[0.9rem] text-center",
-            row: "flex w-full mt-2 justify-between",
+            head_cell: "text-muted-foreground text-xs font-medium w-9 sm:w-10 md:w-10 text-center",
+            row: "flex w-full justify-between",
             cell: cn(
-              "relative p-0 h-12 w-12 md:h-14 md:w-14",
+              "relative p-0 text-center",
               "focus-within:relative focus-within:z-20"
             ),
             day: cn(
-              "h-12 w-12 md:h-14 md:w-14 p-0 font-normal aria-selected:opacity-100 hover:bg-primary/10 transition-all duration-200"
+              "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-primary/10 transition-all duration-200"
             ),
-            nav_button: "hover:bg-primary/10 p-2 rounded-full transition-all duration-200 h-10 w-10",
-            caption_label: "text-lg",
+            nav_button: "hover:bg-primary/10 p-1 rounded-full transition-all duration-200 h-8 w-8",
+            caption_label: "text-base font-medium",
           }}
           components={{
             Day: (props: DayProps) => {
@@ -401,26 +400,28 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               );
               
               const isClickedDay = selectedDay && isSameDay(date, selectedDay);
+              const isToday = isSameDay(date, today);
               
               return (
                 <div
                   className={cn(
-                    "relative h-12 w-12 md:h-14 md:w-14 flex items-center justify-center hover:bg-primary/10 rounded-md transition-all duration-200",
+                    "relative flex items-center justify-center hover:bg-primary/10 rounded-md transition-all duration-200",
                     isSelected && "font-medium",
-                    isClickedDay && "ring-2 ring-primary bg-muted"
+                    isClickedDay && "ring-2 ring-primary bg-muted",
+                    isToday && "font-bold"
                   )}
                   onClick={() => handleDayClick(date)}
                   {...props}
                 >
-                  <div className="flex flex-col items-center justify-center h-full w-full z-10">
-                    <span className="text-sm md:text-base font-medium">
+                  <div className="flex flex-col items-center justify-center h-9 w-9 z-10">
+                    <span className="text-xs font-medium mb-0.5">
                       {date.getDate()}
                     </span>
                     
                     {info ? (
                       <motion.span 
                         className={cn(
-                          "text-base md:text-lg",
+                          "text-base",
                           info.colorClass
                         )}
                         initial={{ scale: 0.5 }}
@@ -430,7 +431,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                         {info.emoji}
                       </motion.span>
                     ) : isSelected ? (
-                      <span className="text-base md:text-lg text-muted-foreground">😶</span>
+                      <span className="text-base text-muted-foreground">😶</span>
                     ) : null}
                   </div>
                   
@@ -499,7 +500,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
 
     return (
       <div className="py-4">
-        <div className="grid grid-cols-6 gap-1 text-center mb-2">
+        <div className="grid grid-cols-6 gap-0 text-center mb-2">
           {months.slice(0, 6).map((month) => (
             <div key={month} className="text-xs font-medium text-muted-foreground">
               {month}
@@ -507,7 +508,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           ))}
         </div>
         
-        <div className="grid grid-cols-6 gap-1 mb-4">
+        <div className="grid grid-cols-6 gap-0 mb-4">
           {months.slice(0, 6).map((month, index) => {
             const monthSentiment = monthlyAverages.get(index);
             const date = new Date(today.getFullYear(), index, 1);
@@ -544,7 +545,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           })}
         </div>
         
-        <div className="grid grid-cols-6 gap-1 text-center mb-2">
+        <div className="grid grid-cols-6 gap-0 text-center mb-2">
           {months.slice(6, 12).map((month) => (
             <div key={month} className="text-xs font-medium text-muted-foreground">
               {month}
@@ -552,7 +553,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           ))}
         </div>
         
-        <div className="grid grid-cols-6 gap-1">
+        <div className="grid grid-cols-6 gap-0">
           {months.slice(6, 12).map((month, index) => {
             const actualIndex = index + 6;
             const monthSentiment = monthlyAverages.get(actualIndex);
