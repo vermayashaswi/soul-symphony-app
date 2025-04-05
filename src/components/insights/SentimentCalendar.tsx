@@ -32,10 +32,14 @@ interface SentimentCalendarProps {
   timeRange: 'today' | 'week' | 'month' | 'year';
 }
 
-function getEmoji(sentiment: number): string {
-  if (sentiment >= 0.2) return "🙂";      // Happy (green)
-  if (sentiment >= -0.2) return "😐";     // Neutral (yellow)
-  return "🙁";                           // Sad (red)
+function getEmoji(sentiment: number): JSX.Element {
+  if (sentiment >= 0.2) {
+    return <span className="text-green-500">🙂</span>; // Happy (green)
+  }
+  if (sentiment >= -0.2) {
+    return <span className="text-yellow-500">😐</span>; // Neutral (yellow)
+  }
+  return <span className="text-red-500">🙁</span>; // Sad (red)
 }
 
 function getEmojiColor(sentiment: number): string {
@@ -48,6 +52,12 @@ function getMoodText(sentiment: number): string {
   if (sentiment >= 0.2) return "Happy";
   if (sentiment >= -0.2) return "Neutral";
   return "Sad";
+}
+
+function getEmojiChar(sentiment: number): string {
+  if (sentiment >= 0.2) return "🙂";
+  if (sentiment >= -0.2) return "😐";
+  return "🙁";
 }
 
 type ViewMode = 'calendar' | 'graph';
@@ -107,9 +117,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const sentimentInfo = React.useMemo(() => {
     const infoMap = new Map<string, {
       sentiment: number;
-      emoji: string;
+      emoji: JSX.Element;
       colorClass: string;
       moodText: string;
+      emojiChar: string;
     }>();
     
     dailySentiment.forEach((avgSentiment, dateKey) => {
@@ -117,7 +128,8 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         sentiment: avgSentiment,
         emoji: getEmoji(avgSentiment),
         colorClass: getEmojiColor(avgSentiment),
-        moodText: getMoodText(avgSentiment)
+        moodText: getMoodText(avgSentiment),
+        emojiChar: getEmojiChar(avgSentiment)
       });
     });
     
@@ -229,7 +241,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, type: "spring" }}
           >
-            <span className={cn("text-6xl", todaySentiment.colorClass)}>{todaySentiment.emoji}</span>
+            <span className="text-6xl">{todaySentiment.emoji}</span>
           </motion.div>
         ) : (
           <motion.div 
@@ -299,10 +311,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   {format(day, 'd')}
                 </div>
                 {daySentiment ? (
-                  <div className={cn(
-                    "text-2xl",
-                    daySentiment.colorClass
-                  )}>
+                  <div className="text-2xl">
                     {daySentiment.emoji}
                   </div>
                 ) : (
@@ -332,7 +341,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 if (daySentiment) {
                   return (
                     <div className="flex justify-center items-center space-x-2">
-                      <span className={cn("text-2xl", daySentiment.colorClass)}>{daySentiment.emoji}</span>
+                      <span className="text-2xl">{daySentiment.emoji}</span>
                       <span className="text-sm">
                         Mood: {daySentiment.moodText} ({daySentiment.sentiment.toFixed(2)})
                       </span>
@@ -375,7 +384,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             caption: "px-4 py-3 text-lg font-semibold",
             month: "space-y-1",
             months: "flex flex-col space-y-2",
-            table: "w-full border-collapse space-y-1",
+            table: isMobile ? "w-full border-collapse space-y-1 table-fixed" : "w-full border-collapse space-y-1",
             head_row: "flex w-full justify-between",
             head_cell: "text-muted-foreground text-xs font-medium w-9 sm:w-10 md:w-10 text-center",
             row: "flex w-full justify-between",
@@ -420,10 +429,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                     
                     {info ? (
                       <motion.span 
-                        className={cn(
-                          "text-base",
-                          info.colorClass
-                        )}
+                        className="text-base"
                         initial={{ scale: 0.5 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.1, duration: 0.2 }}
@@ -449,7 +455,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                         
                         {info ? (
                           <div className="flex justify-center items-center space-x-2">
-                            <span className={cn("text-2xl", info.colorClass)}>{info.emoji}</span>
+                            <span className="text-2xl">{info.emoji}</span>
                             <span className="text-sm">
                               Mood: {info.moodText} ({info.sentiment.toFixed(2)})
                             </span>
@@ -512,7 +518,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           {months.slice(0, 6).map((month, index) => {
             const monthSentiment = monthlyAverages.get(index);
             const date = new Date(today.getFullYear(), index, 1);
-            const colorClass = monthSentiment !== undefined ? getEmojiColor(monthSentiment) : "";
             
             return (
               <motion.div 
@@ -531,10 +536,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   {month}
                 </div>
                 {monthSentiment !== undefined ? (
-                  <div className={cn(
-                    "text-2xl",
-                    colorClass
-                  )}>
+                  <div className="text-2xl">
                     {getEmoji(monthSentiment)}
                   </div>
                 ) : (
@@ -558,7 +560,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             const actualIndex = index + 6;
             const monthSentiment = monthlyAverages.get(actualIndex);
             const date = new Date(today.getFullYear(), actualIndex, 1);
-            const colorClass = monthSentiment !== undefined ? getEmojiColor(monthSentiment) : "";
             
             return (
               <motion.div 
@@ -577,10 +578,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   {month}
                 </div>
                 {monthSentiment !== undefined ? (
-                  <div className={cn(
-                    "text-2xl",
-                    colorClass
-                  )}>
+                  <div className="text-2xl">
                     {getEmoji(monthSentiment)}
                   </div>
                 ) : (
@@ -608,13 +606,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 const monthSentiment = monthlyAverages.get(month);
                 
                 if (monthSentiment !== undefined) {
-                  const colorClass = getEmojiColor(monthSentiment);
                   const emoji = getEmoji(monthSentiment);
                   const moodText = getMoodText(monthSentiment);
                   
                   return (
                     <div className="flex justify-center items-center space-x-2">
-                      <span className={cn("text-2xl", colorClass)}>{emoji}</span>
+                      <span className="text-2xl">{emoji}</span>
                       <span className="text-sm">
                         Mood: {moodText} ({monthSentiment.toFixed(2)})
                       </span>
@@ -678,15 +675,15 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             <XAxis 
               dataKey="time" 
               stroke={theme === 'dark' ? '#888' : '#666'} 
-              fontSize={12}
+              fontSize={isMobile ? 10 : 12}
               tickMargin={10}
             />
             <YAxis 
               domain={[-1, 1]} 
               ticks={[-1, -0.5, 0, 0.5, 1]}
               stroke={theme === 'dark' ? '#888' : '#666'} 
-              fontSize={12}
-              tickMargin={10}
+              fontSize={isMobile ? 10 : 12}
+              tickMargin={isMobile ? 5 : 10}
             />
             <Tooltip
               contentStyle={{
