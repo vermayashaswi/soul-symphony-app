@@ -122,10 +122,16 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
       onClick={handleVoiceRecording}
       disabled={isLoading}
       className={cn(
-        "relative",
+        "relative rounded-full flex items-center justify-center",
+        isRecording ? "bg-red-500 hover:bg-red-600" : "",
         isRecording && "animate-pulse",
         className
       )}
+      style={{
+        width: size === "sm" ? "48px" : "64px",
+        height: size === "sm" ? "48px" : "64px",
+        transition: "all 0.3s ease"
+      }}
     >
       {isRecording ? (
         <Square className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} text-white`} />

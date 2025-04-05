@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
 import { toast } from 'sonner';
@@ -144,8 +145,13 @@ export function useRecordRTCRecorder({
           
           setAudioLevel(scaledLevel);
           
-          if (isRecording && avg > 50 && Math.random() > 0.7) {
-            setRipples(prev => [...prev, Date.now()]);
+          // Add ripple effect when audio level crosses threshold
+          // The higher the audio level, the more likely to create a ripple
+          if (isRecording && scaledLevel > 20) {
+            const probability = scaledLevel / 100; // Higher audio = higher probability
+            if (Math.random() < probability) {
+              setRipples(prev => [...prev, Date.now()]);
+            }
           }
         }
       }, 100);
@@ -214,6 +220,7 @@ export function useRecordRTCRecorder({
         }, maxDuration * 1000);
       }
       
+      // Add initial ripple effect when recording starts
       setRipples([Date.now()]);
       
     } catch (error) {
