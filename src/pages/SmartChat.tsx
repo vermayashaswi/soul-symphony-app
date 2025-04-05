@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -29,6 +30,7 @@ export default function SmartChat() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const previousThreadIdRef = useRef<string | null>(null);
+  const titleGeneratedForThreads = useRef<Set<string>>(new Set());
   
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -105,13 +107,16 @@ export default function SmartChat() {
       setShowSidebar(false);
     };
     
-    // Handle message creation events for title generation
+    // Handle message creation events for title generation of first message only
     const handleMessageCreated = async (event: CustomEvent) => {
       if (event.detail?.threadId && event.detail?.isFirstMessage) {
         // Wait a moment for the first message to be processed
         setTimeout(async () => {
           const title = await generateThreadTitle(event.detail.threadId, user?.id);
           if (title) {
+            // Mark this thread as having a generated title
+            titleGeneratedForThreads.current.add(event.detail.threadId);
+            
             // Dispatch event to update thread title in ChatThreadList
             window.dispatchEvent(
               new CustomEvent('threadTitleUpdated', { 
@@ -134,7 +139,7 @@ export default function SmartChat() {
     };
   }, [isMobile, mobileDemo, user]);
   
-  // Generate title when switching away from a thread
+  // Generate title ONLY when switching away from a thread and if it hasn't been generated before
   useEffect(() => {
     // If we have a previous thread ID and it's different from the current one
     const generateTitleForPreviousThread = async () => {
@@ -142,14 +147,30 @@ export default function SmartChat() {
           previousThreadIdRef.current !== currentThreadId &&
           user?.id) {
         
-        // Check if the thread has messages
-        const { data, error } = await supabase
-          .from('chat_messages')
-          .select('count')
-          .eq('thread_id', previousThreadIdRef.current);
-        
-        if (!error && data && data.length > 0) {
-          await generateThreadTitle(previousThreadIdRef.current, user?.id);
+        // Only generate title if we haven't already done so for this thread
+        if (!titleGeneratedForThreads.current.has(previousThreadIdRef.current)) {
+          // Check if the thread has messages
+          const { data, error } = await supabase
+            .from('chat_messages')
+            .select('count')
+            .eq('thread_id', previousThreadIdRef.current);
+          
+          if (!error && data && data.length > 0) {
+            console.log("Generating title for thread being left:", previousThreadIdRef.current);
+            const title = await generateThreadTitle(previousThreadIdRef.current, user?.id);
+            
+            if (title) {
+              // Mark this thread as having a generated title
+              titleGeneratedForThreads.current.add(previousThreadIdRef.current);
+              
+              // Dispatch event to update thread title in ChatThreadList
+              window.dispatchEvent(
+                new CustomEvent('threadTitleUpdated', { 
+                  detail: { threadId: previousThreadIdRef.current, title } 
+                })
+              );
+            }
+          }
         }
         
         // Update the previous thread ID

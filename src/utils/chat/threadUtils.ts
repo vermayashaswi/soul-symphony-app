@@ -27,6 +27,19 @@ export const generateThreadTitle = async (threadId: string, userId: string | und
       return "New Conversation";
     }
     
+    // Check if this thread already has a real title
+    const { data: thread } = await supabase
+      .from('chat_threads')
+      .select('title')
+      .eq('id', threadId)
+      .single();
+      
+    // Don't regenerate if it already has a non-default title
+    if (thread && thread.title && thread.title !== "New Conversation") {
+      console.log("Thread already has a title, skipping generation:", thread.title);
+      return thread.title;
+    }
+    
     // Create a prompt for title generation
     const userMessages = messages
       .filter(msg => msg.sender === 'user')
