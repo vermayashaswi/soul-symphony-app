@@ -39,18 +39,6 @@ serve(async (req) => {
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
     
-    // Check if this is an emotion analysis query
-    const emotionQueryPattern = /top\s+emotions|emotions\s+summary|main\s+emotions|emotional\s+state|emotion\s+analysis/i;
-    const isEmotionQuery = emotionQueryPattern.test(message);
-    const isLastMonthPattern = /last\s+month|previous\s+month|past\s+month/i;
-    const isLastMonth = isLastMonthPattern.test(message);
-
-    // If it's an emotion query, handle it specially
-    if (isEmotionQuery) {
-      console.log("Detected emotion analysis query, handling specially");
-      return await handleEmotionQuery(userId, isLastMonth, corsHeaders);
-    }
-    
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -134,100 +122,6 @@ serve(async (req) => {
     );
   }
 });
-
-// Handle emotion analysis queries
-async function handleEmotionQuery(userId: string, isLastMonth: boolean, corsHeaders: Record<string, string>) {
-  try {
-    console.log(`Processing emotion analysis query for user: ${userId}, isLastMonth: ${isLastMonth}`);
-    
-    const currentDate = new Date();
-    let startDate: Date | null = null;
-    let endDate: Date | null = currentDate;
-    
-    if (isLastMonth) {
-      // Set to first day of previous month
-      startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-      // Set to last day of previous month
-      endDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
-    }
-    
-    console.log(`Date range: ${startDate?.toISOString()} to ${endDate?.toISOString()}`);
-    
-    // Call the get_top_emotions_with_entries function
-    const { data, error } = await supabase.rpc(
-      'get_top_emotions_with_entries',
-      {
-        user_id_param: userId,
-        start_date: startDate,
-        end_date: endDate,
-        limit_count: 5
-      }
-    );
-    
-    if (error) {
-      console.error(`Error in emotion analysis: ${error.message}`);
-      throw error;
-    }
-    
-    if (!data || data.length === 0) {
-      console.log("No emotion data found");
-      return new Response(
-        JSON.stringify({ 
-          data: "I couldn't find any emotion data for the specified time period. It seems there aren't enough journal entries with emotional content to analyze.",
-          analysis: {
-            type: 'top_emotions',
-            data: []
-          }
-        }),
-        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-      );
-    }
-    
-    console.log(`Found ${data.length} top emotions`);
-    
-    // Format the response
-    const emotionsList = data.map((item: any) => 
-      `${item.emotion} (${(item.score * 100).toFixed(0)}%)`
-    ).join(", ");
-    
-    const responseText = isLastMonth 
-      ? `Based on your journal entries from last month, your top emotions were: ${emotionsList}. These emotions were most prominent in your writing during this period.`
-      : `Based on your journal entries, your top emotions are: ${emotionsList}. These emotions appear most prominently in your writing.`;
-    
-    // Return the formatted response
-    return new Response(
-      JSON.stringify({ 
-        data: responseText,
-        references: data.flatMap((item: any) => 
-          item.sample_entries ? item.sample_entries.map((entry: any) => ({
-            id: entry.id,
-            snippet: entry.content,
-            date: entry.created_at,
-            similarity: entry.score,
-            emotions: { [item.emotion]: entry.score }
-          })) : []
-        ),
-        analysis: {
-          type: 'top_emotions',
-          data: data.map((item: any) => ({
-            emotion: item.emotion,
-            score: item.score
-          }))
-        }
-      }),
-      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-    );
-  } catch (error) {
-    console.error('Error in emotion analysis:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
-    );
-  }
-}
 
 // Update function to correctly pass parameters in the expected order
 async function searchEntriesWithVector(
