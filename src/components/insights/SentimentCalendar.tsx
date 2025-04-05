@@ -34,12 +34,12 @@ interface SentimentCalendarProps {
 
 function getEmoji(sentiment: number): JSX.Element {
   if (sentiment >= 0.2) {
-    return <span role="img" aria-label="happy" className="text-green-500">🙂</span>; // Happy (green)
+    return <span role="img" aria-label="happy" className="text-primary">🙂</span>;
   }
   if (sentiment >= -0.2) {
-    return <span role="img" aria-label="neutral" className="text-yellow-500">😐</span>; // Neutral (yellow)
+    return <span role="img" aria-label="neutral" className="text-primary">😐</span>;
   }
-  return <span role="img" aria-label="sad" className="text-red-500">🙁</span>; // Sad (red)
+  return <span role="img" aria-label="sad" className="text-primary">🙁</span>;
 }
 
 function getEmojiColor(sentiment: number): string {
@@ -58,6 +58,12 @@ function getEmojiChar(sentiment: number): string {
   if (sentiment >= 0.2) return "🙂";
   if (sentiment >= -0.2) return "😐";
   return "🙁";
+}
+
+function getContainerBgColor(sentiment: number): string {
+  if (sentiment >= 0.2) return "bg-green-100 dark:bg-green-900/50"; 
+  if (sentiment >= -0.2) return "bg-yellow-100 dark:bg-yellow-900/50"; 
+  return "bg-red-100 dark:bg-red-900/50";
 }
 
 const EmptyCircle = () => (
@@ -242,7 +248,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         
         {todaySentiment ? (
           <motion.div 
-            className="rounded-full p-12 flex items-center justify-center"
+            className={cn(
+              "rounded-full p-12 flex items-center justify-center",
+              getContainerBgColor(todaySentiment.sentiment)
+            )}
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, type: "spring" }}
@@ -317,7 +326,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   {format(day, 'd')}
                 </div>
                 {daySentiment ? (
-                  <div className="text-2xl">
+                  <div className={cn(
+                    "text-2xl w-7 h-7 flex items-center justify-center rounded-full",
+                    getContainerBgColor(daySentiment.sentiment)
+                  )}>
                     {daySentiment.emoji}
                   </div>
                 ) : (
@@ -347,7 +359,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 if (daySentiment) {
                   return (
                     <div className="flex justify-center items-center space-x-2">
-                      <span className="text-2xl">{daySentiment.emoji}</span>
+                      <span className={cn(
+                        "text-2xl w-8 h-8 flex items-center justify-center rounded-full",
+                        getContainerBgColor(daySentiment.sentiment)
+                      )}>
+                        {daySentiment.emoji}
+                      </span>
                       <span className="text-sm">
                         Mood: {daySentiment.moodText} ({daySentiment.sentiment.toFixed(2)})
                       </span>
@@ -436,7 +453,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                     
                     {info ? (
                       <motion.span 
-                        className="text-base"
+                        className={cn(
+                          "text-base w-6 h-6 flex items-center justify-center rounded-full",
+                          getContainerBgColor(info.sentiment)
+                        )}
                         initial={{ scale: 0.5 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.1, duration: 0.2 }}
@@ -462,7 +482,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                         
                         {info ? (
                           <div className="flex justify-center items-center space-x-2">
-                            <span className="text-2xl">{info.emoji}</span>
+                            <span className={cn(
+                              "text-2xl w-8 h-8 flex items-center justify-center rounded-full",
+                              getContainerBgColor(info.sentiment)
+                            )}>
+                              {info.emoji}
+                            </span>
                             <span className="text-sm">
                               Mood: {info.moodText} ({info.sentiment.toFixed(2)})
                             </span>
@@ -543,7 +568,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   {month}
                 </div>
                 {monthSentiment !== undefined ? (
-                  <div className="text-2xl">
+                  <div className={cn(
+                    "text-2xl w-7 h-7 flex items-center justify-center rounded-full",
+                    getContainerBgColor(monthSentiment)
+                  )}>
                     {getEmoji(monthSentiment)}
                   </div>
                 ) : (
@@ -585,7 +613,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   {month}
                 </div>
                 {monthSentiment !== undefined ? (
-                  <div className="text-2xl">
+                  <div className={cn(
+                    "text-2xl w-7 h-7 flex items-center justify-center rounded-full",
+                    getContainerBgColor(monthSentiment)
+                  )}>
                     {getEmoji(monthSentiment)}
                   </div>
                 ) : (
@@ -618,7 +649,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   
                   return (
                     <div className="flex justify-center items-center space-x-2">
-                      <span className="text-2xl">{emoji}</span>
+                      <span className={cn(
+                        "text-2xl w-8 h-8 flex items-center justify-center rounded-full",
+                        getContainerBgColor(monthSentiment)
+                      )}>
+                        {emoji}
+                      </span>
                       <span className="text-sm">
                         Mood: {moodText} ({monthSentiment.toFixed(2)})
                       </span>
