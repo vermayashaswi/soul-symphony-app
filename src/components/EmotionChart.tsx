@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -127,6 +128,12 @@ export function EmotionChart({
     return filteredEmotions;
   }, [aggregatedData, timeframe]);
   
+  // Force bubble chart to re-render when switching back to bubble view
+  useEffect(() => {
+    setBubbleKey(prev => prev + 1);
+  }, [chartType]);
+  
+  // This effect will update bubble chart when timeframe or data changes
   useEffect(() => {
     console.log('[EmotionChart] Timeframe or aggregatedData changed, updating bubble chart', {
       timeframe,
