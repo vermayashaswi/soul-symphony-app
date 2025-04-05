@@ -1,3 +1,4 @@
+
 import React from "react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +13,18 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
     "வணக்கம்", "Ayubowan", "ਸਤਿ ਸ਼੍ਰੀ ਅਕਾਲ", "Kem Chho", "নমস্কার",
     "স্বাগতম", "Namaste", "Hello", "Hi", "Hey",
   ];
+
+  // Define the keyframes animation style directly in the component
+  const floatTextKeyframes = `
+    @keyframes floatText {
+      0% {
+        transform: translateY(100%);
+      }
+      100% {
+        transform: translateY(-100%);
+      }
+    }
+  `;
 
   return (
     <div
@@ -29,6 +42,9 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
         animation: "floatText 15s linear infinite",
       }}
     >
+      {/* Add style element for keyframes animation */}
+      <style dangerouslySetInnerHTML={{ __html: floatTextKeyframes }} />
+      
       <div className="flex flex-col items-center justify-center h-full">
         {languageWords.map((word, index) => (
           <span
@@ -46,16 +62,6 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
           </span>
         ))}
       </div>
-      <style jsx>{`
-        @keyframes floatText {
-          0% {
-            transform: translateY(100%);
-          }
-          100% {
-            transform: translateY(-100%);
-          }
-        }
-      `}</style>
     </div>
   );
 };
