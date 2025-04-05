@@ -1,7 +1,8 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = 'light' | 'dark' | 'system';
-type ColorTheme = 'Default' | 'Calm' | 'Soothing' | 'Energy' | 'Focus';
+type ColorTheme = 'Default' | 'Calm' | 'Soothing' | 'Energy' | 'Focus' | 'Custom';
 
 interface ThemeProviderProps {
   children: React.ReactNode;
@@ -12,6 +13,8 @@ interface ThemeContextType {
   setTheme: (theme: Theme) => void;
   colorTheme: ColorTheme;
   setColorTheme: (theme: ColorTheme) => void;
+  customColor: string;
+  setCustomColor: (color: string) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -26,6 +29,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
     const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
     return (savedColorTheme as ColorTheme) || 'Calm'; // Default to 'Calm'
+  });
+
+  const [customColor, setCustomColor] = useState<string>(() => {
+    const savedCustomColor = localStorage.getItem('feelosophy-custom-color');
+    return savedCustomColor || '#3b82f6'; // Default to blue
   });
 
   useEffect(() => {
@@ -100,7 +108,24 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       document.documentElement.style.setProperty('--primary-s', `${s2}%`);
       document.documentElement.style.setProperty('--primary-l', `${l2}%`);
     }
-  }, [colorTheme]);
+  }, [colorTheme, customColor]);
+
+  // Save custom color to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('feelosophy-custom-color', customColor);
+    // If colorTheme is Custom, update the CSS variables
+    if (colorTheme === 'Custom') {
+      const root = window.document.documentElement;
+      root.style.setProperty('--color-theme', customColor);
+      
+      const primaryRgb = hexToRgb(customColor);
+      if (primaryRgb) {
+        const [h, s, l] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+        root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
+        root.style.setProperty('--ring', `${h} ${s}% ${l}%`);
+      }
+    }
+  }, [customColor, colorTheme]);
 
   const getColorHex = (theme: ColorTheme): string => {
     switch (theme) {
@@ -114,6 +139,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         return '#f59e0b'; // amber-500
       case 'Focus':
         return '#10b981'; // emerald-500
+      case 'Custom':
+        return customColor; // Return custom color
       default:
         return '#3b82f6'; // Default fallback to blue
     }
@@ -157,7 +184,14 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, colorTheme, setColorTheme }}>
+    <ThemeContext.Provider value={{ 
+      theme, 
+      setTheme, 
+      colorTheme, 
+      setColorTheme, 
+      customColor, 
+      setCustomColor 
+    }}>
       {children}
     </ThemeContext.Provider>
   );

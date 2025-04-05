@@ -17,6 +17,7 @@ import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SouloLogo from '@/components/SouloLogo';
+import { ColorPicker } from '@/components/settings/ColorPicker';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -43,7 +44,7 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 }
 
 export default function Settings() {
-  const { theme, setTheme, colorTheme, setColorTheme } = useTheme();
+  const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { user, signOut } = useAuth();
   const [streakDays, setStreakDays] = useState(0);
@@ -57,6 +58,7 @@ export default function Settings() {
     { name: 'Soothing', color: 'bg-pink-200' }, // Updated to a light pink color class
     { name: 'Energy', color: 'bg-amber-400' },
     { name: 'Focus', color: 'bg-emerald-400' },
+    { name: 'Custom', color: 'custom' }, // Added custom theme option
   ];
 
   useEffect(() => {
@@ -149,13 +151,21 @@ export default function Settings() {
       backgroundColor: `${themeColor}20` 
     };
   };
+
+  // Get custom color style
+  const getCustomStyle = (themeName: string) => {
+    if (themeName === 'Custom') {
+      return { backgroundColor: customColor };
+    }
+    return {};
+  };
   
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
       
-      <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-4" : "pt-8")}>
-        <div className="mb-8">
+      <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
+        <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2 text-theme-color">Settings</h1>
           <p className="text-muted-foreground">Personalize your Feelosophy experience</p>
         </div>
@@ -269,11 +279,12 @@ export default function Settings() {
                       <div
                         className={cn(
                           "h-10 w-10 rounded-full flex items-center justify-center border-2 transition-all",
-                          themeOption.color,
+                          themeOption.color !== 'custom' ? themeOption.color : '',
                           colorTheme === themeOption.name 
                             ? "border-foreground ring-2 ring-background ring-offset-2" 
                             : "border-muted"
                         )}
+                        style={themeOption.name === 'Custom' ? getCustomStyle('Custom') : {}}
                       >
                         {colorTheme === themeOption.name && (
                           <CheckIcon className="h-5 w-5 text-white" />
@@ -290,6 +301,21 @@ export default function Settings() {
                     </button>
                   ))}
                 </div>
+
+                {colorTheme === 'Custom' && (
+                  <div className="mt-4">
+                    <label className="text-sm font-medium mb-2 block text-foreground">
+                      Customize Your Color
+                    </label>
+                    <ColorPicker 
+                      value={customColor}
+                      onChange={(color) => {
+                        setCustomColor(color);
+                      }}
+                      className="mt-2"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
