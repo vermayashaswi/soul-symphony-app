@@ -27,7 +27,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId } = await req.json();
+    const { message, userId, timeRange } = await req.json();
 
     if (!message) {
       throw new Error('Message is required');
@@ -67,9 +67,19 @@ serve(async (req) => {
     const queryEmbedding = embeddingData.data[0].embedding;
     console.log("Embedding generated successfully");
 
-    // 2. Search for relevant entries
+    // 2. Search for relevant entries with proper temporal filtering
     console.log("Searching for relevant entries");
-    const entries = await searchEntriesWithVector(userId, queryEmbedding);
+    
+    // Use different search function based on whether we have a time range
+    let entries = [];
+    if (timeRange && (timeRange.startDate || timeRange.endDate)) {
+      console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
+      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+    } else {
+      console.log("Using standard vector search without time filtering");
+      entries = await searchEntriesWithVector(userId, queryEmbedding);
+    }
+    
     console.log(`Found ${entries.length} relevant entries`);
 
     // 3. Prepare prompt
@@ -123,17 +133,14 @@ serve(async (req) => {
   }
 });
 
-// Update function to correctly pass parameters in the expected order
+// Standard vector search without time filtering
 async function searchEntriesWithVector(
   userId: string, 
-  queryEmbedding: any[], 
-  timeRange?: { startDate?: Date; endDate?: Date }
+  queryEmbedding: any[]
 ) {
   try {
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
     
-    // Fix the parameters order according to the function definition
-    // match_journal_entries_fixed(query_embedding, match_threshold, match_count, user_id_filter)
     const { data, error } = await supabase.rpc(
       'match_journal_entries_fixed',
       {
@@ -153,6 +160,41 @@ async function searchEntriesWithVector(
     return data || [];
   } catch (error) {
     console.error('Error searching entries with vector:', error);
+    throw error;
+  }
+}
+
+// Time-filtered vector search
+async function searchEntriesWithTimeRange(
+  userId: string, 
+  queryEmbedding: any[], 
+  timeRange: { startDate?: string; endDate?: string }
+) {
+  try {
+    console.log(`Searching entries with time range for userId: ${userId}`);
+    console.log(`Time range: from ${timeRange.startDate || 'none'} to ${timeRange.endDate || 'none'}`);
+    
+    const { data, error } = await supabase.rpc(
+      'match_journal_entries_with_date',
+      {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.5,
+        match_count: 10,
+        user_id_filter: userId,
+        start_date: timeRange.startDate || null,
+        end_date: timeRange.endDate || null
+      }
+    );
+    
+    if (error) {
+      console.error(`Error in time-filtered vector search: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`Found ${data?.length || 0} entries with time-filtered vector similarity`);
+    return data || [];
+  } catch (error) {
+    console.error('Error searching entries with time range:', error);
     throw error;
   }
 }

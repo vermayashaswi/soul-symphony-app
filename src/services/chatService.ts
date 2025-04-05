@@ -22,7 +22,16 @@ export const processChatMessage = async (
   try {
     // Determine match threshold and count based on query complexity
     const matchThreshold = queryTypes.isSpecificQuery ? 0.65 : 0.5;
-    const matchCount = queryTypes.needsMoreContext ? 15 : 8;
+    
+    // Adjust match count based on query type:
+    // - More matches for "why" questions that need context
+    // - Fewer matches for specific temporal queries
+    let matchCount = 8; // Default
+    if (queryTypes.needsMoreContext) {
+      matchCount = 15; // More context for complex queries
+    } else if (queryTypes.isTemporalQuery && queryTypes.isSpecificQuery) {
+      matchCount = 5; // Fewer, more focused results for specific temporal queries
+    }
     
     console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
     
