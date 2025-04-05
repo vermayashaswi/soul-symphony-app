@@ -228,7 +228,7 @@ export default function ChatThreadList({
         ) : (
           <div className="space-y-1 py-2">
             {filteredThreads.map((thread) => (
-              <div key={thread.id} className="relative group">
+              <div key={thread.id} className="relative">
                 {editingThread === thread.id ? (
                   <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
                     <Input
@@ -265,17 +265,17 @@ export default function ChatThreadList({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center">
+                  <div className="flex items-center bg-background hover:bg-accent/50 rounded-md">
                     <Button
                       key={thread.id}
                       variant="ghost"
                       className={cn(
-                        "flex-1 justify-start relative pr-20 py-6 h-auto text-left",
+                        "flex-1 justify-start relative h-auto py-4 text-left rounded-r-none",
                         thread.id === currentThreadId && "bg-muted"
                       )}
                       onClick={() => onSelectThread(thread.id)}
                     >
-                      <div className="flex-1 truncate">
+                      <div className="flex-1 truncate mr-2">
                         <div className="flex items-center">
                           <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
                           <span className="truncate">{thread.title}</span>
@@ -286,11 +286,11 @@ export default function ChatThreadList({
                       </div>
                     </Button>
                     
-                    <div className="flex gap-1 mr-2">
+                    <div className="flex flex-shrink-0 pr-1">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0"
+                        className="h-8 w-8"
                         onClick={(e) => {
                           e.stopPropagation();
                           startEditingThread(thread);
@@ -303,7 +303,7 @@ export default function ChatThreadList({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0"
+                        className="h-8 w-8"
                         onClick={(e) => {
                           e.stopPropagation();
                           setThreadToDelete(thread.id);
