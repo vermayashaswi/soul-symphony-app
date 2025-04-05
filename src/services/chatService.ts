@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export type ChatMessage = {
@@ -20,18 +19,9 @@ export const processChatMessage = async (
   console.log("Processing chat message:", message.substring(0, 30) + "...");
   
   try {
-    // Determine match threshold and count based on query complexity
-    const matchThreshold = queryTypes.isSpecificQuery ? 0.65 : 0.5;
-    
-    // Adjust match count based on query type:
-    // - More matches for "why" questions that need context
-    // - Fewer matches for specific temporal queries
-    let matchCount = 8; // Default
-    if (queryTypes.needsMoreContext) {
-      matchCount = 15; // More context for complex queries
-    } else if (queryTypes.isTemporalQuery && queryTypes.isSpecificQuery) {
-      matchCount = 5; // Fewer, more focused results for specific temporal queries
-    }
+    // Use fixed parameters for vector search - let the retriever handle the filtering
+    const matchThreshold = 0.5;
+    const matchCount = 10; // Fixed count, let the retriever determine the actual number
     
     console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
     
@@ -42,7 +32,7 @@ export const processChatMessage = async (
       console.log("Temporal query detected, using time range:", timeRange);
     }
     
-    // Call the Supabase Edge Function with dynamic vector search parameters
+    // Call the Supabase Edge Function with fixed vector search parameters
     const { data, error } = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,

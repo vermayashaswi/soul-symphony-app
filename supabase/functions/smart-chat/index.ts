@@ -38,6 +38,7 @@ serve(async (req) => {
     }
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
+    console.log("Time range received:", timeRange);
     
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
