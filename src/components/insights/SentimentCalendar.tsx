@@ -34,12 +34,12 @@ interface SentimentCalendarProps {
 
 function getEmoji(sentiment: number): JSX.Element {
   if (sentiment >= 0.2) {
-    return <span className="text-green-500">🙂</span>; // Happy (green)
+    return <span role="img" aria-label="happy" className="text-green-500">🙂</span>; // Happy (green)
   }
   if (sentiment >= -0.2) {
-    return <span className="text-yellow-500">😐</span>; // Neutral (yellow)
+    return <span role="img" aria-label="neutral" className="text-yellow-500">😐</span>; // Neutral (yellow)
   }
-  return <span className="text-red-500">🙁</span>; // Sad (red)
+  return <span role="img" aria-label="sad" className="text-red-500">🙁</span>; // Sad (red)
 }
 
 function getEmojiColor(sentiment: number): string {
@@ -59,6 +59,12 @@ function getEmojiChar(sentiment: number): string {
   if (sentiment >= -0.2) return "😐";
   return "🙁";
 }
+
+const EmptyCircle = () => (
+  <div className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center">
+    <span className="sr-only">No data</span>
+  </div>
+);
 
 type ViewMode = 'calendar' | 'graph';
 
@@ -245,12 +251,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           </motion.div>
         ) : (
           <motion.div 
-            className="rounded-full bg-muted p-12 flex items-center justify-center"
+            className="rounded-full p-12 flex items-center justify-center"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, type: "spring" }}
           >
-            <span className="text-6xl">🤔</span>
+            <div className="w-24 h-24 rounded-full border-4 border-gray-300 dark:border-gray-600"></div>
           </motion.div>
         )}
         
@@ -315,7 +321,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                     {daySentiment.emoji}
                   </div>
                 ) : (
-                  <div className="text-2xl text-muted-foreground">😶</div>
+                  <EmptyCircle />
                 )}
               </motion.div>
             );
@@ -410,6 +416,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               
               const isClickedDay = selectedDay && isSameDay(date, selectedDay);
               const isToday = isSameDay(date, today);
+              const isSameMonthValue = isSameMonth(date, today);
               
               return (
                 <div
@@ -436,8 +443,8 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                       >
                         {info.emoji}
                       </motion.span>
-                    ) : isSelected ? (
-                      <span className="text-base text-muted-foreground">😶</span>
+                    ) : isSameMonthValue ? (
+                      <EmptyCircle />
                     ) : null}
                   </div>
                   
@@ -540,7 +547,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                     {getEmoji(monthSentiment)}
                   </div>
                 ) : (
-                  <div className="text-2xl text-muted-foreground">😶</div>
+                  <EmptyCircle />
                 )}
               </motion.div>
             );
@@ -582,7 +589,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                     {getEmoji(monthSentiment)}
                   </div>
                 ) : (
-                  <div className="text-2xl text-muted-foreground">😶</div>
+                  <EmptyCircle />
                 )}
               </motion.div>
             );
