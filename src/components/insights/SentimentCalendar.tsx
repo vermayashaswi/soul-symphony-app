@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -683,24 +684,24 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
             
             <ReferenceArea 
-              y1={0.2} 
+              y1={0.3} 
               y2={1} 
               fill="#F2FCE2" 
-              fillOpacity={theme === 'dark' ? 0.75 : 0.75} 
+              fillOpacity={theme === 'dark' ? 0.3 : 0.5} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-0.1} 
               y2={0.2} 
               fill="#FEF7CD" 
-              fillOpacity={theme === 'dark' ? 0.75 : 0.75} 
+              fillOpacity={theme === 'dark' ? 0.3 : 0.5} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-1} 
-              y2={-0.1} 
+              y2={-0.2} 
               fill="#ea384c" 
-              fillOpacity={theme === 'dark' ? 0.75 : 0.75} 
+              fillOpacity={theme === 'dark' ? 0.2 : 0.3} 
               strokeOpacity={0}
             />
             
@@ -748,15 +749,15 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         <div className="flex justify-center gap-6 mt-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-green-400"></div>
-            <span className="text-sm">Positive</span>
+            <span className="text-sm">Positive (0.3 to 1)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-yellow-300"></div>
-            <span className="text-sm">Neutral</span>
+            <span className="text-sm">Neutral (-0.1 to 0.2)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-400"></div>
-            <span className="text-sm">Negative</span>
+            <span className="text-sm">Negative (-1 to -0.2)</span>
           </div>
         </div>
       </div>
