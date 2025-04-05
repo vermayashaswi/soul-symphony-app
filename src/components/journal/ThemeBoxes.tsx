@@ -56,10 +56,10 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
   const filteredThemes = themes ? themes.filter(theme => theme && theme.trim() !== '' && theme !== '•') : [];
 
   if (!themes || themes.length === 0 || filteredThemes.length === 0) {
-    // Display placeholder theme boxes with funky loading animation
+    // Display placeholder theme boxes with smooth floating animation
     return (
       <div className={cn("flex flex-wrap gap-3 justify-center items-center h-full w-full", className)}>
-        {[1, 2, 3, 4].map((_, i) => (
+        {[1, 2, 3].map((_, i) => (
           <motion.div
             key={`placeholder-${i}`}
             className="bg-gradient-to-r from-gray-100 to-gray-200 text-transparent rounded-lg h-12 shadow-sm"
@@ -68,14 +68,20 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
               opacity: 0.5 - (i * 0.1) 
             }}
             animate={{ 
-              opacity: [0.3, 0.6, 0.3], 
-              scale: [0.9, 1.05, 0.9],
-              rotate: [-2, 2, -2]
+              y: [-(i+1) * 4, (i+1) * 4, -(i+1) * 4], 
+              opacity: [0.4, 0.6, 0.4]
             }}
             transition={{ 
-              duration: 2, 
-              repeat: Infinity, 
-              delay: i * 0.3 
+              y: { 
+                duration: 3 + i * 0.5, 
+                repeat: Infinity, 
+                ease: "easeInOut" 
+              },
+              opacity: {
+                duration: 3 + i * 0.5,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }
             }}
           >
             &nbsp;
@@ -96,8 +102,8 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
       animate="visible"
     >
       {filteredThemes.map((theme, index) => {
-        // Generate a random offset for the animation
-        const randomOffset = Math.random() * 0.5 + 0.5; // Between 0.5 and 1
+        // Generate a random offset for the animation but ensure it's consistent
+        const seed = (index + 1) * 0.2;
         
         return (
           <motion.div
@@ -113,30 +119,36 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
               transition: { duration: 0.2 }
             }}
             animate={isDisturbed ? {
-              x: [0, (Math.random() - 0.5) * 30, 0],
-              y: [0, (Math.random() - 0.5) * 30, 0],
-              rotate: [0, (Math.random() - 0.5) * 15, 0],
-              scale: [1, 1.1, 1],
+              // Smooth floating animation without flickering for disturbed state
+              y: [(seed * -10), (seed * 10), (seed * -10)],
+              x: [(seed * -5), (seed * 5), (seed * -5)],
+              rotate: [(seed * -3), (seed * 3), (seed * -3)],
               transition: {
-                duration: 1.8,
-                ease: "easeInOut",
-                repeat: Infinity,
-                repeatType: "reverse",
-                repeatDelay: Math.random() * 0.5
+                y: { 
+                  duration: 4 + seed * 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                },
+                x: { 
+                  duration: 5 + seed * 2, 
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                },
+                rotate: { 
+                  duration: 6 + seed, 
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }
               }
             } : {
-              y: [0, -3 * randomOffset, 0, 3 * randomOffset, 0],
-              rotate: [0, 1 * randomOffset, 0, -1 * randomOffset, 0],
-              boxShadow: [
-                "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                "0 6px 12px -2px rgba(0, 0, 0, 0.15)",
-                "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-              ],
+              // Subtle hover animation for normal state
+              y: [0, -3 * seed, 0],
               transition: { 
-                duration: 3 + Math.random() * 2,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: index * 0.2
+                y: {
+                  duration: 3 + seed * 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }
               }
             }}
           >

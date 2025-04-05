@@ -27,13 +27,12 @@ export interface JournalEntry {
     sentiment: string;
     score: number;
   };
-  // Update to match database column name
   themes?: string[];
-  master_themes?: string[]; // Keep for backward compatibility
+  master_themes?: string[];
   entities?: {
     text: string;
     type: string;
-    name?: string; // Added name property for entities
+    name?: string;
   }[];
   foreignKey?: string;
 }
@@ -59,7 +58,6 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     try {
       setIsDeleting(true);
       
-      // Delete the entry from the database
       const { error } = await supabase
         .from('Journal Entries')
         .delete()
@@ -69,10 +67,8 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         throw error;
       }
       
-      // Close the dialog
       setOpen(false);
       
-      // Call the onDelete callback to update the UI
       if (onDelete) {
         onDelete(entry.id);
       }
@@ -88,7 +84,6 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
 
   const createdAtFormatted = formatRelativeTime(entry.created_at);
 
-  // Get sentiment score
   const getSentimentScore = (): number => {
     if (typeof entry.sentiment === 'string') {
       return parseFloat(entry.sentiment);
@@ -98,7 +93,6 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     return 0;
   };
 
-  // Get sentiment emoji with appropriate color
   const getSentimentEmoji = () => {
     const score = getSentimentScore();
     
@@ -111,34 +105,24 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     }
   };
 
-  // New Funky Colorful Animation Toggle Component
-  const FunkyToggle = () => (
+  const FloatingDotsToggle = () => (
     <motion.div 
-      className="relative w-8 h-8 cursor-pointer group"
+      className="relative w-8 h-8 cursor-pointer"
       onClick={toggleExpanded}
       whileHover={{ scale: 1.1 }}
+      whileTap={{ scale: 0.95 }}
     >
-      {/* Center particle */}
-      <motion.div 
-        className="absolute top-1/2 left-1/2 w-2.5 h-2.5 rounded-full bg-gradient-to-br from-purple-400 to-pink-500"
-        style={{ transform: 'translate(-50%, -50%)' }}
-        animate={{ 
-          scale: [1, 1.3, 1],
-          boxShadow: [
-            '0 0 0px rgba(192, 132, 252, 0.5)',
-            '0 0 10px rgba(192, 132, 252, 0.8)',
-            '0 0 0px rgba(192, 132, 252, 0.5)',
-          ]
-        }}
-        transition={{ duration: 2, repeat: Infinity }}
-      />
-      
-      {/* Orbiting colorful particles */}
       {[0, 1, 2].map((i) => {
         const colors = [
+          'bg-gradient-to-r from-blue-500 to-purple-500',
           'bg-gradient-to-r from-pink-500 to-orange-400',
           'bg-gradient-to-r from-green-400 to-cyan-500',
-          'bg-gradient-to-r from-purple-500 to-indigo-500'
+        ];
+        
+        const positions = [
+          { x: 0, y: -6 },
+          { x: -5, y: 4 },
+          { x: 5, y: 4 },
         ];
         
         return (
@@ -146,71 +130,63 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
             key={i}
             className={`absolute w-2 h-2 rounded-full ${colors[i]}`}
             style={{ 
-              top: '50%', 
               left: '50%',
-              originX: '0',
-              originY: '0',
+              top: '50%',
+              x: positions[i].x,
+              y: positions[i].y,
             }}
             animate={{
-              rotate: isExpanded ? [i * 120, i * 120 + 360] : [i * 120 + 360, i * 120],
+              y: [
+                positions[i].y, 
+                positions[i].y - 3, 
+                positions[i].y
+              ],
+              boxShadow: [
+                '0 0 2px rgba(255, 255, 255, 0.5)',
+                '0 0 6px rgba(255, 255, 255, 0.8)',
+                '0 0 2px rgba(255, 255, 255, 0.5)',
+              ],
               scale: [1, 1.2, 1],
             }}
             transition={{
-              rotate: {
-                duration: 3 + i * 0.5,
+              y: {
+                duration: 2,
                 repeat: Infinity,
-                repeatType: "loop",
-                ease: "linear"
+                ease: "easeInOut",
+                delay: i * 0.3,
+                repeatType: "mirror"
+              },
+              boxShadow: {
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: i * 0.3
               },
               scale: {
                 duration: 2,
                 repeat: Infinity,
-                repeatType: "reverse",
-                delay: i * 0.3
+                ease: "easeInOut",
+                delay: i * 0.3,
+                repeatType: "mirror"
               }
             }}
-          >
-            <motion.div 
-              className="w-full h-full rounded-full"
-              animate={{
-                boxShadow: [
-                  '0 0 3px rgba(255, 255, 255, 0.5)',
-                  '0 0 8px rgba(255, 255, 255, 0.8)',
-                  '0 0 3px rgba(255, 255, 255, 0.5)',
-                ],
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                delay: i * 0.5
-              }}
-            />
-          </motion.div>
+          />
         );
       })}
-
-      {/* Group hover effect - particle bursts */}
-      {[0, 1, 2, 3].map((i) => (
-        <motion.div
-          key={`burst-${i}`}
-          className="absolute top-1/2 left-1/2 w-1 h-1 rounded-full bg-white opacity-0 group-hover:opacity-100"
-          animate={{
-            x: 0,
-            y: 0,
-            opacity: 0
-          }}
-          whileHover={{
-            x: Math.cos(i * Math.PI / 2) * 30,
-            y: Math.sin(i * Math.PI / 2) * 30,
-            opacity: [0, 1, 0],
-            transition: {
-              duration: 0.8,
-              repeatDelay: 0.2,
-              repeat: Infinity
-            }
-          }}
-        />
-      ))}
+      
+      <motion.div 
+        className="absolute top-1/2 left-1/2 w-5 h-5 rounded-full bg-gradient-to-br from-gray-200/30 to-gray-300/10"
+        style={{ transform: 'translate(-50%, -50%)' }}
+        animate={{ 
+          scale: [0.8, 1.1, 0.8],
+          opacity: [0.3, 0.5, 0.3]
+        }}
+        transition={{ 
+          duration: 3, 
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+      />
     </motion.div>
   );
 
@@ -225,7 +201,7 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         </div>
 
         <div className="flex items-center space-x-2 md:space-x-3">
-          <FunkyToggle />
+          <FloatingDotsToggle />
 
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
