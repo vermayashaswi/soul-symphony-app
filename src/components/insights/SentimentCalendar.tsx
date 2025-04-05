@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -25,16 +24,6 @@ interface SentimentCalendarProps {
     sentiment: number;
   }[];
   timeRange: 'today' | 'week' | 'month' | 'year';
-}
-
-// Define the chart data types to avoid TypeScript errors
-interface BaseChartDataPoint {
-  time: string;
-  sentiment: number | null;
-}
-
-interface ChartDataPointWithDate extends BaseChartDataPoint {
-  fullDate?: string;
 }
 
 function getEmoji(sentiment: number): string {
@@ -487,7 +476,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                             </span>
                           </div>
                         ) : (
-                          <div className="text-sm text-center text-muted-foreground">
+                          <div className="text-sm text-muted-foreground text-center">
                             No mood data for this day
                           </div>
                         )}
@@ -508,13 +497,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   };
 
   const renderYearView = () => {
-    // Generate monthly data for the year
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     
-    // Calculate monthly sentiment averages
     const monthlySentiment = new Map<number, { total: number, count: number }>();
     
     filteredData.forEach(item => {
@@ -686,22 +673,22 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             <ReferenceArea 
               y1={0.3} 
               y2={1} 
-              fill="#F2FCE2" 
-              fillOpacity={theme === 'dark' ? 0.3 : 0.5} 
+              fill="#4ade80" 
+              fillOpacity={theme === 'dark' ? 0.4 : 0.25} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-0.1} 
               y2={0.2} 
-              fill="#FEF7CD" 
-              fillOpacity={theme === 'dark' ? 0.3 : 0.5} 
+              fill="#fde047" 
+              fillOpacity={theme === 'dark' ? 0.4 : 0.3} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-1} 
               y2={-0.2} 
-              fill="#ea384c" 
-              fillOpacity={theme === 'dark' ? 0.2 : 0.3} 
+              fill="#f87171" 
+              fillOpacity={theme === 'dark' ? 0.35 : 0.25} 
               strokeOpacity={0}
             />
             
@@ -748,15 +735,15 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
 
         <div className="flex justify-center gap-6 mt-4">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-400"></div>
+            <div className="w-3 h-3 rounded-full bg-green-500"></div>
             <span className="text-sm">Positive (0.3 to 1)</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-300"></div>
+            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
             <span className="text-sm">Neutral (-0.1 to 0.2)</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-400"></div>
+            <div className="w-3 h-3 rounded-full bg-red-500"></div>
             <span className="text-sm">Negative (-1 to -0.2)</span>
           </div>
         </div>
