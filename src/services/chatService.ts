@@ -59,7 +59,9 @@ export const processChatMessage = async (
       return {
         role: "error",
         content: `I'm having trouble processing your request. Technical details: ${error.message}`,
-        diagnostics: enableDiagnostics ? { error: error.message } : undefined
+        diagnostics: enableDiagnostics ? { 
+          steps: [{ name: "Edge Function Error", status: "error", details: error.message }]
+        } : undefined
       };
     }
 
@@ -68,7 +70,9 @@ export const processChatMessage = async (
       return {
         role: "error",
         content: "I'm having trouble retrieving a response. Please try again in a moment.",
-        diagnostics: enableDiagnostics ? { error: "No data returned" } : undefined
+        diagnostics: enableDiagnostics ? { 
+          steps: [{ name: "No Data Returned", status: "error", details: "Empty response from edge function" }]
+        } : undefined
       };
     }
 
@@ -78,7 +82,9 @@ export const processChatMessage = async (
       return {
         role: "error",
         content: data.response || `There was an issue retrieving information: ${data.error}`,
-        diagnostics: enableDiagnostics ? data.diagnostics : undefined
+        diagnostics: enableDiagnostics ? data.diagnostics || {
+          steps: [{ name: "Processing Error", status: "error", details: data.error }]
+        } : undefined
       };
     }
 
@@ -115,7 +121,9 @@ export const processChatMessage = async (
     return {
       role: "error",
       content: `I'm having trouble with the chat service. ${error instanceof Error ? error.message : "Please try again later."}`,
-      diagnostics: enableDiagnostics ? { error: error instanceof Error ? error.message : String(error) } : undefined
+      diagnostics: enableDiagnostics ? { 
+        steps: [{ name: "Chat Service Error", status: "error", details: error instanceof Error ? error.message : String(error) }]
+      } : undefined
     };
   }
 };
