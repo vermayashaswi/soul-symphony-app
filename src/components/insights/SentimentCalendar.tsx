@@ -26,6 +26,13 @@ interface SentimentCalendarProps {
   timeRange: 'today' | 'week' | 'month' | 'year';
 }
 
+// Define the chart data types to avoid TypeScript errors
+interface ChartDataPointWithDate {
+  time: string;
+  sentiment: number | null;
+  fullDate?: string;
+}
+
 function getEmoji(sentiment: number): string {
   if (sentiment >= 0.7) return "😄";      // Very happy
   if (sentiment >= 0.3) return "🙂";      // Happy
@@ -216,6 +223,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     return [];
   }, [filteredData, timeRange, dailySentiment, today]);
 
+  // Today View - Shows a single emoji representing today's mood
   const renderTodayView = () => {
     const todayKey = format(today, 'yyyy-MM-dd');
     const todaySentiment = sentimentInfo.get(todayKey);
@@ -265,6 +273,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     );
   };
 
+  // Week View - Shows Mon-Sun with respective emojis in a row
   const renderWeekView = () => {
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
     const days = Array.from({ length: 7 }, (_, i) => {
@@ -359,6 +368,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     );
   };
 
+  // Month view - Calendar with days and rows/columns having emojis and dates
   const renderMonthYearView = () => {
     if (timeRange === 'year') {
       return renderYearView();
@@ -496,6 +506,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     );
   };
 
+  // Year View - 2 rows, 6 months per row, Jan-Dec with emojis
   const renderYearView = () => {
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
