@@ -45,7 +45,7 @@ interface JournalEntryCardProps {
 }
 
 export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false); // Changed to false to collapse by default
   const [open, setOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
@@ -112,49 +112,44 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     }
   };
 
-  // Animated dots for expand/collapse trigger
-  const ExpandToggleDots = () => (
+  // New Animated Circular Orbit Component to replace the dots
+  const OrbitToggle = () => (
     <motion.div 
-      className="flex items-center space-x-1.5 cursor-pointer"
+      className="relative w-8 h-8 cursor-pointer"
       onClick={toggleExpanded}
       whileHover={{ scale: 1.1 }}
     >
-      <motion.div
-        animate={{ 
-          y: isExpanded ? [0, -3, 0] : [0, 3, 0],
-        }}
-        transition={{ 
-          repeat: Infinity, 
-          repeatType: "mirror",
-          duration: 1.2,
-          delay: 0
-        }}
-        className="w-2.5 h-2.5 rounded-full bg-blue-400"
+      {/* Center dot */}
+      <motion.div 
+        className="absolute top-1/2 left-1/2 w-2 h-2 rounded-full bg-theme-color"
+        style={{ transform: 'translate(-50%, -50%)' }}
+        animate={{ scale: [1, 1.2, 1] }}
+        transition={{ duration: 2, repeat: Infinity }}
       />
-      <motion.div
-        animate={{ 
-          y: isExpanded ? [0, -4, 0] : [0, 4, 0],
-        }}
-        transition={{ 
-          repeat: Infinity, 
-          repeatType: "mirror",
-          duration: 1.5,
-          delay: 0.2
-        }}
-        className="w-2.5 h-2.5 rounded-full bg-green-400"
-      />
-      <motion.div
-        animate={{ 
-          y: isExpanded ? [0, -3, 0] : [0, 3, 0],
-        }}
-        transition={{ 
-          repeat: Infinity, 
-          repeatType: "mirror",
-          duration: 1.3,
-          delay: 0.4
-        }}
-        className="w-2.5 h-2.5 rounded-full bg-purple-400"
-      />
+      
+      {/* Orbiting dots */}
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          className="absolute w-2 h-2 rounded-full"
+          style={{ 
+            top: '50%', 
+            left: '50%',
+            backgroundColor: `hsl(var(--primary-h), var(--primary-s), ${60 + i * 10}%)` 
+          }}
+          animate={{
+            x: Math.cos(i * (2 * Math.PI / 3)) * 12,
+            y: Math.sin(i * (2 * Math.PI / 3)) * 12,
+            rotate: isExpanded ? [0, 360] : [360, 0],
+          }}
+          transition={{
+            duration: 3 + i * 0.5,
+            repeat: Infinity,
+            repeatType: "loop",
+            ease: "linear"
+          }}
+        />
+      ))}
     </motion.div>
   );
 
@@ -169,7 +164,7 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         </div>
 
         <div className="flex items-center space-x-2 md:space-x-3">
-          <ExpandToggleDots />
+          <OrbitToggle />
 
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
