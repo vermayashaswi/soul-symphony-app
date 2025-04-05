@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -83,6 +84,15 @@
     position: relative;
     bottom: 0;
     border-radius: 1rem !important;
+  }
+  
+  /* Position the recording button at the center bottom */
+  .relative.z-10.flex.justify-center.w-full.mt-auto.mb-24 {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    margin-bottom: 3rem !important;
   }
   
   /* Make card padding smaller on mobile */

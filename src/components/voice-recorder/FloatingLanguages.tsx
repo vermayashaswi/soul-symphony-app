@@ -58,8 +58,8 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
   const containerSize = {
     width: size === "sm" ? "100%" : "100%",
     height: size === "sm" ? "100%" : "100%",
-    maxWidth: size === "sm" ? "400px" : "800px", // Increased from 320px
-    minHeight: size === "sm" ? "400px" : "600px", // Significantly increased
+    maxWidth: size === "sm" ? "400px" : "800px", 
+    minHeight: size === "sm" ? "400px" : "600px",
   };
 
   return (
@@ -133,6 +133,6 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
       </div>
     </div>
   );
-};
+}
 
 export default FloatingLanguages;
