@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
 import { formatTime } from "@/utils/format-time"; 
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { LanguageBackground } from "@/components/voice-recorder/MultilingualTextAnimation";
 
 interface VoiceRecordingButtonProps {
   isLoading: boolean;
@@ -115,35 +115,49 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   };
   
   return (
-    <Button 
-      type="button" 
-      size={size} 
-      variant={isRecording ? "destructive" : "default"}
-      onClick={handleVoiceRecording}
-      disabled={isLoading}
-      className={cn(
-        "relative rounded-full flex items-center justify-center",
-        isRecording ? "bg-red-500 hover:bg-red-600" : "",
-        isRecording && "animate-pulse",
-        className
-      )}
-      style={{
-        width: size === "sm" ? "48px" : "64px",
-        height: size === "sm" ? "48px" : "64px",
-        transition: "all 0.3s ease"
-      }}
-    >
-      {isRecording ? (
-        <Square className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} text-white`} />
-      ) : (
-        <Mic className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"}`} />
-      )}
+    <div className="relative">
       {isRecording && (
-        <span className={`absolute ${size === "sm" ? "-bottom-5" : "-bottom-6"} text-xs font-medium`}>
-          {formatTime(recordingTime)}
-        </span>
+        <div className="absolute -z-10 inset-0 overflow-hidden rounded-full" style={{ 
+          width: size === "sm" ? "90px" : "110px", 
+          height: size === "sm" ? "90px" : "110px",
+          left: "50%",
+          top: "50%",
+          transform: "translate(-50%, -50%)"
+        }}>
+          <LanguageBackground contained={true} />
+        </div>
       )}
-    </Button>
+      
+      <Button 
+        type="button" 
+        size={size} 
+        variant={isRecording ? "destructive" : "default"}
+        onClick={handleVoiceRecording}
+        disabled={isLoading}
+        className={cn(
+          "relative rounded-full flex items-center justify-center",
+          isRecording ? "bg-red-500 hover:bg-red-600" : "",
+          isRecording && "animate-pulse",
+          className
+        )}
+        style={{
+          width: size === "sm" ? "48px" : "64px",
+          height: size === "sm" ? "48px" : "64px",
+          transition: "all 0.3s ease"
+        }}
+      >
+        {isRecording ? (
+          <Square className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} text-white`} />
+        ) : (
+          <Mic className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"}`} />
+        )}
+        {isRecording && (
+          <span className={`absolute ${size === "sm" ? "-bottom-5" : "-bottom-6"} text-xs font-medium`}>
+            {formatTime(recordingTime)}
+          </span>
+        )}
+      </Button>
+    </div>
   );
 };
 
