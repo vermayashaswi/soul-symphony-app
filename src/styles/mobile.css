@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -66,6 +67,23 @@
     display: inline-flex;
     align-items: center;
     font-size: 1.25rem !important;
+  }
+  
+  /* Chat thread list buttons should always be visible */
+  .chat-thread-list .flex-shrink-0 {
+    display: flex !important;
+    opacity: 1 !important;
+  }
+  
+  /* Ensure the edit and delete buttons have adequate spacing */
+  .chat-thread-list .flex-shrink-0 button {
+    margin: 0 2px !important;
+  }
+  
+  /* Make buttons more touchable on mobile */
+  .chat-thread-list .h-8.w-8 {
+    min-height: 40px;
+    min-width: 36px;
   }
   
   /* Voice recorder container height - making it fit the green box outline */
