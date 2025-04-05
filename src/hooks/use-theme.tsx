@@ -106,11 +106,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const getColorHex = (theme: ColorTheme): string => {
     switch (theme) {
       case 'Default':
-        return '#7c3aed'; // violet-600
+        return '#3b82f6'; // Changed Default to blue-500 (same as Calm)
       case 'Calm':
-        return '#3b82f6'; // blue-500
+        return '#8b5cf6'; // Changed Calm to violet-500 (what was previously Soothing)
       case 'Soothing':
-        return '#8b5cf6'; // violet-500
+        return '#8b5cf6'; // Keep violet-500
       case 'Energy':
         return '#f59e0b'; // amber-500
       case 'Focus':

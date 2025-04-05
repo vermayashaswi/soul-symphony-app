@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut } from 'lucide-react';
@@ -52,8 +51,8 @@ export default function Settings() {
   const isMobile = useIsMobile();
   
   const colorThemes = [
-    { name: 'Default', color: 'bg-violet-600' },
-    { name: 'Calm', color: 'bg-blue-500' },
+    { name: 'Default', color: 'bg-blue-500' },
+    { name: 'Calm', color: 'bg-violet-500' },
     { name: 'Soothing', color: 'bg-violet-400' },
     { name: 'Energy', color: 'bg-amber-400' },
     { name: 'Focus', color: 'bg-emerald-400' },
@@ -135,7 +134,6 @@ export default function Settings() {
     }
   };
   
-  // Get the style variables for the current theme
   const getThemeStyle = () => {
     const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
     return { 
@@ -144,11 +142,10 @@ export default function Settings() {
     };
   };
   
-  // Get the lighter version of theme color for backgrounds
   const getThemeBgStyle = () => {
     const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
     return { 
-      backgroundColor: `${themeColor}20` // Adding 20% opacity
+      backgroundColor: `${themeColor}20` 
     };
   };
   
@@ -156,7 +153,7 @@ export default function Settings() {
     <div className="min-h-screen pb-20">
       <Navbar />
       
-      <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-16" : "pt-28")}>
+      <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-4" : "pt-8")}>
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2 text-theme-color">Settings</h1>
           <p className="text-muted-foreground">Personalize your Feelosophy experience</p>
