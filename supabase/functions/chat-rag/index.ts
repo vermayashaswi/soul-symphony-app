@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -848,10 +849,16 @@ serve(async (req) => {
     const systemPrompt = `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
 ${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
 Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
-Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
-mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
-Focus on being helpful rather than diagnostic. 
-${firstName ? `Always address the user by their first name (${firstName}) in your responses.` : ""}`;
+${firstName ? `Always address the user by their first name (${firstName}) in your responses.` : ""}
+
+RESPONSE GUIDELINES:
+- Be extremely concise and to the point
+- Use bullet points wherever possible
+- Don't make assumptions about information not provided
+- Keep your tone warm but direct
+- Focus on being helpful rather than diagnostic
+- Avoid lengthy explanations unless specifically requested
+`;
 
     console.log("Sending to GPT with RAG context...");
     diagnosticSteps.push({
