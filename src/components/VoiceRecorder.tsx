@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,7 +7,6 @@ import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
 import { processRecording } from '@/utils/audio-processing';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
-import { RecordingVisualizer } from '@/components/voice-recorder/RecordingVisualizer';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
@@ -116,12 +116,36 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       <audio ref={audioRef} className="hidden" />
       
       <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-between overflow-hidden pt-6 pb-4">
+        {/* Custom pulse animations rendered directly in VoiceRecorder */}
+        {isRecording && (
+          <div className="relative flex items-center justify-center w-full my-4">
+            <AnimatePresence>
+              {ripples.map((id) => (
+                <motion.div
+                  key={id}
+                  initial={{ scale: 0.5, opacity: 0.8 }}
+                  animate={{ scale: 2.5, opacity: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 2.5, ease: "easeOut" }}
+                  className="absolute rounded-full bg-red-500/50 border-4 border-red-400/60"
+                  style={{
+                    width: '160px',
+                    height: '160px',
+                    margin: 'auto',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                  }}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+        
         <div className="w-full px-4 sm:px-6 relative z-10">
-          <RecordingVisualizer 
-            isRecording={isRecording}
-            audioLevel={audioLevel}
-            ripples={ripples}
-          />
+          {/* No RecordingVisualizer component here anymore */}
         </div>
         
         <div className="relative z-10 flex justify-center w-full mt-auto mb-10">
