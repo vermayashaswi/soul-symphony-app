@@ -38,6 +38,15 @@ serve(async (req) => {
     }
 
     console.log(`Received query: ${userQuery} for user ID: ${userId}`);
+    
+    // Check if this is an emotion analysis query
+    const emotionQueryPattern = /top\s+emotions|emotions\s+summary|main\s+emotions|emotional\s+state|emotion\s+analysis/i;
+    const isEmotionQuery = emotionQueryPattern.test(userQuery);
+    
+    if (isEmotionQuery) {
+      console.log("Detected emotion analysis query, handling specially");
+      return await handleEmotionQuery(userId, timeRange, corsHeaders);
+    }
 
     // 1. Generate embedding for the user query
     console.log('Generating embedding for the user query');
@@ -104,7 +113,7 @@ async function searchJournalEntries(
   try {
     console.log(`Searching journal entries for userId: ${userId}`);
     
-    // Use the fixed function we created
+    // Fix the parameters order according to the function definition
     const { data, error } = await supabase.rpc(
       'match_journal_entries_fixed',
       {
@@ -179,5 +188,78 @@ async function segmentComplexQuery(userQuery: string, entries: any[], apiKey: st
   } catch (error) {
     console.error('Error segmenting complex query:', error);
     throw error;
+  }
+}
+
+// Handle emotion analysis queries
+async function handleEmotionQuery(userId: string, timeRange: any, corsHeaders: Record<string, string>) {
+  try {
+    console.log(`Processing emotion analysis query for user: ${userId}`);
+    
+    let startDate = timeRange?.startDate ? new Date(timeRange.startDate) : null;
+    let endDate = timeRange?.endDate ? new Date(timeRange.endDate) : new Date();
+    
+    // For "last month" queries without explicit dates
+    if (!startDate && /last\s+month|previous\s+month|past\s+month/i.test(timeRange?.label || '')) {
+      const currentDate = new Date();
+      // Set to first day of previous month
+      startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      // Set to last day of previous month
+      endDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+    }
+    
+    console.log(`Date range: ${startDate?.toISOString() || 'all time'} to ${endDate.toISOString()}`);
+    
+    // Call the get_top_emotions_with_entries function
+    const { data, error } = await supabase.rpc(
+      'get_top_emotions_with_entries',
+      {
+        user_id_param: userId,
+        start_date: startDate,
+        end_date: endDate,
+        limit_count: 5
+      }
+    );
+    
+    if (error) {
+      console.error(`Error in emotion analysis: ${error.message}`);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      console.log("No emotion data found");
+      return new Response(
+        JSON.stringify({
+          data: [
+            "What were your most frequent emotions in your journal entries?"
+          ],
+          error: "No emotion data found for the specified time period"
+        }),
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+    
+    console.log(`Found ${data.length} top emotions`);
+    
+    // Return segmented queries focused on emotions
+    const segmentedQueries = [
+      `What does it mean that your top emotion was ${data[0].emotion}?`,
+      `How did your emotional state change throughout this period?`,
+      `What circumstances typically triggered your ${data[0].emotion} emotion?`
+    ];
+    
+    return new Response(JSON.stringify({ data: segmentedQueries }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
+  } catch (error) {
+    console.error('Error in emotion analysis:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      }
+    );
   }
 }

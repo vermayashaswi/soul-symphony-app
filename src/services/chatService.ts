@@ -20,16 +20,27 @@ export const processChatMessage = async (
   console.log("Processing chat message:", message.substring(0, 30) + "...");
   
   try {
-    // Call the Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke('chat-rag', {
-      body: {
-        message,
-        userId,
-        queryTypes,
-        threadId,
-        includeDiagnostics: enableDiagnostics
-      }
-    });
+    // Check for emotion analysis queries to use smart-chat function directly
+    const emotionQueryPattern = /top\s+emotions|emotions\s+summary|main\s+emotions|emotional\s+state|emotion\s+analysis/i;
+    const isEmotionQuery = emotionQueryPattern.test(message);
+    
+    // Call the appropriate Supabase Edge Function
+    const { data, error } = isEmotionQuery 
+      ? await supabase.functions.invoke('smart-chat', {
+          body: {
+            message,
+            userId
+          }
+        })
+      : await supabase.functions.invoke('chat-rag', {
+          body: {
+            message,
+            userId,
+            queryTypes,
+            threadId,
+            includeDiagnostics: enableDiagnostics
+          }
+        });
 
     if (error) {
       console.error("Edge function error:", error);
@@ -57,6 +68,30 @@ export const processChatMessage = async (
         content: data.response || `There was an issue retrieving information: ${data.error}`,
         diagnostics: enableDiagnostics ? data.diagnostics : undefined
       };
+    }
+
+    // For emotion queries that use smart-chat
+    if (isEmotionQuery && data.data) {
+      const chatResponse: ChatMessage = {
+        role: "assistant",
+        content: data.data
+      };
+
+      // Add references if available
+      if (data.references && data.references.length > 0) {
+        chatResponse.references = data.references;
+      }
+
+      // Add analysis if available
+      if (data.analysis) {
+        chatResponse.analysis = data.analysis;
+        if (data.analysis.type === 'quantitative_emotion' || 
+            data.analysis.type === 'top_emotions') {
+          chatResponse.hasNumericResult = true;
+        }
+      }
+      
+      return chatResponse;
     }
 
     // Prepare the response
