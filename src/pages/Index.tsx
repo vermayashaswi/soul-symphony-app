@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -368,23 +369,23 @@ const Index = () => {
         className={cn(
           "flex-1 container mx-auto px-4 py-8 relative z-10",
           shouldRenderMobile ? "max-w-md" : "",
-          shouldRenderMobile ? "pb-16 pt-64" : "pt-64"
+          shouldRenderMobile ? "pb-16 pt-24" : "pt-24" // Reduced the top padding to move the heading down
         )}
         initial="hidden"
         animate="visible"
         variants={containerVariants}
       >
         <motion.div
-          className="text-center mb-12"
+          className="text-center mb-4" // Reduced mb-12 to mb-4 to bring the heading closer to the subtitle
           variants={itemVariants}
         >
-          <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-12 flex items-center justify-center`}>
+          <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-3 flex items-center justify-center`}>
             <span className="text-foreground dark:text-white">
               Welcome to
             </span> 
             <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} animate={true} />
           </h1>
-          <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse mb-12`}>
+          <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse mt-4 mb-8`}>
             Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
           </p>
           
