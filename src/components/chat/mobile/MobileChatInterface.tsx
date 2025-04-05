@@ -99,7 +99,9 @@ export default function MobileChatInterface({
   }, [messages, loading]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const addRagDiagnosticStep = (step: string, status: 'pending' | 'success' | 'error' | 'loading', details?: string) => {
@@ -458,22 +460,27 @@ export default function MobileChatInterface({
         </Button>
       </div>
       
-      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3">
+      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
         {messages.length === 0 ? (
-          <div className="flex flex-col justify-center items-center h-full text-center px-4 py-6">
-            <h3 className="text-xl font-medium mb-2">How can I help you?</h3>
-            <p className="text-muted-foreground text-sm mb-4 px-4">
-              Ask me anything about your mental well-being and journal entries
-            </p>
+          <div className="flex flex-col h-full">
+            <div className="mt-4 text-center px-4">
+              <h3 className="text-xl font-medium mb-2">How can I help you?</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                Ask me anything about your mental well-being and journal entries
+              </p>
+            </div>
+            <div className="flex-1"></div>
           </div>
         ) : (
-          messages.map((message, index) => (
-            <MobileChatMessage 
-              key={index} 
-              message={message} 
-              showAnalysis={false}
-            />
-          ))
+          <div className="flex-grow space-y-3">
+            {messages.map((message, index) => (
+              <MobileChatMessage 
+                key={index} 
+                message={message} 
+                showAnalysis={false}
+              />
+            ))}
+          </div>
         )}
         
         {loading && (
@@ -498,7 +505,7 @@ export default function MobileChatInterface({
         <div ref={messagesEndRef} />
       </div>
       
-      <div className="mobile-chat-input-container">
+      <div className="mobile-chat-input-container mb-14">
         <MobileChatInput 
           onSendMessage={handleSendMessage} 
           isLoading={loading}

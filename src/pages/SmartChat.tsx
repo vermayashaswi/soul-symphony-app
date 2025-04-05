@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -14,6 +15,8 @@ import Navbar from "@/components/Navbar";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
+
+const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
 
 export default function SmartChat() {
   const isMobile = useIsMobile();
@@ -39,6 +42,34 @@ export default function SmartChat() {
     const checkOrCreateThread = async () => {
       if (!user?.id) return;
 
+      // Try to get the last active thread from localStorage first
+      const lastActiveThreadId = localStorage.getItem(THREAD_ID_STORAGE_KEY);
+      
+      if (lastActiveThreadId) {
+        // Verify this thread exists and belongs to the user
+        try {
+          const { data, error } = await supabase
+            .from('chat_threads')
+            .select('id')
+            .eq('id', lastActiveThreadId)
+            .eq('user_id', user.id)
+            .single();
+            
+          if (data && !error) {
+            setCurrentThreadId(lastActiveThreadId);
+            window.dispatchEvent(
+              new CustomEvent('threadSelected', { 
+                detail: { threadId: lastActiveThreadId } 
+              })
+            );
+            return;
+          }
+        } catch (error) {
+          console.error("Error checking thread existence:", error);
+        }
+      }
+      
+      // If no saved thread ID or it doesn't exist, get the most recent thread
       try {
         const { data: threads, error } = await supabase
           .from('chat_threads')
@@ -51,6 +82,7 @@ export default function SmartChat() {
 
         if (threads && threads.length > 0) {
           setCurrentThreadId(threads[0].id);
+          localStorage.setItem(THREAD_ID_STORAGE_KEY, threads[0].id);
           window.dispatchEvent(
             new CustomEvent('threadSelected', { 
               detail: { threadId: threads[0].id } 
@@ -95,6 +127,7 @@ export default function SmartChat() {
       
       if (error) throw error;
       setCurrentThreadId(newThreadId);
+      localStorage.setItem(THREAD_ID_STORAGE_KEY, newThreadId);
       
       window.dispatchEvent(
         new CustomEvent('threadSelected', { 
@@ -108,6 +141,7 @@ export default function SmartChat() {
 
   const handleSelectThread = (threadId: string) => {
     setCurrentThreadId(threadId);
+    localStorage.setItem(THREAD_ID_STORAGE_KEY, threadId);
     window.dispatchEvent(
       new CustomEvent('threadSelected', { 
         detail: { threadId: threadId } 

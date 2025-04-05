@@ -33,6 +33,8 @@ type DbChatMessage = {
   has_numeric_result?: boolean;
 }
 
+const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
+
 export default function SmartChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
@@ -117,6 +119,7 @@ export default function SmartChatInterface() {
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
         setCurrentThreadId(event.detail.threadId);
+        localStorage.setItem(THREAD_ID_STORAGE_KEY, event.detail.threadId);
       }
     };
     
@@ -128,7 +131,9 @@ export default function SmartChatInterface() {
   }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   };
 
   const addRagDiagnosticStep = (step: string, status: 'pending' | 'success' | 'error' | 'loading', details?: string) => {
@@ -429,9 +434,9 @@ export default function SmartChatInterface() {
         </div>
       </CardHeader>
       
-      <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+      <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 flex flex-col">
         {chatHistory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full w-full">
+          <div className="flex flex-col h-full">
             <div className="text-center max-w-lg mx-auto px-4">
               <h1 className="text-2xl md:text-3xl font-bold mb-3">How can I help you?</h1>
               <p className="text-muted-foreground mb-6">
@@ -460,16 +465,19 @@ export default function SmartChatInterface() {
                 </motion.div>
               )}
             </div>
+            <div className="flex-1"></div>
           </div>
         ) : (
           <>
-            {chatHistory.map((msg, idx) => (
-              <ChatMessage 
-                key={idx} 
-                message={msg} 
-                showAnalysis={showAnalysis} 
-              />
-            ))}
+            <div className="flex-grow space-y-4">
+              {chatHistory.map((msg, idx) => (
+                <ChatMessage 
+                  key={idx} 
+                  message={msg} 
+                  showAnalysis={showAnalysis} 
+                />
+              ))}
+            </div>
             
             {ragDiagnostics.isActive && ragDiagnostics.steps.length > 0 && ragDiagnostics.queryText && (
               <div className="mt-4">
