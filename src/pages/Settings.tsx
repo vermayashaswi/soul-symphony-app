@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut } from 'lucide-react';
@@ -53,7 +54,7 @@ export default function Settings() {
   const colorThemes = [
     { name: 'Default', color: 'bg-blue-500' },
     { name: 'Calm', color: 'bg-violet-500' },
-    { name: 'Soothing', color: 'bg-violet-400' },
+    { name: 'Soothing', color: 'bg-pink-200' }, // Updated to a light pink color class
     { name: 'Energy', color: 'bg-amber-400' },
     { name: 'Focus', color: 'bg-emerald-400' },
   ];

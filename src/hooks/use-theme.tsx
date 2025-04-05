@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = 'light' | 'dark' | 'system';
@@ -110,7 +109,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       case 'Calm':
         return '#8b5cf6'; // Changed Calm to violet-500 (what was previously Soothing)
       case 'Soothing':
-        return '#8b5cf6'; // Keep violet-500
+        return '#FFDEE2'; // Changed to light pink
       case 'Energy':
         return '#f59e0b'; // amber-500
       case 'Focus':
