@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -128,12 +127,10 @@ export function EmotionChart({
     return filteredEmotions;
   }, [aggregatedData, timeframe]);
   
-  // Force bubble chart to re-render when switching back to bubble view
   useEffect(() => {
     setBubbleKey(prev => prev + 1);
   }, [chartType]);
   
-  // This effect will update bubble chart when timeframe or data changes
   useEffect(() => {
     console.log('[EmotionChart] Timeframe or aggregatedData changed, updating bubble chart', {
       timeframe,
@@ -153,7 +150,6 @@ export function EmotionChart({
         percentage: Math.round(percentage * 10) / 10 // Round to 1 decimal place
       });
       
-      // Auto-hide after 2 seconds
       setTimeout(() => {
         setSelectedEmotionInfo(null);
       }, 2000);
@@ -189,8 +185,7 @@ export function EmotionChart({
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
-    // Initialize visibleEmotions if it's empty
-    if (visibleEmotions.length === 0) {
+    if (visibleEmotions.length === 0 && chartType === 'line') {
       setVisibleEmotions(topEmotions);
     }
     
@@ -201,7 +196,6 @@ export function EmotionChart({
         };
         
         topEmotions.forEach(emotion => {
-          // Format decimal values to 1 decimal place
           const value = emotions[emotion] || 0;
           dataPoint[emotion] = parseFloat(value.toFixed(1));
         });
@@ -213,7 +207,7 @@ export function EmotionChart({
         const dateB = new Date(b.day);
         return dateA.getTime() - dateB.getTime();
       });
-  }, [aggregatedData, visibleEmotions]);
+  }, [aggregatedData, visibleEmotions, chartType]);
 
   const EmotionLineLabel = (props: any) => {
     const { x, y, stroke, value, index, data, dataKey } = props;
@@ -239,20 +233,10 @@ export function EmotionChart({
 
   const handleLegendClick = (emotion: string) => {
     setVisibleEmotions(prev => {
-      // If this is the only visible emotion, show all emotions
-      if (prev.length === 1 && prev[0] === emotion) {
-        return lineData.length > 0 
-          ? Object.keys(lineData[0]).filter(key => key !== 'day')
-          : [];
-      }
-      
-      // If this emotion is already visible, hide it
       if (prev.includes(emotion)) {
         return prev.filter(e => e !== emotion);
       }
-      
-      // Otherwise, show only this emotion
-      return [emotion];
+      return [...prev, emotion];
     });
   };
 
@@ -326,32 +310,41 @@ export function EmotionChart({
           </LineChart>
         </ResponsiveContainer>
         
-        <div className="flex flex-wrap justify-center gap-4 mt-6 px-2">
-          {allEmotions.map((emotion, index) => (
-            <div 
-              key={emotion} 
-              className={cn(
-                "flex items-center gap-2 px-2 py-1 rounded-lg cursor-pointer transition-all", 
-                visibleEmotions.includes(emotion) 
-                  ? "bg-secondary/50 font-medium" 
-                  : "opacity-60 hover:opacity-100"
-              )}
-              onClick={() => handleLegendClick(emotion)}
-            >
+        <div className="flex flex-wrap justify-center gap-2 mt-6 px-2">
+          {allEmotions.map((emotion, index) => {
+            const isSelected = visibleEmotions.includes(emotion);
+            return (
               <div 
-                className="w-3 h-3 rounded-full" 
-                style={{ backgroundColor: getEmotionColor(emotion, index) }}
-              ></div>
-              <span className="text-sm">{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
-            </div>
-          ))}
+                key={emotion} 
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200",
+                  isSelected 
+                    ? "bg-secondary font-medium shadow-sm" 
+                    : "bg-secondary/30 hover:bg-secondary/50"
+                )}
+                onClick={() => handleLegendClick(emotion)}
+              >
+                <div 
+                  className={cn("w-3 h-3 rounded-full", 
+                    isSelected ? "animate-pulse" : "opacity-60"
+                  )}
+                  style={{ backgroundColor: getEmotionColor(emotion, index) }}
+                ></div>
+                <span 
+                  className={cn("text-sm", 
+                    isSelected ? "font-medium" : "text-muted-foreground"
+                  )}
+                >
+                  {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+                </span>
+              </div>
+            );
+          })}
         </div>
         
-        {!isMobile && (
-          <div className="mt-4 text-center text-xs text-muted-foreground">
-            * Click on a legend item to show/hide emotions
-          </div>
-        )}
+        <div className="mt-4 text-center text-xs text-muted-foreground">
+          * Click on a legend item to toggle visibility
+        </div>
       </div>
     );
   };
