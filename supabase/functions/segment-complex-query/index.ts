@@ -1,11 +1,16 @@
 
-import { serve } from 'std/server';
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { cors } from '../_shared/cors.ts';
 import { supabase } from '../_shared/supabase.ts';
 import { OpenAI } from "https://deno.land/x/openai@v1.3.0/mod.ts";
 
 const apiKey = Deno.env.get('OPENAI_API_KEY');
-const openai = new OpenAI(apiKey || '');
+if (!apiKey) {
+  console.error('OPENAI_API_KEY is not set');
+  Deno.exit(1);
+}
+
+const openai = new OpenAI(apiKey);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
