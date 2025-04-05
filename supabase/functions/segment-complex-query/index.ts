@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { supabase } from '../_shared/supabase.ts';
 import { OpenAI } from "https://deno.land/x/openai@v1.3.0/mod.ts";
@@ -75,7 +74,6 @@ serve(async (req) => {
   }
 });
 
-// Update any function that searches journal entries using vector similarity
 async function searchJournalEntries(
   userId: string, 
   queryEmbedding: any[],
