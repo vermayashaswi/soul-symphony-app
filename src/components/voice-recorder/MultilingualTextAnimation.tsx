@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Expanded language list with more options
+// Expanded language list
 const languages = [
   "English", "Español", "Français", "Deutsch", "Italiano", "Português", 
   "Русский", "日本語", "한국어", "中文", "العربية", "हिन्दी", "Tiếng Việt", 
@@ -22,35 +22,37 @@ interface AnimatedWordProps {
   total: number;
 }
 
-// Individual word animation component with improved smooth movement
+// Individual word animation component with enhanced random movement
 const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
-  // Calculate position that covers the entire container evenly
+  // Generate random position across the entire screen
   const positionGenerator = () => {
-    // Divide the container into a grid and place words evenly
-    const gridSize = Math.ceil(Math.sqrt(total));
-    const cellSize = 100 / gridSize;
-    
-    // Get a position within the grid, then add some randomness
-    const gridX = (index % gridSize) * cellSize;
-    const gridY = Math.floor(index / gridSize) * cellSize;
-    
-    // Add randomness within the cell
-    const x = gridX + (Math.random() * cellSize * 0.6);
-    const y = gridY + (Math.random() * cellSize * 0.6);
-    
-    return { x, y };
+    return {
+      x: Math.random() * 100,
+      y: Math.random() * 100
+    };
+  };
+  
+  // Generate several random positions for movement path
+  const generateRandomPath = (count = 5) => {
+    const path = [];
+    for (let i = 0; i < count; i++) {
+      path.push({
+        x: Math.random() * 100,
+        y: Math.random() * 100
+      });
+    }
+    return path;
   };
   
   // Generate consistent random values for this word
   const basePosition = useRef(positionGenerator());
-  const moveRadius = useRef(5 + Math.random() * 10); // Random movement radius (5-15px)
-  const moveSpeed = useRef(15 + Math.random() * 15); // Random duration (15-30s)
-  const delay = useRef(index * 0.03); // Staggered delay for smoother initial appearance
+  const movePath = useRef(generateRandomPath());
+  const moveSpeed = useRef(25 + Math.random() * 35); // Random duration (25-60s) for slower movement
+  const delay = useRef(index * 0.05); // Staggered delay
   
   // Visual properties
-  const fontSize = useRef(10 + Math.floor(Math.random() * 8)); // 10-18px font size
-  const opacity = useRef(0.5 + Math.random() * 0.5); // 0.5-1.0 opacity
-  const zIndex = useRef(Math.floor(Math.random() * 10)); // Random z-index for layering
+  const fontSize = useRef(8 + Math.floor(Math.random() * 6)); // 8-14px font size
+  const opacity = useRef(0.2 + Math.random() * 0.3); // 0.2-0.5 opacity (increased transparency by ~50%)
   
   return (
     <motion.div
@@ -62,18 +64,8 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
         scale: 0.5,
       }}
       animate={{ 
-        x: [
-          basePosition.current.x,
-          basePosition.current.x + moveRadius.current,
-          basePosition.current.x - moveRadius.current,
-          basePosition.current.x,
-        ],
-        y: [
-          basePosition.current.y,
-          basePosition.current.y - moveRadius.current,
-          basePosition.current.y + moveRadius.current,
-          basePosition.current.y,
-        ],
+        x: movePath.current.map(pos => `${pos.x}%`),
+        y: movePath.current.map(pos => `${pos.y}%`),
         opacity: opacity.current,
         scale: 0.8 + Math.random() * 0.4,
       }}
@@ -82,13 +74,15 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
           duration: moveSpeed.current,
           repeat: Infinity,
           repeatType: "mirror",
-          ease: "easeInOut",
+          ease: "linear",
+          times: movePath.current.map((_, i) => i / (movePath.current.length - 1))
         },
         y: {
-          duration: moveSpeed.current + 5, // Slightly different timing for more natural motion
+          duration: moveSpeed.current * 1.2, // Slightly different timing for more natural motion
           repeat: Infinity,
           repeatType: "mirror",
-          ease: "easeInOut",
+          ease: "linear",
+          times: movePath.current.map((_, i) => i / (movePath.current.length - 1))
         },
         opacity: {
           duration: 0.8,
@@ -101,11 +95,8 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
       }}
       className="absolute select-none pointer-events-none will-change-transform transform-gpu"
       style={{ 
-        left: `${basePosition.current.x}%`,
-        top: `${basePosition.current.y}%`,
         fontSize: `${fontSize.current}px`,
         opacity: opacity.current,
-        zIndex: zIndex.current, 
         transform: 'translate(-50%, -50%)',
         color: 'var(--foreground)', // Using CSS var for theme compatibility
       }}
@@ -116,14 +107,19 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
 };
 
 // Background language animation component with improved performance
-export function LanguageBackground({ contained = false }: { contained?: boolean }) {
+export function LanguageBackground({ contained = false, isActive = true }: { contained?: boolean, isActive?: boolean }) {
   const [visibleWords, setVisibleWords] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
+    if (!isActive) {
+      setVisibleWords([]);
+      return;
+    }
+    
     // Adjusted word count for better performance and distribution
     const updateWords = () => {
-      const wordCount = contained ? 25 : 35;
+      const wordCount = contained ? 25 : 40;
       
       // Create a set to avoid duplicates
       const selectedIndices = new Set<number>();
@@ -145,7 +141,9 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
     const interval = setInterval(updateWords, 12000);
     
     return () => clearInterval(interval);
-  }, [contained]);
+  }, [contained, isActive]);
+  
+  if (!isActive) return null;
   
   return (
     <div 
@@ -171,7 +169,7 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
   );
 }
 
-// The original MultilingualTextAnimation component with enhanced animations
+// The original MultilingualTextAnimation component
 export function MultilingualTextAnimation() {
   const [currentIndex, setCurrentIndex] = useState(0);
   

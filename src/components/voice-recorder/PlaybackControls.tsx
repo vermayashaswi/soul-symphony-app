@@ -32,14 +32,14 @@ export function PlaybackControls({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="flex flex-col items-center gap-3 w-full max-w-xs"
+      className="flex flex-col items-center gap-2 w-full max-w-xs"
     >
       <div className="w-full">
         <Button 
           onClick={onTogglePlayback} 
           variant="outline"
           disabled={isProcessing}
-          className="rounded-full h-10 px-4 flex items-center gap-2 w-full mb-2"
+          className="rounded-full h-10 px-4 flex items-center gap-2 w-full mb-1"
         >
           {isPlaying ? (
             <>
@@ -69,7 +69,7 @@ export function PlaybackControls({
       <Button 
         onClick={onSaveEntry}
         disabled={isProcessing}
-        className="w-full mt-2 rounded-lg flex items-center justify-center gap-2"
+        className="w-full rounded-lg flex items-center justify-center gap-2 mt-1"
       >
         <span>Save Entry</span>
       </Button>

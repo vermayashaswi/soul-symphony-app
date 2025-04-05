@@ -25,6 +25,7 @@ interface VoiceRecorderProps {
 export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [showAnimation, setShowAnimation] = useState(true);
   const { user } = useAuth();
   const isMobile = useIsMobile();
   
@@ -52,6 +53,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     audioRef,
     reset: resetPlayback
   } = useAudioPlayback({ audioBlob });
+
+  // Control animation visibility based on recording state
+  useEffect(() => {
+    if (isRecording) {
+      setShowAnimation(false);
+    }
+    // We intentionally don't turn the animation back on when recording stops
+  }, [isRecording]);
 
   useEffect(() => {
     if (isRecording) {
@@ -111,6 +120,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     resetRecording();
     resetPlayback();
     setRecordingError(null);
+    // Don't re-enable the animation
     toast.info("Recording discarded. Ready to start a new recording.");
   };
 
@@ -122,7 +132,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         "relative w-full h-full flex flex-col items-center justify-between overflow-hidden pt-6 pb-4 rounded-2xl border border-slate-200/20",
         isMobile ? "min-h-[calc(70vh-160px)]" : "min-h-[185px]"
       )}>
-        <LanguageBackground contained={true} />
+        <LanguageBackground contained={true} isActive={showAnimation} />
         
         <div className="w-full px-4 sm:px-6 relative z-10">
           {/* No RecordingVisualizer component */}
@@ -133,7 +143,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             isRecording={isRecording}
             isProcessing={isProcessing}
             hasPermission={hasPermission}
-            onRecordingStart={startRecording}
+            onRecordingStart={() => {
+              setShowAnimation(false);
+              startRecording();
+            }}
             onRecordingStop={stopRecording}
             onPermissionRequest={requestPermissions}
             audioLevel={audioLevel}
