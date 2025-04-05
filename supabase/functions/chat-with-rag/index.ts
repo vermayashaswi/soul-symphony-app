@@ -86,7 +86,7 @@ function isEmotionWhyQuery(message: string): boolean {
          isTopEmotionsQuery(message);
 }
 
-// NEW: Analyze if query is about time patterns
+// Analyze if query is about time patterns
 function isTimePatternQuery(message: string): boolean {
   const lowerMessage = message.toLowerCase();
   const timePatterns = [
@@ -162,7 +162,7 @@ function extractTimePeriod(message: string): {startDate: Date | null, endDate: D
   return { startDate, endDate, periodName };
 }
 
-// NEW: Analyze time of day patterns in entries
+// Analyze time of day patterns in entries
 async function analyzeTimePatterns(entriesWithEmotions: any[], emotionKeywords: string[] = []): Promise<any> {
   if (!entriesWithEmotions || entriesWithEmotions.length === 0) {
     return { timePatterns: null };
@@ -480,9 +480,9 @@ serve(async (req) => {
       userId, 
       threadId = null, 
       includeDiagnostics = false, 
+      queryTypes = {},
       requiresEmotionAnalysis = false,
       isTemporalQuery = false,
-      isTimePatternQuery = false,
       isFrequencyQuery = false,
       isEmotionQuery = false,
       isWhyEmotionQuery = false,
@@ -520,9 +520,12 @@ serve(async (req) => {
       console.log("User message stored in database");
     }
     
+    // Check if this is a time pattern query
+    const isTimePatternQ = queryTypes.isTimePatternQuery || isTimePatternQuery(message);
+    
     // Determine query type and approach
     const queryType = {
-      queryType: isTimePatternQuery ? "time_pattern" :
+      queryType: isTimePatternQ ? "time_pattern" :
                 isTemporalQuery ? "temporal" :
                 isFrequencyQuery ? "frequency" :
                 isEmotionQuery ? "emotion" :
@@ -534,7 +537,7 @@ serve(async (req) => {
       entityName: null,
       timeframe: providedTimeRange || extractTimePeriod(message),
       isWhenQuestion: isTemporalQuery,
-      isTimePatternQuery: isTimePatternQuery || isTimePatternQuery(message)
+      isTimePatternQuery: isTimePatternQ
     };
     
     console.log("Query analysis:", JSON.stringify(queryType));
@@ -645,7 +648,7 @@ serve(async (req) => {
       }
     }
     
-    // NEW: Analyze time patterns if requested
+    // Analyze time patterns if requested
     let timePatternAnalysis = null;
     if (queryType.isTimePatternQuery || requiresTimeAnalysis || analyzeHourPatterns) {
       console.log("Performing time pattern analysis");
@@ -757,7 +760,7 @@ Keep your response conversational and supportive.
       }
     }
     
-    // NEW: For time pattern queries, prepare time analysis context
+    // For time pattern queries, prepare time analysis context
     let timePatternPrompt = "";
     if (timePatternAnalysis && timePatternAnalysis.hasTimePatterns) {
       const emotionContext = emotionKeywords.length > 0 ? 
@@ -806,7 +809,7 @@ Keep your response conversational and supportive.
 The user is asking WHEN something happened. Focus on identifying and highlighting the specific dates or time periods
 when the events they're asking about occurred. Make sure to include these dates prominently in your response.
 `;
-    } else if (queryType.isTimePatternQuery || isTimePatternQuery) {
+    } else if (queryType.isTimePatternQuery) {
       querySpecificInstructions = `
 The user is asking about WHAT TIME OF DAY certain patterns occur. Focus on identifying hour-based patterns in their journal entries
 and provide insights about when they typically experience certain emotions or events during the day. Include specific time ranges in your answer.

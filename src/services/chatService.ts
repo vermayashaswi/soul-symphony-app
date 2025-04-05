@@ -21,13 +21,18 @@ export const processChatMessage = async (
   
   try {
     // Call the Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke('chat-rag', {
+    const { data, error } = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,
         userId,
         queryTypes,
         threadId,
-        includeDiagnostics: enableDiagnostics
+        includeDiagnostics: enableDiagnostics,
+        isEmotionQuery: queryTypes.isEmotionFocused,
+        isWhyEmotionQuery: queryTypes.isWhyQuestion && queryTypes.isEmotionFocused,
+        isTimePatternQuery: queryTypes.isTimePatternQuery,
+        isTemporalQuery: queryTypes.isWhenQuestion,
+        requiresTimeAnalysis: queryTypes.requiresTimeAnalysis
       }
     });
 
@@ -74,7 +79,9 @@ export const processChatMessage = async (
     if (data.analysis) {
       chatResponse.analysis = data.analysis;
       if (data.analysis.type === 'quantitative_emotion' || 
-          data.analysis.type === 'top_emotions') {
+          data.analysis.type === 'top_emotions' ||
+          data.analysis.type === 'time_patterns' ||
+          data.analysis.type === 'combined_analysis') {
         chatResponse.hasNumericResult = true;
       }
     }
