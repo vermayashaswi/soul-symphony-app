@@ -454,7 +454,7 @@ export default function MobileChatInterface({
     }
   };
 
-  const handleStartNewThread = async () => {
+  const handleStartNewThread = async (): Promise<string | null> => {
     setSheetOpen(false);
     if (onCreateNewThread) {
       const newThreadId = await onCreateNewThread();
