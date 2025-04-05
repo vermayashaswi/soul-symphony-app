@@ -1,366 +1,227 @@
 
-// Add the missing type definitions for this file's exports and functions
-import { supabase } from "@/integrations/supabase/client";
+// This file contains functions to analyze the type of query a user is asking
 
-export type QueryTypes = {
+type QueryTypes = {
+  isEmotionFocused: boolean;
+  isQuantitative: boolean;
+  isWhyQuestion: boolean;
   isTemporalQuery: boolean;
   isTimePatternQuery: boolean;
-  isWhyQuestion: boolean;
-  isEmotionFocused: boolean;
-  isFrequencyQuery: boolean;
-  isQuantitative: boolean;
-  isComplexQuery: boolean;
-  isComparisonQuery: boolean;
-  needsContext: boolean;
-  needsDataAggregation: boolean;
+  isWhenQuestion: boolean;
   needsVectorSearch: boolean;
-  searchStrategy: string;
-  querySegments?: string[];
-  isThemeFocused?: boolean;
+  needsMoreContext: boolean;
+  needsDataAggregation: boolean;
+  isSpecificQuery: boolean;
+  isThemeFocused: boolean;
+  requiresTimeAnalysis: boolean;
   emotion?: string;
   theme?: string;
-  isWhenQuestion?: boolean;
+  timeRange: {
+    startDate: string | null;
+    endDate: string | null;
+    periodName: string;
+  };
   startDate?: string;
   endDate?: string;
-  timeRange?: {
-    type: 'day' | 'week' | 'month' | 'year' | 'custom';
-    startDate?: string;
-    endDate?: string;
-  };
-  isSpecificQuery?: boolean;
-  needsMoreContext?: boolean;
-  requiresTimeAnalysis?: boolean;
 };
 
-export function analyzeQueryTypes(queryText: string): QueryTypes {
-  const lowerQuery = queryText.toLowerCase();
+/**
+ * Analyzes the user's query to determine what type of processing it needs
+ */
+export function analyzeQueryTypes(query: string): QueryTypes {
+  const lowerQuery = query.toLowerCase();
   
-  // Analyze for temporal queries (when questions)
-  const isTemporalQuery = /\bwhen\b/i.test(lowerQuery) || 
-    /\byesterday\b|\blast week\b|\blast month\b|\blast year\b|\btoday\b|\bthis week\b|\bthis month\b|\bthis year\b/i.test(lowerQuery);
+  // Initialize result with default values
+  const result: QueryTypes = {
+    isEmotionFocused: false,
+    isQuantitative: false,
+    isWhyQuestion: false,
+    isTemporalQuery: false,
+    isTimePatternQuery: false,
+    isWhenQuestion: false,
+    needsVectorSearch: true, // Most queries will need vector search
+    needsMoreContext: false,
+    needsDataAggregation: false,
+    isSpecificQuery: false,
+    isThemeFocused: false,
+    requiresTimeAnalysis: false,
+    timeRange: {
+      startDate: null,
+      endDate: null,
+      periodName: "recently"
+    }
+  };
   
-  const isWhenQuestion = /\bwhen\b/i.test(lowerQuery);
+  // Detect emotion-focused queries
+  const emotionWords = ['feel', 'feeling', 'felt', 'emotion', 'emotions', 'mood', 'moods', 'happy', 'sad', 'angry', 'anxious', 'joy', 'fear', 'happiness'];
+  result.isEmotionFocused = emotionWords.some(word => lowerQuery.includes(word));
   
-  // NEW: Analyze for time-of-day pattern queries
-  const isTimePatternQuery = /what time|time of day|morning|afternoon|evening|night|o'clock|am\b|pm\b|hour|daytime/i.test(lowerQuery);
+  // Detect if this is a why-question
+  result.isWhyQuestion = lowerQuery.includes('why') || 
+                         lowerQuery.includes('reason') || 
+                         lowerQuery.includes('reasons') ||
+                         lowerQuery.includes('explain') ||
+                         lowerQuery.includes('what caused') ||
+                         lowerQuery.includes('what makes');
   
-  // Analyze for why questions
-  const isWhyQuestion = /\bwhy\b|\bwhat caused\b|\breason for\b|\bexplain why\b/i.test(lowerQuery);
+  // Detect if this needs more context (why questions or complex questions)
+  result.needsMoreContext = result.isWhyQuestion || 
+                           lowerQuery.includes('explain') ||
+                           lowerQuery.includes('elaborate') ||
+                           lowerQuery.includes('details');
   
-  // Analyze for emotion-focused questions
-  const isEmotionFocused = /\bfeel\b|\bfeeling\b|\bfelt\b|\bemotions?\b|\bhappy\b|\bsad\b|\bangry\b|\bworried\b|\banxious\b|\bcontent\b|\bjoyful\b|\bstressed\b|\bupset\b|\bfrustrated\b|\boptimistic\b|\bdepressed\b|\blonely\b/i.test(lowerQuery);
+  // Detect if this is a quantitative query
+  result.isQuantitative = lowerQuery.includes('how much') ||
+                         lowerQuery.includes('how many') ||
+                         lowerQuery.includes('count') ||
+                         lowerQuery.includes('percentage') ||
+                         lowerQuery.includes('rate') ||
+                         lowerQuery.includes('average') ||
+                         lowerQuery.includes('top') ||
+                         /\d+/.test(lowerQuery); // Contains numbers
   
-  // Analyze for frequency queries (how often questions)
-  const isFrequencyQuery = /how (often|frequently|many times|regularly)|frequency|per (day|week|month)|daily|weekly|monthly/i.test(lowerQuery);
+  // Detect theme-focused queries
+  const themeWords = ['theme', 'themes', 'topic', 'topics', 'about', 'regarding', 'related to', 'concerning'];
+  result.isThemeFocused = themeWords.some(word => lowerQuery.includes(word));
   
-  // Analyze for quantitative questions (numbers, rankings, etc.)
-  const isQuantitative = /\bmost\b|\bleast\b|\btop\b|\bbottom\b|\branking\b|\baverage\b|\bmean\b|\bmedian\b|\bcount\b|\bnumber of\b|\bpercentage\b|\bhow many\b|highest|lowest/i.test(lowerQuery);
+  // Identify specific emotions being asked about
+  const specificEmotions = ['happy', 'sad', 'angry', 'anxious', 'joy', 'fear', 'happiness', 'excitement', 'boredom', 'frustration', 'hope'];
+  for (const emotion of specificEmotions) {
+    if (lowerQuery.includes(emotion)) {
+      result.emotion = emotion;
+      break;
+    }
+  }
   
-  // Improved: Analyze for complex queries (multiple questions or conditions)
-  const isComplexQuery = /\band\b|\bor\b|\bbut\b|;|,\s*\b(what|how|when|why|who)\b|\?.*\?/i.test(lowerQuery) || 
-    lowerQuery.split(' ').length > 20 || // Lengthy questions are typically complex
-    (isWhyQuestion && lowerQuery.length > 60) || // Why questions with detailed context
-    // New: Detect ranking or prioritization requests
-    /\border\b|\brank\b|\bprioritize\b|\bpriority\b|\bmost important\b|\bleast important\b/i.test(lowerQuery);
+  // Identify specific themes being asked about
+  if (result.isThemeFocused) {
+    const themeMatches = lowerQuery.match(/about\s+(\w+)/i) || 
+                         lowerQuery.match(/regarding\s+(\w+)/i) ||
+                         lowerQuery.match(/related to\s+(\w+)/i);
+    if (themeMatches && themeMatches[1]) {
+      result.theme = themeMatches[1];
+    }
+  }
   
-  // Analyze for comparison queries
-  const isComparisonQuery = /\bcompared to\b|\bvs\.?\b|\bversus\b|\bagainst\b|\bdifference between\b|\bhow does.*compare\b|\bmore than\b|\bless than\b|\bsimilar to\b|\bdifferent from\b/i.test(lowerQuery);
+  // Detect time-pattern queries
+  result.isTimePatternQuery = lowerQuery.includes('what time') ||
+                            lowerQuery.includes('when do i usually') ||
+                            lowerQuery.includes('time of day') ||
+                            (lowerQuery.includes('morning') && lowerQuery.includes('night')) ||
+                            (lowerQuery.includes('time') && lowerQuery.includes('most'));
   
-  // Determine if we need additional context for this query
-  const needsContext = isWhyQuestion || isComplexQuery || 
-    /explain|elaborate|tell me more|context|understand|meaning|interpret/i.test(lowerQuery);
+  result.requiresTimeAnalysis = result.isTimePatternQuery || 
+                                lowerQuery.includes('pattern') || 
+                                lowerQuery.includes('routine');
   
-  // Determine if the query requires data aggregation (typically for quantitative analysis)
-  const needsDataAggregation = isQuantitative || 
-    /pattern|trend|correlation|relationship between|associated with|connected to|link between|summary|summarize|average|mean|total/i.test(lowerQuery);
+  // Detect temporal queries (asking about a specific time period)
+  result.isTemporalQuery = lowerQuery.includes('yesterday') ||
+                          lowerQuery.includes('last week') ||
+                          lowerQuery.includes('last month') ||
+                          lowerQuery.includes('past week') ||
+                          lowerQuery.includes('past month') ||
+                          lowerQuery.includes('this week') ||
+                          lowerQuery.includes('this month') ||
+                          lowerQuery.includes('today');
   
-  // Determine if the query requires vector search (semantic retrieval)
-  const needsVectorSearch = !needsDataAggregation || isEmotionFocused || isTemporalQuery;
+  // Detect "when" questions
+  result.isWhenQuestion = lowerQuery.startsWith('when') || 
+                         lowerQuery.includes('what day') ||
+                         lowerQuery.includes('what date') ||
+                         lowerQuery.includes('which day') ||
+                         lowerQuery.includes('which date');
   
-  // Determine if this is a specific query (requiring higher similarity threshold)
-  const isSpecificQuery = isTemporalQuery || isWhenQuestion || 
-    /\bexactly\b|\bspecifically\b|\bprecisely\b/i.test(lowerQuery);
-  
-  // Determine if we need more context for this query
-  const needsMoreContext = isWhyQuestion || isComplexQuery;
-  
-  // Extract time range from query
+  // If this is a temporal query, determine the time range
   const timeRange = extractTimeRange(lowerQuery);
+  if (timeRange) {
+    result.timeRange = timeRange;
+    if (timeRange.startDate) {
+      result.startDate = timeRange.startDate;
+    }
+    if (timeRange.endDate) {
+      result.endDate = timeRange.endDate;
+    }
+  }
   
-  // Determine search strategy
-  let searchStrategy = determineSearchStrategy(lowerQuery, {
-    isTemporalQuery,
-    isTimePatternQuery, 
-    isFrequencyQuery, 
-    isEmotionFocused, 
-    isQuantitative,
-    needsDataAggregation
-  });
+  // Detect if this is a specific query that should return fewer, more precise results
+  result.isSpecificQuery = result.isTemporalQuery || result.isWhenQuestion || result.theme !== undefined;
   
-  return {
-    isTemporalQuery,
-    isTimePatternQuery,
-    isWhyQuestion,
-    isEmotionFocused,
-    isFrequencyQuery,
-    isQuantitative,
-    isComplexQuery,
-    isComparisonQuery,
-    needsContext,
-    needsDataAggregation,
-    needsVectorSearch,
-    searchStrategy,
-    timeRange,
-    isWhenQuestion,
-    isSpecificQuery,
-    needsMoreContext,
-    requiresTimeAnalysis: isTemporalQuery || isWhenQuestion
-  };
+  // Detect if we need to aggregate data from multiple entries
+  result.needsDataAggregation = result.isQuantitative || 
+                               lowerQuery.includes('pattern') ||
+                               lowerQuery.includes('usually') ||
+                               lowerQuery.includes('typically') ||
+                               lowerQuery.includes('often') ||
+                               lowerQuery.includes('most of the time');
+  
+  return result;
 }
 
-// New function to segment complex queries
-export async function segmentQuery(queryText: string, userId: string): Promise<string[]> {
-  try {
-    // For non-complex queries, return the original query as a single segment
-    const queryTypes = analyzeQueryTypes(queryText);
-    if (!queryTypes.isComplexQuery) {
-      return [queryText];
-    }
-    
-    // For complex queries, use supabase function to segment the query
-    const { data, error } = await supabase.functions.invoke('segment-complex-query', {
-      body: { 
-        query: queryText,
-        userId: userId
-      }
-    });
-    
-    if (error) {
-      console.error("Error segmenting query:", error);
-      return [queryText]; // Fallback to original query
-    }
-    
-    if (data && data.segments && Array.isArray(data.segments) && data.segments.length > 0) {
-      console.log("Query segmented into:", data.segments);
-      return data.segments;
-    }
-    
-    return [queryText]; // Fallback to original query
-  } catch (error) {
-    console.error("Exception in query segmentation:", error);
-    return [queryText]; // Fallback to original query
-  }
-}
-
-function determineSearchStrategy(
-  query: string, 
-  flags: { 
-    isTemporalQuery: boolean; 
-    isTimePatternQuery: boolean;
-    isFrequencyQuery: boolean; 
-    isEmotionFocused: boolean; 
-    isQuantitative: boolean;
-    needsDataAggregation: boolean;
-  }
-): string {
-  // Check for time-of-day pattern questions first (new strategy)
-  if (flags.isTimePatternQuery) {
-    return 'time_pattern_analysis';
-  }
-  
-  // Check for temporal queries (when did something happen)
-  if (flags.isTemporalQuery) {
-    return 'temporal_vector_search';
-  }
-  
-  // Check for frequency queries (how often)
-  if (flags.isFrequencyQuery) {
-    return 'frequency_analysis';
-  }
-  
-  // Check for emotion-focused queries
-  if (flags.isEmotionFocused) {
-    if (/\bwhy\b/i.test(query)) {
-      return 'emotion_causal_analysis';
-    }
-    
-    if (/\btop\b|\bmost\b|\bcommon\b/i.test(query)) {
-      return 'emotion_aggregation';
-    }
-  }
-  
-  // Check for relationship-themed queries
-  if (/\bpartner\b|\bspouse\b|\bhusband\b|\bwife\b|\brelationship\b|\bmarriage\b|\bboyfriend\b|\bgirlfriend\b/i.test(query)) {
-    return 'relationship_analysis';
-  }
-  
-  // Check for advice/improvement queries
-  if (/\bhow\s+can\s+i\b|\bhow\s+do\s+i\b|\bhow\s+to\b|\badvice\b|\bsuggest\b|\bimprove\b|\bbetter\b|\bhelp\s+me\b/i.test(query)) {
-    return 'contextual_advice';
-  }
-  
-  // Check for data aggregation needs (correlation, patterns, numbers)
-  if (flags.needsDataAggregation || 
-      /\bpattern\b|\btrend\b|\bcorrelation\b|\baverage\b|\bmean\b|\btotal\b|\bsum\b|\bcount\b/i.test(query)) {
-    return 'data_aggregation';
-  }
-  
-  // Default strategy
-  return 'vector_search';
-}
-
-function extractTimeRange(query: string): { type: 'day' | 'week' | 'month' | 'year' | 'custom', startDate?: string, endDate?: string } | undefined {
+/**
+ * Extracts time range from query text
+ */
+function extractTimeRange(query: string): { startDate: string | null, endDate: string | null, periodName: string } {
   const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const date = now.getDate();
   
-  // Check for today
-  if (/\btoday\b/i.test(query)) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return {
-      type: 'day',
-      startDate: today.toISOString(),
-      endDate: now.toISOString()
-    };
+  let startDate: Date | null = null;
+  let endDate: Date | null = null;
+  let periodName = "recently";
+  
+  // Match common time expressions
+  if (query.includes('yesterday')) {
+    startDate = new Date(year, month, date - 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(year, month, date - 1);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = "yesterday";
+  } else if (query.includes('last week')) {
+    // Last week: Monday-Sunday of previous week
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysToLastMonday = dayOfWeek === 0 ? 7 : dayOfWeek;
+    startDate = new Date(year, month, date - daysToLastMonday - 6);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(year, month, date - daysToLastMonday);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = "last week";
+  } else if (query.includes('this week')) {
+    // This week: Monday-Today of current week
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    startDate = new Date(year, month, date - daysToMonday);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(year, month, date);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = "this week";
+  } else if (query.includes('last month')) {
+    startDate = new Date(year, month - 1, 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(year, month, 0);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = "last month";
+  } else if (query.includes('this month')) {
+    startDate = new Date(year, month, 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = now;
+    periodName = "this month";
+  } else if (query.includes('today')) {
+    startDate = new Date(year, month, date);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = now;
+    periodName = "today";
+  } else {
+    // Default to last 30 days
+    startDate = new Date(year, month, date - 30);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = now;
+    periodName = "the last 30 days";
   }
-  
-  // Check for yesterday
-  if (/\byesterday\b/i.test(query)) {
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-    
-    const yesterdayEnd = new Date(yesterday);
-    yesterdayEnd.setHours(23, 59, 59, 999);
-    
-    return {
-      type: 'day',
-      startDate: yesterday.toISOString(),
-      endDate: yesterdayEnd.toISOString()
-    };
-  }
-  
-  // Check for this week
-  if (/\bthis\s+week\b/i.test(query)) {
-    const startOfWeek = new Date(now);
-    const day = startOfWeek.getDay();
-    startOfWeek.setDate(startOfWeek.getDate() - day + (day === 0 ? -6 : 1)); // Adjust to Monday
-    startOfWeek.setHours(0, 0, 0, 0);
-    
-    return {
-      type: 'week',
-      startDate: startOfWeek.toISOString(),
-      endDate: now.toISOString()
-    };
-  }
-  
-  // Check for last week
-  if (/\blast\s+week\b|\bprevious\s+week\b/i.test(query)) {
-    const endOfLastWeek = new Date(now);
-    const day = endOfLastWeek.getDay();
-    endOfLastWeek.setDate(endOfLastWeek.getDate() - day + (day === 0 ? -6 : 1) - 1); // Last Sunday
-    endOfLastWeek.setHours(23, 59, 59, 999);
-    
-    const startOfLastWeek = new Date(endOfLastWeek);
-    startOfLastWeek.setDate(startOfLastWeek.getDate() - 6); // Last Monday
-    startOfLastWeek.setHours(0, 0, 0, 0);
-    
-    return {
-      type: 'week',
-      startDate: startOfLastWeek.toISOString(),
-      endDate: endOfLastWeek.toISOString()
-    };
-  }
-  
-  // Check for this month
-  if (/\bthis\s+month\b/i.test(query)) {
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
-    return {
-      type: 'month',
-      startDate: startOfMonth.toISOString(),
-      endDate: now.toISOString()
-    };
-  }
-  
-  // Check for last month
-  if (/\blast\s+month\b|\bprevious\s+month\b/i.test(query)) {
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-    endOfLastMonth.setHours(23, 59, 59, 999);
-    
-    return {
-      type: 'month',
-      startDate: startOfLastMonth.toISOString(),
-      endDate: endOfLastMonth.toISOString()
-    };
-  }
-  
-  // Check for this year
-  if (/\bthis\s+year\b/i.test(query)) {
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    
-    return {
-      type: 'year',
-      startDate: startOfYear.toISOString(),
-      endDate: now.toISOString()
-    };
-  }
-  
-  // Check for last year
-  if (/\blast\s+year\b|\bprevious\s+year\b/i.test(query)) {
-    const startOfLastYear = new Date(now.getFullYear() - 1, 0, 1);
-    const endOfLastYear = new Date(now.getFullYear() - 1, 11, 31);
-    endOfLastYear.setHours(23, 59, 59, 999);
-    
-    return {
-      type: 'year',
-      startDate: startOfLastYear.toISOString(),
-      endDate: endOfLastYear.toISOString()
-    };
-  }
-  
-  // Default to past 30 days
-  const thirtyDaysAgo = new Date(now);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
   return {
-    type: 'custom',
-    startDate: thirtyDaysAgo.toISOString(),
-    endDate: now.toISOString()
+    startDate: startDate ? startDate.toISOString() : null,
+    endDate: endDate ? endDate.toISOString() : null,
+    periodName
   };
-}
-
-// Helper function to extract emotion keywords from a query
-export function extractEmotionKeywords(message: string): string[] {
-  const lowerMessage = message.toLowerCase();
-  
-  // Common emotion words to look for
-  const emotionWords = [
-    'happy', 'sad', 'angry', 'frustrated', 'excited', 'anxious', 'calm', 
-    'stressed', 'relaxed', 'motivated', 'tired', 'energetic', 'joyful', 
-    'depressed', 'content', 'optimistic', 'pessimistic', 'hopeful',
-    'negative', 'positive', 'irritable', 'annoyed', 'worried', 'scared',
-    'fearful', 'proud', 'ashamed', 'guilty', 'jealous', 'envious',
-    'lonely', 'loved', 'appreciated', 'rejected', 'abandoned'
-  ];
-  
-  // Find any emotion words in the message
-  const foundEmotions = emotionWords.filter(emotion => lowerMessage.includes(emotion));
-  
-  // If no specific emotions found, include general emotional state keywords
-  if (foundEmotions.length === 0) {
-    // Check for general emotional state references
-    if (lowerMessage.includes('feel good') || lowerMessage.includes('positive')) {
-      foundEmotions.push('positive');
-    }
-    if (lowerMessage.includes('feel bad') || lowerMessage.includes('negative')) {
-      foundEmotions.push('negative');
-    }
-    if (foundEmotions.length === 0) {
-      // Default to searching for all emotions if none specified
-      foundEmotions.push('emotion');
-    }
-  }
-  
-  return foundEmotions;
 }
