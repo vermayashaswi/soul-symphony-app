@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -480,7 +481,7 @@ export default function MobileChatInterface({
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
         {messages.length === 0 ? (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col justify-start h-full">
             <div className="mt-4 text-center px-4">
               <h3 className="text-xl font-medium mb-2">How can I help you?</h3>
               <p className="text-muted-foreground text-sm mb-4">
@@ -509,7 +510,6 @@ export default function MobileChatInterface({
                 </motion.div>
               )}
             </div>
-            <div className="flex-1"></div>
           </div>
         ) : (
           <div className="flex-grow space-y-3">
@@ -545,7 +545,7 @@ export default function MobileChatInterface({
         <div ref={messagesEndRef} />
       </div>
       
-      <div className="mobile-chat-input-container mb-14">
+      <div className="mobile-chat-input-container sticky bottom-16 bg-background border-t">
         <MobileChatInput 
           onSendMessage={handleSendMessage} 
           isLoading={loading}
