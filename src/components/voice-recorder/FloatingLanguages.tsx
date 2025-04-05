@@ -1,6 +1,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface FloatingLanguagesProps {
   size: "sm" | "md";
@@ -14,23 +15,12 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
     "স্বাগতম", "Namaste", "Hello", "Hi", "Hey",
   ];
 
-  // Define the keyframes animation style directly in the component
-  const floatTextKeyframes = `
-    @keyframes floatText {
-      0% {
-        transform: translateY(100%);
-      }
-      100% {
-        transform: translateY(-100%);
-      }
-    }
-  `;
-
   return (
     <div
       className={cn(
         "absolute -z-10 inset-0 overflow-hidden rounded-full",
-        size === "sm" ? "text-[0.5rem]" : "text-xs"
+        size === "sm" ? "text-[0.5rem]" : "text-xs",
+        "will-change-transform"
       )}
       style={{
         width: size === "sm" ? "90px" : "110px",
@@ -39,27 +29,36 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
         top: "50%",
         transform: "translate(-50%, -50%)",
         opacity: 0.7,
-        animation: "floatText 15s linear infinite",
       }}
     >
-      {/* Add style element for keyframes animation */}
-      <style dangerouslySetInnerHTML={{ __html: floatTextKeyframes }} />
-      
-      <div className="flex flex-col items-center justify-center h-full">
+      <div className="flex flex-col items-center justify-center h-full perspective-wrapper">
         {languageWords.map((word, index) => (
-          <span
+          <motion.span
             key={index}
             className="whitespace-nowrap"
-            style={{
-              animationDelay: `${index * 1.2}s`,
-              animationDuration: "15s",
-              animationIterationCount: "infinite",
-              animationTimingFunction: "linear",
-              animationName: "floatText",
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ 
+              y: -100, 
+              opacity: [0, 1, 1, 0],
+              transition: {
+                y: {
+                  duration: 15,
+                  repeat: Infinity,
+                  ease: "linear",
+                  delay: index * 0.6,
+                },
+                opacity: {
+                  duration: 15,
+                  times: [0, 0.1, 0.9, 1],
+                  repeat: Infinity,
+                  ease: "linear",
+                  delay: index * 0.6,
+                }
+              }
             }}
           >
             {word}
-          </span>
+          </motion.span>
         ))}
       </div>
     </div>

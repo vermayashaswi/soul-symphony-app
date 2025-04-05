@@ -22,86 +22,84 @@ interface AnimatedWordProps {
   total: number;
 }
 
-// Individual word animation component with randomized movement
+// Individual word animation component with improved smooth movement
 const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
-  // Calculate random position across the entire container (not just around center)
-  const randomX = Math.random() * 100; // Random value 0-100%
-  const randomY = Math.random() * 100; // Random value 0-100%
+  // Calculate random position across the entire container with better distribution
+  const randomX = useRef(Math.random() * 80 + 10); // Random value 10-90% (avoid edges)
+  const randomY = useRef(Math.random() * 80 + 10); // Random value 10-90% (avoid edges)
   
-  // Create more dramatic off-screen starting positions
-  const startX = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 300 + 200);
-  const startY = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 200 + 100);
-  const startScale = 0.5 + Math.random() * 0.5;
+  // Create smooth off-screen starting positions
+  const startX = useRef((Math.random() > 0.5 ? 1 : -1) * (Math.random() * 200 + 100));
+  const startY = useRef((Math.random() > 0.5 ? 1 : -1) * (Math.random() * 100 + 50));
+  const startScale = useRef(0.5 + Math.random() * 0.2);
   
-  // Calculate a depth/z-index so words appear at different layers
-  const zIndex = Math.floor(Math.random() * 20);
+  // Fixed layer values to prevent z-fighting and reduce repaints
+  const zIndex = useRef(Math.floor(Math.random() * 10));
   
-  // Randomly determine opacity and size for variety
-  const opacity = 0.6 + Math.random() * 0.4;
-  const fontSize = 12 + Math.floor(Math.random() * 14); // Random font size between 12-26px
+  // More consistent opacity and size
+  const opacity = useRef(0.4 + Math.random() * 0.4);
+  const fontSize = useRef(10 + Math.floor(Math.random() * 12)); // Random font size between 10-22px
   
-  // Use different animation timing for each word to create staggered effect
-  const duration = 0.8 + Math.random() * 1.2;
-  const delay = index * 0.05 + Math.random() * 0.2;
-  
-  // Create linear motion paths for constant velocity
-  const floatDuration = 10 + Math.random() * 5; // Longer duration for slower, more constant movement
+  // Smoother animation timing with more consistent values
+  const duration = useRef(10 + Math.random() * 20); // Much longer for smoother effect
+  const delay = useRef(index * 0.02);
   
   return (
     <motion.div
       key={`word-${text}-${index}`}
       initial={{ 
-        x: startX, 
-        y: startY, 
-        scale: startScale,
+        x: startX.current, 
+        y: startY.current, 
+        scale: startScale.current,
         opacity: 0,
-        rotate: Math.random() * 20 - 10,
       }}
       animate={{ 
-        // Position across the full container width/height (percentage-based)
-        x: `${randomX}%`, 
-        y: `${randomY}%`,
-        scale: 0.8 + Math.random() * 0.4,
-        opacity,
-        rotate: Math.random() * 10 - 5,
+        x: `${randomX.current}%`, 
+        y: `${randomY.current}%`,
+        scale: 0.8 + Math.random() * 0.2,
+        opacity: opacity.current,
       }}
       exit={{ 
-        x: startX * -0.7, 
-        y: startY * -0.7, 
-        scale: startScale * 0.8, 
         opacity: 0,
-        rotate: Math.random() * 30 - 15,
+        transition: { duration: 0.5 }
       }}
       transition={{ 
-        duration,
-        delay,
-        ease: "linear", // Use linear easing for constant velocity
         x: {
-          duration: floatDuration,
+          type: "spring",
+          stiffness: 5,
+          damping: 20,
+          duration: duration.current,
           repeat: Infinity,
-          repeatType: "reverse", // Smooth back and forth movement
-          ease: "linear" // Constant velocity
+          repeatType: "mirror",
         },
         y: {
-          duration: floatDuration + 1.5, // Slightly different timing for more organic movement
+          type: "spring",
+          stiffness: 5,
+          damping: 20,
+          duration: duration.current + 5,
           repeat: Infinity,
-          repeatType: "reverse", // Smooth back and forth movement
-          ease: "linear" // Constant velocity
+          repeatType: "mirror",
+        },
+        opacity: {
+          duration: 1,
+          delay: delay.current
+        },
+        scale: {
+          duration: 1,
+          delay: delay.current
         }
       }}
-      className="absolute select-none pointer-events-none text-foreground dark:text-foreground"
+      className="absolute select-none pointer-events-none will-change-transform"
       style={{ 
-        // Use absolute positioning with percentages
-        left: `${randomX}%`,
-        top: `${randomY}%`,
-        // Subtract half of element size to center it at the position
+        left: `${randomX.current}%`,
+        top: `${randomY.current}%`,
         transform: `translate(-50%, -50%)`,
-        zIndex, 
+        zIndex: zIndex.current, 
         fontFamily: "var(--font-sans)",
-        fontWeight: Math.random() > 0.6 ? 700 : 400,
-        fontSize: `${fontSize}px`,
-        filter: Math.random() > 0.8 ? "blur(0.5px)" : "none", // Occasional blur for depth
-        opacity: 0.2 + Math.random() * 0.3, // Very subtle opacity
+        fontWeight: Math.random() > 0.6 ? 500 : 400,
+        fontSize: `${fontSize.current}px`,
+        opacity: opacity.current,
+        color: 'var(--foreground)', // Using CSS var for theme compatibility
       }}
     >
       {text}
@@ -109,16 +107,15 @@ const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
   );
 };
 
-// Background language animation component showing words scattered across the space
+// Background language animation component with improved performance
 export function LanguageBackground({ contained = false }: { contained?: boolean }) {
   const [visibleWords, setVisibleWords] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    // Display more languages to cover the container space better
+    // Reduced words count for better performance and smoother animations
     const updateWords = () => {
-      // Increased word count for better distribution
-      const wordCount = contained ? (35 + Math.floor(Math.random() * 10)) : (45 + Math.floor(Math.random() * 15));
+      const wordCount = contained ? 20 : 30;
       const newWords: string[] = [];
       
       // Create a set to avoid duplicates
@@ -136,7 +133,8 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
     };
     
     updateWords();
-    const interval = setInterval(updateWords, 3000);
+    // Slower refresh rate for better performance
+    const interval = setInterval(updateWords, 8000);
     
     return () => clearInterval(interval);
   }, [contained]);
@@ -145,13 +143,17 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
     <div 
       ref={containerRef}
       className={`${contained ? 'absolute inset-0 overflow-hidden' : 'fixed inset-0 overflow-hidden'} w-full h-full pointer-events-none`}
-      style={{ zIndex: 0 }}
+      style={{ 
+        zIndex: 0,
+        perspective: "1000px",
+        transformStyle: "preserve-3d",
+      }}
     >
       <div className="absolute inset-0 w-full h-full">
         <AnimatePresence>
           {visibleWords.map((word, index) => (
             <AnimatedWord 
-              key={`${word}-${index}-${Math.random()}`} 
+              key={`${word}-${index}`} // Simplified key to reduce rerenders
               text={word} 
               index={index} 
               total={visibleWords.length} 
@@ -184,7 +186,7 @@ export function MultilingualTextAnimation() {
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -20, opacity: 0 }}
-            transition={{ duration: 0.5, ease: "linear" }} 
+            transition={{ duration: 0.5, ease: "easeInOut" }} 
             className="absolute inset-0 flex items-center justify-center"
           >
             <span className="text-foreground">{languages[currentIndex]}</span>
