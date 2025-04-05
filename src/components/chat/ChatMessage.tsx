@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
@@ -8,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatRelativeTime } from "@/utils/format-time";
 
 interface ChatMessageProps {
   message: {
@@ -110,7 +112,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                 >
                   {message.references.slice(0, isMobile ? 2 : 3).map((ref, idx) => (
                     <div key={idx} className="mb-2 py-1">
-                      <div className="font-medium text-xs md:text-sm">{new Date(ref.date).toLocaleDateString()}</div>
+                      <div className="font-medium text-xs md:text-sm">
+                        {ref.date && !isNaN(new Date(ref.date).getTime())
+                          ? new Date(ref.date).toLocaleDateString()
+                          : "Unknown date"}
+                      </div>
                       <div className="text-muted-foreground text-xs">{ref.snippet}</div>
                     </div>
                   ))}

@@ -160,15 +160,32 @@ serve(async (req) => {
     console.log("Response generated successfully");
     diagnostics.steps.push(createDiagnosticStep("Language Model Processing", "success"));
 
+    // Process entries to ensure valid dates
+    const processedEntries = entries.map(entry => {
+      // Make sure created_at is a valid date string
+      let createdAt = entry.created_at;
+      if (!createdAt || isNaN(new Date(createdAt).getTime())) {
+        createdAt = new Date().toISOString();
+      }
+      
+      return {
+        id: entry.id,
+        content: entry.content,
+        created_at: createdAt,
+        similarity: entry.similarity || 0
+      };
+    });
+
     // 5. Return response
     return new Response(
       JSON.stringify({ 
         response: responseContent, 
         diagnostics: includeDiagnostics ? diagnostics : undefined,
-        references: entries.map(entry => ({
+        references: processedEntries.map(entry => ({
           id: entry.id,
           content: entry.content,
-          created_at: entry.created_at,
+          date: entry.created_at,
+          snippet: entry.content.substring(0, 150) + (entry.content.length > 150 ? '...' : ''),
           similarity: entry.similarity
         }))
       }),

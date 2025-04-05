@@ -88,9 +88,15 @@ serve(async (req) => {
       timeRange
     );
 
+    // Process entries to ensure valid dates
+    const processedEntries = entries.map(entry => ({
+      ...entry,
+      created_at: entry.created_at || new Date().toISOString() // Ensure created_at is not null
+    }));
+
     // 3. Segment the complex query based on journal entries
     console.log('Segmenting the complex query based on journal entries');
-    const segmentedQuery = await segmentComplexQuery(userQuery, entries, apiKey);
+    const segmentedQuery = await segmentComplexQuery(userQuery, processedEntries, apiKey);
 
     // 4. Return the segmented query
     console.log('Returning the segmented query');

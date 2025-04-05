@@ -1,3 +1,4 @@
+
 import React from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
@@ -109,7 +110,11 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                 >
                   {message.references!.slice(0, 2).map((ref, idx) => (
                     <div key={idx} className="mb-1 py-1">
-                      <div className="font-medium">{new Date(ref.date).toLocaleDateString()}</div>
+                      <div className="font-medium">
+                        {ref.date && !isNaN(new Date(ref.date).getTime()) 
+                          ? new Date(ref.date).toLocaleDateString() 
+                          : "Unknown date"}
+                      </div>
                       <div className="text-muted-foreground">{ref.snippet}</div>
                     </div>
                   ))}
