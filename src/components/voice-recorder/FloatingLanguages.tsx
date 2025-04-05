@@ -24,8 +24,8 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
       
       // Calculate distances from center (random within a range)
       // Initial positions closer to center, animation moves outward
-      const initialDistance = 20 + Math.random() * 30;
-      const animateDistance = 80 + Math.random() * 70;
+      const initialDistance = 10 + Math.random() * 20; // Start closer to center
+      const animateDistance = 120 + Math.random() * 150; // Move farther out
       
       // Convert polar coordinates to cartesian
       const initialX = Math.cos(angle) * initialDistance;
@@ -38,7 +38,7 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
         initialY,
         
         // Target animation positions - farther from center in same angle
-        targetX: Math.cos(angle) * animateDistance - 50, // Using -50 (25% shift left)
+        targetX: Math.cos(angle) * animateDistance,
         targetY: Math.sin(angle) * animateDistance,
         
         // Visual properties
@@ -58,14 +58,14 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
   const containerSize = {
     width: size === "sm" ? "100%" : "100%",
     height: size === "sm" ? "100%" : "100%",
-    maxWidth: size === "sm" ? "300px" : "320px", // Match the width of the voice recorder
-    minHeight: size === "sm" ? "300px" : "340px", // Significantly increased from 185px
+    maxWidth: size === "sm" ? "400px" : "800px", // Increased from 320px
+    minHeight: size === "sm" ? "400px" : "600px", // Significantly increased
   };
 
   return (
     <div
       className={cn(
-        "absolute -z-10 overflow-hidden rounded-2xl", // Changed to rounded-2xl to match voice recorder
+        "absolute -z-10 overflow-hidden",
         size === "sm" ? "text-[0.5rem]" : "text-xs",
         "will-change-transform"
       )}

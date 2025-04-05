@@ -2,7 +2,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LanguageBackground } from './MultilingualTextAnimation';
 import FloatingLanguages from './FloatingLanguages';
 
 interface RecordingButtonProps {
@@ -51,7 +50,7 @@ export function RecordingButton({
   return (
     <div className="relative w-full h-full flex items-center justify-center">
       {showAnimation && (
-        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
           <FloatingLanguages size="md" />
         </div>
       )}
