@@ -138,7 +138,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         </div>
         
         <div className="relative z-10 flex flex-col items-center justify-start w-full h-full pt-20">
-          <div className="relative z-10 flex justify-center items-center">
+          <div className="relative z-10 flex justify-center items-center mt-24">
             <RecordingButton
               isRecording={isRecording}
               isProcessing={isProcessing}
