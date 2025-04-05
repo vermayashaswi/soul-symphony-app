@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   PlusCircle, 
   MessageCircle, 
   Search, 
-  Trash2, 
-  X,
+  Trash2,
   ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -100,26 +100,14 @@ export default function ChatThreadList({
           onClick={handleNewThread}
           className={cn(
             "bg-theme-color hover:bg-theme-color/90 text-white flex items-center gap-1",
-            newChatButtonWidth === 'half' ? "w-1/2" : "w-full"
+            "w-full" // Always use full width for the button, removing the half-width option
           )}
         >
           <PlusCircle className="h-4 w-4" />
           <span>New Chat</span>
         </Button>
         
-        {newChatButtonWidth === 'half' && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-10 w-10" 
-            onClick={() => {
-              // Fire a custom event that the parent can listen for
-              window.dispatchEvent(new CustomEvent('closeChatSidebar'));
-            }}
-          >
-            <X className="h-6 w-6" />
-          </Button>
-        )}
+        {/* Removed the close/cross button that was here */}
       </div>
       
       <div className="px-3 py-2">

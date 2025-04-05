@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,7 @@ const Index = () => {
   const [typingText, setTypingText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [showResponse, setShowResponse] = useState(false);
+  const [welcomeVisible, setWelcomeVisible] = useState(true);
 
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -134,6 +134,14 @@ const Index = () => {
     const intervalId = setInterval(animationCycle, 8000);
     
     return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const flashInterval = setInterval(() => {
+      setWelcomeVisible(prev => !prev);
+    }, 1000); // Flash every second
+    
+    return () => clearInterval(flashInterval);
   }, []);
 
   const features = [
@@ -380,7 +388,13 @@ const Index = () => {
           variants={itemVariants}
         >
           <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-4 flex items-center justify-center`}>
-            Welcome to <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} />
+            <span 
+              className="text-black transition-opacity duration-500" 
+              style={{ opacity: welcomeVisible ? 1 : 0 }}
+            >
+              Welcome to
+            </span> 
+            <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} />
           </h1>
           <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse`}>
             Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
