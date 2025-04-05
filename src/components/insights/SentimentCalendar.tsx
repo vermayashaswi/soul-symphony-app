@@ -61,9 +61,9 @@ function getEmojiChar(sentiment: number): string {
 }
 
 function getContainerBgColor(sentiment: number): string {
-  if (sentiment >= 0.2) return "bg-green-100 dark:bg-green-900/50"; 
-  if (sentiment >= -0.2) return "bg-yellow-100 dark:bg-yellow-900/50"; 
-  return "bg-red-100 dark:bg-red-900/50";
+  if (sentiment >= 0.2) return "bg-green-500/75 dark:bg-green-700"; 
+  if (sentiment >= -0.2) return "bg-yellow-500/75 dark:bg-yellow-700"; 
+  return "bg-red-500/75 dark:bg-red-700";
 }
 
 const EmptyCircle = () => (
@@ -256,7 +256,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, type: "spring" }}
           >
-            <span className="text-6xl">{todaySentiment.emoji}</span>
+            <span className="text-6xl text-white">{todaySentiment.emojiChar}</span>
           </motion.div>
         ) : (
           <motion.div 
@@ -327,10 +327,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 </div>
                 {daySentiment ? (
                   <div className={cn(
-                    "text-2xl w-7 h-7 flex items-center justify-center rounded-full",
+                    "text-2xl flex items-center justify-center rounded-full w-full h-7",
                     getContainerBgColor(daySentiment.sentiment)
                   )}>
-                    {daySentiment.emoji}
+                    <span className="text-white">{daySentiment.emojiChar}</span>
                   </div>
                 ) : (
                   <EmptyCircle />
@@ -363,7 +363,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                         "text-2xl w-8 h-8 flex items-center justify-center rounded-full",
                         getContainerBgColor(daySentiment.sentiment)
                       )}>
-                        {daySentiment.emoji}
+                        <span className="text-white">{daySentiment.emojiChar}</span>
                       </span>
                       <span className="text-sm">
                         Mood: {daySentiment.moodText} ({daySentiment.sentiment.toFixed(2)})
@@ -461,7 +461,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.1, duration: 0.2 }}
                       >
-                        {info.emoji}
+                        <span className="text-white">{info.emojiChar}</span>
                       </motion.span>
                     ) : isSameMonthValue ? (
                       <EmptyCircle />
@@ -486,7 +486,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                               "text-2xl w-8 h-8 flex items-center justify-center rounded-full",
                               getContainerBgColor(info.sentiment)
                             )}>
-                              {info.emoji}
+                              <span className="text-white">{info.emojiChar}</span>
                             </span>
                             <span className="text-sm">
                               Mood: {info.moodText} ({info.sentiment.toFixed(2)})
@@ -569,10 +569,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 </div>
                 {monthSentiment !== undefined ? (
                   <div className={cn(
-                    "text-2xl w-7 h-7 flex items-center justify-center rounded-full",
+                    "text-2xl w-full h-7 flex items-center justify-center rounded-full",
                     getContainerBgColor(monthSentiment)
                   )}>
-                    {getEmoji(monthSentiment)}
+                    <span className="text-white">{getEmojiChar(monthSentiment)}</span>
                   </div>
                 ) : (
                   <EmptyCircle />
@@ -614,10 +614,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 </div>
                 {monthSentiment !== undefined ? (
                   <div className={cn(
-                    "text-2xl w-7 h-7 flex items-center justify-center rounded-full",
+                    "text-2xl w-full h-7 flex items-center justify-center rounded-full",
                     getContainerBgColor(monthSentiment)
                   )}>
-                    {getEmoji(monthSentiment)}
+                    <span className="text-white">{getEmojiChar(monthSentiment)}</span>
                   </div>
                 ) : (
                   <EmptyCircle />
@@ -644,7 +644,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 const monthSentiment = monthlyAverages.get(month);
                 
                 if (monthSentiment !== undefined) {
-                  const emoji = getEmoji(monthSentiment);
+                  const emojiChar = getEmojiChar(monthSentiment);
                   const moodText = getMoodText(monthSentiment);
                   
                   return (
@@ -653,7 +653,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                         "text-2xl w-8 h-8 flex items-center justify-center rounded-full",
                         getContainerBgColor(monthSentiment)
                       )}>
-                        {emoji}
+                        <span className="text-white">{emojiChar}</span>
                       </span>
                       <span className="text-sm">
                         Mood: {moodText} ({monthSentiment.toFixed(2)})
