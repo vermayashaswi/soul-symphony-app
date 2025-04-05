@@ -380,7 +380,7 @@ const Index = () => {
           variants={itemVariants}
         >
           <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-12 flex items-center justify-center`}>
-            <span className="text-black">
+            <span className="text-foreground dark:text-white">
               Welcome to
             </span> 
             <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} animate={true} />

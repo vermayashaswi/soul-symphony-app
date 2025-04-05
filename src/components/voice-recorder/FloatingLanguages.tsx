@@ -38,7 +38,7 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
         initialY,
         
         // Target animation positions - farther from center in same angle
-        targetX: Math.cos(angle) * animateDistance,
+        targetX: Math.cos(angle) * animateDistance - 50, // Shift left by 25%
         targetY: Math.sin(angle) * animateDistance,
         
         // Visual properties
