@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -136,8 +137,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           )}
         </div>
         
-        <div className="relative z-10 flex flex-col items-center justify-center w-full h-full">
-          <div className="relative z-10 flex justify-center items-center w-full h-full">
+        <div className="relative z-10 flex flex-col items-center justify-start w-full h-full pt-20">
+          <div className="relative z-10 flex justify-center items-center">
             <RecordingButton
               isRecording={isRecording}
               isProcessing={isProcessing}

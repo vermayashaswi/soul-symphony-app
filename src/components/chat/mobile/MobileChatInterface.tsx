@@ -457,8 +457,10 @@ export default function MobileChatInterface({
   const handleStartNewThread = async () => {
     setSheetOpen(false);
     if (onCreateNewThread) {
-      await onCreateNewThread();
+      const newThreadId = await onCreateNewThread();
+      return newThreadId;
     }
+    return null;
   };
 
   return (
