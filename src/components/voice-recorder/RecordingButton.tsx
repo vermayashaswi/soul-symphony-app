@@ -11,6 +11,7 @@ interface RecordingButtonProps {
   onRecordingStart: () => void;
   onRecordingStop: () => void;
   onPermissionRequest: () => void;
+  audioLevel?: number;
 }
 
 export function RecordingButton({
@@ -19,7 +20,8 @@ export function RecordingButton({
   hasPermission,
   onRecordingStart,
   onRecordingStop,
-  onPermissionRequest
+  onPermissionRequest,
+  audioLevel = 0
 }: RecordingButtonProps) {
   if (hasPermission === false) {
     return (
@@ -33,29 +35,41 @@ export function RecordingButton({
     );
   }
   
+  // Calculate scale based on audio level
+  const maxScale = 1.2;
+  const scaleAmount = isRecording 
+    ? 1 + ((audioLevel / 100) * (maxScale - 1)) 
+    : 1;
+    
+  // Subtle color shift based on audio level
+  const getButtonColor = () => {
+    if (isProcessing) return "bg-gray-400 border-gray-500";
+    if (!isRecording) return "bg-theme-color hover:bg-theme-color/90 border-theme-color/20";
+    
+    // When recording, shift color based on audio level
+    return `bg-red-500 border-red-600`;
+  };
+  
+  // Dynamic glow effect based on audio level
+  const glowSize = isRecording ? Math.max(4, Math.min(20, audioLevel / 5)) : 0;
+  
   return (
     <motion.button
       onClick={isRecording ? onRecordingStop : onRecordingStart}
       disabled={isProcessing}
       className={cn(
         "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
-        isRecording 
-          ? "bg-red-500 border-red-600 w-20 h-20" // Increased size during recording from 16 to 20
-          : isProcessing 
-            ? "bg-gray-400 border-gray-500 w-20 h-20 opacity-50 cursor-not-allowed" // Grey when processing
-            : "bg-primary hover:bg-primary/90 border-primary/20 w-20 h-20",
+        getButtonColor(),
+        isRecording ? "w-20 h-20" : isProcessing ? "w-20 h-20 opacity-50 cursor-not-allowed" : "w-20 h-20",
       )}
+      style={{
+        boxShadow: isRecording ? `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.6)` : undefined
+      }}
       whileTap={{ scale: 0.95 }}
-      animate={isRecording ? 
-        { 
-          scale: [1, 1.1, 1], 
-          transition: { 
-            repeat: Infinity, 
-            duration: 1.2,
-            ease: "easeInOut"
-          } 
-        } : {}
-      }
+      animate={{ 
+        scale: scaleAmount,
+        transition: { duration: 0.15 }
+      }}
     >
       {isRecording ? (
         <Square className="w-7 h-7 text-white" />

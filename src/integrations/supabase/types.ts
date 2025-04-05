@@ -11,24 +11,30 @@ export type Database = {
     Tables: {
       chat_messages: {
         Row: {
+          analysis_data: Json | null
           content: string
           created_at: string
+          has_numeric_result: boolean | null
           id: string
           reference_entries: Json | null
           sender: string
           thread_id: string
         }
         Insert: {
+          analysis_data?: Json | null
           content: string
           created_at?: string
+          has_numeric_result?: boolean | null
           id?: string
           reference_entries?: Json | null
           sender: string
           thread_id: string
         }
         Update: {
+          analysis_data?: Json | null
           content?: string
           created_at?: string
+          has_numeric_result?: boolean | null
           id?: string
           reference_entries?: Json | null
           sender?: string
@@ -466,6 +472,10 @@ export type Database = {
               id: number
               content: string
               similarity: number
+              embedding: string
+              created_at: string
+              themes: string[]
+              emotions: Json
             }[]
           }
       match_journal_entries_by_emotion: {
@@ -516,6 +526,21 @@ export type Database = {
           created_at: string
           themes: string[]
           similarity: number
+        }[]
+      }
+      match_journal_entries_fixed: {
+        Args: {
+          query_embedding: string
+          match_threshold: number
+          match_count: number
+          user_id_filter: string
+        }
+        Returns: {
+          id: number
+          content: string
+          similarity: number
+          embedding: string
+          created_at: string
         }[]
       }
       match_journal_entries_with_date: {

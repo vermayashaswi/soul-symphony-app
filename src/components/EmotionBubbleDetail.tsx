@@ -162,7 +162,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
           >
-            {percentage.toFixed(1)}%
+            {(Math.round(percentage * 10) / 10).toFixed(1)}%
           </motion.div>
         )}
       </motion.div>

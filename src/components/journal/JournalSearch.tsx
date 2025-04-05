@@ -1,124 +1,124 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { Input } from '@/components/ui/input';
+import { Badge } from "@/components/ui/badge";
 
 interface JournalSearchProps {
-  onSearch: (query: string) => void;
-  totalEntries: number;
-  filteredCount: number;
+  entries: JournalEntry[];
+  onSelectEntry: (entry: JournalEntry) => void;
+  onSearchResults: (filteredEntries: JournalEntry[]) => void;
 }
 
-const PLACEHOLDER_EXAMPLES = [
-  "husband",
-  "work",
-  "meeting",
-  "project",
-  "friend",
-  "manager",
-  "vacation",
-  "cigarettes"
-];
-
-const JournalSearch: React.FC<JournalSearchProps> = ({ onSearch, totalEntries, filteredCount }) => {
+const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, onSearchResults }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPlaceholder, setCurrentPlaceholder] = useState('');
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [isTyping, setIsTyping] = useState(true);
-  const [charIndex, setCharIndex] = useState(0);
-  const [isFocused, setIsFocused] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
 
-  // Animation for the placeholder text
   useEffect(() => {
-    if (isTyping) {
-      if (charIndex < PLACEHOLDER_EXAMPLES[placeholderIndex].length) {
-        timeoutRef.current = setTimeout(() => {
-          setCurrentPlaceholder(prev => 
-            prev + PLACEHOLDER_EXAMPLES[placeholderIndex][charIndex]
-          );
-          setCharIndex(charIndex + 1);
-        }, 100 + Math.random() * 50); // Random typing speed for realism
-      } else {
-        // Pause at the end of typing
-        timeoutRef.current = setTimeout(() => {
-          setIsTyping(false);
-        }, 2000);
-      }
-    } else {
-      // Deleting text
-      if (charIndex > 0) {
-        timeoutRef.current = setTimeout(() => {
-          setCurrentPlaceholder(prev => prev.slice(0, -1));
-          setCharIndex(charIndex - 1);
-        }, 50);
-      } else {
-        // Move to the next example
-        const nextIndex = (placeholderIndex + 1) % PLACEHOLDER_EXAMPLES.length;
-        setPlaceholderIndex(nextIndex);
-        setIsTyping(true);
-      }
+    // When search query is empty, pass all entries
+    if (!searchQuery.trim()) {
+      setFilteredEntries(entries);
+      onSearchResults(entries);
+      return;
     }
 
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+    const filtered = entries.filter(entry => {
+      const content = (entry.content || '').toLowerCase();
+      const query = searchQuery.toLowerCase();
+      
+      // Check content for match
+      if (content.includes(query)) return true;
+      
+      // Check entities for match
+      if (entry.entities) {
+        try {
+          // Entities are usually stored as JSON
+          const entityData = typeof entry.entities === 'string' 
+            ? JSON.parse(entry.entities) 
+            : entry.entities;
+          
+          // Check if any entity matches the search query
+          if (entityData && Array.isArray(entityData)) {
+            return entityData.some(entity => 
+              entity.name?.toLowerCase().includes(query) || 
+              entity.type?.toLowerCase().includes(query)
+            );
+          } else if (entityData && typeof entityData === 'object') {
+            // Handle case where entities might be an object
+            return Object.values(entityData).some(value => 
+              value && String(value).toLowerCase().includes(query)
+            );
+          }
+        } catch (e) {
+          console.error("Error parsing entities:", e);
+        }
       }
-    };
-  }, [charIndex, isTyping, placeholderIndex]);
+      
+      // Check themes for match - use both themes and master_themes for compatibility
+      if (entry.themes && Array.isArray(entry.themes)) {
+        return entry.themes.some(theme => 
+          theme.toLowerCase().includes(query)
+        );
+      }
+      
+      // Also check master_themes if themes is not available
+      if (entry.master_themes && Array.isArray(entry.master_themes)) {
+        return entry.master_themes.some(theme => 
+          theme.toLowerCase().includes(query)
+        );
+      }
+      
+      return false;
+    });
 
-  // Handle search input changes
+    setFilteredEntries(filtered);
+    onSearchResults(filtered); // Pass filtered entries back to parent
+  }, [searchQuery, entries, onSearchResults]);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-    onSearch(query);
-  };
-
-  // Handle focus state
-  const handleFocus = () => {
-    setIsFocused(true);
-    // Scroll to the top of the page when focused
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleBlur = () => {
-    if (!searchQuery) {
-      setIsFocused(false);
-    }
+    const value = e.target.value;
+    setSearchQuery(value);
   };
 
   return (
-    <motion.div 
-      className={`relative mb-6 ${isFocused ? 'sticky top-0 z-30 bg-background pt-4 pb-2 border-b' : ''}`}
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-        <Input
-          ref={inputRef}
-          type="text"
-          value={searchQuery}
-          onChange={handleSearchChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          className="pl-10 pr-4 py-2 w-full rounded-md"
-          placeholder={`Search entries by ${currentPlaceholder}`}
-        />
-      </div>
-      
-      {/* Entry count indicator */}
-      <div className="text-sm text-muted-foreground mt-2 px-1">
-        {searchQuery ? (
-          <span>{filteredCount} {filteredCount === 1 ? 'entry' : 'entries'} found</span>
-        ) : (
-          <span>{totalEntries} total {totalEntries === 1 ? 'entry' : 'entries'}</span>
-        )}
-      </div>
-    </motion.div>
+    <Card className="w-full sticky top-0 z-10 bg-background shadow-sm">
+      <CardContent className="p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search journal entries..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="w-full pl-9"
+          />
+        </div>
+
+        <div className="mt-4">
+          {searchQuery ? (
+            <>
+              {filteredEntries.length > 0 ? (
+                <div className="py-2">
+                  <Badge variant="secondary" className="mb-2">
+                    {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} found
+                  </Badge>
+                </div>
+              ) : (
+                <div className="text-muted-foreground">No entries found.</div>
+              )}
+            </>
+          ) : (
+            <div className="py-2">
+              <Badge variant="secondary" className="mb-2">
+                {entries.length} total {entries.length === 1 ? 'entry' : 'entries'}
+              </Badge>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

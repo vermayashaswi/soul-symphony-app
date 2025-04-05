@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import VoiceRecorder from '@/components/VoiceRecorder';
@@ -13,6 +13,9 @@ import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import JournalDebugPanel from '@/components/journal/JournalDebugPanel';
+import { useNavigate } from 'react-router-dom';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
 const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
@@ -21,10 +24,16 @@ const Journal = () => {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
+  const [selectedEntry, setSelectedEntry] = useState<any>(null);
+  const journalRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
   
   const { entries, loading, fetchEntries } = useJournalEntries(user?.id, refreshKey, isProfileChecked);
 
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -71,6 +80,18 @@ const Journal = () => {
         });
     }
   }, [activeTab, isProfileChecked, fetchEntries]);
+
+  const handleSearchResults = (results: JournalEntry[]) => {
+    setFilteredEntries(results);
+    setIsSearchActive(results.length !== entries.length);
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'entries') {
+      setIsSearchActive(false);
+      setFilteredEntries(entries);
+    }
+  }, [activeTab, entries]);
 
   useEffect(() => {
     if (processingEntries.length > 0 && activeTab === 'entries') {
@@ -411,69 +432,59 @@ const Journal = () => {
     }
   };
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
+  const handleSelectEntry = (entry: any) => {
+    setSelectedEntry(entry);
+    setSearchQuery('');
   };
-
-  const filteredEntries = entries.filter(entry => {
-    if (!searchQuery.trim()) return true;
-    
-    const query = searchQuery.toLowerCase();
-    const content = entry.content.toLowerCase();
-    const themes = entry.themes?.join(' ').toLowerCase() || '';
-    
-    return content.includes(query) || themes.includes(query);
-  });
 
   const showLoading = loading && activeTab === 'entries' && !entries.length;
   
   const showEntries = activeTab === 'entries' && (!loading || entries.length > 0);
 
+  const displayEntries = filteredEntries.length > 0 ? filteredEntries : entries;
+
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-background" ref={journalRef}>
       <Navbar />
       
       <JournalHeader />
       
-      <div className="container mx-auto px-4 py-6 max-w-5xl">
+      <div className="container mx-auto px-4 py-2 max-w-5xl">
         <Tabs defaultValue="record" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="record">Record Entry</TabsTrigger>
-            <TabsTrigger value="entries">Past Entries</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-2">
+            <TabsTrigger value="record" className="text-base">Record Entry</TabsTrigger>
+            <TabsTrigger value="entries" className="text-base">Past Entries</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="record" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-center">Record a New Journal Entry</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center">
+          <TabsContent value="record" className="mt-2">
+            <Card className="mb-2">
+              <CardContent className="pt-2">
+                <div className="flex flex-col items-center overflow-hidden relative">
                   <VoiceRecorder onRecordingComplete={onEntryRecorded} />
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
           
-          <TabsContent value="entries">
+          <TabsContent value="entries" className="relative">
             {activeTab === 'entries' && (
               <JournalSearch 
-                onSearch={handleSearch} 
-                totalEntries={entries.length}
-                filteredCount={filteredEntries.length}
+                entries={entries}
+                onSelectEntry={handleSelectEntry}
+                onSearchResults={handleSearchResults}
               />
             )}
             
             {showLoading && (
-              <div className="flex flex-col items-center justify-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+              <div className="flex flex-col items-center justify-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
                 <p className="text-muted-foreground">Loading your journal entries...</p>
               </div>
             )}
             
             {showEntries && (
               <JournalEntriesList 
-                entries={filteredEntries} 
+                entries={displayEntries}
                 loading={loading}
                 processingEntries={processingEntries}
                 processedEntryIds={processedEntryIds}

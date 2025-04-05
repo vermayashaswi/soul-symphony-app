@@ -69,7 +69,36 @@ export default {
 					peach: '#FFF1E6',
 					green: '#E2F0CB',
 					lavender: '#E9D8FD'
+				},
+				chart: {
+					bg: 'hsl(var(--chart-bg))'
+				},
+				theme: {
+					DEFAULT: 'var(--color-theme)',
+					hover: 'color-mix(in srgb, var(--color-theme) 90%, black)',
+					light: 'color-mix(in srgb, var(--color-theme) 30%, white)',
+					lighter: 'color-mix(in srgb, var(--color-theme) 15%, white)',
+					dark: 'color-mix(in srgb, var(--color-theme) 30%, black)',
+					darker: 'color-mix(in srgb, var(--color-theme) 50%, black)',
 				}
+			},
+			backgroundColor: {
+				theme: 'var(--color-theme)',
+			},
+			textColor: {
+				theme: 'var(--color-theme)',
+			},
+			borderColor: {
+				theme: 'var(--color-theme)',
+			},
+			ringColor: {
+				theme: 'var(--color-theme)',
+			},
+			fill: {
+				theme: 'var(--color-theme)',
+			},
+			stroke: {
+				theme: 'var(--color-theme)',
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

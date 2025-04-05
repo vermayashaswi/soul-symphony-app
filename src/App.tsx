@@ -20,6 +20,7 @@ import "./styles/mobile.css";
 import MobilePreviewFrame from "./components/MobilePreviewFrame";
 import MobileNavbar from "./components/mobile/MobileNavbar";
 import { useIsMobile } from "./hooks/use-mobile";
+import { useScrollRestoration } from "./hooks/use-scroll-restoration";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,6 +66,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const ScrollToTop = () => {
+  useScrollRestoration();
+  return null;
+};
+
 const AppRoutes = () => {
   const isMobile = useIsMobile();
   const urlParams = new URLSearchParams(window.location.search);
@@ -105,6 +111,7 @@ const AppRoutes = () => {
   
   return (
     <>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={
           <MobilePreviewWrapper>
