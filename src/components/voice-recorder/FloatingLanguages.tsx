@@ -11,7 +11,7 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
   const languageWords = [
     "नमस्ते", "你好", "Hola", "Bonjour", "Ciao", "こんにちは",
     "Guten Tag", "Olá", "Привет", "Merhaba", "أهلاً", "Shalom",
-    "வணக்கம்", "Ayubowan", "ਸਤਿ ਸ਼੍ਰੀ ਅਕਾਲ", "Kem Chho", "নমস্কার",
+    "வணக்கம்", "Ayubowan", "ਸਤਿ ਸ਼੍ਰੀ ਅਕਾਲ", "Kem Chho", "நமஸ்காரம்",
     "স্বাগতম", "Namaste", "Hello", "Hi", "Hey", "Svenska", "Lietuvių",
     "Română", "Беларуская", "Gaeilge", "বাংলা", "فارسی", "Русский", "Shqip"
   ];
@@ -54,16 +54,23 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
 
   const positions = React.useMemo(() => generateRadialPositions(), []);
 
+  // Updated container styles to match voice recorder dimensions
+  const containerSize = {
+    width: size === "sm" ? "100%" : "100%",
+    height: size === "sm" ? "100%" : "100%",
+    maxWidth: size === "sm" ? "300px" : "320px", // Match the width of the voice recorder
+    minHeight: size === "sm" ? "185px" : "185px", // Match the min-height of voice recorder
+  };
+
   return (
     <div
       className={cn(
-        "absolute -z-10 overflow-hidden rounded-full",
+        "absolute -z-10 overflow-hidden rounded-2xl", // Changed to rounded-2xl to match voice recorder
         size === "sm" ? "text-[0.5rem]" : "text-xs",
         "will-change-transform"
       )}
       style={{
-        width: size === "sm" ? "300px" : "320px",
-        height: size === "sm" ? "300px" : "320px",
+        ...containerSize,
         left: "50%",
         top: "50%",
         transform: "translate(-50%, -50%)",

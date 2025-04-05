@@ -50,10 +50,10 @@ export function RecordingButton({
   };
   
   return (
-    <div className="relative">
-      {/* Language animation centered behind the button */}
+    <div className="relative w-full h-full flex items-center justify-center">
+      {/* Updated the positioning container to better fill the available space */}
       {showAnimation && (
-        <div className="absolute" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}>
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-2xl">
           <FloatingLanguages size="md" />
         </div>
       )}
