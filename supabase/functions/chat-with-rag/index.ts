@@ -844,10 +844,16 @@ ${journalContext}
 ${conversationContext}
 ${querySpecificInstructions}
 
-Based on the above context and the user's message, provide a thoughtful, personalized response.
-Keep your tone warm, supportive and conversational. If you notice patterns or insights from the journal entries,
-mention them, but do so gently and constructively. Pay special attention to the emotional patterns revealed in the entries.
-Focus on being helpful rather than diagnostic. 
+IMPORTANT INSTRUCTIONS ON RESPONSE FORMAT:
+- Be extremely concise and to the point
+- Use bullet points whenever possible
+- Don't assume information that isn't in the journal entries
+- Avoid lengthy introductions and unnecessary explanations
+- Focus only on directly answering what was asked
+- If uncertain, acknowledge the lack of information rather than making assumptions
+- Keep your tone warm but brief
+
+Based on the above context and the user's message, provide a focused, direct response.
 ${firstName ? `Always address the user by their first name (${firstName}) in your responses.` : ""}`;
 
     console.log("Sending to GPT with RAG context and conversation history...");
