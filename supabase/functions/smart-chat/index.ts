@@ -37,7 +37,10 @@ serve(async (req) => {
       throw new Error('User ID is required');
     }
 
+    console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
+    
     // 1. Generate embedding for the message
+    console.log("Generating embedding for message");
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -62,9 +65,12 @@ serve(async (req) => {
     }
 
     const queryEmbedding = embeddingData.data[0].embedding;
+    console.log("Embedding generated successfully");
 
     // 2. Search for relevant entries
+    console.log("Searching for relevant entries");
     const entries = await searchEntriesWithVector(userId, queryEmbedding);
+    console.log(`Found ${entries.length} relevant entries`);
 
     // 3. Prepare prompt
     const prompt = `You are a personal mental well-being assistant. Your goal is to provide helpful, empathetic, and insightful responses based on the user's journal entries.
@@ -77,6 +83,7 @@ serve(async (req) => {
       Keep your answers concise and to the point. Focus on providing actionable insights and support.`;
 
     // 4. Call OpenAI
+    console.log("Calling OpenAI for completion");
     const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -97,6 +104,7 @@ serve(async (req) => {
 
     const completionData = await completionResponse.json();
     const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+    console.log("Response generated successfully");
 
     // 5. Return response
     return new Response(
