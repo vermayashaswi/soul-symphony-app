@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,7 +44,7 @@ interface JournalEntryCardProps {
 }
 
 export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false); // Changed to false to collapse by default
+  const [isExpanded, setIsExpanded] = useState(false);
   const [open, setOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
@@ -112,41 +111,103 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
     }
   };
 
-  // New Animated Circular Orbit Component to replace the dots
-  const OrbitToggle = () => (
+  // New Funky Colorful Animation Toggle Component
+  const FunkyToggle = () => (
     <motion.div 
-      className="relative w-8 h-8 cursor-pointer"
+      className="relative w-8 h-8 cursor-pointer group"
       onClick={toggleExpanded}
       whileHover={{ scale: 1.1 }}
     >
-      {/* Center dot */}
+      {/* Center particle */}
       <motion.div 
-        className="absolute top-1/2 left-1/2 w-2 h-2 rounded-full bg-theme-color"
+        className="absolute top-1/2 left-1/2 w-2.5 h-2.5 rounded-full bg-gradient-to-br from-purple-400 to-pink-500"
         style={{ transform: 'translate(-50%, -50%)' }}
-        animate={{ scale: [1, 1.2, 1] }}
+        animate={{ 
+          scale: [1, 1.3, 1],
+          boxShadow: [
+            '0 0 0px rgba(192, 132, 252, 0.5)',
+            '0 0 10px rgba(192, 132, 252, 0.8)',
+            '0 0 0px rgba(192, 132, 252, 0.5)',
+          ]
+        }}
         transition={{ duration: 2, repeat: Infinity }}
       />
       
-      {/* Orbiting dots */}
-      {[0, 1, 2].map((i) => (
+      {/* Orbiting colorful particles */}
+      {[0, 1, 2].map((i) => {
+        const colors = [
+          'bg-gradient-to-r from-pink-500 to-orange-400',
+          'bg-gradient-to-r from-green-400 to-cyan-500',
+          'bg-gradient-to-r from-purple-500 to-indigo-500'
+        ];
+        
+        return (
+          <motion.div
+            key={i}
+            className={`absolute w-2 h-2 rounded-full ${colors[i]}`}
+            style={{ 
+              top: '50%', 
+              left: '50%',
+              originX: '0',
+              originY: '0',
+            }}
+            animate={{
+              rotate: isExpanded ? [i * 120, i * 120 + 360] : [i * 120 + 360, i * 120],
+              scale: [1, 1.2, 1],
+            }}
+            transition={{
+              rotate: {
+                duration: 3 + i * 0.5,
+                repeat: Infinity,
+                repeatType: "loop",
+                ease: "linear"
+              },
+              scale: {
+                duration: 2,
+                repeat: Infinity,
+                repeatType: "reverse",
+                delay: i * 0.3
+              }
+            }}
+          >
+            <motion.div 
+              className="w-full h-full rounded-full"
+              animate={{
+                boxShadow: [
+                  '0 0 3px rgba(255, 255, 255, 0.5)',
+                  '0 0 8px rgba(255, 255, 255, 0.8)',
+                  '0 0 3px rgba(255, 255, 255, 0.5)',
+                ],
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                delay: i * 0.5
+              }}
+            />
+          </motion.div>
+        );
+      })}
+
+      {/* Group hover effect - particle bursts */}
+      {[0, 1, 2, 3].map((i) => (
         <motion.div
-          key={i}
-          className="absolute w-2 h-2 rounded-full"
-          style={{ 
-            top: '50%', 
-            left: '50%',
-            backgroundColor: `hsl(var(--primary-h), var(--primary-s), ${60 + i * 10}%)` 
-          }}
+          key={`burst-${i}`}
+          className="absolute top-1/2 left-1/2 w-1 h-1 rounded-full bg-white opacity-0 group-hover:opacity-100"
           animate={{
-            x: Math.cos(i * (2 * Math.PI / 3)) * 12,
-            y: Math.sin(i * (2 * Math.PI / 3)) * 12,
-            rotate: isExpanded ? [0, 360] : [360, 0],
+            x: 0,
+            y: 0,
+            opacity: 0
           }}
-          transition={{
-            duration: 3 + i * 0.5,
-            repeat: Infinity,
-            repeatType: "loop",
-            ease: "linear"
+          whileHover={{
+            x: Math.cos(i * Math.PI / 2) * 30,
+            y: Math.sin(i * Math.PI / 2) * 30,
+            opacity: [0, 1, 0],
+            transition: {
+              duration: 0.8,
+              repeatDelay: 0.2,
+              repeat: Infinity
+            }
           }}
         />
       ))}
@@ -164,7 +225,7 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
         </div>
 
         <div className="flex items-center space-x-2 md:space-x-3">
-          <OrbitToggle />
+          <FunkyToggle />
 
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -205,7 +266,7 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
             {entry.themes && entry.themes.length > 0 && (
               <div className="mt-3 md:mt-4">
                 <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
-                <ThemeBoxes themes={entry.themes} />
+                <ThemeBoxes themes={entry.themes} isDisturbed={true} />
               </div>
             )}
           </div>
