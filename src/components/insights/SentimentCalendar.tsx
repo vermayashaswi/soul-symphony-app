@@ -46,14 +46,13 @@ function getEmojiColor(sentiment: number): string {
   if (sentiment >= 0.7) return "bg-green-500 dark:bg-green-600"; 
   if (sentiment >= 0.3) return "bg-green-400 dark:bg-green-500"; 
   if (sentiment >= 0.1) return "bg-green-300 dark:bg-green-400"; 
-  if (sentiment >= -0.1) return "bg-yellow-300 dark:bg-yellow-400"; 
-  if (sentiment >= -0.3) return "bg-orange-300 dark:bg-orange-400"; 
-  if (sentiment >= -0.7) return "bg-red-400 dark:bg-red-500"; 
-  return "bg-red-500 dark:bg-red-600"; 
+  if (sentiment >= -0.1) return "bg-yellow-400 dark:bg-yellow-500"; // Brighter yellow
+  if (sentiment >= -0.3) return "bg-orange-400 dark:bg-orange-500"; // Brighter orange
+  if (sentiment >= -0.7) return "bg-red-500 dark:bg-red-600";       // Brighter red
+  return "bg-red-600 dark:bg-red-700";   // Even brighter red
 }
 
 function getEmojiTextColor(sentiment: number): string {
-  if (sentiment >= 0.1) return "text-white"; 
   if (sentiment >= -0.1) return "text-black dark:text-white"; 
   return "text-white"; 
 }
@@ -388,6 +387,9 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             month: "space-y-1",
             months: "flex flex-col space-y-4",
             table: "w-full border-collapse",
+            head_row: "flex w-full justify-between",
+            head_cell: "text-muted-foreground rounded-md w-9 md:w-14 font-medium text-[0.9rem] text-center",
+            row: "flex w-full mt-2 justify-between",
             cell: cn(
               "relative p-0 h-12 w-12 md:h-14 md:w-14",
               "focus-within:relative focus-within:z-20"
@@ -396,9 +398,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               "h-12 w-12 md:h-14 md:w-14 p-0 font-normal aria-selected:opacity-100 hover:bg-primary/10 transition-all duration-200"
             ),
             nav_button: "hover:bg-primary/10 p-2 rounded-full transition-all duration-200 h-10 w-10",
-            head_row: "flex w-full",
-            head_cell: "text-muted-foreground rounded-md w-9 md:w-14 font-medium text-[0.9rem]",
-            row: "flex w-full mt-2",
             caption_label: "text-lg",
           }}
           components={{
@@ -426,11 +425,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                   {info && (
                     <motion.div 
                       className={cn(
-                        "absolute inset-1 rounded-md opacity-80",
+                        "absolute inset-1 rounded-md opacity-90",
                         info.colorClass
                       )}
                       initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 0.8 }}
+                      animate={{ scale: 1, opacity: 0.9 }}
                       transition={{ duration: 0.2 }}
                     />
                   )}
@@ -680,21 +679,21 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               y1={0.3} 
               y2={1} 
               fill="#4ade80" 
-              fillOpacity={theme === 'dark' ? 0.4 : 0.25} 
+              fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-0.1} 
               y2={0.2} 
-              fill="#fde047" 
-              fillOpacity={theme === 'dark' ? 0.4 : 0.3} 
+              fill="#facc15" 
+              fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-1} 
               y2={-0.2} 
-              fill="#f87171" 
-              fillOpacity={theme === 'dark' ? 0.35 : 0.25} 
+              fill="#ef4444" 
+              fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
               strokeOpacity={0}
             />
             
