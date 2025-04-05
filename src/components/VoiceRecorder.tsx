@@ -116,7 +116,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       <audio ref={audioRef} className="hidden" />
       
       <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-between overflow-hidden pt-6 pb-4">
-        {/* Custom pulse animations rendered directly in VoiceRecorder */}
+        {/* Concentric circle pulse animations */}
         {isRecording && (
           <div className="relative flex items-center justify-center w-full my-4">
             <AnimatePresence>
@@ -127,7 +127,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
                   animate={{ scale: 2.5, opacity: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 2.5, ease: "easeOut" }}
-                  className="absolute rounded-full bg-red-500/50 border-4 border-red-400/60"
+                  className="absolute rounded-full border-4 border-red-500"
                   style={{
                     width: '160px',
                     height: '160px',
@@ -145,7 +145,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         )}
         
         <div className="w-full px-4 sm:px-6 relative z-10">
-          {/* No RecordingVisualizer component here anymore */}
+          {/* No RecordingVisualizer component */}
         </div>
         
         <div className="relative z-10 flex justify-center w-full mt-auto mb-10">
