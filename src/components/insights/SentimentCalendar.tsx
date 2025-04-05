@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -33,28 +34,21 @@ interface SentimentCalendarProps {
 }
 
 function getEmoji(sentiment: number): string {
-  if (sentiment >= 0.7) return "😄";      // Very happy
-  if (sentiment >= 0.3) return "🙂";      // Happy
-  if (sentiment >= 0.1) return "😌";      // Slightly happy
-  if (sentiment >= -0.1) return "😐";     // Neutral
-  if (sentiment >= -0.3) return "😕";     // Slightly sad
-  if (sentiment >= -0.7) return "😞";     // Sad
-  return "😢";                           // Very sad
+  if (sentiment >= 0.2) return "🙂";      // Happy (green)
+  if (sentiment >= -0.2) return "😐";     // Neutral (yellow)
+  return "🙁";                           // Sad (red)
 }
 
 function getEmojiColor(sentiment: number): string {
-  if (sentiment >= 0.7) return "bg-green-500 dark:bg-green-600"; 
-  if (sentiment >= 0.3) return "bg-green-400 dark:bg-green-500"; 
-  if (sentiment >= 0.1) return "bg-green-300 dark:bg-green-400"; 
-  if (sentiment >= -0.1) return "bg-yellow-400 dark:bg-yellow-500"; // Brighter yellow
-  if (sentiment >= -0.3) return "bg-orange-400 dark:bg-orange-500"; // Brighter orange
-  if (sentiment >= -0.7) return "bg-red-500 dark:bg-red-600";       // Brighter red
-  return "bg-red-600 dark:bg-red-700";   // Even brighter red
+  if (sentiment >= 0.2) return "text-green-500"; 
+  if (sentiment >= -0.2) return "text-yellow-500"; 
+  return "text-red-500";
 }
 
-function getEmojiTextColor(sentiment: number): string {
-  if (sentiment >= -0.1) return "text-black dark:text-white"; 
-  return "text-white"; 
+function getMoodText(sentiment: number): string {
+  if (sentiment >= 0.2) return "Happy";
+  if (sentiment >= -0.2) return "Neutral";
+  return "Sad";
 }
 
 type ViewMode = 'calendar' | 'graph';
@@ -116,7 +110,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       sentiment: number;
       emoji: string;
       colorClass: string;
-      textColorClass: string;
+      moodText: string;
     }>();
     
     dailySentiment.forEach((avgSentiment, dateKey) => {
@@ -124,7 +118,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         sentiment: avgSentiment,
         emoji: getEmoji(avgSentiment),
         colorClass: getEmojiColor(avgSentiment),
-        textColorClass: getEmojiTextColor(avgSentiment)
+        moodText: getMoodText(avgSentiment)
       });
     });
     
@@ -231,15 +225,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         
         {todaySentiment ? (
           <motion.div 
-            className={cn(
-              "rounded-full p-12 flex items-center justify-center",
-              todaySentiment.colorClass
-            )}
+            className="rounded-full p-12 flex items-center justify-center"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, type: "spring" }}
           >
-            <span className={cn("text-6xl", todaySentiment.textColorClass)}>{todaySentiment.emoji}</span>
+            <span className={cn("text-6xl", todaySentiment.colorClass)}>{todaySentiment.emoji}</span>
           </motion.div>
         ) : (
           <motion.div 
@@ -300,23 +291,24 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 className={cn(
                   "aspect-square rounded-md flex flex-col items-center justify-center p-1 cursor-pointer",
                   isToday && "ring-2 ring-primary",
-                  daySentiment ? daySentiment.colorClass : "bg-muted"
+                  selectedDay && isSameDay(day, selectedDay) && "bg-muted"
                 )}
                 whileHover={{ scale: 1.05 }}
                 onClick={() => handleDayClick(day)}
               >
-                <div className={cn(
-                  "text-xs font-medium mb-1",
-                  daySentiment && daySentiment.textColorClass
-                )}>
+                <div className="text-xs font-medium mb-1">
                   {format(day, 'd')}
                 </div>
-                <div className={cn(
-                  "text-2xl",
-                  daySentiment && daySentiment.textColorClass
-                )}>
-                  {daySentiment ? daySentiment.emoji : "😶"}
-                </div>
+                {daySentiment ? (
+                  <div className={cn(
+                    "text-2xl",
+                    daySentiment.colorClass
+                  )}>
+                    {daySentiment.emoji}
+                  </div>
+                ) : (
+                  <div className="text-2xl text-muted-foreground">😶</div>
+                )}
               </motion.div>
             );
           })}
@@ -341,11 +333,9 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 if (daySentiment) {
                   return (
                     <div className="flex justify-center items-center space-x-2">
-                      <span className="text-2xl">{daySentiment.emoji}</span>
+                      <span className={cn("text-2xl", daySentiment.colorClass)}>{daySentiment.emoji}</span>
                       <span className="text-sm">
-                        Mood: {daySentiment.sentiment >= 0.3 ? 'Happy' : 
-                            daySentiment.sentiment >= -0.3 ? 'Neutral' : 'Sad'}
-                        ({daySentiment.sentiment.toFixed(2)})
+                        Mood: {daySentiment.moodText} ({daySentiment.sentiment.toFixed(2)})
                       </span>
                     </div>
                   );
@@ -416,40 +406,22 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 <div
                   className={cn(
                     "relative h-12 w-12 md:h-14 md:w-14 flex items-center justify-center hover:bg-primary/10 rounded-md transition-all duration-200",
-                    isSelected && "font-medium text-primary",
-                    isClickedDay && "ring-2 ring-primary"
+                    isSelected && "font-medium",
+                    isClickedDay && "ring-2 ring-primary bg-muted"
                   )}
                   onClick={() => handleDayClick(date)}
                   {...props}
                 >
-                  {info && (
-                    <motion.div 
-                      className={cn(
-                        "absolute inset-1 rounded-md opacity-90",
-                        info.colorClass
-                      )}
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 0.9 }}
-                      transition={{ duration: 0.2 }}
-                    />
-                  )}
-                  
-                  <div className={cn(
-                    "flex flex-col items-center justify-center h-full w-full z-10",
-                    info && info.textColorClass
-                  )}>
-                    <span className={cn(
-                      "text-sm md:text-base font-medium",
-                      info && info.textColorClass
-                    )}>
+                  <div className="flex flex-col items-center justify-center h-full w-full z-10">
+                    <span className="text-sm md:text-base font-medium">
                       {date.getDate()}
                     </span>
                     
-                    {info && (
+                    {info ? (
                       <motion.span 
                         className={cn(
                           "text-base md:text-lg",
-                          info && info.textColorClass
+                          info.colorClass
                         )}
                         initial={{ scale: 0.5 }}
                         animate={{ scale: 1 }}
@@ -457,7 +429,9 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                       >
                         {info.emoji}
                       </motion.span>
-                    )}
+                    ) : isSelected ? (
+                      <span className="text-base md:text-lg text-muted-foreground">😶</span>
+                    ) : null}
                   </div>
                   
                   <AnimatePresence>
@@ -474,10 +448,9 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                         
                         {info ? (
                           <div className="flex justify-center items-center space-x-2">
-                            <span className="text-2xl">{info.emoji}</span>
+                            <span className={cn("text-2xl", info.colorClass)}>{info.emoji}</span>
                             <span className="text-sm">
-                              Mood: {info.sentiment >= 0.3 ? 'Happy' : 
-                                    info.sentiment >= -0.3 ? 'Neutral' : 'Sad'}
+                              Mood: {info.moodText} ({info.sentiment.toFixed(2)})
                             </span>
                           </div>
                         ) : (
@@ -538,33 +511,34 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           {months.slice(0, 6).map((month, index) => {
             const monthSentiment = monthlyAverages.get(index);
             const date = new Date(today.getFullYear(), index, 1);
+            const colorClass = monthSentiment !== undefined ? getEmojiColor(monthSentiment) : "";
             
             return (
               <motion.div 
                 key={month}
                 className={cn(
                   "aspect-square rounded-md flex flex-col items-center justify-center p-1 cursor-pointer",
-                  monthSentiment !== undefined
-                    ? getEmojiColor(monthSentiment)
-                    : "bg-muted"
+                  selectedDay && 
+                    selectedDay.getMonth() === index && 
+                    selectedDay.getFullYear() === today.getFullYear() && 
+                    "bg-muted ring-2 ring-primary"
                 )}
                 whileHover={{ scale: 1.05 }}
                 onClick={() => handleDayClick(date)}
               >
-                <div className={cn(
-                  "text-xs font-medium mb-1",
-                  monthSentiment !== undefined && getEmojiTextColor(monthSentiment)
-                )}>
+                <div className="text-xs font-medium mb-1">
                   {month}
                 </div>
-                <div className={cn(
-                  "text-2xl",
-                  monthSentiment !== undefined && getEmojiTextColor(monthSentiment)
-                )}>
-                  {monthSentiment !== undefined 
-                    ? getEmoji(monthSentiment) 
-                    : "😶"}
-                </div>
+                {monthSentiment !== undefined ? (
+                  <div className={cn(
+                    "text-2xl",
+                    colorClass
+                  )}>
+                    {getEmoji(monthSentiment)}
+                  </div>
+                ) : (
+                  <div className="text-2xl text-muted-foreground">😶</div>
+                )}
               </motion.div>
             );
           })}
@@ -583,33 +557,34 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             const actualIndex = index + 6;
             const monthSentiment = monthlyAverages.get(actualIndex);
             const date = new Date(today.getFullYear(), actualIndex, 1);
+            const colorClass = monthSentiment !== undefined ? getEmojiColor(monthSentiment) : "";
             
             return (
               <motion.div 
                 key={month}
                 className={cn(
                   "aspect-square rounded-md flex flex-col items-center justify-center p-1 cursor-pointer",
-                  monthSentiment !== undefined
-                    ? getEmojiColor(monthSentiment)
-                    : "bg-muted"
+                  selectedDay && 
+                    selectedDay.getMonth() === actualIndex && 
+                    selectedDay.getFullYear() === today.getFullYear() && 
+                    "bg-muted ring-2 ring-primary"
                 )}
                 whileHover={{ scale: 1.05 }}
                 onClick={() => handleDayClick(date)}
               >
-                <div className={cn(
-                  "text-xs font-medium mb-1",
-                  monthSentiment !== undefined && getEmojiTextColor(monthSentiment)
-                )}>
+                <div className="text-xs font-medium mb-1">
                   {month}
                 </div>
-                <div className={cn(
-                  "text-2xl",
-                  monthSentiment !== undefined && getEmojiTextColor(monthSentiment)
-                )}>
-                  {monthSentiment !== undefined 
-                    ? getEmoji(monthSentiment) 
-                    : "😶"}
-                </div>
+                {monthSentiment !== undefined ? (
+                  <div className={cn(
+                    "text-2xl",
+                    colorClass
+                  )}>
+                    {getEmoji(monthSentiment)}
+                  </div>
+                ) : (
+                  <div className="text-2xl text-muted-foreground">😶</div>
+                )}
               </motion.div>
             );
           })}
@@ -632,13 +607,15 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 const monthSentiment = monthlyAverages.get(month);
                 
                 if (monthSentiment !== undefined) {
+                  const colorClass = getEmojiColor(monthSentiment);
+                  const emoji = getEmoji(monthSentiment);
+                  const moodText = getMoodText(monthSentiment);
+                  
                   return (
                     <div className="flex justify-center items-center space-x-2">
-                      <span className="text-2xl">{getEmoji(monthSentiment)}</span>
+                      <span className={cn("text-2xl", colorClass)}>{emoji}</span>
                       <span className="text-sm">
-                        Mood: {monthSentiment >= 0.3 ? 'Happy' : 
-                            monthSentiment >= -0.3 ? 'Neutral' : 'Sad'}
-                        ({monthSentiment.toFixed(2)})
+                        Mood: {moodText} ({monthSentiment.toFixed(2)})
                       </span>
                     </div>
                   );
@@ -676,14 +653,14 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
             
             <ReferenceArea 
-              y1={0.3} 
+              y1={0.2} 
               y2={1} 
               fill="#4ade80" 
               fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
               strokeOpacity={0}
             />
             <ReferenceArea 
-              y1={-0.1} 
+              y1={-0.2} 
               y2={0.2} 
               fill="#facc15" 
               fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
@@ -741,11 +718,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         <div className="flex justify-center gap-6 mt-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span className="text-sm">Positive (0.3 to 1)</span>
+            <span className="text-sm">Positive (0.2 to 1)</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-            <span className="text-sm">Neutral (-0.1 to 0.2)</span>
+            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <span className="text-sm">Neutral (-0.2 to 0.2)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-500"></div>
