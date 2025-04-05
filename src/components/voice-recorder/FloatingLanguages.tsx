@@ -15,6 +15,20 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
     "স্বাগতম", "Namaste", "Hello", "Hi", "Hey",
   ];
 
+  // Generate random positions for each word
+  const generateRandomPositions = () => {
+    return languageWords.map((_, index) => ({
+      x: Math.random() * 200 - 100, // Range from -100 to 100
+      y: Math.random() * 200 - 100, // Range from -100 to 100
+      scale: 0.8 + Math.random() * 0.4, // Range from 0.8 to 1.2
+      opacity: 0.4 + Math.random() * 0.6, // Range from 0.4 to 1.0
+      delay: index * 0.1, // Staggered delay for each word
+      duration: 5 + Math.random() * 10 // Different durations for more natural movement
+    }));
+  };
+
+  const positions = React.useMemo(() => generateRandomPositions(), []);
+
   return (
     <div
       className={cn(
@@ -31,35 +45,59 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
         opacity: 0.7,
       }}
     >
-      <div className="flex flex-col items-center justify-center h-full perspective-wrapper">
-        {languageWords.map((word, index) => (
-          <motion.span
-            key={index}
-            className="whitespace-nowrap"
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ 
-              y: -100, 
-              opacity: [0, 1, 1, 0],
-              transition: {
-                y: {
-                  duration: 15,
+      <div className="relative h-full w-full perspective-wrapper">
+        {languageWords.map((word, index) => {
+          const position = positions[index];
+          
+          return (
+            <motion.span
+              key={index}
+              className="absolute whitespace-nowrap transform-gpu"
+              style={{
+                left: "50%",
+                top: "50%",
+              }}
+              initial={{
+                x: position.x * 2,
+                y: position.y * 2,
+                scale: 0,
+                opacity: 0
+              }}
+              animate={{
+                x: [position.x, position.x + 15, position.x - 10, position.x],
+                y: [position.y, position.y - 10, position.y + 15, position.y],
+                scale: position.scale,
+                opacity: position.opacity
+              }}
+              transition={{
+                x: {
+                  duration: position.duration,
                   repeat: Infinity,
-                  ease: "linear",
-                  delay: index * 0.6,
+                  repeatType: "reverse",
+                  ease: "easeInOut",
+                  delay: position.delay
+                },
+                y: {
+                  duration: position.duration * 1.2, // Slightly different duration for x and y
+                  repeat: Infinity,
+                  repeatType: "reverse",
+                  ease: "easeInOut", 
+                  delay: position.delay
                 },
                 opacity: {
-                  duration: 15,
-                  times: [0, 0.1, 0.9, 1],
-                  repeat: Infinity,
-                  ease: "linear",
-                  delay: index * 0.6,
+                  duration: 1,
+                  delay: position.delay
+                },
+                scale: {
+                  duration: 0.8,
+                  delay: position.delay
                 }
-              }
-            }}
-          >
-            {word}
-          </motion.span>
-        ))}
+              }}
+            >
+              {word}
+            </motion.span>
+          );
+        })}
       </div>
     </div>
   );

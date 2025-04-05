@@ -233,10 +233,16 @@
 
 @keyframes float-around {
   0%, 100% {
-    transform: translateY(0);
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(5px, -5px);
   }
   50% {
-    transform: translateY(-5px);
+    transform: translate(0, -10px);
+  }
+  75% {
+    transform: translate(-5px, -5px);
   }
 }
 
@@ -245,25 +251,23 @@
 }
 
 .float-around {
-  animation: float-around 5s ease-in-out infinite;
+  animation: float-around 10s ease-in-out infinite;
 }
 
-/* Add language animation related styles */
+/* Improved animation related styles */
 .language-animation-word {
   transition: all 0.3s ease;
   opacity: 0.8;
-  will-change: transform, opacity; /* Hint for browser optimization */
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
-.language-animation-word:hover {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
-/* 3D perspective for language animation */
 .language-animation-container {
   perspective: 1000px;
-  will-change: transform; /* Optimize for animations */
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .language-animation-3d {
@@ -273,6 +277,17 @@
 /* Optimize animation performance */
 .will-change-transform {
   will-change: transform, opacity;
-  backface-visibility: hidden; /* Reduces repaints */
-  transform: translateZ(0); /* Force GPU acceleration */
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Add fluid motion to animations */
+.fluid-motion {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Improve animation smoothness */
+.smooth-float {
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-fill-mode: both;
 }

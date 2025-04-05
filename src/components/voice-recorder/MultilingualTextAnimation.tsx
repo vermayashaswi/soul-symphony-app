@@ -24,81 +24,89 @@ interface AnimatedWordProps {
 
 // Individual word animation component with improved smooth movement
 const AnimatedWord: React.FC<AnimatedWordProps> = ({ text, index, total }) => {
-  // Calculate random position across the entire container with better distribution
-  const randomX = useRef(Math.random() * 80 + 10); // Random value 10-90% (avoid edges)
-  const randomY = useRef(Math.random() * 80 + 10); // Random value 10-90% (avoid edges)
+  // Calculate position that covers the entire container evenly
+  const positionGenerator = () => {
+    // Divide the container into a grid and place words evenly
+    const gridSize = Math.ceil(Math.sqrt(total));
+    const cellSize = 100 / gridSize;
+    
+    // Get a position within the grid, then add some randomness
+    const gridX = (index % gridSize) * cellSize;
+    const gridY = Math.floor(index / gridSize) * cellSize;
+    
+    // Add randomness within the cell
+    const x = gridX + (Math.random() * cellSize * 0.6);
+    const y = gridY + (Math.random() * cellSize * 0.6);
+    
+    return { x, y };
+  };
   
-  // Create smooth off-screen starting positions
-  const startX = useRef((Math.random() > 0.5 ? 1 : -1) * (Math.random() * 200 + 100));
-  const startY = useRef((Math.random() > 0.5 ? 1 : -1) * (Math.random() * 100 + 50));
-  const startScale = useRef(0.5 + Math.random() * 0.2);
+  // Generate consistent random values for this word
+  const basePosition = useRef(positionGenerator());
+  const moveRadius = useRef(5 + Math.random() * 10); // Random movement radius (5-15px)
+  const moveSpeed = useRef(15 + Math.random() * 15); // Random duration (15-30s)
+  const delay = useRef(index * 0.03); // Staggered delay for smoother initial appearance
   
-  // Fixed layer values to prevent z-fighting and reduce repaints
-  const zIndex = useRef(Math.floor(Math.random() * 10));
-  
-  // More consistent opacity and size
-  const opacity = useRef(0.4 + Math.random() * 0.4);
-  const fontSize = useRef(10 + Math.floor(Math.random() * 12)); // Random font size between 10-22px
-  
-  // Smoother animation timing with more consistent values
-  const duration = useRef(10 + Math.random() * 20); // Much longer for smoother effect
-  const delay = useRef(index * 0.02);
+  // Visual properties
+  const fontSize = useRef(10 + Math.floor(Math.random() * 8)); // 10-18px font size
+  const opacity = useRef(0.5 + Math.random() * 0.5); // 0.5-1.0 opacity
+  const zIndex = useRef(Math.floor(Math.random() * 10)); // Random z-index for layering
   
   return (
     <motion.div
       key={`word-${text}-${index}`}
       initial={{ 
-        x: startX.current, 
-        y: startY.current, 
-        scale: startScale.current,
+        x: basePosition.current.x + (Math.random() > 0.5 ? 100 : -100), 
+        y: basePosition.current.y + (Math.random() > 0.5 ? 100 : -100), 
         opacity: 0,
+        scale: 0.5,
       }}
       animate={{ 
-        x: `${randomX.current}%`, 
-        y: `${randomY.current}%`,
-        scale: 0.8 + Math.random() * 0.2,
+        x: [
+          basePosition.current.x,
+          basePosition.current.x + moveRadius.current,
+          basePosition.current.x - moveRadius.current,
+          basePosition.current.x,
+        ],
+        y: [
+          basePosition.current.y,
+          basePosition.current.y - moveRadius.current,
+          basePosition.current.y + moveRadius.current,
+          basePosition.current.y,
+        ],
         opacity: opacity.current,
-      }}
-      exit={{ 
-        opacity: 0,
-        transition: { duration: 0.5 }
+        scale: 0.8 + Math.random() * 0.4,
       }}
       transition={{ 
         x: {
-          type: "spring",
-          stiffness: 5,
-          damping: 20,
-          duration: duration.current,
+          duration: moveSpeed.current,
           repeat: Infinity,
           repeatType: "mirror",
+          ease: "easeInOut",
         },
         y: {
-          type: "spring",
-          stiffness: 5,
-          damping: 20,
-          duration: duration.current + 5,
+          duration: moveSpeed.current + 5, // Slightly different timing for more natural motion
           repeat: Infinity,
           repeatType: "mirror",
+          ease: "easeInOut",
         },
         opacity: {
-          duration: 1,
-          delay: delay.current
+          duration: 0.8,
+          delay: delay.current,
         },
         scale: {
-          duration: 1,
-          delay: delay.current
+          duration: 0.8,
+          delay: delay.current,
         }
       }}
-      className="absolute select-none pointer-events-none will-change-transform"
+      className="absolute select-none pointer-events-none will-change-transform transform-gpu"
       style={{ 
-        left: `${randomX.current}%`,
-        top: `${randomY.current}%`,
-        transform: `translate(-50%, -50%)`,
-        zIndex: zIndex.current, 
-        fontFamily: "var(--font-sans)",
-        fontWeight: Math.random() > 0.6 ? 500 : 400,
+        left: `${basePosition.current.x}%`,
+        top: `${basePosition.current.y}%`,
         fontSize: `${fontSize.current}px`,
         opacity: opacity.current,
+        zIndex: zIndex.current, 
+        transform: 'translate(-50%, -50%)',
         color: 'var(--foreground)', // Using CSS var for theme compatibility
       }}
     >
@@ -113,13 +121,13 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
   const containerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    // Reduced words count for better performance and smoother animations
+    // Adjusted word count for better performance and distribution
     const updateWords = () => {
-      const wordCount = contained ? 20 : 30;
-      const newWords: string[] = [];
+      const wordCount = contained ? 25 : 35;
       
       // Create a set to avoid duplicates
       const selectedIndices = new Set<number>();
+      const newWords: string[] = [];
       
       while (newWords.length < wordCount) {
         const randomIndex = Math.floor(Math.random() * languages.length);
@@ -133,8 +141,8 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
     };
     
     updateWords();
-    // Slower refresh rate for better performance
-    const interval = setInterval(updateWords, 8000);
+    // Reduced refresh rate for better performance
+    const interval = setInterval(updateWords, 12000);
     
     return () => clearInterval(interval);
   }, [contained]);
@@ -149,18 +157,16 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
         transformStyle: "preserve-3d",
       }}
     >
-      <div className="absolute inset-0 w-full h-full">
-        <AnimatePresence>
-          {visibleWords.map((word, index) => (
-            <AnimatedWord 
-              key={`${word}-${index}`} // Simplified key to reduce rerenders
-              text={word} 
-              index={index} 
-              total={visibleWords.length} 
-            />
-          ))}
-        </AnimatePresence>
-      </div>
+      <AnimatePresence>
+        {visibleWords.map((word, index) => (
+          <AnimatedWord 
+            key={`${word}-${index}`}
+            text={word} 
+            index={index} 
+            total={visibleWords.length} 
+          />
+        ))}
+      </AnimatePresence>
     </div>
   );
 }
