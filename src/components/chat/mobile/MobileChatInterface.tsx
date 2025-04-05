@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Brain } from "lucide-react";
+import { Menu, X, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage, ChatMessage as ChatMessageType } from "@/services/chatService";
@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import ChatDiagnostics from "@/components/chat/ChatDiagnostics";
 import { Json } from "@/integrations/supabase/types";
+import { motion } from "framer-motion";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -66,6 +67,21 @@ export default function MobileChatInterface({
     queryAnalysis: null,
     functionExecutions: null
   });
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  const suggestionQuestions = [
+    {
+      text: "How did I feel yesterday?",
+      icon: <BarChart2 className="h-4 w-4 mr-1" />
+    },
+    {
+      text: "What makes me happy?", 
+      icon: <Lightbulb className="h-4 w-4 mr-1" />
+    },
+    {
+      text: "Find entries about work",
+      icon: <Search className="h-4 w-4 mr-1" />
+    }
+  ];
   const { toast } = useToast();
   const { user } = useAuth();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -148,8 +164,10 @@ export default function MobileChatInterface({
         })) as UIChatMessage[];
         
         setMessages(formattedMessages);
+        setShowSuggestions(false);
       } else {
         setMessages([]);
+        setShowSuggestions(true);
       }
     } catch (error) {
       console.error("[Mobile] Error loading messages:", error);
@@ -468,6 +486,28 @@ export default function MobileChatInterface({
               <p className="text-muted-foreground text-sm mb-4">
                 Ask me anything about your mental well-being and journal entries
               </p>
+              
+              {showSuggestions && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="flex flex-col gap-2 mx-auto max-w-[280px]"
+                >
+                  {suggestionQuestions.map((question, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
+                      className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted"
+                      onClick={() => handleSendMessage(question.text)}
+                    >
+                      {question.icon}
+                      <span>{question.text}</span>
+                    </Button>
+                  ))}
+                </motion.div>
+              )}
             </div>
             <div className="flex-1"></div>
           </div>
