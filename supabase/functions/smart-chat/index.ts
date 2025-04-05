@@ -123,7 +123,7 @@ serve(async (req) => {
   }
 });
 
-// Update any function that searches for journal entries using vector similarity
+// Update function to correctly pass parameters in the expected order
 async function searchEntriesWithVector(
   userId: string, 
   queryEmbedding: any[], 
@@ -132,7 +132,8 @@ async function searchEntriesWithVector(
   try {
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
     
-    // Use the fixed function we created
+    // Fix the parameters order according to the function definition
+    // match_journal_entries_fixed(query_embedding, match_threshold, match_count, user_id_filter)
     const { data, error } = await supabase.rpc(
       'match_journal_entries_fixed',
       {
