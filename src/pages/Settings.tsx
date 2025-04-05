@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
+import SouloLogo from '@/components/SouloLogo';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -157,7 +158,7 @@ export default function Settings() {
       
       <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-16" : "pt-28")}>
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2 text-foreground">Settings</h1>
+          <h1 className="text-3xl font-bold mb-2 text-theme-color">Settings</h1>
           <p className="text-muted-foreground">Personalize your Feelosophy experience</p>
         </div>
         
@@ -169,7 +170,7 @@ export default function Settings() {
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-foreground">Your Profile</h2>
+              <h2 className="text-xl font-semibold text-theme-color">Your Profile</h2>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
@@ -206,7 +207,7 @@ export default function Settings() {
             transition={{ duration: 0.3, delay: 0.1 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
-            <h2 className="text-xl font-semibold mb-4 text-foreground">Appearance</h2>
+            <h2 className="text-xl font-semibold mb-4 text-theme-color">Appearance</h2>
             
             <div className="space-y-4">
               <div>
@@ -254,7 +255,7 @@ export default function Settings() {
               </div>
               
               <div>
-                <label className="text-sm font-medium mb-2 block text-foreground">Color Theme</label>
+                <label className="text-sm font-medium mb-2 block text-theme-color">Color Theme</label>
                 <div className="flex flex-wrap gap-3">
                   {colorThemes.map((themeOption) => (
                     <button
@@ -301,7 +302,7 @@ export default function Settings() {
             transition={{ duration: 0.3, delay: 0.2 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
-            <h2 className="text-xl font-semibold mb-4 text-foreground">Preferences</h2>
+            <h2 className="text-xl font-semibold mb-4 text-theme-color">Preferences</h2>
             
             <div className="space-y-3 divide-y">
               <SettingItem
@@ -323,7 +324,7 @@ export default function Settings() {
             transition={{ duration: 0.3, delay: 0.3 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
-            <h2 className="text-xl font-semibold mb-4 text-foreground">Help & Support</h2>
+            <h2 className="text-xl font-semibold mb-4 text-theme-color">Help & Support</h2>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Button variant="outline" size="lg" className="h-auto py-6 rounded-xl justify-start">
@@ -360,7 +361,9 @@ export default function Settings() {
           </motion.div>
           
           <div className="py-4 text-center text-sm text-muted-foreground">
-            <p>Feelosophy v1.0.0</p>
+            <p className="flex items-center justify-center gap-1">
+              <SouloLogo size="small" useColorTheme={true} /> v1.0.0
+            </p>
           </div>
         </div>
       </div>
