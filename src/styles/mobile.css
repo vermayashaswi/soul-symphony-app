@@ -71,12 +71,12 @@
   
   /* Voice recorder container height - making it fill more space */
   [class*="min-h-[160px]"], [class*="min-h-[185px]"] {
-    min-height: 350px !important; /* Increased to fill the green area */
+    min-height: calc(100vh - 160px) !important; /* Adjust to fill space above navbar */
   }
   
   /* Voice recorder container position adjustment to stay above mobile navbar */
   .min-h-\[185px\] {
-    min-height: 350px !important; /* Increased to fill the green area */
+    min-height: calc(100vh - 160px) !important; /* Adjust to fill space above navbar */
     margin-bottom: 0;
     position: relative;
     bottom: 0;
@@ -121,8 +121,7 @@
   /* Position the recorder at the bottom */
   .journal-container .card {
     margin-bottom: 0 !important;
-    position: fixed;
-    bottom: 4rem;
+    position: relative;
     left: 0;
     right: 0;
     z-index: 40;
@@ -130,7 +129,12 @@
     border-left: none;
     border-right: none;
     border-bottom: none;
-    height: calc(100vh - 210px); /* Make the container fill most of the available space */
+    height: auto; /* Let it size naturally */
+  }
+  
+  /* Make recording card fill available height */
+  .journal-container .tabs-content > div > .card {
+    min-height: calc(100vh - 180px); /* Adjusted to account for header and navbar */
   }
   
   /* Adjust spacing of journal tabs container */

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +14,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { LanguageBackground } from '@/components/voice-recorder/MultilingualTextAnimation';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -24,6 +26,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   
   const {
     isRecording,
@@ -115,7 +118,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
       <audio ref={audioRef} className="hidden" />
       
-      <div className="relative w-full h-full min-h-[185px] flex flex-col items-center justify-between overflow-hidden pt-6 pb-4">
+      <div className={cn(
+        "relative w-full h-full flex flex-col items-center justify-between overflow-hidden pt-6 pb-4",
+        isMobile ? "min-h-[calc(100vh-160px)]" : "min-h-[185px]"
+      )}>
         <LanguageBackground contained={true} />
         
         <div className="w-full px-4 sm:px-6 relative z-10">

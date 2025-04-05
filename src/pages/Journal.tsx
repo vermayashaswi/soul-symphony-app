@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +17,7 @@ import JournalDebugPanel from '@/components/journal/JournalDebugPanel';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import MobileNavbar from '@/components/mobile/MobileNavbar';
 
 const Journal = () => {
   const [activeTab, setActiveTab] = useState('record');
@@ -444,7 +446,7 @@ const Journal = () => {
   const displayEntries = filteredEntries.length > 0 ? filteredEntries : entries;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background" ref={journalRef}>
+    <div className="flex flex-col min-h-screen bg-background journal-container" ref={journalRef}>
       <Navbar />
       
       <JournalHeader />
@@ -497,6 +499,7 @@ const Journal = () => {
       </div>
       
       <JournalDebugPanel />
+      <MobileNavbar />
     </div>
   );
 };
