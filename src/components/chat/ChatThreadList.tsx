@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   PlusCircle, 
@@ -21,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 interface ChatThreadListProps {
   userId?: string;
   onSelectThread: (threadId: string) => void;
-  onStartNewThread: () => Promise<void>;
+  onStartNewThread: () => Promise<string | null>;
   currentThreadId?: string | null;
   newChatButtonWidth?: 'full' | 'half';
 }
@@ -67,7 +66,6 @@ export default function ChatThreadList({
 
     fetchThreads();
     
-    // Listen for thread title updates
     const handleTitleUpdated = (event: CustomEvent) => {
       if (event.detail?.threadId && event.detail?.title) {
         setThreads(prevThreads => 
@@ -126,7 +124,6 @@ export default function ChatThreadList({
           description: "Conversation deleted",
         });
         
-        // If current thread was deleted, trigger new thread creation
         if (currentThreadId === threadToDelete) {
           onStartNewThread();
         }
@@ -196,14 +193,12 @@ export default function ChatThreadList({
           onClick={handleNewThread}
           className={cn(
             "bg-theme-color hover:bg-theme-color/90 text-white flex items-center gap-1",
-            "w-full" // Always use full width for the button, removing the half-width option
+            "w-full"
           )}
         >
           <PlusCircle className="h-4 w-4" />
           <span>New Chat</span>
         </Button>
-        
-        {/* Removed the close/cross button that was here */}
       </div>
       
       <div className="px-3 py-2">
