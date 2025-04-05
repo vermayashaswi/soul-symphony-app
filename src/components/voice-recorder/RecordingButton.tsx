@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Square } from 'lucide-react';
@@ -51,9 +50,8 @@ export function RecordingButton({
   
   return (
     <div className="relative w-full h-full flex items-center justify-center">
-      {/* Updated the positioning container to better fill the available space */}
       {showAnimation && (
-        <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-2xl">
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
           <FloatingLanguages size="md" />
         </div>
       )}
