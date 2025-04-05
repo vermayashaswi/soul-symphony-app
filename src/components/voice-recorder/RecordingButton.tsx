@@ -1,7 +1,10 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LanguageBackground } from './MultilingualTextAnimation';
+import FloatingLanguages from './FloatingLanguages';
 
 interface RecordingButtonProps {
   isRecording: boolean;
@@ -11,6 +14,7 @@ interface RecordingButtonProps {
   onRecordingStop: () => void;
   onPermissionRequest: () => void;
   audioLevel?: number;
+  showAnimation?: boolean;
 }
 
 export function RecordingButton({
@@ -20,7 +24,8 @@ export function RecordingButton({
   onRecordingStart,
   onRecordingStop,
   onPermissionRequest,
-  audioLevel = 0
+  audioLevel = 0,
+  showAnimation = true
 }: RecordingButtonProps) {
   if (hasPermission === false) {
     return (
@@ -45,25 +50,33 @@ export function RecordingButton({
   };
   
   return (
-    <motion.button
-      onClick={isRecording ? onRecordingStop : onRecordingStart}
-      disabled={isProcessing}
-      className={cn(
-        "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
-        getButtonColor(),
-        isRecording ? "w-20 h-20" : isProcessing ? "w-20 h-20 opacity-50 cursor-not-allowed" : "w-20 h-20",
+    <div className="relative">
+      {/* Language animation centered behind the button */}
+      {showAnimation && (
+        <div className="absolute" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}>
+          <FloatingLanguages size="md" />
+        </div>
       )}
-      style={{
-        boxShadow: isRecording ? `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.8)` : undefined
-      }}
-      whileTap={{ scale: 0.95 }}
-      // Removed the scale animation that was making the button grow
-    >
-      {isRecording ? (
-        <Square className="w-7 h-7 text-white" />
-      ) : (
-        <Mic className="w-8 h-8 text-white" />
-      )}
-    </motion.button>
+      
+      <motion.button
+        onClick={isRecording ? onRecordingStop : onRecordingStart}
+        disabled={isProcessing}
+        className={cn(
+          "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
+          getButtonColor(),
+          isRecording ? "w-20 h-20" : isProcessing ? "w-20 h-20 opacity-50 cursor-not-allowed" : "w-20 h-20",
+        )}
+        style={{
+          boxShadow: isRecording ? `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.8)` : undefined
+        }}
+        whileTap={{ scale: 0.95 }}
+      >
+        {isRecording ? (
+          <Square className="w-7 h-7 text-white" />
+        ) : (
+          <Mic className="w-8 h-8 text-white" />
+        )}
+      </motion.button>
+    </div>
   );
 }

@@ -132,7 +132,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         "relative w-full h-full flex flex-col items-center justify-between overflow-hidden pt-6 pb-4 rounded-2xl border border-slate-200/20",
         isMobile ? "min-h-[calc(70vh-160px)]" : "min-h-[185px]"
       )}>
-        <LanguageBackground contained={true} isActive={showAnimation} />
+        {/* We remove the global container animation and will add it to the RecordingButton component */}
         
         <div className="w-full px-4 sm:px-6 relative z-10">
           {/* No RecordingVisualizer component */}
@@ -150,6 +150,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             onRecordingStop={stopRecording}
             onPermissionRequest={requestPermissions}
             audioLevel={audioLevel}
+            showAnimation={showAnimation}
           />
         </div>
         
