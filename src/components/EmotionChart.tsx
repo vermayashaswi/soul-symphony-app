@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -86,7 +87,7 @@ export function EmotionChart({
   aggregatedData 
 }: EmotionChartProps) {
   const [chartType, setChartType] = useState<ChartType>('bubble');
-  const [bubbleKey, setBubbleKey] = useState(0); // Add key for forcing re-render
+  const [bubbleKey, setBubbleKey] = useState(0); 
   const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
   const [visibleEmotions, setVisibleEmotions] = useState<string[]>([]);
   const { theme } = useTheme();
@@ -185,6 +186,7 @@ export function EmotionChart({
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
+    // Initialize visible emotions to show all emotions by default
     if (visibleEmotions.length === 0 && chartType === 'line') {
       setVisibleEmotions(topEmotions);
     }

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -265,9 +264,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           {todaySentiment ? (
             <div className="text-center">
               <div className="font-medium">{format(today, 'MMMM d, yyyy')}</div>
-              <div className="text-muted-foreground mt-1">
-                Average mood: {todaySentiment.sentiment.toFixed(2)}
-              </div>
             </div>
           ) : (
             <div className="text-center text-muted-foreground">
@@ -605,15 +601,15 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         <div className="flex justify-center gap-6 mt-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span className="text-sm">Positive (0.2 to 1)</span>
+            <span className="text-sm">Positive</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-            <span className="text-sm">Neutral (-0.2 to 0.2)</span>
+            <span className="text-sm">Neutral</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <span className="text-sm">Negative (-1 to -0.2)</span>
+            <span className="text-sm">Negative</span>
           </div>
         </div>
       </div>
