@@ -1,4 +1,3 @@
-
 // Add the missing type definitions for this file's exports and functions
 import { supabase } from "@/integrations/supabase/client";
 
@@ -27,14 +26,19 @@ export type QueryTypes = {
     startDate?: string;
     endDate?: string;
   };
+  isSpecificQuery?: boolean;
+  needsMoreContext?: boolean;
+  requiresTimeAnalysis?: boolean;
 };
 
 export function analyzeQueryTypes(queryText: string): QueryTypes {
   const lowerQuery = queryText.toLowerCase();
   
   // Analyze for temporal queries (when questions)
-  const isTemporalQuery = /\bwhen\b/i.test(lowerQuery) && 
-    !/what time|time of day|morning|afternoon|evening|night/i.test(lowerQuery);
+  const isTemporalQuery = /\bwhen\b/i.test(lowerQuery) || 
+    /\byesterday\b|\blast week\b|\blast month\b|\blast year\b|\btoday\b|\bthis week\b|\bthis month\b|\bthis year\b/i.test(lowerQuery);
+  
+  const isWhenQuestion = /\bwhen\b/i.test(lowerQuery);
   
   // NEW: Analyze for time-of-day pattern queries
   const isTimePatternQuery = /what time|time of day|morning|afternoon|evening|night|o'clock|am\b|pm\b|hour|daytime/i.test(lowerQuery);
@@ -72,8 +76,12 @@ export function analyzeQueryTypes(queryText: string): QueryTypes {
   // Determine if the query requires vector search (semantic retrieval)
   const needsVectorSearch = !needsDataAggregation || isEmotionFocused || isTemporalQuery;
   
-  // Try to determine time range from query
-  const timeRange = extractTimeRange(lowerQuery);
+  // Determine if this is a specific query (requiring higher similarity threshold)
+  const isSpecificQuery = isTemporalQuery || isWhenQuestion || 
+    /\bexactly\b|\bspecifically\b|\bprecisely\b/i.test(lowerQuery);
+  
+  // Determine if we need more context for this query
+  const needsMoreContext = isWhyQuestion || isComplexQuery;
   
   // Determine search strategy
   let searchStrategy = determineSearchStrategy(lowerQuery, {
@@ -98,7 +106,11 @@ export function analyzeQueryTypes(queryText: string): QueryTypes {
     needsDataAggregation,
     needsVectorSearch,
     searchStrategy,
-    timeRange
+    timeRange,
+    isWhenQuestion,
+    isSpecificQuery,
+    needsMoreContext,
+    requiresTimeAnalysis: isTemporalQuery || isWhenQuestion
   };
 }
 

@@ -26,6 +26,13 @@ export const processChatMessage = async (
     
     console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
     
+    // Extract time range if this is a temporal query
+    let timeRange = null;
+    if (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion) {
+      timeRange = queryTypes.timeRange;
+      console.log("Temporal query detected, using time range:", timeRange);
+    }
+    
     // Call the Supabase Edge Function with dynamic vector search parameters
     const { data, error } = await supabase.functions.invoke('chat-with-rag', {
       body: {
@@ -41,8 +48,9 @@ export const processChatMessage = async (
         isEmotionQuery: queryTypes.isEmotionFocused,
         isWhyEmotionQuery: queryTypes.isWhyQuestion && queryTypes.isEmotionFocused,
         isTimePatternQuery: queryTypes.isTimePatternQuery,
-        isTemporalQuery: queryTypes.isWhenQuestion,
-        requiresTimeAnalysis: queryTypes.requiresTimeAnalysis
+        isTemporalQuery: queryTypes.isTemporalQuery || queryTypes.isWhenQuestion,
+        requiresTimeAnalysis: queryTypes.requiresTimeAnalysis,
+        timeRange: timeRange
       }
     });
 
