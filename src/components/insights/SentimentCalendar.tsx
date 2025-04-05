@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -76,8 +77,6 @@ type ViewMode = 'calendar' | 'graph';
 
 export default function SentimentCalendar({ sentimentData, timeRange }: SentimentCalendarProps) {
   const isMobile = useIsMobile();
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-  const today = new Date();
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const { theme } = useTheme();
   
@@ -147,14 +146,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     
     return infoMap;
   }, [dailySentiment]);
-  
-  const handleDayClick = (day: Date) => {
-    if (selectedDay && isSameDay(day, selectedDay)) {
-      setSelectedDay(null);
-    } else {
-      setSelectedDay(day);
-    }
-  };
 
   const lineChartData = React.useMemo(() => {
     if (filteredData.length === 0) {
@@ -184,7 +175,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     } 
     
     if (timeRange === 'week') {
-      const startOfWeekDate = startOfWeek(today, { weekStartsOn: 1 });
+      const startOfWeekDate = startOfWeek(new Date(), { weekStartsOn: 1 });
       return Array.from({ length: 7 }, (_, i) => {
         const date = addDays(startOfWeekDate, i);
         const dateStr = format(date, 'yyyy-MM-dd');
@@ -197,11 +188,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     } 
     
     if (timeRange === 'month') {
-      const startOfMonthDate = startOfMonth(today);
-      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      const startOfMonthDate = startOfMonth(new Date());
+      const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
       
       return Array.from({ length: daysInMonth }, (_, i) => {
-        const date = new Date(today.getFullYear(), today.getMonth(), i + 1);
+        const date = new Date(new Date().getFullYear(), new Date().getMonth(), i + 1);
         const dateStr = format(date, 'yyyy-MM-dd');
         return {
           time: format(date, 'd'),
@@ -225,7 +216,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       });
       
       return Array.from({ length: 12 }, (_, month) => {
-        const date = new Date(today.getFullYear(), month, 1);
+        const date = new Date(new Date().getFullYear(), month, 1);
         const data = monthlyData.get(month);
         return {
           time: format(date, 'MMM'),
@@ -236,9 +227,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     }
     
     return [];
-  }, [filteredData, timeRange, dailySentiment, today]);
+  }, [filteredData, timeRange, dailySentiment]);
 
   const renderTodayView = () => {
+    const today = new Date();
     const todayKey = format(today, 'yyyy-MM-dd');
     const todaySentiment = sentimentInfo.get(todayKey);
     
@@ -288,6 +280,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   };
 
   const renderWeekView = () => {
+    const today = new Date();
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
     const days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date(weekStart);
@@ -312,15 +305,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             const isToday = isSameDay(day, today);
             
             return (
-              <motion.div 
+              <div 
                 key={dateKey}
                 className={cn(
-                  "aspect-square rounded-md flex flex-col items-center justify-center p-1 cursor-pointer",
-                  isToday && "ring-2 ring-primary",
-                  selectedDay && isSameDay(day, selectedDay) && "bg-muted"
+                  "aspect-square rounded-md flex flex-col items-center justify-center p-1",
+                  isToday && "ring-2 ring-primary"
                 )}
-                whileHover={{ scale: 1.05 }}
-                onClick={() => handleDayClick(day)}
               >
                 <div className="text-xs font-medium mb-1">
                   {format(day, 'd')}
@@ -335,52 +325,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 ) : (
                   <EmptyCircle />
                 )}
-              </motion.div>
+              </div>
             );
           })}
         </div>
-        
-        <AnimatePresence>
-          {selectedDay && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="mt-4 p-3 bg-background rounded-lg shadow border"
-            >
-              <div className="text-center mb-1 font-medium">
-                {format(selectedDay, 'MMMM d, yyyy')}
-              </div>
-              
-              {(() => {
-                const dateKey = format(selectedDay, 'yyyy-MM-dd');
-                const daySentiment = sentimentInfo.get(dateKey);
-                
-                if (daySentiment) {
-                  return (
-                    <div className="flex justify-center items-center space-x-2">
-                      <span className={cn(
-                        "text-2xl w-8 h-8 flex items-center justify-center rounded-full",
-                        getContainerBgColor(daySentiment.sentiment)
-                      )}>
-                        <span className="text-white">{daySentiment.emojiChar}</span>
-                      </span>
-                      <span className="text-sm">
-                        Mood: {daySentiment.moodText} ({daySentiment.sentiment.toFixed(2)})
-                      </span>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div className="text-sm text-muted-foreground text-center">
-                      No mood data recorded for this day
-                    </div>
-                  );
-                }
-              })()}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     );
   };
@@ -431,19 +379,16 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 d => isSameDay(d.date, date)
               );
               
-              const isClickedDay = selectedDay && isSameDay(date, selectedDay);
-              const isToday = isSameDay(date, today);
-              const isSameMonthValue = isSameMonth(date, today);
+              const isToday = isSameDay(date, new Date());
+              const isSameMonthValue = isSameMonth(date, new Date());
               
               return (
                 <div
                   className={cn(
                     "relative flex items-center justify-center hover:bg-primary/10 rounded-md transition-all duration-200",
                     isSelected && "font-medium",
-                    isClickedDay && "ring-2 ring-primary bg-muted",
                     isToday && "font-bold"
                   )}
-                  onClick={() => handleDayClick(date)}
                   {...props}
                 >
                   <div className="flex flex-col items-center justify-center h-9 w-9 z-10">
@@ -467,43 +412,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                       <EmptyCircle />
                     ) : null}
                   </div>
-                  
-                  <AnimatePresence>
-                    {isClickedDay && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-popover shadow-lg rounded-lg p-3 z-50 w-48"
-                      >
-                        <div className="text-center mb-1 font-medium">
-                          {format(date, 'MMMM d, yyyy')}
-                        </div>
-                        
-                        {info ? (
-                          <div className="flex justify-center items-center space-x-2">
-                            <span className={cn(
-                              "text-2xl w-8 h-8 flex items-center justify-center rounded-full",
-                              getContainerBgColor(info.sentiment)
-                            )}>
-                              <span className="text-white">{info.emojiChar}</span>
-                            </span>
-                            <span className="text-sm">
-                              Mood: {info.moodText} ({info.sentiment.toFixed(2)})
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-muted-foreground text-center">
-                            No mood data for this day
-                          </div>
-                        )}
-                        
-                        <div className="text-xs text-center mt-2 text-muted-foreground">
-                          Click again to close
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
               );
             },
@@ -514,6 +422,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   };
 
   const renderYearView = () => {
+    const today = new Date();
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
@@ -549,20 +458,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         <div className="grid grid-cols-6 gap-0 mb-4">
           {months.slice(0, 6).map((month, index) => {
             const monthSentiment = monthlyAverages.get(index);
-            const date = new Date(today.getFullYear(), index, 1);
             
             return (
-              <motion.div 
+              <div 
                 key={month}
-                className={cn(
-                  "aspect-square rounded-md flex flex-col items-center justify-center p-1 cursor-pointer",
-                  selectedDay && 
-                    selectedDay.getMonth() === index && 
-                    selectedDay.getFullYear() === today.getFullYear() && 
-                    "bg-muted ring-2 ring-primary"
-                )}
-                whileHover={{ scale: 1.05 }}
-                onClick={() => handleDayClick(date)}
+                className="aspect-square rounded-md flex flex-col items-center justify-center p-1"
               >
                 <div className="text-xs font-medium mb-1">
                   {month}
@@ -577,7 +477,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 ) : (
                   <EmptyCircle />
                 )}
-              </motion.div>
+              </div>
             );
           })}
         </div>
@@ -594,20 +494,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           {months.slice(6, 12).map((month, index) => {
             const actualIndex = index + 6;
             const monthSentiment = monthlyAverages.get(actualIndex);
-            const date = new Date(today.getFullYear(), actualIndex, 1);
             
             return (
-              <motion.div 
+              <div 
                 key={month}
-                className={cn(
-                  "aspect-square rounded-md flex flex-col items-center justify-center p-1 cursor-pointer",
-                  selectedDay && 
-                    selectedDay.getMonth() === actualIndex && 
-                    selectedDay.getFullYear() === today.getFullYear() && 
-                    "bg-muted ring-2 ring-primary"
-                )}
-                whileHover={{ scale: 1.05 }}
-                onClick={() => handleDayClick(date)}
+                className="aspect-square rounded-md flex flex-col items-center justify-center p-1"
               >
                 <div className="text-xs font-medium mb-1">
                   {month}
@@ -622,55 +513,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 ) : (
                   <EmptyCircle />
                 )}
-              </motion.div>
+              </div>
             );
           })}
         </div>
-        
-        <AnimatePresence>
-          {selectedDay && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="mt-4 p-3 bg-background rounded-lg shadow border"
-            >
-              <div className="text-center mb-1 font-medium">
-                {format(selectedDay, 'MMMM yyyy')}
-              </div>
-              
-              {(() => {
-                const month = selectedDay.getMonth();
-                const monthSentiment = monthlyAverages.get(month);
-                
-                if (monthSentiment !== undefined) {
-                  const emojiChar = getEmojiChar(monthSentiment);
-                  const moodText = getMoodText(monthSentiment);
-                  
-                  return (
-                    <div className="flex justify-center items-center space-x-2">
-                      <span className={cn(
-                        "text-2xl w-8 h-8 flex items-center justify-center rounded-full",
-                        getContainerBgColor(monthSentiment)
-                      )}>
-                        <span className="text-white">{emojiChar}</span>
-                      </span>
-                      <span className="text-sm">
-                        Mood: {moodText} ({monthSentiment.toFixed(2)})
-                      </span>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div className="text-sm text-muted-foreground text-center">
-                      No mood data recorded for this month
-                    </div>
-                  );
-                }
-              })()}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     );
   };
