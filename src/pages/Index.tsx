@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -378,13 +379,13 @@ const Index = () => {
           className="text-center mb-12"
           variants={itemVariants}
         >
-          <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-4 flex items-center justify-center`}>
+          <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-12 flex items-center justify-center`}>
             <span className="text-black">
               Welcome to
             </span> 
             <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} animate={true} />
           </h1>
-          <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse`}>
+          <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse mb-12`}>
             Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
           </p>
           
