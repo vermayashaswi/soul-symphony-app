@@ -131,13 +131,12 @@ const Journal = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
-      <JournalHeader isFirstTime={isFirstTimeUser} />
+      <JournalHeader />
       
       {/* Voice recorder component */}
       <div className="mb-8">
         <VoiceRecorder 
-          onRecordingComplete={handleRecordingComplete} 
-          shouldAnimateMic={true}
+          onRecordingComplete={handleRecordingComplete}
         />
       </div>
       
