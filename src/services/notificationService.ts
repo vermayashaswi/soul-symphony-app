@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 
 // Duration constants
@@ -133,7 +132,7 @@ export const clearToast = (toastId: string | number) => {
   }
 };
 
-// Clear all toasts - enhanced to be more aggressive and reliable
+// Clear all toasts - enhanced to be more aggressive
 export const clearAllToasts = () => {
   console.log('[NotificationService] Clearing all toasts');
   
@@ -145,11 +144,6 @@ export const clearAllToasts = () => {
   
   // Then clear our tracking set
   activeToasts.clear();
-  
-  // Wait a tiny bit and try once more (helps with animation timing issues)
-  setTimeout(() => {
-    toast.dismiss();
-  }, 50);
   
   // As a safety measure for any persistent toasts with the loading state,
   // get all toast elements and remove them manually if needed
@@ -167,30 +161,10 @@ export const clearAllToasts = () => {
           }
         });
       }
-      
-      // Also try to find any toast-specific elements
-      const toastElements = document.querySelectorAll('[data-sonner-toast-container]');
-      if (toastElements.length > 0) {
-        console.log(`[NotificationService] Found ${toastElements.length} toast elements`);
-        toastElements.forEach(el => {
-          if (el.parentNode) {
-            el.parentNode.removeChild(el);
-          }
-        });
-      }
-      
-      // Final fallback - get the root sonner element
-      const sonnerRoot = document.querySelector('[data-sonner-toaster]');
-      if (sonnerRoot) {
-        // Clear its contents but don't remove the root
-        sonnerRoot.innerHTML = '';
-      }
     } catch (e) {
       console.error('[NotificationService] Error trying to clean up persistent toasts:', e);
     }
   }
-  
-  return true; // Return success status for better error handling
 };
 
 // Function to request notification permissions (web only for now)
@@ -266,4 +240,3 @@ export const cleanupNotifications = () => {
   clearToastTimeouts();
   activeToasts.clear();
 };
-
