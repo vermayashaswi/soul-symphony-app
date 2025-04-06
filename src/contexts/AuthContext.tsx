@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,7 +13,6 @@ import {
   signOut as signOutService,
   refreshSession as refreshSessionService
 } from '@/services/authService';
-import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -26,7 +26,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const checkMobile = () => {
@@ -130,7 +129,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async (): Promise<void> => {
     try {
-      await signOutService(navigate);
+      // Pass a callback function instead of the navigate object
+      await signOutService((path: string) => {
+        // Use window.location.href for navigation instead of useNavigate
+        window.location.href = path;
+      });
       
       setSession(null);
       setUser(null);
