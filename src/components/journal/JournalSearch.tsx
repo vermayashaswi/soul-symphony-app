@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { JournalEntry } from './JournalEntryCard';
@@ -12,10 +12,40 @@ interface JournalSearchProps {
   onSearchResults: (filteredEntries: JournalEntry[]) => void;
 }
 
+const searchPrompts = [
+  "emotions",
+  "memories",
+  "places",
+  "people",
+  "thoughts",
+  "events",
+  "feelings",
+  "themes",
+  "issues",
+  "entities"
+];
+
 const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, onSearchResults }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [showPlaceholder, setShowPlaceholder] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
 
+  // Set up the animation for the placeholder text
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setShowPlaceholder(false);
+      setTimeout(() => {
+        setPlaceholderIndex((prevIndex) => (prevIndex + 1) % searchPrompts.length);
+        setShowPlaceholder(true);
+      }, 500); // Time for fade out before changing text
+    }, 3000); // Change text every 3 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Handle search functionality
   useEffect(() => {
     // When search query is empty, pass all entries
     if (!searchQuery.trim()) {
@@ -82,14 +112,19 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     setSearchQuery(value);
   };
 
+  const handleEntrySelect = (entry: JournalEntry) => {
+    onSelectEntry(entry);
+  };
+
   return (
     <Card className="w-full sticky top-0 z-10 bg-background shadow-sm">
       <CardContent className="p-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            ref={inputRef}
             type="text"
-            placeholder="Search journal entries..."
+            placeholder={showPlaceholder ? `Search for ${searchPrompts[placeholderIndex]}...` : "Search journal entries..."}
             value={searchQuery}
             onChange={handleSearchChange}
             className="w-full pl-9"

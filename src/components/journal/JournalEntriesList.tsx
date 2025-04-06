@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import { Skeleton } from '@/components/ui/skeleton';
+import JournalSearch from './JournalSearch';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -28,12 +29,14 @@ export default function JournalEntriesList({
   const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
   const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
+  const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [renderRetryCount, setRenderRetryCount] = useState(0);
   const hasProcessingEntries = Array.isArray(processingEntries) && processingEntries.length > 0;
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
   const [renderError, setRenderError] = useState<Error | null>(null);
   const hasNoValidEntries = useRef(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   useEffect(() => {
     try {
@@ -49,14 +52,17 @@ export default function JournalEntriesList({
         hasNoValidEntries.current = filteredEntries.length === 0 && entries.length > 0;
         
         setLocalEntries(filteredEntries);
+        setFilteredEntries(filteredEntries);
       } else {
         console.warn('[JournalEntriesList] Entries is not an array:', entries);
         setLocalEntries([]);
+        setFilteredEntries([]);
       }
     } catch (error) {
       console.error('[JournalEntriesList] Error processing entries:', error);
       setRenderError(error instanceof Error ? error : new Error('Unknown error processing entries'));
       setLocalEntries([]);
+      setFilteredEntries([]);
     }
 
     return () => {
@@ -138,26 +144,18 @@ export default function JournalEntriesList({
     };
   }, []);
   
+  const handleEntrySelect = (entry: JournalEntry) => {
+    console.log('Selected entry:', entry);
+  };
+
+  const handleSearchResults = (results: JournalEntry[]) => {
+    setFilteredEntries(results);
+    setIsSearchActive(true);
+  };
+  
   const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !hasProcessingEntries;
   
   const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !processingEntries.length;
-
-  const handleRetry = () => {
-    setRenderError(null);
-    setRenderRetryCount(count => count + 1);
-    
-    if (Array.isArray(entries)) {
-      try {
-        const filteredEntries = entries.filter(entry => 
-          entry && typeof entry === 'object' && entry.id && !pendingDeletions.current.has(entry.id)
-        );
-        setLocalEntries(filteredEntries);
-      } catch (e) {
-        console.error("[JournalEntriesList] Error filtering entries during retry:", e);
-        setLocalEntries([]);
-      }
-    }
-  };
 
   if (hasNoValidEntries.current) {
     return (
@@ -181,7 +179,8 @@ export default function JournalEntriesList({
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
 
-  const safeLocalEntries = Array.isArray(localEntries) ? localEntries : [];
+  const displayEntries = isSearchActive ? filteredEntries : localEntries;
+  const safeLocalEntries = Array.isArray(displayEntries) ? displayEntries : [];
 
   return (
     <ErrorBoundary>
@@ -196,8 +195,14 @@ export default function JournalEntriesList({
           </div>
         </div>
 
+        <JournalSearch 
+          entries={localEntries}
+          onSelectEntry={handleEntrySelect}
+          onSearchResults={handleSearchResults}
+        />
+
         <AnimatePresence>
-          <div className="space-y-4">
+          <div className="space-y-4 mt-6">
             {hasProcessingEntries && (
               <div className="mb-4">
                 <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
