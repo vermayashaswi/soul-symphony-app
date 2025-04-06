@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
@@ -25,12 +25,36 @@ const Journal = () => {
   const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
   const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
   const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
+  const previousEntriesRef = useRef<number[]>([]);
   
   const { entries, loading, fetchEntries } = useJournalEntries(
     user?.id,
     refreshKey,
     isProfileChecked
   );
+
+  // Track previously seen entries to detect when new ones appear
+  useEffect(() => {
+    if (entries.length > 0) {
+      const currentEntryIds = entries.map(entry => entry.id);
+      const prevEntryIds = previousEntriesRef.current;
+      
+      // Check if we have new entries that weren't in the previous list
+      const newEntryIds = currentEntryIds.filter(id => !prevEntryIds.includes(id));
+      
+      if (newEntryIds.length > 0 && processingEntries.length > 0) {
+        console.log('[Journal] New entries detected:', newEntryIds);
+        setEntryHasBeenProcessed(true);
+        
+        // Update the list of processed entry IDs
+        setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
+      }
+      
+      // Update the reference of previous entries
+      previousEntriesRef.current = currentEntryIds;
+    }
+  }, [entries, processingEntries]);
 
   // Cleanup toasts when component unmounts
   useEffect(() => {
@@ -80,13 +104,14 @@ const Journal = () => {
       
       if (completedProcessingEntries.length > 0) {
         console.log('[Journal] Found completed processing entries, dismissing their toasts:', completedProcessingEntries);
+        setEntryHasBeenProcessed(true);
         
-        // Dismiss the loading toasts for completed entries
+        // Dismiss the loading toasts for completed entries and show success notifications
         completedProcessingEntries.forEach(tempId => {
           if (toastIds[tempId]) {
-            toast.success('Journal entry processed!', { 
+            toast.success('Journal entry analyzed and saved', { 
               id: toastIds[tempId], 
-              duration: 1000
+              duration: 3000
             });
             
             // Remove from toastIds
@@ -117,7 +142,10 @@ const Journal = () => {
     
     if (newEntries.length > 0 && notifiedEntryIds.size > 0) {
       // Only show a toast if we have new entries after the initial load
-      toast.success('Journal entry processed!', { duration: 1000 });
+      if (!entryHasBeenProcessed) {
+        toast.success('Journal entry analyzed and saved', { duration: 3000 });
+        setEntryHasBeenProcessed(true);
+      }
       
       const updatedNotifiedIds = new Set(notifiedEntryIds);
       newEntries.forEach(entry => updatedNotifiedIds.add(entry.id));
@@ -133,7 +161,7 @@ const Journal = () => {
     setProcessingEntries(prev => 
       prev.filter(tempId => !entries.some(entry => entry.id.toString() === tempId))
     );
-  }, [entries, loading, notifiedEntryIds, processingEntries]);
+  }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -198,6 +226,7 @@ const Journal = () => {
     
     try {
       setActiveTab('entries');
+      setEntryHasBeenProcessed(false);
       
       // Use duration: Infinity for loading toasts so they persist until dismissed
       const toastId = toast.loading('Processing your journal entry...', {
@@ -228,9 +257,9 @@ const Journal = () => {
             setProcessingEntries(prev => prev.filter(id => id !== tempId));
             
             if (toastIds[tempId]) {
-              toast.success('Journal entry processed!', { 
+              toast.success('Journal entry analyzed and saved', { 
                 id: toastIds[tempId], 
-                duration: 1000
+                duration: 3000
               });
               
               setToastIds(prev => {
