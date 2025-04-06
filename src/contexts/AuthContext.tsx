@@ -20,10 +20,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [profileCreationInProgress, setProfileCreationInProgress] = useState(false);
 
-  // Ensure profile exists wrapper
+  // Ensure profile exists wrapper with improved error handling
   const ensureProfileExists = async (): Promise<boolean> => {
-    return ensureProfileExistsService(user);
+    if (!user || profileCreationInProgress) return false;
+    
+    try {
+      setProfileCreationInProgress(true);
+      const result = await ensureProfileExistsService(user);
+      return result;
+    } catch (error) {
+      console.error('Error in ensureProfileExists:', error);
+      return false;
+    } finally {
+      setProfileCreationInProgress(false);
+    }
   };
 
   // Update user profile wrapper
@@ -99,6 +111,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Create or verify user profile
+  const createOrVerifyProfile = async (currentUser: User): Promise<boolean> => {
+    if (profileCreationInProgress) return false;
+    
+    try {
+      setProfileCreationInProgress(true);
+      // First try to create profile
+      const profileCreated = await ensureProfileExistsService(currentUser);
+      
+      if (profileCreated) {
+        console.log('Profile created or verified for user:', currentUser.email);
+        return true;
+      } else {
+        console.warn('First attempt to create profile failed, retrying...');
+        
+        // Retry once after a short delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const retryResult = await ensureProfileExistsService(currentUser);
+        
+        if (retryResult) {
+          console.log('Profile created or verified on retry for user:', currentUser.email);
+          return true;
+        } else {
+          console.error('Failed to create profile after retry for user:', currentUser.email);
+          return false;
+        }
+      }
+    } catch (error) {
+      console.error('Error in profile creation:', error);
+      return false;
+    } finally {
+      setProfileCreationInProgress(false);
+    }
+  };
+
   useEffect(() => {
     console.log("AuthProvider: Setting up auth state listener");
     
@@ -108,22 +155,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        // If user just signed in or signed up, ensure profile exists
-        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || 
-             event === 'INITIAL_SESSION') && currentSession?.user) {
-          try {
-            // Using setTimeout to prevent auth deadlock
-            setTimeout(async () => {
-              const profileCreated = await ensureProfileExistsService(currentSession.user);
-              if (profileCreated) {
-                console.log('Profile created or verified for user:', currentSession.user.email);
-              } else {
-                console.warn('Failed to create or verify profile for user:', currentSession.user.email);
-              }
-            }, 100);
-          } catch (error) {
-            console.error('Error in profile creation:', error);
-          }
+        // Handle profile creation for sign in events
+        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && currentSession?.user) {
+          // Use setTimeout to prevent auth deadlock
+          setTimeout(() => {
+            createOrVerifyProfile(currentSession.user)
+              .catch(error => console.error('Error in delayed profile creation:', error));
+          }, 500);
         }
         
         setIsLoading(false);
@@ -136,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
+    // Initial session check
     supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
       console.log('Initial session check:', currentSession?.user?.email);
       setSession(currentSession);
@@ -143,12 +182,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Check for existing profile on initial load
       if (currentSession?.user) {
-        try {
-          const profileExists = await ensureProfileExistsService(currentSession.user);
-          console.log('Profile exists check on initial load:', profileExists);
-        } catch (error) {
-          console.error('Error checking profile on initial load:', error);
-        }
+        setTimeout(() => {
+          createOrVerifyProfile(currentSession.user)
+            .catch(error => console.error('Error in initial profile creation:', error));
+        }, 500);
       }
       
       setIsLoading(false);

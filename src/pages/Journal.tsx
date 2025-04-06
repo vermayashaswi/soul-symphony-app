@@ -6,7 +6,6 @@ import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import JournalHeader from '@/components/journal/JournalHeader';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
@@ -18,6 +17,7 @@ const Journal = () => {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isCheckingProfile, setIsCheckingProfile] = useState(true);
   const [activeTab, setActiveTab] = useState('record');
+  const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
   
   // Get journal entries using the hook
   const { entries, loading, fetchEntries } = useJournalEntries(
@@ -40,18 +40,31 @@ const Journal = () => {
       
       console.log('Checking user profile for ID:', userId);
       
-      // Ensure profile exists
-      const profileCreated = await ensureProfileExists();
-      if (!profileCreated) {
-        console.log('Profile check failed, retrying...');
-        // Retry once more if the first attempt failed
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await ensureProfileExists();
+      // Ensure profile exists with retry mechanism
+      let profileCreated = await ensureProfileExists();
+      
+      // If profile creation failed and we haven't retried too many times
+      if (!profileCreated && profileCheckRetryCount < 3) {
+        console.log('Profile check failed, retrying...', profileCheckRetryCount + 1);
+        
+        // Wait a bit longer each time
+        await new Promise(resolve => setTimeout(resolve, 1000 * (profileCheckRetryCount + 1)));
+        profileCreated = await ensureProfileExists();
+        
+        setProfileCheckRetryCount(prevCount => prevCount + 1);
       }
       
-      setIsProfileChecked(true);
+      if (profileCreated) {
+        console.log('Profile created or verified successfully');
+        setIsProfileChecked(true);
+      } else if (profileCheckRetryCount >= 3) {
+        console.error('Failed to create profile after multiple retries');
+        // Only show one toast for profile creation failure
+        toast.error('Unable to set up your profile. Please refresh the page.');
+      }
     } catch (error: any) {
       console.error('Error checking/creating user profile:', error);
+      // Only show one toast for error
       toast.error('Error setting up profile. Please refresh and try again.');
     } finally {
       setIsCheckingProfile(false);
@@ -69,7 +82,7 @@ const Journal = () => {
     if (!audioBlob || !user?.id) return;
     
     try {
-      // We'll only show one toast for the entire process
+      // Show only one toast for the entire process
       const toastId = toast.loading('Processing your journal entry...');
       
       // Process the recording and get a temporary ID
@@ -83,22 +96,21 @@ const Journal = () => {
         setTimeout(() => {
           setRefreshKey(prev => prev + 1);
           
-          // Remove the tempId from processing entries after a longer delay
-          setTimeout(() => {
-            setProcessingEntries(prev => prev.filter(id => id !== tempId));
-            // Update the toast once processing is complete
-            toast.success('Journal entry saved successfully!', { id: toastId });
-          }, 5000);
+          // Remove the tempId from processing entries
+          setProcessingEntries(prev => prev.filter(id => id !== tempId));
+          
+          // Update the toast once processing is complete
+          toast.success('Journal entry saved!', { id: toastId });
           
           // Switch to the entries tab after recording is processed
           setActiveTab('entries');
         }, 1500);
       } else {
-        toast.error('Failed to process recording. Please try again.', { id: toastId });
+        toast.error('Failed to process recording', { id: toastId });
       }
     } catch (error) {
       console.error('Error processing recording:', error);
-      toast.error('Error processing your recording. Please try again.');
+      toast.error('Error processing your recording');
     }
   };
 

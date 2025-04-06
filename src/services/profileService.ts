@@ -11,6 +11,8 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
   
   try {
     console.log('Checking if profile exists for user:', user.id);
+    
+    // First check if the profile already exists
     const { data, error } = await supabase
       .from('profiles')
       .select('id')
@@ -24,19 +26,21 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         // Extract user metadata for profile creation
         const fullName = user.user_metadata?.full_name || '';
         const avatarUrl = user.user_metadata?.avatar_url || '';
+        const email = user.email || '';
         
         console.log('Creating profile with data:', {
           id: user.id,
-          email: user.email,
+          email,
           full_name: fullName,
           avatar_url: avatarUrl
         });
         
+        // Create the profile
         const { error: insertError } = await supabase
           .from('profiles')
           .insert([{
             id: user.id,
-            email: user.email,
+            email,
             full_name: fullName,
             avatar_url: avatarUrl,
             onboarding_completed: false
@@ -44,8 +48,23 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
           
         if (insertError) {
           console.error('Error creating profile:', insertError);
-          toast.error('Failed to create your profile. Please try again.');
-          return false;
+          
+          // Try a upsert as a fallback in case of race conditions
+          console.log('Trying upsert as fallback');
+          const { error: upsertError } = await supabase
+            .from('profiles')
+            .upsert([{
+              id: user.id,
+              email,
+              full_name: fullName,
+              avatar_url: avatarUrl,
+              onboarding_completed: false
+            }]);
+            
+          if (upsertError) {
+            console.error('Error upserting profile:', upsertError);
+            return false;
+          }
         }
         
         console.log('Profile created successfully');
@@ -60,7 +79,6 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     return true;
   } catch (error: any) {
     console.error('Error ensuring profile exists:', error);
-    toast.error('Error setting up your profile. Please refresh and try again.');
     return false;
   }
 };
