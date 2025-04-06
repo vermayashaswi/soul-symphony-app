@@ -8,27 +8,44 @@ interface ThemeBoxesProps {
   themes: string[];
   className?: string;
   isDisturbed?: boolean;
-  isLoading?: boolean; // Added loading state prop
+  isLoading?: boolean;
 }
 
 const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ 
   themes, 
   className, 
   isDisturbed = false,
-  isLoading = false // Default to false
+  isLoading = false
 }) => {
   const isMobile = useIsMobile();
   const [isLocalLoading, setIsLocalLoading] = useState(isLoading);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   
   // Update local loading state when prop changes
   useEffect(() => {
     setIsLocalLoading(isLoading);
+    if (isLoading) {
+      // Reset and start loading animation
+      setLoadingProgress(0);
+      const interval = setInterval(() => {
+        setLoadingProgress(prev => {
+          const newProgress = prev + (Math.random() * 10);
+          return newProgress > 95 ? 95 : newProgress;
+        });
+      }, 600);
+      
+      return () => clearInterval(interval);
+    } else {
+      // Complete loading animation
+      setLoadingProgress(100);
+    }
   }, [isLoading]);
   
   // If themes changes from empty to non-empty, ensure loading is false
   useEffect(() => {
     if (themes && themes.length > 0) {
       setIsLocalLoading(false);
+      setLoadingProgress(100);
     }
   }, [themes]);
   
@@ -73,18 +90,20 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
 
   // Filter out any empty themes
   const filteredThemes = themes ? themes.filter(theme => theme && theme.trim() !== '' && theme !== '•') : [];
+  const hasThemes = filteredThemes.length > 0;
 
-  if (isLocalLoading || !themes || themes.length === 0 || filteredThemes.length === 0) {
+  if (isLocalLoading || !hasThemes) {
     // Display placeholder theme boxes with smooth floating animation
     return (
       <div className={cn("flex flex-wrap gap-3 justify-center items-center h-full w-full", className)}>
         {[1, 2, 3].map((_, i) => (
           <motion.div
             key={`placeholder-${i}`}
-            className="bg-gradient-to-r from-gray-100 to-gray-200 text-transparent rounded-lg h-12 shadow-sm"
+            className="bg-gradient-to-r from-gray-200/50 to-gray-300/30 dark:from-gray-700/30 dark:to-gray-800/20 text-transparent rounded-lg h-10 shadow-sm"
             style={{ 
               width: isMobile ? '80px' : '120px',
-              opacity: 0.5 - (i * 0.1) 
+              opacity: 0.5 - (i * 0.1),
+              background: `linear-gradient(90deg, rgba(var(--primary), 0.05) 0%, rgba(var(--primary), 0.2) ${loadingProgress}%, rgba(var(--primary), 0.05) 100%)`
             }}
             animate={{ 
               y: [-(i+1) * 4, (i+1) * 4, -(i+1) * 4], 

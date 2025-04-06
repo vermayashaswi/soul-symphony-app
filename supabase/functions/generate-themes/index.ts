@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -142,10 +143,12 @@ serve(async (req) => {
           
           try {
             console.log("Starting entity extraction for entry:", entryId);
+            // Modify the way we call the batch-extract-entities function to avoid the error
             const { error: invokeError } = await supabase.functions.invoke('batch-extract-entities', {
               body: {
-                processAll: true,
-                diagnosticMode: false
+                processAll: false,
+                diagnosticMode: false,
+                entryId: entryId
               }
             });
             

@@ -56,7 +56,9 @@ export function JournalEntryCard({
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const [highlightNew, setHighlightNew] = useState(isNew);
-  const [isThemesLoading, setIsThemesLoading] = useState(isProcessing);
+  const [isThemesLoading, setIsThemesLoading] = useState(true);
+  const [refreshTime, setRefreshTime] = useState(0);
+  const [themes, setThemes] = useState<string[]>([]);
 
   // Auto-expand new entries
   useEffect(() => {
@@ -73,17 +75,52 @@ export function JournalEntryCard({
     }
   }, [isNew]);
   
-  // Update themes loading state when processing state changes
+  // Handle theme loading and extraction
   useEffect(() => {
-    setIsThemesLoading(isProcessing);
-  }, [isProcessing]);
-  
-  // When themes are loaded, update the loading state
-  useEffect(() => {
-    if (entry.themes && entry.themes.length > 0 || entry.master_themes && entry.master_themes.length > 0) {
-      setIsThemesLoading(false);
+    // Set initial themes
+    const currentThemes = entry.master_themes || entry.themes || [];
+    setThemes(currentThemes);
+    
+    // Determine if themes are still loading
+    const shouldBeLoading = isProcessing || (currentThemes.length === 0);
+    setIsThemesLoading(shouldBeLoading);
+    
+    // Set up polling for theme updates if they're loading
+    if (shouldBeLoading) {
+      const pollInterval = setInterval(async () => {
+        try {
+          // Fetch the latest version of the entry
+          const { data, error } = await supabase
+            .from('Journal Entries')
+            .select('master_themes, themes')
+            .eq('id', entry.id)
+            .single();
+            
+          if (error) throw error;
+          
+          const updatedThemes = data.master_themes || data.themes || [];
+          
+          // If we now have themes, update them and stop loading
+          if (updatedThemes.length > 0) {
+            setThemes(updatedThemes);
+            setIsThemesLoading(false);
+            clearInterval(pollInterval);
+          }
+          
+          setRefreshTime(prev => prev + 1);
+        } catch (error) {
+          console.error("Error polling for themes:", error);
+          // After multiple retries (30 seconds), stop showing loading state
+          if (refreshTime > 10) {
+            setIsThemesLoading(false);
+            clearInterval(pollInterval);
+          }
+        }
+      }, 3000); // Poll every 3 seconds
+      
+      return () => clearInterval(pollInterval);
     }
-  }, [entry.themes, entry.master_themes]);
+  }, [entry.id, entry.master_themes, entry.themes, isProcessing, refreshTime]);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
@@ -289,7 +326,7 @@ export function JournalEntryCard({
               <div className="mt-3 md:mt-4">
                 <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
                 <ThemeBoxes 
-                  themes={entry.themes || entry.master_themes || []} 
+                  themes={themes} 
                   isDisturbed={true}
                   isLoading={isThemesLoading} 
                 />

@@ -1,3 +1,4 @@
+
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
@@ -145,6 +146,48 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     
     if (result?.success) {
       console.log('Journal entry saved successfully:', result);
+      
+      // Manually trigger theme extraction when we have a new entry
+      if (result.data?.entryId) {
+        try {
+          console.log("Manually triggering theme extraction for entry:", result.data.entryId);
+          
+          // Get the entry text
+          const { data: entryData, error: fetchError } = await supabase
+            .from('Journal Entries')
+            .select('id, "refined text", "transcription text"')
+            .eq('id', result.data.entryId)
+            .single();
+            
+          if (fetchError) {
+            console.error("Error fetching entry for theme extraction:", fetchError);
+          } else if (entryData) {
+            const text = entryData["refined text"] || entryData["transcription text"] || "";
+            
+            if (text) {
+              // Call the generate-themes function directly
+              console.log("Calling generate-themes with text:", text.substring(0, 50) + "...");
+              const { error } = await supabase.functions.invoke('generate-themes', {
+                body: {
+                  text: text,
+                  entryId: result.data.entryId
+                }
+              });
+              
+              if (error) {
+                console.error("Error calling generate-themes:", error);
+              } else {
+                console.log("Successfully triggered theme extraction");
+              }
+            } else {
+              console.error("No text content found for theme extraction");
+            }
+          }
+        } catch (themeErr) {
+          console.error("Error manually triggering theme extraction:", themeErr);
+        }
+      }
+      
       isEntryBeingProcessed = false;
       
       // Clear any remaining toasts to ensure no processing notifications are left

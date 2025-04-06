@@ -61,7 +61,17 @@ async function processJournalEntries(entries, diagnosticMode = false) {
   for (const entry of entries) {
     try {
       console.log(`Processing entry ID: ${entry.id}`);
-      const { entities, error } = await extractEntities(entry.text);
+      
+      // Fix: Use "refined text" or "transcription text" field instead of "text"
+      const textToProcess = entry["refined text"] || entry["transcription text"] || "";
+      
+      if (!textToProcess) {
+        console.error(`No text content found for entry ID ${entry.id}`);
+        results.push({ id: entry.id, success: false, error: "No text content found" });
+        continue;
+      }
+      
+      const { entities, error } = await extractEntities(textToProcess);
 
       if (error) {
         console.error(`Error extracting entities for entry ID ${entry.id}:`, error);
@@ -100,7 +110,7 @@ serve(async (req) => {
   }
 
   try {
-    const { diagnosticMode = false, checkApiKeyOnly = false } = await req.json();
+    const { diagnosticMode = false, checkApiKeyOnly = false, processAll = false } = await req.json();
 
     if (checkApiKeyOnly) {
       if (!googleApiKey) {
@@ -130,16 +140,18 @@ serve(async (req) => {
 
     console.log("Starting batch entity extraction...");
 
-    // Fetch journal entries without entities
-    const { data: entries, error: fetchError } = await supabase
+    // Use the correct field names in the query
+    const query = supabase
       .from('Journal Entries')
-      .select('id, text')
+      .select('id, "refined text", "transcription text"')
       .is('entities', null)
       .limit(50);
+      
+    const { data: entries, error: fetchError } = await query;
 
     if (fetchError) {
       console.error("Error fetching journal entries:", fetchError);
-      return new Response(JSON.stringify({ error: 'Failed to fetch journal entries' }), {
+      return new Response(JSON.stringify({ error: 'Failed to fetch journal entries', details: fetchError }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
       });
