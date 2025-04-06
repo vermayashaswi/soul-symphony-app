@@ -9,7 +9,8 @@ import {
   FloatingDotsToggle, 
   SentimentEmoji, 
   ThemeLoader, 
-  DeleteEntryDialog 
+  DeleteEntryDialog,
+  EntryContent
 } from './entry-card';
 import ErrorBoundary from './ErrorBoundary';
 
@@ -204,6 +205,11 @@ export function JournalEntryCard({
     }
   };
 
+  // Determine if each component is still processing
+  const isSentimentProcessing = !safeEntry.sentiment && isNew;
+  const isThemesProcessing = isProcessing || isEntryBeingProcessed();
+  const isContentProcessing = !safeEntry.content || safeEntry.content === "Processing entry...";
+
   // Provide an error fallback if we had any rendering errors
   if (hasError) {
     return (
@@ -241,7 +247,12 @@ export function JournalEntryCard({
             <div>
               <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
               <div className="mt-1">
-                <SentimentEmoji sentiment={safeEntry.sentiment} />
+                <ErrorBoundary>
+                  <SentimentEmoji 
+                    sentiment={safeEntry.sentiment} 
+                    isProcessing={isSentimentProcessing}
+                  />
+                </ErrorBoundary>
               </div>
             </div>
 
@@ -252,21 +263,20 @@ export function JournalEntryCard({
           </div>
 
           <div className="p-3 md:p-4">
-            {isExpanded ? (
-              <div>
-                <p className="text-xs md:text-sm text-foreground">{safeEntry.content}</p>
-                <ErrorBoundary>
-                  <ThemeLoader 
-                    entryId={safeEntry.id}
-                    initialThemes={initialThemes}
-                    content={safeEntry.content}
-                    isProcessing={isProcessing || isEntryBeingProcessed()}
-                    isNew={isNew}
-                  />
-                </ErrorBoundary>
-              </div>
-            ) : (
-              <p className="text-xs md:text-sm text-foreground line-clamp-3">{safeEntry.content}</p>
+            <ErrorBoundary>
+              <EntryContent content={safeEntry.content} isExpanded={isExpanded} />
+            </ErrorBoundary>
+            
+            {isExpanded && (
+              <ErrorBoundary>
+                <ThemeLoader 
+                  entryId={safeEntry.id}
+                  initialThemes={initialThemes}
+                  content={safeEntry.content}
+                  isProcessing={isThemesProcessing}
+                  isNew={isNew}
+                />
+              </ErrorBoundary>
             )}
           </div>
         </Card>
