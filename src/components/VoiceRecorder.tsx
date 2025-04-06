@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -53,22 +52,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     reset: resetPlayback
   } = useAudioPlayback({ audioBlob });
 
-  // Control animation visibility based on recording state
-  useEffect(() => {
-    // Hide animation when recording starts
-    if (isRecording) {
-      setShowAnimation(false);
-    } 
-    // Only show animation in the initial state (no recording yet)
-    else if (!audioBlob) {
-      setShowAnimation(true);
-    }
-    // Hide animation once recording is stopped and we have audio
-    else {
-      setShowAnimation(false);
-    }
-  }, [isRecording, audioBlob]);
-
   useEffect(() => {
     if (isRecording) {
       setRecordingError(null);
@@ -78,7 +61,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   useEffect(() => {
     if (isRecording && recordingTime >= 120) {
       toast.warning("Your recording is quite long. Consider stopping now for better processing.", {
-        duration: 3000, // Show for just 3 seconds
+        duration: 3000,
       });
     }
   }, [isRecording, recordingTime]);
@@ -135,7 +118,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         "relative w-full h-full flex flex-col items-center justify-between overflow-hidden rounded-2xl border border-slate-200/20",
         isMobile ? "min-h-[calc(80vh-160px)]" : "min-h-[500px]"
       )}>
-        {/* Single animation container */}
         {showAnimation && (
           <div className="absolute inset-0 w-full h-full flex items-center justify-center">
             <FloatingLanguages size="md" />
@@ -154,7 +136,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               onRecordingStop={stopRecording}
               onPermissionRequest={requestPermissions}
               audioLevel={audioLevel}
-              showAnimation={false} // Remove animation from the button itself
+              showAnimation={false}
             />
           </div>
 

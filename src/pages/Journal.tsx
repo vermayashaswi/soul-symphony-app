@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -49,16 +48,32 @@ const Journal = () => {
         
         // Update the list of processed entry IDs
         setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
+        
+        // Dismiss all processing toast notifications and show success
+        processingEntries.forEach(tempId => {
+          if (toastIds[tempId]) {
+            // Replace processing toast with success toast
+            toast.success('Journal entry analyzed and saved', {
+              id: toastIds[tempId],
+              duration: 3000
+            });
+          }
+        });
+        
+        // Clear all processing entries as they're now complete
+        setProcessingEntries([]);
+        setToastIds({});
       }
       
       // Update the reference of previous entries
       previousEntriesRef.current = currentEntryIds;
     }
-  }, [entries, processingEntries]);
+  }, [entries, processingEntries, toastIds]);
 
-  // Cleanup toasts when component unmounts
+  // Clean up toasts when component unmounts
   useEffect(() => {
     return () => {
+      // Dismiss all toasts when unmounting
       Object.values(toastIds).forEach(id => {
         if (id) toast.dismiss(id);
       });
@@ -113,20 +128,20 @@ const Journal = () => {
               id: toastIds[tempId], 
               duration: 3000
             });
-            
-            // Remove from toastIds
-            setToastIds(prev => {
-              const newToastIds = { ...prev };
-              delete newToastIds[tempId];
-              return newToastIds;
-            });
           }
         });
         
-        // Remove completed entries from processingEntries
+        // Remove completed entries from processingEntries and toastIds
         setProcessingEntries(prev => 
           prev.filter(tempId => !completedProcessingEntries.includes(tempId))
         );
+        
+        // Clean up toastIds
+        const newToastIds = { ...toastIds };
+        completedProcessingEntries.forEach(tempId => {
+          delete newToastIds[tempId];
+        });
+        setToastIds(newToastIds);
       }
     }
   }, [entries, loading, processingEntries, toastIds]);
@@ -158,10 +173,23 @@ const Journal = () => {
     }
     
     // Clear any entries from processingEntries that now appear in the actual entries list
-    setProcessingEntries(prev => 
-      prev.filter(tempId => !entries.some(entry => entry.id.toString() === tempId))
+    const newProcessingEntries = processingEntries.filter(tempId => 
+      !entries.some(entry => entry.id.toString() === tempId)
     );
-  }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed]);
+    
+    if (newProcessingEntries.length !== processingEntries.length) {
+      setProcessingEntries(newProcessingEntries);
+      
+      // Clean up associated toastIds
+      const newToastIds = { ...toastIds };
+      processingEntries.forEach(tempId => {
+        if (!newProcessingEntries.includes(tempId)) {
+          delete newToastIds[tempId];
+        }
+      });
+      setToastIds(newToastIds);
+    }
+  }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -228,8 +256,8 @@ const Journal = () => {
       setActiveTab('entries');
       setEntryHasBeenProcessed(false);
       
-      // Use duration: Infinity for loading toasts so they persist until dismissed
-      const toastId = toast.loading('Processing your journal entry...', {
+      // Use a clearer message for the processing toast
+      const toastId = toast.loading('Processing your journal entry with AI...', {
         duration: Infinity // This will persist until we explicitly dismiss it
       });
       
@@ -254,14 +282,17 @@ const Journal = () => {
           if (processingEntries.includes(tempId)) {
             console.log('[Journal] Maximum processing time reached for tempId:', tempId);
             
+            // Find and remove the specific entry from processingEntries
             setProcessingEntries(prev => prev.filter(id => id !== tempId));
             
+            // Change loading toast to success toast
             if (toastIds[tempId]) {
               toast.success('Journal entry analyzed and saved', { 
                 id: toastIds[tempId], 
                 duration: 3000
               });
               
+              // Remove this toast ID from tracking
               setToastIds(prev => {
                 const newToastIds = { ...prev };
                 delete newToastIds[tempId];
@@ -290,24 +321,16 @@ const Journal = () => {
     if (!user?.id) return;
     
     try {
-      // Clean up any processing states and toasts
-      setProcessingEntries(prev => {
-        const newProcessingEntries = [...prev];
-        
-        newProcessingEntries.forEach(tempId => {
-          if (toastIds[tempId]) {
-            toast.dismiss(toastIds[tempId]);
-            
-            setToastIds(prev => {
-              const newToastIds = { ...prev };
-              delete newToastIds[tempId];
-              return newToastIds;
-            });
-          }
-        });
-        
-        return [];
+      // Clean up any processing states and explicitly dismiss all toasts
+      processingEntries.forEach(tempId => {
+        if (toastIds[tempId]) {
+          toast.dismiss(toastIds[tempId]);
+        }
       });
+      
+      // Clear all processing entries and toast IDs
+      setProcessingEntries([]);
+      setToastIds({});
       
       setNotifiedEntryIds(prev => {
         const updated = new Set(prev);

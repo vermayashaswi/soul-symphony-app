@@ -13,6 +13,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group z-[100]" // Increased z-index for better visibility
       // Default duration is set to 3000ms (3 seconds) for better visibility
       duration={3000}
+      closeButton={true} // Ensure close button is visible
+      richColors={true} // Use rich colors for better visibility
       toastOptions={{
         classNames: {
           toast:
