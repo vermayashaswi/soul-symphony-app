@@ -34,46 +34,72 @@ export function PlaybackControls({
   
   // Track previous progress for animation smoothness
   const prevProgressRef = useRef(playbackProgress);
+  const lastPlayAttemptRef = useRef<number>(0);
   
   // Use animation that respects the current progress position
   useEffect(() => {
     prevProgressRef.current = playbackProgress;
   }, [playbackProgress]);
 
-  // Add more debug logging for playback actions
+  // Add enhanced debug logging for playback actions with debouncing
   const handlePlayClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log("Play/Pause button clicked, isPlaying=", isPlaying, "audioBlob=", !!audioBlob);
+    e.stopPropagation(); // Prevent event bubbling
+    
+    // Debounce rapid clicks (prevent multiple rapid clicks)
+    const now = Date.now();
+    if (now - lastPlayAttemptRef.current < 300) {
+      console.log("Debouncing play click - too soon after last attempt");
+      return;
+    }
+    lastPlayAttemptRef.current = now;
+    
+    console.log("Play/Pause button clicked with details:", {
+      isPlaying: isPlaying,
+      audioBlob: audioBlob ? `Size: ${audioBlob.size}, Type: ${audioBlob.type}` : 'null',
+      audioDuration: audioDuration,
+      playbackProgress: playbackProgress
+    });
     
     if (!audioBlob) {
       console.error("Cannot play: No audio blob available");
-      toast.error("No audio to play");
+      toast.error("No audio to play", { duration: 3000 });
       return;
     }
     
     try {
       onTogglePlayback();
+      console.log("Toggled playback successfully");
     } catch (err) {
       console.error("Error in play/pause handler:", err);
-      toast.error("Error playing audio");
+      toast.error("Error playing audio", { duration: 3000 });
     }
   };
   
   // Handle save click with error prevention
   const handleSaveClick = (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent any default form actions
+    e.stopPropagation(); // Prevent event bubbling
     
     if (!isProcessing && audioBlob) {
       try {
-        console.log("Save button clicked, calling onSaveEntry");
+        console.log("Save button clicked, calling onSaveEntry with audio blob size:", audioBlob.size);
         onSaveEntry();
       } catch (err) {
         console.error("Error in save handler:", err);
-        toast.error("Error saving recording");
+        toast.error("Error saving recording", { duration: 3000 });
       }
     } else {
       console.log("Save button clicked but disabled condition: isProcessing=", isProcessing, "audioBlob=", !!audioBlob);
     }
+  };
+  
+  // Handle restart click
+  const handleRestartClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("Restart button clicked");
+    onRestart();
   };
   
   return (
@@ -126,7 +152,7 @@ export function PlaybackControls({
         
         {/* Restart Button */}
         <Button 
-          onClick={onRestart}
+          onClick={handleRestartClick}
           variant="ghost" 
           size="icon"
           className="w-10 h-10 rounded-full border"

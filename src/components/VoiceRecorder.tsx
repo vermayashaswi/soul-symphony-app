@@ -26,6 +26,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
   const [navigationAttempted, setNavigationAttempted] = useState(false);
+  const [navigationCompleted, setNavigationCompleted] = useState(false);
+  const [processingCompleted, setProcessingCompleted] = useState(false);
   const { user, forceRefreshAuth } = useAuth();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -52,8 +54,31 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     audioDuration,
     togglePlayback,
     audioRef,
+    audioLoaded,
+    lastError,
     reset: resetPlayback
   } = useAudioPlayback({ audioBlob });
+
+  // Debug Effects
+  useEffect(() => {
+    if (audioBlob) {
+      console.log("VoiceRecorder: Audio blob available", {
+        size: audioBlob.size,
+        type: audioBlob.type,
+        audioDuration
+      });
+    }
+  }, [audioBlob, audioDuration]);
+  
+  useEffect(() => {
+    if (lastError) {
+      console.error("VoiceRecorder: Audio playback error:", lastError);
+    }
+  }, [lastError]);
+
+  useEffect(() => {
+    console.log("VoiceRecorder: Audio loaded state changed:", audioLoaded);
+  }, [audioLoaded]);
 
   const checkAuthBeforeSaving = useCallback(async () => {
     if (!user) {
@@ -61,13 +86,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         const authValid = await forceRefreshAuth();
         if (!authValid) {
           console.error("[VoiceRecorder] Auth validation failed before saving");
-          toast.error("Session expired. Please refresh and try again.");
+          toast.error("Session expired. Please refresh and try again.", { duration: 5000 });
           return false;
         }
         return true;
       } catch (error) {
         console.error("[VoiceRecorder] Auth refresh error:", error);
-        toast.error("Authentication error. Please refresh and try again.");
+        toast.error("Authentication error. Please refresh and try again.", { duration: 5000 });
         return false;
       }
     }
@@ -83,7 +108,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   useEffect(() => {
     if (isRecording && recordingTime >= 120) {
       toast.warning("Your recording is quite long. Consider stopping now for better processing.", {
-        duration: 3000,
+        duration: 5000,
       });
     }
   }, [isRecording, recordingTime]);
@@ -99,13 +124,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const handleSaveEntry = async () => {
     if (!audioBlob) {
       setRecordingError("No audio recording available");
-      toast.error("No audio recording available");
+      toast.error("No audio recording available", { duration: 3000 });
       return;
     }
     
     try {
       setIsProcessing(true);
       setRecordingError(null);
+      setNavigationAttempted(false);
+      setNavigationCompleted(false);
+      setProcessingCompleted(false);
       
       const isAuthValid = await checkAuthBeforeSaving();
       if (!isAuthValid) {
@@ -128,46 +156,65 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         try {
           console.log("Calling onRecordingComplete callback");
           
-          // Indicate that navigation is being attempted
-          setNavigationAttempted(true);
+          // Indicate that processing is starting
+          toast.loading("Processing your journal entry...", { 
+            id: "processing-journal",
+            duration: 30000 // Long duration to avoid disappearing during processing
+          });
           
           // Handle successful recording with proper timeout for UI feedback
           onRecordingComplete(normalizedBlob);
+          setProcessingCompleted(true);
           
-          // Ensure navigation happens after a short delay for UI feedback
-          if (window.location.pathname === '/') {
-            console.log("Preparing to navigate to journal page");
-            toast.success("Recording saved! Navigating to journal...");
-            
-            // Set a slight delay to ensure toast is visible
-            setTimeout(() => {
-              console.log("Actually navigating to journal page now");
-              navigate('/journal');
-            }, 1500);
-          }
+          // Set navigation attempted flag before trying to navigate
+          setNavigationAttempted(true);
+          
+          // Wait before navigating to ensure the journal page is ready
+          setTimeout(() => {
+            if (window.location.pathname === '/') {
+              console.log("Navigating to journal page after processing");
+              
+              // Update toast to indicate navigation
+              toast.success("Recording saved! Navigating to journal...", { 
+                id: "processing-journal",
+                duration: 5000
+              });
+              
+              // Set a slight delay to ensure toast is visible
+              setTimeout(() => {
+                console.log("Actually navigating to journal page now");
+                navigate('/journal');
+                setNavigationCompleted(true);
+              }, 1000);
+            } else {
+              setNavigationCompleted(true);
+              setIsProcessing(false);
+            }
+          }, 1000);
         } catch (error) {
           console.error("Error in recording complete callback:", error);
-          toast.error("Error processing your recording");
+          toast.error("Error processing your recording", { duration: 5000 });
           setIsProcessing(false);
           setNavigationAttempted(false);
         }
       } else {
         // If no callback is provided, we're done
         setIsProcessing(false);
-        toast.success("Recording saved successfully");
+        toast.success("Recording saved successfully", { duration: 3000 });
         
         // If we're on the root route, navigate to journal
         if (window.location.pathname === '/') {
           console.log("Navigating to journal page");
           setTimeout(() => {
             navigate('/journal');
+            setNavigationCompleted(true);
           }, 1000);
         }
       }
     } catch (error: any) {
       console.error('Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
-      toast.error("Error saving recording");
+      toast.error("Error saving recording", { duration: 5000 });
       setIsProcessing(false);
       setNavigationAttempted(false);
     }
@@ -179,7 +226,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     setRecordingError(null);
     setShowAnimation(true);
     setNavigationAttempted(false);
-    toast.info("Starting a new recording");
+    setNavigationCompleted(false);
+    setProcessingCompleted(false);
+    toast.info("Starting a new recording", { duration: 3000 });
   };
 
   return (
@@ -258,10 +307,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             </motion.div>
           )}
           
-          {(isProcessing || navigationAttempted) && (
+          {(isProcessing || navigationAttempted) && !navigationCompleted && (
             <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground relative z-10 absolute bottom-4">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>{navigationAttempted ? "Navigating..." : "Processing..."}</span>
+              <span>
+                {processingCompleted 
+                  ? "Navigating to journal..." 
+                  : navigationAttempted 
+                    ? "Processing entry..." 
+                    : "Saving recording..."}
+              </span>
             </div>
           )}
         </div>
