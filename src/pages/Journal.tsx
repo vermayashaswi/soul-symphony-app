@@ -15,6 +15,7 @@ const Journal = () => {
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(true);
 
   // Get journal entries using the hook
   const { entries, loading, fetchEntries } = useJournalEntries(
@@ -26,11 +27,14 @@ const Journal = () => {
   useEffect(() => {
     if (user?.id) {
       checkUserProfile(user.id);
+    } else {
+      setIsCheckingProfile(false);
     }
   }, [user?.id]);
 
   const checkUserProfile = async (userId: string) => {
     try {
+      setIsCheckingProfile(true);
       const event = new CustomEvent('journalOperationStart', {
         detail: {
           type: 'loading',
@@ -43,6 +47,12 @@ const Journal = () => {
       
       // Ensure profile exists
       const profileCreated = await ensureProfileExists();
+      if (!profileCreated) {
+        console.log('Profile check failed, retrying...');
+        // Retry once more if the first attempt failed
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await ensureProfileExists();
+      }
       
       // Still check the profile to get the onboarding status
       const { data: profile, error } = await supabase
@@ -53,6 +63,7 @@ const Journal = () => {
       
       if (error) {
         console.error('Error checking profile:', error);
+        toast.error('Error loading your profile. Please refresh the page.');
         throw error;
       }
       
@@ -68,7 +79,9 @@ const Journal = () => {
       }));
     } catch (error: any) {
       console.error('Error checking/creating user profile:', error);
-      toast.error('Error setting up profile. Please try again.');
+      toast.error('Error setting up profile. Please refresh and try again.');
+    } finally {
+      setIsCheckingProfile(false);
     }
   };
 
@@ -115,6 +128,16 @@ const Journal = () => {
       console.error('Error deleting entry:', error);
     }
   };
+
+  // If we're checking the profile, show a loading state
+  if (isCheckingProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="ml-4 text-muted-foreground">Setting up your profile...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">

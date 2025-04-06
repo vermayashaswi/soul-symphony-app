@@ -1,6 +1,7 @@
 
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 /**
  * Ensures a profile exists for the given user
@@ -17,31 +18,49 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
       .single();
       
     if (error) {
-      console.log('Profile not found, creating new profile');
-      
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert([{
+      if (error.code === 'PGRST116') {
+        console.log('Profile not found, creating new profile');
+        
+        // Extract user metadata for profile creation
+        const fullName = user.user_metadata?.full_name || '';
+        const avatarUrl = user.user_metadata?.avatar_url || '';
+        
+        console.log('Creating profile with data:', {
           id: user.id,
           email: user.email,
-          full_name: user.user_metadata?.full_name || '',
-          avatar_url: user.user_metadata?.avatar_url || '',
-          onboarding_completed: false
-        }]);
+          full_name: fullName,
+          avatar_url: avatarUrl
+        });
         
-      if (insertError) {
-        console.error('Error creating profile:', insertError);
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: user.id,
+            email: user.email,
+            full_name: fullName,
+            avatar_url: avatarUrl,
+            onboarding_completed: false
+          }]);
+          
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          toast.error('Failed to create your profile. Please try again.');
+          return false;
+        }
+        
+        console.log('Profile created successfully');
+        return true;
+      } else {
+        console.error('Error checking if profile exists:', error);
         return false;
       }
-      
-      console.log('Profile created successfully');
-      return true;
     }
     
     console.log('Profile exists:', data.id);
     return true;
   } catch (error: any) {
     console.error('Error ensuring profile exists:', error);
+    toast.error('Error setting up your profile. Please refresh and try again.');
     return false;
   }
 };
