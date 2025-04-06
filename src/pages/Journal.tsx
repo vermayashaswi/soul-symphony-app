@@ -276,7 +276,7 @@ const Journal = () => {
     }
     
     try {
-      // Switch to entries tab before starting processing - important to do this first
+      // Make sure we're on the entries tab after clicking save
       setActiveTab('entries');
       
       setEntryHasBeenProcessed(false);

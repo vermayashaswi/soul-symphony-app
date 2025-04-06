@@ -27,7 +27,7 @@ export function PlaybackControls({
   onRestart
 }: PlaybackControlsProps) {
   // Calculate the current time based on the progress and total duration
-  const currentTime = playbackProgress * audioDuration;
+  const currentTime = playbackProgress * (audioDuration || 0);
   const formattedProgress = formatTime(currentTime);
   const formattedDuration = formatTime(audioDuration || 0); // Add fallback for zero duration
   
@@ -38,6 +38,19 @@ export function PlaybackControls({
   useEffect(() => {
     prevProgressRef.current = playbackProgress;
   }, [playbackProgress]);
+  
+  // Handle save click with error prevention
+  const handleSaveClick = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent any default form actions
+    
+    if (!isProcessing && audioBlob) {
+      try {
+        onSaveEntry();
+      } catch (err) {
+        console.error("Error in save handler:", err);
+      }
+    }
+  };
   
   return (
     <div className="w-full px-4">
@@ -74,9 +87,10 @@ export function PlaybackControls({
         
         {/* Save Button */}
         <Button 
-          onClick={onSaveEntry}
+          onClick={handleSaveClick}
           disabled={isProcessing || !audioBlob}
           variant="default"
+          className="relative"
         >
           {isProcessing ? (
             <>
@@ -102,6 +116,8 @@ export function PlaybackControls({
 }
 
 function formatTime(seconds: number): string {
+  if (isNaN(seconds)) return "0:00";
+  
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;

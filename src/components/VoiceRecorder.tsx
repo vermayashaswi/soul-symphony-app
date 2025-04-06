@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -54,10 +55,17 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
 
   const checkAuthBeforeSaving = useCallback(async () => {
     if (!user) {
-      const authValid = await forceRefreshAuth();
-      if (!authValid) {
-        console.error("[VoiceRecorder] Auth validation failed before saving");
-        toast.error("Session expired. Please refresh and try again.");
+      try {
+        const authValid = await forceRefreshAuth();
+        if (!authValid) {
+          console.error("[VoiceRecorder] Auth validation failed before saving");
+          toast.error("Session expired. Please refresh and try again.");
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error("[VoiceRecorder] Auth refresh error:", error);
+        toast.error("Authentication error. Please refresh and try again.");
         return false;
       }
     }
@@ -113,7 +121,19 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       });
       
       if (onRecordingComplete) {
-        onRecordingComplete(normalizedBlob);
+        // Call the completion handler but with a try/catch to prevent navigation issues
+        try {
+          onRecordingComplete(normalizedBlob);
+        } catch (error) {
+          console.error("Error in recording complete callback:", error);
+          toast.error("Error processing your recording");
+          setIsProcessing(false);
+          throw error; // Rethrow to be caught by outer catch
+        }
+      } else {
+        // If no callback is provided, we're done
+        setIsProcessing(false);
+        toast.success("Recording saved successfully");
       }
     } catch (error: any) {
       console.error('Error in save entry:', error);

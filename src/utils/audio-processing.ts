@@ -1,3 +1,4 @@
+
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
@@ -24,13 +25,18 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     console.error('No user ID provided for audio processing');
     
     // Double-check session is still valid
-    const { data } = await supabase.auth.getSession();
-    if (!data?.session?.user?.id) {
-      return { success: false, error: 'Session expired. Please refresh and try again.' };
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (!data?.session?.user?.id) {
+        return { success: false, error: 'Session expired. Please refresh and try again.' };
+      }
+      
+      // Update userId if we can
+      userId = data.session.user.id;
+    } catch (error) {
+      console.error('Error getting session:', error);
+      return { success: false, error: 'Authentication error. Please refresh and try again.' };
     }
-    
-    // Update userId if we can
-    userId = data.session.user.id;
   }
   
   // Validate the audio blob
@@ -153,16 +159,20 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       
       // Verify the entry was saved by querying the database
       if (result.data?.entryId) {
-        const { data: savedEntry, error: fetchError } = await supabase
-          .from('Journal Entries')
-          .select('id, "refined text", duration')
-          .eq('id', result.data.entryId)
-          .single();
-          
-        if (fetchError || !savedEntry) {
-          console.error('Failed to verify journal entry was saved:', fetchError);
-        } else {
-          console.log('Journal entry verified in database:', savedEntry);
+        try {
+          const { data: savedEntry, error: fetchError } = await supabase
+            .from('Journal Entries')
+            .select('id, "refined text", duration')
+            .eq('id', result.data.entryId)
+            .single();
+            
+          if (fetchError || !savedEntry) {
+            console.error('Failed to verify journal entry was saved:', fetchError);
+          } else {
+            console.log('Journal entry verified in database:', savedEntry);
+          }
+        } catch (error) {
+          console.error('Error verifying journal entry in database:', error);
         }
       }
     } else {
@@ -218,27 +228,32 @@ async function ensureUserProfileExists(userId: string | undefined): Promise<bool
     if (fetchError || !profile) {
       console.log('User profile not found, creating one...');
       
-      // Get user data from auth
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      
-      // Create profile
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert([{ 
-          id: userId,
-          email: userData.user?.email,
-          full_name: userData.user?.user_metadata?.full_name || '',
-          avatar_url: userData.user?.user_metadata?.avatar_url || '',
-          onboarding_completed: false
-        }]);
+      try {
+        // Get user data from auth
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
         
-      if (insertError) {
-        console.error('Error creating user profile:', insertError);
-        throw insertError;
+        // Create profile
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert([{ 
+            id: userId,
+            email: userData.user?.email,
+            full_name: userData.user?.user_metadata?.full_name || '',
+            avatar_url: userData.user?.user_metadata?.avatar_url || '',
+            onboarding_completed: false
+          }]);
+          
+        if (insertError) {
+          console.error('Error creating user profile:', insertError);
+          throw insertError;
+        }
+        
+        console.log('User profile created successfully');
+      } catch (error) {
+        console.error('Error creating user profile:', error);
+        return false;
       }
-      
-      console.log('User profile created successfully');
     } else {
       console.log('Profile exists:', profile.id);
     }
