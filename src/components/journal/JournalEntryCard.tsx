@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/utils/format-time';
@@ -40,13 +41,30 @@ export interface JournalEntry {
 interface JournalEntryCardProps {
   entry: JournalEntry;
   onDelete?: (entryId: number) => void;
+  isNew?: boolean;
 }
 
-export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
+export function JournalEntryCard({ entry, onDelete, isNew = false }: JournalEntryCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [open, setOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
+  const [highlightNew, setHighlightNew] = useState(isNew);
+
+  // Auto-expand new entries
+  useEffect(() => {
+    if (isNew) {
+      setIsExpanded(true);
+      setHighlightNew(true);
+      
+      // Remove highlight after 5 seconds
+      const timer = setTimeout(() => {
+        setHighlightNew(false);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isNew]);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
@@ -191,65 +209,76 @@ export function JournalEntryCard({ entry, onDelete }: JournalEntryCardProps) {
   );
 
   return (
-    <Card className="bg-background shadow-md">
-      <div className="flex justify-between items-start p-3 md:p-4">
-        <div>
-          <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-          <div className="mt-1">
-            {getSentimentEmoji()}
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2 md:space-x-3">
-          <FloatingDotsToggle />
-
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size={isMobile ? "sm" : "icon"} className={isMobile ? "h-8 w-8 p-0" : ""}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] max-w-[90vw]">
-              <DialogHeader>
-                <DialogTitle>Are you absolutely sure?</DialogTitle>
-                <DialogDescription>
-                  This action cannot be undone. This will permanently delete your journal entry from our
-                  servers.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={isDeleting}>
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit" 
-                  variant="destructive" 
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      <div className="p-3 md:p-4">
-        {isExpanded ? (
+    <motion.div
+      initial={isNew ? { borderColor: 'rgba(var(--color-primary), 0.7)' } : {}}
+      animate={highlightNew 
+        ? { 
+            borderColor: ['rgba(var(--color-primary), 0.7)', 'rgba(var(--color-primary), 0)'],
+            boxShadow: ['0 0 15px rgba(var(--color-primary), 0.3)', '0 0 0px rgba(var(--color-primary), 0)']
+          } 
+        : {}}
+      transition={{ duration: 3 }}
+    >
+      <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
+        <div className="flex justify-between items-start p-3 md:p-4">
           <div>
-            <p className="text-xs md:text-sm text-foreground">{entry.content}</p>
-            {entry.themes && entry.themes.length > 0 && (
-              <div className="mt-3 md:mt-4">
-                <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
-                <ThemeBoxes themes={entry.themes} isDisturbed={true} />
-              </div>
-            )}
+            <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
+            <div className="mt-1">
+              {getSentimentEmoji()}
+            </div>
           </div>
-        ) : (
-          <p className="text-xs md:text-sm text-foreground line-clamp-3">{entry.content}</p>
-        )}
-      </div>
-    </Card>
+
+          <div className="flex items-center space-x-2 md:space-x-3">
+            <FloatingDotsToggle />
+
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size={isMobile ? "sm" : "icon"} className={isMobile ? "h-8 w-8 p-0" : ""}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px] max-w-[90vw]">
+                <DialogHeader>
+                  <DialogTitle>Are you absolutely sure?</DialogTitle>
+                  <DialogDescription>
+                    This action cannot be undone. This will permanently delete your journal entry from our
+                    servers.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={isDeleting}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    variant="destructive" 
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        <div className="p-3 md:p-4">
+          {isExpanded ? (
+            <div>
+              <p className="text-xs md:text-sm text-foreground">{entry.content}</p>
+              {entry.themes && entry.themes.length > 0 && (
+                <div className="mt-3 md:mt-4">
+                  <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
+                  <ThemeBoxes themes={entry.themes} isDisturbed={true} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs md:text-sm text-foreground line-clamp-3">{entry.content}</p>
+          )}
+        </div>
+      </Card>
+    </motion.div>
   );
 }

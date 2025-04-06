@@ -106,24 +106,27 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     // 4. Process the full journal entry
     let result;
     let retries = 0;
-    const maxRetries = 2;
+    const maxRetries = 3; // Increase retry count
     
     while (retries <= maxRetries) {
       try {
         // Set directTranscription to false to get full journal entry processing
         result = await sendAudioForTranscription(base64String, authStatus.userId, false);
-        if (result.success) break;
+        if (result.success) {
+          console.log('Transcription successful, breaking retry loop');
+          break;
+        }
         retries++;
         if (retries <= maxRetries) {
-          console.log(`Transcription attempt ${retries} failed, retrying...`);
-          // Wait a bit before retrying
-          await new Promise(r => setTimeout(r, 1500));
+          console.log(`Transcription attempt ${retries} failed, retrying after delay...`);
+          // Increase delay between retries (exponential backoff)
+          await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries)));
         }
       } catch (err) {
         console.error(`Transcription attempt ${retries + 1} error:`, err);
         retries++;
         if (retries <= maxRetries) {
-          await new Promise(r => setTimeout(r, 1500));
+          await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries)));
         }
       }
     }

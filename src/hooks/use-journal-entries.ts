@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
@@ -30,6 +29,7 @@ export function useJournalEntries(
   const isFetchingRef = useRef(false);
   const initialFetchDoneRef = useRef(false);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const consecutiveEmptyFetchesRef = useRef(0);
 
   const verifyUserProfile = useCallback(async (userId: string) => {
     // Check if profile exists
@@ -55,10 +55,8 @@ export function useJournalEntries(
       return;
     }
     
-    if (isFetchingRef.current) {
-      console.log('[useJournalEntries] Skipping fetch as one is already in progress');
-      return;
-    }
+    // Don't check if we're currently fetching to allow forced refreshes
+    console.log('[useJournalEntries] Starting fetch, currently fetching:', isFetchingRef.current);
     
     // Check if profile exists and create if needed
     if (profileExists === false) {
@@ -68,7 +66,7 @@ export function useJournalEntries(
         setError('Failed to create user profile');
         return;
       }
-    } else if (profileExists === null) {
+    } else if (profileExists === null && !isProfileChecked) {
       const exists = await verifyUserProfile(userId);
       if (!exists) {
         setLoading(false);
@@ -98,20 +96,45 @@ export function useJournalEntries(
           initialFetchDoneRef.current = true;
           // Don't set isFetchingRef to false here so the actual fetch can still complete
         }
-      }, 8000); // 8 second timeout for UI loading state
+      }, 5000); // Reduce timeout to 5 seconds for better UI responsiveness
       
       // Fetch journal entries
       const journalEntries = await fetchJournalEntries(userId, fetchTimeoutRef);
-      setEntries(journalEntries);
       
+      // If we got new entries after previously having none, show a success toast
+      if (entries.length === 0 && journalEntries.length > 0 && initialFetchDoneRef.current) {
+        toast.success('New journal entry added!');
+        consecutiveEmptyFetchesRef.current = 0;
+      } else if (journalEntries.length === 0) {
+        // Track consecutive empty fetches for new users
+        consecutiveEmptyFetchesRef.current += 1;
+      } else {
+        consecutiveEmptyFetchesRef.current = 0;
+      }
+      
+      // Check if we have new entries compared to last fetch
+      const prevEntryIds = new Set(entries.map(e => e.id));
+      const newEntries = journalEntries.filter(e => !prevEntryIds.has(e.id));
+      
+      if (newEntries.length > 0 && initialFetchDoneRef.current && entries.length > 0) {
+        console.log(`[useJournalEntries] Found ${newEntries.length} new entries!`);
+        // New entry has been added after initial load
+        toast.success('New journal entry processed!');
+      }
+      
+      setEntries(journalEntries);
       setLastFetchTime(new Date());
       setFetchCount(prev => prev + 1);
       initialFetchDoneRef.current = true;
     } catch (error: any) {
       console.error('[useJournalEntries] Error fetching entries:', error);
       setError('Failed to load entries: ' + error.message);
-      // For new users who don't have entries yet, we want to show empty state
-      setEntries([]);
+      
+      // If we already had entries, keep showing them
+      if (entries.length === 0) {
+        setEntries([]);
+      }
+      
       initialFetchDoneRef.current = true;
       
       // Only show toast error on initial load and if it's not just "No rows returned"
@@ -122,7 +145,7 @@ export function useJournalEntries(
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [userId, fetchCount, profileExists, verifyUserProfile]);
+  }, [userId, fetchCount, profileExists, verifyUserProfile, entries, isProfileChecked]);
 
   useEffect(() => {
     if (userId) {

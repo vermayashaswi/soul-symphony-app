@@ -107,35 +107,50 @@ const Journal = () => {
     if (!audioBlob || !user?.id) return;
     
     try {
-      const toastId = toast.loading('Processing your journal entry...');
+      // Immediately switch to the entries tab after recording
+      setActiveTab('entries');
+      
+      // Show user feedback
+      const toastId = toast.loading('Processing your journal entry with AI...');
       
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
       
       if (success && tempId) {
+        // Add tempId to processing entries
         setProcessingEntries(prev => [...prev, tempId]);
         
-        // Always switch to the entries tab after recording completion
-        setActiveTab('entries');
+        // Refresh entries list immediately to show processing indicator
+        setRefreshKey(prev => prev + 1);
+        fetchEntries();
         
-        // Refresh the entries list after a short delay to allow processing to start
-        setTimeout(() => {
-          console.log('[Journal] Refreshing entries after processing start');
-          setRefreshKey(prev => prev + 1);
-          fetchEntries();
-        }, 1000);
-        
-        // Refresh again after a longer delay to ensure server processing is complete
-        setTimeout(() => {
-          console.log('[Journal] Performing additional entries refresh after processing should be done');
-          setRefreshKey(prev => prev + 1);
+        // Set up a polling mechanism to check for new entries
+        const checkInterval = setInterval(() => {
+          console.log('[Journal] Checking for processed entries...');
           fetchEntries();
           
-          // Clear the processing entry from the list
-          setProcessingEntries(prev => prev.filter(id => id !== tempId));
-          
-          toast.success('Journal entry saved!', { id: toastId });
+          // After 30 seconds, stop polling regardless
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            
+            // Clear the processing entry
+            setProcessingEntries(prev => prev.filter(id => id !== tempId));
+            
+            // Show success message if toast is still showing
+            toast.success('Journal entry processed!', { id: toastId });
+            
+            // Perform final refresh
+            setRefreshKey(prev => prev + 1);
+            fetchEntries();
+          }, 30000);
+        }, 3000); // Poll every 3 seconds
+        
+        // Clear after 5 seconds for the first check
+        setTimeout(() => {
+          setRefreshKey(prev => prev + 1);
+          fetchEntries();
         }, 5000);
       } else {
+        // Clear loading toast and show error
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { id: toastId });
       }
     } catch (error) {

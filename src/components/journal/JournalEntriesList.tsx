@@ -25,37 +25,40 @@ export default function JournalEntriesList({
 }: JournalEntriesListProps) {
   const [showEntriesCount, setShowEntriesCount] = useState(0);
   const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
+  const [prevEntriesLength, setPrevEntriesLength] = useState(0);
 
   // Update entries count when entries change to trigger animation for new entries
   useEffect(() => {
-    if (entries.length > showEntriesCount) {
+    if (entries.length > 0) {
+      if (entries.length > prevEntriesLength) {
+        // New entries have been added, highlight them
+        const newEntryIds = entries
+          .slice(0, entries.length - prevEntriesLength)
+          .map(entry => entry.id);
+          
+        setAnimatedEntryIds(prev => [...prev, ...newEntryIds]);
+        
+        // Remove animation after 5 seconds
+        setTimeout(() => {
+          setAnimatedEntryIds([]);
+        }, 5000);
+      }
+      
+      setPrevEntriesLength(entries.length);
+      
       // Small delay to ensure smooth animation
       setTimeout(() => {
         setShowEntriesCount(entries.length);
       }, 300);
     } else {
       setShowEntriesCount(entries.length);
+      setPrevEntriesLength(0);
     }
-  }, [entries.length]);
-  
-  // Track which entries should have highlight animation
-  useEffect(() => {
-    if (processedEntryIds && processedEntryIds.length > 0) {
-      // Add the processed entry IDs to the animated entries
-      setAnimatedEntryIds(prev => [...prev, ...processedEntryIds]);
-      
-      // Remove animation after 5 seconds
-      const timer = setTimeout(() => {
-        setAnimatedEntryIds([]);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [processedEntryIds]);
+  }, [entries.length, prevEntriesLength]);
   
   // Show primary loading state only when loading initial entries
   // But don't show loading indefinitely for new users with no entries
-  const showInitialLoading = loading && entries.length === 0 && !processingEntries.length;
+  const showInitialLoading = loading && entries.length === 0;
 
   // New flag to check if this is likely a new user who hasn't created any entries yet
   const isLikelyNewUser = !loading && entries.length === 0 && !processingEntries.length;
@@ -86,6 +89,24 @@ export default function JournalEntriesList({
         </div>
       </div>
 
+      {/* Processing entries indicator - show prominently at the top */}
+      {processingEntries.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="mb-6 p-4 bg-primary-foreground/30 border border-primary/20 rounded-lg flex items-center gap-3"
+        >
+          <div className="flex-shrink-0">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-primary">Processing your journal entry with AI</p>
+            <p className="text-xs text-muted-foreground mt-1">This may take a minute or two. Your entry will appear here when it's ready.</p>
+          </div>
+        </motion.div>
+      )}
+
       <AnimatePresence>
         <div className="space-y-4">
           {entries.map((entry, index) => (
@@ -95,14 +116,14 @@ export default function JournalEntriesList({
               animate={{ 
                 opacity: 1, 
                 y: 0,
-                border: animatedEntryIds.includes(entry.id) ? 
-                  '2px solid rgba(var(--color-primary), 0.7)' : 
-                  '1px solid transparent' 
+                boxShadow: animatedEntryIds.includes(entry.id) ? 
+                  '0 0 0 2px rgba(var(--color-primary), 0.5)' : 
+                  'none'
               }}
               exit={{ opacity: 0, height: 0, marginBottom: 0 }}
               transition={{ 
                 duration: 0.3, 
-                delay: index === 0 && entries.length > showEntriesCount ? 0 : 0.05 * index 
+                delay: index === 0 && entries.length > showEntriesCount ? 0 : 0.05 * Math.min(index, 5) 
               }}
               className={animatedEntryIds.includes(entry.id) ? 
                 "rounded-lg shadow-md relative overflow-hidden" : 
@@ -112,24 +133,18 @@ export default function JournalEntriesList({
               <JournalEntryCard 
                 entry={entry} 
                 onDelete={onDeleteEntry} 
+                isNew={animatedEntryIds.includes(entry.id)}
               />
             </motion.div>
           ))}
         </div>
       </AnimatePresence>
       
-      {processingEntries.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          className="mt-4 p-3 bg-primary-foreground/10 border border-primary/20 rounded-lg"
-        >
-          <div className="flex items-center gap-2 text-sm text-primary">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Processing new entries...</span>
-          </div>
-        </motion.div>
+      {/* Show loading state at the bottom if needed */}
+      {loading && entries.length > 0 && (
+        <div className="flex items-center justify-center h-16 mt-4">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
       )}
     </div>
   );
