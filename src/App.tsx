@@ -23,21 +23,21 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthProvider>
-          <ThemeProvider>
-            <div className="relative min-h-screen">
-              <div className="relative z-10">
-                <Toaster />
-                <Sonner position="top-center" closeButton={false} />
-                <BrowserRouter>
+        <BrowserRouter>
+          <AuthProvider>
+            <ThemeProvider>
+              <div className="relative min-h-screen">
+                <div className="relative z-10">
+                  <Toaster />
+                  <Sonner position="top-center" closeButton={false} />
                   <AnimatePresence mode="wait">
                     <AppRoutes />
                   </AnimatePresence>
-                </BrowserRouter>
+                </div>
               </div>
-            </div>
-          </ThemeProvider>
-        </AuthProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );
