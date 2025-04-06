@@ -79,6 +79,18 @@ const Journal = () => {
   }, []);
 
   useEffect(() => {
+    if (!loading && entries.length > 0 && isSavingRecording) {
+      const timer = setTimeout(() => {
+        setSafeToSwitchTab(true);
+        setActiveTab('entries');
+        setIsSavingRecording(false);
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loading, entries.length, isSavingRecording]);
+
+  useEffect(() => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
       const prevEntryIds = previousEntriesRef.current;
@@ -102,6 +114,10 @@ const Journal = () => {
         setIsSavingRecording(false);
         setSafeToSwitchTab(true);
         
+        if (activeTab === 'record') {
+          setActiveTab('entries');
+        }
+        
         setEntriesReady(true);
       }
       
@@ -111,7 +127,7 @@ const Journal = () => {
         setEntriesReady(true);
       }
     }
-  }, [entries, processingEntries, toastIds, entriesReady]);
+  }, [entries, processingEntries, toastIds, entriesReady, activeTab]);
 
   useEffect(() => {
     return () => {
@@ -249,6 +265,8 @@ const Journal = () => {
       setAudioStatus(`Processing (${formatBytes(audioBlob.size)})`);
       setSafeToSwitchTab(false);
       setEntriesReady(false);
+      
+      setActiveTab('entries');
       
       const toastId = toast.loading('Processing your journal entry with AI...', {
         duration: 15000,
@@ -555,11 +573,17 @@ const Journal = () => {
               </TabsContent>
               
               <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
-                {showLoadingFeedback || (!safeToSwitchTab && activeTab === 'entries') ? (
-                  <div className="mt-8 flex flex-col items-center justify-center">
+                {!safeToSwitchTab && isSavingRecording ? (
+                  <div className="mt-8 flex flex-col items-center justify-center p-12 border border-dashed border-gray-300 rounded-lg">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-                    <p className="text-muted-foreground">Processing your recording...</p>
-                    <p className="text-muted-foreground text-sm mt-2">This may take a moment. Your journal entries will appear here shortly.</p>
+                    <p className="text-muted-foreground font-medium">Processing your recording...</p>
+                    <p className="text-muted-foreground text-sm mt-2">Your journal entry will appear here in a moment</p>
+                  </div>
+                ) : showLoadingFeedback ? (
+                  <div className="mt-8 flex flex-col items-center justify-center p-12 border border-dashed border-gray-300 rounded-lg">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                    <p className="text-muted-foreground font-medium">Processing your entry with AI...</p>
+                    <p className="text-muted-foreground text-sm mt-2">Analyzing your journal entry for themes and sentiment</p>
                   </div>
                 ) : (
                   <ErrorBoundary>

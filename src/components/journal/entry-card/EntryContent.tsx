@@ -1,14 +1,16 @@
 
 import React from 'react';
+import { LoadingEntryContent } from './LoadingEntryContent';
 
 interface EntryContentProps {
   content: string;
   isExpanded: boolean;
+  isProcessing?: boolean;
 }
 
-export function EntryContent({ content, isExpanded }: EntryContentProps) {
-  if (!content) {
-    return <p className="text-xs md:text-sm text-foreground italic">Processing entry content...</p>;
+export function EntryContent({ content, isExpanded, isProcessing = false }: EntryContentProps) {
+  if (isProcessing || !content) {
+    return <LoadingEntryContent />;
   }
 
   return isExpanded ? (

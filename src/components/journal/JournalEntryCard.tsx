@@ -208,7 +208,7 @@ export function JournalEntryCard({
   // Determine if each component is still processing
   const isSentimentProcessing = !safeEntry.sentiment && isNew;
   const isThemesProcessing = isProcessing || isEntryBeingProcessed();
-  const isContentProcessing = !safeEntry.content || safeEntry.content === "Processing entry...";
+  const isContentProcessing = !safeEntry.content || safeEntry.content === "Processing entry..." || isProcessing;
 
   // Provide an error fallback if we had any rendering errors
   if (hasError) {
@@ -264,7 +264,11 @@ export function JournalEntryCard({
 
           <div className="p-3 md:p-4">
             <ErrorBoundary>
-              <EntryContent content={safeEntry.content} isExpanded={isExpanded} />
+              <EntryContent 
+                content={safeEntry.content} 
+                isExpanded={isExpanded} 
+                isProcessing={isContentProcessing}
+              />
             </ErrorBoundary>
             
             {isExpanded && (
