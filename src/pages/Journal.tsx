@@ -142,7 +142,7 @@ const Journal = () => {
           console.log('[Journal] Checking for processed entries...');
           fetchEntries();
           
-          // After 30 seconds, stop polling regardless
+          // After 15 seconds, stop polling regardless (reduced from 30 seconds)
           setTimeout(() => {
             clearInterval(checkInterval);
             
@@ -164,7 +164,7 @@ const Journal = () => {
             // Perform final refresh
             setRefreshKey(prev => prev + 1);
             fetchEntries();
-          }, 30000);
+          }, 15000);
         }, 3000); // Poll every 3 seconds
         
         // Clear after 5 seconds for the first check

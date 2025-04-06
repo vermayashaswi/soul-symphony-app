@@ -89,24 +89,6 @@ export default function JournalEntriesList({
         </div>
       </div>
 
-      {/* Processing entries indicator - show prominently at the top */}
-      {processingEntries.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          className="mb-6 p-4 bg-primary-foreground/30 border border-primary/20 rounded-lg flex items-center gap-3"
-        >
-          <div className="flex-shrink-0">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-primary">Processing your journal entry with AI</p>
-            <p className="text-xs text-muted-foreground mt-1">This may take a minute or two. Your entry will appear here when it's ready.</p>
-          </div>
-        </motion.div>
-      )}
-
       <AnimatePresence>
         <div className="space-y-4">
           {entries.map((entry, index) => (
