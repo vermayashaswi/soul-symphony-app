@@ -323,11 +323,19 @@ const Journal = () => {
     setTabChangeInProgress(true);
     
     setTimeout(() => {
+      if (value === 'entries' && !safeToSwitchTab) {
+        console.log('[Journal] User attempting to switch to entries while processing');
+        
+        toast.info('Processing in progress...', { 
+          duration: 2000,
+          closeButton: false
+        });
+      }
+      
       setActiveTab(value);
       
       if (value === 'entries') {
         fetchEntries();
-        setRefreshKey(prev => prev + 1);
       }
       
       setTabChangeInProgress(false);
@@ -686,40 +694,12 @@ const Journal = () => {
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
                     <p className="text-muted-foreground font-medium">Processing your recording...</p>
                     <p className="text-muted-foreground text-sm mt-2">Your journal entry will appear here in a moment</p>
-                    
-                    {entries.length > 0 && (
-                      <div className="w-full mt-8 pt-8 border-t border-gray-200">
-                        <h3 className="text-lg font-medium mb-4">Previous Entries</h3>
-                        <JournalEntriesList
-                          entries={entries}
-                          loading={loading}
-                          processingEntries={processingEntries}
-                          processedEntryIds={processedEntryIds}
-                          onStartRecording={handleStartRecording}
-                          onDeleteEntry={handleDeleteEntry}
-                        />
-                      </div>
-                    )}
                   </div>
                 ) : showLoadingFeedback ? (
                   <div className="mt-8 flex flex-col items-center justify-center p-12 border border-dashed border-gray-300 rounded-lg">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
                     <p className="text-muted-foreground font-medium">Processing your entry with AI...</p>
                     <p className="text-muted-foreground text-sm mt-2">Analyzing your journal entry for themes and sentiment</p>
-                    
-                    {entries.length > 0 && (
-                      <div className="w-full mt-8 pt-8 border-t border-gray-200">
-                        <h3 className="text-lg font-medium mb-4">Previous Entries</h3>
-                        <JournalEntriesList
-                          entries={entries}
-                          loading={loading}
-                          processingEntries={processingEntries}
-                          processedEntryIds={processedEntryIds}
-                          onStartRecording={handleStartRecording}
-                          onDeleteEntry={handleDeleteEntry}
-                        />
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <ErrorBoundary>
