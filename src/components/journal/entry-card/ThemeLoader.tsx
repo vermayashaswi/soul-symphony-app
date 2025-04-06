@@ -120,13 +120,13 @@ export function ThemeLoader({
             
           // Check if data exists and is not an error
           if (data && typeof data === 'object') {
-            // Safely extract themes with fallbacks
-            const updatedMasterThemes = Array.isArray(data?.master_themes) 
-              ? data?.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
+            // Safely extract themes with fallbacks - fixed null checks
+            const updatedMasterThemes = data.master_themes && Array.isArray(data.master_themes) 
+              ? data.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
               : [];
               
-            const updatedThemes = Array.isArray(data?.themes) 
-              ? data?.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
+            const updatedThemes = data.themes && Array.isArray(data.themes) 
+              ? data.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
               : [];
               
             const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
