@@ -14,7 +14,6 @@ import { Loader2 } from 'lucide-react';
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
-  const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isCheckingProfile, setIsCheckingProfile] = useState(true);
@@ -57,21 +56,6 @@ const Journal = () => {
         await ensureProfileExists();
       }
       
-      // Still check the profile to get the onboarding status
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('id, onboarding_completed')
-        .eq('id', userId)
-        .single();
-      
-      if (error) {
-        console.error('Error checking profile:', error);
-        toast.error('Error loading your profile. Please refresh the page.');
-        throw error;
-      }
-      
-      console.log('Profile exists:', profile.id);
-      setIsFirstTimeUser(!profile.onboarding_completed);
       setIsProfileChecked(true);
       
       window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
@@ -148,7 +132,7 @@ const Journal = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
-      <JournalHeader isFirstTime={isFirstTimeUser} />
+      <JournalHeader />
       
       <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
         <TabsList className="grid w-full grid-cols-2 mb-6">
@@ -180,7 +164,7 @@ const Journal = () => {
             <div className="mt-4 p-3 bg-primary-foreground/10 border border-primary/20 rounded-lg">
               <div className="flex items-center gap-2 text-sm text-primary">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Processing {processingEntries.length} journal {processingEntries.length === 1 ? 'entry' : 'entries'}...</span>
+                <span>Processing {processingEntries.length > 1 ? 'entries' : 'entry'}...</span>
               </div>
             </div>
           )}

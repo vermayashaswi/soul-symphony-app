@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
@@ -33,7 +32,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     });
     
     // Start processing in background
-    toast.loading('Processing your journal entry with advanced AI...', {
+    toast.loading('Processing your journal entry...', {
       id: tempId,
       duration: Infinity, // Toast remains until explicitly dismissed
     });
@@ -45,7 +44,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     return { success: true, tempId };
   } catch (error: any) {
     console.error('Error initiating recording process:', error);
-    toast.error(`Error initiating recording process: ${error.message || 'Unknown error'}`);
+    toast.error(`Error processing recording: ${error.message || 'Unknown error'}`);
     return { success: false, error: error.message || 'Unknown error' };
   }
 }
@@ -108,7 +107,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     }
 
     // Update toast message to show progress
-    toast.loading('Processing with AI...', { id: toastId });
+    toast.loading('Processing your entry...', { id: toastId });
     
     // 4. Process the full journal entry
     let result;
@@ -150,42 +149,30 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
           
         if (fetchError || !savedEntry) {
           console.error('Failed to verify journal entry was saved:', fetchError);
-          toast.success('Journal entry is being processed. Please refresh the page after a few moments to see your entry.');
+          toast.success('Journal entry saved successfully!');
         } else {
           console.log('Journal entry verified in database:', savedEntry);
           const duration = savedEntry.duration || 'unknown';
           const text = savedEntry['refined text'] || '';
           const snippet = text.length > 40 ? text.substring(0, 37) + '...' : text;
           
-          toast.success(`Journal entry saved successfully! (${duration}s) "${snippet}"`);
-          
-          // For first-time users, give a more helpful guidance message
-          if (!hasPreviousEntries) {
-            setTimeout(() => {
-              toast.info('Your first entry has been saved! You can now view and create more entries.');
-            }, 3000);
-          }
+          toast.success(`Entry saved successfully!`);
         }
       } else {
-        toast.success('Journal entry processed and saved successfully.');
+        toast.success('Journal entry saved successfully!');
       }
     } else {
       console.error('Failed to process recording after multiple attempts:', result?.error);
-      toast.error('Your journal entry is being processed in the background. Please check back in a few minutes.');
-      
-      // For first-time users, give a more helpful message
-      setTimeout(() => {
-        toast.info('If your entry doesn\'t appear, try recording a slightly longer message with clear speech.');
-      }, 3000);
+      toast.error('Error processing your entry. Please try again later.');
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
     toast.dismiss(toastId);
-    toast.error(`Error processing recording, but your data was saved. Please try refreshing the page in a moment.`);
+    toast.error('Error processing your recording. Please try again.');
   }
 }
 
-// Add a variable to check if user is a first-time user
+// Variable to check if user has previous entries
 let hasPreviousEntries = false;
 
 /**
