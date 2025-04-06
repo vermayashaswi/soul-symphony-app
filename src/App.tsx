@@ -11,7 +11,7 @@ import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
 import { debugLogger, logError, logInfo } from './components/debug/DebugPanel';
 import DebugPanel from './components/debug/DebugPanel';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 // Enable debugger globally
 debugLogger.setEnabled(true);
@@ -40,6 +40,9 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
+  // State to track debug panel visibility
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  
   // Log application startup
   debugLogger.log('info', 'Application initialized', 'App');
   
@@ -93,8 +96,8 @@ const App = () => {
                     <AppRoutes />
                   </AnimatePresence>
                 </div>
-                {/* Add Debug Panel to the app */}
-                <DebugPanel />
+                {/* Debug Panel is hidden by default, but still active for logging */}
+                <DebugPanel isOpen={false} />
               </div>
             </AuthProvider>
           </ThemeProvider>

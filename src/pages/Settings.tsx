@@ -19,7 +19,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { ColorPicker } from '@/components/settings/ColorPicker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import DebugPanel, { logInfo, logError, logRender, logAPI, logAction, logAuth } from '@/components/debug/DebugPanel';
+import DebugPanel, { debugLogger, logInfo, logError, logRender, logAPI, logAction, logAuth } from '@/components/debug/DebugPanel';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -166,6 +166,11 @@ export default function Settings() {
       });
     }
   }, [notificationsEnabled]);
+
+  useEffect(() => {
+    debugLogger.setEnabled(true);
+    logInfo('Debug logging enabled from Settings page', 'Settings');
+  }, []);
 
   const handleContactSupport = () => {
     logAction('Contact support clicked', 'Settings');
@@ -423,6 +428,7 @@ export default function Settings() {
                   onCheckedChange={(checked) => {
                     logAction(`Debug panel ${checked ? 'enabled' : 'disabled'}`, 'Settings');
                     setShowDebugPanel(checked);
+                    
                     if (checked) {
                       toast.success('Debug panel enabled');
                     } else {
