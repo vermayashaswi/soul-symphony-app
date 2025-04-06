@@ -9,7 +9,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
-import { debugLogger } from './components/debug/DebugPanel';
+import { debugLogger, logError, logInfo } from './components/debug/DebugPanel';
 import { useEffect } from 'react';
 
 // Enable debugger globally

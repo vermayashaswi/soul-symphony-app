@@ -46,6 +46,7 @@ class DebugLogger {
   private listeners: Set<() => void> = new Set();
   private errorCount: number = 0;
   private warnCount: number = 0;
+  private lastProfileError: string | null = null;
   
   private constructor() {
     // Singleton pattern
@@ -140,6 +141,15 @@ class DebugLogger {
   public getWarnCount(): number {
     return this.warnCount;
   }
+  
+  public setLastProfileError(error: string | null): void {
+    this.lastProfileError = error;
+    this.notifyListeners();
+  }
+  
+  public getLastProfileError(): string | null {
+    return this.lastProfileError;
+  }
 }
 
 // Create and export singleton instance
@@ -166,8 +176,20 @@ export const logProfile = (message: string, source: string, details?: any) => {
   debugLogger.log('profile', message, source, details);
 };
 
-export const logAuthError = (message: string, source: string, details?: any) => {
+export const logAuth = (message: string, source: string, details?: any) => {
   debugLogger.log('auth', message, source, details);
+};
+
+export const logRender = (message: string, source: string, details?: any) => {
+  debugLogger.log('debug', `Render: ${message}`, source, details);
+};
+
+export const logAPI = (message: string, source: string, details?: any) => {
+  debugLogger.log('info', `API: ${message}`, source, details);
+};
+
+export const logAction = (message: string, source: string, details?: any) => {
+  debugLogger.log('info', `Action: ${message}`, source, details);
 };
 
 // Log level selection component
