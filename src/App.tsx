@@ -9,17 +9,32 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
+import { debugLogger, logInfo } from './components/debug/DebugPanel';
+
+// Enable debugger globally
+debugLogger.setEnabled(true);
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      onError: (error) => {
+        console.error('Query error:', error);
+        // Log query errors to the debugger
+        if (debugLogger.isEnabled()) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          debugLogger.log('error', `Query error: ${errorMessage}`, 'QueryClient', error);
+        }
+      }
     },
   },
 });
 
 const App = () => {
+  // Log application startup
+  logInfo('Application initialized', 'App');
+  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

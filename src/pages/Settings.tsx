@@ -19,6 +19,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { ColorPicker } from '@/components/settings/ColorPicker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DebugPanel, logInfo, logError, logRender, logAPI, logAction, logAuth } from '@/components/debug/DebugPanel';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -28,6 +29,10 @@ interface SettingItemProps {
 }
 
 function SettingItem({ icon: Icon, title, description, children }: SettingItemProps) {
+  useEffect(() => {
+    logRender(`Setting item rendered: ${title}`, 'SettingItem');
+  }, [title]);
+
   return (
     <div className="flex items-start justify-between py-4">
       <div className="flex gap-3">
@@ -45,6 +50,8 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 }
 
 export default function Settings() {
+  logRender('Settings page component mounting', 'Settings');
+  
   const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { user, signOut } = useAuth();
@@ -66,9 +73,36 @@ export default function Settings() {
   ];
 
   useEffect(() => {
+    if (user) {
+      logAuth('User authenticated', 'Settings', { userId: user.id, email: user.email });
+    } else {
+      logAuth('No authenticated user', 'Settings');
+    }
+  }, [user]);
+
+  useEffect(() => {
+    logRender(`Journal entries loaded: ${entries.length}`, 'Settings', { entriesCount: entries.length });
+  }, [entries]);
+
+  useEffect(() => {
+    logInfo(`Device type: ${isMobile ? 'Mobile' : 'Desktop'}`, 'Settings');
+  }, [isMobile]);
+
+  useEffect(() => {
+    logInfo(`Current theme: ${theme}`, 'Settings', { 
+      theme,
+      colorTheme,
+      customColor,
+      systemTheme
+    });
+  }, [theme, colorTheme, customColor, systemTheme]);
+
+  useEffect(() => {
     const calculateStreak = async () => {
       if (user?.id) {
         try {
+          logAPI('Fetching journal entries for streak calculation', 'Settings', { userId: user.id });
+          
           const { data, error } = await supabase
             .from('Journal Entries')
             .select('created_at')
@@ -76,11 +110,13 @@ export default function Settings() {
             .order('created_at', { ascending: false });
             
           if (error) {
+            logError("Error fetching entries for streak", 'Settings', error);
             console.error("Error fetching entries for streak:", error);
             return;
           }
           
           if (!data || data.length === 0) {
+            logInfo("No journal entries found for streak calculation", 'Settings');
             setStreakDays(0);
             return;
           }
@@ -104,21 +140,26 @@ export default function Settings() {
             }
           }
           
+          logInfo(`Streak calculation complete: ${streak} days`, 'Settings', { streak });
           setStreakDays(streak);
         } catch (error) {
+          logError("Error calculating streak", 'Settings', error);
           console.error("Error calculating streak:", error);
         }
       }
     };
     
+    logInfo('Starting streak calculation', 'Settings');
     calculateStreak();
   }, [user, entries]);
 
   useEffect(() => {
     if (notificationsEnabled) {
+      logAction('Setting up journal reminders', 'Settings', { notificationsEnabled });
       setupJournalReminder(true).then(() => {
         if (typeof window !== 'undefined' && !('Notification' in window) || 
             (window.Notification && window.Notification.permission !== 'granted')) {
+          logInfo('Initializing capacitor notifications', 'Settings');
           initializeCapacitorNotifications();
         }
       });
@@ -126,6 +167,7 @@ export default function Settings() {
   }, [notificationsEnabled]);
 
   const handleContactSupport = () => {
+    logAction('Contact support clicked', 'Settings');
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
     const mailtoLink = `mailto:verma.yashaswi@gmail.com?subject=${subject}`;
     window.open(mailtoLink, '_blank');
@@ -133,9 +175,12 @@ export default function Settings() {
   
   const handleLogout = async () => {
     try {
+      logAction('Logout initiated', 'Settings');
       toast.info('Logging out...');
       await signOut();
+      logAuth('User signed out successfully', 'Settings');
     } catch (error) {
+      logError('Error logging out', 'Settings', error);
       console.error('Error logging out from Settings page:', error);
       window.location.href = '/';
     }
@@ -156,6 +201,18 @@ export default function Settings() {
     };
   };
 
+  useEffect(() => {
+    logInfo(`FAQ dialog: ${showFAQ ? 'opened' : 'closed'}`, 'Settings');
+  }, [showFAQ]);
+
+  useEffect(() => {
+    logInfo(`Privacy Policy dialog: ${showPrivacyPolicy ? 'opened' : 'closed'}`, 'Settings');
+  }, [showPrivacyPolicy]);
+
+  useEffect(() => {
+    logInfo(`Color Picker dialog: ${showColorPicker ? 'opened' : 'closed'}`, 'Settings');
+  }, [showColorPicker]);
+
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
@@ -172,6 +229,7 @@ export default function Settings() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
+            onAnimationComplete={() => logRender('Profile section animation completed', 'Settings')}
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-theme-color">Your Profile</h2>
@@ -197,7 +255,11 @@ export default function Settings() {
                   </div>
                 </div>
                 
-                <Button variant="destructive" className="gap-2" onClick={handleLogout}>
+                <Button 
+                  variant="destructive" 
+                  className="gap-2" 
+                  onClick={handleLogout}
+                >
                   <LogOut className="h-4 w-4" />
                   Logout
                 </Button>
@@ -210,6 +272,7 @@ export default function Settings() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
+            onAnimationComplete={() => logRender('Appearance section animation completed', 'Settings')}
           >
             <h2 className="text-xl font-semibold mb-4 text-theme-color">Appearance</h2>
             
@@ -219,6 +282,7 @@ export default function Settings() {
                 <div className="flex p-1 bg-secondary rounded-full w-fit">
                   <button
                     onClick={() => {
+                      logAction('Theme changed to light', 'Settings');
                       setTheme('light');
                       toast.success('Light theme applied');
                     }}
@@ -232,6 +296,7 @@ export default function Settings() {
                   </button>
                   <button
                     onClick={() => {
+                      logAction('Theme changed to dark', 'Settings');
                       setTheme('dark');
                       toast.success('Dark theme applied');
                     }}
@@ -245,6 +310,7 @@ export default function Settings() {
                   </button>
                   <button
                     onClick={() => {
+                      logAction('Theme changed to system', 'Settings');
                       setTheme('system');
                       toast.success('System theme applied');
                     }}
@@ -271,6 +337,7 @@ export default function Settings() {
                     <button
                       key={themeOption.name}
                       onClick={() => {
+                        logAction(`Color theme changed to ${themeOption.name}`, 'Settings');
                         setColorTheme(themeOption.name as any);
                         toast.success(`${themeOption.name} theme applied`);
                       }}
@@ -308,7 +375,10 @@ export default function Settings() {
                     variant="outline" 
                     size="sm" 
                     className="flex items-center gap-2"
-                    onClick={() => setShowColorPicker(true)}
+                    onClick={() => {
+                      logAction('Custom color picker opened', 'Settings');
+                      setShowColorPicker(true);
+                    }}
                   >
                     <Palette className="h-4 w-4" />
                     Customize Your Color
@@ -323,6 +393,7 @@ export default function Settings() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
+            onAnimationComplete={() => logRender('Preferences section animation completed', 'Settings')}
           >
             <h2 className="text-xl font-semibold mb-4 text-theme-color">Preferences</h2>
             
@@ -334,7 +405,10 @@ export default function Settings() {
               >
                 <Switch 
                   checked={notificationsEnabled}
-                  onCheckedChange={setNotificationsEnabled}
+                  onCheckedChange={(checked) => {
+                    logAction(`Notifications ${checked ? 'enabled' : 'disabled'}`, 'Settings');
+                    setNotificationsEnabled(checked);
+                  }}
                 />
               </SettingItem>
             </div>
@@ -345,6 +419,7 @@ export default function Settings() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.3 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
+            onAnimationComplete={() => logRender('Help & Support section animation completed', 'Settings')}
           >
             <h2 className="text-xl font-semibold mb-4 text-theme-color">Help & Support</h2>
             
@@ -353,7 +428,10 @@ export default function Settings() {
                 variant="outline" 
                 size="lg" 
                 className="h-auto py-6 rounded-xl justify-start"
-                onClick={() => setShowFAQ(true)}
+                onClick={() => {
+                  logAction('FAQ button clicked', 'Settings');
+                  setShowFAQ(true);
+                }}
               >
                 <div className="flex flex-col items-start text-left">
                   <div className="flex items-center gap-2 mb-1">
@@ -368,7 +446,10 @@ export default function Settings() {
                 variant="outline" 
                 size="lg" 
                 className="h-auto py-6 rounded-xl justify-start"
-                onClick={() => setShowPrivacyPolicy(true)}
+                onClick={() => {
+                  logAction('Privacy Policy button clicked', 'Settings');
+                  setShowPrivacyPolicy(true);
+                }}
               >
                 <div className="flex flex-col items-start text-left">
                   <div className="flex items-center gap-2 mb-1">
@@ -400,7 +481,13 @@ export default function Settings() {
         </div>
       </div>
       
-      <Dialog open={showFAQ} onOpenChange={setShowFAQ}>
+      <Dialog 
+        open={showFAQ} 
+        onOpenChange={(open) => {
+          logAction(`FAQ dialog ${open ? 'opened' : 'closed'}`, 'Settings');
+          setShowFAQ(open);
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-xl text-theme-color">Frequently Asked Questions</DialogTitle>
@@ -484,7 +571,13 @@ export default function Settings() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={showPrivacyPolicy} onOpenChange={setShowPrivacyPolicy}>
+      <Dialog 
+        open={showPrivacyPolicy} 
+        onOpenChange={(open) => {
+          logAction(`Privacy Policy dialog ${open ? 'opened' : 'closed'}`, 'Settings');
+          setShowPrivacyPolicy(open);
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-xl text-theme-color">Privacy Policy</DialogTitle>
@@ -613,7 +706,13 @@ export default function Settings() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={showColorPicker} onOpenChange={setShowColorPicker}>
+      <Dialog 
+        open={showColorPicker} 
+        onOpenChange={(open) => {
+          logAction(`Color Picker dialog ${open ? 'opened' : 'closed'}`, 'Settings');
+          setShowColorPicker(open);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl text-theme-color">Customize Your Color</DialogTitle>
@@ -626,6 +725,7 @@ export default function Settings() {
             <ColorPicker
               value={customColor}
               onChange={(color) => {
+                logAction(`Custom color changed to ${color}`, 'Settings');
                 setCustomColor(color);
                 setColorTheme('Custom');
               }}
@@ -635,6 +735,7 @@ export default function Settings() {
           <div className="flex justify-end mt-2">
             <Button 
               onClick={() => {
+                logAction('Custom color applied', 'Settings');
                 setShowColorPicker(false);
                 toast.success('Custom color applied');
               }}
@@ -645,6 +746,8 @@ export default function Settings() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <DebugPanel />
     </div>
   );
 }
