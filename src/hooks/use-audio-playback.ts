@@ -200,10 +200,19 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
         setPlaybackProgress(0);
       }
       
-      // Start playback
-      audioRef.current.play().catch(error => {
-        console.error('[AudioPlayback] Error playing audio:', error);
-      });
+      // Start playback with explicit error handling
+      try {
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error('[AudioPlayback] Error playing audio:', error);
+            setIsPlaying(false);
+          });
+        }
+      } catch (error) {
+        console.error('[AudioPlayback] Exception playing audio:', error);
+        setIsPlaying(false);
+      }
       // setIsPlaying will be handled by the play event
     }
   };

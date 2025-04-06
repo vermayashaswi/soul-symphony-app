@@ -65,7 +65,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     // Show a toast to indicate processing has started
     toast.loading('Processing your journal entry...', {
       id: `processing-${tempId}`,
-      duration: 10000
+      duration: 30000 // Increase duration to avoid toast disappearing during processing
     });
     
     // Launch the processing without awaiting it
@@ -75,6 +75,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
         isEntryBeingProcessed = false;
         toast.error('Error processing your recording', {
           id: `processing-${tempId}`,
+          duration: 5000
         });
       });
     
@@ -99,6 +100,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       console.error('No audio data to process');
       toast.error('No audio data to process', {
         id: `processing-${tempId}`,
+        duration: 5000
       });
       return;
     }
@@ -111,6 +113,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       console.error('Invalid base64 audio data');
       toast.error('Invalid audio data', {
         id: `processing-${tempId}`,
+        duration: 5000
       });
       return;
     }
@@ -127,6 +130,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       console.error('User authentication failed:', authStatus.error);
       toast.error('Authentication failed', {
         id: `processing-${tempId}`,
+        duration: 5000
       });
       return;
     }
@@ -140,6 +144,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         console.error('Failed to ensure user profile exists');
         toast.error('Failed to verify user profile', {
           id: `processing-${tempId}`,
+          duration: 5000
         });
         return;
       }
@@ -147,6 +152,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       console.error('Cannot identify user ID');
       toast.error('Cannot identify user', {
         id: `processing-${tempId}`,
+        duration: 5000
       });
       return;
     }
@@ -161,6 +167,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         // Update toast message
         toast.loading(`Processing your journal entry (attempt ${retries + 1})...`, {
           id: `processing-${tempId}`,
+          duration: 30000
         });
         
         // Set directTranscription to false to get full journal entry processing
@@ -169,6 +176,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
           console.log('Transcription successful, breaking retry loop');
           toast.success('Journal entry processed successfully', {
             id: `processing-${tempId}`,
+            duration: 5000
           });
           break;
         }
@@ -177,6 +185,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
           console.log(`Transcription attempt ${retries} failed, retrying after delay...`);
           toast.loading(`Retrying processing (${retries}/${maxRetries})...`, {
             id: `processing-${tempId}`,
+            duration: 10000
           });
           // Increase delay between retries (exponential backoff)
           await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries)));
@@ -187,11 +196,13 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         if (retries <= maxRetries) {
           toast.loading(`Retrying after error (${retries}/${maxRetries})...`, {
             id: `processing-${tempId}`,
+            duration: 10000
           });
           await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries)));
         } else {
           toast.error('Failed to process recording after multiple attempts', {
             id: `processing-${tempId}`,
+            duration: 5000
           });
         }
       }
@@ -206,7 +217,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       
       // Show success toast
       toast.success('Journal entry saved successfully!', {
-        duration: 3000,
+        duration: 5000,
       });
       
       // Verify the entry was saved by querying the database
@@ -234,7 +245,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       // Show error toast
       toast.error('Failed to process your journal entry', {
         id: `processing-${tempId}`,
-        duration: 3000,
+        duration: 5000,
       });
       
       // Also clear toasts here in case of error
@@ -247,7 +258,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     // Show error toast
     toast.error(`Error: ${error.message || 'Unknown error'}`, {
       id: `processing-${tempId}`,
-      duration: 3000,
+      duration: 5000,
     });
     
     // Clear toasts in case of any error

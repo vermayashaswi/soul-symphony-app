@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
@@ -8,7 +8,6 @@ import { useAudioPlayback } from '@/hooks/use-audio-playback';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
@@ -26,6 +25,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
+  const [navigationAttempted, setNavigationAttempted] = useState(false);
   const { user, forceRefreshAuth } = useAuth();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -99,6 +99,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const handleSaveEntry = async () => {
     if (!audioBlob) {
       setRecordingError("No audio recording available");
+      toast.error("No audio recording available");
       return;
     }
     
@@ -126,20 +127,29 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         // Call the completion handler but with a try/catch to prevent navigation issues
         try {
           console.log("Calling onRecordingComplete callback");
+          
+          // Indicate that navigation is being attempted
+          setNavigationAttempted(true);
+          
+          // Handle successful recording with proper timeout for UI feedback
           onRecordingComplete(normalizedBlob);
           
-          // If we're on the root route and not in a child component, navigate to journal
+          // Ensure navigation happens after a short delay for UI feedback
           if (window.location.pathname === '/') {
-            console.log("Navigating to journal page");
+            console.log("Preparing to navigate to journal page");
+            toast.success("Recording saved! Navigating to journal...");
+            
+            // Set a slight delay to ensure toast is visible
             setTimeout(() => {
+              console.log("Actually navigating to journal page now");
               navigate('/journal');
-            }, 1000);
+            }, 1500);
           }
         } catch (error) {
           console.error("Error in recording complete callback:", error);
           toast.error("Error processing your recording");
           setIsProcessing(false);
-          throw error; // Rethrow to be caught by outer catch
+          setNavigationAttempted(false);
         }
       } else {
         // If no callback is provided, we're done
@@ -159,6 +169,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       setRecordingError(error?.message || "An unexpected error occurred");
       toast.error("Error saving recording");
       setIsProcessing(false);
+      setNavigationAttempted(false);
     }
   };
 
@@ -167,11 +178,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     resetPlayback();
     setRecordingError(null);
     setShowAnimation(true);
+    setNavigationAttempted(false);
     toast.info("Starting a new recording");
   };
 
   return (
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
+      {/* Ensure audio element is always in the DOM */}
       <audio ref={audioRef} className="hidden" />
       
       <div className={cn(
@@ -188,7 +201,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           <div className="relative z-10 flex justify-center items-center mt-40">
             <RecordingButton
               isRecording={isRecording}
-              isProcessing={isProcessing}
+              isProcessing={isProcessing || navigationAttempted}
               hasPermission={hasPermission}
               onRecordingStart={() => {
                 startRecording();
@@ -211,7 +224,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
                 <PlaybackControls
                   audioBlob={audioBlob}
                   isPlaying={isPlaying}
-                  isProcessing={isProcessing}
+                  isProcessing={isProcessing || navigationAttempted}
                   playbackProgress={playbackProgress}
                   audioDuration={audioDuration}
                   onTogglePlayback={togglePlayback}
@@ -245,10 +258,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             </motion.div>
           )}
           
-          {isProcessing && (
+          {(isProcessing || navigationAttempted) && (
             <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground relative z-10 absolute bottom-4">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Processing...</span>
+              <span>{navigationAttempted ? "Navigating..." : "Processing..."}</span>
             </div>
           )}
         </div>

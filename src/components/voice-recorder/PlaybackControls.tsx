@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -38,6 +39,25 @@ export function PlaybackControls({
   useEffect(() => {
     prevProgressRef.current = playbackProgress;
   }, [playbackProgress]);
+
+  // Add more debug logging for playback actions
+  const handlePlayClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    console.log("Play/Pause button clicked, isPlaying=", isPlaying, "audioBlob=", !!audioBlob);
+    
+    if (!audioBlob) {
+      console.error("Cannot play: No audio blob available");
+      toast.error("No audio to play");
+      return;
+    }
+    
+    try {
+      onTogglePlayback();
+    } catch (err) {
+      console.error("Error in play/pause handler:", err);
+      toast.error("Error playing audio");
+    }
+  };
   
   // Handle save click with error prevention
   const handleSaveClick = (e: React.MouseEvent) => {
@@ -49,6 +69,7 @@ export function PlaybackControls({
         onSaveEntry();
       } catch (err) {
         console.error("Error in save handler:", err);
+        toast.error("Error saving recording");
       }
     } else {
       console.log("Save button clicked but disabled condition: isProcessing=", isProcessing, "audioBlob=", !!audioBlob);
@@ -73,9 +94,9 @@ export function PlaybackControls({
       </div>
 
       <div className="flex items-center justify-center gap-4 mt-6">
-        {/* Play/Pause Button */}
+        {/* Play/Pause Button with better logging */}
         <Button 
-          onClick={onTogglePlayback}
+          onClick={handlePlayClick}
           variant="ghost" 
           size="icon"
           className="w-10 h-10 rounded-full border"
