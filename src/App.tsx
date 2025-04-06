@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import Index from "./pages/Index";
-import { Journal } from "./pages/Journal";
+import Journal from "./pages/Journal"; // Fixed import
 import Insights from "./pages/Insights";
 import Chat from "./pages/Chat";
 import SmartChat from "./pages/SmartChat";
