@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -20,7 +19,8 @@ export default function Auth() {
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  const from = redirectParam || fromLocation || storedRedirect || '/';
+  // Always redirect to home page after successful Google sign-in
+  const from = '/';
 
   useEffect(() => {
     // Log the current origin/domain for debugging
@@ -88,10 +88,6 @@ export default function Auth() {
   const handleSignIn = async () => {
     console.log('Initiating Google sign-in from', window.location.origin);
     try {
-      // Store the intended destination before initiating sign-in
-      if (from && from !== '/') {
-        localStorage.setItem('authRedirectTo', from);
-      }
       await signInWithGoogle();
     } catch (error) {
       console.error('Failed to initiate Google sign-in:', error);

@@ -40,11 +40,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
           // Higher contrast background for light/dark modes
           background: "var(--background)",
           color: "var(--foreground)",
-        },
-        // Special styling for loading toasts - these will persist until dismissed
-        loading: {
-          duration: Infinity, // Loading toasts persist until explicitly dismissed
         }
+        // The 'loading' property was removed from here as it's not a valid option in ToastOptions
       }}
       {...props}
     />

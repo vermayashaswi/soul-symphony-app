@@ -141,6 +141,7 @@ const Journal = () => {
     try {
       setActiveTab('entries');
       
+      // Use duration: Infinity for loading toasts so they persist until dismissed
       const toastId = toast.loading('Processing your journal entry...', {
         duration: Infinity // This will persist until we explicitly dismiss it
       });
