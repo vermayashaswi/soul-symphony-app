@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -23,7 +22,6 @@ const Journal = () => {
   const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
   const [showRetryButton, setShowRetryButton] = useState(false);
   const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
-  // New state to track entries we've already shown notifications for
   const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
   
   const { entries, loading, fetchEntries } = useJournalEntries(
@@ -40,39 +38,30 @@ const Journal = () => {
     }
   }, [user?.id]);
 
-  // Clear processing entries when the component unmounts
   useEffect(() => {
     return () => {
-      // Clear any lingering toasts when component unmounts
       Object.values(toastIds).forEach(id => {
         if (id) toast.dismiss(id);
       });
     };
   }, [toastIds]);
 
-  // Check for new entries that we haven't shown notifications for
   useEffect(() => {
-    // Skip if we're loading or if we don't have entries
     if (loading || entries.length === 0) return;
     
-    // Find new entries that we haven't notified about
     const newEntries = entries.filter(entry => 
       !notifiedEntryIds.has(entry.id) && 
       !processingEntries.some(tempId => tempId === entry.id.toString())
     );
     
-    // If we have new entries and we've already loaded entries before (to avoid showing on initial load)
     if (newEntries.length > 0 && notifiedEntryIds.size > 0) {
-      // Show a notification for new entries only once - with shorter duration
-      toast.success('Journal entry processed!', { duration: 2000 });
+      toast.success('Journal entry processed!', { duration: 1000 });
       
-      // Add these entries to our notified set
       const updatedNotifiedIds = new Set(notifiedEntryIds);
       newEntries.forEach(entry => updatedNotifiedIds.add(entry.id));
       setNotifiedEntryIds(updatedNotifiedIds);
     } 
     else if (notifiedEntryIds.size === 0 && entries.length > 0) {
-      // Initialize our set with existing entries the first time
       const initialIds = new Set(entries.map(entry => entry.id));
       setNotifiedEntryIds(initialIds);
     }
@@ -106,7 +95,7 @@ const Journal = () => {
         
         const now = Date.now();
         if (now - lastProfileErrorTime > 60000) {
-          toast.error('Having trouble setting up your profile. You can try again or continue using the app.');
+          toast.error('Having trouble setting up your profile. You can try again or continue using the app.', { duration: 3000 });
           setLastProfileErrorTime(now);
         }
         
@@ -119,7 +108,7 @@ const Journal = () => {
       
       const now = Date.now();
       if (now - lastProfileErrorTime > 60000) {
-        toast.error('Having trouble with your profile. You can try again or continue using the app.');
+        toast.error('Having trouble with your profile. You can try again or continue using the app.', { duration: 3000 });
         setLastProfileErrorTime(now);
       }
       
@@ -148,56 +137,32 @@ const Journal = () => {
     if (!audioBlob || !user?.id) return;
     
     try {
-      // Immediately switch to the entries tab after recording
       setActiveTab('entries');
       
-      // Show user feedback with shorter duration
       const toastId = toast.loading('Processing your journal entry...', {
-        duration: 5000 // Limit to 5 seconds max
+        id: `processing-${Date.now()}`
       });
       
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
       
       if (success && tempId) {
-        // Add tempId to processing entries
         setProcessingEntries(prev => [...prev, tempId]);
-        
-        // Store the toast ID with the tempId
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
-        
-        // Refresh entries list immediately to show processing indicator
         setRefreshKey(prev => prev + 1);
         fetchEntries();
         
-        // Set up a timeout to auto-dismiss the loading toast after 8 seconds max
-        // This prevents stuck "Processing..." notifications
-        setTimeout(() => {
-          if (toastIds[tempId]) {
-            toast.dismiss(toastId);
-            
-            // Remove the toast ID from our tracking
-            setToastIds(prev => {
-              const newToastIds = { ...prev };
-              delete newToastIds[tempId];
-              return newToastIds;
-            });
-          }
-        }, 8000);
-        
-        // Set up polling but only do one success notification
         let hasNotifiedSuccess = false;
         
-        // Start a timeout to check for completion
-        const checkTimeout = setTimeout(() => {
-          // Clear the processing entry
+        setTimeout(() => {
           setProcessingEntries(prev => prev.filter(id => id !== tempId));
           
-          // Update toast to success only if we haven't already done so
           if (toastIds[tempId] && !hasNotifiedSuccess) {
-            toast.success('Journal entry processed!', { id: toastIds[tempId], duration: 2000 });
+            toast.success('Journal entry processed!', { 
+              id: toastIds[tempId], 
+              duration: 1000
+            });
             hasNotifiedSuccess = true;
             
-            // Remove the toast ID from our tracking
             setToastIds(prev => {
               const newToastIds = { ...prev };
               delete newToastIds[tempId];
@@ -205,18 +170,15 @@ const Journal = () => {
             });
           }
           
-          // Do a final refresh
           setRefreshKey(prev => prev + 1);
           fetchEntries();
         }, 15000);
         
-        // Do an initial check after 5 seconds
         setTimeout(() => {
           setRefreshKey(prev => prev + 1);
           fetchEntries();
         }, 5000);
       } else {
-        // Clear loading toast and show error
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
           id: toastId,
           duration: 3000
@@ -232,16 +194,13 @@ const Journal = () => {
     if (!user?.id) return;
     
     try {
-      // When an entry is deleted, clear any processing entries and their associated toasts
       setProcessingEntries(prev => {
         const newProcessingEntries = [...prev];
         
-        // For each processing entry we're removing, clear its toast
         newProcessingEntries.forEach(tempId => {
           if (toastIds[tempId]) {
             toast.dismiss(toastIds[tempId]);
             
-            // Remove the toast ID from our tracking
             setToastIds(prev => {
               const newToastIds = { ...prev };
               delete newToastIds[tempId];
@@ -253,7 +212,6 @@ const Journal = () => {
         return [];
       });
       
-      // Also remove the entry from our notified set
       setNotifiedEntryIds(prev => {
         const updated = new Set(prev);
         updated.delete(entryId);

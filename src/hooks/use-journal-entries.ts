@@ -31,11 +31,9 @@ export function useJournalEntries(
   const consecutiveEmptyFetchesRef = useRef(0);
 
   const verifyUserProfile = useCallback(async (userId: string) => {
-    // Check if profile exists
     const exists = await checkUserProfile(userId);
     setProfileExists(exists);
     
-    // If not exists, create it
     if (!exists) {
       const created = await createUserProfile(userId);
       setProfileExists(created);
@@ -54,10 +52,8 @@ export function useJournalEntries(
       return;
     }
     
-    // Don't check if we're currently fetching to allow forced refreshes
     console.log('[useJournalEntries] Starting fetch, currently fetching:', isFetchingRef.current);
     
-    // Check if profile exists and create if needed
     if (profileExists === false) {
       const created = await createUserProfile(userId);
       if (!created) {
@@ -74,7 +70,6 @@ export function useJournalEntries(
       }
     }
     
-    // Clear any previous errors
     setError(null);
     
     try {
@@ -83,7 +78,6 @@ export function useJournalEntries(
       
       console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
       
-      // Set a timeout in case the fetch takes too long
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
@@ -93,22 +87,17 @@ export function useJournalEntries(
           console.log('[useJournalEntries] Fetch is taking too long, setting loading to false');
           setLoading(false);
           initialFetchDoneRef.current = true;
-          // Don't set isFetchingRef to false here so the actual fetch can still complete
         }
-      }, 5000); // Reduce timeout to 5 seconds for better UI responsiveness
+      }, 5000);
       
-      // Fetch journal entries
       const journalEntries = await fetchJournalEntries(userId, fetchTimeoutRef);
       
-      // Track consecutive empty fetches
       if (journalEntries.length === 0) {
         consecutiveEmptyFetchesRef.current += 1;
       } else {
         consecutiveEmptyFetchesRef.current = 0;
       }
       
-      // Update entries state without showing toasts
-      // (Toast management is now handled in the Journal component)
       setEntries(journalEntries);
       setLastFetchTime(new Date());
       setFetchCount(prev => prev + 1);
@@ -117,14 +106,11 @@ export function useJournalEntries(
       console.error('[useJournalEntries] Error fetching entries:', error);
       setError('Failed to load entries: ' + error.message);
       
-      // If we already had entries, keep showing them
       if (entries.length === 0) {
         setEntries([]);
       }
       
       initialFetchDoneRef.current = true;
-      
-      // Remove toast error notification - let parent component handle this
     } finally {
       setLoading(false);
       isFetchingRef.current = false;
@@ -152,7 +138,6 @@ export function useJournalEntries(
       }
     }
     
-    // Cleanup function to clear any timeouts
     return () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);

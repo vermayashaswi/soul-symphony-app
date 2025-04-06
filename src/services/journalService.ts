@@ -1,6 +1,4 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
 /**
@@ -58,7 +56,6 @@ export const createUserProfile = async (userId: string): Promise<boolean> => {
     return true;
   } catch (error: any) {
     console.error('[JournalService] Error creating profile:', error.message);
-    toast.error('Error setting up profile. Please try again.');
     return false;
   }
 };
