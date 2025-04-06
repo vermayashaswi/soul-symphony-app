@@ -1,3 +1,4 @@
+
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
@@ -29,8 +30,15 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       userId: userId || 'anonymous'
     });
     
+    // Verify the user ID is valid
+    if (!userId) {
+      console.error('No user ID provided for audio processing');
+      return { success: false, error: 'Authentication required' };
+    }
+    
     // Launch the processing without awaiting it
-    processRecordingInBackground(audioBlob, userId, tempId);
+    processRecordingInBackground(audioBlob, userId, tempId)
+      .catch(err => console.error('Background processing error:', err));
     
     // Return immediately with the temp ID
     return { success: true, tempId };
@@ -85,7 +93,11 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
 
     // 3. Check if the user profile exists, and create one if it doesn't
     if (authStatus.userId) {
-      await ensureUserProfileExists(authStatus.userId);
+      const profileExists = await ensureUserProfileExists(authStatus.userId);
+      if (!profileExists) {
+        console.error('Failed to ensure user profile exists');
+        return;
+      }
     } else {
       console.error('Cannot identify user ID');
       return;
@@ -148,8 +160,8 @@ let hasPreviousEntries = false;
  * Ensures that a user profile exists for the given user ID
  * Creates one if it doesn't exist
  */
-async function ensureUserProfileExists(userId: string | undefined): Promise<void> {
-  if (!userId) return;
+async function ensureUserProfileExists(userId: string | undefined): Promise<boolean> {
+  if (!userId) return false;
   
   try {
     // Check if user profile exists
@@ -197,9 +209,10 @@ async function ensureUserProfileExists(userId: string | undefined): Promise<void
     } else {
       console.log('Profile exists:', profile.id);
     }
+    
+    return true;
   } catch (error) {
     console.error('Error ensuring user profile exists:', error);
-    // We don't throw here to allow the process to continue
-    // The foreign key constraint will fail later if this fails
+    return false;
   }
 }

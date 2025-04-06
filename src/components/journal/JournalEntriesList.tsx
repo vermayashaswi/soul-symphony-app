@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
@@ -23,6 +23,20 @@ export default function JournalEntriesList({
   onStartRecording, 
   onDeleteEntry 
 }: JournalEntriesListProps) {
+  const [showEntriesCount, setShowEntriesCount] = useState(0);
+
+  // Update entries count when entries change to trigger animation for new entries
+  useEffect(() => {
+    if (entries.length > showEntriesCount) {
+      // Small delay to ensure smooth animation
+      setTimeout(() => {
+        setShowEntriesCount(entries.length);
+      }, 300);
+    } else {
+      setShowEntriesCount(entries.length);
+    }
+  }, [entries.length]);
+  
   // Show primary loading state only when loading initial entries
   // But don't show loading indefinitely for new users with no entries
   const showInitialLoading = loading && entries.length === 0;
@@ -58,13 +72,16 @@ export default function JournalEntriesList({
 
       <AnimatePresence>
         <div className="space-y-4">
-          {entries.map((entry) => (
+          {entries.map((entry, index) => (
             <motion.div
               key={entry.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-              transition={{ duration: 0.3 }}
+              transition={{ 
+                duration: 0.3, 
+                delay: index === 0 && entries.length > showEntriesCount ? 0 : 0.05 * index 
+              }}
             >
               <JournalEntryCard 
                 entry={entry} 
@@ -74,6 +91,20 @@ export default function JournalEntriesList({
           ))}
         </div>
       </AnimatePresence>
+      
+      {processingEntries.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="mt-4 p-3 bg-primary-foreground/10 border border-primary/20 rounded-lg"
+        >
+          <div className="flex items-center gap-2 text-sm text-primary">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Processing new entries...</span>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

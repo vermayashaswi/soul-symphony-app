@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -112,15 +113,25 @@ const Journal = () => {
       if (success && tempId) {
         setProcessingEntries(prev => [...prev, tempId]);
         
+        // Ensure we switch to the entries tab
+        setActiveTab('entries');
+        
+        // Refresh the entries list after a short delay to allow processing
         setTimeout(() => {
+          console.log('[Journal] Refreshing entries after processing');
           setRefreshKey(prev => prev + 1);
           
           setProcessingEntries(prev => prev.filter(id => id !== tempId));
           
           toast.success('Journal entry saved!', { id: toastId });
-          
-          setActiveTab('entries');
         }, 1500);
+        
+        // Fetch entries again after a longer delay to ensure server processing is complete
+        setTimeout(() => {
+          console.log('[Journal] Performing additional entries refresh');
+          setRefreshKey(prev => prev + 1);
+          fetchEntries();
+        }, 3000);
       } else {
         toast.error('Failed to process recording', { id: toastId });
       }
