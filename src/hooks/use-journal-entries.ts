@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +20,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.log('[useJournalEntries] No user ID provided for fetching entries');
       setLoading(false);
       setEntries([]);
+      initialFetchDoneRef.current = true;
       return;
     }
     
@@ -44,6 +44,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         setEntries([]);
         setLoading(false);
         isFetchingRef.current = false;
+        initialFetchDoneRef.current = true;
         setError('No active session. Please sign in again.');
         return;
       }
@@ -57,6 +58,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         if (isFetchingRef.current) {
           console.log('[useJournalEntries] Fetch is taking too long, setting loading to false');
           setLoading(false);
+          initialFetchDoneRef.current = true;
           // Don't set isFetchingRef to false here so the actual fetch can still complete
         }
       }, 8000); // 8 second timeout for UI loading state
@@ -79,49 +81,57 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       if (error) {
         console.error('[useJournalEntries] Error fetching entries:', error);
         
-        // Only show toast error on initial load
-        if (!initialFetchDoneRef.current) {
+        // Only show toast error on initial load and if it's not just "No rows returned"
+        if (!initialFetchDoneRef.current && !error.message.includes('No rows returned')) {
           toast.error('Failed to load journal entries. Please try again later.');
         }
         
         setError('Failed to load entries: ' + error.message);
-        throw error;
-      }
-      
-      console.log(`[useJournalEntries] Fetched ${data?.length || 0} entries`);
-      
-      if (data && data.length > 0) {
-        console.log('[useJournalEntries] First entry sample:', {
-          id: data[0].id,
-          text: data[0]["refined text"],
-          created: data[0].created_at
-        });
+        
+        // If there's no data, set entries to empty array instead of keeping previous
+        // This is important for new users who shouldn't see stale data
+        setEntries([]);
       } else {
-        console.log('[useJournalEntries] No entries found for this user');
+        console.log(`[useJournalEntries] Fetched ${data?.length || 0} entries`);
+        
+        if (data && data.length > 0) {
+          console.log('[useJournalEntries] First entry sample:', {
+            id: data[0].id,
+            text: data[0]["refined text"],
+            created: data[0].created_at
+          });
+        } else {
+          console.log('[useJournalEntries] No entries found for this user');
+        }
+        
+        const typedEntries: JournalEntry[] = (data || []).map(item => ({
+          id: item.id,
+          content: item["refined text"] || item["transcription text"] || "",
+          created_at: item.created_at,
+          audio_url: item.audio_url,
+          sentiment: item.sentiment,
+          themes: item.master_themes,
+          foreignKey: item["foreign key"],
+          entities: item.entities ? (item.entities as any[]).map(entity => ({
+            type: entity.type,
+            name: entity.name,
+            text: entity.text
+          })) : undefined
+        }));
+        
+        setEntries(typedEntries);
       }
       
-      const typedEntries: JournalEntry[] = (data || []).map(item => ({
-        id: item.id,
-        content: item["refined text"] || item["transcription text"] || "",
-        created_at: item.created_at,
-        audio_url: item.audio_url,
-        sentiment: item.sentiment,
-        themes: item.master_themes,
-        foreignKey: item["foreign key"],
-        entities: item.entities ? (item.entities as any[]).map(entity => ({
-          type: entity.type,
-          name: entity.name,
-          text: entity.text
-        })) : undefined
-      }));
-      
-      setEntries(typedEntries);
       setLastFetchTime(new Date());
       setFetchCount(prev => prev + 1);
       initialFetchDoneRef.current = true;
     } catch (error: any) {
       console.error('[useJournalEntries] Error fetching entries:', error);
       setError('Failed to load entries: ' + error.message);
+      // For new users who don't have entries yet, we want to show empty state
+      // instead of an error, so we set entries to empty array
+      setEntries([]);
+      initialFetchDoneRef.current = true;
     } finally {
       setLoading(false);
       isFetchingRef.current = false;
@@ -129,7 +139,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   }, [userId, fetchCount]);
 
   useEffect(() => {
-    if (userId && isProfileChecked) {
+    if (userId) {
       const isInitialLoad = !initialFetchDoneRef.current;
       const hasRefreshKeyChanged = refreshKey !== lastRefreshKey;
       
@@ -141,8 +151,12 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         console.log(`[useJournalEntries] Skipping unnecessary fetch`);
       }
     } else {
-      console.log(`[useJournalEntries] Waiting for prerequisites: userId=${!!userId}, isProfileChecked=${isProfileChecked}`);
-      setLoading(userId !== undefined);
+      console.log(`[useJournalEntries] Waiting for prerequisites: userId=${!!userId}`);
+      if (!initialFetchDoneRef.current) {
+        setLoading(userId !== undefined);
+      } else {
+        setLoading(false);
+      }
     }
     
     // Cleanup function to clear any timeouts
@@ -151,7 +165,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [userId, refreshKey, isProfileChecked, fetchEntries, lastRefreshKey]);
+  }, [userId, refreshKey, fetchEntries, lastRefreshKey]);
 
   return { 
     entries, 

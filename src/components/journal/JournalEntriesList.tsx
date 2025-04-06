@@ -23,8 +23,8 @@ export default function JournalEntriesList({
   onStartRecording, 
   onDeleteEntry 
 }: JournalEntriesListProps) {
-  // Show primary loading state only when loading and no entries exist
-  if (loading && entries.length === 0) {
+  // Show primary loading state only when loading and no entries exist and no entries are being processed
+  if (loading && entries.length === 0 && (!processingEntries || processingEntries.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
@@ -33,6 +33,7 @@ export default function JournalEntriesList({
     );
   }
 
+  // Show empty state only when there are no entries and no processing entries
   if (entries.length === 0 && (!processingEntries || processingEntries.length === 0)) {
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
@@ -48,6 +49,16 @@ export default function JournalEntriesList({
           </Button>
         </div>
       </div>
+
+      {/* Show processing indicator when entries are being processed */}
+      {processingEntries && processingEntries.length > 0 && (
+        <div className="mb-4 p-3 bg-primary-50 border border-primary-100 rounded-lg">
+          <div className="flex items-center gap-2 text-sm text-primary-700">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Processing {processingEntries.length} journal {processingEntries.length === 1 ? 'entry' : 'entries'}...</span>
+          </div>
+        </div>
+      )}
 
       <AnimatePresence>
         <div className="space-y-4">

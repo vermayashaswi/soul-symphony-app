@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,7 +25,7 @@ interface VoiceRecorderProps {
 export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
-  const [showAnimation, setShowAnimation] = useState(true);
+  const [showAnimation, setShowAnimation] = useState(true); // Always show animation by default
   const { user } = useAuth();
   const isMobile = useIsMobile();
   
@@ -53,6 +54,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     reset: resetPlayback
   } = useAudioPlayback({ audioBlob });
 
+  // Only hide animation when actively recording
   useEffect(() => {
     if (isRecording) {
       setShowAnimation(false);
@@ -149,7 +151,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               onRecordingStop={stopRecording}
               onPermissionRequest={requestPermissions}
               audioLevel={audioLevel}
-              showAnimation={false}
+              showAnimation={true} // Always show animation in the button
             />
           </div>
 

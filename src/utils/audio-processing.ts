@@ -158,6 +158,13 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
           const snippet = text.length > 40 ? text.substring(0, 37) + '...' : text;
           
           toast.success(`Journal entry saved successfully! (${duration}s) "${snippet}"`);
+          
+          // For first-time users, give a more helpful guidance message
+          if (!hasPreviousEntries) {
+            setTimeout(() => {
+              toast.info('Your first entry has been saved! You can now view and create more entries.');
+            }, 3000);
+          }
         }
       } else {
         toast.success('Journal entry processed and saved successfully.');
@@ -178,6 +185,9 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
   }
 }
 
+// Add a variable to check if user is a first-time user
+let hasPreviousEntries = false;
+
 /**
  * Ensures that a user profile exists for the given user ID
  * Creates one if it doesn't exist
@@ -189,9 +199,19 @@ async function ensureUserProfileExists(userId: string | undefined): Promise<void
     // Check if user profile exists
     const { data: profile, error: fetchError } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, onboarding_completed')
       .eq('id', userId)
       .single();
+      
+    // Check if user has existing journal entries
+    const { data: entries, error: entriesError } = await supabase
+      .from('Journal Entries')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1);
+      
+    hasPreviousEntries = !entriesError && entries && entries.length > 0;
+    console.log('User has previous entries:', hasPreviousEntries);
       
     // If profile doesn't exist, create one
     if (fetchError || !profile) {
@@ -218,6 +238,8 @@ async function ensureUserProfileExists(userId: string | undefined): Promise<void
       }
       
       console.log('User profile created successfully');
+    } else {
+      console.log('Profile exists:', profile.id);
     }
   } catch (error) {
     console.error('Error ensuring user profile exists:', error);
