@@ -92,11 +92,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       return;
     }
     
-    if (audioDuration < 0.5) {
-      setRecordingError("Recording is too short. Please try again.");
-      return;
-    }
-    
     try {
       setIsProcessing(true);
       setRecordingError(null);

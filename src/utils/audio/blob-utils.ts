@@ -30,9 +30,10 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
     return { isValid: false, errorMessage: 'No recording to process.' };
   }
   
-  // Minimum size check (increased to 1000 bytes for better validation)
-  if (audioBlob.size < 1000) {
-    return { isValid: false, errorMessage: 'Recording is too short. Please try again.' };
+  // Minimum size check - remove the check for minimum audio length
+  // Simply check if the blob exists and has some data
+  if (audioBlob.size <= 0) {
+    return { isValid: false, errorMessage: 'Recording is empty. Please try again.' };
   }
   
   // Check for supported MIME types

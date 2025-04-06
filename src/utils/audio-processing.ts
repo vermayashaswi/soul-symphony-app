@@ -1,4 +1,3 @@
-
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
@@ -78,12 +77,6 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     
     if (!audioBlob) {
       console.error('No audio data to process');
-      return;
-    }
-    
-    // Check if audio blob is too small to be useful
-    if (audioBlob.size < 1000) {
-      console.error('Audio recording is too small to process');
       return;
     }
     

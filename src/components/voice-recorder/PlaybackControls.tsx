@@ -29,7 +29,7 @@ export function PlaybackControls({
   // Calculate the current time based on the progress and total duration
   const currentTime = playbackProgress * audioDuration;
   const formattedProgress = formatTime(currentTime);
-  const formattedDuration = formatTime(audioDuration);
+  const formattedDuration = formatTime(audioDuration || 0); // Add fallback for zero duration
   
   // Track previous progress for animation smoothness
   const prevProgressRef = useRef(playbackProgress);
