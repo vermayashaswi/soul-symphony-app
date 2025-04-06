@@ -98,6 +98,13 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
             
           if (insertError) {
             console.error('[ProfileService] Final fallback insert failed:', insertError);
+            
+            // Another fallback with minimal data
+            if (insertError.code === '23505') { // Duplicate key value violates unique constraint
+              console.log('[ProfileService] Profile already exists but we got a not found error earlier. Weird state resolved.');
+              return true;
+            }
+            
             return false;
           }
         }

@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,8 +14,10 @@ import {
   refreshSession as refreshSessionService
 } from '@/services/authService';
 
+// Create the context with a default undefined value
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Export the context for direct import if needed
 export { AuthContext };
 
 export function AuthProvider({ children }: { children: ReactNode }) {

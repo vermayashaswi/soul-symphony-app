@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -7,7 +8,7 @@ import JournalHeader from '@/components/journal/JournalHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import JournalProfileDebug from '@/components/journal/JournalProfileDebug';
 import { Button } from '@/components/ui/button';
 
@@ -166,8 +167,10 @@ const Journal = () => {
   if (isCheckingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="ml-4 text-muted-foreground">Setting up your profile...</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Setting up your profile...</p>
+        </div>
       </div>
     );
   }
@@ -179,9 +182,12 @@ const Journal = () => {
       {showRetryButton && (
         <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
           <div className="flex flex-col gap-3">
-            <p className="text-amber-800 dark:text-amber-200">
-              We're having trouble setting up your profile. Your entries may not be saved correctly.
-            </p>
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-amber-800 dark:text-amber-200">
+                We're having trouble setting up your profile. Your entries may not be saved correctly.
+              </p>
+            </div>
             <Button 
               variant="outline" 
               className="w-full sm:w-auto border-amber-500 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
