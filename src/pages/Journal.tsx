@@ -27,6 +27,7 @@ const Journal = () => {
   const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
   const previousEntriesRef = useRef<number[]>([]);
+  const profileCheckedOnceRef = useRef(false);
   
   const { entries, loading, fetchEntries } = useJournalEntries(
     user?.id,
@@ -107,7 +108,7 @@ const Journal = () => {
   }, [isCheckingProfile, user?.id]);
 
   useEffect(() => {
-    if (user?.id && isCheckingProfile && !isProfileChecked) {
+    if (user?.id && isCheckingProfile && !isProfileChecked && !profileCheckedOnceRef.current) {
       checkUserProfile(user.id);
     }
   }, [user?.id, isCheckingProfile, isProfileChecked]);
@@ -193,34 +194,23 @@ const Journal = () => {
       
       console.log('[Journal] Checking user profile for ID:', userId);
       
-      let profileCreated = await ensureProfileExists();
-      
-      if (!profileCreated && profileCheckRetryCount < 3) {
-        console.log('[Journal] Profile check failed, retrying...', profileCheckRetryCount + 1);
+      if (!profileCheckedOnceRef.current) {
+        const profileCreated = await ensureProfileExists();
+        profileCheckedOnceRef.current = true;
         
-        const delay = 1000;
-        await new Promise(resolve => setTimeout(resolve, delay));
+        console.log('[Journal] Profile check result:', profileCreated);
         
-        profileCreated = await ensureProfileExists();
-        
-        setProfileCheckRetryCount(prevCount => prevCount + 1);
+        if (!profileCreated) {
+          setShowRetryButton(true);
+        }
       }
       
-      console.log('[Journal] Proceeding with journal view regardless of profile status');
       setIsProfileChecked(true);
-      
-      if (!profileCreated) {
-        setShowRetryButton(true);
-      }
     } catch (error: any) {
       console.error('[Journal] Error checking/creating user profile:', error);
       
       const now = Date.now();
       if (now - lastProfileErrorTime > 60000) {
-        toast.error('Having trouble with your profile. You can try again or continue using the app.', { 
-          duration: 3000,
-          closeButton: false
-        });
         setLastProfileErrorTime(now);
       }
       
@@ -236,6 +226,7 @@ const Journal = () => {
     if (!user?.id) return;
     
     setProfileCheckRetryCount(0);
+    profileCheckedOnceRef.current = false;
     setIsProfileChecked(false);
     checkUserProfile(user.id);
   };

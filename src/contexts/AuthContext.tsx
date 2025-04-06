@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [lastProfileAttemptTime, setLastProfileAttemptTime] = useState<number>(0);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
+  const [profileCreationComplete, setProfileCreationComplete] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -43,10 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const ensureProfileExists = async (): Promise<boolean> => {
     if (!user || profileCreationInProgress) return false;
     
-    if (profileExistsStatus === true) {
+    // If we've already confirmed profile exists, return true immediately
+    if (profileExistsStatus === true || profileCreationComplete) {
       return true;
     }
     
+    // Rate limiting to prevent too many rapid attempts
     const now = Date.now();
     if (now - lastProfileAttemptTime < 2000) {
       console.log('[AuthContext] Skipping profile check - too soon after last attempt');
@@ -59,16 +63,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfileCreationAttempts(prev => prev + 1);
       
       console.log(`[AuthContext] Attempt #${profileCreationAttempts + 1} to ensure profile exists for user:`, user.id);
-      console.log(`[AuthContext] Auth provider: ${user.app_metadata?.provider}, Has metadata: ${!!user.user_metadata}`);
       
+      // Check/create profile
       const result = await ensureProfileExistsService(user);
       
       if (result) {
         console.log('[AuthContext] Profile created or verified successfully');
         setProfileCreationAttempts(0);
         setProfileExistsStatus(true);
-      } else if (profileCreationAttempts < 5) {
-        console.log(`[AuthContext] Profile creation failed on attempt #${profileCreationAttempts + 1}, will retry later`);
+        setProfileCreationComplete(true);
+      } else if (profileCreationAttempts < 3) {
+        console.log(`[AuthContext] Profile creation failed on attempt #${profileCreationAttempts + 1}, status: ${result}`);
         setProfileExistsStatus(false);
       }
       
@@ -148,8 +153,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const createOrVerifyProfile = async (currentUser: User): Promise<boolean> => {
-    if (profileCreationInProgress) return false;
+    if (profileCreationInProgress || profileCreationComplete) return profileExistsStatus || false;
     
+    // If we've already confirmed profile exists, return true immediately
     if (profileExistsStatus === true) {
       return true;
     }
@@ -157,12 +163,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setProfileCreationInProgress(true);
       console.log('[AuthContext] Attempting profile creation for user:', currentUser.email);
-      console.log('[AuthContext] Auth provider:', currentUser.app_metadata?.provider);
-      console.log('[AuthContext] Has user_metadata:', !!currentUser.user_metadata);
       
+      // Add a small delay for stability
       if (isMobileDevice) {
         console.log('[AuthContext] Mobile device detected, adding stabilization delay');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
       
       const profileCreated = await ensureProfileExistsService(currentUser);
@@ -171,36 +176,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[AuthContext] Profile created or verified for user:', currentUser.email);
         setProfileCreationAttempts(0);
         setProfileExistsStatus(true);
+        setProfileCreationComplete(true);
         return true;
       } else {
-        console.warn('[AuthContext] First attempt to create profile failed, retrying with backoff...');
+        console.warn('[AuthContext] First attempt to create profile failed, retrying once...');
         
-        const retryLimit = isMobileDevice ? 3 : 2;
+        // Just try one more time with a short delay
+        await new Promise(resolve => setTimeout(resolve, 800));
         
-        for (let attempt = 1; attempt <= retryLimit; attempt++) {
-          const baseDelay = isMobileDevice ? 1500 : 1000;
-          const delay = baseDelay * attempt;
-          console.log(`[AuthContext] Waiting ${delay}ms before retry attempt #${attempt}`);
-          
-          await new Promise(resolve => setTimeout(resolve, delay));
-          
-          const retryResult = await ensureProfileExistsService(currentUser);
-          if (retryResult) {
-            console.log(`[AuthContext] Profile created or verified on retry #${attempt} for user:`, currentUser.email);
-            setProfileCreationAttempts(0);
-            setProfileExistsStatus(true);
-            return true;
-          }
+        const retryResult = await ensureProfileExistsService(currentUser);
+        if (retryResult) {
+          console.log('[AuthContext] Profile created or verified on retry for user:', currentUser.email);
+          setProfileCreationAttempts(0);
+          setProfileExistsStatus(true);
+          setProfileCreationComplete(true);
+          return true;
         }
         
         setProfileExistsStatus(false);
-        console.warn('[AuthContext] Failed to create profile after multiple retries, but proceeding anyway');
-        return true;
+        return false;
       }
     } catch (error) {
       console.error('[AuthContext] Error in profile creation:', error);
       setProfileExistsStatus(false);
-      return true;
+      return false;
     } finally {
       setProfileCreationInProgress(false);
     }
@@ -216,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(currentSession?.user ?? null);
         
         if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && currentSession?.user) {
-          const delay = isMobileDevice ? 1800 : 1200;
+          const delay = isMobileDevice ? 1000 : 800;
           console.log(`[AuthContext] Delaying profile creation by ${delay}ms for platform stability`);
           
           setTimeout(() => {
@@ -230,18 +229,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_IN') {
           toast.success('Signed in successfully');
         } else if (event === 'SIGNED_OUT') {
+          // Reset profile status when signing out
+          setProfileExistsStatus(null);
+          setProfileCreationComplete(false);
           toast.info('Signed out');
         }
       }
     );
 
+    // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
       console.log('[AuthContext] Initial session check:', currentSession?.user?.email);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        const delay = isMobileDevice ? 2000 : 1500;
+        const delay = isMobileDevice ? 1200 : 800;
         console.log(`[AuthContext] Delaying initial profile creation by ${delay}ms for platform stability`);
         
         setTimeout(() => {
