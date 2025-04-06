@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -8,8 +7,9 @@ import JournalHeader from '@/components/journal/JournalHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import JournalProfileDebug from '@/components/journal/JournalProfileDebug';
+import { Button } from '@/components/ui/button';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -19,8 +19,8 @@ const Journal = () => {
   const [isCheckingProfile, setIsCheckingProfile] = useState(true);
   const [activeTab, setActiveTab] = useState('record');
   const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
-  // Track when the last profile error message was shown to avoid spamming
   const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
+  const [showRetryButton, setShowRetryButton] = useState(false);
   
   // Get journal entries using the hook
   const { entries, loading, fetchEntries } = useJournalEntries(
@@ -40,6 +40,7 @@ const Journal = () => {
   const checkUserProfile = async (userId: string) => {
     try {
       setIsCheckingProfile(true);
+      setShowRetryButton(false);
       
       console.log('[Journal] Checking user profile for ID:', userId);
       
@@ -68,9 +69,12 @@ const Journal = () => {
         // Only show error toast occasionally (max once per minute)
         const now = Date.now();
         if (now - lastProfileErrorTime > 60000) {
-          toast.error('Having trouble setting up your profile. You can still use the app.');
+          toast.error('Having trouble setting up your profile. You can try again or continue using the app.');
           setLastProfileErrorTime(now);
         }
+        
+        // Show a retry button after multiple failures
+        setShowRetryButton(true);
         
         // Allow usage even if profile creation failed
         setIsProfileChecked(true);
@@ -81,15 +85,26 @@ const Journal = () => {
       // Only show error toast occasionally (max once per minute)
       const now = Date.now();
       if (now - lastProfileErrorTime > 60000) {
-        toast.error('Having trouble with your profile, but you can continue using the app');
+        toast.error('Having trouble with your profile. You can try again or continue using the app.');
         setLastProfileErrorTime(now);
       }
+      
+      // Show retry button
+      setShowRetryButton(true);
       
       // Allow usage even with errors
       setIsProfileChecked(true);
     } finally {
       setIsCheckingProfile(false);
     }
+  };
+
+  const handleRetryProfileCreation = () => {
+    if (!user?.id) return;
+    
+    setProfileCheckRetryCount(0);
+    setIsProfileChecked(false);
+    checkUserProfile(user.id);
   };
 
   // Handle starting a new recording
@@ -160,6 +175,24 @@ const Journal = () => {
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
       <JournalHeader />
+      
+      {showRetryButton && (
+        <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
+          <div className="flex flex-col gap-3">
+            <p className="text-amber-800 dark:text-amber-200">
+              We're having trouble setting up your profile. Your entries may not be saved correctly.
+            </p>
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto border-amber-500 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
+              onClick={handleRetryProfileCreation}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" /> 
+              Retry Profile Setup
+            </Button>
+          </div>
+        </div>
+      )}
       
       <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
         <TabsList className="grid w-full grid-cols-2 mb-6">

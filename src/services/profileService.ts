@@ -8,7 +8,7 @@ import { toast } from 'sonner';
  */
 export const ensureProfileExists = async (user: User | null): Promise<boolean> => {
   if (!user) {
-    console.log('Cannot create profile: No user provided');
+    console.log('[ProfileService] Cannot create profile: No user provided');
     return false;
   }
   
@@ -36,38 +36,32 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         // Log all metadata to help debug
         console.log('[ProfileService] Full user metadata:', JSON.stringify(user.user_metadata, null, 2));
         
-        // Try different metadata paths for different auth providers
-        if (user.user_metadata) {
-          // Google auth uses these fields
-          if (user.app_metadata?.provider === 'google') {
-            console.log('[ProfileService] Extracting Google-specific metadata');
-            fullName = user.user_metadata?.name || 
-                      user.user_metadata?.full_name ||
-                      `${user.user_metadata?.given_name || ''} ${user.user_metadata?.family_name || ''}`.trim();
-            
-            avatarUrl = user.user_metadata?.picture || 
-                       user.user_metadata?.avatar_url || 
-                       '';
-          } else {
-            // Email auth or other providers
-            fullName = user.user_metadata?.full_name || 
-                      user.user_metadata?.name ||
-                      `${user.user_metadata?.given_name || ''} ${user.user_metadata?.family_name || ''}`.trim();
-            
-            avatarUrl = user.user_metadata?.avatar_url || 
-                       user.user_metadata?.picture || 
-                       '';
-          }
+        // Handle different authentication providers' metadata formats
+        if (user.app_metadata?.provider === 'google') {
+          // Google specific metadata extraction
+          fullName = user.user_metadata?.name || 
+                    user.user_metadata?.full_name ||
+                    `${user.user_metadata?.given_name || ''} ${user.user_metadata?.family_name || ''}`.trim();
+          
+          avatarUrl = user.user_metadata?.picture || 
+                     user.user_metadata?.avatar_url || 
+                     '';
+          
+          console.log('[ProfileService] Extracted Google metadata:', { fullName, avatarUrl });
+        } else {
+          // Default metadata extraction for email or other providers
+          fullName = user.user_metadata?.full_name || 
+                    user.user_metadata?.name ||
+                    `${user.user_metadata?.given_name || ''} ${user.user_metadata?.family_name || ''}`.trim();
+          
+          avatarUrl = user.user_metadata?.avatar_url || 
+                     user.user_metadata?.picture || 
+                     '';
+                     
+          console.log('[ProfileService] Extracted default metadata:', { fullName, avatarUrl });
         }
         
-        console.log('[ProfileService] Creating profile with data:', {
-          id: user.id,
-          email,
-          full_name: fullName,
-          avatar_url: avatarUrl
-        });
-        
-        // Explicit handling for different auth providers
+        // Explicit profile data preparation
         const profileData = {
           id: user.id,
           email,
@@ -76,6 +70,8 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
           onboarding_completed: false,
           updated_at: new Date().toISOString()
         };
+        
+        console.log('[ProfileService] Creating profile with data:', profileData);
         
         // First, try upsert with explicit conflict handling
         const { error: upsertError } = await supabase
@@ -88,31 +84,21 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         if (upsertError) {
           console.error('[ProfileService] Error upserting profile:', upsertError);
           
-          // If upsert fails, try direct insert as fallback
+          // If upsert fails, try direct insert as fallback with simplified data
           console.log('[ProfileService] Attempting direct insert as fallback');
           const { error: insertError } = await supabase
             .from('profiles')
-            .insert([profileData]);
+            .insert([{
+              id: user.id,
+              email,
+              full_name: fullName,
+              avatar_url: avatarUrl,
+              onboarding_completed: false
+            }]);
             
           if (insertError) {
             console.error('[ProfileService] Final fallback insert failed:', insertError);
-            
-            // Last resort - try without updated_at field which might cause issues
-            console.log('[ProfileService] Trying simplified insert without updated_at');
-            const { error: finalError } = await supabase
-              .from('profiles')
-              .insert([{
-                id: user.id,
-                email,
-                full_name: fullName,
-                avatar_url: avatarUrl,
-                onboarding_completed: false
-              }]);
-              
-            if (finalError) {
-              console.error('[ProfileService] All insert attempts failed:', finalError);
-              return false;
-            }
+            return false;
           }
         }
         
@@ -124,7 +110,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
       }
     }
     
-    console.log('[ProfileService] Profile already exists:', data.id);
+    console.log('[ProfileService] Profile already exists:', data?.id);
     return true;
   } catch (error: any) {
     console.error('[ProfileService] Error ensuring profile exists:', error);
@@ -159,7 +145,7 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
 
     return true;
   } catch (error) {
-    console.error('Error updating profile:', error);
+    console.error('[ProfileService] Error updating profile:', error);
     return false;
   }
 };

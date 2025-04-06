@@ -52,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfileCreationAttempts(prev => prev + 1);
       
       console.log(`[AuthContext] Attempt #${profileCreationAttempts + 1} to ensure profile exists for user:`, user.id);
+      console.log(`[AuthContext] Auth provider: ${user.app_metadata?.provider}, Has metadata: ${!!user.user_metadata}`);
+      
       const result = await ensureProfileExistsService(user);
       
       if (result) {
@@ -144,6 +146,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('[AuthContext] Auth provider:', currentUser.app_metadata?.provider);
       console.log('[AuthContext] Has user_metadata:', !!currentUser.user_metadata);
       
+      if (isMobileDevice) {
+        console.log('[AuthContext] Mobile device detected, adding stabilization delay');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
       const profileCreated = await ensureProfileExistsService(currentUser);
       
       if (profileCreated) {
@@ -153,7 +160,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         console.warn('[AuthContext] First attempt to create profile failed, retrying with backoff...');
         
-        for (let attempt = 1; attempt <= 3; attempt++) {
+        const retryLimit = isMobileDevice ? 5 : 3;
+        
+        for (let attempt = 1; attempt <= retryLimit; attempt++) {
           const baseDelay = isMobileDevice ? 2000 : 1000;
           const delay = Math.pow(2, attempt - 1) * baseDelay;
           console.log(`[AuthContext] Waiting ${delay}ms before retry attempt #${attempt}`);
@@ -189,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(currentSession?.user ?? null);
         
         if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && currentSession?.user) {
-          const delay = isMobileDevice ? 1500 : 1000;
+          const delay = isMobileDevice ? 1800 : 1200;
           console.log(`[AuthContext] Delaying profile creation by ${delay}ms for platform stability`);
           
           setTimeout(() => {
@@ -214,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        const delay = isMobileDevice ? 1800 : 1200;
+        const delay = isMobileDevice ? 2000 : 1500;
         console.log(`[AuthContext] Delaying initial profile creation by ${delay}ms for platform stability`);
         
         setTimeout(() => {
