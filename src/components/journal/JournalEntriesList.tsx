@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -32,10 +31,8 @@ export default function JournalEntriesList({
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
 
-  // Initialize and update local entries
   useEffect(() => {
     if (entries.length >= 0) {
-      // Filter out any entries that are pending deletion
       const filteredEntries = entries.filter(
         entry => !pendingDeletions.current.has(entry.id)
       );
@@ -47,20 +44,17 @@ export default function JournalEntriesList({
     };
   }, [entries]);
 
-  // Update entries count when entries change to trigger animation for new entries
   useEffect(() => {
     if (!componentMounted.current) return;
     
     if (entries.length > 0) {
       if (entries.length > prevEntriesLength) {
-        // New entries have been added, highlight them
         const newEntryIds = entries
           .slice(0, entries.length - prevEntriesLength)
           .map(entry => entry.id);
           
         setAnimatedEntryIds(prev => [...prev, ...newEntryIds]);
         
-        // Remove animation after 5 seconds
         setTimeout(() => {
           if (componentMounted.current) {
             setAnimatedEntryIds([]);
@@ -74,28 +68,22 @@ export default function JournalEntriesList({
     }
   }, [entries.length, prevEntriesLength, entries]);
   
-  // Handle entry deletion by calling the parent handler and updating local state
   const handleEntryDelete = (entryId: number) => {
     console.log(`[JournalEntriesList] Handling deletion of entry ${entryId}`);
     
-    // Mark entry as pending deletion to prevent UI flickering
     pendingDeletions.current.add(entryId);
     
-    // Update local entries immediately to avoid blank screen
     setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
     
-    // Call the parent handler with a slight delay to avoid state conflicts
     if (onDeleteEntry) {
       setTimeout(() => {
         if (componentMounted.current) {
           try {
             const result = onDeleteEntry(entryId);
             
-            // Check if result is a Promise and handle it properly
             if (result && typeof result.then === 'function') {
               result
                 .then(() => {
-                  // After successful deletion, remove from pending set
                   pendingDeletions.current.delete(entryId);
                 })
                 .catch(error => {
@@ -103,7 +91,6 @@ export default function JournalEntriesList({
                   pendingDeletions.current.delete(entryId);
                 });
             } else {
-              // If it's not a Promise, just remove from pending
               pendingDeletions.current.delete(entryId);
             }
           } catch (error) {
@@ -115,7 +102,6 @@ export default function JournalEntriesList({
     }
   };
   
-  // Clean up the component when unmounting
   useEffect(() => {
     return () => {
       console.log("[JournalEntriesList] Component unmounting");
@@ -124,11 +110,8 @@ export default function JournalEntriesList({
     };
   }, []);
   
-  // Show primary loading state only when loading initial entries
-  // But don't show loading indefinitely for new users with no entries
   const showInitialLoading = loading && localEntries.length === 0 && !hasProcessingEntries;
 
-  // New flag to check if this is likely a new user who hasn't created any entries yet
   const isLikelyNewUser = !loading && localEntries.length === 0 && !processingEntries.length;
 
   if (showInitialLoading) {
@@ -140,7 +123,6 @@ export default function JournalEntriesList({
     );
   }
 
-  // Show empty state for new users or users with no entries
   if (isLikelyNewUser) {
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
@@ -160,7 +142,6 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4">
-            {/* Processing entry skeletons */}
             {hasProcessingEntries && (
               <div className="mb-4">
                 <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
@@ -205,7 +186,6 @@ export default function JournalEntriesList({
           </div>
         </AnimatePresence>
         
-        {/* Show loading state at the bottom if needed */}
         {loading && localEntries.length > 0 && !hasProcessingEntries && (
           <div className="flex items-center justify-center h-16 mt-4">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
