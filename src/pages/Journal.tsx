@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -9,7 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
-import JournalProfileDebug from '@/components/journal/JournalProfileDebug';
 import { Button } from '@/components/ui/button';
 
 const Journal = () => {
@@ -23,7 +21,6 @@ const Journal = () => {
   const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
   const [showRetryButton, setShowRetryButton] = useState(false);
   
-  // Get journal entries using the hook
   const { entries, loading, fetchEntries } = useJournalEntries(
     user?.id,
     refreshKey,
@@ -45,14 +42,11 @@ const Journal = () => {
       
       console.log('[Journal] Checking user profile for ID:', userId);
       
-      // Ensure profile exists with retry mechanism
       let profileCreated = await ensureProfileExists();
       
-      // If profile creation failed and we haven't retried too many times
       if (!profileCreated && profileCheckRetryCount < 5) {
         console.log('[Journal] Profile check failed, retrying...', profileCheckRetryCount + 1);
         
-        // Wait a bit longer each time (exponential backoff)
         const delay = 1000 * Math.pow(1.5, profileCheckRetryCount);
         await new Promise(resolve => setTimeout(resolve, delay));
         
@@ -67,33 +61,27 @@ const Journal = () => {
       } else if (profileCheckRetryCount >= 5) {
         console.error('[Journal] Failed to create profile after multiple retries');
         
-        // Only show error toast occasionally (max once per minute)
         const now = Date.now();
         if (now - lastProfileErrorTime > 60000) {
           toast.error('Having trouble setting up your profile. You can try again or continue using the app.');
           setLastProfileErrorTime(now);
         }
         
-        // Show a retry button after multiple failures
         setShowRetryButton(true);
         
-        // Allow usage even if profile creation failed
         setIsProfileChecked(true);
       }
     } catch (error: any) {
       console.error('[Journal] Error checking/creating user profile:', error);
       
-      // Only show error toast occasionally (max once per minute)
       const now = Date.now();
       if (now - lastProfileErrorTime > 60000) {
         toast.error('Having trouble with your profile. You can try again or continue using the app.');
         setLastProfileErrorTime(now);
       }
       
-      // Show retry button
       setShowRetryButton(true);
       
-      // Allow usage even with errors
       setIsProfileChecked(true);
     } finally {
       setIsCheckingProfile(false);
@@ -108,38 +96,29 @@ const Journal = () => {
     checkUserProfile(user.id);
   };
 
-  // Handle starting a new recording
   const handleStartRecording = () => {
     console.log('Starting new recording');
     setActiveTab('record');
   };
 
-  // Handle when a recording is completed
   const handleRecordingComplete = async (audioBlob: Blob) => {
     if (!audioBlob || !user?.id) return;
     
     try {
-      // Show only one toast for the entire process
       const toastId = toast.loading('Processing your journal entry...');
       
-      // Process the recording and get a temporary ID
       const { success, tempId } = await processRecording(audioBlob, user.id);
       
       if (success && tempId) {
-        // Add the tempId to processing entries state
         setProcessingEntries(prev => [...prev, tempId]);
         
-        // Refresh the entries list after a delay to allow processing
         setTimeout(() => {
           setRefreshKey(prev => prev + 1);
           
-          // Remove the tempId from processing entries
           setProcessingEntries(prev => prev.filter(id => id !== tempId));
           
-          // Update the toast once processing is complete
           toast.success('Journal entry saved!', { id: toastId });
           
-          // Switch to the entries tab after recording is processed
           setActiveTab('entries');
         }, 1500);
       } else {
@@ -151,19 +130,16 @@ const Journal = () => {
     }
   };
 
-  // Handle deleting an entry
   const handleDeleteEntry = async (entryId: number) => {
     if (!user?.id) return;
     
     try {
-      // After successful deletion, refresh the entries list
       setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Error deleting entry:', error);
     }
   };
 
-  // If we're checking the profile, show a loading state
   if (isCheckingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -207,7 +183,6 @@ const Journal = () => {
         </TabsList>
         
         <TabsContent value="record" className="mt-0">
-          {/* Voice recorder component */}
           <div className="mb-4">
             <VoiceRecorder 
               onRecordingComplete={handleRecordingComplete}
@@ -216,7 +191,6 @@ const Journal = () => {
         </TabsContent>
         
         <TabsContent value="entries" className="mt-0">
-          {/* Journal entries list */}
           <JournalEntriesList
             entries={entries}
             loading={loading}
@@ -225,7 +199,6 @@ const Journal = () => {
             onDeleteEntry={handleDeleteEntry}
           />
           
-          {/* Show processing indicator when entries are being processed */}
           {processingEntries.length > 0 && (
             <div className="mt-4 p-3 bg-primary-foreground/10 border border-primary/20 rounded-lg">
               <div className="flex items-center gap-2 text-sm text-primary">
@@ -236,9 +209,6 @@ const Journal = () => {
           )}
         </TabsContent>
       </Tabs>
-      
-      {/* Add the Profile Debug Component */}
-      <JournalProfileDebug />
     </div>
   );
 };
