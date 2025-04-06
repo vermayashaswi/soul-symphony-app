@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -34,20 +33,21 @@ export default function JournalEntriesList({
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
   const [renderError, setRenderError] = useState<Error | null>(null);
+  const hasNoValidEntries = useRef(false);
 
-  // Safely handle entries updates with error boundaries
   useEffect(() => {
     try {
       if (Array.isArray(entries)) {
-        // Add defensive filtering to ensure we only render valid entries
         const filteredEntries = entries.filter(
           entry => entry && 
                   typeof entry === 'object' && 
                   entry.id && 
                   !pendingDeletions.current.has(entry.id) &&
-                  // Ensure entry has minimum required content to display
                   (entry.content || entry.created_at)
         );
+        
+        hasNoValidEntries.current = filteredEntries.length === 0 && entries.length > 0;
+        
         setLocalEntries(filteredEntries);
       } else {
         console.warn('[JournalEntriesList] Entries is not an array:', entries);
@@ -56,7 +56,6 @@ export default function JournalEntriesList({
     } catch (error) {
       console.error('[JournalEntriesList] Error processing entries:', error);
       setRenderError(error instanceof Error ? error : new Error('Unknown error processing entries'));
-      // Fallback to empty array
       setLocalEntries([]);
     }
 
@@ -65,7 +64,6 @@ export default function JournalEntriesList({
     };
   }, [entries]);
 
-  // Track new entries for animation
   useEffect(() => {
     if (!componentMounted.current) return;
     
@@ -74,7 +72,6 @@ export default function JournalEntriesList({
         if (entries.length > prevEntriesLength) {
           const newEntryIds: number[] = [];
           
-          // Safely extract new entry IDs
           for (let i = 0; i < Math.min(entries.length - prevEntriesLength, entries.length); i++) {
             const entry = entries[i];
             if (entry && typeof entry === 'object' && entry.id) {
@@ -127,7 +124,6 @@ export default function JournalEntriesList({
     } catch (error) {
       console.error(`[JournalEntriesList] Error in handleEntryDelete for entry ${entryId}:`, error);
       
-      // Ensure we clean up even if there's an error
       if (componentMounted.current) {
         pendingDeletions.current.delete(entryId);
       }
@@ -142,18 +138,14 @@ export default function JournalEntriesList({
     };
   }, []);
   
-  // Safe calculation of loading states with fallbacks
   const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !hasProcessingEntries;
   
-  // Safe calculation for new user state
   const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !processingEntries.length;
 
-  // Handle retry for rendering errors
   const handleRetry = () => {
     setRenderError(null);
     setRenderRetryCount(count => count + 1);
     
-    // Try to reset local entries from the prop
     if (Array.isArray(entries)) {
       try {
         const filteredEntries = entries.filter(entry => 
@@ -167,17 +159,11 @@ export default function JournalEntriesList({
     }
   };
 
-  // If we have a render error, show a friendly message with retry option
-  if (renderError) {
+  if (hasNoValidEntries.current) {
     return (
-      <div className="flex flex-col items-center justify-center space-y-4 p-8 border border-red-200 rounded-lg bg-red-50 dark:bg-red-900/20">
-        <p className="text-red-700 dark:text-red-300">We had trouble displaying your entries</p>
-        <Button 
-          variant="outline" 
-          onClick={handleRetry}
-        >
-          Try Again
-        </Button>
+      <div className="flex flex-col items-center justify-center h-64">
+        <p className="text-muted-foreground mb-4">Your entries are still being processed</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
       </div>
     );
   }
@@ -185,7 +171,7 @@ export default function JournalEntriesList({
   if (showInitialLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
         <p className="text-muted-foreground">Loading your journal entries...</p>
       </div>
     );
@@ -195,7 +181,6 @@ export default function JournalEntriesList({
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
 
-  // Ensure localEntries is actually an array before rendering
   const safeLocalEntries = Array.isArray(localEntries) ? localEntries : [];
 
   return (

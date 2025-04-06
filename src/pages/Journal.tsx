@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -39,6 +38,7 @@ const Journal = () => {
   const [lastAction, setLastAction] = useState<string>('Page Loaded');
   const [audioStatus, setAudioStatus] = useState<string>('No Recording');
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
+  const [entriesReady, setEntriesReady] = useState(false);
 
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
@@ -101,11 +101,17 @@ const Journal = () => {
         setToastIds({});
         setIsSavingRecording(false);
         setSafeToSwitchTab(true);
+        
+        setEntriesReady(true);
       }
       
       previousEntriesRef.current = currentEntryIds;
+      
+      if (!entriesReady && entries.length > 0) {
+        setEntriesReady(true);
+      }
     }
-  }, [entries, processingEntries, toastIds]);
+  }, [entries, processingEntries, toastIds, entriesReady]);
 
   useEffect(() => {
     return () => {
@@ -210,17 +216,19 @@ const Journal = () => {
     setProcessingError(null);
   };
 
-  // This controls when we actually switch tabs
   const handleTabChange = (value: string) => {
-    // If we're trying to switch to entries tab and it's not safe, just show loading
+    console.log(`[Journal] Tab change requested to: ${value}. Current safeToSwitchTab: ${safeToSwitchTab}`);
+    
     if (value === 'entries' && !safeToSwitchTab) {
       console.log('[Journal] Attempted to switch to entries but waiting for processing');
-      // We don't set the active tab yet, but we'll show a loading indicator on entries tab
-      // The actual switch will happen when processing completes
       return;
     }
     
     setActiveTab(value);
+    
+    if (value === 'entries') {
+      fetchEntries();
+    }
   };
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
@@ -240,12 +248,7 @@ const Journal = () => {
       setLastAction('Recording Complete - Processing');
       setAudioStatus(`Processing (${formatBytes(audioBlob.size)})`);
       setSafeToSwitchTab(false);
-      
-      // We'll delay switching to entries tab until processing has advanced a bit
-      // This helps prevent blank screen issues
-      
-      setEntryHasBeenProcessed(false);
-      clearAllToasts();
+      setEntriesReady(false);
       
       const toastId = toast.loading('Processing your journal entry with AI...', {
         duration: 15000,
@@ -271,12 +274,6 @@ const Journal = () => {
         setProcessingEntries(prev => [...prev, tempId]);
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
-        
-        // Now it's safe to switch to the entries tab with a slight delay
-        // to ensure we show proper loading state
-        setTimeout(() => {
-          setActiveTab('entries');
-        }, 500);
         
         await fetchEntries();
         setRefreshKey(prev => prev + 1);
