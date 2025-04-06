@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
-import { JournalDebugger } from '@/components/journal/debugger';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
 
 const Journal = () => {
@@ -426,17 +425,6 @@ const Journal = () => {
 
   return (
     <ErrorBoundary onReset={resetError}>
-      <JournalDebugger 
-        processingEntries={processingEntries}
-        isSavingRecording={isSavingRecording}
-        isRecordingComplete={isRecordingComplete}
-        activeTab={activeTab}
-        processingError={processingError}
-        lastAction={lastAction}
-        audioStatus={audioStatus}
-        recordingDuration={recordingDuration}
-      />
-      
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
         <JournalHeader />
         
