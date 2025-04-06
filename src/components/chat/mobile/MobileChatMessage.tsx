@@ -59,6 +59,12 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             : 'bg-muted/60 border border-border/50 rounded-tl-none'
         )}
       >
+        {message.role === 'assistant' && hasReferences && (
+          <div className="mb-2 text-xs font-medium text-muted-foreground bg-muted/80 rounded-sm px-2 py-1 inline-block">
+            Based on {message.references.length} journal {message.references.length === 1 ? 'entry' : 'entries'}
+          </div>
+        )}
+        
         {message.role === 'assistant' ? (
           <ReactMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words">
             {formattedContent}

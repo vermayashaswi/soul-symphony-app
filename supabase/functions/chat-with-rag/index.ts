@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -122,6 +121,26 @@ serve(async (req) => {
     
     console.log(`Found ${entries.length} relevant entries`);
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "success", `Found ${entries.length} entries`));
+    
+    // Check if we found any entries for the requested time period when a time range was specified
+    if (timeRange && (timeRange.startDate || timeRange.endDate) && entries.length === 0) {
+      console.log("No entries found for the specified time range");
+      diagnostics.steps.push(createDiagnosticStep("Time Range Check", "warning", "No entries found in specified time range"));
+      
+      // Process empty entries to ensure valid dates for the response format
+      const processedEntries = [];
+      
+      // Return a response with no entries but proper message
+      return new Response(
+        JSON.stringify({ 
+          response: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
+          diagnostics: includeDiagnostics ? diagnostics : undefined,
+          references: processedEntries,
+          noEntriesForTimeRange: true
+        }),
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
 
     // 3. Prepare prompt
     const prompt = `You are a personal mental well-being assistant. Your goal is to provide helpful, empathetic, and insightful responses based on the user's journal entries.

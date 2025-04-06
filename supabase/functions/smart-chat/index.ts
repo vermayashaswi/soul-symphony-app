@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -82,6 +81,20 @@ serve(async (req) => {
     }
     
     console.log(`Found ${entries.length} relevant entries`);
+
+    // Check if we found any entries for the requested time period
+    if (timeRange && (timeRange.startDate || timeRange.endDate) && entries.length === 0) {
+      console.log("No entries found for the specified time range");
+      
+      // Return a friendly message indicating no entries were found
+      return new Response(
+        JSON.stringify({ 
+          data: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
+          noEntriesForTimeRange: true
+        }),
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
 
     // 3. Prepare prompt
     const prompt = `You are a personal mental well-being assistant. Your goal is to provide helpful, empathetic, and insightful responses based on the user's journal entries.
