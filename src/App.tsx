@@ -24,8 +24,8 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <BrowserRouter>
-          <AuthProvider>
-            <ThemeProvider>
+          <ThemeProvider>
+            <AuthProvider>
               <div className="relative min-h-screen">
                 <div className="relative z-10">
                   <Toaster />
@@ -35,8 +35,8 @@ const App = () => {
                   </AnimatePresence>
                 </div>
               </div>
-            </ThemeProvider>
-          </AuthProvider>
+            </AuthProvider>
+          </ThemeProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

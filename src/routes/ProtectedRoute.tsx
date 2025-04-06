@@ -1,15 +1,38 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, isLoading } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
   const location = useLocation();
+  
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        setUser(data.session?.user || null);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking authentication in ProtectedRoute:', error);
+        setIsLoading(false);
+      }
+    };
+    
+    checkAuth();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user || null);
+      setIsLoading(false);
+    });
+    
+    return () => subscription.unsubscribe();
+  }, []);
   
   React.useEffect(() => {
     if (!isLoading && !user) {

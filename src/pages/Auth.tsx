@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -8,11 +9,12 @@ import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
 
 export default function Auth() {
-  const { user, isLoading, signInWithGoogle } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authUser, setAuthUser] = useState(null);
   
   // Get the return path - prioritize query param, then location state, then localStorage, or default to / (home)
   const redirectParam = searchParams.get('redirectTo');
@@ -23,11 +25,27 @@ export default function Auth() {
   const from = '/';
 
   useEffect(() => {
+    // Check if the user is already authenticated
+    const checkAuthState = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        setAuthUser(data.session?.user || null);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking auth state:', error);
+        setIsLoading(false);
+      }
+    };
+    
+    checkAuthState();
+  }, []);
+
+  useEffect(() => {
     // Log the current origin/domain for debugging
     console.log('Current origin for Auth page:', window.location.origin);
     console.log('Redirect destination after auth:', from);
     
-    if (user && !redirecting) {
+    if (authUser && !redirecting) {
       console.log('Auth page: User detected, redirecting to:', from);
       setRedirecting(true);
       
@@ -41,7 +59,7 @@ export default function Auth() {
       
       return () => clearTimeout(timer);
     }
-  }, [user, navigate, redirecting, from]);
+  }, [authUser, navigate, redirecting, from]);
 
   useEffect(() => {
     const handleHashRedirect = async () => {
@@ -72,7 +90,7 @@ export default function Auth() {
             toast.error('Authentication error. Please try again.');
           } else if (data.session) {
             console.log('Successfully retrieved session after redirect:', data.session.user.email);
-            console.log('Current domain:', window.location.origin);
+            setAuthUser(data.session.user);
             // Session will be picked up by the other useEffect
           }
         } catch (e) {
@@ -88,11 +106,32 @@ export default function Auth() {
   const handleSignIn = async () => {
     console.log('Initiating Google sign-in from', window.location.origin);
     try {
-      await signInWithGoogle();
+      const redirectUrl = getRedirectUrl();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+      
+      if (error) {
+        throw error;
+      }
     } catch (error) {
       console.error('Failed to initiate Google sign-in:', error);
       toast.error('Failed to initiate sign-in process. Please try again.');
     }
+  };
+  
+  // Helper function to get redirect URL
+  const getRedirectUrl = (): string => {
+    const origin = window.location.origin;
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectTo = urlParams.get('redirectTo');
+    if (redirectTo) {
+      localStorage.setItem('authRedirectTo', redirectTo);
+    }
+    return `${origin}/auth`;
   };
 
   if (isLoading) {
@@ -103,7 +142,7 @@ export default function Auth() {
     );
   }
 
-  if (user) {
+  if (authUser) {
     console.log('Auth page: User exists in render, redirecting to', from);
     return <Navigate to={from} replace />;
   }

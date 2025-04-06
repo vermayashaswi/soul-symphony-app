@@ -161,3 +161,29 @@ export const refreshSession = async () => {
     throw error;
   }
 };
+
+/**
+ * Check if user is authenticated
+ */
+export const isAuthenticated = async () => {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return !!data.session;
+  } catch (error) {
+    console.error('Error checking authentication status:', error);
+    return false;
+  }
+};
+
+/**
+ * Get current user
+ */
+export const getCurrentUser = async () => {
+  try {
+    const { data } = await supabase.auth.getUser();
+    return data.user;
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    return null;
+  }
+};
