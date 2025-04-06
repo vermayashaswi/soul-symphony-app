@@ -61,10 +61,10 @@ const Journal = () => {
       !processingEntries.some(tempId => tempId === entry.id.toString())
     );
     
-    // If we have new entries and we've already loaded entries before
+    // If we have new entries and we've already loaded entries before (to avoid showing on initial load)
     if (newEntries.length > 0 && notifiedEntryIds.size > 0) {
-      // Show a notification for new entries only once
-      toast.success('Journal entry processed!');
+      // Show a notification for new entries only once - with shorter duration
+      toast.success('Journal entry processed!', { duration: 2000 });
       
       // Add these entries to our notified set
       const updatedNotifiedIds = new Set(notifiedEntryIds);
@@ -151,8 +151,10 @@ const Journal = () => {
       // Immediately switch to the entries tab after recording
       setActiveTab('entries');
       
-      // Show user feedback
-      const toastId = toast.loading('Processing your journal entry with AI...');
+      // Show user feedback with shorter duration
+      const toastId = toast.loading('Processing your journal entry...', {
+        duration: 5000 // Limit to 5 seconds max
+      });
       
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
       
@@ -167,6 +169,21 @@ const Journal = () => {
         setRefreshKey(prev => prev + 1);
         fetchEntries();
         
+        // Set up a timeout to auto-dismiss the loading toast after 8 seconds max
+        // This prevents stuck "Processing..." notifications
+        setTimeout(() => {
+          if (toastIds[tempId]) {
+            toast.dismiss(toastId);
+            
+            // Remove the toast ID from our tracking
+            setToastIds(prev => {
+              const newToastIds = { ...prev };
+              delete newToastIds[tempId];
+              return newToastIds;
+            });
+          }
+        }, 8000);
+        
         // Set up polling but only do one success notification
         let hasNotifiedSuccess = false;
         
@@ -177,7 +194,7 @@ const Journal = () => {
           
           // Update toast to success only if we haven't already done so
           if (toastIds[tempId] && !hasNotifiedSuccess) {
-            toast.success('Journal entry processed!', { id: toastIds[tempId] });
+            toast.success('Journal entry processed!', { id: toastIds[tempId], duration: 2000 });
             hasNotifiedSuccess = true;
             
             // Remove the toast ID from our tracking
@@ -200,11 +217,14 @@ const Journal = () => {
         }, 5000);
       } else {
         // Clear loading toast and show error
-        toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { id: toastId });
+        toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
+          id: toastId,
+          duration: 3000
+        });
       }
     } catch (error) {
       console.error('Error processing recording:', error);
-      toast.error('Error processing your recording');
+      toast.error('Error processing your recording', { duration: 3000 });
     }
   };
 

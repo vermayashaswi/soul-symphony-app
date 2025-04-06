@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { toast } from 'sonner';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { checkUserProfile, createUserProfile, fetchJournalEntries } from '@/services/journalService';
 
@@ -125,10 +124,7 @@ export function useJournalEntries(
       
       initialFetchDoneRef.current = true;
       
-      // Only show toast error on initial load and if it's not just "No rows returned"
-      if (!initialFetchDoneRef.current && !error.message?.includes('No rows returned')) {
-        toast.error('Failed to load journal entries. Please try again later.');
-      }
+      // Remove toast error notification - let parent component handle this
     } finally {
       setLoading(false);
       isFetchingRef.current = false;

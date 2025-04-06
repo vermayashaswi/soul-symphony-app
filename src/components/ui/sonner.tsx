@@ -10,8 +10,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
-      className="toaster group"
-      duration={3000} // Set 3 second duration (increased from 1 second)
+      className="toaster group z-[100]" // Increased z-index for better visibility
+      duration={3000} // Set 3 second duration
       toastOptions={{
         classNames: {
           toast:
@@ -21,12 +21,21 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
           cancelButton:
             "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground dark:group-[.toast]:text-white/80",
-          title: "dark:group-[.toast]:text-white",
-          info: "dark:group-[.toast]:text-white group-[.toast]:text-black",
-          success: "dark:group-[.toast]:text-white group-[.toast]:text-black",
-          warning: "dark:group-[.toast]:text-white group-[.toast]:text-black",
-          error: "dark:group-[.toast]:text-white group-[.toast]:text-black",
-          closeButton: "dark:group-[.toast]:text-white/70 dark:group-[.toast]:hover:text-white group-[.toast]:text-black/70 group-[.toast]:hover:text-black"
+          title: "font-medium dark:group-[.toast]:text-white",
+          info: "dark:group-[.toast]:text-white group-[.toast]:text-black font-medium",
+          success: "dark:group-[.toast]:text-white group-[.toast]:text-black font-medium",
+          warning: "dark:group-[.toast]:text-white group-[.toast]:text-black font-medium",
+          error: "dark:group-[.toast]:text-white group-[.toast]:text-black font-medium",
+          closeButton: "dark:group-[.toast]:text-white/70 dark:group-[.toast]:hover:text-white group-[.toast]:text-black/70 group-[.toast]:hover:text-black",
+          loader: "dark:group-[.toast]:border-t-white/80 dark:group-[.toast]:border-l-white/80"
+        },
+        style: {
+          // Add stronger contrast to make toast more visible
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+          border: "1px solid var(--border)",
+          padding: "16px",
+          fontSize: "14px",
+          fontWeight: "500",
         },
       }}
       {...props}
