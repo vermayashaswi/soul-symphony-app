@@ -1,19 +1,19 @@
+
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
-import { processRecording } from '@/utils/audio-processing';
-import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
-import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
-import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
+import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
+import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
+import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -68,7 +68,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   
   useEffect(() => {
     if (isRecording && recordingTime >= 120) {
-      toast.warning("Your recording is quite long. Consider stopping now for better processing.");
+      toast.warning("Your recording is quite long. Consider stopping now for better processing.", {
+        duration: 3000, // Show for just 3 seconds
+      });
     }
   }, [isRecording, recordingTime]);
   
@@ -96,19 +98,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         recordingTime: recordingTime
       });
       
-      const result = await processRecording(normalizedBlob, user?.id);
-      
-      if (result.success && onRecordingComplete) {
-        onRecordingComplete(normalizedBlob, result.tempId);
-        toast.success("Recording saved and processing began!");
-      } else if (!result.success) {
-        setRecordingError(result.error || "Failed to process recording");
-        toast.error(result.error || "Failed to process recording");
+      if (onRecordingComplete) {
+        onRecordingComplete(normalizedBlob);
       }
     } catch (error: any) {
       console.error('Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
-      toast.error("Error saving recording: " + (error?.message || "An unexpected error occurred"));
+      toast.error("Error saving recording");
     } finally {
       setIsProcessing(false);
     }
@@ -118,7 +114,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     resetRecording();
     resetPlayback();
     setRecordingError(null);
-    toast.info("Recording discarded. Ready to start a new recording.");
+    toast.info("Starting a new recording");
   };
 
   return (
@@ -211,8 +207,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           {isProcessing && (
             <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground relative z-10 absolute bottom-4">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Processing with AI...</span>
-              <ChevronRight className="w-4 h-4" />
+              <span>Processing...</span>
             </div>
           )}
         </div>

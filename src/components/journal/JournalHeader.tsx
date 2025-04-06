@@ -8,11 +8,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
 
-interface JournalHeaderProps {
-  isFirstTime?: boolean;
-}
-
-const JournalHeader = ({ isFirstTime }: JournalHeaderProps = {}) => {
+const JournalHeader = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const urlParams = new URLSearchParams(window.location.search);

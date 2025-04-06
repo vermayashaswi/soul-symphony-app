@@ -18,9 +18,9 @@ const EmptyJournalState: React.FC<EmptyJournalStateProps> = ({ onStartRecording 
       <Card>
         <CardContent className="flex flex-col items-center py-12">
           <Mic className="h-16 w-16 text-muted-foreground mb-4" />
-          <h3 className="text-xl font-medium mb-2">No Journal Entries Yet</h3>
+          <h3 className="text-xl font-medium mb-2">Your Journal Is Empty</h3>
           <p className="text-muted-foreground text-center mb-6">
-            Start recording your thoughts to begin your journaling journey
+            Record your thoughts to begin your journaling experience
           </p>
           <Button onClick={onStartRecording}>
             Record Your First Entry

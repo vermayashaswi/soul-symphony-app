@@ -18,7 +18,7 @@ const Journal = () => {
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isCheckingProfile, setIsCheckingProfile] = useState(true);
   const [activeTab, setActiveTab] = useState('record');
-
+  
   // Get journal entries using the hook
   const { entries, loading, fetchEntries } = useJournalEntries(
     user?.id,
@@ -37,13 +37,6 @@ const Journal = () => {
   const checkUserProfile = async (userId: string) => {
     try {
       setIsCheckingProfile(true);
-      const event = new CustomEvent('journalOperationStart', {
-        detail: {
-          type: 'loading',
-          message: 'Checking user profile'
-        }
-      });
-      window.dispatchEvent(event);
       
       console.log('Checking user profile for ID:', userId);
       
@@ -57,13 +50,6 @@ const Journal = () => {
       }
       
       setIsProfileChecked(true);
-      
-      window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
-        detail: {
-          id: (event as any).detail?.id,
-          status: 'success'
-        }
-      }));
     } catch (error: any) {
       console.error('Error checking/creating user profile:', error);
       toast.error('Error setting up profile. Please refresh and try again.');
@@ -83,6 +69,9 @@ const Journal = () => {
     if (!audioBlob || !user?.id) return;
     
     try {
+      // We'll only show one toast for the entire process
+      const toastId = toast.loading('Processing your journal entry...');
+      
       // Process the recording and get a temporary ID
       const { success, tempId } = await processRecording(audioBlob, user.id);
       
@@ -97,14 +86,19 @@ const Journal = () => {
           // Remove the tempId from processing entries after a longer delay
           setTimeout(() => {
             setProcessingEntries(prev => prev.filter(id => id !== tempId));
-          }, 10000);
+            // Update the toast once processing is complete
+            toast.success('Journal entry saved successfully!', { id: toastId });
+          }, 5000);
           
           // Switch to the entries tab after recording is processed
           setActiveTab('entries');
-        }, 3000);
+        }, 1500);
+      } else {
+        toast.error('Failed to process recording. Please try again.', { id: toastId });
       }
     } catch (error) {
       console.error('Error processing recording:', error);
+      toast.error('Error processing your recording. Please try again.');
     }
   };
 
@@ -160,11 +154,11 @@ const Journal = () => {
           />
           
           {/* Show processing indicator when entries are being processed */}
-          {processingEntries && processingEntries.length > 0 && (
+          {processingEntries.length > 0 && (
             <div className="mt-4 p-3 bg-primary-foreground/10 border border-primary/20 rounded-lg">
               <div className="flex items-center gap-2 text-sm text-primary">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Processing {processingEntries.length > 1 ? 'entries' : 'entry'}...</span>
+                <span>Processing entry...</span>
               </div>
             </div>
           )}
