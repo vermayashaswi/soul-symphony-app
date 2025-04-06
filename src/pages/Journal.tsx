@@ -353,7 +353,13 @@ const Journal = () => {
     }
     
     try {
-      clearAllToasts();
+      await new Promise<void>((resolve) => {
+        clearAllToasts();
+        setTimeout(() => {
+          clearAllToasts();
+          setTimeout(() => resolve(), 150);
+        }, 50);
+      });
       
       setIsRecordingComplete(true);
       setIsSavingRecording(true);
@@ -444,12 +450,12 @@ const Journal = () => {
         
         toast.dismiss(toastId);
         
-        setTimeout(() => {
-          toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
-            duration: 3000,
-            closeButton: false
-          });
-        }, 100);
+        await new Promise(resolve => setTimeout(resolve, 150));
+        
+        toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
+          duration: 3000,
+          closeButton: false
+        });
         
         setIsRecordingComplete(false);
         setIsSavingRecording(false);
@@ -463,6 +469,10 @@ const Journal = () => {
       console.error('Error processing recording:', error);
       setProcessingError(error?.message || 'Unknown error occurred');
       setLastAction(`Exception: ${error?.message || 'Unknown'}`);
+      
+      clearAllToasts();
+      
+      await new Promise(resolve => setTimeout(resolve, 150));
       
       toast.error('Error processing your recording', { 
         duration: 3000,

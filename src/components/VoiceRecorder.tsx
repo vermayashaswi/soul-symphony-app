@@ -13,7 +13,7 @@ import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
-import { clearAllToasts } from '@/services/notificationService';
+import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -30,8 +30,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [hasPlayedOnce, setHasPlayedOnce] = useState(false);
   const [audioPrepared, setAudioPrepared] = useState(false);
   const [waitingForClear, setWaitingForClear] = useState(false);
+  const [toastsCleared, setToastsCleared] = useState(false);
   const saveCompleteRef = useRef(false);
   const savingInProgressRef = useRef(false);
+  const domClearAttemptedRef = useRef(false);
   const { user } = useAuth();
   const isMobile = useIsMobile();
   
@@ -70,6 +72,20 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.log('[VoiceRecorder] Playback ended');
     }
   });
+
+  // Clear toasts when component mounts
+  useEffect(() => {
+    const clearToastsOnMount = async () => {
+      await ensureAllToastsCleared();
+      setToastsCleared(true);
+    };
+    
+    clearToastsOnMount();
+    
+    return () => {
+      clearAllToasts();
+    };
+  }, []);
 
   useEffect(() => {
     if (isRecording) {
@@ -115,7 +131,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       hasSaved,
       hasPlayedOnce,
       audioPrepared,
-      waitingForClear
+      waitingForClear,
+      toastsCleared
     });
     
     if (updateDebugInfo) {
@@ -126,7 +143,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         duration: audioDuration || recordingTime
       });
     }
-  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, updateDebugInfo]);
+  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
   useEffect(() => {
     return () => {
@@ -156,19 +173,40 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.log('[VoiceRecorder] Starting save process');
       savingInProgressRef.current = true;
       
-      // Force clear ALL existing toasts to prevent UI interference
-      clearAllToasts();
-      
-      // Set a slight delay to ensure all toasts are fully cleared
+      // Set waiting state to update UI
       setWaitingForClear(true);
       
-      // Wait a brief moment to ensure UI is clear of toasts
+      // Aggressively clear all toasts to prevent UI interference (multiple attempts)
+      console.log('[VoiceRecorder] Ensuring all toasts are cleared before processing');
+      await ensureAllToastsCleared();
+      
+      // Force clear DOM if not attempted yet
+      if (!domClearAttemptedRef.current) {
+        domClearAttemptedRef.current = true;
+        try {
+          // Find and remove any lingering toast elements
+          const toastElements = document.querySelectorAll('[data-sonner-toast]');
+          if (toastElements.length > 0) {
+            console.log(`[VoiceRecorder] Found ${toastElements.length} lingering toasts, removing manually`);
+            toastElements.forEach(el => {
+              if (el.parentNode) {
+                el.parentNode.removeChild(el);
+              }
+            });
+          }
+        } catch (e) {
+          console.error('[VoiceRecorder] Error in manual DOM cleanup:', e);
+        }
+      }
+      
+      // Final safety check - wait a bit more to ensure UI is clean
       await new Promise(resolve => setTimeout(resolve, 100));
       
       setIsProcessing(true);
       setRecordingError(null);
       setHasSaved(true);
       setWaitingForClear(false);
+      setToastsCleared(true);
       
       // If recording hasn't been played, ensure audio is prepared
       if (!hasPlayedOnce || audioDuration === 0) {
@@ -216,32 +254,24 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           console.log('[VoiceRecorder] Calling recording completion callback');
           saveCompleteRef.current = false;
           
-          // Show a toast independent of the save process, but with a unique ID so we can control it
-          const processingToastId = toast.loading('Processing your journal entry...', {
-            id: 'processing-toast',
-            duration: 3000
-          });
-          
+          // Don't create any new toasts here - ensure clean UI state
           await onRecordingComplete(normalizedBlob);
           
           saveCompleteRef.current = true;
           savingInProgressRef.current = false;
           
           console.log('[VoiceRecorder] Recording callback completed successfully');
-          
-          // Dismiss the specific loading toast to avoid lingering UI elements
-          toast.dismiss('processing-toast');
         } catch (error: any) {
           console.error('[VoiceRecorder] Error in recording callback:', error);
           setRecordingError(error?.message || "An unexpected error occurred");
           
-          // Dismiss any loading toasts
-          toast.dismiss('processing-toast');
-          
-          toast.error("Error saving recording", {
-            id: 'error-toast',
-            duration: 3000
-          });
+          // Use a setTimeout to ensure we don't create toasts too quickly after clearing
+          setTimeout(() => {
+            toast.error("Error saving recording", {
+              id: 'error-toast',
+              duration: 3000
+            });
+          }, 300);
           
           setIsProcessing(false);
           setHasSaved(false);
@@ -252,10 +282,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.error('[VoiceRecorder] Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
       
-      toast.error("Error saving recording", {
-        id: 'error-toast',
-        duration: 3000
-      });
+      // Use a setTimeout to ensure we don't create toasts too quickly after clearing
+      setTimeout(() => {
+        toast.error("Error saving recording", {
+          id: 'error-toast',
+          duration: 3000
+        });
+      }, 300);
       
       setIsProcessing(false);
       setHasSaved(false);
@@ -263,9 +296,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   };
 
-  const handleRestart = () => {
+  const handleRestart = async () => {
     // Clear all toasts when restarting to avoid UI conflicts
-    clearAllToasts();
+    await ensureAllToastsCleared();
     
     resetRecording();
     resetPlayback();
@@ -277,6 +310,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     setAudioPrepared(false);
     saveCompleteRef.current = false;
     savingInProgressRef.current = false;
+    domClearAttemptedRef.current = false;
+    
+    // Wait a bit before showing any new toasts
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     toast.info("Starting a new recording", {
       duration: 2000
@@ -303,9 +340,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               isRecording={isRecording}
               isProcessing={isProcessing}
               hasPermission={hasPermission}
-              onRecordingStart={() => {
+              onRecordingStart={async () => {
                 console.log('[VoiceRecorder] Starting new recording');
-                clearAllToasts(); // Clear all toasts before starting a new recording
+                await ensureAllToastsCleared(); // Clear all toasts before starting a new recording
                 startRecording();
               }}
               onRecordingStop={() => {
@@ -335,16 +372,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                   isProcessing={isProcessing || waitingForClear}
                   playbackProgress={playbackProgress}
                   audioDuration={audioDuration}
-                  onTogglePlayback={() => {
+                  onTogglePlayback={async () => {
                     console.log('[VoiceRecorder] Toggle playback clicked');
                     // Clear toasts before playing to ensure clean UI state
-                    clearAllToasts();
+                    await ensureAllToastsCleared();
                     togglePlayback();
                   }}
-                  onSaveEntry={() => {
-                    console.log('[VoiceRecorder] Save button clicked');
-                    handleSaveEntry();
-                  }}
+                  onSaveEntry={handleSaveEntry}
                   onRestart={handleRestart}
                   onSeek={seekTo}
                 />

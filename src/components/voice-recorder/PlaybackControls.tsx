@@ -5,6 +5,7 @@ import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+import { clearAllToasts } from '@/services/notificationService';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -30,6 +31,7 @@ export function PlaybackControls({
   onSeek
 }: PlaybackControlsProps) {
   const [currentTime, setCurrentTime] = useState(0);
+  const [isClearingToasts, setIsClearingToasts] = useState(false);
   
   // Calculate current time based on progress and duration
   useEffect(() => {
@@ -45,6 +47,57 @@ export function PlaybackControls({
       const position = value[0] / 100;
       onSeek(position);
     }
+  };
+
+  // Function to ensure all toasts are completely cleared
+  const handleSaveClick = async () => {
+    setIsClearingToasts(true);
+    
+    // First force clear any existing toasts
+    clearAllToasts();
+    
+    // Give some time for the DOM to update
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Clear again to ensure any new toasts are also cleared
+    clearAllToasts();
+    
+    // Wait a bit more for any lingering DOM effects
+    await new Promise(resolve => setTimeout(resolve, 150));
+    
+    // Try to find any remaining toast elements and force remove them
+    try {
+      const toastElements = document.querySelectorAll('[data-sonner-toast]');
+      if (toastElements.length > 0) {
+        console.log(`[PlaybackControls] Found ${toastElements.length} lingering toasts, removing manually`);
+        toastElements.forEach(el => {
+          if (el.parentNode) {
+            el.parentNode.removeChild(el);
+          }
+        });
+      }
+      
+      // Also try to clear any toast containers from the DOM
+      const toastContainers = document.querySelectorAll('[data-sonner-toaster]');
+      if (toastContainers.length > 0) {
+        console.log(`[PlaybackControls] Found ${toastContainers.length} toast containers`);
+        // Don't remove containers as they're needed, but clear their children
+        toastContainers.forEach(container => {
+          while (container.firstChild) {
+            container.removeChild(container.firstChild);
+          }
+        });
+      }
+    } catch (e) {
+      console.error('[PlaybackControls] Error trying to manually clear toasts:', e);
+    }
+    
+    // Final safety check
+    clearAllToasts();
+    
+    // Now it's safe to proceed with the save operation
+    setIsClearingToasts(false);
+    onSaveEntry();
   };
   
   return (
@@ -83,14 +136,14 @@ export function PlaybackControls({
         
         {/* Save Button */}
         <Button 
-          onClick={onSaveEntry}
-          disabled={isProcessing || !audioBlob}
+          onClick={handleSaveClick}
+          disabled={isProcessing || !audioBlob || isClearingToasts}
           variant="default"
         >
-          {isProcessing ? (
+          {isProcessing || isClearingToasts ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
+              {isClearingToasts ? "Preparing..." : "Processing..."}
             </>
           ) : "Save"}
         </Button>
