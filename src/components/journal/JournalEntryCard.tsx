@@ -56,13 +56,9 @@ export function JournalEntryCard({
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const [highlightNew, setHighlightNew] = useState(isNew);
-  const [isThemesLoading, setIsThemesLoading] = useState(true);
-  const [refreshTime, setRefreshTime] = useState(0);
+  const [isThemesLoading, setIsThemesLoading] = useState(isProcessing);
   const [themes, setThemes] = useState<string[]>([]);
-  const entryRef = useRef<HTMLDivElement>(null);
-  const lastRenderTimeRef = useRef<number>(Date.now());
   const mountedRef = useRef<boolean>(true);
-  const deleteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Log when the component is mounted/unmounted
   useEffect(() => {
@@ -72,12 +68,6 @@ export function JournalEntryCard({
     return () => {
       console.log(`[JournalEntryCard] Unmounted entry ${entry.id}`);
       mountedRef.current = false;
-      
-      // Clear any pending timeouts on unmount
-      if (deleteTimeoutRef.current) {
-        clearTimeout(deleteTimeoutRef.current);
-        deleteTimeoutRef.current = null;
-      }
     };
   }, [entry.id]);
 
@@ -98,7 +88,7 @@ export function JournalEntryCard({
     }
   }, [isNew]);
   
-  // Handle theme loading and extraction
+  // Extract themes from the entry
   useEffect(() => {
     if (!mountedRef.current) return;
     
@@ -127,24 +117,25 @@ export function JournalEntryCard({
     const currentThemes = extractThemes();
     setThemes(currentThemes);
     
-    // Set a maximum time for theme loading
-    const maxLoadingTime = 15000; // 15 seconds
-    
     // Determine if themes are still loading
-    const shouldBeLoading = isProcessing || (currentThemes.length === 0);
+    const shouldBeLoading = isProcessing || (currentThemes.length === 0 && isNew);
     setIsThemesLoading(shouldBeLoading);
     
-    // Set up polling for theme updates if they're loading
+    // If themes are loading and we have an entry ID, poll for themes
     if (shouldBeLoading && entry.id) {
+      let pollAttempts = 0;
+      const maxAttempts = 5;
+      
       const pollInterval = setInterval(async () => {
         if (!mountedRef.current) {
           clearInterval(pollInterval);
           return;
         }
         
+        pollAttempts++;
+        console.log(`[JournalEntryCard] Polling for themes for entry ${entry.id}, attempt ${pollAttempts}`);
+        
         try {
-          console.log(`[JournalEntryCard] Polling for themes for entry ${entry.id}, attempt ${refreshTime + 1}`);
-          
           // Fetch the latest version of the entry
           const { data, error } = await supabase
             .from('Journal Entries')
@@ -179,54 +170,46 @@ export function JournalEntryCard({
               if (mountedRef.current) {
                 setThemes(updatedCurrentThemes);
                 setIsThemesLoading(false);
+                clearInterval(pollInterval);
               }
-              
-              clearInterval(pollInterval);
             }
           }
           
-          if (mountedRef.current) {
-            setRefreshTime(prev => prev + 1);
-          }
-          
-          // After several attempts, stop showing loading state
-          if (refreshTime >= 5 || Date.now() - lastRenderTimeRef.current > maxLoadingTime) {
-            console.log(`[JournalEntryCard] Maximum polling attempts reached for entry ${entry.id}`);
-            
+          // Stop polling after max attempts
+          if (pollAttempts >= maxAttempts) {
+            console.log(`[JournalEntryCard] Max polling attempts reached for entry ${entry.id}`);
             if (mountedRef.current) {
               setIsThemesLoading(false);
             }
-            
             clearInterval(pollInterval);
           }
         } catch (error) {
           console.error(`[JournalEntryCard] Error polling for themes for entry ${entry.id}:`, error);
           
           // After multiple retries, stop showing loading state
-          if (refreshTime > 5) {
+          if (pollAttempts >= maxAttempts) {
             if (mountedRef.current) {
               setIsThemesLoading(false);
             }
-            
             clearInterval(pollInterval);
           }
         }
       }, 3000); // Poll every 3 seconds
       
-      // Safety timeout to stop loading state after maxLoadingTime
+      // Safety timeout to stop loading state after 15 seconds regardless
       const safetyTimeout = setTimeout(() => {
         if (mountedRef.current) {
           setIsThemesLoading(false);
           clearInterval(pollInterval);
         }
-      }, maxLoadingTime);
+      }, 15000);
       
       return () => {
         clearInterval(pollInterval);
         clearTimeout(safetyTimeout);
       };
     }
-  }, [entry.id, entry.master_themes, entry.themes, isProcessing, refreshTime]);
+  }, [entry.id, entry.master_themes, entry.themes, isProcessing, isNew]);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
@@ -254,13 +237,11 @@ export function JournalEntryCard({
       
       console.log(`[JournalEntryCard] Successfully deleted entry ${entry.id}`);
       
-      // Notify parent component about deletion, but with a small delay
-      // to ensure this component unmounts cleanly first
+      // Call parent handler with a small delay to ensure UI updates properly
       if (onDelete) {
-        deleteTimeoutRef.current = setTimeout(() => {
-          console.log(`[JournalEntryCard] Calling onDelete for entry ${entry.id}`);
-          onDelete(entry.id);
-          deleteTimeoutRef.current = null;
+        console.log(`[JournalEntryCard] Calling onDelete for entry ${entry.id}`);
+        setTimeout(() => {
+          if (onDelete) onDelete(entry.id);
         }, 100);
       }
       
@@ -380,19 +361,8 @@ export function JournalEntryCard({
     </motion.div>
   );
 
-  // Calculate time since last render to detect performance issues
-  const now = Date.now();
-  const timeSinceLastRender = now - lastRenderTimeRef.current;
-  lastRenderTimeRef.current = now;
-  
-  // Log slow renders
-  if (timeSinceLastRender > 100) {
-    console.log(`[JournalEntryCard] Slow render for entry ${entry.id}: ${timeSinceLastRender}ms`);
-  }
-
   return (
     <motion.div
-      ref={entryRef}
       initial={isNew ? { borderColor: 'rgba(var(--color-primary), 0.7)' } : {}}
       animate={highlightNew 
         ? { 
@@ -401,8 +371,8 @@ export function JournalEntryCard({
           } 
         : {}}
       transition={{ duration: 3 }}
-      className="journal-entry-card" // Add a class for debugging
-      data-entry-id={entry.id} // Add data attribute for debugging
+      className="journal-entry-card" 
+      data-entry-id={entry.id}
     >
       <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
         <div className="flex justify-between items-start p-3 md:p-4">

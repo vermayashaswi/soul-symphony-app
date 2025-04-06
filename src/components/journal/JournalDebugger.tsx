@@ -36,7 +36,18 @@ const JournalDebugger = ({
   const [renderCount, setRenderCount] = useState(0);
   const [hasErrorState, setHasErrorState] = useState(false);
   const { user } = useAuth();
-  const { entries, loading, error } = useJournalEntries(user?.id, Date.now(), true);
+  
+  // Use try-catch to safely access journal entries
+  const journalState = (() => {
+    try {
+      return useJournalEntries(user?.id, Date.now(), true);
+    } catch (e) {
+      console.error("Error accessing journal entries in debugger:", e);
+      return { entries: [], loading: false, error: String(e) };
+    }
+  })();
+  
+  const { entries = [], loading = false, error = null } = journalState;
 
   useEffect(() => {
     // Increment render count on each render
@@ -74,7 +85,8 @@ const JournalDebugger = ({
     zIndex: 9999,
     position: 'fixed' as 'fixed',
     top: '2rem',
-    right: '2rem'
+    right: '2rem',
+    pointerEvents: 'auto'
   };
 
   return (

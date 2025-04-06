@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -23,18 +24,13 @@ export default function JournalEntriesList({
   onStartRecording, 
   onDeleteEntry 
 }: JournalEntriesListProps) {
-  const [showEntriesCount, setShowEntriesCount] = useState(0);
   const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
-  const [listEntries, setListEntries] = useState<JournalEntry[]>([]);
   const hasProcessingEntries = processingEntries.length > 0;
 
   // Update entries count when entries change to trigger animation for new entries
   useEffect(() => {
     if (entries.length > 0) {
-      // Keep our own copy of the entries to prevent UI issues during deletions
-      setListEntries(entries);
-      
       if (entries.length > prevEntriesLength) {
         // New entries have been added, highlight them
         const newEntryIds = entries
@@ -50,24 +46,14 @@ export default function JournalEntriesList({
       }
       
       setPrevEntriesLength(entries.length);
-      
-      // Small delay to ensure smooth animation
-      setTimeout(() => {
-        setShowEntriesCount(entries.length);
-      }, 300);
     } else {
-      setListEntries([]);
-      setShowEntriesCount(entries.length);
       setPrevEntriesLength(0);
     }
   }, [entries.length, prevEntriesLength, entries]);
   
-  // Handle entry deletion locally to prevent UI issues
+  // Handle entry deletion by calling the parent handler
   const handleEntryDelete = (entryId: number) => {
     console.log(`[JournalEntriesList] Handling deletion of entry ${entryId}`);
-    
-    // Update our local copy of entries
-    setListEntries(prev => prev.filter(entry => entry.id !== entryId));
     
     // Call the parent handler
     if (onDeleteEntry) {
@@ -129,7 +115,7 @@ export default function JournalEntriesList({
             </div>
           )}
           
-          {listEntries.map((entry, index) => (
+          {entries.map((entry, index) => (
             <motion.div
               key={entry.id}
               initial={{ opacity: 0, y: 20 }}
@@ -143,7 +129,7 @@ export default function JournalEntriesList({
               exit={{ opacity: 0, height: 0, marginBottom: 0 }}
               transition={{ 
                 duration: 0.3, 
-                delay: index === 0 && listEntries.length > showEntriesCount ? 0 : 0.05 * Math.min(index, 5) 
+                delay: index === 0 && entries.length > prevEntriesLength ? 0 : 0.05 * Math.min(index, 5) 
               }}
               className={animatedEntryIds.includes(entry.id) ? 
                 "rounded-lg shadow-md relative overflow-hidden" : 

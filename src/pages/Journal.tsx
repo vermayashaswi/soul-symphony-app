@@ -12,6 +12,7 @@ import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import JournalDebugger from '@/components/journal/JournalDebugger';
+import { supabase } from '@/integrations/supabase/client';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -38,11 +39,13 @@ const Journal = () => {
   
   // Use try-catch to detect render errors
   useEffect(() => {
-    window.addEventListener('error', (event) => {
+    const handleError = (event: ErrorEvent) => {
       console.error('[Journal] Caught render error:', event);
       setHasRenderError(true);
-    });
-    return () => window.removeEventListener('error', () => {});
+    };
+    
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
   }, []);
   
   const { 
@@ -84,6 +87,7 @@ const Journal = () => {
     };
   }, []);
 
+  // Check for completed entries from processing
   useEffect(() => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
@@ -148,85 +152,7 @@ const Journal = () => {
     }
   }, [user?.id, isProfileChecked, isCheckingProfile]);
 
-  useEffect(() => {
-    if (!loading && entries.length > 0 && processingEntries.length > 0) {
-      const entryIds = entries.map(entry => entry.id.toString());
-      const completedProcessingEntries = processingEntries.filter(tempId => 
-        entryIds.includes(tempId)
-      );
-      
-      if (completedProcessingEntries.length > 0) {
-        console.log('[Journal] Found completed processing entries, dismissing their toasts:', completedProcessingEntries);
-        setEntryHasBeenProcessed(true);
-        
-        completedProcessingEntries.forEach(tempId => {
-          if (toastIds[tempId]) {
-            toast.success('Journal entry analyzed and saved', { 
-              id: toastIds[tempId], 
-              duration: 3000,
-              closeButton: false
-            });
-          }
-        });
-        
-        setProcessingEntries(prev => 
-          prev.filter(tempId => !completedProcessingEntries.includes(tempId))
-        );
-        
-        const newToastIds = { ...toastIds };
-        completedProcessingEntries.forEach(tempId => {
-          delete newToastIds[tempId];
-        });
-        setToastIds(newToastIds);
-        setIsSavingRecording(false);
-      }
-    }
-  }, [entries, loading, processingEntries, toastIds]);
-
-  useEffect(() => {
-    if (loading || entries.length === 0) return;
-    
-    const newEntries = entries.filter(entry => 
-      !notifiedEntryIds.has(entry.id) && 
-      !processingEntries.some(tempId => tempId === entry.id.toString())
-    );
-    
-    if (newEntries.length > 0 && notifiedEntryIds.size > 0) {
-      if (!entryHasBeenProcessed) {
-        toast.success('Journal entry analyzed and saved', { duration: 3000, closeButton: false });
-        setEntryHasBeenProcessed(true);
-      }
-      
-      const updatedNotifiedIds = new Set(notifiedEntryIds);
-      newEntries.forEach(entry => updatedNotifiedIds.add(entry.id));
-      setNotifiedEntryIds(updatedNotifiedIds);
-    } 
-    else if (notifiedEntryIds.size === 0 && entries.length > 0) {
-      const initialIds = new Set(entries.map(entry => entry.id));
-      setNotifiedEntryIds(initialIds);
-    }
-    
-    const newProcessingEntries = processingEntries.filter(tempId => 
-      !entries.some(entry => entry.id.toString() === tempId)
-    );
-    
-    if (newProcessingEntries.length !== processingEntries.length) {
-      setProcessingEntries(newProcessingEntries);
-      
-      const newToastIds = { ...toastIds };
-      processingEntries.forEach(tempId => {
-        if (!newProcessingEntries.includes(tempId)) {
-          delete newToastIds[tempId];
-        }
-      });
-      setToastIds(newToastIds);
-      
-      if (newProcessingEntries.length === 0 && processingEntries.length > 0) {
-        setIsSavingRecording(false);
-      }
-    }
-  }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
-
+  // Poll for updates when entries are processing
   useEffect(() => {
     if (processingEntries.length > 0 || isSavingRecording) {
       const interval = setInterval(() => {
@@ -408,6 +334,8 @@ const Journal = () => {
     if (!user?.id) return;
     
     try {
+      console.log(`[Journal] Deleting entry ${entryId}`);
+      
       clearAllToasts();
       
       processingEntries.forEach(tempId => {
@@ -425,12 +353,13 @@ const Journal = () => {
         return updated;
       });
       
-      setRefreshKey(prev => prev + 1);
+      // Immediately trigger a refetch to ensure UI is updated
+      setRefreshKey(Date.now());
       
-      // Force a re-fetch of entries after deletion
+      // Force a re-fetch of entries after deletion with delay
       setTimeout(() => {
         fetchEntries();
-      }, 300);
+      }, 500);
       
     } catch (error) {
       console.error('Error deleting entry:', error);
