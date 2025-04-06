@@ -204,7 +204,7 @@ const Journal = () => {
     }
   }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
 
-  // Poll for updates while processing
+  // Poll for updates while processing - this helps ensure we detect new entries
   useEffect(() => {
     if (processingEntries.length > 0 || isSavingRecording) {
       const interval = setInterval(() => {
@@ -309,7 +309,8 @@ const Journal = () => {
         setProcessingEntries(prev => [...prev, tempId]);
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         
-        fetchEntries();
+        // Force immediate fetch to ensure we get any entries that were already processed
+        await fetchEntries();
         setRefreshKey(prev => prev + 1);
         
         // Polling for updates
@@ -325,30 +326,34 @@ const Journal = () => {
         
         // Set a maximum timeout to clean up if entry is never processed
         setTimeout(() => {
-          if (processingEntries.includes(tempId)) {
-            console.log('[Journal] Maximum processing time reached for tempId:', tempId);
-            
-            setProcessingEntries(prev => prev.filter(id => id !== tempId));
-            
-            if (toastIds[tempId]) {
-              toast.dismiss(toastIds[tempId]);
+          console.log('[Journal] Maximum processing time check for tempId:', tempId);
+          setProcessingEntries(prev => {
+            if (prev.includes(tempId)) {
+              console.log('[Journal] Maximum processing time reached for tempId:', tempId);
               
-              toast.success('Journal entry processed', { 
-                duration: 3000,
-                closeButton: false
-              });
+              if (toastIds[tempId]) {
+                toast.dismiss(toastIds[tempId]);
+                
+                toast.success('Journal entry processed', { 
+                  duration: 3000,
+                  closeButton: false
+                });
+                
+                setToastIds(prev => {
+                  const newToastIds = { ...prev };
+                  delete newToastIds[tempId];
+                  return newToastIds;
+                });
+              }
               
-              setToastIds(prev => {
-                const newToastIds = { ...prev };
-                delete newToastIds[tempId];
-                return newToastIds;
-              });
+              fetchEntries();
+              setRefreshKey(prev => prev + 1);
+              setIsSavingRecording(false);
+              
+              return prev.filter(id => id !== tempId);
             }
-            
-            fetchEntries();
-            setRefreshKey(prev => prev + 1);
-            setIsSavingRecording(false);
-          }
+            return prev;
+          });
         }, 20000);
       } else {
         console.error('[Journal] Processing failed:', error);
@@ -450,7 +455,8 @@ const Journal = () => {
     );
   }
 
-  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && entries.length === 0 && !error && !processingError;
+  // Important state to show proper loading feedback
+  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && !error && !processingError;
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">

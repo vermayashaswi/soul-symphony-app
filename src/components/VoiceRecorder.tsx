@@ -103,7 +103,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         try {
           // Make sure we wait for the callback to complete before resetting anything
           await onRecordingComplete(normalizedBlob);
-          // Only reset if successful (this avoids blank states on error)
+          // Only reset after successful completion
+          // We don't reset the recorder here since Journal.tsx will handle the UI transition
         } catch (error: any) {
           console.error('Error in recording callback:', error);
           setRecordingError(error?.message || "An unexpected error occurred");
