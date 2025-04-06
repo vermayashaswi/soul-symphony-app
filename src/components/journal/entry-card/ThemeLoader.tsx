@@ -119,7 +119,7 @@ export function ThemeLoader({
           }
             
           // Check if data exists and is not an error
-          if (data && typeof data === 'object') {
+          if (data) {
             // Safely extract themes with fallbacks
             const updatedMasterThemes = Array.isArray(data.master_themes) 
               ? data.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
