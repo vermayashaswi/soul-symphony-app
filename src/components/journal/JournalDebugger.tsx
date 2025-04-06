@@ -69,8 +69,16 @@ const JournalDebugger = ({
     setDebugHistory(prev => [currentState, ...prev].slice(0, 20));
   }, [entries.length, processingEntries, isSavingRecording, isRecordingComplete, activeTab, error, processingError]);
 
+  // Style to ensure debugger is always visible
+  const debuggerStyle = {
+    zIndex: 9999,
+    position: 'fixed' as 'fixed',
+    top: '2rem',
+    right: '2rem'
+  };
+
   return (
-    <div className="fixed top-2 right-2 z-50">
+    <div style={debuggerStyle}>
       {!isOpen ? (
         <motion.div 
           className={`p-2 rounded-full cursor-pointer shadow-lg hover:opacity-90 transition-colors flex items-center justify-center ${hasErrorState ? 'bg-red-500 text-white' : 'bg-yellow-500 text-black'}`}

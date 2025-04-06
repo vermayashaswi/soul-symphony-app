@@ -20,13 +20,30 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
   const isMobile = useIsMobile();
   const [isLocalLoading, setIsLocalLoading] = useState(isLoading);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingTimeoutId, setLoadingTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [loadingIntervalId, setLoadingIntervalId] = useState<NodeJS.Timeout | null>(null);
+  const [maxLoadingTime, setMaxLoadingTime] = useState(false);
   
   // Update local loading state when prop changes
   useEffect(() => {
     setIsLocalLoading(isLoading);
+    
+    // Clean up any existing timers to prevent memory leaks
+    if (loadingIntervalId) {
+      clearInterval(loadingIntervalId);
+      setLoadingIntervalId(null);
+    }
+    
+    if (loadingTimeoutId) {
+      clearTimeout(loadingTimeoutId);
+      setLoadingTimeoutId(null);
+    }
+    
     if (isLoading) {
       // Reset and start loading animation
       setLoadingProgress(0);
+      setMaxLoadingTime(false);
+      
       const interval = setInterval(() => {
         setLoadingProgress(prev => {
           const newProgress = prev + (Math.random() * 10);
@@ -34,18 +51,59 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
         });
       }, 600);
       
-      return () => clearInterval(interval);
+      setLoadingIntervalId(interval);
+      
+      // Safety timeout - force loading to complete after 20 seconds
+      const timeout = setTimeout(() => {
+        setMaxLoadingTime(true);
+        setIsLocalLoading(false);
+        setLoadingProgress(100);
+        
+        if (loadingIntervalId) {
+          clearInterval(loadingIntervalId);
+          setLoadingIntervalId(null);
+        }
+      }, 20000);
+      
+      setLoadingTimeoutId(timeout);
+      
+      return () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
     } else {
       // Complete loading animation
       setLoadingProgress(100);
     }
   }, [isLoading]);
   
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingIntervalId) {
+        clearInterval(loadingIntervalId);
+      }
+      if (loadingTimeoutId) {
+        clearTimeout(loadingTimeoutId);
+      }
+    };
+  }, []);
+  
   // If themes changes from empty to non-empty, ensure loading is false
   useEffect(() => {
     if (themes && themes.length > 0) {
       setIsLocalLoading(false);
       setLoadingProgress(100);
+      
+      if (loadingIntervalId) {
+        clearInterval(loadingIntervalId);
+        setLoadingIntervalId(null);
+      }
+      
+      if (loadingTimeoutId) {
+        clearTimeout(loadingTimeoutId);
+        setLoadingTimeoutId(null);
+      }
     }
   }, [themes]);
   
@@ -92,10 +150,75 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
   const filteredThemes = themes ? themes.filter(theme => theme && theme.trim() !== '' && theme !== '•') : [];
   const hasThemes = filteredThemes.length > 0;
 
+  // Handle case where loading has gone on too long but we have themes to show
+  if (maxLoadingTime && hasThemes) {
+    return (
+      <motion.div 
+        className={cn("flex flex-wrap gap-3 md:gap-4 justify-center items-center h-full w-full p-2", className)}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {filteredThemes.map((theme, index) => {
+          const seed = (index + 1) * 0.2;
+          
+          return (
+            <motion.div
+              key={`${theme}-${index}`}
+              className={cn(
+                "rounded-lg shadow-sm font-medium flex items-center justify-center px-4 py-2",
+                colorClasses[index % colorClasses.length],
+              )}
+              variants={itemVariants}
+              whileHover={{ 
+                scale: 1.05, 
+                boxShadow: "0 8px 20px -5px rgba(0, 0, 0, 0.15)",
+                transition: { duration: 0.2 }
+              }}
+              animate={isDisturbed ? {
+                y: [(seed * -10), (seed * 10), (seed * -10)],
+                x: [(seed * -5), (seed * 5), (seed * -5)],
+                rotate: [(seed * -3), (seed * 3), (seed * -3)],
+                transition: {
+                  y: { 
+                    duration: 4 + seed * 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  },
+                  x: { 
+                    duration: 5 + seed * 2, 
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  },
+                  rotate: { 
+                    duration: 6 + seed, 
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }
+                }
+              } : {
+                y: [0, -3 * seed, 0],
+                transition: { 
+                  y: {
+                    duration: 3 + seed * 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }
+                }
+              }}
+            >
+              {theme}
+            </motion.div>
+          );
+        })}
+      </motion.div>
+    );
+  }
+
   if (isLocalLoading || !hasThemes) {
     // Display placeholder theme boxes with smooth floating animation
     return (
-      <div className={cn("flex flex-wrap gap-3 justify-center items-center h-full w-full", className)}>
+      <div className={cn("flex flex-wrap gap-3 justify-center items-center h-full w-full relative", className)}>
         {[1, 2, 3].map((_, i) => (
           <motion.div
             key={`placeholder-${i}`}

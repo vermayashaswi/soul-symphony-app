@@ -62,6 +62,7 @@ export function JournalEntryCard({
   const entryRef = useRef<HTMLDivElement>(null);
   const lastRenderTimeRef = useRef<number>(Date.now());
   const mountedRef = useRef<boolean>(true);
+  const deleteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Log when the component is mounted/unmounted
   useEffect(() => {
@@ -71,6 +72,12 @@ export function JournalEntryCard({
     return () => {
       console.log(`[JournalEntryCard] Unmounted entry ${entry.id}`);
       mountedRef.current = false;
+      
+      // Clear any pending timeouts on unmount
+      if (deleteTimeoutRef.current) {
+        clearTimeout(deleteTimeoutRef.current);
+        deleteTimeoutRef.current = null;
+      }
     };
   }, [entry.id]);
 
@@ -101,7 +108,16 @@ export function JournalEntryCard({
         // Safely access master_themes and themes, providing fallback empty arrays
         const masterThemes = Array.isArray(entry.master_themes) ? entry.master_themes : [];
         const entryThemes = Array.isArray(entry.themes) ? entry.themes : [];
-        return masterThemes.length > 0 ? masterThemes : entryThemes;
+        
+        // Filter out empty themes
+        const filteredMasterThemes = masterThemes.filter(theme => 
+          theme && theme.trim() !== '' && theme !== '•'
+        );
+        const filteredEntryThemes = entryThemes.filter(theme => 
+          theme && theme.trim() !== '' && theme !== '•'
+        );
+        
+        return filteredMasterThemes.length > 0 ? filteredMasterThemes : filteredEntryThemes;
       } catch (error) {
         console.error("[JournalEntryCard] Error extracting themes:", error);
         return [];
@@ -110,6 +126,9 @@ export function JournalEntryCard({
     
     const currentThemes = extractThemes();
     setThemes(currentThemes);
+    
+    // Set a maximum time for theme loading
+    const maxLoadingTime = 15000; // 15 seconds
     
     // Determine if themes are still loading
     const shouldBeLoading = isProcessing || (currentThemes.length === 0);
@@ -143,8 +162,14 @@ export function JournalEntryCard({
             const entryData = data as { master_themes?: string[], themes?: string[] };
             
             // Safely extract themes with fallbacks
-            const updatedMasterThemes = Array.isArray(entryData.master_themes) ? entryData.master_themes : [];
-            const updatedThemes = Array.isArray(entryData.themes) ? entryData.themes : [];
+            const updatedMasterThemes = Array.isArray(entryData.master_themes) 
+              ? entryData.master_themes.filter(t => t && t.trim() !== '' && t !== '•') 
+              : [];
+              
+            const updatedThemes = Array.isArray(entryData.themes) 
+              ? entryData.themes.filter(t => t && t.trim() !== '' && t !== '•') 
+              : [];
+              
             const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
             
             // If we now have themes, update them and stop loading
@@ -165,7 +190,7 @@ export function JournalEntryCard({
           }
           
           // After several attempts, stop showing loading state
-          if (refreshTime >= 10) {
+          if (refreshTime >= 5 || Date.now() - lastRenderTimeRef.current > maxLoadingTime) {
             console.log(`[JournalEntryCard] Maximum polling attempts reached for entry ${entry.id}`);
             
             if (mountedRef.current) {
@@ -178,7 +203,7 @@ export function JournalEntryCard({
           console.error(`[JournalEntryCard] Error polling for themes for entry ${entry.id}:`, error);
           
           // After multiple retries, stop showing loading state
-          if (refreshTime > 10) {
+          if (refreshTime > 5) {
             if (mountedRef.current) {
               setIsThemesLoading(false);
             }
@@ -188,8 +213,17 @@ export function JournalEntryCard({
         }
       }, 3000); // Poll every 3 seconds
       
+      // Safety timeout to stop loading state after maxLoadingTime
+      const safetyTimeout = setTimeout(() => {
+        if (mountedRef.current) {
+          setIsThemesLoading(false);
+          clearInterval(pollInterval);
+        }
+      }, maxLoadingTime);
+      
       return () => {
         clearInterval(pollInterval);
+        clearTimeout(safetyTimeout);
       };
     }
   }, [entry.id, entry.master_themes, entry.themes, isProcessing, refreshTime]);
@@ -206,6 +240,9 @@ export function JournalEntryCard({
       
       console.log(`[JournalEntryCard] Deleting entry ${entry.id}`);
       
+      // First close the dialog to prevent further user interactions
+      setOpen(false);
+      
       const { error } = await supabase
         .from('Journal Entries')
         .delete()
@@ -217,14 +254,15 @@ export function JournalEntryCard({
       
       console.log(`[JournalEntryCard] Successfully deleted entry ${entry.id}`);
       
-      setOpen(false);
-      
-      // Wrap in setTimeout to ensure this component unmounts cleanly before deletion handler runs
-      setTimeout(() => {
-        if (onDelete) {
+      // Notify parent component about deletion, but with a small delay
+      // to ensure this component unmounts cleanly first
+      if (onDelete) {
+        deleteTimeoutRef.current = setTimeout(() => {
+          console.log(`[JournalEntryCard] Calling onDelete for entry ${entry.id}`);
           onDelete(entry.id);
-        }
-      }, 0);
+          deleteTimeoutRef.current = null;
+        }, 100);
+      }
       
       toast.success('Journal entry deleted');
     } catch (error) {

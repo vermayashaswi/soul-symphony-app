@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { checkUserProfile, createUserProfile, fetchJournalEntries } from '@/services/journalService';
@@ -30,6 +31,7 @@ export function useJournalEntries(
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const consecutiveEmptyFetchesRef = useRef(0);
   const entriesRef = useRef<JournalEntry[]>([]);
+  const lastSuccessfulFetchRef = useRef<JournalEntry[]>([]);
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -116,9 +118,13 @@ export function useJournalEntries(
         consecutiveEmptyFetchesRef.current = 0;
       }
       
+      // Save successful fetch for recovery
+      lastSuccessfulFetchRef.current = journalEntries;
+      
       // Don't replace entries with empty array if we already have entries
       // and this fetch returned empty (could be a temporary connectivity issue)
       if (journalEntries.length > 0 || entriesRef.current.length === 0) {
+        console.log('[useJournalEntries] Setting entries:', journalEntries.length);
         setEntries(journalEntries);
       } else {
         console.log('[useJournalEntries] Fetch returned empty but keeping existing entries');
@@ -131,8 +137,11 @@ export function useJournalEntries(
       console.error('[useJournalEntries] Error fetching entries:', error);
       setError('Failed to load entries: ' + error.message);
       
-      // Don't clear entries on error if we already have entries
-      if (entriesRef.current.length === 0) {
+      // On error, if we have a last successful fetch, use that
+      if (lastSuccessfulFetchRef.current.length > 0) {
+        console.log('[useJournalEntries] Using last successful fetch:', lastSuccessfulFetchRef.current.length);
+        setEntries(lastSuccessfulFetchRef.current);
+      } else if (entriesRef.current.length === 0) {
         setEntries([]);
       }
       
