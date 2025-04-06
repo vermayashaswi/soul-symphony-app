@@ -61,12 +61,12 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
           console.log('[ProfileService] Extracted default metadata:', { fullName, avatarUrl });
         }
         
-        // Explicit profile data preparation
+        // Explicit profile data preparation - ensure field names match exactly with the database schema
         const profileData = {
           id: user.id,
           email,
           full_name: fullName,
-          avatar_url: avatarUrl,
+          avatar_url: avatarUrl, // Ensure this matches the column name exactly
           onboarding_completed: false,
           updated_at: new Date().toISOString()
         };
@@ -92,7 +92,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
               id: user.id,
               email,
               full_name: fullName,
-              avatar_url: avatarUrl,
+              avatar_url: avatarUrl, // Ensure this matches exactly
               onboarding_completed: false
             }]);
             
@@ -137,7 +137,7 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
       await supabase
         .from('profiles')
         .update({
-          avatar_url: metadata.avatar_url,
+          avatar_url: metadata.avatar_url, // Ensure field name matches
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id);
