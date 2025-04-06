@@ -22,11 +22,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
           cancelButton:
             "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground dark:group-[.toast]:text-white/80",
           title: "dark:group-[.toast]:text-white",
-          info: "dark:group-[.toast]:text-white",
-          success: "dark:group-[.toast]:text-white",
-          warning: "dark:group-[.toast]:text-white",
-          error: "dark:group-[.toast]:text-white",
-          closeButton: "dark:group-[.toast]:text-white/70 dark:group-[.toast]:hover:text-white"
+          info: "dark:group-[.toast]:text-white group-[.toast]:text-black",
+          success: "dark:group-[.toast]:text-white group-[.toast]:text-black",
+          warning: "dark:group-[.toast]:text-white group-[.toast]:text-black",
+          error: "dark:group-[.toast]:text-white group-[.toast]:text-black",
+          closeButton: "dark:group-[.toast]:text-white/70 dark:group-[.toast]:hover:text-white group-[.toast]:text-black/70 group-[.toast]:hover:text-black"
         },
       }}
       {...props}
