@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { checkUserProfile, createUserProfile, fetchJournalEntries } from '@/services/journalService';
@@ -30,6 +29,11 @@ export function useJournalEntries(
   const initialFetchDoneRef = useRef(false);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const consecutiveEmptyFetchesRef = useRef(0);
+  const entriesRef = useRef<JournalEntry[]>([]);
+
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
 
   const verifyUserProfile = useCallback(async (userId: string) => {
     try {
@@ -61,6 +65,10 @@ export function useJournalEntries(
     }
     
     console.log('[useJournalEntries] Starting fetch, currently fetching:', isFetchingRef.current);
+    if (isFetchingRef.current) {
+      console.log('[useJournalEntries] Already fetching, skipping this request');
+      return;
+    }
     
     if (profileExists === false) {
       const created = await createUserProfile(userId);
@@ -96,6 +104,7 @@ export function useJournalEntries(
           console.log('[useJournalEntries] Fetch is taking too long, setting loading to false');
           setLoading(false);
           initialFetchDoneRef.current = true;
+          isFetchingRef.current = false;
         }
       }, 5000);
       
@@ -109,7 +118,7 @@ export function useJournalEntries(
       
       // Don't replace entries with empty array if we already have entries
       // and this fetch returned empty (could be a temporary connectivity issue)
-      if (journalEntries.length > 0 || entries.length === 0) {
+      if (journalEntries.length > 0 || entriesRef.current.length === 0) {
         setEntries(journalEntries);
       } else {
         console.log('[useJournalEntries] Fetch returned empty but keeping existing entries');
@@ -123,7 +132,7 @@ export function useJournalEntries(
       setError('Failed to load entries: ' + error.message);
       
       // Don't clear entries on error if we already have entries
-      if (entries.length === 0) {
+      if (entriesRef.current.length === 0) {
         setEntries([]);
       }
       
@@ -132,7 +141,7 @@ export function useJournalEntries(
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [userId, fetchCount, profileExists, verifyUserProfile, entries, isProfileChecked]);
+  }, [userId, fetchCount, profileExists, verifyUserProfile, isProfileChecked]);
 
   useEffect(() => {
     if (userId) {

@@ -60,7 +60,7 @@ export default function JournalEntriesList({
   
   // Show primary loading state only when loading initial entries
   // But don't show loading indefinitely for new users with no entries
-  const showInitialLoading = loading && entries.length === 0;
+  const showInitialLoading = loading && entries.length === 0 && !hasProcessingEntries;
 
   // New flag to check if this is likely a new user who hasn't created any entries yet
   const isLikelyNewUser = !loading && entries.length === 0 && !processingEntries.length;

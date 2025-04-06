@@ -65,16 +65,15 @@ export function PlaybackControls({
         {/* Save Button */}
         <Button 
           onClick={onSaveEntry}
-          variant="default" 
-          className={cn("px-6", isProcessing && "opacity-70")}
           disabled={isProcessing || !audioBlob}
+          variant="default"
         >
           {isProcessing ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Processing...
             </>
-          ) : "Save Entry"}
+          ) : "Save"}
         </Button>
         
         {/* Restart Button */}

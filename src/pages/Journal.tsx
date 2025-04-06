@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
-import { processRecording, isProcessingEntry } from '@/utils/audio-processing';
+import { processRecording } from '@/utils/audio-processing';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import JournalHeader from '@/components/journal/JournalHeader';
@@ -18,7 +18,7 @@ const Journal = () => {
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
-  const [isCheckingProfile, setIsCheckingProfile] = useState(true);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(false);
   const [activeTab, setActiveTab] = useState('record');
   const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
   const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
@@ -30,12 +30,13 @@ const Journal = () => {
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   
-  const { entries, loading, fetchEntries } = useJournalEntries(
+  const { entries, loading, fetchEntries, error } = useJournalEntries(
     user?.id,
     refreshKey,
     isProfileChecked
   );
 
+  // Clear toasts on mount and unmount
   useEffect(() => {
     clearAllToasts();
     
@@ -52,6 +53,7 @@ const Journal = () => {
     };
   }, []);
 
+  // Check for new entries
   useEffect(() => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
@@ -66,7 +68,7 @@ const Journal = () => {
         setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
         
         toast.success('Journal entry analyzed and saved', {
-          duration: 1000,
+          duration: 3000,
           id: 'journal-success-toast',
           closeButton: false
         });
@@ -79,6 +81,7 @@ const Journal = () => {
     }
   }, [entries, processingEntries, toastIds]);
 
+  // Clean up toasts on unmount
   useEffect(() => {
     return () => {
       Object.values(toastIds).forEach(id => {
@@ -91,13 +94,15 @@ const Journal = () => {
     };
   }, [toastIds, profileCheckTimeoutId]);
 
+  // Profile check timeout
   useEffect(() => {
-    if (isCheckingProfile && user?.id) {
+    if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
       const timeoutId = setTimeout(() => {
         console.log('[Journal] Profile check taking too long, proceeding anyway');
         setIsCheckingProfile(false);
         setIsProfileChecked(true);
-      }, 10000);
+        profileCheckedOnceRef.current = true;
+      }, 5000);
       
       setProfileCheckTimeoutId(timeoutId);
       
@@ -106,14 +111,16 @@ const Journal = () => {
         setProfileCheckTimeoutId(null);
       };
     }
-  }, [isCheckingProfile, user?.id]);
+  }, [user?.id, isCheckingProfile]);
 
+  // Initial profile check
   useEffect(() => {
-    if (user?.id && isCheckingProfile && !isProfileChecked && !profileCheckedOnceRef.current) {
+    if (user?.id && !isProfileChecked && !isCheckingProfile && !profileCheckedOnceRef.current) {
       checkUserProfile(user.id);
     }
-  }, [user?.id, isCheckingProfile, isProfileChecked]);
+  }, [user?.id, isProfileChecked, isCheckingProfile]);
 
+  // Check for completed processing entries
   useEffect(() => {
     if (!loading && entries.length > 0 && processingEntries.length > 0) {
       const entryIds = entries.map(entry => entry.id.toString());
@@ -129,7 +136,7 @@ const Journal = () => {
           if (toastIds[tempId]) {
             toast.success('Journal entry analyzed and saved', { 
               id: toastIds[tempId], 
-              duration: 1000,
+              duration: 3000,
               closeButton: false
             });
           }
@@ -148,6 +155,7 @@ const Journal = () => {
     }
   }, [entries, loading, processingEntries, toastIds]);
 
+  // Notify about new entries
   useEffect(() => {
     if (loading || entries.length === 0) return;
     
@@ -158,7 +166,7 @@ const Journal = () => {
     
     if (newEntries.length > 0 && notifiedEntryIds.size > 0) {
       if (!entryHasBeenProcessed) {
-        toast.success('Journal entry analyzed and saved', { duration: 1000, closeButton: false });
+        toast.success('Journal entry analyzed and saved', { duration: 3000, closeButton: false });
         setEntryHasBeenProcessed(true);
       }
       
@@ -188,13 +196,14 @@ const Journal = () => {
     }
   }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
 
+  // Poll for updates while processing entries
   useEffect(() => {
     if (processingEntries.length > 0) {
       const interval = setInterval(() => {
         console.log('[Journal] Polling for updates while processing entries');
         setRefreshKey(prev => prev + 1);
         fetchEntries();
-      }, 3000);
+      }, 2000); // Decreased from 3000 to 2000 for faster updates
       
       return () => clearInterval(interval);
     }
@@ -207,15 +216,13 @@ const Journal = () => {
       
       console.log('[Journal] Checking user profile for ID:', userId);
       
-      if (!profileCheckedOnceRef.current) {
-        const profileCreated = await ensureProfileExists();
-        profileCheckedOnceRef.current = true;
-        
-        console.log('[Journal] Profile check result:', profileCreated);
-        
-        if (!profileCreated) {
-          setShowRetryButton(true);
-        }
+      const profileCreated = await ensureProfileExists();
+      profileCheckedOnceRef.current = true;
+      
+      console.log('[Journal] Profile check result:', profileCreated);
+      
+      if (!profileCreated) {
+        setShowRetryButton(true);
       }
       
       setIsProfileChecked(true);
@@ -287,18 +294,18 @@ const Journal = () => {
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         
         // Trigger immediate fetch
-        setRefreshKey(prev => prev + 1);
         fetchEntries();
+        setRefreshKey(prev => prev + 1);
         
         // Set up polling at regular intervals
-        const pollIntervals = [1500, 3000, 5000, 8000, 15000];
+        const pollIntervals = [1000, 2000, 3000, 5000, 8000, 12000];
         
         pollIntervals.forEach(interval => {
           setTimeout(() => {
             if (processingEntries.includes(tempId)) {
               console.log(`[Journal] Polling for entry at ${interval}ms interval`);
-              setRefreshKey(prev => prev + 1);
               fetchEntries();
+              setRefreshKey(prev => prev + 1);
             }
           }, interval);
         });
@@ -314,7 +321,7 @@ const Journal = () => {
               toast.dismiss(toastIds[tempId]);
               
               toast.success('Journal entry analyzed and saved', { 
-                duration: 1000,
+                duration: 3000,
                 closeButton: false
               });
               
@@ -326,8 +333,8 @@ const Journal = () => {
             }
             
             // Final fetch attempt
-            setRefreshKey(prev => prev + 1);
             fetchEntries();
+            setRefreshKey(prev => prev + 1);
           }
         }, 20000);
       } else {
@@ -375,7 +382,7 @@ const Journal = () => {
     }
   };
 
-  // Fix for white screen issue: Handle the case when profile is being checked
+  // Handle profile check loading state
   if (isCheckingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -387,11 +394,34 @@ const Journal = () => {
     );
   }
 
-  useEffect(() => {
-    if (user?.id && !isProfileChecked && !isCheckingProfile) {
-      checkUserProfile(user.id);
-    }
-  }, [user?.id, isProfileChecked, isCheckingProfile]);
+  if (error && !loading) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
+        <JournalHeader />
+        <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-red-800 dark:text-red-200">
+                Error loading your journal entries: {error}
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+              onClick={() => {
+                setRefreshKey(prev => prev + 1);
+                fetchEntries();
+              }}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" /> 
+              Retry Loading
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
