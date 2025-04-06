@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +17,11 @@ import { debugLogger, logInfo, logError, logAuthError, logProfile } from '@/comp
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Maximum number of automatic profile creation attempts
+const MAX_AUTO_PROFILE_ATTEMPTS = 5;
+// Initial delay between retries in ms
+const BASE_RETRY_DELAY = 500;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -26,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
+  const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -36,10 +43,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     checkMobile();
-  }, []);
+    
+    // Clean up any timeouts on unmount
+    return () => {
+      if (autoRetryTimeoutId) {
+        clearTimeout(autoRetryTimeoutId);
+      }
+    };
+  }, [autoRetryTimeoutId]);
 
-  const ensureProfileExists = async (): Promise<boolean> => {
-    if (!user || profileCreationInProgress) {
+  const ensureProfileExists = async (forceRetry = false): Promise<boolean> => {
+    if (!user || (profileCreationInProgress && !forceRetry)) {
       logProfile(`Profile check skipped: ${!user ? 'No user' : 'Already in progress'}`, 'AuthContext');
       return false;
     }
@@ -50,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     const now = Date.now();
-    if (now - lastProfileAttemptTime < 2000) {
+    if (!forceRetry && now - lastProfileAttemptTime < 2000) {
       logProfile('Skipping profile check - too soon after last attempt', 'AuthContext');
       return profileExistsStatus || false;
     }
@@ -75,11 +89,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
-      } else if (profileCreationAttempts < 3) {
-        const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}, status: ${result}`;
+        return true;
+      } else {
+        const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}`;
         logAuthError(errorMsg, 'AuthContext');
         debugLogger.setLastProfileError(errorMsg);
         setProfileExistsStatus(false);
+        
+        // If we haven't reached the maximum number of auto attempts, schedule another retry
+        if (profileCreationAttempts < MAX_AUTO_PROFILE_ATTEMPTS) {
+          const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
+          logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
+          
+          // Clear any existing timeout
+          if (autoRetryTimeoutId) {
+            clearTimeout(autoRetryTimeoutId);
+          }
+          
+          // Schedule next retry
+          const timeoutId = setTimeout(() => {
+            logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
+            setAutoRetryTimeoutId(null);
+            ensureProfileExists(true).catch(e => {
+              logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
+            });
+          }, nextAttemptDelay);
+          
+          setAutoRetryTimeoutId(timeoutId);
+        }
       }
       
       return result;
@@ -221,14 +258,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     try {
       setProfileCreationInProgress(true);
-      logProfile(`Attempting profile creation for user: ${currentUser.email}`, 'AuthContext', {
+      setProfileCreationAttempts(prev => prev + 1);
+      
+      logProfile(`Attempt #${profileCreationAttempts + 1} to create profile for user: ${currentUser.email}`, 'AuthContext', {
         userProvider: currentUser.app_metadata?.provider,
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
       if (isMobileDevice) {
         logProfile('Mobile device detected, adding stabilization delay', 'AuthContext');
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
       
       const profileCreated = await ensureProfileExistsService(currentUser);
@@ -243,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         logAuthError('First attempt to create profile failed, retrying once...', 'AuthContext');
         
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         const retryResult = await ensureProfileExistsService(currentUser);
         if (retryResult) {
@@ -259,6 +298,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logAuthError(errorMsg, 'AuthContext');
         debugLogger.setLastProfileError(errorMsg);
         setProfileExistsStatus(false);
+        
+        // Schedule automatic retries
+        if (profileCreationAttempts < MAX_AUTO_PROFILE_ATTEMPTS) {
+          const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
+          logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
+          
+          // Clear any existing timeout
+          if (autoRetryTimeoutId) {
+            clearTimeout(autoRetryTimeoutId);
+          }
+          
+          // Schedule next retry
+          const timeoutId = setTimeout(() => {
+            logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
+            setAutoRetryTimeoutId(null);
+            ensureProfileExists(true).catch(e => {
+              logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
+            });
+          }, nextAttemptDelay);
+          
+          setAutoRetryTimeoutId(timeoutId);
+        }
+        
         return false;
       }
     } catch (error: any) {
@@ -282,15 +344,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(currentSession?.user ?? null);
         
         if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && currentSession?.user) {
-          const delay = isMobileDevice ? 1000 : 800;
-          logProfile(`Delaying profile creation by ${delay}ms for platform stability`, 'AuthContext');
+          // Implement staggered profile creation for improved reliability
+          const initialDelay = isMobileDevice ? 1500 : 1000;
+          logProfile(`Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
           
+          // First attempt
           setTimeout(() => {
             createOrVerifyProfile(currentSession.user)
               .catch(error => {
-                logAuthError(`Error in delayed profile creation: ${error.message}`, 'AuthContext', error);
+                logAuthError(`Error in initial profile creation: ${error.message}`, 'AuthContext', error);
               });
-          }, delay);
+          }, initialDelay);
+          
+          // Secondary attempt as backup
+          setTimeout(() => {
+            if (!profileCreationComplete && !profileCreationInProgress) {
+              logProfile('Executing backup profile creation attempt', 'AuthContext');
+              createOrVerifyProfile(currentSession.user)
+                .catch(error => {
+                  logAuthError(`Error in backup profile creation: ${error.message}`, 'AuthContext', error);
+                });
+            }
+          }, initialDelay + 3000);
         }
         
         setIsLoading(false);
@@ -303,6 +378,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfileExistsStatus(null);
           setProfileCreationComplete(false);
           debugLogger.setLastProfileError(null);
+          
+          // Clear any pending auto-retry
+          if (autoRetryTimeoutId) {
+            clearTimeout(autoRetryTimeoutId);
+            setAutoRetryTimeoutId(null);
+          }
+          
           toast.info('Signed out');
         }
       }
@@ -314,15 +396,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        const delay = isMobileDevice ? 1200 : 800;
-        logProfile(`Delaying initial profile creation by ${delay}ms for platform stability`, 'AuthContext');
+        // Implement staggered profile creation for improved reliability
+        const initialDelay = isMobileDevice ? 1500 : 1000;
+        logProfile(`Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
         
+        // First attempt
         setTimeout(() => {
           createOrVerifyProfile(currentSession.user)
             .catch(error => {
               logAuthError(`Error in initial profile creation: ${error.message}`, 'AuthContext', error);
             });
-        }, delay);
+        }, initialDelay);
+        
+        // Secondary attempt as backup
+        setTimeout(() => {
+          if (!profileCreationComplete && !profileCreationInProgress) {
+            logProfile('Executing backup initial profile creation attempt', 'AuthContext');
+            createOrVerifyProfile(currentSession.user)
+              .catch(error => {
+                logAuthError(`Error in backup initial profile creation: ${error.message}`, 'AuthContext', error);
+              });
+          }
+        }, initialDelay + 3000);
       }
       
       setIsLoading(false);
@@ -330,6 +425,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       subscription.unsubscribe();
+      if (autoRetryTimeoutId) {
+        clearTimeout(autoRetryTimeoutId);
+      }
     };
   }, [isMobileDevice]);
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -11,6 +12,7 @@ import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
+import { debugLogger, logInfo, logError } from '@/components/debug/DebugPanel';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -32,6 +34,8 @@ const Journal = () => {
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [hasRenderError, setHasRenderError] = useState(false);
   const [safeToSwitchTab, setSafeToSwitchTab] = useState(true);
+  const [profileCreationAttempts, setProfileCreationAttempts] = useState(0);
+  const maxProfileAttempts = 3;
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   const entriesListRef = useRef<HTMLDivElement>(null);
@@ -39,15 +43,31 @@ const Journal = () => {
   const [audioStatus, setAudioStatus] = useState<string>('No Recording');
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
   const [entriesReady, setEntriesReady] = useState(false);
+  const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Log component mount
+    logInfo('Journal page mounted', 'Journal');
+    
     const handleError = (event: ErrorEvent) => {
       console.error('[Journal] Caught render error:', event);
+      logError(`Render error: ${event.message}`, 'Journal', {
+        filename: event.filename,
+        lineno: event.lineno,
+        stack: event.error?.stack
+      });
       setHasRenderError(true);
     };
     
     window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
+    
+    return () => {
+      logInfo('Journal page unmounted', 'Journal');
+      window.removeEventListener('error', handleError);
+      if (autoRetryTimeoutRef.current) {
+        clearTimeout(autoRetryTimeoutRef.current);
+      }
+    };
   }, []);
 
   const { 
@@ -75,6 +95,10 @@ const Journal = () => {
       if (profileCheckTimeoutId) {
         clearTimeout(profileCheckTimeoutId);
       }
+      
+      if (autoRetryTimeoutRef.current) {
+        clearTimeout(autoRetryTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -99,6 +123,7 @@ const Journal = () => {
       
       if (newEntryIds.length > 0 && processingEntries.length > 0) {
         console.log('[Journal] New entries detected:', newEntryIds);
+        logInfo(`New entries detected: ${newEntryIds.join(', ')}`, 'Journal');
         setEntryHasBeenProcessed(true);
         
         setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
@@ -145,6 +170,7 @@ const Journal = () => {
     if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
       const timeoutId = setTimeout(() => {
         console.log('[Journal] Profile check taking too long, proceeding anyway');
+        logInfo('Profile check taking too long, proceeding anyway', 'Journal');
         setIsCheckingProfile(false);
         setIsProfileChecked(true);
         profileCheckedOnceRef.current = true;
@@ -169,6 +195,7 @@ const Journal = () => {
     if (processingEntries.length > 0 || isSavingRecording) {
       const interval = setInterval(() => {
         console.log('[Journal] Polling for updates while processing entries');
+        logInfo('Polling for updates while processing entries', 'Journal');
         setRefreshKey(prev => prev + 1);
         fetchEntries();
       }, 2000);
@@ -184,30 +211,82 @@ const Journal = () => {
       setLastAction('Checking Profile');
       
       console.log('[Journal] Checking user profile for ID:', userId);
+      logInfo(`Checking user profile for ID: ${userId}`, 'Journal');
       
       const profileCreated = await ensureProfileExists();
       profileCheckedOnceRef.current = true;
       
       console.log('[Journal] Profile check result:', profileCreated);
+      logInfo(`Profile check result: ${profileCreated}`, 'Journal');
       
       if (!profileCreated) {
-        setShowRetryButton(true);
-        setLastAction('Profile Check Failed');
+        // Automatic retry logic
+        if (profileCreationAttempts < maxProfileAttempts) {
+          setProfileCreationAttempts(prev => prev + 1);
+          logInfo(`Scheduling automatic profile creation retry ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
+          
+          const retryDelay = 1000 * Math.pow(1.5, profileCreationAttempts);
+          
+          if (autoRetryTimeoutRef.current) {
+            clearTimeout(autoRetryTimeoutRef.current);
+          }
+          
+          autoRetryTimeoutRef.current = setTimeout(() => {
+            logInfo(`Executing automatic profile creation retry ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
+            setLastAction(`Auto Retry Profile ${profileCreationAttempts + 1}`);
+            
+            // Only show retry button after all auto-retries fail
+            if (profileCreationAttempts >= maxProfileAttempts - 1) {
+              setShowRetryButton(true);
+            }
+            
+            checkUserProfile(userId);
+          }, retryDelay);
+        } else {
+          setShowRetryButton(true);
+          setLastAction('Profile Check Failed');
+        }
       } else {
         setLastAction('Profile Check Success');
+        setProfileCreationAttempts(0);
       }
       
       setIsProfileChecked(true);
     } catch (error: any) {
       console.error('[Journal] Error checking/creating user profile:', error);
+      logError(`Error checking/creating user profile: ${error.message}`, 'Journal', error);
       
       const now = Date.now();
       if (now - lastProfileErrorTime > 60000) {
         setLastProfileErrorTime(now);
       }
       
-      setShowRetryButton(true);
-      setLastAction('Profile Check Error');
+      // Automatic retry logic
+      if (profileCreationAttempts < maxProfileAttempts) {
+        setProfileCreationAttempts(prev => prev + 1);
+        logInfo(`Scheduling automatic profile creation retry after error ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
+        
+        const retryDelay = 1000 * Math.pow(1.5, profileCreationAttempts);
+        
+        if (autoRetryTimeoutRef.current) {
+          clearTimeout(autoRetryTimeoutRef.current);
+        }
+        
+        autoRetryTimeoutRef.current = setTimeout(() => {
+          logInfo(`Executing automatic profile creation retry after error ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
+          setLastAction(`Auto Retry Profile After Error ${profileCreationAttempts + 1}`);
+          
+          // Only show retry button after all auto-retries fail
+          if (profileCreationAttempts >= maxProfileAttempts - 1) {
+            setShowRetryButton(true);
+          }
+          
+          checkUserProfile(userId);
+        }, retryDelay);
+      } else {
+        setShowRetryButton(true);
+        setLastAction('Profile Check Error');
+      }
       
       setIsProfileChecked(true);
     } finally {
@@ -218,7 +297,7 @@ const Journal = () => {
   const handleRetryProfileCreation = () => {
     if (!user?.id) return;
     
-    setProfileCheckRetryCount(0);
+    setProfileCreationAttempts(0);
     profileCheckedOnceRef.current = false;
     setIsProfileChecked(false);
     setLastAction('Retry Profile Creation');
