@@ -9,7 +9,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
-import { debugLogger, logInfo, logError } from './components/debug/DebugPanel';
+import { debugLogger } from './components/debug/DebugPanel';
 import { useEffect } from 'react';
 
 // Enable debugger globally
@@ -40,12 +40,12 @@ const queryClient = new QueryClient({
 
 const App = () => {
   // Log application startup
-  logInfo('Application initialized', 'App');
+  debugLogger.log('info', 'Application initialized', 'App');
   
   useEffect(() => {
     // Add a global error listener to catch runtime errors
     const handleGlobalError = (event: ErrorEvent) => {
-      logError(`Global error: ${event.message}`, 'Window', {
+      debugLogger.log('error', `Global error: ${event.message}`, 'Window', {
         filename: event.filename,
         lineno: event.lineno,
         colno: event.colno,
@@ -55,7 +55,7 @@ const App = () => {
     
     // Add a global unhandled rejection listener
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      logError(`Unhandled promise rejection: ${event.reason}`, 'Window', {
+      debugLogger.log('error', `Unhandled promise rejection: ${event.reason}`, 'Window', {
         reason: event.reason,
         stack: event.reason?.stack
       });
@@ -65,7 +65,7 @@ const App = () => {
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     
     // Detect browser-specific features and limitations
-    logInfo(`Browser details: ${navigator.userAgent}`, 'App', {
+    debugLogger.log('info', `Browser details: ${navigator.userAgent}`, 'App', {
       localStorage: typeof localStorage !== 'undefined',
       sessionStorage: typeof sessionStorage !== 'undefined',
       cookiesEnabled: navigator.cookieEnabled,
