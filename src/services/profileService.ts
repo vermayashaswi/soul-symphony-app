@@ -23,10 +23,22 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
       if (error.code === 'PGRST116') {
         console.log('Profile not found, creating new profile');
         
-        // Extract user metadata for profile creation
-        const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
-        const avatarUrl = user.user_metadata?.avatar_url || '';
+        // Extract user metadata - handle different metadata formats (Google vs. Email)
+        let fullName = '';
+        let avatarUrl = '';
         const email = user.email || '';
+        
+        // Try different metadata paths for different auth providers
+        if (user.user_metadata) {
+          // Google auth often uses these fields
+          fullName = user.user_metadata?.full_name || 
+                    user.user_metadata?.name ||
+                    `${user.user_metadata?.given_name || ''} ${user.user_metadata?.family_name || ''}`.trim();
+          
+          avatarUrl = user.user_metadata?.avatar_url || 
+                     user.user_metadata?.picture || 
+                     '';
+        }
         
         console.log('Creating profile with data:', {
           id: user.id,
@@ -35,34 +47,37 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
           avatar_url: avatarUrl
         });
         
-        // Create the profile
-        const { error: insertError } = await supabase
+        // Try upsert approach directly (handles both insert and update cases)
+        const { error: upsertError } = await supabase
           .from('profiles')
-          .insert([{
+          .upsert([{
             id: user.id,
             email,
             full_name: fullName,
             avatar_url: avatarUrl,
-            onboarding_completed: false
-          }]);
+            onboarding_completed: false,
+            updated_at: new Date().toISOString()
+          }], { 
+            onConflict: 'id',
+            ignoreDuplicates: false 
+          });
+            
+        if (upsertError) {
+          console.error('Error upserting profile:', upsertError);
           
-        if (insertError) {
-          console.error('Error creating profile:', insertError);
-          
-          // Try a upsert as a fallback in case of race conditions
-          console.log('Trying upsert as fallback');
-          const { error: upsertError } = await supabase
+          // One more fallback attempt with a direct insert
+          const { error: insertError } = await supabase
             .from('profiles')
-            .upsert([{
+            .insert([{
               id: user.id,
               email,
               full_name: fullName,
               avatar_url: avatarUrl,
               onboarding_completed: false
-            }], { onConflict: 'id' });
+            }]);
             
-          if (upsertError) {
-            console.error('Error upserting profile:', upsertError);
+          if (insertError) {
+            console.error('Final fallback insert failed:', insertError);
             return false;
           }
         }

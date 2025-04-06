@@ -22,19 +22,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [profileCreationInProgress, setProfileCreationInProgress] = useState(false);
   const [profileCreationAttempts, setProfileCreationAttempts] = useState(0);
+  const [lastProfileAttemptTime, setLastProfileAttemptTime] = useState<number>(0);
 
   // Ensure profile exists wrapper with improved error handling
   const ensureProfileExists = async (): Promise<boolean> => {
     if (!user || profileCreationInProgress) return false;
     
+    // Prevent rapid repeated attempts (at least 2 seconds between attempts)
+    const now = Date.now();
+    if (now - lastProfileAttemptTime < 2000) {
+      console.log('Skipping profile check - too soon after last attempt');
+      return false;
+    }
+    
     try {
       setProfileCreationInProgress(true);
+      setLastProfileAttemptTime(now);
       setProfileCreationAttempts(prev => prev + 1);
       
       console.log(`Attempt #${profileCreationAttempts + 1} to ensure profile exists for user:`, user.id);
       const result = await ensureProfileExistsService(user);
       
-      if (!result && profileCreationAttempts < 3) {
+      if (!result && profileCreationAttempts < 5) {
         console.log(`Profile creation failed on attempt #${profileCreationAttempts + 1}, will retry later`);
         // We'll let the next attempt happen naturally when needed
       } else if (result) {
@@ -125,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Create or verify user profile
+  // Create or verify user profile with exponential backoff retry strategy
   const createOrVerifyProfile = async (currentUser: User): Promise<boolean> => {
     if (profileCreationInProgress) return false;
     
@@ -139,31 +148,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfileCreationAttempts(0);
         return true;
       } else {
-        console.warn('First attempt to create profile failed, retrying...');
+        console.warn('First attempt to create profile failed, retrying with backoff...');
         
-        // Retry once after a short delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        const retryResult = await ensureProfileExistsService(currentUser);
-        
-        if (retryResult) {
-          console.log('Profile created or verified on retry for user:', currentUser.email);
-          setProfileCreationAttempts(0);
-          return true;
-        } else {
-          // Try one more time with a longer delay
-          console.warn('Second attempt to create profile failed, final retry...');
-          await new Promise(resolve => setTimeout(resolve, 2500));
-          const finalResult = await ensureProfileExistsService(currentUser);
+        // Retry with exponential backoff
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          // Calculate delay with exponential backoff (1s, 2s, 4s)
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          console.log(`Waiting ${delay}ms before retry attempt #${attempt}`);
           
-          if (finalResult) {
-            console.log('Profile created or verified on final retry for user:', currentUser.email);
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          // Try again
+          const retryResult = await ensureProfileExistsService(currentUser);
+          if (retryResult) {
+            console.log(`Profile created or verified on retry #${attempt} for user:`, currentUser.email);
             setProfileCreationAttempts(0);
             return true;
-          } else {
-            console.error('Failed to create profile after multiple retries for user:', currentUser.email);
-            return false;
           }
         }
+        
+        console.error('Failed to create profile after multiple retries for user:', currentUser.email);
+        return false;
       }
     } catch (error) {
       console.error('Error in profile creation:', error);
@@ -184,11 +190,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // Handle profile creation for sign in events
         if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && currentSession?.user) {
-          // Use setTimeout to prevent auth deadlock
+          // Use setTimeout to prevent auth deadlock - crucial for mobile
           setTimeout(() => {
             createOrVerifyProfile(currentSession.user)
               .catch(error => console.error('Error in delayed profile creation:', error));
-          }, 800);
+          }, 1000);  // Increased delay to 1000ms for mobile stability
         }
         
         setIsLoading(false);
@@ -212,7 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTimeout(() => {
           createOrVerifyProfile(currentSession.user)
             .catch(error => console.error('Error in initial profile creation:', error));
-        }, 800);
+        }, 1200);  // Increased delay for mobile
       }
       
       setIsLoading(false);

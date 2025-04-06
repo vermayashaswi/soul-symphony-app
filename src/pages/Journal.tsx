@@ -18,7 +18,8 @@ const Journal = () => {
   const [isCheckingProfile, setIsCheckingProfile] = useState(true);
   const [activeTab, setActiveTab] = useState('record');
   const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
-  const [profileCreationError, setProfileCreationError] = useState(false);
+  // Track when the last profile error message was shown to avoid spamming
+  const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
   
   // Get journal entries using the hook
   const { entries, loading, fetchEntries } = useJournalEntries(
@@ -38,7 +39,6 @@ const Journal = () => {
   const checkUserProfile = async (userId: string) => {
     try {
       setIsCheckingProfile(true);
-      setProfileCreationError(false);
       
       console.log('Checking user profile for ID:', userId);
       
@@ -49,8 +49,8 @@ const Journal = () => {
       if (!profileCreated && profileCheckRetryCount < 5) {
         console.log('Profile check failed, retrying...', profileCheckRetryCount + 1);
         
-        // Wait a bit longer each time
-        const delay = 1000 * (profileCheckRetryCount + 1);
+        // Wait a bit longer each time (exponential backoff)
+        const delay = 1000 * Math.pow(1.5, profileCheckRetryCount);
         await new Promise(resolve => setTimeout(resolve, delay));
         
         profileCreated = await ensureProfileExists();
@@ -61,22 +61,31 @@ const Journal = () => {
       if (profileCreated) {
         console.log('Profile created or verified successfully');
         setIsProfileChecked(true);
-        setProfileCreationError(false);
       } else if (profileCheckRetryCount >= 5) {
         console.error('Failed to create profile after multiple retries');
-        // Only show this error once
-        if (!profileCreationError) {
-          toast.error('Unable to set up your profile. Please try logging out and back in.');
-          setProfileCreationError(true);
+        
+        // Only show error toast occasionally (max once per minute)
+        const now = Date.now();
+        if (now - lastProfileErrorTime > 60000) {
+          toast.error('Having trouble setting up your profile. You can still use the app.');
+          setLastProfileErrorTime(now);
         }
+        
+        // Allow usage even if profile creation failed
+        setIsProfileChecked(true);
       }
     } catch (error: any) {
       console.error('Error checking/creating user profile:', error);
-      // Only show error toast if we haven't already
-      if (!profileCreationError) {
-        toast.error('Error setting up profile. Please try refreshing the page.');
-        setProfileCreationError(true);
+      
+      // Only show error toast occasionally (max once per minute)
+      const now = Date.now();
+      if (now - lastProfileErrorTime > 60000) {
+        toast.error('Having trouble with your profile, but you can continue using the app');
+        setLastProfileErrorTime(now);
       }
+      
+      // Allow usage even with errors
+      setIsProfileChecked(true);
     } finally {
       setIsCheckingProfile(false);
     }
