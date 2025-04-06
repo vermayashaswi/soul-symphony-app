@@ -25,10 +25,10 @@ export default function JournalEntriesList({
 }: JournalEntriesListProps) {
   // Show primary loading state only when loading initial entries
   // But don't show loading indefinitely for new users with no entries
-  const showInitialLoading = loading && entries.length === 0 && (!processingEntries || processingEntries.length === 0);
+  const showInitialLoading = loading && entries.length === 0;
 
   // New flag to check if this is likely a new user who hasn't created any entries yet
-  const isLikelyNewUser = !loading && entries.length === 0 && (!processingEntries || processingEntries.length === 0);
+  const isLikelyNewUser = !loading && entries.length === 0;
 
   if (showInitialLoading) {
     return (
@@ -48,23 +48,13 @@ export default function JournalEntriesList({
     <div>
       <div className="space-y-4 mb-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Your Journal</h2>
+          <h2 className="text-xl font-semibold">Your Journal Entries</h2>
           <Button onClick={onStartRecording} size="sm" className="gap-1">
             <Plus className="h-4 w-4" />
             New Entry
           </Button>
         </div>
       </div>
-
-      {/* Show processing indicator when entries are being processed */}
-      {processingEntries && processingEntries.length > 0 && (
-        <div className="mb-4 p-3 bg-primary-50 border border-primary-100 rounded-lg">
-          <div className="flex items-center gap-2 text-sm text-primary-700">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Processing {processingEntries.length} journal {processingEntries.length === 1 ? 'entry' : 'entries'}...</span>
-          </div>
-        </div>
-      )}
 
       <AnimatePresence>
         <div className="space-y-4">

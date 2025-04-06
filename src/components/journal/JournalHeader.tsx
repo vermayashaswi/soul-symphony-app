@@ -15,7 +15,6 @@ interface JournalHeaderProps {
 const JournalHeader = ({ isFirstTime }: JournalHeaderProps = {}) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { colorTheme } = useTheme();
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldAdjustForMobile = isMobile || mobileDemo;
@@ -49,8 +48,8 @@ const JournalHeader = ({ isFirstTime }: JournalHeaderProps = {}) => {
               transition={{ duration: 0.5, delay: 0.2 }}
             >
               {isFirstTime 
-                ? "Welcome! Start your journaling journey by recording your first entry" 
-                : "Record your thoughts and feelings through voice journaling"}
+                ? "Welcome! Record your thoughts by voice or switch to view past entries" 
+                : "Record your thoughts or browse your previous journal entries"}
             </motion.p>
           </div>
         </div>

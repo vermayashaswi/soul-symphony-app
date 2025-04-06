@@ -8,6 +8,8 @@ import JournalHeader from '@/components/journal/JournalHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2 } from 'lucide-react';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -16,6 +18,7 @@ const Journal = () => {
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [isCheckingProfile, setIsCheckingProfile] = useState(true);
+  const [activeTab, setActiveTab] = useState('record');
 
   // Get journal entries using the hook
   const { entries, loading, fetchEntries } = useJournalEntries(
@@ -88,6 +91,7 @@ const Journal = () => {
   // Handle starting a new recording
   const handleStartRecording = () => {
     console.log('Starting new recording');
+    setActiveTab('record');
   };
 
   // Handle when a recording is completed
@@ -110,6 +114,9 @@ const Journal = () => {
           setTimeout(() => {
             setProcessingEntries(prev => prev.filter(id => id !== tempId));
           }, 10000);
+          
+          // Switch to the entries tab after recording is processed
+          setActiveTab('entries');
         }, 3000);
       }
     } catch (error) {
@@ -143,21 +150,42 @@ const Journal = () => {
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
       <JournalHeader isFirstTime={isFirstTimeUser} />
       
-      {/* Voice recorder component */}
-      <div className="mb-8">
-        <VoiceRecorder 
-          onRecordingComplete={handleRecordingComplete}
-        />
-      </div>
-      
-      {/* Journal entries list */}
-      <JournalEntriesList
-        entries={entries}
-        loading={loading}
-        processingEntries={processingEntries}
-        onStartRecording={handleStartRecording}
-        onDeleteEntry={handleDeleteEntry}
-      />
+      <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="record">Record Entry</TabsTrigger>
+          <TabsTrigger value="entries">Past Entries</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="record" className="mt-0">
+          {/* Voice recorder component */}
+          <div className="mb-4">
+            <VoiceRecorder 
+              onRecordingComplete={handleRecordingComplete}
+            />
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="entries" className="mt-0">
+          {/* Journal entries list */}
+          <JournalEntriesList
+            entries={entries}
+            loading={loading}
+            processingEntries={processingEntries}
+            onStartRecording={handleStartRecording}
+            onDeleteEntry={handleDeleteEntry}
+          />
+          
+          {/* Show processing indicator when entries are being processed */}
+          {processingEntries && processingEntries.length > 0 && (
+            <div className="mt-4 p-3 bg-primary-foreground/10 border border-primary/20 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-primary">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Processing {processingEntries.length} journal {processingEntries.length === 1 ? 'entry' : 'entries'}...</span>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
