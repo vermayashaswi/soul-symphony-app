@@ -22,6 +22,7 @@ const Journal = () => {
   const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
   const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
   const [showRetryButton, setShowRetryButton] = useState(false);
+  const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
   
   const { entries, loading, fetchEntries } = useJournalEntries(
     user?.id,
@@ -36,6 +37,16 @@ const Journal = () => {
       setIsCheckingProfile(false);
     }
   }, [user?.id]);
+
+  // Clear processing entries when the component unmounts
+  useEffect(() => {
+    return () => {
+      // Clear any lingering toasts when component unmounts
+      Object.values(toastIds).forEach(id => {
+        if (id) toast.dismiss(id);
+      });
+    };
+  }, [toastIds]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -119,6 +130,9 @@ const Journal = () => {
         // Add tempId to processing entries
         setProcessingEntries(prev => [...prev, tempId]);
         
+        // Store the toast ID with the tempId
+        setToastIds(prev => ({ ...prev, [tempId]: toastId }));
+        
         // Refresh entries list immediately to show processing indicator
         setRefreshKey(prev => prev + 1);
         fetchEntries();
@@ -136,7 +150,16 @@ const Journal = () => {
             setProcessingEntries(prev => prev.filter(id => id !== tempId));
             
             // Show success message if toast is still showing
-            toast.success('Journal entry processed!', { id: toastId });
+            if (toastIds[tempId]) {
+              toast.success('Journal entry processed!', { id: toastIds[tempId] });
+              
+              // Remove the toast ID from our tracking
+              setToastIds(prev => {
+                const newToastIds = { ...prev };
+                delete newToastIds[tempId];
+                return newToastIds;
+              });
+            }
             
             // Perform final refresh
             setRefreshKey(prev => prev + 1);
@@ -163,6 +186,27 @@ const Journal = () => {
     if (!user?.id) return;
     
     try {
+      // When an entry is deleted, clear any processing entries and their associated toasts
+      setProcessingEntries(prev => {
+        const newProcessingEntries = [...prev];
+        
+        // For each processing entry we're removing, clear its toast
+        newProcessingEntries.forEach(tempId => {
+          if (toastIds[tempId]) {
+            toast.dismiss(toastIds[tempId]);
+            
+            // Remove the toast ID from our tracking
+            setToastIds(prev => {
+              const newToastIds = { ...prev };
+              delete newToastIds[tempId];
+              return newToastIds;
+            });
+          }
+        });
+        
+        return [];
+      });
+      
       setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Error deleting entry:', error);
