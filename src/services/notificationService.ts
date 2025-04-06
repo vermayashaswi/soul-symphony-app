@@ -1,9 +1,9 @@
-
 import { toast } from "sonner";
 
 // Duration constants
 const STANDARD_DURATION = 1000; // 1 second for regular toasts
 const ACTIVE_JOB_DURATION = null; // null means the toast won't auto-dismiss
+const ERROR_DURATION = 3000; // 3 seconds for errors
 
 // Check if we're in a browser environment
 const isBrowser = (): boolean => {
@@ -16,7 +16,8 @@ export const showToast = (
   type: "default" | "success" | "error" | "info" | "warning" = "default",
   isActiveJob = false
 ) => {
-  const duration = isActiveJob ? ACTIVE_JOB_DURATION : STANDARD_DURATION;
+  const duration = isActiveJob ? ACTIVE_JOB_DURATION : 
+                  (type === "error" ? ERROR_DURATION : STANDARD_DURATION);
   
   let toastId;
   switch (type) {

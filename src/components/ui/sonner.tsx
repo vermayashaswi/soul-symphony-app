@@ -43,6 +43,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
           color: "var(--foreground)",
         }
       }}
+      // Enable swipe to dismiss in all directions
+      swipeDirection={["up", "down", "left", "right"]}
+      // Ensure swipe gestures work properly
+      swipeThreshold={10} // Lower threshold to make swipe more responsive
       {...props}
     />
   )

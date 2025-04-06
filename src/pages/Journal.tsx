@@ -33,47 +33,38 @@ const Journal = () => {
     isProfileChecked
   );
 
-  // Track previously seen entries to detect when new ones appear
   useEffect(() => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
       const prevEntryIds = previousEntriesRef.current;
       
-      // Check if we have new entries that weren't in the previous list
       const newEntryIds = currentEntryIds.filter(id => !prevEntryIds.includes(id));
       
       if (newEntryIds.length > 0 && processingEntries.length > 0) {
         console.log('[Journal] New entries detected:', newEntryIds);
         setEntryHasBeenProcessed(true);
         
-        // Update the list of processed entry IDs
         setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
         
-        // Dismiss all processing toast notifications and show success
         processingEntries.forEach(tempId => {
           if (toastIds[tempId]) {
-            // Replace processing toast with success toast
             toast.success('Journal entry analyzed and saved', {
               id: toastIds[tempId],
-              duration: 3000
+              duration: 1000
             });
           }
         });
         
-        // Clear all processing entries as they're now complete
         setProcessingEntries([]);
         setToastIds({});
       }
       
-      // Update the reference of previous entries
       previousEntriesRef.current = currentEntryIds;
     }
   }, [entries, processingEntries, toastIds]);
 
-  // Clean up toasts when component unmounts
   useEffect(() => {
     return () => {
-      // Dismiss all toasts when unmounting
       Object.values(toastIds).forEach(id => {
         if (id) toast.dismiss(id);
       });
@@ -84,14 +75,13 @@ const Journal = () => {
     };
   }, [toastIds, profileCheckTimeoutId]);
 
-  // Set a maximum timeout for profile checking to prevent infinite loading state
   useEffect(() => {
     if (isCheckingProfile && user?.id) {
       const timeoutId = setTimeout(() => {
         console.log('[Journal] Profile check taking too long, proceeding anyway');
         setIsCheckingProfile(false);
         setIsProfileChecked(true);
-      }, 10000); // 10 seconds maximum wait time
+      }, 10000);
       
       setProfileCheckTimeoutId(timeoutId);
       
@@ -102,14 +92,12 @@ const Journal = () => {
     }
   }, [isCheckingProfile, user?.id]);
 
-  // Initialize profile checking when user is available
   useEffect(() => {
     if (user?.id && isCheckingProfile && !isProfileChecked) {
       checkUserProfile(user.id);
     }
   }, [user?.id, isCheckingProfile, isProfileChecked]);
 
-  // Check if any processing entries appear in the loaded entries list, and dismiss their loading toasts
   useEffect(() => {
     if (!loading && entries.length > 0 && processingEntries.length > 0) {
       const entryIds = entries.map(entry => entry.id.toString());
@@ -121,22 +109,19 @@ const Journal = () => {
         console.log('[Journal] Found completed processing entries, dismissing their toasts:', completedProcessingEntries);
         setEntryHasBeenProcessed(true);
         
-        // Dismiss the loading toasts for completed entries and show success notifications
         completedProcessingEntries.forEach(tempId => {
           if (toastIds[tempId]) {
             toast.success('Journal entry analyzed and saved', { 
               id: toastIds[tempId], 
-              duration: 3000
+              duration: 1000
             });
           }
         });
         
-        // Remove completed entries from processingEntries and toastIds
         setProcessingEntries(prev => 
           prev.filter(tempId => !completedProcessingEntries.includes(tempId))
         );
         
-        // Clean up toastIds
         const newToastIds = { ...toastIds };
         completedProcessingEntries.forEach(tempId => {
           delete newToastIds[tempId];
@@ -146,7 +131,6 @@ const Journal = () => {
     }
   }, [entries, loading, processingEntries, toastIds]);
 
-  // Only show success notification when new entries are added and not for the initial load
   useEffect(() => {
     if (loading || entries.length === 0) return;
     
@@ -156,9 +140,8 @@ const Journal = () => {
     );
     
     if (newEntries.length > 0 && notifiedEntryIds.size > 0) {
-      // Only show a toast if we have new entries after the initial load
       if (!entryHasBeenProcessed) {
-        toast.success('Journal entry analyzed and saved', { duration: 3000 });
+        toast.success('Journal entry analyzed and saved', { duration: 1000 });
         setEntryHasBeenProcessed(true);
       }
       
@@ -167,12 +150,10 @@ const Journal = () => {
       setNotifiedEntryIds(updatedNotifiedIds);
     } 
     else if (notifiedEntryIds.size === 0 && entries.length > 0) {
-      // Initialize the set with all current entries on first load
       const initialIds = new Set(entries.map(entry => entry.id));
       setNotifiedEntryIds(initialIds);
     }
     
-    // Clear any entries from processingEntries that now appear in the actual entries list
     const newProcessingEntries = processingEntries.filter(tempId => 
       !entries.some(entry => entry.id.toString() === tempId)
     );
@@ -180,7 +161,6 @@ const Journal = () => {
     if (newProcessingEntries.length !== processingEntries.length) {
       setProcessingEntries(newProcessingEntries);
       
-      // Clean up associated toastIds
       const newToastIds = { ...toastIds };
       processingEntries.forEach(tempId => {
         if (!newProcessingEntries.includes(tempId)) {
@@ -211,7 +191,6 @@ const Journal = () => {
         setProfileCheckRetryCount(prevCount => prevCount + 1);
       }
       
-      // Even if profile creation fails, proceed after a few attempts
       console.log('[Journal] Proceeding with journal view regardless of profile status');
       setIsProfileChecked(true);
       
@@ -229,7 +208,6 @@ const Journal = () => {
       
       setShowRetryButton(true);
       
-      // Still proceed to show the journal even if there was an error
       setIsProfileChecked(true);
     } finally {
       setIsCheckingProfile(false);
@@ -256,9 +234,8 @@ const Journal = () => {
       setActiveTab('entries');
       setEntryHasBeenProcessed(false);
       
-      // Use a clearer message for the processing toast
       const toastId = toast.loading('Processing your journal entry with AI...', {
-        duration: Infinity // This will persist until we explicitly dismiss it
+        duration: Infinity
       });
       
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
@@ -267,32 +244,26 @@ const Journal = () => {
         setProcessingEntries(prev => [...prev, tempId]);
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         
-        // Refresh entries immediately to check for quick processing
         setRefreshKey(prev => prev + 1);
         fetchEntries();
         
-        // Check again after a short delay
         setTimeout(() => {
           setRefreshKey(prev => prev + 1);
           fetchEntries();
         }, 5000);
         
-        // Set a maximum processing time after which we'll dismiss the loading toast
         setTimeout(() => {
           if (processingEntries.includes(tempId)) {
             console.log('[Journal] Maximum processing time reached for tempId:', tempId);
             
-            // Find and remove the specific entry from processingEntries
             setProcessingEntries(prev => prev.filter(id => id !== tempId));
             
-            // Change loading toast to success toast
             if (toastIds[tempId]) {
               toast.success('Journal entry analyzed and saved', { 
                 id: toastIds[tempId], 
-                duration: 3000
+                duration: 1000
               });
               
-              // Remove this toast ID from tracking
               setToastIds(prev => {
                 const newToastIds = { ...prev };
                 delete newToastIds[tempId];
@@ -305,7 +276,6 @@ const Journal = () => {
           fetchEntries();
         }, 15000);
       } else {
-        // Dismiss the loading toast and show an error
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
           id: toastId,
           duration: 3000
@@ -321,14 +291,12 @@ const Journal = () => {
     if (!user?.id) return;
     
     try {
-      // Clean up any processing states and explicitly dismiss all toasts
       processingEntries.forEach(tempId => {
         if (toastIds[tempId]) {
           toast.dismiss(toastIds[tempId]);
         }
       });
       
-      // Clear all processing entries and toast IDs
       setProcessingEntries([]);
       setToastIds({});
       
