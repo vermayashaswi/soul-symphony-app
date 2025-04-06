@@ -5,7 +5,7 @@ import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
+import { clearAllToasts } from '@/services/notificationService';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -32,8 +32,6 @@ export function PlaybackControls({
 }: PlaybackControlsProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [isClearingToasts, setIsClearingToasts] = useState(false);
-  const [clearAttempts, setClearAttempts] = useState(0);
-  const [allToastsCleared, setAllToastsCleared] = useState(false);
   
   // Calculate current time based on progress and duration
   useEffect(() => {
@@ -51,138 +49,55 @@ export function PlaybackControls({
     }
   };
 
-  // Comprehensive toast clearing and save function that fully replicates the manual swipe behavior
+  // Function to ensure all toasts are completely cleared
   const handleSaveClick = async () => {
-    console.log('[PlaybackControls] Save button clicked, starting toast cleanup sequence');
-    
-    // Prevent multiple simultaneous save attempts
-    if (isClearingToasts) {
-      console.log('[PlaybackControls] Already clearing toasts, ignoring duplicate save request');
-      return;
-    }
-    
     setIsClearingToasts(true);
-    setAllToastsCleared(false);
-    setClearAttempts(0);
     
+    // First force clear any existing toasts
+    clearAllToasts();
+    
+    // Give some time for the DOM to update
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Clear again to ensure any new toasts are also cleared
+    clearAllToasts();
+    
+    // Wait a bit more for any lingering DOM effects
+    await new Promise(resolve => setTimeout(resolve, 150));
+    
+    // Try to find any remaining toast elements and force remove them
     try {
-      // Step 1: First round of toast clearing with the enhanced method
-      console.log('[PlaybackControls] Step 1: Initial toast clearing');
-      await ensureAllToastsCleared();
-      setClearAttempts(prev => prev + 1);
-      
-      // Step 2: Wait for DOM updates and animations to complete
-      console.log('[PlaybackControls] Step 2: Waiting for DOM updates');
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Step 3: Second round of toast clearing
-      console.log('[PlaybackControls] Step 3: Second round of toast clearing');
-      await ensureAllToastsCleared();
-      setClearAttempts(prev => prev + 1);
-      
-      // Step 4: Direct DOM manipulation to forcefully remove any lingering toast elements
-      console.log('[PlaybackControls] Step 4: Direct DOM manipulation');
-      try {
-        // Find and remove any toast elements that might be lingering
-        const toastElements = document.querySelectorAll('[data-sonner-toast]');
-        if (toastElements.length > 0) {
-          console.log(`[PlaybackControls] Found ${toastElements.length} lingering toasts, removing manually`);
-          toastElements.forEach(el => {
-            try {
-              if (el.parentNode) {
-                // Add fade-out animation before removal for smoother transition
-                el.style.opacity = '0';
-                el.style.transform = 'translateY(-10px)';
-                el.style.transition = 'opacity 100ms ease, transform 100ms ease';
-                
-                // Remove after transition
-                setTimeout(() => {
-                  if (el.parentNode) {
-                    el.parentNode.removeChild(el);
-                  }
-                }, 100);
-              }
-            } catch (err) {
-              console.error('[PlaybackControls] Error removing individual toast element:', err);
-            }
-          });
-        }
-        
-        // Clear toast containers by removing their children
-        const toastContainers = document.querySelectorAll('[data-sonner-toaster]');
-        if (toastContainers.length > 0) {
-          console.log(`[PlaybackControls] Found ${toastContainers.length} toast containers`);
-          toastContainers.forEach(container => {
-            try {
-              // Don't remove the container itself, just clear its children
-              while (container.firstChild) {
-                container.removeChild(container.firstChild);
-              }
-            } catch (err) {
-              console.error('[PlaybackControls] Error clearing toast container children:', err);
-            }
-          });
-        }
-        
-        // Also look for any toast portals or other related elements
-        const toastPortals = document.querySelectorAll('[id^="sonner"]');
-        if (toastPortals.length > 0) {
-          console.log(`[PlaybackControls] Found ${toastPortals.length} sonner portals`);
-          toastPortals.forEach(portal => {
-            try {
-              while (portal.firstChild) {
-                portal.removeChild(portal.firstChild);
-              }
-            } catch (err) {
-              console.error('[PlaybackControls] Error clearing toast portal children:', err);
-            }
-          });
-        }
-      } catch (e) {
-        console.error('[PlaybackControls] Error during direct DOM manipulation:', e);
-      }
-      
-      // Step 5: Final toast clearing to ensure no new toasts appeared
-      console.log('[PlaybackControls] Step 5: Final toast clearing');
-      await ensureAllToastsCleared();
-      setClearAttempts(prev => prev + 1);
-      
-      // Step 6: Reset internal state of toast systems
-      console.log('[PlaybackControls] Step 6: Resetting toast state');
-      // Force clear using standard method one more time
-      clearAllToasts();
-      
-      // Step 7: Final check for any remaining toast elements
-      const remainingToasts = document.querySelectorAll('[data-sonner-toast]');
-      if (remainingToasts.length > 0) {
-        console.warn(`[PlaybackControls] ${remainingToasts.length} toasts still remain after cleanup sequence`);
-        // One last forceful attempt
-        remainingToasts.forEach(el => {
+      const toastElements = document.querySelectorAll('[data-sonner-toast]');
+      if (toastElements.length > 0) {
+        console.log(`[PlaybackControls] Found ${toastElements.length} lingering toasts, removing manually`);
+        toastElements.forEach(el => {
           if (el.parentNode) {
             el.parentNode.removeChild(el);
           }
         });
-      } else {
-        console.log('[PlaybackControls] All toasts successfully cleared');
       }
       
-      // All toasts should be cleared by now
-      setAllToastsCleared(true);
-      
-      // Step 8: Small delay before proceeding with save to ensure clean UI state
-      console.log('[PlaybackControls] Step 8: Final delay before saving');
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      // Step 9: Now it's safe to proceed with the actual save operation
-      console.log('[PlaybackControls] Step 9: Executing save operation');
-      onSaveEntry();
-    } catch (error) {
-      console.error('[PlaybackControls] Error during toast clearing sequence:', error);
-      // Still try to save even if toast clearing had errors
-      onSaveEntry();
-    } finally {
-      setIsClearingToasts(false);
+      // Also try to clear any toast containers from the DOM
+      const toastContainers = document.querySelectorAll('[data-sonner-toaster]');
+      if (toastContainers.length > 0) {
+        console.log(`[PlaybackControls] Found ${toastContainers.length} toast containers`);
+        // Don't remove containers as they're needed, but clear their children
+        toastContainers.forEach(container => {
+          while (container.firstChild) {
+            container.removeChild(container.firstChild);
+          }
+        });
+      }
+    } catch (e) {
+      console.error('[PlaybackControls] Error trying to manually clear toasts:', e);
     }
+    
+    // Final safety check
+    clearAllToasts();
+    
+    // Now it's safe to proceed with the save operation
+    setIsClearingToasts(false);
+    onSaveEntry();
   };
   
   return (
@@ -228,7 +143,7 @@ export function PlaybackControls({
           {isProcessing || isClearingToasts ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {isClearingToasts ? (clearAttempts > 0 ? "Preparing UI..." : "Clearing notifications...") : "Processing..."}
+              {isClearingToasts ? "Preparing..." : "Processing..."}
             </>
           ) : "Save"}
         </Button>
