@@ -34,7 +34,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
   
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isLoading && !user) {
       console.log("Protected route: No user, should redirect to /auth", {
         path: location.pathname

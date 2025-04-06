@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor } from 'lucide-react';
@@ -64,6 +63,7 @@ export default function Settings() {
   const [showFAQ, setShowFAQ] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
   
   const colorThemes = [
     { name: 'Default', color: 'bg-blue-500' },
@@ -748,7 +748,10 @@ export default function Settings() {
         </DialogContent>
       </Dialog>
 
-      <DebugPanel />
+      <DebugPanel 
+        isOpen={showDebugPanel}
+        onClose={() => setShowDebugPanel(false)}
+      />
     </div>
   );
 }
