@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { cn } from '@/lib/utils';
 import { Check as CheckIcon } from 'lucide-react';
-import { Input } from "@/components/ui/input";
 
 interface ColorPickerProps {
   value: string;
@@ -16,7 +14,6 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   const [saturation, setSaturation] = useState(80);
   const [lightness, setLightness] = useState(60);
   const [currentColor, setCurrentColor] = useState(value || '#3b82f6');
-  const [hexInput, setHexInput] = useState(value || '#3b82f6');
   const colorCircleRef = useRef<HTMLDivElement>(null);
   const spectrumRef = useRef<HTMLDivElement>(null);
 
@@ -29,7 +26,6 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
         setHue(h);
         setSaturation(s);
         setLightness(l);
-        setHexInput(value);
       }
     }
   }, [value]);
@@ -38,7 +34,6 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   useEffect(() => {
     const hexColor = hslToHex(hue, saturation, lightness);
     setCurrentColor(hexColor);
-    setHexInput(hexColor);
   }, [hue, saturation, lightness]);
 
   const handleHueChange = (newHue: number[]) => {
@@ -59,26 +54,7 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   const updateColor = (h: number, s: number, l: number) => {
     const hexColor = hslToHex(h, s, l);
     setCurrentColor(hexColor);
-    setHexInput(hexColor);
     onChange(hexColor);
-  };
-
-  const handleHexInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newHex = e.target.value;
-    setHexInput(newHex);
-    
-    // Only update if it's a valid hex color
-    if (/^#[0-9A-F]{6}$/i.test(newHex)) {
-      const rgb = hexToRgb(newHex);
-      if (rgb) {
-        const [h, s, l] = rgbToHsl(rgb.r, rgb.g, rgb.b);
-        setHue(h);
-        setSaturation(s);
-        setLightness(l);
-        setCurrentColor(newHex);
-        onChange(newHex);
-      }
-    }
   };
 
   const handleSpectrumClick = (e: React.MouseEvent) => {
@@ -166,19 +142,11 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   return (
     <div className={cn("flex flex-col space-y-4", className)}>
       {/* Color preview */}
-      <div className="flex items-center gap-3 mb-2">
+      <div className="flex items-center justify-center mb-2">
         <div 
-          className="h-12 w-12 rounded-full border-2 border-gray-200"
+          className="h-16 w-16 rounded-full border-2 border-gray-200 shadow-md"
           style={{ backgroundColor: currentColor }}
         />
-        <div className="flex-1">
-          <Input
-            value={hexInput}
-            onChange={handleHexInputChange}
-            className="font-mono uppercase"
-            maxLength={7}
-          />
-        </div>
       </div>
       
       {/* Hue spectrum slider */}
