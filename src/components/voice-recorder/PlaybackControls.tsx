@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
+import { Play, Pause, Save, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { cn } from '@/lib/utils';
+import { formatTime } from '@/utils/format-time';
+import { clearAllToasts } from '@/services/notificationService';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -15,7 +15,7 @@ interface PlaybackControlsProps {
   onTogglePlayback: () => void;
   onSaveEntry: () => void;
   onRestart: () => void;
-  onSeek?: (position: number) => void;
+  onSeek: (position: number) => void;
 }
 
 export function PlaybackControls({
@@ -29,89 +29,106 @@ export function PlaybackControls({
   onRestart,
   onSeek
 }: PlaybackControlsProps) {
-  const [currentTime, setCurrentTime] = useState(0);
+  const [seekValue, setSeekValue] = useState(0);
+  const [isSaveRequested, setIsSaveRequested] = useState(false);
   
-  // Calculate current time based on progress and duration
+  // Always update local state when playback progress changes
   useEffect(() => {
-    const timeInSeconds = (playbackProgress * audioDuration);
-    setCurrentTime(timeInSeconds);
-  }, [playbackProgress, audioDuration]);
+    setSeekValue(playbackProgress * 100);
+  }, [playbackProgress]);
   
-  const formattedProgress = formatTime(currentTime);
-  const formattedDuration = formatTime(audioDuration);
+  // Track seek events to properly update the UI
+  const handleSeekChange = (value: number[]) => {
+    const seekPosition = value[0] / 100;
+    setSeekValue(value[0]);
+    onSeek(seekPosition);
+  };
   
-  const handleSliderChange = (value: number[]) => {
-    if (onSeek) {
-      const position = value[0] / 100;
-      onSeek(position);
-    }
+  // Safer save entry handling with toast clearing
+  const handleSafeEntryRequest = async () => {
+    // Only allow save once
+    if (isSaveRequested) return;
+    
+    console.log('[PlaybackControls] Save requested, clearing all toasts first');
+    setIsSaveRequested(true);
+    
+    // Clear any toast notifications to prevent UI conflicts
+    clearAllToasts();
+    
+    // Let the UI process the toast clearing
+    setTimeout(() => {
+      // Double-check clear to ensure UI is clean
+      clearAllToasts();
+      
+      // Now it's safe to call the save function
+      onSaveEntry();
+    }, 100);
   };
   
   return (
-    <div className="w-full px-4">
-      <div className="mb-4 relative">
-        <Slider
-          defaultValue={[0]}
-          value={[playbackProgress * 100]}
-          max={100}
-          step={0.1}
-          onValueChange={handleSliderChange}
-          disabled={isProcessing || !audioBlob}
-          className="mb-2"
-        />
-        <div className="flex justify-between mt-1.5 text-xs text-slate-500">
-          <span>{formattedProgress}</span>
-          <span>{formattedDuration}</span>
-        </div>
+    <div className="w-full max-w-md flex flex-col gap-4 px-6">
+      <div className="w-full flex justify-between items-center">
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          {formatTime(playbackProgress * audioDuration)}
+        </span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          {formatTime(audioDuration)}
+        </span>
       </div>
-
-      <div className="flex items-center justify-center gap-4 mt-6">
-        {/* Play/Pause Button */}
-        <Button 
-          onClick={onTogglePlayback}
-          variant="ghost" 
+      
+      <Slider
+        value={[seekValue]}
+        min={0}
+        max={100}
+        step={0.1}
+        disabled={isProcessing || !audioBlob}
+        onValueChange={handleSeekChange}
+        className="w-full"
+      />
+      
+      <div className="w-full flex justify-between items-center mt-4">
+        <Button
           size="icon"
-          className="w-10 h-10 rounded-full border"
+          variant="outline"
+          onClick={() => {
+            // Clear toasts before restart
+            clearAllToasts();
+            onRestart();
+          }}
           disabled={isProcessing || !audioBlob}
+          className="rounded-full"
         >
-          {isPlaying ? (
-            <Pause className="h-5 w-5" />
-          ) : (
-            <Play className="h-5 w-5 ml-0.5" />
-          )}
+          <RefreshCw className="h-4 w-4" />
         </Button>
         
-        {/* Save Button */}
-        <Button 
-          onClick={onSaveEntry}
+        <Button
+          size="icon"
+          variant={isPlaying ? "destructive" : "default"}
+          onClick={() => {
+            // Clear toasts before playback
+            clearAllToasts();
+            onTogglePlayback();
+          }}
           disabled={isProcessing || !audioBlob}
-          variant="default"
+          className="w-12 h-12 rounded-full"
+        >
+          {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
+        </Button>
+        
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={handleSafeEntryRequest}
+          disabled={isProcessing || !audioBlob || isSaveRequested}
+          className={`rounded-full ${isProcessing ? 'bg-muted' : ''}`}
         >
           {isProcessing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
-            </>
-          ) : "Save"}
-        </Button>
-        
-        {/* Restart Button */}
-        <Button 
-          onClick={onRestart}
-          variant="ghost" 
-          size="icon"
-          className="w-10 h-10 rounded-full border"
-          disabled={isProcessing}
-        >
-          <RotateCcw className="h-5 w-5" />
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
         </Button>
       </div>
     </div>
   );
-}
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }

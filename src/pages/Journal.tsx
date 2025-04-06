@@ -311,13 +311,17 @@ const Journal = () => {
   const handleTabChange = (value: string) => {
     console.log(`[Journal] Tab change requested to: ${value}. Current safeToSwitchTab: ${safeToSwitchTab}`);
     
+    clearAllToasts();
+    
     if (value === 'entries' && !safeToSwitchTab) {
       console.log('[Journal] User attempting to switch to entries while processing');
       
-      toast.info('Processing in progress...', { 
-        duration: 2000,
-        closeButton: false
-      });
+      setTimeout(() => {
+        toast.info('Processing in progress...', { 
+          duration: 2000,
+          closeButton: false
+        });
+      }, 100);
     }
     
     setTabChangeInProgress(true);
@@ -325,21 +329,16 @@ const Journal = () => {
     setTimeout(() => {
       if (value === 'entries' && !safeToSwitchTab) {
         console.log('[Journal] User attempting to switch to entries while processing');
+      } else {
+        setActiveTab(value);
         
-        toast.info('Processing in progress...', { 
-          duration: 2000,
-          closeButton: false
-        });
-      }
-      
-      setActiveTab(value);
-      
-      if (value === 'entries') {
-        fetchEntries();
+        if (value === 'entries') {
+          fetchEntries();
+        }
       }
       
       setTabChangeInProgress(false);
-    }, 50);
+    }, 150);
   };
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
@@ -355,6 +354,8 @@ const Journal = () => {
     try {
       clearAllToasts();
       
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       setIsRecordingComplete(true);
       setIsSavingRecording(true);
       setProcessingError(null);
@@ -365,7 +366,7 @@ const Journal = () => {
       
       setTimeout(() => {
         setActiveTab('entries');
-      }, 50);
+      }, 150);
       
       const toastId = toast.loading('Processing your journal entry with AI...', {
         duration: 15000,
