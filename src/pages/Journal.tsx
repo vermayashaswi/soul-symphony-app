@@ -29,6 +29,7 @@ const Journal = () => {
   const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
   const [isRecordingComplete, setIsRecordingComplete] = useState(false);
   const [isSavingRecording, setIsSavingRecording] = useState(false);
+  const [processingError, setProcessingError] = useState<string | null>(null);
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   
@@ -261,18 +262,24 @@ const Journal = () => {
   const handleStartRecording = () => {
     console.log('Starting new recording');
     setActiveTab('record');
+    setProcessingError(null);
   };
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
     if (!audioBlob || !user?.id) {
       console.error('[Journal] Cannot process recording: missing audio blob or user ID');
+      setProcessingError('Cannot process recording: missing required information');
+      setIsRecordingComplete(false);
+      setIsSavingRecording(false);
       return;
     }
     
     try {
       setIsRecordingComplete(true);
       setIsSavingRecording(true);
+      setProcessingError(null);
       
+      // Switch to entries tab to show progress
       setActiveTab('entries');
       
       setEntryHasBeenProcessed(false);
@@ -305,17 +312,16 @@ const Journal = () => {
         fetchEntries();
         setRefreshKey(prev => prev + 1);
         
+        // Polling for updates
         const pollIntervals = [1000, 2000, 3000, 5000, 8000, 12000];
         
-        pollIntervals.forEach(interval => {
+        for (const interval of pollIntervals) {
           setTimeout(() => {
-            if (processingEntries.includes(tempId)) {
-              console.log(`[Journal] Polling for entry at ${interval}ms interval`);
-              fetchEntries();
-              setRefreshKey(prev => prev + 1);
-            }
+            console.log(`[Journal] Polling for entry at ${interval}ms interval`);
+            fetchEntries();
+            setRefreshKey(prev => prev + 1);
           }, interval);
-        });
+        }
         
         // Set a maximum timeout to clean up if entry is never processed
         setTimeout(() => {
@@ -327,7 +333,7 @@ const Journal = () => {
             if (toastIds[tempId]) {
               toast.dismiss(toastIds[tempId]);
               
-              toast.success('Journal entry analyzed and saved', { 
+              toast.success('Journal entry processed', { 
                 duration: 3000,
                 closeButton: false
               });
@@ -341,13 +347,12 @@ const Journal = () => {
             
             fetchEntries();
             setRefreshKey(prev => prev + 1);
-            
-            setIsRecordingComplete(false);
             setIsSavingRecording(false);
           }
         }, 20000);
       } else {
         console.error('[Journal] Processing failed:', error);
+        setProcessingError(error || 'Unknown error occurred');
         toast.dismiss(toastId);
         
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
@@ -357,9 +362,14 @@ const Journal = () => {
         
         setIsRecordingComplete(false);
         setIsSavingRecording(false);
+        
+        // Show record tab again if there was an error
+        setActiveTab('record');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing recording:', error);
+      setProcessingError(error?.message || 'Unknown error occurred');
+      
       toast.error('Error processing your recording', { 
         duration: 3000,
         closeButton: false
@@ -368,7 +378,8 @@ const Journal = () => {
       setIsRecordingComplete(false);
       setIsSavingRecording(false);
       
-      setRefreshKey(prev => prev + 1);
+      // Show record tab again if there was an error
+      setActiveTab('record');
     }
   };
 
@@ -439,7 +450,7 @@ const Journal = () => {
     );
   }
 
-  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && entries.length === 0 && !error;
+  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && entries.length === 0 && !error && !processingError;
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
@@ -461,6 +472,30 @@ const Journal = () => {
             >
               <RefreshCw className="w-4 h-4 mr-2" /> 
               Retry Profile Setup
+            </Button>
+          </div>
+        </div>
+      )}
+      
+      {processingError && (
+        <div className="mb-6 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-red-800 dark:text-red-200">
+                Error processing your recording: {processingError}
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+              onClick={() => {
+                setProcessingError(null);
+                setActiveTab('record');
+              }}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" /> 
+              Try Again
             </Button>
           </div>
         </div>

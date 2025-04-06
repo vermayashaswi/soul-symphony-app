@@ -77,8 +77,11 @@ export function JournalEntryCard({
   
   // Handle theme loading and extraction
   useEffect(() => {
-    // Set initial themes
-    const currentThemes = entry.master_themes || entry.themes || [];
+    // Safely access master_themes and themes, providing fallback empty arrays
+    const masterThemes = Array.isArray(entry.master_themes) ? entry.master_themes : [];
+    const entryThemes = Array.isArray(entry.themes) ? entry.themes : [];
+    const currentThemes = masterThemes.length > 0 ? masterThemes : entryThemes;
+    
     setThemes(currentThemes);
     
     // Determine if themes are still loading
@@ -106,12 +109,14 @@ export function JournalEntryCard({
             // Use type assertion to safely access properties
             const entryData = data as { master_themes?: string[], themes?: string[] };
             
-            // Now TypeScript knows these properties exist on entryData
-            const updatedThemes = entryData.master_themes || entryData.themes || [];
+            // Safely extract themes with fallbacks
+            const updatedMasterThemes = Array.isArray(entryData.master_themes) ? entryData.master_themes : [];
+            const updatedThemes = Array.isArray(entryData.themes) ? entryData.themes : [];
+            const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
             
             // If we now have themes, update them and stop loading
-            if (updatedThemes.length > 0) {
-              setThemes(updatedThemes);
+            if (updatedCurrentThemes.length > 0) {
+              setThemes(updatedCurrentThemes);
               setIsThemesLoading(false);
               clearInterval(pollInterval);
             }

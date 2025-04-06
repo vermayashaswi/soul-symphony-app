@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
@@ -8,7 +8,6 @@ import { useAudioPlayback } from '@/hooks/use-audio-playback';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
@@ -101,8 +100,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       });
       
       if (onRecordingComplete) {
-        // Make sure we wait for the callback to complete before resetting anything
-        await onRecordingComplete(normalizedBlob);
+        try {
+          // Make sure we wait for the callback to complete before resetting anything
+          await onRecordingComplete(normalizedBlob);
+          // Only reset if successful (this avoids blank states on error)
+        } catch (error: any) {
+          console.error('Error in recording callback:', error);
+          setRecordingError(error?.message || "An unexpected error occurred");
+          toast.error("Error saving recording");
+          setIsProcessing(false);
+        }
       }
     } catch (error: any) {
       console.error('Error in save entry:', error);
@@ -117,6 +124,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     resetPlayback();
     setRecordingError(null);
     setShowAnimation(true);
+    setIsProcessing(false);
     toast.info("Starting a new recording");
   };
 
