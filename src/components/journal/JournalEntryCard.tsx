@@ -45,7 +45,7 @@ export function JournalEntryCard({
   isNew = false, 
   isProcessing = false 
 }: JournalEntryCardProps) {
-  // Safe defaults for entry properties
+  // Safe defaults for entry properties - add more defensive checks
   const safeEntry = {
     id: entry?.id || 0,
     content: entry?.content || "Processing entry...",
@@ -59,16 +59,17 @@ export function JournalEntryCard({
   const [highlightNew, setHighlightNew] = useState(isNew);
   const [deletionCompleted, setDeletionCompleted] = useState(false);
   const [deletionInProgress, setDeletionInProgress] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const mountedRef = useRef<boolean>(true);
   
-  // Extract themes from the entry
+  // Extract themes from the entry with robust error handling
   const extractThemes = (): string[] => {
     try {
       // Fall back to empty arrays if properties are undefined
       const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
       const entryThemes = Array.isArray(safeEntry.themes) ? safeEntry.themes : [];
       
-      // Filter out empty themes
+      // Filter out empty themes and ensure they're valid strings
       const filteredMasterThemes = masterThemes.filter(theme => 
         theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
       );
@@ -162,6 +163,7 @@ export function JournalEntryCard({
       if (mountedRef.current) {
         setDeletionInProgress(false);
         setDeletionCompleted(false);
+        setHasError(true);
       }
       
       toast.error('Failed to delete entry');
@@ -178,15 +180,47 @@ export function JournalEntryCard({
     }
   };
 
-  const createdAtFormatted = formatRelativeTime(safeEntry.created_at);
+  // Add defensive formatting for creation date
+  const createdAtFormatted = (() => {
+    try {
+      return formatRelativeTime(safeEntry.created_at);
+    } catch (error) {
+      console.error('[JournalEntryCard] Error formatting date:', error);
+      return 'Recently';
+    }
+  })();
+  
   const initialThemes = extractThemes();
   
-  // Check if an entry is still being processed
+  // Check if an entry is still being processed with detailed checks
   const isEntryBeingProcessed = () => {
-    return (!safeEntry.themes || safeEntry.themes.length === 0) && 
-           (!safeEntry.master_themes || safeEntry.master_themes.length === 0) &&
-           isNew;
+    try {
+      const noThemes = (!safeEntry.themes || safeEntry.themes.length === 0) && 
+                     (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
+      return noThemes && isNew;
+    } catch (error) {
+      console.error('[JournalEntryCard] Error checking if entry is being processed:', error);
+      return false;
+    }
   };
+
+  // Provide an error fallback if we had any rendering errors
+  if (hasError) {
+    return (
+      <Card className="bg-background shadow-md border-red-300">
+        <div className="p-4">
+          <h3 className="text-red-600">Error displaying entry</h3>
+          <p className="text-sm mt-2">There was a problem showing this entry.</p>
+          <button 
+            className="text-sm mt-2 text-blue-600 underline" 
+            onClick={() => setHasError(false)}
+          >
+            Try again
+          </button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <ErrorBoundary>

@@ -7,6 +7,7 @@ import EmptyJournalState from './EmptyJournalState';
 import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -18,7 +19,7 @@ interface JournalEntriesListProps {
 }
 
 export default function JournalEntriesList({ 
-  entries = [], // Add default value for safety
+  entries = [],
   loading = false, 
   processingEntries = [], 
   processedEntryIds = [],
@@ -28,7 +29,8 @@ export default function JournalEntriesList({
   const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
   const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
-  const hasProcessingEntries = processingEntries.length > 0;
+  const [renderRetryCount, setRenderRetryCount] = useState(0);
+  const hasProcessingEntries = Array.isArray(processingEntries) && processingEntries.length > 0;
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
   const [renderError, setRenderError] = useState<Error | null>(null);
@@ -37,8 +39,14 @@ export default function JournalEntriesList({
   useEffect(() => {
     try {
       if (Array.isArray(entries)) {
+        // Add defensive filtering to ensure we only render valid entries
         const filteredEntries = entries.filter(
-          entry => entry && typeof entry === 'object' && entry.id && !pendingDeletions.current.has(entry.id)
+          entry => entry && 
+                  typeof entry === 'object' && 
+                  entry.id && 
+                  !pendingDeletions.current.has(entry.id) &&
+                  // Ensure entry has minimum required content to display
+                  (entry.content || entry.created_at)
         );
         setLocalEntries(filteredEntries);
       } else {
@@ -140,6 +148,25 @@ export default function JournalEntriesList({
   // Safe calculation for new user state
   const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !processingEntries.length;
 
+  // Handle retry for rendering errors
+  const handleRetry = () => {
+    setRenderError(null);
+    setRenderRetryCount(count => count + 1);
+    
+    // Try to reset local entries from the prop
+    if (Array.isArray(entries)) {
+      try {
+        const filteredEntries = entries.filter(entry => 
+          entry && typeof entry === 'object' && entry.id && !pendingDeletions.current.has(entry.id)
+        );
+        setLocalEntries(filteredEntries);
+      } catch (e) {
+        console.error("[JournalEntriesList] Error filtering entries during retry:", e);
+        setLocalEntries([]);
+      }
+    }
+  };
+
   // If we have a render error, show a friendly message with retry option
   if (renderError) {
     return (
@@ -147,14 +174,7 @@ export default function JournalEntriesList({
         <p className="text-red-700 dark:text-red-300">We had trouble displaying your entries</p>
         <Button 
           variant="outline" 
-          onClick={() => {
-            setRenderError(null);
-            if (Array.isArray(entries)) {
-              setLocalEntries(entries.filter(entry => 
-                entry && typeof entry === 'object' && entry.id && !pendingDeletions.current.has(entry.id)
-              ));
-            }
-          }}
+          onClick={handleRetry}
         >
           Try Again
         </Button>

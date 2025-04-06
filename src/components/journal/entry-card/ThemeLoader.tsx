@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import ThemeBoxes from '../ThemeBoxes';
 import { supabase } from '@/integrations/supabase/client';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ThemeLoaderProps {
   entryId: number;
@@ -13,13 +14,15 @@ interface ThemeLoaderProps {
 
 export function ThemeLoader({ 
   entryId, 
-  initialThemes = [], // Add default value for safety
-  content = "", // Add default value for safety
+  initialThemes = [], 
+  content = "", 
   isProcessing = false, 
   isNew = false 
 }: ThemeLoaderProps) {
   const [themes, setThemes] = useState<string[]>([]);
   const [isThemesLoading, setIsThemesLoading] = useState(isProcessing);
+  const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const mountedRef = useRef<boolean>(true);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -46,27 +49,33 @@ export function ThemeLoader({
     };
   }, [entryId]);
 
-  // Safely initialize themes with defensive checks
+  // Safely initialize themes with extensive defensive checks
   useEffect(() => {
     try {
-      // Safety check for initialThemes
-      const safeInitialThemes = Array.isArray(initialThemes) ? initialThemes : [];
+      // Extra safety check for initialThemes
+      if (!Array.isArray(initialThemes)) {
+        console.warn(`[ThemeLoader] initialThemes is not an array for entry ${entryId}:`, initialThemes);
+        setThemes([]);
+      } else {
+        // Filter out empty themes or invalid values
+        const filteredThemes = initialThemes.filter(theme => 
+          theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
+        );
+        
+        setThemes(filteredThemes);
+      }
       
-      // Filter out empty themes
-      const filteredThemes = safeInitialThemes.filter(theme => 
-        theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
-      );
-      
-      setThemes(filteredThemes);
-      
-      // Determine if themes are still loading
-      const shouldBeLoading = isProcessing || (filteredThemes.length === 0 && isNew);
+      // Determine if themes are still loading with safe check for initialThemes
+      const noThemes = Array.isArray(initialThemes) ? initialThemes.length === 0 : true;
+      const shouldBeLoading = isProcessing || (noThemes && isNew);
       setIsThemesLoading(shouldBeLoading);
+      
     } catch (error) {
       console.error('[ThemeLoader] Error setting initial themes:', error);
       setThemes([]);
+      setHasError(true);
     }
-  }, [initialThemes, isProcessing, isNew]);
+  }, [initialThemes, isProcessing, isNew, entryId]);
 
   // Set up polling for themes if needed
   useEffect(() => {
@@ -82,6 +91,9 @@ export function ThemeLoader({
       clearTimeout(safetyTimeoutRef.current);
       safetyTimeoutRef.current = null;
     }
+    
+    // Reset error state on dependencies change
+    setHasError(false);
     
     // If themes are loading and we have an entry ID, poll for themes
     if (isThemesLoading && entryId) {
@@ -117,11 +129,11 @@ export function ThemeLoader({
             
             // Safely extract themes with fallbacks
             const updatedMasterThemes = Array.isArray(entryData.master_themes) 
-              ? entryData.master_themes.filter(t => t && t.trim() !== '' && t !== '•') 
+              ? entryData.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
               : [];
               
             const updatedThemes = Array.isArray(entryData.themes) 
-              ? entryData.themes.filter(t => t && t.trim() !== '' && t !== '•') 
+              ? entryData.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
               : [];
               
             const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
@@ -169,6 +181,7 @@ export function ThemeLoader({
           if (pollAttempts >= maxAttempts) {
             if (mountedRef.current) {
               setIsThemesLoading(false);
+              setHasError(pollAttempts >= 3); // Set error state after multiple failures
               
               // Generate fallback themes if needed
               if (themes.length === 0 && content) {
@@ -221,14 +234,14 @@ export function ThemeLoader({
     }
   }, [entryId, isThemesLoading, themes.length, content]);
 
-  // Generate fallback themes from content
+  // Generate fallback themes from content with robust error handling
   const generateFallbackThemes = (text: string): string[] => {
     try {
       if (!text || typeof text !== 'string') return [];
       
       const words = text.split(/\s+/);
       const longWords = words
-        .filter(word => word.length > 5)
+        .filter(word => word && typeof word === 'string' && word.length > 5)
         .slice(0, 3)
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
       
@@ -242,14 +255,64 @@ export function ThemeLoader({
     }
   };
 
+  const handleRetry = () => {
+    setHasError(false);
+    setRetryCount(prev => prev + 1);
+    setIsThemesLoading(true);
+    
+    // Trigger a new attempt to fetch themes
+    if (entryId && content) {
+      setTimeout(() => {
+        if (themes.length === 0) {
+          const fallbackThemes = generateFallbackThemes(content);
+          if (fallbackThemes.length > 0) {
+            setThemes(fallbackThemes);
+          }
+          setIsThemesLoading(false);
+        }
+      }, 3000);
+    }
+  };
+
+  // Show an error state with retry button if needed
+  if (hasError && themes.length === 0) {
+    return (
+      <div className="mt-3 md:mt-4">
+        <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
+        <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
+          <p className="text-xs text-red-700 dark:text-red-300">Unable to load themes</p>
+          <button 
+            onClick={handleRetry}
+            className="text-xs mt-1 text-blue-600 underline"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-3 md:mt-4">
       <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
-      <ThemeBoxes 
-        themes={themes} 
-        isDisturbed={true}
-        isLoading={isThemesLoading} 
-      />
+      {isThemesLoading ? (
+        <div className="space-y-2 mt-2">
+          <div className="flex space-x-2">
+            <Skeleton className="h-6 w-16 rounded-md" />
+            <Skeleton className="h-6 w-20 rounded-md" />
+          </div>
+          <div className="flex space-x-2">
+            <Skeleton className="h-6 w-24 rounded-md" />
+            <Skeleton className="h-6 w-12 rounded-md" />
+          </div>
+        </div>
+      ) : (
+        <ThemeBoxes 
+          themes={themes} 
+          isDisturbed={true}
+          isLoading={false} 
+        />
+      )}
     </div>
   );
 }

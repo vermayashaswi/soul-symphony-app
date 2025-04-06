@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -31,6 +32,7 @@ const Journal = () => {
   const [isSavingRecording, setIsSavingRecording] = useState(false);
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [hasRenderError, setHasRenderError] = useState(false);
+  const [safeToSwitchTab, setSafeToSwitchTab] = useState(true);
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   const entriesListRef = useRef<HTMLDivElement>(null);
@@ -98,6 +100,7 @@ const Journal = () => {
         setProcessingEntries([]);
         setToastIds({});
         setIsSavingRecording(false);
+        setSafeToSwitchTab(true);
       }
       
       previousEntriesRef.current = currentEntryIds;
@@ -207,6 +210,19 @@ const Journal = () => {
     setProcessingError(null);
   };
 
+  // This controls when we actually switch tabs
+  const handleTabChange = (value: string) => {
+    // If we're trying to switch to entries tab and it's not safe, just show loading
+    if (value === 'entries' && !safeToSwitchTab) {
+      console.log('[Journal] Attempted to switch to entries but waiting for processing');
+      // We don't set the active tab yet, but we'll show a loading indicator on entries tab
+      // The actual switch will happen when processing completes
+      return;
+    }
+    
+    setActiveTab(value);
+  };
+
   const handleRecordingComplete = async (audioBlob: Blob) => {
     if (!audioBlob || !user?.id) {
       console.error('[Journal] Cannot process recording: missing audio blob or user ID');
@@ -223,8 +239,10 @@ const Journal = () => {
       setProcessingError(null);
       setLastAction('Recording Complete - Processing');
       setAudioStatus(`Processing (${formatBytes(audioBlob.size)})`);
+      setSafeToSwitchTab(false);
       
-      setActiveTab('entries');
+      // We'll delay switching to entries tab until processing has advanced a bit
+      // This helps prevent blank screen issues
       
       setEntryHasBeenProcessed(false);
       clearAllToasts();
@@ -254,7 +272,11 @@ const Journal = () => {
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
         
-        setActiveTab('entries');
+        // Now it's safe to switch to the entries tab with a slight delay
+        // to ensure we show proper loading state
+        setTimeout(() => {
+          setActiveTab('entries');
+        }, 500);
         
         await fetchEntries();
         setRefreshKey(prev => prev + 1);
@@ -294,6 +316,7 @@ const Journal = () => {
               fetchEntries();
               setRefreshKey(prev => prev + 1);
               setIsSavingRecording(false);
+              setSafeToSwitchTab(true);
               
               return prev.filter(id => id !== tempId);
             }
@@ -313,6 +336,7 @@ const Journal = () => {
         
         setIsRecordingComplete(false);
         setIsSavingRecording(false);
+        setSafeToSwitchTab(true);
         
         setActiveTab('record');
       }
@@ -328,6 +352,7 @@ const Journal = () => {
       
       setIsRecordingComplete(false);
       setIsSavingRecording(false);
+      setSafeToSwitchTab(true);
       
       setActiveTab('record');
     }
@@ -392,6 +417,7 @@ const Journal = () => {
     setActiveTab('entries');
     setRefreshKey(Date.now());
     setLastAction('Reset Error State');
+    setSafeToSwitchTab(true);
     setTimeout(() => {
       fetchEntries();
     }, 100);
@@ -511,7 +537,12 @@ const Journal = () => {
               </div>
             )}
             
-            <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
+            <Tabs 
+              defaultValue={activeTab} 
+              value={activeTab} 
+              onValueChange={handleTabChange} 
+              className="mt-6"
+            >
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="record">Record Entry</TabsTrigger>
                 <TabsTrigger value="entries">Past Entries</TabsTrigger>
@@ -527,7 +558,7 @@ const Journal = () => {
               </TabsContent>
               
               <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
-                {showLoadingFeedback ? (
+                {showLoadingFeedback || (!safeToSwitchTab && activeTab === 'entries') ? (
                   <div className="mt-8 flex flex-col items-center justify-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
                     <p className="text-muted-foreground">Processing your recording...</p>
