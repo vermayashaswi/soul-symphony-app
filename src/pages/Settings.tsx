@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor } from 'lucide-react';
@@ -19,7 +20,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { ColorPicker } from '@/components/settings/ColorPicker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DebugPanel, logInfo, logError, logRender, logAPI, logAction, logAuth } from '@/components/debug/DebugPanel';
+import DebugPanel, { logInfo, logError, logRender, logAPI, logAction, logAuth } from '@/components/debug/DebugPanel';
 
 interface SettingItemProps {
   icon: React.ElementType;

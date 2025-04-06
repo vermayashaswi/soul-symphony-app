@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Badge } from "@/components/ui/badge";
@@ -148,6 +149,23 @@ export class DebugLogger {
   public getLastProfileError(): string | null {
     return this.lastProfileError;
   }
+  
+  // Add new logging functions
+  public logRender(message: string, source: string, data?: any): void {
+    this.log('debug', `[Render] ${message}`, source, data);
+  }
+  
+  public logAPI(message: string, source: string, data?: any): void {
+    this.log('info', `[API] ${message}`, source, data);
+  }
+  
+  public logAction(message: string, source: string, data?: any): void {
+    this.log('info', `[Action] ${message}`, source, data);
+  }
+  
+  public logAuth(message: string, source: string, data?: any): void {
+    this.log('info', `[Auth] ${message}`, source, data);
+  }
 }
 
 export const debugLogger = new DebugLogger();
@@ -174,6 +192,23 @@ export const logProfile = (message: string, source: string, data?: any) => {
 
 export const logAuthError = (message: string, source: string, error?: any) => {
   debugLogger.logError(`[Auth] ${message}`, source, error);
+};
+
+// Add exports for the new logging functions
+export const logRender = (message: string, source: string, data?: any) => {
+  debugLogger.logRender(message, source, data);
+};
+
+export const logAPI = (message: string, source: string, data?: any) => {
+  debugLogger.logAPI(message, source, data);
+};
+
+export const logAction = (message: string, source: string, data?: any) => {
+  debugLogger.logAction(message, source, data);
+};
+
+export const logAuth = (message: string, source: string, data?: any) => {
+  debugLogger.logAuth(message, source, data);
 };
 
 const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose }) => {
