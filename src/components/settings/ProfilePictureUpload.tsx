@@ -50,9 +50,42 @@ export function ProfilePictureUpload() {
     try {
       setUploading(true);
       
-      // Convert the data URL to a blob
-      const response = await fetch(selectedImage);
-      const blob = await response.blob();
+      // Create a canvas to capture the transformed image
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx || !imageRef.current || !containerRef.current) {
+        throw new Error('Could not create canvas context');
+      }
+      
+      // Set canvas dimensions to match the avatar size (circular crop)
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight;
+      canvas.width = containerWidth;
+      canvas.height = containerHeight;
+      
+      // Create a circular clipping path
+      ctx.beginPath();
+      ctx.arc(containerWidth / 2, containerHeight / 2, containerWidth / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      
+      // Draw the transformed image onto the canvas
+      ctx.drawImage(
+        imageRef.current,
+        position.x,
+        position.y,
+        imageRef.current.width * zoom,
+        imageRef.current.height * zoom
+      );
+      
+      // Convert canvas to blob
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else throw new Error('Canvas to Blob conversion failed');
+        }, 'image/jpeg', 0.95);
+      });
       
       // Create a File object
       const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
@@ -274,22 +307,6 @@ export function ProfilePictureUpload() {
                   />
                 </div>
               )}
-            </div>
-            
-            <div className="w-full px-2">
-              <label htmlFor="zoom-slider" className="text-sm font-medium block mb-2 text-center">
-                Zoom: {zoom.toFixed(1)}x
-              </label>
-              <input 
-                id="zoom-slider"
-                type="range" 
-                min="0.5" 
-                max="3" 
-                step="0.1" 
-                value={zoom}
-                onChange={(e) => setZoom(parseFloat(e.target.value))}
-                className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
-              />
             </div>
             
             <p className="text-sm text-muted-foreground text-center">

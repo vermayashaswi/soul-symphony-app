@@ -141,13 +141,18 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
     }
 
     if (user.id) {
-      await supabase
+      // Ensure avatar_url is updated in the profiles table too
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({
           avatar_url: metadata.avatar_url, // Ensure field name matches
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id);
+        
+      if (profileError) {
+        console.error('[ProfileService] Error updating profile table:', profileError);
+      }
     }
 
     return true;
