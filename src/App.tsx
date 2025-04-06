@@ -10,6 +10,7 @@ import { ThemeProvider } from "./hooks/use-theme";
 import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
 import { debugLogger, logError, logInfo } from './components/debug/DebugPanel';
+import DebugPanel from './components/debug/DebugPanel';
 import { useEffect } from 'react';
 
 // Enable debugger globally
@@ -92,6 +93,8 @@ const App = () => {
                     <AppRoutes />
                   </AnimatePresence>
                 </div>
+                {/* Add Debug Panel to the app */}
+                <DebugPanel />
               </div>
             </AuthProvider>
           </ThemeProvider>
