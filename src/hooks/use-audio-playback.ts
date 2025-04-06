@@ -14,17 +14,33 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
 
   // Set up the audio when the blob changes
   useEffect(() => {
-    if (audioRef.current && audioBlob) {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+    }
+    
+    if (audioBlob) {
       const audioUrl = URL.createObjectURL(audioBlob);
       audioRef.current.src = audioUrl;
-      audioRef.current.addEventListener('loadedmetadata', () => {
+      
+      const handleLoadedMetadata = () => {
         if (audioRef.current) {
-          setAudioDuration(audioRef.current.duration);
-          console.log(`Audio duration: ${audioRef.current.duration}s`);
+          const duration = audioRef.current.duration;
+          setAudioDuration(duration);
+          console.log(`Audio duration: ${duration}s`);
         }
-      });
+      };
+      
+      audioRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
+      
+      // In case the metadata is already loaded
+      if (audioRef.current.readyState >= 2) {
+        handleLoadedMetadata();
+      }
 
       return () => {
+        if (audioRef.current) {
+          audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        }
         URL.revokeObjectURL(audioUrl);
       };
     }
@@ -35,6 +51,11 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
     return () => {
       if (progressTimerRef.current) {
         clearInterval(progressTimerRef.current);
+      }
+      
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
       }
     };
   }, []);
@@ -52,41 +73,28 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
         audioRef.current.currentTime = 0;
       }
     };
+    
+    const handleTimeUpdate = () => {
+      if (audioRef.current && audioRef.current.duration > 0) {
+        const progress = audioRef.current.currentTime / audioRef.current.duration;
+        setPlaybackProgress(progress);
+      }
+    };
 
     audioRef.current.addEventListener('play', handlePlay);
     audioRef.current.addEventListener('pause', handlePause);
     audioRef.current.addEventListener('ended', handleEnded);
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('play', handlePlay);
         audioRef.current.removeEventListener('pause', handlePause);
         audioRef.current.removeEventListener('ended', handleEnded);
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
       }
     };
   }, []);
-
-  // Update progress during playback
-  useEffect(() => {
-    if (isPlaying) {
-      progressTimerRef.current = window.setInterval(() => {
-        if (audioRef.current) {
-          const progress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-          setPlaybackProgress(progress);
-        }
-      }, 50);
-    } else if (progressTimerRef.current) {
-      clearInterval(progressTimerRef.current);
-      progressTimerRef.current = null;
-    }
-
-    return () => {
-      if (progressTimerRef.current) {
-        clearInterval(progressTimerRef.current);
-        progressTimerRef.current = null;
-      }
-    };
-  }, [isPlaying]);
 
   const togglePlayback = () => {
     if (!audioRef.current) return;
@@ -98,6 +106,14 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
         console.error('Error playing audio:', error);
       });
     }
+  };
+  
+  const seekTo = (position: number) => {
+    if (!audioRef.current || !audioBlob) return;
+    
+    const newTime = position * audioDuration;
+    audioRef.current.currentTime = newTime;
+    setPlaybackProgress(position);
   };
 
   const reset = () => {
@@ -116,6 +132,7 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
     audioDuration,
     togglePlayback,
     audioRef,
-    reset
+    reset,
+    seekTo
   };
 }

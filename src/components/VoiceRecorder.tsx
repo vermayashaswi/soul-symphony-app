@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -49,7 +50,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     audioDuration,
     togglePlayback,
     audioRef,
-    reset: resetPlayback
+    reset: resetPlayback,
+    seekTo
   } = useAudioPlayback({ audioBlob });
 
   useEffect(() => {
@@ -165,6 +167,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
                   onTogglePlayback={togglePlayback}
                   onSaveEntry={handleSaveEntry}
                   onRestart={handleRestart}
+                  onSeek={seekTo}
                 />
               </div>
             ) : hasPermission === false ? (

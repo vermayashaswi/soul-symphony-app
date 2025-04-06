@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 
 interface PlaybackControlsProps {
@@ -14,6 +15,7 @@ interface PlaybackControlsProps {
   onTogglePlayback: () => void;
   onSaveEntry: () => void;
   onRestart: () => void;
+  onSeek?: (position: number) => void;
 }
 
 export function PlaybackControls({
@@ -24,22 +26,39 @@ export function PlaybackControls({
   audioDuration,
   onTogglePlayback,
   onSaveEntry,
-  onRestart
+  onRestart,
+  onSeek
 }: PlaybackControlsProps) {
-  const formattedProgress = formatTime(playbackProgress * audioDuration);
+  const [currentTime, setCurrentTime] = useState(0);
+  
+  // Calculate current time based on progress and duration
+  useEffect(() => {
+    const timeInSeconds = (playbackProgress * audioDuration);
+    setCurrentTime(timeInSeconds);
+  }, [playbackProgress, audioDuration]);
+  
+  const formattedProgress = formatTime(currentTime);
   const formattedDuration = formatTime(audioDuration);
+  
+  const handleSliderChange = (value: number[]) => {
+    if (onSeek) {
+      const position = value[0] / 100;
+      onSeek(position);
+    }
+  };
   
   return (
     <div className="w-full px-4">
       <div className="mb-4 relative">
-        <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-primary rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${playbackProgress * 100}%` }}
-            transition={{ type: "tween" }}
-          />
-        </div>
+        <Slider
+          defaultValue={[0]}
+          value={[playbackProgress * 100]}
+          max={100}
+          step={0.1}
+          onValueChange={handleSliderChange}
+          disabled={isProcessing || !audioBlob}
+          className="mb-2"
+        />
         <div className="flex justify-between mt-1.5 text-xs text-slate-500">
           <span>{formattedProgress}</span>
           <span>{formattedDuration}</span>
