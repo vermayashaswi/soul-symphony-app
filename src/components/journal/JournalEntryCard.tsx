@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,7 +57,10 @@ export function JournalEntryCard({
   const [highlightNew, setHighlightNew] = useState(isNew);
   const [isThemesLoading, setIsThemesLoading] = useState(isProcessing);
   const [themes, setThemes] = useState<string[]>([]);
+  const [deletionCompleted, setDeletionCompleted] = useState(false);
   const mountedRef = useRef<boolean>(true);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Log when the component is mounted/unmounted
   useEffect(() => {
@@ -68,6 +70,17 @@ export function JournalEntryCard({
     return () => {
       console.log(`[JournalEntryCard] Unmounted entry ${entry.id}`);
       mountedRef.current = false;
+      
+      // Clean up any intervals/timeouts when component unmounts
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+        safetyTimeoutRef.current = null;
+      }
     };
   }, [entry.id]);
 
@@ -88,26 +101,57 @@ export function JournalEntryCard({
     }
   }, [isNew]);
   
-  // Extract themes from the entry
+  // Extract themes from the entry and set up polling if needed
   useEffect(() => {
     if (!mountedRef.current) return;
+    
+    // Clean up previous intervals
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    
+    if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = null;
+    }
     
     // Safely extract themes from the entry
     const extractThemes = () => {
       try {
-        // Safely access master_themes and themes, providing fallback empty arrays
+        // Fall back to empty arrays if properties are undefined
         const masterThemes = Array.isArray(entry.master_themes) ? entry.master_themes : [];
         const entryThemes = Array.isArray(entry.themes) ? entry.themes : [];
         
         // Filter out empty themes
         const filteredMasterThemes = masterThemes.filter(theme => 
-          theme && theme.trim() !== '' && theme !== '•'
+          theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
         );
         const filteredEntryThemes = entryThemes.filter(theme => 
-          theme && theme.trim() !== '' && theme !== '•'
+          theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
         );
         
-        return filteredMasterThemes.length > 0 ? filteredMasterThemes : filteredEntryThemes;
+        // Use master themes if available, otherwise use regular themes
+        // If we have no valid themes, provide some default fallback themes based on entry content
+        if (filteredMasterThemes.length > 0) {
+          return filteredMasterThemes;
+        } else if (filteredEntryThemes.length > 0) {
+          return filteredEntryThemes;
+        } else if (entry.content) {
+          // Generate some fallback themes based on the content
+          // This ensures we always show something even if theme generation failed
+          const words = entry.content.split(/\s+/);
+          const longWords = words
+            .filter(word => word.length > 5)
+            .slice(0, 3)
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+          
+          if (longWords.length > 0) {
+            return [...new Set(longWords)]; // Remove duplicates
+          }
+        }
+        
+        return [];
       } catch (error) {
         console.error("[JournalEntryCard] Error extracting themes:", error);
         return [];
@@ -126,9 +170,12 @@ export function JournalEntryCard({
       let pollAttempts = 0;
       const maxAttempts = 5;
       
-      const pollInterval = setInterval(async () => {
+      pollIntervalRef.current = setInterval(async () => {
         if (!mountedRef.current) {
-          clearInterval(pollInterval);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
           return;
         }
         
@@ -141,7 +188,7 @@ export function JournalEntryCard({
             .from('Journal Entries')
             .select('master_themes, themes')
             .eq('id', entry.id)
-            .single();
+            .maybeSingle(); // Use maybeSingle instead of single to prevent errors
             
           if (error) {
             throw error;
@@ -170,7 +217,11 @@ export function JournalEntryCard({
               if (mountedRef.current) {
                 setThemes(updatedCurrentThemes);
                 setIsThemesLoading(false);
-                clearInterval(pollInterval);
+                
+                if (pollIntervalRef.current) {
+                  clearInterval(pollIntervalRef.current);
+                  pollIntervalRef.current = null;
+                }
               }
             }
           }
@@ -180,8 +231,25 @@ export function JournalEntryCard({
             console.log(`[JournalEntryCard] Max polling attempts reached for entry ${entry.id}`);
             if (mountedRef.current) {
               setIsThemesLoading(false);
+              
+              // Generate fallback themes if we still don't have any
+              if (themes.length === 0 && entry.content) {
+                const words = entry.content.split(/\s+/);
+                const fallbackThemes = words
+                  .filter(word => word.length > 5)
+                  .slice(0, 3)
+                  .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+                
+                if (fallbackThemes.length > 0) {
+                  setThemes([...new Set(fallbackThemes)]);
+                }
+              }
             }
-            clearInterval(pollInterval);
+            
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
           }
         } catch (error) {
           console.error(`[JournalEntryCard] Error polling for themes for entry ${entry.id}:`, error);
@@ -191,32 +259,60 @@ export function JournalEntryCard({
             if (mountedRef.current) {
               setIsThemesLoading(false);
             }
-            clearInterval(pollInterval);
+            
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
           }
         }
       }, 3000); // Poll every 3 seconds
       
       // Safety timeout to stop loading state after 15 seconds regardless
-      const safetyTimeout = setTimeout(() => {
+      safetyTimeoutRef.current = setTimeout(() => {
         if (mountedRef.current) {
           setIsThemesLoading(false);
-          clearInterval(pollInterval);
+          
+          // Fallback themes if we still have none
+          if (themes.length === 0 && entry.content) {
+            const words = entry.content.split(/\s+/);
+            const fallbackThemes = words
+              .filter(word => word.length > 5)
+              .slice(0, 3)
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+            
+            if (fallbackThemes.length > 0) {
+              setThemes([...new Set(fallbackThemes)]);
+            }
+          }
+          
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
         }
       }, 15000);
       
       return () => {
-        clearInterval(pollInterval);
-        clearTimeout(safetyTimeout);
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        
+        if (safetyTimeoutRef.current) {
+          clearTimeout(safetyTimeoutRef.current);
+          safetyTimeoutRef.current = null;
+        }
       };
     }
-  }, [entry.id, entry.master_themes, entry.themes, isProcessing, isNew]);
+  }, [entry.id, entry.master_themes, entry.themes, entry.content, isProcessing, isNew, themes.length]);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
   };
 
   const handleDelete = async () => {
-    if (!entry.id) return;
+    if (!entry.id || deletionCompleted) return;
     
     try {
       setIsDeleting(true);
@@ -225,6 +321,9 @@ export function JournalEntryCard({
       
       // First close the dialog to prevent further user interactions
       setOpen(false);
+      
+      // Mark as completed to prevent duplicate deletion attempts
+      setDeletionCompleted(true);
       
       const { error } = await supabase
         .from('Journal Entries')
@@ -240,16 +339,22 @@ export function JournalEntryCard({
       // Call parent handler with a small delay to ensure UI updates properly
       if (onDelete) {
         console.log(`[JournalEntryCard] Calling onDelete for entry ${entry.id}`);
-        setTimeout(() => {
-          if (onDelete) onDelete(entry.id);
-        }, 100);
+        onDelete(entry.id);
       }
       
       toast.success('Journal entry deleted');
     } catch (error) {
       console.error('[JournalEntryCard] Error deleting journal entry:', error);
       setIsDeleting(false);
+      setDeletionCompleted(false);
       toast.error('Failed to delete entry');
+      
+      // Still try to update the UI even if the database operation failed
+      if (onDelete) {
+        setTimeout(() => {
+          onDelete(entry.id);
+        }, 100);
+      }
     }
   };
 

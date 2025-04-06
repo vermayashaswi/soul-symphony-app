@@ -86,7 +86,7 @@ const JournalDebugger = ({
     position: 'fixed' as 'fixed',
     top: '2rem',
     right: '2rem',
-    pointerEvents: 'auto'
+    pointerEvents: 'auto' as 'auto'  // Fix typing error by using 'auto' instead of string
   };
 
   return (

@@ -26,7 +26,15 @@ export default function JournalEntriesList({
 }: JournalEntriesListProps) {
   const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
+  const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
   const hasProcessingEntries = processingEntries.length > 0;
+
+  // Initialize and update local entries
+  useEffect(() => {
+    if (entries.length >= 0) {
+      setLocalEntries(entries);
+    }
+  }, [entries]);
 
   // Update entries count when entries change to trigger animation for new entries
   useEffect(() => {
@@ -51,9 +59,12 @@ export default function JournalEntriesList({
     }
   }, [entries.length, prevEntriesLength, entries]);
   
-  // Handle entry deletion by calling the parent handler
+  // Handle entry deletion by calling the parent handler and updating local state
   const handleEntryDelete = (entryId: number) => {
     console.log(`[JournalEntriesList] Handling deletion of entry ${entryId}`);
+    
+    // Update local entries immediately to avoid blank screen
+    setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
     
     // Call the parent handler
     if (onDeleteEntry) {
@@ -71,10 +82,10 @@ export default function JournalEntriesList({
   
   // Show primary loading state only when loading initial entries
   // But don't show loading indefinitely for new users with no entries
-  const showInitialLoading = loading && entries.length === 0 && !hasProcessingEntries;
+  const showInitialLoading = loading && localEntries.length === 0 && !hasProcessingEntries;
 
   // New flag to check if this is likely a new user who hasn't created any entries yet
-  const isLikelyNewUser = !loading && entries.length === 0 && !processingEntries.length;
+  const isLikelyNewUser = !loading && localEntries.length === 0 && !processingEntries.length;
 
   if (showInitialLoading) {
     return (
@@ -115,7 +126,7 @@ export default function JournalEntriesList({
             </div>
           )}
           
-          {entries.map((entry, index) => (
+          {localEntries.map((entry, index) => (
             <motion.div
               key={entry.id}
               initial={{ opacity: 0, y: 20 }}
@@ -129,7 +140,7 @@ export default function JournalEntriesList({
               exit={{ opacity: 0, height: 0, marginBottom: 0 }}
               transition={{ 
                 duration: 0.3, 
-                delay: index === 0 && entries.length > prevEntriesLength ? 0 : 0.05 * Math.min(index, 5) 
+                delay: index === 0 && localEntries.length > prevEntriesLength ? 0 : 0.05 * Math.min(index, 5) 
               }}
               className={animatedEntryIds.includes(entry.id) ? 
                 "rounded-lg shadow-md relative overflow-hidden" : 
@@ -148,7 +159,7 @@ export default function JournalEntriesList({
       </AnimatePresence>
       
       {/* Show loading state at the bottom if needed */}
-      {loading && entries.length > 0 && !hasProcessingEntries && (
+      {loading && localEntries.length > 0 && !hasProcessingEntries && (
         <div className="flex items-center justify-center h-16 mt-4">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>

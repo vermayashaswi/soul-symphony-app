@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -12,7 +11,6 @@ import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import JournalDebugger from '@/components/journal/JournalDebugger';
-import { supabase } from '@/integrations/supabase/client';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -37,7 +35,6 @@ const Journal = () => {
   const profileCheckedOnceRef = useRef(false);
   const entriesListRef = useRef<HTMLDivElement>(null);
   
-  // Use try-catch to detect render errors
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       console.error('[Journal] Caught render error:', event);
@@ -60,17 +57,6 @@ const Journal = () => {
     isProfileChecked
   );
 
-  // Log component render cycles for debugging
-  useEffect(() => {
-    console.log('[Journal] Component rendered with state:', {
-      entries: entries.length,
-      loading,
-      processingEntries,
-      activeTab,
-      hasRenderError
-    });
-  });
-
   useEffect(() => {
     clearAllToasts();
     
@@ -87,7 +73,6 @@ const Journal = () => {
     };
   }, []);
 
-  // Check for completed entries from processing
   useEffect(() => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
@@ -152,7 +137,6 @@ const Journal = () => {
     }
   }, [user?.id, isProfileChecked, isCheckingProfile]);
 
-  // Poll for updates when entries are processing
   useEffect(() => {
     if (processingEntries.length > 0 || isSavingRecording) {
       const interval = setInterval(() => {
@@ -344,8 +328,18 @@ const Journal = () => {
         }
       });
       
-      setProcessingEntries([]);
-      setToastIds({});
+      const updatedProcessingEntries = processingEntries.filter(
+        tempId => !tempId.includes(String(entryId))
+      );
+      setProcessingEntries(updatedProcessingEntries);
+      
+      const updatedToastIds = { ...toastIds };
+      Object.keys(updatedToastIds).forEach(key => {
+        if (key.includes(String(entryId))) {
+          delete updatedToastIds[key];
+        }
+      });
+      setToastIds(updatedToastIds);
       
       setNotifiedEntryIds(prev => {
         const updated = new Set(prev);
@@ -353,22 +347,27 @@ const Journal = () => {
         return updated;
       });
       
-      // Immediately trigger a refetch to ensure UI is updated
       setRefreshKey(Date.now());
       
-      // Force a re-fetch of entries after deletion with delay
       setTimeout(() => {
         fetchEntries();
       }, 500);
       
+      toast.success('Entry deleted successfully');
+      
     } catch (error) {
-      console.error('Error deleting entry:', error);
+      console.error('[Journal] Error deleting entry:', error);
+      toast.error('Failed to delete entry');
+      
+      setTimeout(() => {
+        setRefreshKey(Date.now());
+        fetchEntries();
+      }, 500);
     }
   };
 
   const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && !entriesError && !processingError;
 
-  // Force the component to render visibly even if there are errors
   if (hasRenderError) {
     console.error('[Journal] Recovering from render error');
     setHasRenderError(false);
@@ -376,7 +375,6 @@ const Journal = () => {
 
   return (
     <>
-      {/* Always render debugger regardless of other component states */}
       <JournalDebugger 
         processingEntries={processingEntries}
         isSavingRecording={isSavingRecording}
