@@ -4,9 +4,24 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { DayProps } from "react-day-picker";
-import { subDays, startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format, isSameDay, isSameMonth, isSameWeek, addDays, getMonth } from "date-fns";
+import { 
+  subDays, 
+  startOfDay, 
+  endOfDay, 
+  startOfWeek, 
+  startOfMonth, 
+  startOfYear, 
+  format, 
+  isSameDay, 
+  isSameMonth, 
+  isSameWeek, 
+  addDays, 
+  getMonth,
+  addWeeks,
+  subWeeks 
+} from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CalendarDays, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
+import { CalendarDays, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   Line,
   LineChart as RechartsLineChart,
@@ -79,6 +94,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const { theme, colorTheme, customColor } = useTheme();
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
   
   const filteredData = React.useMemo(() => {
     const now = new Date();
@@ -276,17 +292,65 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     );
   };
 
+  const navigateToPreviousWeek = () => {
+    setCurrentWeekStart(prevWeekStart => subWeeks(prevWeekStart, 1));
+  };
+
+  const navigateToNextWeek = () => {
+    const nextWeekStart = addWeeks(currentWeekStart, 1);
+    // Only allow navigating up to the current week
+    if (nextWeekStart <= startOfWeek(new Date(), { weekStartsOn: 1 })) {
+      setCurrentWeekStart(nextWeekStart);
+    }
+  };
+
+  const isCurrentWeek = (date: Date) => {
+    const currentWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
+    return format(date, 'yyyy-MM-dd') === format(currentWeek, 'yyyy-MM-dd');
+  };
+
   const renderWeekView = () => {
-    const today = new Date();
-    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
     const days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
+      const date = new Date(currentWeekStart);
+      date.setDate(currentWeekStart.getDate() + i);
       return date;
     });
     
+    const today = new Date();
+    
     return (
       <div className="py-4">
+        <div className="flex justify-between items-center mb-4">
+          <button 
+            onClick={navigateToPreviousWeek}
+            className="p-1 rounded-full hover:bg-muted transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          
+          <div className="text-sm font-medium">
+            {format(currentWeekStart, 'MMMM d')} - {format(addDays(currentWeekStart, 6), 'MMMM d, yyyy')}
+            {isCurrentWeek(currentWeekStart) && (
+              <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                Current Week
+              </span>
+            )}
+          </div>
+          
+          <button 
+            onClick={navigateToNextWeek}
+            disabled={isCurrentWeek(currentWeekStart)}
+            className={cn(
+              "p-1 rounded-full transition-colors",
+              isCurrentWeek(currentWeekStart) 
+                ? "text-muted-foreground cursor-not-allowed" 
+                : "hover:bg-muted"
+            )}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+        
         <div className="grid grid-cols-7 gap-0 text-center mb-2">
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
             <div key={day} className="text-xs font-medium text-muted-foreground">
@@ -679,4 +743,3 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     </motion.div>
   );
 }
-
