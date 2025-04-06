@@ -23,8 +23,14 @@ export default function JournalEntriesList({
   onStartRecording, 
   onDeleteEntry 
 }: JournalEntriesListProps) {
-  // Show primary loading state only when loading and no entries exist and no entries are being processed
-  if (loading && entries.length === 0 && (!processingEntries || processingEntries.length === 0)) {
+  // Show primary loading state only when loading initial entries
+  // But don't show loading indefinitely for new users with no entries
+  const showInitialLoading = loading && entries.length === 0 && (!processingEntries || processingEntries.length === 0);
+
+  // New flag to check if this is likely a new user who hasn't created any entries yet
+  const isLikelyNewUser = !loading && entries.length === 0 && (!processingEntries || processingEntries.length === 0);
+
+  if (showInitialLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
@@ -33,8 +39,8 @@ export default function JournalEntriesList({
     );
   }
 
-  // Show empty state only when there are no entries and no processing entries
-  if (entries.length === 0 && (!processingEntries || processingEntries.length === 0)) {
+  // Show empty state for new users or users with no entries
+  if (isLikelyNewUser) {
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
 

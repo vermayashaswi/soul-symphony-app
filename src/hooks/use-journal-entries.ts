@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,10 +11,71 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [fetchCount, setFetchCount] = useState(0);
   const [lastRefreshKey, setLastRefreshKey] = useState(refreshKey);
   const [error, setError] = useState<string | null>(null);
+  const [profileExists, setProfileExists] = useState<boolean | null>(null);
   
   const isFetchingRef = useRef(false);
   const initialFetchDoneRef = useRef(false);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Add a function to check if user profile exists
+  const checkUserProfile = useCallback(async (userId: string) => {
+    try {
+      console.log('[useJournalEntries] Checking if profile exists for user:', userId);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+        
+      if (error) {
+        console.log('[useJournalEntries] Profile not found or error:', error.message);
+        setProfileExists(false);
+        return false;
+      }
+      
+      console.log('[useJournalEntries] Profile found:', data);
+      setProfileExists(true);
+      return true;
+    } catch (error: any) {
+      console.error('[useJournalEntries] Error checking profile:', error.message);
+      setProfileExists(false);
+      return false;
+    }
+  }, []);
+
+  // Add a function to create user profile if it doesn't exist
+  const createUserProfile = useCallback(async (userId: string) => {
+    try {
+      console.log('[useJournalEntries] Creating profile for user:', userId);
+      
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        throw userError;
+      }
+      
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert([{
+          id: userId,
+          email: userData.user?.email,
+          full_name: userData.user?.user_metadata?.full_name || '',
+          avatar_url: userData.user?.user_metadata?.avatar_url || '',
+          onboarding_completed: false
+        }]);
+        
+      if (insertError) {
+        throw insertError;
+      }
+      
+      console.log('[useJournalEntries] Profile created successfully');
+      setProfileExists(true);
+      return true;
+    } catch (error: any) {
+      console.error('[useJournalEntries] Error creating profile:', error.message);
+      toast.error('Error setting up profile. Please try again.');
+      return false;
+    }
+  }, []);
 
   const fetchEntries = useCallback(async () => {
     if (!userId) {
@@ -27,6 +89,26 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     if (isFetchingRef.current) {
       console.log('[useJournalEntries] Skipping fetch as one is already in progress');
       return;
+    }
+    
+    // Check if profile exists and create if needed
+    if (profileExists === false) {
+      const created = await createUserProfile(userId);
+      if (!created) {
+        setLoading(false);
+        setError('Failed to create user profile');
+        return;
+      }
+    } else if (profileExists === null) {
+      const exists = await checkUserProfile(userId);
+      if (!exists) {
+        const created = await createUserProfile(userId);
+        if (!created) {
+          setLoading(false);
+          setError('Failed to create user profile');
+          return;
+        }
+      }
     }
     
     // Clear any previous errors
@@ -136,7 +218,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [userId, fetchCount]);
+  }, [userId, fetchCount, profileExists, checkUserProfile, createUserProfile]);
 
   useEffect(() => {
     if (userId) {
@@ -173,6 +255,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     fetchEntries,
     lastFetchTime,
     fetchCount,
-    error
+    error,
+    profileExists
   };
 }

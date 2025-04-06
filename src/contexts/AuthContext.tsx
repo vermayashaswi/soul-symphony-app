@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +15,7 @@ type AuthContextType = {
   signUp: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (metadata: Record<string, any>) => Promise<boolean>;
+  ensureProfileExists: () => Promise<boolean>;
 };
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,10 +29,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log("AuthProvider: Setting up auth state listener");
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
+      async (event, currentSession) => {
         console.log('Auth state changed:', event, currentSession?.user?.email);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
+        
+        // If user just signed in or signed up, ensure profile exists
+        if ((event === 'SIGNED_IN' || event === 'SIGNED_UP') && currentSession?.user) {
+          // Using setTimeout to prevent auth deadlock
+          setTimeout(async () => {
+            await ensureProfileExists(currentSession.user);
+          }, 0);
+        }
+        
         setIsLoading(false);
 
         if (event === 'SIGNED_IN') {
@@ -41,10 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
       console.log('Initial session check:', currentSession?.user?.email);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      
+      // Check for existing profile on initial load
+      if (currentSession?.user) {
+        await ensureProfileExists(currentSession.user);
+      }
+      
       setIsLoading(false);
     });
 
@@ -52,6 +69,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Helper function to ensure user profile exists
+  const ensureProfileExists = async (userToCheck: User | null = null) => {
+    const currentUser = userToCheck || user;
+    if (!currentUser) return false;
+    
+    try {
+      console.log('Checking if profile exists for user:', currentUser.id);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', currentUser.id)
+        .single();
+        
+      if (error) {
+        console.log('Profile not found, creating new profile');
+        
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: currentUser.id,
+            email: currentUser.email,
+            full_name: currentUser.user_metadata?.full_name || '',
+            avatar_url: currentUser.user_metadata?.avatar_url || '',
+            onboarding_completed: false
+          }]);
+          
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          return false;
+        }
+        
+        console.log('Profile created successfully');
+        return true;
+      }
+      
+      console.log('Profile exists:', data.id);
+      return true;
+    } catch (error: any) {
+      console.error('Error ensuring profile exists:', error);
+      return false;
+    }
+  };
 
   const getRedirectUrl = () => {
     const origin = window.location.origin;
@@ -107,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { error, data } = await supabase.auth.signUp({
         email,
         password,
       });
@@ -115,6 +175,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         throw error;
       }
+      
+      // Profile creation handled by auth state change listener
+      
     } catch (error: any) {
       console.error('Error signing up:', error);
       toast.error(`Error signing up: ${error.message}`);
@@ -205,6 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     resetPassword,
     updateUserProfile,
+    ensureProfileExists,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
