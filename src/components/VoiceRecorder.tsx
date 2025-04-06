@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
@@ -24,7 +25,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
-  const { user } = useAuth();
+  const { user, forceRefreshAuth } = useAuth();
   const isMobile = useIsMobile();
   
   const {
@@ -51,6 +52,20 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     audioRef,
     reset: resetPlayback
   } = useAudioPlayback({ audioBlob });
+
+  // Before saving, verify auth is still valid
+  const checkAuthBeforeSaving = useCallback(async () => {
+    if (!user) {
+      // Try to refresh auth state
+      const authValid = await forceRefreshAuth();
+      if (!authValid) {
+        console.error("[VoiceRecorder] Auth validation failed before saving");
+        toast.error("Session expired. Please refresh and try again.");
+        return false;
+      }
+    }
+    return true;
+  }, [user, forceRefreshAuth]);
 
   useEffect(() => {
     if (isRecording) {
@@ -89,6 +104,15 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       setIsProcessing(true);
       setRecordingError(null);
       
+      // Verify auth is valid before proceeding
+      const isAuthValid = await checkAuthBeforeSaving();
+      if (!isAuthValid) {
+        setIsProcessing(false);
+        setRecordingError("Authentication error. Please refresh the page and try again.");
+        return;
+      }
+      
+      // Normalize the audio blob
       const normalizedBlob = normalizeAudioBlob(audioBlob);
       
       console.log('Processing audio:', {
@@ -105,7 +129,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       console.error('Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
       toast.error("Error saving recording");
-    } finally {
       setIsProcessing(false);
     }
   };

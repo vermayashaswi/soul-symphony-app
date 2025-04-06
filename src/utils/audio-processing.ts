@@ -1,3 +1,4 @@
+
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
@@ -19,7 +20,21 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   // Clear any lingering toasts from previous sessions
   clearAllToasts();
   
-  // 1. Validate the audio blob
+  // Verify we have an authenticated user
+  if (!userId) {
+    console.error('No user ID provided for audio processing');
+    
+    // Double-check session is still valid
+    const { data } = await supabase.auth.getSession();
+    if (!data?.session?.user?.id) {
+      return { success: false, error: 'Session expired. Please refresh and try again.' };
+    }
+    
+    // Update userId if we can
+    userId = data.session.user.id;
+  }
+  
+  // Validate the audio blob
   const validation = validateAudioBlob(audioBlob);
   if (!validation.isValid) {
     return { success: false, error: validation.errorMessage };
@@ -36,13 +51,6 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       type: audioBlob?.type || 'unknown',
       userId: userId || 'anonymous'
     });
-    
-    // Verify the user ID is valid
-    if (!userId) {
-      console.error('No user ID provided for audio processing');
-      isEntryBeingProcessed = false;
-      return { success: false, error: 'Authentication required' };
-    }
     
     // Launch the processing without awaiting it
     processRecordingInBackground(audioBlob, userId, tempId)

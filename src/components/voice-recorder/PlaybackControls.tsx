@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,15 +31,23 @@ export function PlaybackControls({
   const formattedProgress = formatTime(currentTime);
   const formattedDuration = formatTime(audioDuration);
   
+  // Track previous progress for animation smoothness
+  const prevProgressRef = useRef(playbackProgress);
+  
+  // Use animation that respects the current progress position
+  useEffect(() => {
+    prevProgressRef.current = playbackProgress;
+  }, [playbackProgress]);
+  
   return (
     <div className="w-full px-4">
       <div className="mb-4 relative">
         <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-primary rounded-full"
-            initial={{ width: 0 }}
+            initial={{ width: `${(prevProgressRef.current || 0) * 100}%` }}
             animate={{ width: `${playbackProgress * 100}%` }}
-            transition={{ type: "tween" }}
+            transition={{ type: "tween", duration: 0.1 }}
           />
         </div>
         <div className="flex justify-between mt-1.5 text-xs text-slate-500">

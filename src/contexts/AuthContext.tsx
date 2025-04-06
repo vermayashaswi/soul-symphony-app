@@ -16,6 +16,9 @@ import {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Add global auth initialized flag to prevent race conditions
+let AUTH_INITIALIZED = false;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -26,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -193,6 +197,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // New function to forcibly re-initialize auth context
+  const forceRefreshAuth = async (): Promise<boolean> => {
+    try {
+      console.log('[AuthContext] Force refreshing auth state');
+      const { data } = await supabase.auth.getSession();
+      
+      if (data?.session) {
+        setSession(data.session);
+        setUser(data.session.user);
+        
+        if (data.session.user) {
+          const profileExists = await createOrVerifyProfile(data.session.user);
+          return profileExists;
+        }
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('[AuthContext] Error in force refresh:', error);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     console.log("[AuthContext] Setting up auth state listener");
     
@@ -218,9 +247,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
         
+        // Mark auth as initialized - IMPORTANT
+        AUTH_INITIALIZED = true;
+        setAuthInitialized(true);
         setIsLoading(false);
       } catch (error) {
         console.error('[AuthContext] Error in initial auth check:', error);
+        // Mark auth as initialized even on error to prevent hanging
+        AUTH_INITIALIZED = true;
+        setAuthInitialized(true);
         setIsLoading(false);
       }
     };
@@ -245,6 +280,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }, delay);
         }
         
+        // Update initialization state
+        if (!AUTH_INITIALIZED) {
+          AUTH_INITIALIZED = true;
+          setAuthInitialized(true);
+        }
+        
         setIsLoading(false);
 
         if (event === 'SIGNED_IN') {
@@ -262,6 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [isMobileDevice]);
 
+  // Add value of forceRefreshAuth to context
   const value = {
     session,
     user,
@@ -274,6 +316,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetPassword,
     updateUserProfile,
     ensureProfileExists,
+    forceRefreshAuth,
+    authInitialized
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
