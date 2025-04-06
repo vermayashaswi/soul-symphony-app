@@ -230,6 +230,14 @@ export const setupJournalReminder = async (enabled: boolean): Promise<void> => {
   }
 };
 
+// Initialize Capacitor notifications if available
+export const initializeCapacitorNotifications = async (): Promise<void> => {
+  // This is a stub function for the Settings page
+  // In a real implementation, this would initialize Capacitor notifications
+  // But since we're focused on web right now, it's just a placeholder
+  console.log("[NotificationService] Capacitor notifications initialization stub called");
+};
+
 // Clean up function to be called when components unmount
 export const cleanupNotifications = () => {
   console.log('[NotificationService] Cleaning up notifications');

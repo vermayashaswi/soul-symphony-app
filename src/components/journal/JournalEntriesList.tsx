@@ -14,7 +14,7 @@ interface JournalEntriesListProps {
   processingEntries?: string[];
   processedEntryIds?: number[];
   onStartRecording: () => void;
-  onDeleteEntry?: (entryId: number) => void;
+  onDeleteEntry?: (entryId: number) => Promise<void> | void;
 }
 
 export default function JournalEntriesList({ 
@@ -88,13 +88,28 @@ export default function JournalEntriesList({
     if (onDeleteEntry) {
       setTimeout(() => {
         if (componentMounted.current) {
-          onDeleteEntry(entryId).then(() => {
-            // After successful deletion, remove from pending set
+          try {
+            const result = onDeleteEntry(entryId);
+            
+            // Check if result is a Promise and handle it properly
+            if (result && typeof result.then === 'function') {
+              result
+                .then(() => {
+                  // After successful deletion, remove from pending set
+                  pendingDeletions.current.delete(entryId);
+                })
+                .catch(error => {
+                  console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
+                  pendingDeletions.current.delete(entryId);
+                });
+            } else {
+              // If it's not a Promise, just remove from pending
+              pendingDeletions.current.delete(entryId);
+            }
+          } catch (error) {
+            console.error(`[JournalEntriesList] Error calling onDeleteEntry for ${entryId}:`, error);
             pendingDeletions.current.delete(entryId);
-          }).catch(error => {
-            console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
-            pendingDeletions.current.delete(entryId);
-          });
+          }
         }
       }, 100);
     }
