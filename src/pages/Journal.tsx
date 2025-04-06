@@ -24,6 +24,7 @@ const Journal = () => {
   const [showRetryButton, setShowRetryButton] = useState(false);
   const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
   const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
+  const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
   
   const { entries, loading, fetchEntries } = useJournalEntries(
     user?.id,
@@ -37,8 +38,37 @@ const Journal = () => {
       Object.values(toastIds).forEach(id => {
         if (id) toast.dismiss(id);
       });
+      
+      if (profileCheckTimeoutId) {
+        clearTimeout(profileCheckTimeoutId);
+      }
     };
-  }, [toastIds]);
+  }, [toastIds, profileCheckTimeoutId]);
+
+  // Set a maximum timeout for profile checking to prevent infinite loading state
+  useEffect(() => {
+    if (isCheckingProfile && user?.id) {
+      const timeoutId = setTimeout(() => {
+        console.log('[Journal] Profile check taking too long, proceeding anyway');
+        setIsCheckingProfile(false);
+        setIsProfileChecked(true);
+      }, 10000); // 10 seconds maximum wait time
+      
+      setProfileCheckTimeoutId(timeoutId);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        setProfileCheckTimeoutId(null);
+      };
+    }
+  }, [isCheckingProfile, user?.id]);
+
+  // Initialize profile checking when user is available
+  useEffect(() => {
+    if (user?.id && isCheckingProfile && !isProfileChecked) {
+      checkUserProfile(user.id);
+    }
+  }, [user?.id, isCheckingProfile, isProfileChecked]);
 
   // Only show success notification when new entries are added and not for the initial load
   useEffect(() => {
@@ -78,10 +108,10 @@ const Journal = () => {
       
       let profileCreated = await ensureProfileExists();
       
-      if (!profileCreated && profileCheckRetryCount < 5) {
+      if (!profileCreated && profileCheckRetryCount < 3) {
         console.log('[Journal] Profile check failed, retrying...', profileCheckRetryCount + 1);
         
-        const delay = 1000 * Math.pow(1.5, profileCheckRetryCount);
+        const delay = 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
         
         profileCreated = await ensureProfileExists();
@@ -89,21 +119,12 @@ const Journal = () => {
         setProfileCheckRetryCount(prevCount => prevCount + 1);
       }
       
-      if (profileCreated) {
-        console.log('[Journal] Profile created or verified successfully');
-        setIsProfileChecked(true);
-      } else if (profileCheckRetryCount >= 5) {
-        console.error('[Journal] Failed to create profile after multiple retries');
-        
-        const now = Date.now();
-        if (now - lastProfileErrorTime > 60000) {
-          toast.error('Having trouble setting up your profile. You can try again or continue using the app.', { duration: 3000 });
-          setLastProfileErrorTime(now);
-        }
-        
+      // Even if profile creation fails, proceed after a few attempts
+      console.log('[Journal] Proceeding with journal view regardless of profile status');
+      setIsProfileChecked(true);
+      
+      if (!profileCreated) {
         setShowRetryButton(true);
-        
-        setIsProfileChecked(true);
       }
     } catch (error: any) {
       console.error('[Journal] Error checking/creating user profile:', error);
@@ -116,6 +137,7 @@ const Journal = () => {
       
       setShowRetryButton(true);
       
+      // Still proceed to show the journal even if there was an error
       setIsProfileChecked(true);
     } finally {
       setIsCheckingProfile(false);

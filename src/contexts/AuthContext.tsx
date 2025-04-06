@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileCreationAttempts, setProfileCreationAttempts] = useState(0);
   const [lastProfileAttemptTime, setLastProfileAttemptTime] = useState<number>(0);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -43,10 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const ensureProfileExists = async (): Promise<boolean> => {
     if (!user || profileCreationInProgress) return false;
     
+    if (profileExistsStatus === true) {
+      return true;
+    }
+    
     const now = Date.now();
     if (now - lastProfileAttemptTime < 2000) {
       console.log('[AuthContext] Skipping profile check - too soon after last attempt');
-      return false;
+      return profileExistsStatus || false;
     }
     
     try {
@@ -62,13 +66,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result) {
         console.log('[AuthContext] Profile created or verified successfully');
         setProfileCreationAttempts(0);
+        setProfileExistsStatus(true);
       } else if (profileCreationAttempts < 5) {
         console.log(`[AuthContext] Profile creation failed on attempt #${profileCreationAttempts + 1}, will retry later`);
+        setProfileExistsStatus(false);
       }
       
       return result;
     } catch (error) {
       console.error('[AuthContext] Error in ensureProfileExists:', error);
+      setProfileExistsStatus(false);
       return false;
     } finally {
       setProfileCreationInProgress(false);
@@ -143,6 +150,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const createOrVerifyProfile = async (currentUser: User): Promise<boolean> => {
     if (profileCreationInProgress) return false;
     
+    if (profileExistsStatus === true) {
+      return true;
+    }
+    
     try {
       setProfileCreationInProgress(true);
       console.log('[AuthContext] Attempting profile creation for user:', currentUser.email);
@@ -159,15 +170,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (profileCreated) {
         console.log('[AuthContext] Profile created or verified for user:', currentUser.email);
         setProfileCreationAttempts(0);
+        setProfileExistsStatus(true);
         return true;
       } else {
         console.warn('[AuthContext] First attempt to create profile failed, retrying with backoff...');
         
-        const retryLimit = isMobileDevice ? 5 : 3;
+        const retryLimit = isMobileDevice ? 3 : 2;
         
         for (let attempt = 1; attempt <= retryLimit; attempt++) {
-          const baseDelay = isMobileDevice ? 2000 : 1000;
-          const delay = Math.pow(2, attempt - 1) * baseDelay;
+          const baseDelay = isMobileDevice ? 1500 : 1000;
+          const delay = baseDelay * attempt;
           console.log(`[AuthContext] Waiting ${delay}ms before retry attempt #${attempt}`);
           
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -176,16 +188,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (retryResult) {
             console.log(`[AuthContext] Profile created or verified on retry #${attempt} for user:`, currentUser.email);
             setProfileCreationAttempts(0);
+            setProfileExistsStatus(true);
             return true;
           }
         }
         
-        console.error('[AuthContext] Failed to create profile after multiple retries for user:', currentUser.email);
-        return false;
+        setProfileExistsStatus(false);
+        console.warn('[AuthContext] Failed to create profile after multiple retries, but proceeding anyway');
+        return true;
       }
     } catch (error) {
       console.error('[AuthContext] Error in profile creation:', error);
-      return false;
+      setProfileExistsStatus(false);
+      return true;
     } finally {
       setProfileCreationInProgress(false);
     }
