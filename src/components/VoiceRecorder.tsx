@@ -66,6 +66,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     }
   }, [isRecording, recordingTime]);
   
+  useEffect(() => {
+    if (isRecording) {
+      setShowAnimation(true);
+    } else if (audioBlob) {
+      setShowAnimation(false);
+    }
+  }, [isRecording, audioBlob]);
+  
   const handleSaveEntry = async () => {
     if (!audioBlob) {
       setRecordingError("No audio recording available");
@@ -158,15 +166,17 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
                   onSaveEntry={handleSaveEntry}
                 />
                 
-                <Button
-                  onClick={handleRestart}
-                  variant="outline"
-                  className="mt-3 flex items-center gap-2 bg-background/80 backdrop-blur-sm"
-                  disabled={isProcessing}
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>Start Over</span>
-                </Button>
+                <div className="w-full flex justify-center mt-auto pt-8">
+                  <Button
+                    onClick={handleRestart}
+                    variant="outline"
+                    className="flex items-center gap-2 bg-background/80 backdrop-blur-sm"
+                    disabled={isProcessing}
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Start Over</span>
+                  </Button>
+                </div>
               </div>
             ) : hasPermission === false ? (
               <motion.p

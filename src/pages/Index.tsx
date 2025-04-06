@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -369,14 +368,14 @@ const Index = () => {
         className={cn(
           "flex-1 container mx-auto px-4 py-8 relative z-10",
           shouldRenderMobile ? "max-w-md" : "",
-          shouldRenderMobile ? "pb-16 pt-24" : "pt-24" // Reduced the top padding to move the heading down
+          shouldRenderMobile ? "pb-28 pt-24" : "pt-24"
         )}
         initial="hidden"
         animate="visible"
         variants={containerVariants}
       >
         <motion.div
-          className="text-center mb-4" // Reduced mb-12 to mb-4 to bring the heading closer to the subtitle
+          className="text-center mb-4" 
           variants={itemVariants}
         >
           <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-3 flex items-center justify-center`}>
@@ -406,7 +405,7 @@ const Index = () => {
         </motion.div>
         
         <motion.div 
-          className={`grid ${shouldRenderMobile ? 'grid-cols-1 gap-4' : 'grid-cols-1 md:grid-cols-2 gap-6'} max-w-4xl mx-auto`}
+          className={`grid ${shouldRenderMobile ? 'grid-cols-1 gap-4 mb-16' : 'grid-cols-1 md:grid-cols-2 gap-6'} max-w-4xl mx-auto`}
           variants={containerVariants}
         >
           {features.map((feature, index) => (

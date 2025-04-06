@@ -32,7 +32,7 @@ export function PlaybackControls({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="flex flex-col items-center gap-1 w-full max-w-xs"
+      className="flex flex-col items-center gap-3 w-full max-w-xs"
     >
       <div className="w-full">
         <Button 
@@ -55,7 +55,7 @@ export function PlaybackControls({
         </Button>
         
         {/* Playback progress indicator */}
-        <div className="w-full space-y-1">
+        <div className="w-full space-y-1 mb-4">
           <Progress value={playbackProgress} className="h-2" />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>
@@ -69,7 +69,7 @@ export function PlaybackControls({
       <Button 
         onClick={onSaveEntry}
         disabled={isProcessing}
-        className="w-full rounded-lg flex items-center justify-center gap-2 mt-0"
+        className="w-full rounded-lg flex items-center justify-center gap-2 mb-4"
       >
         <span>Save Entry</span>
       </Button>
