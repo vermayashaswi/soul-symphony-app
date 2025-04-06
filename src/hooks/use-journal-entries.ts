@@ -10,9 +10,11 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
   const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
   const [fetchCount, setFetchCount] = useState(0);
   const [lastRefreshKey, setLastRefreshKey] = useState(refreshKey);
+  const [error, setError] = useState<string | null>(null);
   
   const isFetchingRef = useRef(false);
   const initialFetchDoneRef = useRef(false);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchEntries = useCallback(async () => {
     if (!userId) {
@@ -27,6 +29,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       return;
     }
     
+    // Clear any previous errors
+    setError(null);
+    
     try {
       isFetchingRef.current = true;
       setLoading(true);
@@ -39,8 +44,22 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         setEntries([]);
         setLoading(false);
         isFetchingRef.current = false;
+        setError('No active session. Please sign in again.');
         return;
       }
+      
+      // Set a timeout in case the fetch takes too long
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      
+      fetchTimeoutRef.current = setTimeout(() => {
+        if (isFetchingRef.current) {
+          console.log('[useJournalEntries] Fetch is taking too long, setting loading to false');
+          setLoading(false);
+          // Don't set isFetchingRef to false here so the actual fetch can still complete
+        }
+      }, 8000); // 8 second timeout for UI loading state
       
       const { data, error, status } = await supabase
         .from('Journal Entries')
@@ -48,12 +67,24 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       
+      // Clear the timeout as fetch completed
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
+      }
+      
       const fetchEndTime = Date.now();
       console.log(`[useJournalEntries] Fetch completed in ${fetchEndTime - fetchStartTime}ms with status: ${status}`);
         
       if (error) {
         console.error('[useJournalEntries] Error fetching entries:', error);
-        toast.error('Failed to load journal entries');
+        
+        // Only show toast error on initial load
+        if (!initialFetchDoneRef.current) {
+          toast.error('Failed to load journal entries. Please try again later.');
+        }
+        
+        setError('Failed to load entries: ' + error.message);
         throw error;
       }
       
@@ -88,9 +119,9 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       setLastFetchTime(new Date());
       setFetchCount(prev => prev + 1);
       initialFetchDoneRef.current = true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('[useJournalEntries] Error fetching entries:', error);
-      toast.error('Failed to load journal entries');
+      setError('Failed to load entries: ' + error.message);
     } finally {
       setLoading(false);
       isFetchingRef.current = false;
@@ -113,6 +144,13 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
       console.log(`[useJournalEntries] Waiting for prerequisites: userId=${!!userId}, isProfileChecked=${isProfileChecked}`);
       setLoading(userId !== undefined);
     }
+    
+    // Cleanup function to clear any timeouts
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
   }, [userId, refreshKey, isProfileChecked, fetchEntries, lastRefreshKey]);
 
   return { 
@@ -120,6 +158,7 @@ export function useJournalEntries(userId: string | undefined, refreshKey: number
     loading, 
     fetchEntries,
     lastFetchTime,
-    fetchCount
+    fetchCount,
+    error
   };
 }

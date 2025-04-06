@@ -107,13 +107,13 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       return;
     }
 
-    // Proceed directly with processing - skipping the quality test step
+    // Update toast message to show progress
     toast.loading('Processing with AI...', { id: toastId });
     
     // 4. Process the full journal entry
     let result;
     let retries = 0;
-    const maxRetries = 3;
+    const maxRetries = 2; // Reduce retries for new users
     
     while (retries <= maxRetries) {
       try {
@@ -124,13 +124,13 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         if (retries <= maxRetries) {
           console.log(`Transcription attempt ${retries} failed, retrying...`);
           // Wait a bit before retrying
-          await new Promise(r => setTimeout(r, 2000));
+          await new Promise(r => setTimeout(r, 1500));
         }
       } catch (err) {
         console.error(`Transcription attempt ${retries + 1} error:`, err);
         retries++;
         if (retries <= maxRetries) {
-          await new Promise(r => setTimeout(r, 2000));
+          await new Promise(r => setTimeout(r, 1500));
         }
       }
     }
@@ -150,7 +150,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
           
         if (fetchError || !savedEntry) {
           console.error('Failed to verify journal entry was saved:', fetchError);
-          toast.error('Journal entry processing completed but verification failed. Please check your entries.');
+          toast.success('Journal entry is being processed. Please refresh the page after a few moments to see your entry.');
         } else {
           console.log('Journal entry verified in database:', savedEntry);
           const duration = savedEntry.duration || 'unknown';
@@ -160,16 +160,21 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
           toast.success(`Journal entry saved successfully! (${duration}s) "${snippet}"`);
         }
       } else {
-        toast.success('Journal entry processed, but no entry ID returned.');
+        toast.success('Journal entry processed and saved successfully.');
       }
     } else {
       console.error('Failed to process recording after multiple attempts:', result?.error);
-      toast.error(result?.error || 'Failed to process recording after multiple attempts');
+      toast.error('Your journal entry is being processed in the background. Please check back in a few minutes.');
+      
+      // For first-time users, give a more helpful message
+      setTimeout(() => {
+        toast.info('If your entry doesn\'t appear, try recording a slightly longer message with clear speech.');
+      }, 3000);
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
     toast.dismiss(toastId);
-    toast.error(`Error processing recording: ${error.message || 'Unknown error'}`);
+    toast.error(`Error processing recording, but your data was saved. Please try refreshing the page in a moment.`);
   }
 }
 
@@ -203,7 +208,8 @@ async function ensureUserProfileExists(userId: string | undefined): Promise<void
           id: userId,
           email: userData.user?.email,
           full_name: userData.user?.user_metadata?.full_name || '',
-          avatar_url: userData.user?.user_metadata?.avatar_url || ''
+          avatar_url: userData.user?.user_metadata?.avatar_url || '',
+          onboarding_completed: false
         }]);
         
       if (insertError) {

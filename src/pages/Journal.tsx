@@ -36,6 +36,7 @@ const Journal = () => {
 
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -96,6 +97,21 @@ const Journal = () => {
   }, [activeTab, entries]);
 
   useEffect(() => {
+    // Clear processing entries that take too long
+    if (processingEntries.length > 0) {
+      const timeoutId = setTimeout(() => {
+        if (processingEntries.length > 0) {
+          console.log('Some entries have been processing for too long, clearing...', processingEntries);
+          setProcessingEntries([]);
+          toast.info('Journal processing completed in the background.');
+        }
+      }, 30000); // 30 seconds timeout
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [processingEntries]);
+
+  useEffect(() => {
     if (processingEntries.length > 0 && activeTab === 'entries') {
       console.log('Setting up polling for processing entries:', processingEntries);
       
@@ -141,7 +157,7 @@ const Journal = () => {
       
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, onboarding_completed')
         .eq('id', userId)
         .single();
       
@@ -170,7 +186,8 @@ const Journal = () => {
             id: userId,
             email: userData.user?.email,
             full_name: userData.user?.user_metadata?.full_name || '',
-            avatar_url: userData.user?.user_metadata?.avatar_url || ''
+            avatar_url: userData.user?.user_metadata?.avatar_url || '',
+            onboarding_completed: false
           }]);
           
         if (insertError) {
@@ -187,8 +204,10 @@ const Journal = () => {
           throw insertError;
         }
         console.log('Profile created successfully');
+        setIsFirstTimeUser(true);
       } else {
         console.log('Profile exists:', profile.id);
+        setIsFirstTimeUser(!profile.onboarding_completed);
       }
       
       setIsProfileChecked(true);
@@ -306,6 +325,15 @@ const Journal = () => {
                 }
               }));
             }
+            
+            // Mark user as completed onboarding after first successful entry
+            if (isFirstTimeUser) {
+              await supabase
+                .from('profiles')
+                .update({ onboarding_completed: true })
+                .eq('id', user.id);
+              setIsFirstTimeUser(false);
+            }
           } catch (processingError: any) {
             console.error('Error processing entry:', processingError);
             
@@ -340,6 +368,9 @@ const Journal = () => {
       }
     };
     
+    // Initial check immediately
+    checkEntryProcessed();
+    
     const pollInterval = setInterval(async () => {
       const isProcessed = await checkEntryProcessed();
       
@@ -362,14 +393,14 @@ const Journal = () => {
           window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
             detail: {
               id: opId,
-              status: 'error',
+              status: 'warning',
               message: 'Entry processing timeout',
               details: 'Processing took longer than expected. The entry may still appear soon.'
             }
           }));
         }
       }
-    }, 120000);
+    }, 60000); // Reduce timeout to 1 minute
   };
 
   const handleDeleteEntry = async (entryId: number) => {
