@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +13,9 @@ import {
   refreshSession as refreshSessionService
 } from '@/services/authService';
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export { AuthContext };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -25,7 +26,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [lastProfileAttemptTime, setLastProfileAttemptTime] = useState<number>(0);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
 
-  // Check if running on mobile device
   useEffect(() => {
     const checkMobile = () => {
       const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
@@ -37,11 +37,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkMobile();
   }, []);
 
-  // Ensure profile exists wrapper with improved error handling
   const ensureProfileExists = async (): Promise<boolean> => {
     if (!user || profileCreationInProgress) return false;
     
-    // Prevent rapid repeated attempts (at least 2 seconds between attempts)
     const now = Date.now();
     if (now - lastProfileAttemptTime < 2000) {
       console.log('[AuthContext] Skipping profile check - too soon after last attempt');
@@ -58,11 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (result) {
         console.log('[AuthContext] Profile created or verified successfully');
-        // Reset attempts counter on success
         setProfileCreationAttempts(0);
       } else if (profileCreationAttempts < 5) {
         console.log(`[AuthContext] Profile creation failed on attempt #${profileCreationAttempts + 1}, will retry later`);
-        // We'll let the next attempt happen naturally when needed
       }
       
       return result;
@@ -74,10 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Update user profile wrapper
   const updateUserProfile = async (metadata: Record<string, any>): Promise<boolean> => {
     const result = await updateUserProfileService(user, metadata);
-    // If successful and we get updated user data, update the state
     if (result) {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
@@ -87,7 +81,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
-  // Sign in with Google wrapper
   const signInWithGoogle = async (): Promise<void> => {
     setIsLoading(true);
     try {
@@ -97,7 +90,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Sign in with email wrapper
   const signInWithEmail = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
     try {
@@ -107,7 +99,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Sign up wrapper
   const signUp = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
     try {
@@ -117,7 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Reset password wrapper
   const resetPassword = async (email: string): Promise<void> => {
     setIsLoading(true);
     try {
@@ -127,7 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Sign out wrapper
   const signOut = async (): Promise<void> => {
     try {
       await signOutService();
@@ -136,7 +125,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Refresh session wrapper
   const refreshSession = async (): Promise<void> => {
     try {
       const currentSession = await refreshSessionService();
@@ -147,7 +135,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Create or verify user profile with exponential backoff retry strategy
   const createOrVerifyProfile = async (currentUser: User): Promise<boolean> => {
     if (profileCreationInProgress) return false;
     
@@ -157,7 +144,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('[AuthContext] Auth provider:', currentUser.app_metadata?.provider);
       console.log('[AuthContext] Has user_metadata:', !!currentUser.user_metadata);
       
-      // First try to create profile
       const profileCreated = await ensureProfileExistsService(currentUser);
       
       if (profileCreated) {
@@ -167,17 +153,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         console.warn('[AuthContext] First attempt to create profile failed, retrying with backoff...');
         
-        // Retry with exponential backoff
         for (let attempt = 1; attempt <= 3; attempt++) {
-          // Calculate delay with exponential backoff (1s, 2s, 4s on desktop, longer on mobile)
-          const baseDelay = isMobileDevice ? 2000 : 1000; // Longer delay on mobile
+          const baseDelay = isMobileDevice ? 2000 : 1000;
           const delay = Math.pow(2, attempt - 1) * baseDelay;
           console.log(`[AuthContext] Waiting ${delay}ms before retry attempt #${attempt}`);
           
-          // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, delay));
           
-          // Try again
           const retryResult = await ensureProfileExistsService(currentUser);
           if (retryResult) {
             console.log(`[AuthContext] Profile created or verified on retry #${attempt} for user:`, currentUser.email);
@@ -206,10 +188,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        // Handle profile creation for sign in events
         if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && currentSession?.user) {
-          // Use setTimeout to prevent auth deadlock - crucial for mobile
-          const delay = isMobileDevice ? 1500 : 1000; // Longer delay on mobile
+          const delay = isMobileDevice ? 1500 : 1000;
           console.log(`[AuthContext] Delaying profile creation by ${delay}ms for platform stability`);
           
           setTimeout(() => {
@@ -228,15 +208,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // Initial session check
     supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
       console.log('[AuthContext] Initial session check:', currentSession?.user?.email);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
-      // Check for existing profile on initial load
       if (currentSession?.user) {
-        const delay = isMobileDevice ? 1800 : 1200; // Longer delay on mobile
+        const delay = isMobileDevice ? 1800 : 1200;
         console.log(`[AuthContext] Delaying initial profile creation by ${delay}ms for platform stability`);
         
         setTimeout(() => {
@@ -251,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [isMobileDevice]);  // Re-run if mobile detection changes
+  }, [isMobileDevice]);
 
   const value = {
     session,
