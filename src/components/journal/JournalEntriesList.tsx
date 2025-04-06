@@ -58,6 +58,13 @@ export default function JournalEntriesList({
     }
   }, [entries.length, prevEntriesLength]);
   
+  // Function to check if an entry is still being processed
+  const isEntryBeingProcessed = (entry: JournalEntry) => {
+    return (!entry.themes || entry.themes.length === 0) && 
+           (!entry.master_themes || entry.master_themes.length === 0) &&
+           animatedEntryIds.includes(entry.id);
+  };
+  
   // Show primary loading state only when loading initial entries
   // But don't show loading indefinitely for new users with no entries
   const showInitialLoading = loading && entries.length === 0 && !hasProcessingEntries;
@@ -129,6 +136,7 @@ export default function JournalEntriesList({
                 entry={entry} 
                 onDelete={onDeleteEntry} 
                 isNew={animatedEntryIds.includes(entry.id)}
+                isProcessing={isEntryBeingProcessed(entry)}
               />
             </motion.div>
           ))}

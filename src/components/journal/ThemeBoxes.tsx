@@ -8,10 +8,29 @@ interface ThemeBoxesProps {
   themes: string[];
   className?: string;
   isDisturbed?: boolean;
+  isLoading?: boolean; // Added loading state prop
 }
 
-const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed = false }) => {
+const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ 
+  themes, 
+  className, 
+  isDisturbed = false,
+  isLoading = false // Default to false
+}) => {
   const isMobile = useIsMobile();
+  const [isLocalLoading, setIsLocalLoading] = useState(isLoading);
+  
+  // Update local loading state when prop changes
+  useEffect(() => {
+    setIsLocalLoading(isLoading);
+  }, [isLoading]);
+  
+  // If themes changes from empty to non-empty, ensure loading is false
+  useEffect(() => {
+    if (themes && themes.length > 0) {
+      setIsLocalLoading(false);
+    }
+  }, [themes]);
   
   // Enhanced vibrant color classes for theme boxes
   const colorClasses = [
@@ -55,7 +74,7 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
   // Filter out any empty themes
   const filteredThemes = themes ? themes.filter(theme => theme && theme.trim() !== '' && theme !== '•') : [];
 
-  if (!themes || themes.length === 0 || filteredThemes.length === 0) {
+  if (isLocalLoading || !themes || themes.length === 0 || filteredThemes.length === 0) {
     // Display placeholder theme boxes with smooth floating animation
     return (
       <div className={cn("flex flex-wrap gap-3 justify-center items-center h-full w-full", className)}>
@@ -88,7 +107,7 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({ themes, className, isDisturbed 
           </motion.div>
         ))}
         <div className="absolute text-sm text-muted-foreground">
-          Extracting themes...
+          {isLocalLoading ? "Generating themes..." : "Extracting themes..."}
         </div>
       </div>
     );

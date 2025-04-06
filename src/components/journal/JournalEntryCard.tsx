@@ -42,14 +42,21 @@ interface JournalEntryCardProps {
   entry: JournalEntry;
   onDelete?: (entryId: number) => void;
   isNew?: boolean;
+  isProcessing?: boolean; // Add prop to indicate if entry is being processed
 }
 
-export function JournalEntryCard({ entry, onDelete, isNew = false }: JournalEntryCardProps) {
+export function JournalEntryCard({ 
+  entry, 
+  onDelete, 
+  isNew = false, 
+  isProcessing = false 
+}: JournalEntryCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [open, setOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const [highlightNew, setHighlightNew] = useState(isNew);
+  const [isThemesLoading, setIsThemesLoading] = useState(isProcessing);
 
   // Auto-expand new entries
   useEffect(() => {
@@ -65,6 +72,18 @@ export function JournalEntryCard({ entry, onDelete, isNew = false }: JournalEntr
       return () => clearTimeout(timer);
     }
   }, [isNew]);
+  
+  // Update themes loading state when processing state changes
+  useEffect(() => {
+    setIsThemesLoading(isProcessing);
+  }, [isProcessing]);
+  
+  // When themes are loaded, update the loading state
+  useEffect(() => {
+    if (entry.themes && entry.themes.length > 0 || entry.master_themes && entry.master_themes.length > 0) {
+      setIsThemesLoading(false);
+    }
+  }, [entry.themes, entry.master_themes]);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
@@ -267,12 +286,14 @@ export function JournalEntryCard({ entry, onDelete, isNew = false }: JournalEntr
           {isExpanded ? (
             <div>
               <p className="text-xs md:text-sm text-foreground">{entry.content}</p>
-              {entry.themes && entry.themes.length > 0 && (
-                <div className="mt-3 md:mt-4">
-                  <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
-                  <ThemeBoxes themes={entry.themes} isDisturbed={true} />
-                </div>
-              )}
+              <div className="mt-3 md:mt-4">
+                <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
+                <ThemeBoxes 
+                  themes={entry.themes || entry.master_themes || []} 
+                  isDisturbed={true}
+                  isLoading={isThemesLoading} 
+                />
+              </div>
             </div>
           ) : (
             <p className="text-xs md:text-sm text-foreground line-clamp-3">{entry.content}</p>
