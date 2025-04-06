@@ -19,12 +19,15 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
-      onError: (error) => {
-        console.error('Query error:', error);
-        // Log query errors to the debugger
-        if (debugLogger.isEnabled()) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          debugLogger.log('error', `Query error: ${errorMessage}`, 'QueryClient', error);
+      // Using meta for error handling in v5
+      meta: {
+        onError: (error: unknown) => {
+          console.error('Query error:', error);
+          // Log query errors to the debugger
+          if (debugLogger.isEnabled()) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            debugLogger.log('error', `Query error: ${errorMessage}`, 'QueryClient', error);
+          }
         }
       }
     },
