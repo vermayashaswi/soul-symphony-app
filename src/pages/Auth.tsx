@@ -15,12 +15,12 @@ export default function Auth() {
   const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
   
-  // Get the return path - prioritize query param, then location state, then localStorage, or default to /journal
+  // Get the return path - prioritize query param, then location state, then localStorage, or default to / (home)
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  const from = redirectParam || fromLocation || storedRedirect || '/journal';
+  const from = redirectParam || fromLocation || storedRedirect || '/';
 
   useEffect(() => {
     // Log the current origin/domain for debugging
@@ -89,7 +89,7 @@ export default function Auth() {
     console.log('Initiating Google sign-in from', window.location.origin);
     try {
       // Store the intended destination before initiating sign-in
-      if (from && from !== '/journal') {
+      if (from && from !== '/') {
         localStorage.setItem('authRedirectTo', from);
       }
       await signInWithGoogle();

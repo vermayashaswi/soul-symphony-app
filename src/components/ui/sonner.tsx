@@ -12,7 +12,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={theme as ToasterProps["theme"]}
       className="toaster group z-[100]" // Increased z-index for better visibility
       // Default duration is set to 1000ms (1 second) for regular toasts
-      // Loading toasts will persist until dismissed or explicitly completed
       duration={1000}
       toastOptions={{
         classNames: {
@@ -38,7 +37,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
           padding: "16px",
           fontSize: "14px",
           fontWeight: "500",
+          // Higher contrast background for light/dark modes
+          background: "var(--background)",
+          color: "var(--foreground)",
         },
+        // Special styling for loading toasts - these will persist until dismissed
+        loading: {
+          duration: Infinity, // Loading toasts persist until explicitly dismissed
+        }
       }}
       {...props}
     />
