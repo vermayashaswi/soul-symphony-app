@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { checkUserProfile, createUserProfile, fetchJournalEntries } from '@/services/journalService';
@@ -31,16 +32,23 @@ export function useJournalEntries(
   const consecutiveEmptyFetchesRef = useRef(0);
 
   const verifyUserProfile = useCallback(async (userId: string) => {
-    const exists = await checkUserProfile(userId);
-    setProfileExists(exists);
-    
-    if (!exists) {
-      const created = await createUserProfile(userId);
-      setProfileExists(created);
-      return created;
+    try {
+      console.log('[useJournalEntries] Verifying user profile:', userId);
+      const exists = await checkUserProfile(userId);
+      setProfileExists(exists);
+      
+      if (!exists) {
+        console.log('[useJournalEntries] Profile does not exist, creating one');
+        const created = await createUserProfile(userId);
+        setProfileExists(created);
+        return created;
+      }
+      
+      return exists;
+    } catch (error) {
+      console.error('[useJournalEntries] Error verifying user profile:', error);
+      return false;
     }
-    
-    return exists;
   }, []);
 
   const fetchEntries = useCallback(async () => {
@@ -82,6 +90,7 @@ export function useJournalEntries(
         clearTimeout(fetchTimeoutRef.current);
       }
       
+      // Set a timeout to avoid showing loading indefinitely
       fetchTimeoutRef.current = setTimeout(() => {
         if (isFetchingRef.current) {
           console.log('[useJournalEntries] Fetch is taking too long, setting loading to false');
@@ -98,7 +107,14 @@ export function useJournalEntries(
         consecutiveEmptyFetchesRef.current = 0;
       }
       
-      setEntries(journalEntries);
+      // Don't replace entries with empty array if we already have entries
+      // and this fetch returned empty (could be a temporary connectivity issue)
+      if (journalEntries.length > 0 || entries.length === 0) {
+        setEntries(journalEntries);
+      } else {
+        console.log('[useJournalEntries] Fetch returned empty but keeping existing entries');
+      }
+      
       setLastFetchTime(new Date());
       setFetchCount(prev => prev + 1);
       initialFetchDoneRef.current = true;
@@ -106,6 +122,7 @@ export function useJournalEntries(
       console.error('[useJournalEntries] Error fetching entries:', error);
       setError('Failed to load entries: ' + error.message);
       
+      // Don't clear entries on error if we already have entries
       if (entries.length === 0) {
         setEntries([]);
       }
@@ -132,7 +149,7 @@ export function useJournalEntries(
     } else {
       console.log(`[useJournalEntries] Waiting for prerequisites: userId=${!!userId}`);
       if (!initialFetchDoneRef.current) {
-        setLoading(userId !== undefined);
+        setLoading(userId !== undefined); // Only show loading if userId is defined but falsy
       } else {
         setLoading(false);
       }

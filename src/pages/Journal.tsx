@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, isProcessingEntry } from '@/utils/audio-processing';
@@ -249,12 +250,16 @@ const Journal = () => {
   };
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
-    if (!audioBlob || !user?.id) return;
+    if (!audioBlob || !user?.id) {
+      console.error('[Journal] Cannot process recording: missing audio blob or user ID');
+      return;
+    }
     
     try {
+      // Switch to entries tab before starting processing - important to do this first
       setActiveTab('entries');
-      setEntryHasBeenProcessed(false);
       
+      setEntryHasBeenProcessed(false);
       clearAllToasts();
       
       const toastId = toast.loading('Processing your journal entry with AI...', {
@@ -273,16 +278,20 @@ const Journal = () => {
         }
       });
       
+      console.log('[Journal] Starting processing for audio file:', audioBlob.size, 'bytes');
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
       
       if (success && tempId) {
+        console.log('[Journal] Processing started with tempId:', tempId);
         setProcessingEntries(prev => [...prev, tempId]);
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         
+        // Trigger immediate fetch
         setRefreshKey(prev => prev + 1);
         fetchEntries();
         
-        const pollIntervals = [3000, 6000, 10000, 15000];
+        // Set up polling at regular intervals
+        const pollIntervals = [1500, 3000, 5000, 8000, 15000];
         
         pollIntervals.forEach(interval => {
           setTimeout(() => {
@@ -294,6 +303,7 @@ const Journal = () => {
           }, interval);
         });
         
+        // Failsafe: If entry is still processing after max time, remove it from processing list
         setTimeout(() => {
           if (processingEntries.includes(tempId)) {
             console.log('[Journal] Maximum processing time reached for tempId:', tempId);
@@ -315,11 +325,13 @@ const Journal = () => {
               });
             }
             
+            // Final fetch attempt
             setRefreshKey(prev => prev + 1);
             fetchEntries();
           }
         }, 20000);
       } else {
+        console.error('[Journal] Processing failed:', error);
         toast.dismiss(toastId);
         
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
@@ -363,6 +375,7 @@ const Journal = () => {
     }
   };
 
+  // Fix for white screen issue: Handle the case when profile is being checked
   if (isCheckingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -373,6 +386,12 @@ const Journal = () => {
       </div>
     );
   }
+
+  useEffect(() => {
+    if (user?.id && !isProfileChecked && !isCheckingProfile) {
+      checkUserProfile(user.id);
+    }
+  }, [user?.id, isProfileChecked, isCheckingProfile]);
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">

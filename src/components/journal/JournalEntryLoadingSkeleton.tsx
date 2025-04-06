@@ -9,7 +9,7 @@ interface JournalEntryLoadingSkeletonProps {
 
 export default function JournalEntryLoadingSkeleton({ count = 1 }: JournalEntryLoadingSkeletonProps) {
   return (
-    <div className="space-y-4 animate-pulse">
+    <div className="space-y-4">
       {Array.from({ length: count }).map((_, index) => (
         <Card key={index} className="bg-background shadow-md border-primary/20 border-dashed">
           <div className="flex justify-between items-start p-3 md:p-4">
