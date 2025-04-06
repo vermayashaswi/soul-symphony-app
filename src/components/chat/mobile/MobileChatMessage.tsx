@@ -46,6 +46,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             src="/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png" 
             alt="Roha"
             className="bg-primary/10"
+            loading="eager"
           />
           <AvatarFallback className="bg-primary/10 text-primary text-xs">R</AvatarFallback>
         </Avatar>
@@ -59,12 +60,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             : 'bg-muted/60 border border-border/50 rounded-tl-none'
         )}
       >
-        {message.role === 'assistant' && hasReferences && (
-          <div className="mb-2 text-xs font-medium text-muted-foreground bg-muted/80 rounded-sm px-2 py-1 inline-block">
-            Based on {message.references.length} journal {message.references.length === 1 ? 'entry' : 'entries'}
-          </div>
-        )}
-        
         {message.role === 'assistant' ? (
           <ReactMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words">
             {formattedContent}
@@ -142,6 +137,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             src={user?.user_metadata?.avatar_url} 
             alt="User"
             className="bg-primary/20"
+            loading="eager"
           />
           <AvatarFallback className="bg-primary/20 text-primary text-xs">
             {user?.user_metadata?.full_name ? 
