@@ -24,6 +24,7 @@ export default function JournalEntriesList({
   onDeleteEntry 
 }: JournalEntriesListProps) {
   const [showEntriesCount, setShowEntriesCount] = useState(0);
+  const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
 
   // Update entries count when entries change to trigger animation for new entries
   useEffect(() => {
@@ -37,12 +38,27 @@ export default function JournalEntriesList({
     }
   }, [entries.length]);
   
+  // Track which entries should have highlight animation
+  useEffect(() => {
+    if (processedEntryIds && processedEntryIds.length > 0) {
+      // Add the processed entry IDs to the animated entries
+      setAnimatedEntryIds(prev => [...prev, ...processedEntryIds]);
+      
+      // Remove animation after 5 seconds
+      const timer = setTimeout(() => {
+        setAnimatedEntryIds([]);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [processedEntryIds]);
+  
   // Show primary loading state only when loading initial entries
   // But don't show loading indefinitely for new users with no entries
-  const showInitialLoading = loading && entries.length === 0;
+  const showInitialLoading = loading && entries.length === 0 && !processingEntries.length;
 
   // New flag to check if this is likely a new user who hasn't created any entries yet
-  const isLikelyNewUser = !loading && entries.length === 0;
+  const isLikelyNewUser = !loading && entries.length === 0 && !processingEntries.length;
 
   if (showInitialLoading) {
     return (
@@ -76,12 +92,22 @@ export default function JournalEntriesList({
             <motion.div
               key={entry.id}
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              animate={{ 
+                opacity: 1, 
+                y: 0,
+                border: animatedEntryIds.includes(entry.id) ? 
+                  '2px solid rgba(var(--color-primary), 0.7)' : 
+                  '1px solid transparent' 
+              }}
               exit={{ opacity: 0, height: 0, marginBottom: 0 }}
               transition={{ 
                 duration: 0.3, 
                 delay: index === 0 && entries.length > showEntriesCount ? 0 : 0.05 * index 
               }}
+              className={animatedEntryIds.includes(entry.id) ? 
+                "rounded-lg shadow-md relative overflow-hidden" : 
+                "relative overflow-hidden"
+              }
             >
               <JournalEntryCard 
                 entry={entry} 

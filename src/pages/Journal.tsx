@@ -16,6 +16,7 @@ const Journal = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
+  const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
   const [isCheckingProfile, setIsCheckingProfile] = useState(true);
   const [activeTab, setActiveTab] = useState('record');
   const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
@@ -108,32 +109,34 @@ const Journal = () => {
     try {
       const toastId = toast.loading('Processing your journal entry...');
       
-      const { success, tempId } = await processRecording(audioBlob, user.id);
+      const { success, tempId, error } = await processRecording(audioBlob, user.id);
       
       if (success && tempId) {
         setProcessingEntries(prev => [...prev, tempId]);
         
-        // Ensure we switch to the entries tab
+        // Always switch to the entries tab after recording completion
         setActiveTab('entries');
         
-        // Refresh the entries list after a short delay to allow processing
+        // Refresh the entries list after a short delay to allow processing to start
         setTimeout(() => {
-          console.log('[Journal] Refreshing entries after processing');
+          console.log('[Journal] Refreshing entries after processing start');
           setRefreshKey(prev => prev + 1);
+          fetchEntries();
+        }, 1000);
+        
+        // Refresh again after a longer delay to ensure server processing is complete
+        setTimeout(() => {
+          console.log('[Journal] Performing additional entries refresh after processing should be done');
+          setRefreshKey(prev => prev + 1);
+          fetchEntries();
           
+          // Clear the processing entry from the list
           setProcessingEntries(prev => prev.filter(id => id !== tempId));
           
           toast.success('Journal entry saved!', { id: toastId });
-        }, 1500);
-        
-        // Fetch entries again after a longer delay to ensure server processing is complete
-        setTimeout(() => {
-          console.log('[Journal] Performing additional entries refresh');
-          setRefreshKey(prev => prev + 1);
-          fetchEntries();
-        }, 3000);
+        }, 5000);
       } else {
-        toast.error('Failed to process recording', { id: toastId });
+        toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { id: toastId });
       }
     } catch (error) {
       console.error('Error processing recording:', error);
@@ -206,18 +209,10 @@ const Journal = () => {
             entries={entries}
             loading={loading}
             processingEntries={processingEntries}
+            processedEntryIds={processedEntryIds}
             onStartRecording={handleStartRecording}
             onDeleteEntry={handleDeleteEntry}
           />
-          
-          {processingEntries.length > 0 && (
-            <div className="mt-4 p-3 bg-primary-foreground/10 border border-primary/20 rounded-lg">
-              <div className="flex items-center gap-2 text-sm text-primary">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Processing entry...</span>
-              </div>
-            </div>
-          )}
         </TabsContent>
       </Tabs>
     </div>
