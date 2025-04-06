@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
-import { processRecording } from '@/utils/audio-processing';
+import { processRecording, isProcessingEntry } from '@/utils/audio-processing';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import JournalHeader from '@/components/journal/JournalHeader';
@@ -9,6 +10,7 @@ import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { clearAllToasts } from '@/services/notificationService';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -33,6 +35,24 @@ const Journal = () => {
     isProfileChecked
   );
 
+  // Clear all toasts when component mounts or unmounts
+  useEffect(() => {
+    clearAllToasts();
+    
+    return () => {
+      clearAllToasts();
+      
+      // Dismiss all toasts by ID when component unmounts
+      Object.values(toastIds).forEach(id => {
+        if (id) toast.dismiss(id);
+      });
+      
+      if (profileCheckTimeoutId) {
+        clearTimeout(profileCheckTimeoutId);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
@@ -46,15 +66,13 @@ const Journal = () => {
         
         setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
         
-        processingEntries.forEach(tempId => {
-          if (toastIds[tempId]) {
-            toast.success('Journal entry analyzed and saved', {
-              id: toastIds[tempId],
-              duration: 1000
-            });
-          }
+        // Show a single toast for all new entries with auto-dismiss
+        toast.success('Journal entry analyzed and saved', {
+          duration: 1000,
+          id: 'journal-success-toast'
         });
         
+        // Clear processing entries and toast IDs
         setProcessingEntries([]);
         setToastIds({});
       }
@@ -234,8 +252,11 @@ const Journal = () => {
       setActiveTab('entries');
       setEntryHasBeenProcessed(false);
       
+      // Clear any existing toasts first
+      clearAllToasts();
+      
       const toastId = toast.loading('Processing your journal entry with AI...', {
-        duration: Infinity
+        duration: 15000 // Set a maximum duration even for loading toasts
       });
       
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
@@ -252,6 +273,7 @@ const Journal = () => {
           fetchEntries();
         }, 5000);
         
+        // Always clear processing state and toasts after maximum time
         setTimeout(() => {
           if (processingEntries.includes(tempId)) {
             console.log('[Journal] Maximum processing time reached for tempId:', tempId);
@@ -291,6 +313,9 @@ const Journal = () => {
     if (!user?.id) return;
     
     try {
+      // Clear all toasts when deleting an entry
+      clearAllToasts();
+      
       processingEntries.forEach(tempId => {
         if (toastIds[tempId]) {
           toast.dismiss(toastIds[tempId]);

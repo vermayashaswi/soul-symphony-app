@@ -3,7 +3,7 @@ import { toast } from "sonner";
 
 // Duration constants
 const STANDARD_DURATION = 1000; // 1 second for regular toasts
-const ACTIVE_JOB_DURATION = null; // null means the toast won't auto-dismiss
+const ACTIVE_JOB_DURATION = 5000; // 5 seconds for active jobs (previously null which made them permanent)
 const ERROR_DURATION = 3000; // 3 seconds for errors
 
 // Check if we're in a browser environment
@@ -11,31 +11,49 @@ const isBrowser = (): boolean => {
   return typeof window !== 'undefined';
 };
 
+// Store active toast IDs to prevent duplicates and ensure cleanup
+const activeToasts = new Set<string | number>();
+
 // Enhanced toast functions for different types of notifications
 export const showToast = (
   message: string, 
   type: "default" | "success" | "error" | "info" | "warning" = "default",
   isActiveJob = false
 ) => {
+  // Deduplicate identical messages that might be in flight
+  if (activeToasts.has(message)) {
+    return;
+  }
+  
   const duration = isActiveJob ? ACTIVE_JOB_DURATION : 
                   (type === "error" ? ERROR_DURATION : STANDARD_DURATION);
   
   let toastId;
   switch (type) {
     case "success":
-      toastId = toast.success(message, { duration });
+      toastId = toast.success(message, { duration, onDismiss: () => activeToasts.delete(message) });
       break;
     case "error":
-      toastId = toast.error(message, { duration });
+      toastId = toast.error(message, { duration, onDismiss: () => activeToasts.delete(message) });
       break;
     case "info":
-      toastId = toast.info(message, { duration });
+      toastId = toast.info(message, { duration, onDismiss: () => activeToasts.delete(message) });
       break;
     case "warning":
-      toastId = toast.warning(message, { duration });
+      toastId = toast.warning(message, { duration, onDismiss: () => activeToasts.delete(message) });
       break;
     default:
-      toastId = toast(message, { duration });
+      toastId = toast(message, { duration, onDismiss: () => activeToasts.delete(message) });
+  }
+  
+  activeToasts.add(message);
+  
+  // Ensure toasts are cleared after their duration
+  if (duration !== null) {
+    setTimeout(() => {
+      clearToast(toastId);
+      activeToasts.delete(message);
+    }, duration + 100); // Add a small buffer to ensure toast removal
   }
   
   return toastId;
@@ -43,7 +61,15 @@ export const showToast = (
 
 // Clear a specific toast
 export const clearToast = (toastId: string | number) => {
-  toast.dismiss(toastId);
+  if (toastId) {
+    toast.dismiss(toastId);
+  }
+};
+
+// Clear all toasts
+export const clearAllToasts = () => {
+  toast.dismiss();
+  activeToasts.clear();
 };
 
 // Function to request notification permissions (web only for now)

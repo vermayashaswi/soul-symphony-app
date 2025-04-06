@@ -1,8 +1,11 @@
-
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
 import { supabase } from '@/integrations/supabase/client';
+import { clearAllToasts } from '@/services/notificationService';
+
+// Flag to track if an entry is being processed to prevent duplicate notifications
+let isEntryBeingProcessed = false;
 
 /**
  * Processes an audio recording for transcription and analysis
@@ -13,6 +16,9 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   tempId?: string;
   error?: string;
 }> {
+  // Clear any lingering toasts from previous sessions
+  clearAllToasts();
+  
   // 1. Validate the audio blob
   const validation = validateAudioBlob(audioBlob);
   if (!validation.isValid) {
@@ -22,6 +28,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   try {
     // Generate a temporary ID for this recording
     const tempId = `temp-${Date.now()}`;
+    isEntryBeingProcessed = true;
     
     // Log the audio details
     console.log('Processing audio:', {
@@ -33,17 +40,22 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     // Verify the user ID is valid
     if (!userId) {
       console.error('No user ID provided for audio processing');
+      isEntryBeingProcessed = false;
       return { success: false, error: 'Authentication required' };
     }
     
     // Launch the processing without awaiting it
     processRecordingInBackground(audioBlob, userId, tempId)
-      .catch(err => console.error('Background processing error:', err));
+      .catch(err => {
+        console.error('Background processing error:', err);
+        isEntryBeingProcessed = false;
+      });
     
     // Return immediately with the temp ID
     return { success: true, tempId };
   } catch (error: any) {
     console.error('Error initiating recording process:', error);
+    isEntryBeingProcessed = false;
     return { success: false, error: error.message || 'Unknown error' };
   }
 }
@@ -133,6 +145,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     
     if (result?.success) {
       console.log('Journal entry saved successfully:', result);
+      isEntryBeingProcessed = false;
       
       // Verify the entry was saved by querying the database
       if (result.data?.entryId) {
@@ -150,10 +163,17 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       }
     } else {
       console.error('Failed to process recording after multiple attempts:', result?.error);
+      isEntryBeingProcessed = false;
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
+    isEntryBeingProcessed = false;
   }
+}
+
+// Check if a journal entry is currently being processed
+export function isProcessingEntry(): boolean {
+  return isEntryBeingProcessed;
 }
 
 // Variable to check if user has previous entries
