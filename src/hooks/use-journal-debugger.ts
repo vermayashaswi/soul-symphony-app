@@ -17,6 +17,8 @@ interface DebugState {
   audioStatus?: string;
   recordingDuration?: number;
   mountStatus?: string;
+  layoutInfo?: any;
+  cssState?: any;
 }
 
 export function useJournalDebugger({
@@ -45,6 +47,8 @@ export function useJournalDebugger({
   const [hasErrorState, setHasErrorState] = useState(false);
   const [lastRenderTime, setLastRenderTime] = useState<string>(new Date().toLocaleTimeString());
   const [mountStatus, setMountStatus] = useState<string>("Mounted");
+  const [layoutInfo, setLayoutInfo] = useState<any>({});
+  const [cssState, setCssState] = useState<any>({});
   const { user } = useAuth();
   const componentMounted = useRef(true);
   
@@ -59,6 +63,91 @@ export function useJournalDebugger({
   })();
   
   const { entries = [], loading = false, error = null } = journalState;
+
+  // Collect layout and CSS information
+  useEffect(() => {
+    const updateLayoutInfo = () => {
+      if (!componentMounted.current) return;
+      
+      try {
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        const scrollY = window.scrollY;
+        
+        setLayoutInfo({
+          viewport: { width: viewportWidth, height: viewportHeight },
+          contentHeight: documentHeight,
+          scrollY: scrollY,
+          devicePixelRatio: window.devicePixelRatio,
+          orientation: window.screen.orientation ? window.screen.orientation.type : 'unknown'
+        });
+      } catch (e) {
+        console.error("Error collecting layout information:", e);
+      }
+    };
+    
+    const updateCssState = () => {
+      if (!componentMounted.current) return;
+      
+      try {
+        // Check if there's a theme
+        const htmlElement = document.documentElement;
+        const theme = htmlElement.classList.contains('dark') ? 'dark' : 'light';
+        
+        // Count CSS variables
+        const cssVars = getComputedStyle(htmlElement);
+        let cssVarCount = 0;
+        for (let i = 0; i < cssVars.length; i++) {
+          if (cssVars[i].startsWith('--')) cssVarCount++;
+        }
+        
+        // Count stylesheets
+        const styleSheets = document.styleSheets.length;
+        
+        // Check for common CSS errors
+        const errors: string[] = [];
+        
+        // Check if main container has 100% height
+        const mainContainer = document.querySelector('main');
+        if (mainContainer) {
+          const mainHeight = getComputedStyle(mainContainer).height;
+          if (mainHeight === '0px') errors.push('Main container has zero height');
+        }
+        
+        // Check if there are elements with position: fixed that might be causing issues
+        const fixedElements = document.querySelectorAll('[style*="position: fixed"]');
+        if (fixedElements.length > 5) errors.push(`${fixedElements.length} fixed-position elements detected`);
+        
+        setCssState({
+          theme,
+          cssVarCount,
+          styleSheets,
+          errors
+        });
+      } catch (e) {
+        console.error("Error collecting CSS information:", e);
+        setCssState({ errors: ["Error analyzing CSS: " + String(e)] });
+      }
+    };
+    
+    // Collect initial information
+    updateLayoutInfo();
+    updateCssState();
+    
+    // Set up event listeners
+    window.addEventListener('resize', updateLayoutInfo);
+    window.addEventListener('scroll', updateLayoutInfo);
+    
+    // Monitor for CSS changes periodically
+    const cssCheckInterval = setInterval(updateCssState, 2000);
+    
+    return () => {
+      window.removeEventListener('resize', updateLayoutInfo);
+      window.removeEventListener('scroll', updateLayoutInfo);
+      clearInterval(cssCheckInterval);
+    };
+  }, []);
 
   useEffect(() => {
     // Provide cleanup function
@@ -83,9 +172,9 @@ export function useJournalDebugger({
   useEffect(() => {
     if (!componentMounted.current) return;
     
-    const hasErrors = !!error || !!processingError;
+    const hasErrors = !!error || !!processingError || (cssState.errors && cssState.errors.length > 0);
     setHasErrorState(hasErrors);
-  }, [error, processingError]);
+  }, [error, processingError, cssState.errors]);
 
   useEffect(() => {
     if (!componentMounted.current) return;
@@ -104,7 +193,9 @@ export function useJournalDebugger({
       lastAction,
       audioStatus,
       recordingDuration,
-      mountStatus
+      mountStatus,
+      layoutInfo,
+      cssState
     };
 
     setDebugHistory(prev => [currentState, ...prev].slice(0, 20));
@@ -119,7 +210,9 @@ export function useJournalDebugger({
     lastAction,
     audioStatus,
     recordingDuration,
-    mountStatus
+    mountStatus,
+    layoutInfo,
+    cssState
   ]);
 
   return {
@@ -133,6 +226,8 @@ export function useJournalDebugger({
     error,
     lastRenderTime,
     mountStatus,
+    layoutInfo,
+    cssState,
     toggleOpen,
     toggleExpanded
   };

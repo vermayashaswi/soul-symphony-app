@@ -15,6 +15,8 @@ interface DebugState {
   audioStatus?: string;
   recordingDuration?: number;
   mountStatus?: string;
+  layoutInfo?: any;
+  cssState?: any;
 }
 
 interface DebugHistoryProps {
@@ -58,6 +60,17 @@ export function DebugHistory({ debugHistory }: DebugHistoryProps) {
               <div>Status:</div>
               <div className="font-mono">{state.mountStatus || 'Normal'}</div>
               
+              {state.layoutInfo && (
+                <>
+                  <div>Viewport:</div>
+                  <div className="font-mono">
+                    {state.layoutInfo.viewport 
+                      ? `${state.layoutInfo.viewport.width}×${state.layoutInfo.viewport.height}` 
+                      : 'Unknown'}
+                  </div>
+                </>
+              )}
+              
               {state.error && (
                 <>
                   <div className="text-red-400">Error:</div>
@@ -69,6 +82,13 @@ export function DebugHistory({ debugHistory }: DebugHistoryProps) {
                 <>
                   <div className="text-red-400">Proc Error:</div>
                   <div className="font-mono text-red-400">{state.processingError}</div>
+                </>
+              )}
+              
+              {state.cssState?.errors && state.cssState.errors.length > 0 && (
+                <>
+                  <div className="text-red-400">CSS Errors:</div>
+                  <div className="font-mono text-red-400">{state.cssState.errors[0]}</div>
                 </>
               )}
             </div>

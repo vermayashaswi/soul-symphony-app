@@ -9,13 +9,15 @@ interface CurrentDebugStateProps {
   isRecordingComplete: boolean;
   activeTab: string;
   loading: boolean;
-  error: string | null;
-  processingError: string | null;
+  error?: string | null;
+  processingError?: string | null;
   lastAction?: string;
   audioStatus?: string;
   recordingDuration?: number;
   lastRenderTime?: string;
   mountStatus?: string;
+  layoutInfo?: any;
+  cssState?: any;
 }
 
 export function CurrentDebugState({
@@ -32,7 +34,9 @@ export function CurrentDebugState({
   audioStatus,
   recordingDuration,
   lastRenderTime,
-  mountStatus
+  mountStatus,
+  layoutInfo,
+  cssState
 }: CurrentDebugStateProps) {
   return (
     <div className="bg-gray-900 p-2 rounded">
@@ -41,20 +45,11 @@ export function CurrentDebugState({
         <div>User ID:</div>
         <div className="font-mono text-green-400">{userId || 'Not logged in'}</div>
         
-        <div>Mount Status:</div>
-        <div className="font-mono text-green-400">{mountStatus || 'Normal'}</div>
-        
-        <div>Last Render:</div>
-        <div className="font-mono text-green-400">{lastRenderTime || new Date().toLocaleTimeString()}</div>
-        
-        <div>Entries Count:</div>
+        <div>Entries:</div>
         <div className="font-mono text-green-400">{entriesCount}</div>
         
         <div>Processing Entries:</div>
         <div className="font-mono text-green-400">{processingEntries.length > 0 ? processingEntries.join(', ') : 'None'}</div>
-        
-        <div>Last Action:</div>
-        <div className="font-mono text-green-400">{lastAction || 'None'}</div>
         
         <div>Saving Recording:</div>
         <div className={`font-mono ${isSavingRecording ? 'text-yellow-400' : 'text-green-400'}`}>
@@ -66,12 +61,6 @@ export function CurrentDebugState({
           {isRecordingComplete ? 'Yes' : 'No'}
         </div>
         
-        <div>Audio Status:</div>
-        <div className="font-mono text-green-400">{audioStatus || 'N/A'}</div>
-        
-        <div>Recording Duration:</div>
-        <div className="font-mono text-green-400">{recordingDuration !== undefined ? `${recordingDuration}s` : 'N/A'}</div>
-        
         <div>Active Tab:</div>
         <div className="font-mono text-green-400">{activeTab}</div>
         
@@ -80,8 +69,37 @@ export function CurrentDebugState({
           {loading ? 'Yes' : 'No'}
         </div>
         
-        <div>Time:</div>
-        <div className="font-mono text-green-400">{new Date().toLocaleTimeString()}</div>
+        <div>Last Render:</div>
+        <div className="font-mono text-green-400">{lastRenderTime || new Date().toLocaleTimeString()}</div>
+        
+        <div>Mount Status:</div>
+        <div className="font-mono text-green-400">{mountStatus || 'Normal'}</div>
+        
+        <div>Last Action:</div>
+        <div className="font-mono text-green-400">{lastAction || 'None'}</div>
+        
+        {/* Layout and CSS debug info */}
+        <div className="col-span-2 mt-2 mb-1 text-yellow-400 font-medium">Layout & CSS:</div>
+        
+        <div>Viewport:</div>
+        <div className="font-mono text-green-400">
+          {layoutInfo?.viewport ? `${layoutInfo.viewport.width}×${layoutInfo.viewport.height}` : 'Unknown'}
+        </div>
+        
+        <div>Content Height:</div>
+        <div className="font-mono text-green-400">{layoutInfo?.contentHeight || 'Unknown'}</div>
+        
+        <div>Scroll Position:</div>
+        <div className="font-mono text-green-400">{layoutInfo?.scrollY !== undefined ? `${layoutInfo.scrollY}px` : 'Unknown'}</div>
+        
+        <div>Theme:</div>
+        <div className="font-mono text-green-400">{cssState?.theme || 'Default'}</div>
+        
+        <div>CSS Variables:</div>
+        <div className="font-mono text-green-400">{cssState?.cssVarCount || '0'} loaded</div>
+        
+        <div>Styles:</div>
+        <div className="font-mono text-green-400">{cssState?.styleSheets || '0'} sheets</div>
         
         {error && (
           <>
@@ -96,7 +114,16 @@ export function CurrentDebugState({
             <div className="font-mono text-red-400">{processingError}</div>
           </>
         )}
+        
+        {cssState?.errors && cssState.errors.length > 0 && (
+          <>
+            <div className="text-red-400">CSS Errors:</div>
+            <div className="font-mono text-red-400">{cssState.errors.join(', ')}</div>
+          </>
+        )}
       </div>
     </div>
   );
 }
+
+export default CurrentDebugState;

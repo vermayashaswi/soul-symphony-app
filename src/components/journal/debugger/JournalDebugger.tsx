@@ -29,16 +29,19 @@ const JournalDebugger = (props: JournalDebuggerProps) => {
     error,
     lastRenderTime,
     mountStatus,
+    layoutInfo,
+    cssState,
     toggleOpen,
     toggleExpanded
   } = useJournalDebugger(props);
 
-  // Style to ensure debugger is always visible
+  // Style to ensure debugger is always visible in center of screen
   const debuggerStyle = {
     zIndex: 9999,
     position: 'fixed' as 'fixed',
-    top: '2rem',
-    right: '2rem',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
     pointerEvents: 'auto' as 'auto'
   };
 
@@ -68,6 +71,8 @@ const JournalDebugger = (props: JournalDebuggerProps) => {
           recordingDuration={props.recordingDuration}
           lastRenderTime={lastRenderTime}
           mountStatus={mountStatus}
+          layoutInfo={layoutInfo}
+          cssState={cssState}
           onToggleExpanded={toggleExpanded}
           onClose={toggleOpen}
         />

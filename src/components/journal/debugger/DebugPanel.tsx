@@ -23,6 +23,8 @@ interface DebugPanelProps {
   recordingDuration?: number;
   lastRenderTime?: string;
   mountStatus?: string;
+  layoutInfo?: any;
+  cssState?: any;
   onToggleExpanded: () => void;
   onClose: () => void;
 }
@@ -45,6 +47,8 @@ export function DebugPanel({
   recordingDuration,
   lastRenderTime,
   mountStatus,
+  layoutInfo,
+  cssState,
   onToggleExpanded,
   onClose
 }: DebugPanelProps) {
@@ -88,6 +92,8 @@ export function DebugPanel({
           recordingDuration={recordingDuration}
           lastRenderTime={lastRenderTime}
           mountStatus={mountStatus}
+          layoutInfo={layoutInfo}
+          cssState={cssState}
         />
         
         {isExpanded && <DebugHistory debugHistory={debugHistory} />}
