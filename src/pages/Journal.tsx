@@ -65,6 +65,7 @@ const Journal = () => {
         console.log('[Journal] New entries detected:', newEntryIds);
         setEntryHasBeenProcessed(true);
         
+        // Mark these entries as processed so they get auto-expanded
         setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
         
         toast.success('Journal entry analyzed and saved', {
@@ -73,13 +74,19 @@ const Journal = () => {
           closeButton: false
         });
         
+        // Clear processing state
         setProcessingEntries([]);
         setToastIds({});
+        
+        // Force a refetch after a short delay to get updated themes
+        setTimeout(() => {
+          fetchEntries();
+        }, 1000);
       }
       
       previousEntriesRef.current = currentEntryIds;
     }
-  }, [entries, processingEntries, toastIds]);
+  }, [entries, processingEntries, toastIds, fetchEntries]);
 
   // Clean up toasts on unmount
   useEffect(() => {
@@ -132,6 +139,13 @@ const Journal = () => {
         console.log('[Journal] Found completed processing entries, dismissing their toasts:', completedProcessingEntries);
         setEntryHasBeenProcessed(true);
         
+        // Get the actual entry IDs for auto-expanding
+        const processedIds = entries
+          .filter(entry => completedProcessingEntries.includes(entry.id.toString()))
+          .map(entry => entry.id);
+          
+        setProcessedEntryIds(prev => [...prev, ...processedIds]);
+        
         completedProcessingEntries.forEach(tempId => {
           if (toastIds[tempId]) {
             toast.success('Journal entry analyzed and saved', { 
@@ -151,9 +165,14 @@ const Journal = () => {
           delete newToastIds[tempId];
         });
         setToastIds(newToastIds);
+        
+        // Force a refetch after a short delay to get updated themes
+        setTimeout(() => {
+          fetchEntries();
+        }, 1000);
       }
     }
-  }, [entries, loading, processingEntries, toastIds]);
+  }, [entries, loading, processingEntries, toastIds, fetchEntries]);
 
   // Notify about new entries
   useEffect(() => {
@@ -169,6 +188,9 @@ const Journal = () => {
         toast.success('Journal entry analyzed and saved', { duration: 3000, closeButton: false });
         setEntryHasBeenProcessed(true);
       }
+      
+      // Mark these entries as processed for auto-expanding
+      setProcessedEntryIds(prev => [...prev, ...newEntries.map(entry => entry.id)]);
       
       const updatedNotifiedIds = new Set(notifiedEntryIds);
       newEntries.forEach(entry => updatedNotifiedIds.add(entry.id));
@@ -196,16 +218,32 @@ const Journal = () => {
     }
   }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
 
-  // Poll for updates while processing entries
+  // Poll for updates while processing entries with more frequent and longer polling
   useEffect(() => {
     if (processingEntries.length > 0) {
+      // Set up an interval to poll for updates
       const interval = setInterval(() => {
         console.log('[Journal] Polling for updates while processing entries');
         setRefreshKey(prev => prev + 1);
         fetchEntries();
-      }, 2000); // Decreased from 3000 to 2000 for faster updates
+      }, 2000);
       
-      return () => clearInterval(interval);
+      // Set up individual polling times with increasing intervals
+      const pollTimes = [1000, 2000, 3000, 5000, 8000, 12000, 15000, 20000, 25000, 30000];
+      
+      // Create individual timeouts for each poll time
+      const timeouts = pollTimes.map(time => 
+        setTimeout(() => {
+          console.log(`[Journal] One-time poll at ${time}ms`);
+          fetchEntries();
+          setRefreshKey(prev => prev + 1);
+        }, time)
+      );
+      
+      return () => {
+        clearInterval(interval);
+        timeouts.forEach(timeout => clearTimeout(timeout));
+      };
     }
   }, [processingEntries.length, fetchEntries]);
 
@@ -270,7 +308,7 @@ const Journal = () => {
       clearAllToasts();
       
       const toastId = toast.loading('Processing your journal entry with AI...', {
-        duration: 15000,
+        duration: 30000, // Increased from 15000 to 30000
         closeButton: false,
         onAutoClose: () => {
           if (toastId) {
@@ -297,8 +335,8 @@ const Journal = () => {
         fetchEntries();
         setRefreshKey(prev => prev + 1);
         
-        // Set up polling at regular intervals
-        const pollIntervals = [1000, 2000, 3000, 5000, 8000, 12000];
+        // Set up polling at regular intervals with more frequent checks
+        const pollIntervals = [1000, 2000, 3000, 4000, 5000, 7000, 9000, 12000, 15000, 20000, 25000];
         
         pollIntervals.forEach(interval => {
           setTimeout(() => {
@@ -336,7 +374,7 @@ const Journal = () => {
             fetchEntries();
             setRefreshKey(prev => prev + 1);
           }
-        }, 20000);
+        }, 35000); // Increased from 20000 to 35000
       } else {
         console.error('[Journal] Processing failed:', error);
         toast.dismiss(toastId);
@@ -376,7 +414,11 @@ const Journal = () => {
         return updated;
       });
       
+      // Remove from processedEntryIds as well
+      setProcessedEntryIds(prev => prev.filter(id => id !== entryId));
+      
       setRefreshKey(prev => prev + 1);
+      fetchEntries();
     } catch (error) {
       console.error('Error deleting entry:', error);
     }

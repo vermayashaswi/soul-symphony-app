@@ -27,7 +27,22 @@ export default function JournalEntriesList({
   const [showEntriesCount, setShowEntriesCount] = useState(0);
   const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
+  const [justProcessedEntryIds, setJustProcessedEntryIds] = useState<number[]>([]);
   const hasProcessingEntries = processingEntries.length > 0;
+
+  // Track processed entries to force expand them
+  useEffect(() => {
+    if (processedEntryIds.length > 0) {
+      setJustProcessedEntryIds(processedEntryIds);
+      
+      // Clear the list after some time
+      const timer = setTimeout(() => {
+        setJustProcessedEntryIds([]);
+      }, 10000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [processedEntryIds]);
 
   // Update entries count when entries change to trigger animation for new entries
   useEffect(() => {
@@ -104,34 +119,40 @@ export default function JournalEntriesList({
             </div>
           )}
           
-          {entries.map((entry, index) => (
-            <motion.div
-              key={entry.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ 
-                opacity: 1, 
-                y: 0,
-                boxShadow: animatedEntryIds.includes(entry.id) ? 
-                  '0 0 0 2px rgba(var(--color-primary), 0.5)' : 
-                  'none'
-              }}
-              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-              transition={{ 
-                duration: 0.3, 
-                delay: index === 0 && entries.length > showEntriesCount ? 0 : 0.05 * Math.min(index, 5) 
-              }}
-              className={animatedEntryIds.includes(entry.id) ? 
-                "rounded-lg shadow-md relative overflow-hidden" : 
-                "relative overflow-hidden"
-              }
-            >
-              <JournalEntryCard 
-                entry={entry} 
-                onDelete={onDeleteEntry} 
-                isNew={animatedEntryIds.includes(entry.id)}
-              />
-            </motion.div>
-          ))}
+          {entries.map((entry, index) => {
+            // Check if this entry was just processed
+            const isJustProcessed = justProcessedEntryIds.includes(entry.id);
+            
+            return (
+              <motion.div
+                key={entry.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ 
+                  opacity: 1, 
+                  y: 0,
+                  boxShadow: animatedEntryIds.includes(entry.id) ? 
+                    '0 0 0 2px rgba(var(--color-primary), 0.5)' : 
+                    'none'
+                }}
+                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                transition={{ 
+                  duration: 0.3, 
+                  delay: index === 0 && entries.length > showEntriesCount ? 0 : 0.05 * Math.min(index, 5) 
+                }}
+                className={animatedEntryIds.includes(entry.id) ? 
+                  "rounded-lg shadow-md relative overflow-hidden" : 
+                  "relative overflow-hidden"
+                }
+              >
+                <JournalEntryCard 
+                  entry={entry} 
+                  onDelete={onDeleteEntry} 
+                  isNew={animatedEntryIds.includes(entry.id)}
+                  forcedExpand={isJustProcessed}
+                />
+              </motion.div>
+            );
+          })}
         </div>
       </AnimatePresence>
       
