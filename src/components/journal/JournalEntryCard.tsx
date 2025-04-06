@@ -77,11 +77,8 @@ export function JournalEntryCard({
   
   // Handle theme loading and extraction
   useEffect(() => {
-    // Safely access master_themes and themes, providing fallback empty arrays
-    const masterThemes = Array.isArray(entry.master_themes) ? entry.master_themes : [];
-    const entryThemes = Array.isArray(entry.themes) ? entry.themes : [];
-    const currentThemes = masterThemes.length > 0 ? masterThemes : entryThemes;
-    
+    // Set initial themes
+    const currentThemes = entry.master_themes || entry.themes || [];
     setThemes(currentThemes);
     
     // Determine if themes are still loading
@@ -99,27 +96,15 @@ export function JournalEntryCard({
             .eq('id', entry.id)
             .single();
             
-          if (error) {
-            console.error("Error polling for themes:", error);
-            throw error;
-          }
+          if (error) throw error;
           
-          // Check if data exists and is not an error
-          if (data && typeof data === 'object') {
-            // Use type assertion to safely access properties
-            const entryData = data as { master_themes?: string[], themes?: string[] };
-            
-            // Safely extract themes with fallbacks
-            const updatedMasterThemes = Array.isArray(entryData.master_themes) ? entryData.master_themes : [];
-            const updatedThemes = Array.isArray(entryData.themes) ? entryData.themes : [];
-            const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
-            
-            // If we now have themes, update them and stop loading
-            if (updatedCurrentThemes.length > 0) {
-              setThemes(updatedCurrentThemes);
-              setIsThemesLoading(false);
-              clearInterval(pollInterval);
-            }
+          const updatedThemes = data.master_themes || data.themes || [];
+          
+          // If we now have themes, update them and stop loading
+          if (updatedThemes.length > 0) {
+            setThemes(updatedThemes);
+            setIsThemesLoading(false);
+            clearInterval(pollInterval);
           }
           
           setRefreshTime(prev => prev + 1);

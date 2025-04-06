@@ -36,8 +36,10 @@ export async function sendAudioForTranscription(
       }
     });
 
-    // Handle response errors
-    if (response.error) {
+    // Response handling using statusCode
+    const statusCode = response.error ? 500 : 200;
+    
+    if (statusCode !== 200) {
       console.error('Edge function error:', response.error);
       return {
         success: false,
@@ -51,15 +53,6 @@ export async function sendAudioForTranscription(
       return {
         success: false,
         error: response.data.error || response.data.message || 'Unknown error in audio processing'
-      };
-    }
-
-    // Validate that we have data back
-    if (!response.data) {
-      console.error('No data returned from edge function');
-      return {
-        success: false,
-        error: 'No data returned from server'
       };
     }
 
