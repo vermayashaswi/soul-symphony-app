@@ -130,8 +130,8 @@ const Journal = () => {
         // Add tempId to processing entries
         setProcessingEntries(prev => [...prev, tempId]);
         
-        // Store the toast ID with the tempId
-        setToastIds(prev => ({ ...prev, [tempId]: toastId }));
+        // Store the toast ID with the tempId - ensure toastId is treated as string
+        setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         
         // Refresh entries list immediately to show processing indicator
         setRefreshKey(prev => prev + 1);
