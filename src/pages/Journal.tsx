@@ -414,133 +414,128 @@ const Journal = () => {
     />
   );
 
-  if (isCheckingProfile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Setting up your profile...</p>
-        </div>
-        {renderDebugger()}
-      </div>
-    );
-  }
-
-  if (error && !loading) {
-    return (
+  return (
+    <>
+      {renderDebugger()}
+      
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
         <JournalHeader />
-        <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-              <p className="text-red-800 dark:text-red-200">
-                Error loading your journal entries: {error}
-              </p>
+        
+        {isCheckingProfile ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <p className="text-muted-foreground">Setting up your profile...</p>
             </div>
-            <Button 
-              variant="outline" 
-              className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
-              onClick={() => {
-                setRefreshKey(prev => prev + 1);
-                fetchEntries();
-              }}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" /> 
-              Retry Loading
-            </Button>
           </div>
-        </div>
-        {renderDebugger()}
+        ) : error && !loading ? (
+          <>
+            <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <p className="text-red-800 dark:text-red-200">
+                    Error loading your journal entries: {error}
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+                  onClick={() => {
+                    setRefreshKey(prev => prev + 1);
+                    fetchEntries();
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" /> 
+                  Retry Loading
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {showRetryButton && (
+              <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-amber-800 dark:text-amber-200">
+                      We're having trouble setting up your profile. Your entries may not be saved correctly.
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto border-amber-500 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                    onClick={handleRetryProfileCreation}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> 
+                    Retry Profile Setup
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {processingError && (
+              <div className="mb-6 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-red-800 dark:text-red-200">
+                      Error processing your recording: {processingError}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+                    onClick={() => {
+                      setProcessingError(null);
+                      setActiveTab('record');
+                    }}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> 
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="record">Record Entry</TabsTrigger>
+                <TabsTrigger value="entries">Past Entries</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="record" className="mt-0">
+                <div className="mb-4">
+                  <VoiceRecorder 
+                    onRecordingComplete={handleRecordingComplete}
+                  />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="entries" className="mt-0">
+                {showLoadingFeedback ? (
+                  <div className="mt-8 flex flex-col items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                    <p className="text-muted-foreground">Processing your recording...</p>
+                    <p className="text-muted-foreground text-sm mt-2">This may take a moment. Your journal entries will appear here shortly.</p>
+                  </div>
+                ) : (
+                  <JournalEntriesList
+                    entries={entries}
+                    loading={loading}
+                    processingEntries={processingEntries}
+                    processedEntryIds={processedEntryIds}
+                    onStartRecording={handleStartRecording}
+                    onDeleteEntry={handleDeleteEntry}
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
       </div>
-    );
-  }
-
-  return (
-    <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
-      <JournalHeader />
-      
-      {showRetryButton && (
-        <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-amber-800 dark:text-amber-200">
-                We're having trouble setting up your profile. Your entries may not be saved correctly.
-              </p>
-            </div>
-            <Button 
-              variant="outline" 
-              className="w-full sm:w-auto border-amber-500 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
-              onClick={handleRetryProfileCreation}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" /> 
-              Retry Profile Setup
-            </Button>
-          </div>
-        </div>
-      )}
-      
-      {processingError && (
-        <div className="mb-6 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-              <p className="text-red-800 dark:text-red-200">
-                Error processing your recording: {processingError}
-              </p>
-            </div>
-            <Button 
-              variant="outline" 
-              className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
-              onClick={() => {
-                setProcessingError(null);
-                setActiveTab('record');
-              }}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" /> 
-              Try Again
-            </Button>
-          </div>
-        </div>
-      )}
-      
-      <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="record">Record Entry</TabsTrigger>
-          <TabsTrigger value="entries">Past Entries</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="record" className="mt-0">
-          <div className="mb-4">
-            <VoiceRecorder 
-              onRecordingComplete={handleRecordingComplete}
-            />
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="entries" className="mt-0">
-          {showLoadingFeedback ? (
-            <div className="mt-8 flex flex-col items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-              <p className="text-muted-foreground">Processing your recording...</p>
-              <p className="text-muted-foreground text-sm mt-2">This may take a moment. Your journal entries will appear here shortly.</p>
-            </div>
-          ) : (
-            <JournalEntriesList
-              entries={entries}
-              loading={loading}
-              processingEntries={processingEntries}
-              processedEntryIds={processedEntryIds}
-              onStartRecording={handleStartRecording}
-              onDeleteEntry={handleDeleteEntry}
-            />
-          )}
-        </TabsContent>
-      </Tabs>
-      
-      {renderDebugger()}
-    </div>
+    </>
   );
 };
 
