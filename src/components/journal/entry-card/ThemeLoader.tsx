@@ -118,14 +118,14 @@ export function ThemeLoader({
             return;
           }
             
-          // Check if data exists and is not an error
+          // Check if data exists and is not an error with additional null check
           if (data && typeof data === 'object') {
-            // Safely extract themes with fallbacks - fixed null checks
-            const updatedMasterThemes = data.master_themes && Array.isArray(data.master_themes) 
+            // Safely extract themes with fallbacks - fixed null checks with additional type guards
+            const updatedMasterThemes = (data && 'master_themes' in data && data.master_themes && Array.isArray(data.master_themes))
               ? data.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
               : [];
               
-            const updatedThemes = data.themes && Array.isArray(data.themes) 
+            const updatedThemes = (data && 'themes' in data && data.themes && Array.isArray(data.themes))
               ? data.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
               : [];
               
