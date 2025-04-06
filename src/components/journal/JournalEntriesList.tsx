@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
 import EmptyJournalState from './EmptyJournalState';
 import { motion, AnimatePresence } from 'framer-motion';
+import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -26,6 +27,7 @@ export default function JournalEntriesList({
   const [showEntriesCount, setShowEntriesCount] = useState(0);
   const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
+  const hasProcessingEntries = processingEntries.length > 0;
 
   // Update entries count when entries change to trigger animation for new entries
   useEffect(() => {
@@ -91,6 +93,17 @@ export default function JournalEntriesList({
 
       <AnimatePresence>
         <div className="space-y-4">
+          {/* Processing entry skeletons */}
+          {hasProcessingEntries && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Processing your new entry...</span>
+              </div>
+              <JournalEntryLoadingSkeleton count={processingEntries.length} />
+            </div>
+          )}
+          
           {entries.map((entry, index) => (
             <motion.div
               key={entry.id}
@@ -123,7 +136,7 @@ export default function JournalEntriesList({
       </AnimatePresence>
       
       {/* Show loading state at the bottom if needed */}
-      {loading && entries.length > 0 && (
+      {loading && entries.length > 0 && !hasProcessingEntries && (
         <div className="flex items-center justify-center h-16 mt-4">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>

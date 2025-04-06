@@ -187,6 +187,18 @@ const Journal = () => {
     }
   }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
 
+  useEffect(() => {
+    if (processingEntries.length > 0) {
+      const interval = setInterval(() => {
+        console.log('[Journal] Polling for updates while processing entries');
+        setRefreshKey(prev => prev + 1);
+        fetchEntries();
+      }, 3000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [processingEntries.length, fetchEntries]);
+
   const checkUserProfile = async (userId: string) => {
     try {
       setIsCheckingProfile(true);
@@ -270,10 +282,17 @@ const Journal = () => {
         setRefreshKey(prev => prev + 1);
         fetchEntries();
         
-        setTimeout(() => {
-          setRefreshKey(prev => prev + 1);
-          fetchEntries();
-        }, 5000);
+        const pollIntervals = [3000, 6000, 10000, 15000];
+        
+        pollIntervals.forEach(interval => {
+          setTimeout(() => {
+            if (processingEntries.includes(tempId)) {
+              console.log(`[Journal] Polling for entry at ${interval}ms interval`);
+              setRefreshKey(prev => prev + 1);
+              fetchEntries();
+            }
+          }, interval);
+        });
         
         setTimeout(() => {
           if (processingEntries.includes(tempId)) {
@@ -295,11 +314,11 @@ const Journal = () => {
                 return newToastIds;
               });
             }
+            
+            setRefreshKey(prev => prev + 1);
+            fetchEntries();
           }
-          
-          setRefreshKey(prev => prev + 1);
-          fetchEntries();
-        }, 15000);
+        }, 20000);
       } else {
         toast.dismiss(toastId);
         
