@@ -12,6 +12,7 @@ import {
   signOut as signOutService,
   refreshSession as refreshSessionService
 } from '@/services/authService';
+import { debugLogger, logInfo, logError, logAuthError, logProfile } from '@/components/debug/DebugPanel';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -31,22 +32,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
       const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
       setIsMobileDevice(isMobile);
-      console.log(`[AuthContext] Detected ${isMobile ? 'mobile' : 'desktop'} device`);
+      logInfo(`Detected ${isMobile ? 'mobile' : 'desktop'} device`, 'AuthContext');
     };
 
     checkMobile();
   }, []);
 
   const ensureProfileExists = async (): Promise<boolean> => {
-    if (!user || profileCreationInProgress) return false;
+    if (!user || profileCreationInProgress) {
+      logProfile(`Profile check skipped: ${!user ? 'No user' : 'Already in progress'}`, 'AuthContext');
+      return false;
+    }
     
     if (profileExistsStatus === true || profileCreationComplete) {
+      logProfile('Profile already verified as existing', 'AuthContext');
       return true;
     }
     
     const now = Date.now();
     if (now - lastProfileAttemptTime < 2000) {
-      console.log('[AuthContext] Skipping profile check - too soon after last attempt');
+      logProfile('Skipping profile check - too soon after last attempt', 'AuthContext');
       return profileExistsStatus || false;
     }
     
@@ -55,23 +60,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLastProfileAttemptTime(now);
       setProfileCreationAttempts(prev => prev + 1);
       
-      console.log(`[AuthContext] Attempt #${profileCreationAttempts + 1} to ensure profile exists for user:`, user.id);
+      logProfile(`Attempt #${profileCreationAttempts + 1} to ensure profile exists for user: ${user.id}`, 'AuthContext', {
+        userEmail: user.email,
+        provider: user.app_metadata?.provider,
+        hasUserMetadata: !!user.user_metadata,
+        userMetadataKeys: user.user_metadata ? Object.keys(user.user_metadata) : []
+      });
       
       const result = await ensureProfileExistsService(user);
       
       if (result) {
-        console.log('[AuthContext] Profile created or verified successfully');
+        logProfile('Profile created or verified successfully', 'AuthContext');
         setProfileCreationAttempts(0);
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
+        debugLogger.setLastProfileError(null);
       } else if (profileCreationAttempts < 3) {
-        console.log(`[AuthContext] Profile creation failed on attempt #${profileCreationAttempts + 1}, status: ${result}`);
+        const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}, status: ${result}`;
+        logAuthError(errorMsg, 'AuthContext');
+        debugLogger.setLastProfileError(errorMsg);
         setProfileExistsStatus(false);
       }
       
       return result;
-    } catch (error) {
-      console.error('[AuthContext] Error in ensureProfileExists:', error);
+    } catch (error: any) {
+      const errorMsg = `Error in ensureProfileExists: ${error.message}`;
+      logAuthError(errorMsg, 'AuthContext', error);
+      debugLogger.setLastProfileError(errorMsg);
       setProfileExistsStatus(false);
       return false;
     } finally {
@@ -80,48 +95,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateUserProfile = async (metadata: Record<string, any>): Promise<boolean> => {
+    logProfile(`Updating user profile metadata`, 'AuthContext', { metadataKeys: Object.keys(metadata) });
+    
     const result = await updateUserProfileService(user, metadata);
     if (result) {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
         setUser(data.user);
+        logProfile('User profile updated successfully', 'AuthContext');
       }
+    } else {
+      logAuthError('Failed to update user profile', 'AuthContext');
     }
     return result;
   };
 
   const signInWithGoogle = async (): Promise<void> => {
     setIsLoading(true);
+    logInfo('Initiating Google sign-in', 'AuthContext', { 
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
     try {
       await signInWithGoogleService();
-    } catch (error) {
+      logInfo('Google sign-in initiated', 'AuthContext');
+    } catch (error: any) {
+      logAuthError(`Google sign-in failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
     }
   };
 
   const signInWithEmail = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
+    logInfo('Initiating email sign-in', 'AuthContext', { 
+      email,
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
     try {
       await signInWithEmailService(email, password);
-    } catch (error) {
+      logInfo('Email sign-in initiated', 'AuthContext');
+    } catch (error: any) {
+      logAuthError(`Email sign-in failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
+    logInfo('Initiating sign-up', 'AuthContext', { 
+      email,
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
     try {
       await signUpService(email, password);
-    } catch (error) {
+      logInfo('Sign-up initiated', 'AuthContext');
+    } catch (error: any) {
+      logAuthError(`Sign-up failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
     }
   };
 
   const resetPassword = async (email: string): Promise<void> => {
     setIsLoading(true);
+    logInfo('Initiating password reset', 'AuthContext', { 
+      email,
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
     try {
       await resetPasswordService(email);
-    } catch (error) {
+      logInfo('Password reset initiated', 'AuthContext');
+    } catch (error: any) {
+      logAuthError(`Password reset failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
     }
   };
@@ -158,48 +209,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const createOrVerifyProfile = async (currentUser: User): Promise<boolean> => {
-    if (profileCreationInProgress || profileCreationComplete) return profileExistsStatus || false;
+    if (profileCreationInProgress || profileCreationComplete) {
+      logProfile(`Profile creation skipped: ${profileCreationInProgress ? 'In progress' : 'Already complete'}`, 'AuthContext');
+      return profileExistsStatus || false;
+    }
     
     if (profileExistsStatus === true) {
+      logProfile('Profile already exists, skipping creation', 'AuthContext');
       return true;
     }
     
     try {
       setProfileCreationInProgress(true);
-      console.log('[AuthContext] Attempting profile creation for user:', currentUser.email);
+      logProfile(`Attempting profile creation for user: ${currentUser.email}`, 'AuthContext', {
+        userProvider: currentUser.app_metadata?.provider,
+        userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
+      });
       
       if (isMobileDevice) {
-        console.log('[AuthContext] Mobile device detected, adding stabilization delay');
+        logProfile('Mobile device detected, adding stabilization delay', 'AuthContext');
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       
       const profileCreated = await ensureProfileExistsService(currentUser);
       
       if (profileCreated) {
-        console.log('[AuthContext] Profile created or verified for user:', currentUser.email);
+        logProfile(`Profile created or verified for user: ${currentUser.email}`, 'AuthContext');
         setProfileCreationAttempts(0);
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
+        debugLogger.setLastProfileError(null);
         return true;
       } else {
-        console.warn('[AuthContext] First attempt to create profile failed, retrying once...');
+        logAuthError('First attempt to create profile failed, retrying once...', 'AuthContext');
         
         await new Promise(resolve => setTimeout(resolve, 800));
         
         const retryResult = await ensureProfileExistsService(currentUser);
         if (retryResult) {
-          console.log('[AuthContext] Profile created or verified on retry for user:', currentUser.email);
+          logProfile(`Profile created or verified on retry for user: ${currentUser.email}`, 'AuthContext');
           setProfileCreationAttempts(0);
           setProfileExistsStatus(true);
           setProfileCreationComplete(true);
+          debugLogger.setLastProfileError(null);
           return true;
         }
         
+        const errorMsg = `Failed to create profile after retry for user: ${currentUser.email}`;
+        logAuthError(errorMsg, 'AuthContext');
+        debugLogger.setLastProfileError(errorMsg);
         setProfileExistsStatus(false);
         return false;
       }
-    } catch (error) {
-      console.error('[AuthContext] Error in profile creation:', error);
+    } catch (error: any) {
+      const errorMsg = `Error in profile creation: ${error.message}`;
+      logAuthError(errorMsg, 'AuthContext', error);
+      debugLogger.setLastProfileError(errorMsg);
       setProfileExistsStatus(false);
       return false;
     } finally {
@@ -208,48 +273,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    console.log("[AuthContext] Setting up auth state listener");
+    logInfo("Setting up auth state listener", 'AuthContext');
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log('[AuthContext] Auth state changed:', event, currentSession?.user?.email);
+        logInfo(`Auth state changed: ${event}, user: ${currentSession?.user?.email}`, 'AuthContext');
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && currentSession?.user) {
           const delay = isMobileDevice ? 1000 : 800;
-          console.log(`[AuthContext] Delaying profile creation by ${delay}ms for platform stability`);
+          logProfile(`Delaying profile creation by ${delay}ms for platform stability`, 'AuthContext');
           
           setTimeout(() => {
             createOrVerifyProfile(currentSession.user)
-              .catch(error => console.error('[AuthContext] Error in delayed profile creation:', error));
+              .catch(error => {
+                logAuthError(`Error in delayed profile creation: ${error.message}`, 'AuthContext', error);
+              });
           }, delay);
         }
         
         setIsLoading(false);
 
         if (event === 'SIGNED_IN') {
+          logInfo('User signed in successfully', 'AuthContext');
           toast.success('Signed in successfully');
         } else if (event === 'SIGNED_OUT') {
+          logInfo('User signed out', 'AuthContext');
           setProfileExistsStatus(null);
           setProfileCreationComplete(false);
+          debugLogger.setLastProfileError(null);
           toast.info('Signed out');
         }
       }
     );
 
     supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      console.log('[AuthContext] Initial session check:', currentSession?.user?.email);
+      logInfo(`Initial session check: ${currentSession?.user?.email || 'No session'}`, 'AuthContext');
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
         const delay = isMobileDevice ? 1200 : 800;
-        console.log(`[AuthContext] Delaying initial profile creation by ${delay}ms for platform stability`);
+        logProfile(`Delaying initial profile creation by ${delay}ms for platform stability`, 'AuthContext');
         
         setTimeout(() => {
           createOrVerifyProfile(currentSession.user)
-            .catch(error => console.error('[AuthContext] Error in initial profile creation:', error));
+            .catch(error => {
+              logAuthError(`Error in initial profile creation: ${error.message}`, 'AuthContext', error);
+            });
         }, delay);
       }
       

@@ -14,6 +14,9 @@ import { debugLogger, logInfo } from './components/debug/DebugPanel';
 // Enable debugger globally
 debugLogger.setEnabled(true);
 
+// Configurable options for debug panel
+debugLogger.log('info', 'Initializing application with debug mode enabled', 'App');
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -37,6 +40,42 @@ const queryClient = new QueryClient({
 const App = () => {
   // Log application startup
   logInfo('Application initialized', 'App');
+  
+  useEffect(() => {
+    // Add a global error listener to catch runtime errors
+    const handleGlobalError = (event: ErrorEvent) => {
+      logError(`Global error: ${event.message}`, 'Window', {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        stack: event.error?.stack
+      });
+    };
+    
+    // Add a global unhandled rejection listener
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      logError(`Unhandled promise rejection: ${event.reason}`, 'Window', {
+        reason: event.reason,
+        stack: event.reason?.stack
+      });
+    };
+    
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    
+    // Detect browser-specific features and limitations
+    logInfo(`Browser details: ${navigator.userAgent}`, 'App', {
+      localStorage: typeof localStorage !== 'undefined',
+      sessionStorage: typeof sessionStorage !== 'undefined',
+      cookiesEnabled: navigator.cookieEnabled,
+      language: navigator.language
+    });
+    
+    return () => {
+      window.removeEventListener('error', handleGlobalError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
   
   return (
     <QueryClientProvider client={queryClient}>

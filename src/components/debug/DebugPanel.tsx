@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronUp, ChevronDown, RefreshCw, Download, Code, Activity, Search, Info, Settings, CircleCheck, CircleX, Eye, EyeOff, LogIn, LogOut } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -40,6 +39,10 @@ class DebugLogger {
   private enabled = false;
   private performanceMarks: Record<string, number> = {};
   private errorCount = 0;
+  private profileEvents: LogEntry[] = [];
+  private authEvents: LogEntry[] = [];
+  private lastAuthError: string | null = null;
+  private lastProfileError: string | null = null;
   
   static getInstance(): DebugLogger {
     if (!DebugLogger.instance) {
@@ -126,17 +129,86 @@ class DebugLogger {
     this.notifyListeners();
   }
   
-  getLogs(): LogEntry[] {
-    return this.logs;
+  logProfileEvent(message: string, componentName?: string, details?: any): void {
+    if (!this.enabled) return;
+    
+    const entry: LogEntry = {
+      timestamp: new Date(),
+      message,
+      level: 'auth',
+      details,
+      componentName
+    };
+    
+    this.logs = [...this.logs, entry];
+    this.profileEvents = [...this.profileEvents, entry];
+    
+    console.log(
+      `%c[PROFILE]${componentName ? ` [${componentName}]` : ''}`,
+      'color: #8b5cf6; font-weight: bold;',
+      message,
+      details || ''
+    );
+    
+    this.notifyListeners();
   }
   
-  getErrorCount(): number {
-    return this.errorCount;
+  logAuthError(message: string, componentName?: string, details?: any): void {
+    if (!this.enabled) return;
+    
+    const entry: LogEntry = {
+      timestamp: new Date(),
+      message,
+      level: 'error',
+      details,
+      componentName: componentName || 'AuthContext'
+    };
+    
+    this.logs = [...this.logs, entry];
+    this.authEvents = [...this.authEvents, entry];
+    this.lastAuthError = message;
+    this.errorCount++;
+    
+    console.error(
+      `%c[AUTH ERROR]${componentName ? ` [${componentName}]` : ''}`,
+      'color: #ef4444; font-weight: bold; background-color: #fef2f2; padding: 2px 4px; border-radius: 2px;',
+      message,
+      details || ''
+    );
+    
+    this.notifyListeners();
+  }
+  
+  setLastProfileError(error: string | null): void {
+    this.lastProfileError = error;
+    this.notifyListeners();
+  }
+  
+  getLastProfileError(): string | null {
+    return this.lastProfileError;
+  }
+  
+  getLastAuthError(): string | null {
+    return this.lastAuthError;
+  }
+  
+  getProfileEvents(): LogEntry[] {
+    return this.profileEvents;
+  }
+  
+  getAuthEvents(): LogEntry[] {
+    return this.authEvents;
   }
   
   clearLogs(): void {
     this.logs = [];
     this.errorCount = 0;
+    this.notifyListeners();
+  }
+  
+  clearProfileEvents(): void {
+    this.profileEvents = [];
+    this.lastProfileError = null;
     this.notifyListeners();
   }
   
@@ -190,6 +262,12 @@ export const logNetwork = (message: string, componentName?: string, details?: an
 
 export const logPerformance = (message: string, componentName?: string, details?: any) => 
   debugLogger.log('performance', message, componentName, details);
+
+export const logProfile = (message: string, componentName?: string, details?: any) => 
+  debugLogger.logProfileEvent(message, componentName, details);
+
+export const logAuthError = (message: string, componentName?: string, details?: any) => 
+  debugLogger.logAuthError(message, componentName, details);
 
 export function startPerformanceMeasure(name: string): () => void {
   debugLogger.startPerformanceMark(name);
@@ -402,6 +480,276 @@ export function DebugPanel() {
     return { key, average, max, min, count: durations.length };
   }).sort((a, b) => b.average - a.average);
   
+  const authEvents = state.logs.filter(log => 
+    log.level === 'auth' || 
+    (log.componentName && log.componentName.toLowerCase().includes('auth'))
+  );
+  
+  const profileEvents = state.logs.filter(log => 
+    (log.componentName && log.componentName.toLowerCase().includes('profile')) ||
+    log.message.toLowerCase().includes('profile')
+  );
+  
+  const tabsContent = [
+    { id: 'logs', label: 'Logs', content: (
+      <ScrollArea className="h-full" ref={scrollRef}>
+        <div className="p-2 space-y-1">
+          {filteredLogs.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground">
+              No logs to display
+            </div>
+          ) : (
+            filteredLogs.map((log, index) => (
+              <div 
+                key={index} 
+                className="p-2 rounded text-xs font-mono border border-border hover:bg-muted"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex gap-2 items-start">
+                    <Badge 
+                      className={cn("text-[10px] uppercase", getLevelColor(log.level))}
+                      size="sm"
+                    >
+                      {log.level}
+                    </Badge>
+                    
+                    {log.componentName && (
+                      <Badge variant="outline" className="text-[10px]" size="sm">
+                        {log.componentName}
+                      </Badge>
+                    )}
+                    
+                    <span className="font-medium">{log.message}</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {log.timestamp.toLocaleTimeString()}
+                    {log.duration && ` (${log.duration.toFixed(2)}ms)`}
+                  </span>
+                </div>
+                
+                {log.details && (
+                  <div className="mt-1 pl-4 border-l-2 border-muted text-muted-foreground">
+                    {typeof log.details === 'object' ? (
+                      <pre className="text-[10px] whitespace-pre-wrap break-all">
+                        {JSON.stringify(log.details, null, 2)}
+                      </pre>
+                    ) : (
+                      <span>{String(log.details)}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </ScrollArea>
+    )},
+    { id: 'components', label: 'Components', content: (
+      <ScrollArea className="h-full">
+        <div className="p-2 space-y-4">
+          {Object.keys(logsByComponent).length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground">
+              No component logs to display
+            </div>
+          ) : (
+            Object.entries(logsByComponent).map(([component, logs]) => (
+              <div key={component} className="border border-border rounded-md overflow-hidden">
+                <div className="bg-muted p-2 font-semibold">
+                  {component} <Badge variant="outline" className="ml-2">{logs.length}</Badge>
+                </div>
+                <div className="p-2 space-y-1">
+                  {logs.map((log, idx) => (
+                    <div 
+                      key={idx}
+                      className="text-xs p-1.5 rounded hover:bg-muted flex items-start justify-between"
+                    >
+                      <div className="flex gap-2 items-start">
+                        <Badge 
+                          className={cn("text-[10px] uppercase", getLevelColor(log.level))}
+                          size="sm"
+                        >
+                          {log.level}
+                        </Badge>
+                        <span>{log.message}</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {log.timestamp.toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </ScrollArea>
+    )},
+    { id: 'performance', label: 'Performance', content: (
+      <ScrollArea className="h-full">
+        <div className="p-2 space-y-4">
+          {performanceAverages.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground">
+              No performance metrics available
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-5 gap-4 text-xs font-medium p-2 border-b">
+                <div className="col-span-2">Operation</div>
+                <div>Avg (ms)</div>
+                <div>Min/Max (ms)</div>
+                <div>Count</div>
+              </div>
+              {performanceAverages.map((metric, idx) => (
+                <div 
+                  key={idx}
+                  className={cn(
+                    "grid grid-cols-5 gap-4 text-xs p-2 rounded",
+                    metric.average > 100 ? "bg-red-50 dark:bg-red-950/20" : 
+                    metric.average > 50 ? "bg-yellow-50 dark:bg-yellow-950/20" :
+                    "hover:bg-muted"
+                  )}
+                >
+                  <div className="col-span-2 font-mono">{metric.key}</div>
+                  <div className={cn(
+                    "font-mono",
+                    metric.average > 100 ? "text-red-600 dark:text-red-400" : 
+                    metric.average > 50 ? "text-yellow-600 dark:text-yellow-400" : ""
+                  )}>
+                    {metric.average.toFixed(2)}
+                  </div>
+                  <div className="font-mono">{metric.min.toFixed(1)} / {metric.max.toFixed(1)}</div>
+                  <div>{metric.count}</div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </ScrollArea>
+    )},
+    { id: 'network', label: 'Network', content: (
+      <ScrollArea className="h-full">
+        <div className="p-2">
+          {filteredLogs.filter(log => log.level === 'api' || log.level === 'network').length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground">
+              No network activity recorded
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredLogs
+                .filter(log => log.level === 'api' || log.level === 'network')
+                .map((log, idx) => (
+                  <div 
+                    key={idx} 
+                    className="p-2 rounded text-xs border border-border hover:bg-muted"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex gap-2 items-start">
+                        <Badge 
+                          className={cn("text-[10px] uppercase", getLevelColor(log.level))}
+                          size="sm"
+                        >
+                          {log.level}
+                        </Badge>
+                        
+                        {log.componentName && (
+                          <Badge variant="outline" className="text-[10px]" size="sm">
+                            {log.componentName}
+                          </Badge>
+                        )}
+                        
+                        <span className="font-medium">{log.message}</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {log.timestamp.toLocaleTimeString()}
+                        {log.duration && ` (${log.duration.toFixed(2)}ms)`}
+                      </span>
+                    </div>
+                    
+                    {log.details && (
+                      <div className="mt-1 pl-4 border-l-2 border-muted text-muted-foreground">
+                        <pre className="text-[10px] whitespace-pre-wrap break-all">
+                          {JSON.stringify(log.details, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    )},
+    { id: 'auth', label: 'Auth', content: (
+      <ScrollArea className="h-full">
+        <div className="p-2">
+          {debugLogger.getLastAuthError() && (
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Last Auth Error</h3>
+              <p className="mt-1 text-xs text-red-700 dark:text-red-300">{debugLogger.getLastAuthError()}</p>
+            </div>
+          )}
+          
+          {debugLogger.getLastProfileError() && (
+            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Last Profile Error</h3>
+              <p className="mt-1 text-xs text-yellow-700 dark:text-yellow-300">{debugLogger.getLastProfileError()}</p>
+            </div>
+          )}
+          
+          <div className="mb-4">
+            <h3 className="text-sm font-medium">Auth Events Timeline</h3>
+            <div className="mt-2 space-y-2">
+              {authEvents.length === 0 ? (
+                <div className="text-xs text-muted-foreground p-2">No auth events recorded</div>
+              ) : (
+                authEvents.map((event, idx) => (
+                  <div key={idx} className="relative pl-4 pb-2 border-l border-primary/30">
+                    <div className="absolute w-2 h-2 bg-primary rounded-full -left-1 top-1.5"></div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {event.timestamp.toLocaleTimeString()}
+                    </div>
+                    <div className="text-xs font-medium">{event.message}</div>
+                    {event.details && (
+                      <div className="mt-1 text-[10px] text-muted-foreground">
+                        {typeof event.details === 'object' ? 
+                          JSON.stringify(event.details) : String(event.details)}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="text-sm font-medium">Profile Events Timeline</h3>
+            <div className="mt-2 space-y-2">
+              {profileEvents.length === 0 ? (
+                <div className="text-xs text-muted-foreground p-2">No profile events recorded</div>
+              ) : (
+                profileEvents.map((event, idx) => (
+                  <div key={idx} className="relative pl-4 pb-2 border-l border-secondary/30">
+                    <div className="absolute w-2 h-2 bg-secondary rounded-full -left-1 top-1.5"></div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {event.timestamp.toLocaleTimeString()}
+                    </div>
+                    <div className="text-xs font-medium">{event.message}</div>
+                    {event.details && (
+                      <div className="mt-1 text-[10px] text-muted-foreground">
+                        {typeof event.details === 'object' ? 
+                          JSON.stringify(event.details) : String(event.details)}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </ScrollArea>
+    )},
+  ];
+  
   return (
     <div 
       className={cn(
@@ -430,6 +778,11 @@ export function DebugPanel() {
             {state.errorCount > 0 && (
               <Badge variant="destructive" className="text-[10px]">
                 {state.errorCount} {state.errorCount === 1 ? 'error' : 'errors'}
+              </Badge>
+            )}
+            {debugLogger.getLastProfileError() && (
+              <Badge variant="warning" className="text-[10px] bg-yellow-500">
+                Profile Error
               </Badge>
             )}
           </span>
@@ -529,203 +882,21 @@ export function DebugPanel() {
             className="flex flex-col h-[calc(70vh-112px)]"
           >
             <TabsList className="mx-2 mt-2 mb-0">
-              <TabsTrigger value="logs" className="text-xs">Logs</TabsTrigger>
-              <TabsTrigger value="components" className="text-xs">Components</TabsTrigger>
-              <TabsTrigger value="performance" className="text-xs">Performance</TabsTrigger>
-              <TabsTrigger value="network" className="text-xs">Network</TabsTrigger>
+              {tabsContent.map(tab => (
+                <TabsTrigger key={tab.id} value={tab.id} className="text-xs">
+                  {tab.label}
+                  {tab.id === 'auth' && debugLogger.getLastAuthError() && (
+                    <span className="ml-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                  )}
+                </TabsTrigger>
+              ))}
             </TabsList>
             
-            <TabsContent value="logs" className="flex-1 overflow-hidden p-0 m-0">
-              <ScrollArea className="h-full" ref={scrollRef}>
-                <div className="p-2 space-y-1">
-                  {filteredLogs.length === 0 ? (
-                    <div className="flex items-center justify-center h-32 text-muted-foreground">
-                      No logs to display
-                    </div>
-                  ) : (
-                    filteredLogs.map((log, index) => (
-                      <div 
-                        key={index} 
-                        className="p-2 rounded text-xs font-mono border border-border hover:bg-muted"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex gap-2 items-start">
-                            <Badge 
-                              className={cn("text-[10px] uppercase", getLevelColor(log.level))}
-                              size="sm"
-                            >
-                              {log.level}
-                            </Badge>
-                            
-                            {log.componentName && (
-                              <Badge variant="outline" className="text-[10px]" size="sm">
-                                {log.componentName}
-                              </Badge>
-                            )}
-                            
-                            <span className="font-medium">{log.message}</span>
-                          </div>
-                          <span className="text-[10px] text-muted-foreground">
-                            {log.timestamp.toLocaleTimeString()}
-                            {log.duration && ` (${log.duration.toFixed(2)}ms)`}
-                          </span>
-                        </div>
-                        
-                        {log.details && (
-                          <div className="mt-1 pl-4 border-l-2 border-muted text-muted-foreground">
-                            {typeof log.details === 'object' ? (
-                              <pre className="text-[10px] whitespace-pre-wrap break-all">
-                                {JSON.stringify(log.details, null, 2)}
-                              </pre>
-                            ) : (
-                              <span>{String(log.details)}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-            
-            <TabsContent value="components" className="flex-1 overflow-hidden p-0 m-0">
-              <ScrollArea className="h-full">
-                <div className="p-2 space-y-4">
-                  {Object.keys(logsByComponent).length === 0 ? (
-                    <div className="flex items-center justify-center h-32 text-muted-foreground">
-                      No component logs to display
-                    </div>
-                  ) : (
-                    Object.entries(logsByComponent).map(([component, logs]) => (
-                      <div key={component} className="border border-border rounded-md overflow-hidden">
-                        <div className="bg-muted p-2 font-semibold">
-                          {component} <Badge variant="outline" className="ml-2">{logs.length}</Badge>
-                        </div>
-                        <div className="p-2 space-y-1">
-                          {logs.map((log, idx) => (
-                            <div 
-                              key={idx}
-                              className="text-xs p-1.5 rounded hover:bg-muted flex items-start justify-between"
-                            >
-                              <div className="flex gap-2 items-start">
-                                <Badge 
-                                  className={cn("text-[10px] uppercase", getLevelColor(log.level))}
-                                  size="sm"
-                                >
-                                  {log.level}
-                                </Badge>
-                                <span>{log.message}</span>
-                              </div>
-                              <span className="text-[10px] text-muted-foreground">
-                                {log.timestamp.toLocaleTimeString()}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-            
-            <TabsContent value="performance" className="flex-1 overflow-hidden p-0 m-0">
-              <ScrollArea className="h-full">
-                <div className="p-2 space-y-4">
-                  {performanceAverages.length === 0 ? (
-                    <div className="flex items-center justify-center h-32 text-muted-foreground">
-                      No performance metrics available
-                    </div>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-5 gap-4 text-xs font-medium p-2 border-b">
-                        <div className="col-span-2">Operation</div>
-                        <div>Avg (ms)</div>
-                        <div>Min/Max (ms)</div>
-                        <div>Count</div>
-                      </div>
-                      {performanceAverages.map((metric, idx) => (
-                        <div 
-                          key={idx}
-                          className={cn(
-                            "grid grid-cols-5 gap-4 text-xs p-2 rounded",
-                            metric.average > 100 ? "bg-red-50 dark:bg-red-950/20" : 
-                            metric.average > 50 ? "bg-yellow-50 dark:bg-yellow-950/20" :
-                            "hover:bg-muted"
-                          )}
-                        >
-                          <div className="col-span-2 font-mono">{metric.key}</div>
-                          <div className={cn(
-                            "font-mono",
-                            metric.average > 100 ? "text-red-600 dark:text-red-400" : 
-                            metric.average > 50 ? "text-yellow-600 dark:text-yellow-400" : ""
-                          )}>
-                            {metric.average.toFixed(2)}
-                          </div>
-                          <div className="font-mono">{metric.min.toFixed(1)} / {metric.max.toFixed(1)}</div>
-                          <div>{metric.count}</div>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-            
-            <TabsContent value="network" className="flex-1 overflow-hidden p-0 m-0">
-              <ScrollArea className="h-full">
-                <div className="p-2">
-                  {filteredLogs.filter(log => log.level === 'api' || log.level === 'network').length === 0 ? (
-                    <div className="flex items-center justify-center h-32 text-muted-foreground">
-                      No network activity recorded
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {filteredLogs
-                        .filter(log => log.level === 'api' || log.level === 'network')
-                        .map((log, idx) => (
-                          <div 
-                            key={idx} 
-                            className="p-2 rounded text-xs border border-border hover:bg-muted"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex gap-2 items-start">
-                                <Badge 
-                                  className={cn("text-[10px] uppercase", getLevelColor(log.level))}
-                                  size="sm"
-                                >
-                                  {log.level}
-                                </Badge>
-                                
-                                {log.componentName && (
-                                  <Badge variant="outline" className="text-[10px]" size="sm">
-                                    {log.componentName}
-                                  </Badge>
-                                )}
-                                
-                                <span className="font-medium">{log.message}</span>
-                              </div>
-                              <span className="text-[10px] text-muted-foreground">
-                                {log.timestamp.toLocaleTimeString()}
-                                {log.duration && ` (${log.duration.toFixed(2)}ms)`}
-                              </span>
-                            </div>
-                            
-                            {log.details && (
-                              <div className="mt-1 pl-4 border-l-2 border-muted text-muted-foreground">
-                                <pre className="text-[10px] whitespace-pre-wrap break-all">
-                                  {JSON.stringify(log.details, null, 2)}
-                                </pre>
-                              </div>
-                            )}
-                          </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </TabsContent>
+            {tabsContent.map(tab => (
+              <TabsContent key={tab.id} value={tab.id} className="flex-1 overflow-hidden p-0 m-0">
+                {tab.content}
+              </TabsContent>
+            ))}
           </Tabs>
         </>
       )}
