@@ -17,6 +17,8 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
   // Set up audio when blob changes
   useEffect(() => {
     if (audioBlob) {
+      console.log("[AudioPlayback] Setting up with blob:", audioBlob.type, audioBlob.size);
+      
       // Clean up any previous URL
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
@@ -37,8 +39,9 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
       // Get duration when metadata is loaded
       const handleLoadedMetadata = () => {
         if (audioRef.current) {
-          console.log("[AudioPlayback] Duration loaded:", audioRef.current.duration);
-          setAudioDuration(audioRef.current.duration || 0);
+          const duration = audioRef.current.duration || 0;
+          console.log("[AudioPlayback] Duration loaded:", duration);
+          setAudioDuration(duration);
         }
       };
       
@@ -46,7 +49,11 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
       
       // If metadata is already loaded, update duration immediately
       if (audioRef.current.readyState >= 2) {
-        setAudioDuration(audioRef.current.duration || 0);
+        const duration = audioRef.current.duration || 0;
+        console.log("[AudioPlayback] Duration immediately available:", duration);
+        setAudioDuration(duration);
+      } else {
+        console.log("[AudioPlayback] Waiting for metadata to load");
       }
       
       return () => {
@@ -70,6 +77,8 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
   useEffect(() => {
     if (!audioRef.current || !audioUrl) return;
     
+    console.log("[AudioPlayback] Setting up event listeners for audio element");
+    
     // More accurate progress tracking with manual interval
     const updateProgress = () => {
       if (audioRef.current && !audioRef.current.paused) {
@@ -80,12 +89,14 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
     
     // Event listeners for audio playback
     const handlePlay = () => {
+      console.log("[AudioPlayback] Play event");
       // Start progress tracking interval
       progressUpdateInterval.current = window.setInterval(updateProgress, 50);
       setIsPlaying(true);
     };
     
     const handlePause = () => {
+      console.log("[AudioPlayback] Pause event");
       // Clear progress tracking interval
       if (progressUpdateInterval.current) {
         clearInterval(progressUpdateInterval.current);
@@ -98,6 +109,7 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
     };
     
     const handleEnded = () => {
+      console.log("[AudioPlayback] Ended event");
       setIsPlaying(false);
       setPlaybackProgress(1); // Set to end
       
@@ -169,14 +181,21 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
   }, [audioUrl]);
   
   const togglePlayback = () => {
-    if (!audioRef.current || !audioUrl) return;
+    console.log("[AudioPlayback] Toggle playback called, isPlaying:", isPlaying);
+    if (!audioRef.current || !audioUrl) {
+      console.log("[AudioPlayback] No audio element or URL available");
+      return;
+    }
     
     if (isPlaying) {
+      console.log("[AudioPlayback] Pausing audio");
       audioRef.current.pause();
       // setIsPlaying will be handled by the pause event
     } else {
+      console.log("[AudioPlayback] Starting audio playback");
       // If at end, reset to beginning
       if (playbackProgress >= 0.99 && audioRef.current) {
+        console.log("[AudioPlayback] Resetting to beginning");
         audioRef.current.currentTime = 0;
         setPlaybackProgress(0);
       }
@@ -190,6 +209,7 @@ export function useAudioPlayback({ audioBlob }: UseAudioPlaybackProps) {
   };
   
   const reset = () => {
+    console.log("[AudioPlayback] Resetting playback");
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;

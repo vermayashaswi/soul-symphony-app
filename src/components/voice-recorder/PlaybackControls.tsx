@@ -45,10 +45,13 @@ export function PlaybackControls({
     
     if (!isProcessing && audioBlob) {
       try {
+        console.log("Save button clicked, calling onSaveEntry");
         onSaveEntry();
       } catch (err) {
         console.error("Error in save handler:", err);
       }
+    } else {
+      console.log("Save button clicked but disabled condition: isProcessing=", isProcessing, "audioBlob=", !!audioBlob);
     }
   };
   

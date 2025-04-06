@@ -14,6 +14,7 @@ import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
+import { useNavigate } from 'react-router-dom';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -27,6 +28,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [showAnimation, setShowAnimation] = useState(true);
   const { user, forceRefreshAuth } = useAuth();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   
   const {
     isRecording,
@@ -123,7 +125,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       if (onRecordingComplete) {
         // Call the completion handler but with a try/catch to prevent navigation issues
         try {
+          console.log("Calling onRecordingComplete callback");
           onRecordingComplete(normalizedBlob);
+          
+          // If we're on the root route and not in a child component, navigate to journal
+          if (window.location.pathname === '/') {
+            console.log("Navigating to journal page");
+            setTimeout(() => {
+              navigate('/journal');
+            }, 1000);
+          }
         } catch (error) {
           console.error("Error in recording complete callback:", error);
           toast.error("Error processing your recording");
@@ -134,6 +145,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         // If no callback is provided, we're done
         setIsProcessing(false);
         toast.success("Recording saved successfully");
+        
+        // If we're on the root route, navigate to journal
+        if (window.location.pathname === '/') {
+          console.log("Navigating to journal page");
+          setTimeout(() => {
+            navigate('/journal');
+          }, 1000);
+        }
       }
     } catch (error: any) {
       console.error('Error in save entry:', error);
