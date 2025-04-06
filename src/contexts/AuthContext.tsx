@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(currentSession?.user ?? null);
         
         // If user just signed in or signed up, ensure profile exists
-        if ((event === 'SIGNED_IN' || event === 'SIGNED_UP') && currentSession?.user) {
+        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && currentSession?.user) {
           // Using setTimeout to prevent auth deadlock
           setTimeout(async () => {
             await ensureProfileExists(currentSession.user);
