@@ -1,14 +1,14 @@
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Loader2, X, MoveHorizontal, MoveVertical } from 'lucide-react';
+import { Camera, Loader2, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
+import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
 
 export function ProfilePictureUpload() {
   const { user, updateUserProfile } = useAuth();
@@ -16,9 +16,12 @@ export function ProfilePictureUpload() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState([1]);
+  const [zoom, setZoom] = useState(1);
   const imageRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const lastTouchDistance = useRef<number | null>(null);
   
   // Get the avatar URL from the user metadata or default to an empty string
   const avatarUrl = user?.user_metadata?.avatar_url || '';
@@ -35,7 +38,7 @@ export function ProfilePictureUpload() {
       setShowImageEditor(true);
       // Reset position and zoom for new image
       setPosition({ x: 0, y: 0 });
-      setZoom([1]);
+      setZoom(1);
     } catch (error: any) {
       console.error('Error selecting image:', error.message);
       toast.error(`Error selecting image: ${error.message}`);
@@ -106,16 +109,107 @@ export function ProfilePictureUpload() {
     }
   };
 
-  const handlePositionChange = (direction: 'x' | 'y', value: number) => {
-    setPosition(prev => ({
-      ...prev,
-      [direction]: value
-    }));
-  };
+  // Touch event handlers for image positioning
+  useEffect(() => {
+    const imageContainer = containerRef.current;
+    if (!imageContainer) return;
 
-  const handleZoomChange = (values: number[]) => {
-    setZoom(values);
-  };
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        // Single touch - move the image
+        startPosRef.current = {
+          x: e.touches[0].clientX - position.x,
+          y: e.touches[0].clientY - position.y
+        };
+      } else if (e.touches.length === 2) {
+        // Two touches - pinch to zoom
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        lastTouchDistance.current = dist;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault(); // Prevent scrolling when touching the image
+
+      if (e.touches.length === 1) {
+        // Single touch - move the image
+        const newX = e.touches[0].clientX - startPosRef.current.x;
+        const newY = e.touches[0].clientY - startPosRef.current.y;
+        setPosition({ x: newX, y: newY });
+      } else if (e.touches.length === 2 && lastTouchDistance.current !== null) {
+        // Two touches - pinch to zoom
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        
+        const delta = dist - lastTouchDistance.current;
+        const newZoom = Math.max(0.5, Math.min(3, zoom + delta * 0.01));
+        
+        setZoom(newZoom);
+        lastTouchDistance.current = dist;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      lastTouchDistance.current = null;
+    };
+
+    // Mouse drag support for desktop
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      isDragging = true;
+      startX = e.clientX - position.x;
+      startY = e.clientY - position.y;
+      imageContainer.style.cursor = 'grabbing';
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      
+      const newX = e.clientX - startX;
+      const newY = e.clientY - startY;
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      isDragging = false;
+      imageContainer.style.cursor = 'grab';
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY * -0.01;
+      const newZoom = Math.max(0.5, Math.min(3, zoom + delta));
+      setZoom(newZoom);
+    };
+
+    imageContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+    imageContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+    imageContainer.addEventListener('touchend', handleTouchEnd);
+    
+    imageContainer.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    imageContainer.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      imageContainer.removeEventListener('touchstart', handleTouchStart);
+      imageContainer.removeEventListener('touchmove', handleTouchMove);
+      imageContainer.removeEventListener('touchend', handleTouchEnd);
+      
+      imageContainer.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      imageContainer.removeEventListener('wheel', handleWheel);
+    };
+  }, [position, zoom]);
 
   return (
     <div className="flex flex-col items-center">
@@ -155,21 +249,24 @@ export function ProfilePictureUpload() {
           <DialogHeader>
             <DialogTitle>Adjust Your Profile Picture</DialogTitle>
             <DialogDescription>
-              Adjust the position and zoom of your profile picture before saving.
+              Pinch to zoom and drag to position your profile picture.
             </DialogDescription>
           </DialogHeader>
           
           <div className="flex flex-col items-center space-y-4 py-4">
-            <div className="relative h-64 w-64 rounded-full overflow-hidden border-2 border-muted">
+            <div 
+              ref={containerRef}
+              className="relative h-64 w-64 rounded-full overflow-hidden border-2 border-muted cursor-grab touch-none"
+            >
               {selectedImage && (
-                <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
                   <img
                     ref={imageRef}
                     src={selectedImage}
                     alt="Profile Preview"
-                    className="transition-all duration-200 ease-in-out"
+                    className="transition-all duration-100 ease-in-out"
                     style={{
-                      transform: `translate(${position.x}px, ${position.y}px) scale(${zoom[0]})`,
+                      transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
                       maxWidth: 'none',
                       maxHeight: 'none',
                     }}
@@ -178,40 +275,10 @@ export function ProfilePictureUpload() {
               )}
             </div>
             
-            <div className="w-full space-y-3">
-              <div className="flex items-center space-x-2">
-                <MoveHorizontal className="h-4 w-4 text-muted-foreground" />
-                <Slider
-                  value={[position.x]}
-                  min={-100}
-                  max={100}
-                  step={1}
-                  onValueChange={(values) => handlePositionChange('x', values[0])}
-                />
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <MoveVertical className="h-4 w-4 text-muted-foreground" />
-                <Slider
-                  value={[position.y]}
-                  min={-100}
-                  max={100}
-                  step={1}
-                  onValueChange={(values) => handlePositionChange('y', values[0])}
-                />
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-muted-foreground">Zoom</span>
-                <Slider
-                  value={zoom}
-                  min={0.5}
-                  max={2}
-                  step={0.01}
-                  onValueChange={handleZoomChange}
-                />
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              <span className="block sm:inline">Use pinch gestures to zoom in/out.</span>{" "}
+              <span className="block sm:inline">Drag to position the image.</span>
+            </p>
           </div>
           
           <div className="flex justify-between">
