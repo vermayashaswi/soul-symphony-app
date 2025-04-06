@@ -81,46 +81,27 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     
     console.log('[ProfileService] Creating profile with data:', profileData);
     
-    // Try inserting first since that's most common for new users
-    const { error: insertError } = await supabase
+    // Try upsert with explicit conflict handling
+    const { error: upsertError } = await supabase
       .from('profiles')
-      .insert([profileData]);
-    
-    if (!insertError) {
-      console.log('[ProfileService] Profile created successfully via insert');
-      return true;
-    }
-    
-    // If insert fails with conflict, try upsert instead
-    if (insertError && (insertError.code === '23505' || insertError.message.includes('duplicate'))) {
-      console.log('[ProfileService] Profile insertion failed due to conflict, trying upsert');
+      .upsert([profileData], { 
+        onConflict: 'id',
+        ignoreDuplicates: false
+      });
+        
+    if (upsertError) {
+      console.error('[ProfileService] Error upserting profile:', upsertError);
       
-      const { error: upsertError } = await supabase
-        .from('profiles')
-        .upsert([profileData], { 
-          onConflict: 'id',
-          ignoreDuplicates: false
-        });
-          
-      if (upsertError) {
-        console.error('[ProfileService] Error upserting profile:', upsertError);
-        
-        // If error code is for a duplicate, that means the profile actually exists
-        if (upsertError.code === '23505') { // Duplicate key value violates unique constraint
-          console.log('[ProfileService] Profile already exists (detected via constraint error)');
-          return true;
-        }
-        
-        return false;
+      // If error code is for a duplicate, that means the profile actually exists
+      if (upsertError.code === '23505') { // Duplicate key value violates unique constraint
+        console.log('[ProfileService] Profile already exists (detected via constraint error)');
+        return true;
       }
       
-      console.log('[ProfileService] Profile created successfully via upsert');
-      return true;
-    } else if (insertError) {
-      console.error('[ProfileService] Error inserting profile:', insertError);
       return false;
     }
     
+    console.log('[ProfileService] Profile created successfully');
     return true;
   } catch (error: any) {
     console.error('[ProfileService] Error ensuring profile exists:', error);

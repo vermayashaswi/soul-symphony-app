@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   PlusCircle, 
@@ -114,15 +113,13 @@ export default function ChatThreadList({
         toast({
           title: "Error",
           description: "Failed to delete conversation",
-          variant: "destructive",
-          duration: 3000
+          variant: "destructive"
         });
       } else {
         setThreads(threads.filter(thread => thread.id !== threadToDelete));
         toast({
           title: "Success",
           description: "Conversation deleted",
-          duration: 3000
         });
         
         if (currentThreadId === threadToDelete) {
@@ -134,8 +131,7 @@ export default function ChatThreadList({
       toast({
         title: "Error",
         description: "Failed to delete conversation",
-        variant: "destructive",
-        duration: 3000
+        variant: "destructive"
       });
     } finally {
       setThreadToDelete(null);
@@ -167,8 +163,7 @@ export default function ChatThreadList({
         toast({
           title: "Error",
           description: "Failed to update conversation title",
-          variant: "destructive",
-          duration: 3000
+          variant: "destructive"
         });
       } else {
         setThreads(threads.map(thread => 
@@ -179,7 +174,6 @@ export default function ChatThreadList({
         toast({
           title: "Success",
           description: "Conversation title updated",
-          duration: 3000
         });
       }
     } catch (error) {
@@ -290,11 +284,11 @@ export default function ChatThreadList({
                       </div>
                     </Button>
                     
-                    <div className="flex items-center pr-1">
+                    <div className="flex items-center pr-1 chat-thread-buttons">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-8 w-8 thread-edit-button"
                         onClick={(e) => {
                           e.stopPropagation();
                           startEditingThread(thread);
@@ -307,7 +301,7 @@ export default function ChatThreadList({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-8 w-8 thread-delete-button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setThreadToDelete(thread.id);

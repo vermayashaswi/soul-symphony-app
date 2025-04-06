@@ -3,7 +3,6 @@ import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
 import { supabase } from '@/integrations/supabase/client';
 import { clearAllToasts } from '@/services/notificationService';
-import { toast } from 'sonner';
 
 // Flag to track if an entry is being processed to prevent duplicate notifications
 let isEntryBeingProcessed = false;
@@ -20,32 +19,9 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   // Clear any lingering toasts from previous sessions
   clearAllToasts();
   
-  console.log("processRecording called with blob:", audioBlob?.size, "userId:", userId);
-  
-  // Verify we have an authenticated user
-  if (!userId) {
-    console.error('No user ID provided for audio processing');
-    
-    // Double-check session is still valid
-    try {
-      const { data } = await supabase.auth.getSession();
-      if (!data?.session?.user?.id) {
-        return { success: false, error: 'Session expired. Please refresh and try again.' };
-      }
-      
-      // Update userId if we can
-      userId = data.session.user.id;
-      console.log("Retrieved userId from session:", userId);
-    } catch (error) {
-      console.error('Error getting session:', error);
-      return { success: false, error: 'Authentication error. Please refresh and try again.' };
-    }
-  }
-  
-  // Validate the audio blob
+  // 1. Validate the audio blob
   const validation = validateAudioBlob(audioBlob);
   if (!validation.isValid) {
-    console.error("Audio blob validation failed:", validation.errorMessage);
     return { success: false, error: validation.errorMessage };
   }
   
@@ -61,21 +37,18 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       userId: userId || 'anonymous'
     });
     
-    // Show a toast to indicate processing has started
-    toast.loading('Processing your journal entry...', {
-      id: `processing-${tempId}`,
-      duration: 60000 // Increased duration to avoid toast disappearing during processing
-    });
+    // Verify the user ID is valid
+    if (!userId) {
+      console.error('No user ID provided for audio processing');
+      isEntryBeingProcessed = false;
+      return { success: false, error: 'Authentication required' };
+    }
     
     // Launch the processing without awaiting it
     processRecordingInBackground(audioBlob, userId, tempId)
       .catch(err => {
         console.error('Background processing error:', err);
         isEntryBeingProcessed = false;
-        toast.error('Error processing your recording', {
-          id: `processing-${tempId}`,
-          duration: 5000
-        });
       });
     
     // Return immediately with the temp ID
@@ -97,10 +70,12 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     
     if (!audioBlob) {
       console.error('No audio data to process');
-      toast.error('No audio data to process', {
-        id: `processing-${tempId}`,
-        duration: 5000
-      });
+      return;
+    }
+    
+    // Check if audio blob is too small to be useful
+    if (audioBlob.size < 1000) {
+      console.error('Audio recording is too small to process');
       return;
     }
     
@@ -110,10 +85,6 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     // Validate base64 data
     if (!base64Audio || base64Audio.length < 100) {
       console.error('Invalid base64 audio data');
-      toast.error('Invalid audio data', {
-        id: `processing-${tempId}`,
-        duration: 5000
-      });
       return;
     }
     
@@ -127,10 +98,6 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     const authStatus = await verifyUserAuthentication();
     if (!authStatus.isAuthenticated) {
       console.error('User authentication failed:', authStatus.error);
-      toast.error('Authentication failed', {
-        id: `processing-${tempId}`,
-        duration: 5000
-      });
       return;
     }
 
@@ -141,18 +108,10 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       const profileExists = await ensureUserProfileExists(authStatus.userId);
       if (!profileExists) {
         console.error('Failed to ensure user profile exists');
-        toast.error('Failed to verify user profile', {
-          id: `processing-${tempId}`,
-          duration: 5000
-        });
         return;
       }
     } else {
       console.error('Cannot identify user ID');
-      toast.error('Cannot identify user', {
-        id: `processing-${tempId}`,
-        duration: 5000
-      });
       return;
     }
     
@@ -163,29 +122,15 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     
     while (retries <= maxRetries) {
       try {
-        // Update toast message
-        toast.loading(`Processing your journal entry (attempt ${retries + 1})...`, {
-          id: `processing-${tempId}`,
-          duration: 60000
-        });
-        
         // Set directTranscription to false to get full journal entry processing
         result = await sendAudioForTranscription(base64String, authStatus.userId, false);
         if (result.success) {
           console.log('Transcription successful, breaking retry loop');
-          toast.success('Journal entry processed successfully', {
-            id: `processing-${tempId}`,
-            duration: 10000
-          });
           break;
         }
         retries++;
         if (retries <= maxRetries) {
           console.log(`Transcription attempt ${retries} failed, retrying after delay...`);
-          toast.loading(`Retrying processing (${retries}/${maxRetries})...`, {
-            id: `processing-${tempId}`,
-            duration: 15000
-          });
           // Increase delay between retries (exponential backoff)
           await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries)));
         }
@@ -193,16 +138,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         console.error(`Transcription attempt ${retries + 1} error:`, err);
         retries++;
         if (retries <= maxRetries) {
-          toast.loading(`Retrying after error (${retries}/${maxRetries})...`, {
-            id: `processing-${tempId}`,
-            duration: 15000
-          });
           await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries)));
-        } else {
-          toast.error('Failed to process recording after multiple attempts', {
-            id: `processing-${tempId}`,
-            duration: 10000
-          });
         }
       }
     }
@@ -211,58 +147,36 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       console.log('Journal entry saved successfully:', result);
       isEntryBeingProcessed = false;
       
-      // Show success toast
-      toast.success('Journal entry saved successfully!', {
-        id: `processing-${tempId}`,
-        duration: 10000,
-      });
+      // Clear any remaining toasts to ensure no processing notifications are left
+      clearAllToasts();
       
       // Verify the entry was saved by querying the database
       if (result.data?.entryId) {
-        try {
-          const { data: savedEntry, error: fetchError } = await supabase
-            .from('Journal Entries')
-            .select('id, "refined text", duration')
-            .eq('id', result.data.entryId)
-            .single();
-            
-          if (fetchError || !savedEntry) {
-            console.error('Failed to verify journal entry was saved:', fetchError);
-          } else {
-            console.log('Journal entry verified in database:', savedEntry);
-            
-            // Keep success toast visible longer after verification
-            toast.success('Journal entry saved and verified in database!', {
-              id: `processing-${tempId}`,
-              duration: 10000,
-            });
-          }
-        } catch (error) {
-          console.error('Error verifying journal entry in database:', error);
+        const { data: savedEntry, error: fetchError } = await supabase
+          .from('Journal Entries')
+          .select('id, "refined text", duration')
+          .eq('id', result.data.entryId)
+          .single();
+          
+        if (fetchError || !savedEntry) {
+          console.error('Failed to verify journal entry was saved:', fetchError);
+        } else {
+          console.log('Journal entry verified in database:', savedEntry);
         }
       }
     } else {
       console.error('Failed to process recording after multiple attempts:', result?.error);
       isEntryBeingProcessed = false;
       
-      // Show error toast
-      toast.error('Failed to process your journal entry', {
-        id: `processing-${tempId}`,
-        duration: 10000,
-      });
+      // Also clear toasts here in case of error
+      clearAllToasts();
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
     isEntryBeingProcessed = false;
     
-    // Show error toast
-    toast.error(`Error: ${error.message || 'Unknown error'}`, {
-      id: `processing-${tempId}`,
-      duration: 10000,
-    });
-  } finally {
-    // Ensure we always clear the processing flag
-    isEntryBeingProcessed = false;
+    // Clear toasts in case of any error
+    clearAllToasts();
   }
 }
 
@@ -303,32 +217,27 @@ async function ensureUserProfileExists(userId: string | undefined): Promise<bool
     if (fetchError || !profile) {
       console.log('User profile not found, creating one...');
       
-      try {
-        // Get user data from auth
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
+      // Get user data from auth
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      
+      // Create profile
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert([{ 
+          id: userId,
+          email: userData.user?.email,
+          full_name: userData.user?.user_metadata?.full_name || '',
+          avatar_url: userData.user?.user_metadata?.avatar_url || '',
+          onboarding_completed: false
+        }]);
         
-        // Create profile
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert([{ 
-            id: userId,
-            email: userData.user?.email,
-            full_name: userData.user?.user_metadata?.full_name || '',
-            avatar_url: userData.user?.user_metadata?.avatar_url || '',
-            onboarding_completed: false
-          }]);
-          
-        if (insertError) {
-          console.error('Error creating user profile:', insertError);
-          throw insertError;
-        }
-        
-        console.log('User profile created successfully');
-      } catch (error) {
-        console.error('Error creating user profile:', error);
-        return false;
+      if (insertError) {
+        console.error('Error creating user profile:', insertError);
+        throw insertError;
       }
+      
+      console.log('User profile created successfully');
     } else {
       console.log('Profile exists:', profile.id);
     }

@@ -42,27 +42,20 @@ interface JournalEntryCardProps {
   entry: JournalEntry;
   onDelete?: (entryId: number) => void;
   isNew?: boolean;
-  forcedExpand?: boolean;
 }
 
-export function JournalEntryCard({ 
-  entry, 
-  onDelete, 
-  isNew = false,
-  forcedExpand = false
-}: JournalEntryCardProps) {
-  const [isExpanded, setIsExpanded] = useState(isNew || forcedExpand);
-  const [open, setOpen] = useState(false);
+export function JournalEntryCard({ entry, onDelete, isNew = false }: JournalEntryCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [open, setOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isThemesLoaded, setIsThemesLoaded] = useState(false);
   const isMobile = useIsMobile();
   const [highlightNew, setHighlightNew] = useState(isNew);
 
   // Auto-expand new entries
   useEffect(() => {
-    if (isNew || forcedExpand) {
+    if (isNew) {
       setIsExpanded(true);
-      setHighlightNew(isNew);
+      setHighlightNew(true);
       
       // Remove highlight after 5 seconds
       const timer = setTimeout(() => {
@@ -71,43 +64,10 @@ export function JournalEntryCard({
       
       return () => clearTimeout(timer);
     }
-  }, [isNew, forcedExpand]);
-
-  // Effect to check if themes are loaded
-  useEffect(() => {
-    if (entry.themes && entry.themes.length > 0) {
-      setIsThemesLoaded(true);
-    } else if (entry.id && !isThemesLoaded) {
-      // If we have an ID but no themes, try fetching the entry again to get themes
-      const fetchThemes = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('Journal Entries')
-            .select('master_themes')
-            .eq('id', entry.id)
-            .single();
-            
-          if (!error && data && data.master_themes && data.master_themes.length > 0) {
-            // Only update if the fetched themes are actually present
-            entry.themes = data.master_themes;
-            setIsThemesLoaded(true);
-          }
-        } catch (error) {
-          console.error('Error fetching themes:', error);
-        }
-      };
-      
-      // Set a timeout to wait a bit before trying to fetch themes
-      const themeTimer = setTimeout(() => {
-        fetchThemes();
-      }, 2000);
-      
-      return () => clearTimeout(themeTimer);
-    }
-  }, [entry.id, entry.themes, isThemesLoaded]);
+  }, [isNew]);
 
   const toggleExpanded = () => {
-    setIsExpanded(prev => !prev);
+    setIsExpanded(!isExpanded);
   };
 
   const handleDelete = async () => {
@@ -307,10 +267,12 @@ export function JournalEntryCard({
           {isExpanded ? (
             <div>
               <p className="text-xs md:text-sm text-foreground">{entry.content}</p>
-              <div className="mt-3 md:mt-4">
-                <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
-                <ThemeBoxes themes={entry.themes || []} isDisturbed={true} />
-              </div>
+              {entry.themes && entry.themes.length > 0 && (
+                <div className="mt-3 md:mt-4">
+                  <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
+                  <ThemeBoxes themes={entry.themes} isDisturbed={true} />
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-xs md:text-sm text-foreground line-clamp-3">{entry.content}</p>

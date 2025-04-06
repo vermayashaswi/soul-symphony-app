@@ -20,11 +20,13 @@ const Journal = () => {
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
   const [activeTab, setActiveTab] = useState('record');
-  const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
-  const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
+  const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
+  const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
+  const [showRetryButton, setShowRetryButton] = useState(false);
   const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
   const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
-  const [hasNavigated, setHasNavigated] = useState(false);
+  const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   
@@ -34,30 +36,9 @@ const Journal = () => {
     isProfileChecked
   );
 
-  // Debug effects
-  useEffect(() => {
-    console.log("[Journal] Mount with tab:", activeTab);
-    console.log("[Journal] Processing entries:", processingEntries);
-    console.log("[Journal] User ID:", user?.id);
-    
-    return () => {
-      console.log("[Journal] Unmounting Journal component");
-    };
-  }, []);
-  
-  useEffect(() => {
-    console.log("[Journal] Entries changed:", entries.length);
-    console.log("[Journal] Active tab:", activeTab);
-  }, [entries.length, activeTab]);
-  
-  useEffect(() => {
-    console.log("[Journal] Processing entries state changed:", processingEntries);
-  }, [processingEntries]);
-
   // Clear toasts on mount and unmount
   useEffect(() => {
     clearAllToasts();
-    setHasNavigated(true);
     
     return () => {
       clearAllToasts();
@@ -84,28 +65,34 @@ const Journal = () => {
         console.log('[Journal] New entries detected:', newEntryIds);
         setEntryHasBeenProcessed(true);
         
-        // Mark these entries as processed so they get auto-expanded
         setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
         
         toast.success('Journal entry analyzed and saved', {
-          duration: 5000,
+          duration: 3000,
           id: 'journal-success-toast',
-          closeButton: true
+          closeButton: false
         });
         
-        // Clear processing state
         setProcessingEntries([]);
         setToastIds({});
-        
-        // Force a refetch after a short delay to get updated themes
-        setTimeout(() => {
-          fetchEntries();
-        }, 1000);
       }
       
       previousEntriesRef.current = currentEntryIds;
     }
-  }, [entries, processingEntries, toastIds, fetchEntries]);
+  }, [entries, processingEntries, toastIds]);
+
+  // Clean up toasts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(toastIds).forEach(id => {
+        if (id) toast.dismiss(id);
+      });
+      
+      if (profileCheckTimeoutId) {
+        clearTimeout(profileCheckTimeoutId);
+      }
+    };
+  }, [toastIds, profileCheckTimeoutId]);
 
   // Profile check timeout
   useEffect(() => {
@@ -126,7 +113,7 @@ const Journal = () => {
     }
   }, [user?.id, isCheckingProfile]);
 
-  // Initial profile check - silently attempt to ensure profile exists
+  // Initial profile check
   useEffect(() => {
     if (user?.id && !isProfileChecked && !isCheckingProfile && !profileCheckedOnceRef.current) {
       checkUserProfile(user.id);
@@ -136,174 +123,132 @@ const Journal = () => {
   // Check for completed processing entries
   useEffect(() => {
     if (!loading && entries.length > 0 && processingEntries.length > 0) {
-      console.log('[Journal] Checking for completed entries:', { 
-        entries: entries.map(e => e.id), 
-        processing: processingEntries 
-      });
-      
       const entryIds = entries.map(entry => entry.id.toString());
       const completedProcessingEntries = processingEntries.filter(tempId => 
         entryIds.includes(tempId)
       );
       
       if (completedProcessingEntries.length > 0) {
-        console.log('[Journal] Found completed processing entries:', completedProcessingEntries);
+        console.log('[Journal] Found completed processing entries, dismissing their toasts:', completedProcessingEntries);
         setEntryHasBeenProcessed(true);
-        
-        // Get the actual entry IDs for auto-expanding
-        const processedIds = entries
-          .filter(entry => completedProcessingEntries.includes(entry.id.toString()))
-          .map(entry => entry.id);
-          
-        setProcessedEntryIds(prev => [...prev, ...processedIds]);
         
         completedProcessingEntries.forEach(tempId => {
           if (toastIds[tempId]) {
             toast.success('Journal entry analyzed and saved', { 
               id: toastIds[tempId], 
-              duration: 5000,
-              closeButton: true
+              duration: 3000,
+              closeButton: false
             });
           }
         });
         
-        // Update processing entries list
         setProcessingEntries(prev => 
           prev.filter(tempId => !completedProcessingEntries.includes(tempId))
         );
         
-        // Update toast IDs
         const newToastIds = { ...toastIds };
         completedProcessingEntries.forEach(tempId => {
           delete newToastIds[tempId];
         });
         setToastIds(newToastIds);
-        
-        // Force a refetch after a short delay to get updated themes
-        setTimeout(() => {
-          fetchEntries();
-        }, 1000);
       }
     }
-  }, [entries, loading, processingEntries, toastIds, fetchEntries]);
+  }, [entries, loading, processingEntries, toastIds]);
 
   // Notify about new entries
   useEffect(() => {
     if (loading || entries.length === 0) return;
     
-    // Check if this is first load
-    if (notifiedEntryIds.size === 0 && entries.length > 0) {
-      console.log('[Journal] Initial entries loaded:', entries.length);
-      const initialIds = new Set(entries.map(entry => entry.id));
-      setNotifiedEntryIds(initialIds);
-      return;
-    }
-    
-    // Check for new entries not being processed
     const newEntries = entries.filter(entry => 
       !notifiedEntryIds.has(entry.id) && 
       !processingEntries.some(tempId => tempId === entry.id.toString())
     );
     
-    if (newEntries.length > 0) {
-      console.log('[Journal] New entries detected that were not from processing:', newEntries.length);
-      
-      if (!entryHasBeenProcessed && hasNavigated) {
-        toast.success('Journal entry analyzed and saved', { 
-          duration: 5000, 
-          closeButton: true 
-        });
+    if (newEntries.length > 0 && notifiedEntryIds.size > 0) {
+      if (!entryHasBeenProcessed) {
+        toast.success('Journal entry analyzed and saved', { duration: 3000, closeButton: false });
         setEntryHasBeenProcessed(true);
       }
       
-      // Mark these entries as processed for auto-expanding
-      setProcessedEntryIds(prev => [...prev, ...newEntries.map(entry => entry.id)]);
-      
-      // Update notified IDs
       const updatedNotifiedIds = new Set(notifiedEntryIds);
       newEntries.forEach(entry => updatedNotifiedIds.add(entry.id));
       setNotifiedEntryIds(updatedNotifiedIds);
+    } 
+    else if (notifiedEntryIds.size === 0 && entries.length > 0) {
+      const initialIds = new Set(entries.map(entry => entry.id));
+      setNotifiedEntryIds(initialIds);
     }
     
-    // Check if any processing entries have been completed
     const newProcessingEntries = processingEntries.filter(tempId => 
       !entries.some(entry => entry.id.toString() === tempId)
     );
     
     if (newProcessingEntries.length !== processingEntries.length) {
-      console.log('[Journal] Some processing entries have completed:', {
-        before: processingEntries.length,
-        after: newProcessingEntries.length
-      });
-      
       setProcessingEntries(newProcessingEntries);
       
-      // Update toast IDs
       const newToastIds = { ...toastIds };
       processingEntries.forEach(tempId => {
         if (!newProcessingEntries.includes(tempId)) {
-          if (newToastIds[tempId]) {
-            toast.success('Journal entry processed successfully', {
-              id: newToastIds[tempId],
-              duration: 5000
-            });
-            delete newToastIds[tempId];
-          }
+          delete newToastIds[tempId];
         }
       });
       setToastIds(newToastIds);
     }
-  }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds, hasNavigated]);
+  }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
 
-  // Poll for updates while processing entries with more frequent and longer polling
+  // Poll for updates while processing entries
   useEffect(() => {
     if (processingEntries.length > 0) {
-      console.log('[Journal] Setting up polling for processing entries');
-      
-      // Set up an interval to poll for updates
       const interval = setInterval(() => {
         console.log('[Journal] Polling for updates while processing entries');
         setRefreshKey(prev => prev + 1);
         fetchEntries();
-      }, 2000);
+      }, 2000); // Decreased from 3000 to 2000 for faster updates
       
-      // Set up individual polling times with increasing intervals
-      const pollTimes = [1000, 2000, 3000, 5000, 8000, 12000, 15000, 20000, 25000, 30000];
-      
-      // Create individual timeouts for each poll time
-      const timeouts = pollTimes.map(time => 
-        setTimeout(() => {
-          console.log(`[Journal] One-time poll at ${time}ms`);
-          fetchEntries();
-          setRefreshKey(prev => prev + 1);
-        }, time)
-      );
-      
-      return () => {
-        clearInterval(interval);
-        timeouts.forEach(timeout => clearTimeout(timeout));
-      };
+      return () => clearInterval(interval);
     }
   }, [processingEntries.length, fetchEntries]);
 
-  // Silently check and create user profile if needed
   const checkUserProfile = async (userId: string) => {
     try {
       setIsCheckingProfile(true);
+      setShowRetryButton(false);
       
       console.log('[Journal] Checking user profile for ID:', userId);
       
-      // Silently try to ensure profile exists - no UI indication of failure
-      await ensureProfileExists();
+      const profileCreated = await ensureProfileExists();
       profileCheckedOnceRef.current = true;
+      
+      console.log('[Journal] Profile check result:', profileCreated);
+      
+      if (!profileCreated) {
+        setShowRetryButton(true);
+      }
       
       setIsProfileChecked(true);
     } catch (error: any) {
       console.error('[Journal] Error checking/creating user profile:', error);
+      
+      const now = Date.now();
+      if (now - lastProfileErrorTime > 60000) {
+        setLastProfileErrorTime(now);
+      }
+      
+      setShowRetryButton(true);
+      
       setIsProfileChecked(true);
     } finally {
       setIsCheckingProfile(false);
     }
+  };
+
+  const handleRetryProfileCreation = () => {
+    if (!user?.id) return;
+    
+    setProfileCheckRetryCount(0);
+    profileCheckedOnceRef.current = false;
+    setIsProfileChecked(false);
+    checkUserProfile(user.id);
   };
 
   const handleStartRecording = () => {
@@ -318,14 +263,14 @@ const Journal = () => {
     }
     
     try {
-      // Make sure we're on the entries tab after clicking save
+      // Switch to entries tab before starting processing - important to do this first
       setActiveTab('entries');
       
       setEntryHasBeenProcessed(false);
       clearAllToasts();
       
       const toastId = toast.loading('Processing your journal entry with AI...', {
-        duration: 60000, // Significantly increased from 30000 to 60000
+        duration: 15000,
         closeButton: false,
         onAutoClose: () => {
           if (toastId) {
@@ -352,8 +297,8 @@ const Journal = () => {
         fetchEntries();
         setRefreshKey(prev => prev + 1);
         
-        // Set up polling at regular intervals with more frequent checks
-        const pollIntervals = [1000, 2000, 3000, 4000, 5000, 7000, 9000, 12000, 15000, 20000, 25000, 30000, 40000, 50000];
+        // Set up polling at regular intervals
+        const pollIntervals = [1000, 2000, 3000, 5000, 8000, 12000];
         
         pollIntervals.forEach(interval => {
           setTimeout(() => {
@@ -376,8 +321,8 @@ const Journal = () => {
               toast.dismiss(toastIds[tempId]);
               
               toast.success('Journal entry analyzed and saved', { 
-                duration: 5000,
-                closeButton: true
+                duration: 3000,
+                closeButton: false
               });
               
               setToastIds(prev => {
@@ -391,21 +336,21 @@ const Journal = () => {
             fetchEntries();
             setRefreshKey(prev => prev + 1);
           }
-        }, 60000); // Increased from 35000 to 60000
+        }, 20000);
       } else {
         console.error('[Journal] Processing failed:', error);
         toast.dismiss(toastId);
         
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
-          duration: 5000,
-          closeButton: true
+          duration: 3000,
+          closeButton: false
         });
       }
     } catch (error) {
       console.error('Error processing recording:', error);
       toast.error('Error processing your recording', { 
-        duration: 5000,
-        closeButton: true
+        duration: 3000,
+        closeButton: false
       });
     }
   };
@@ -431,11 +376,7 @@ const Journal = () => {
         return updated;
       });
       
-      // Remove from processedEntryIds as well
-      setProcessedEntryIds(prev => prev.filter(id => id !== entryId));
-      
       setRefreshKey(prev => prev + 1);
-      fetchEntries();
     } catch (error) {
       console.error('Error deleting entry:', error);
     }
@@ -485,6 +426,27 @@ const Journal = () => {
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
       <JournalHeader />
+      
+      {showRetryButton && (
+        <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-amber-800 dark:text-amber-200">
+                We're having trouble setting up your profile. Your entries may not be saved correctly.
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto border-amber-500 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
+              onClick={handleRetryProfileCreation}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" /> 
+              Retry Profile Setup
+            </Button>
+          </div>
+        </div>
+      )}
       
       <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
         <TabsList className="grid w-full grid-cols-2 mb-6">

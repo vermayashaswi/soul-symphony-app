@@ -1,10 +1,9 @@
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -27,80 +26,8 @@ export function PlaybackControls({
   onSaveEntry,
   onRestart
 }: PlaybackControlsProps) {
-  // Calculate the current time based on the progress and total duration
-  const currentTime = playbackProgress * (audioDuration || 0);
-  const formattedProgress = formatTime(currentTime);
-  const formattedDuration = formatTime(audioDuration || 0); // Add fallback for zero duration
-  
-  // Track previous progress for animation smoothness
-  const prevProgressRef = useRef(playbackProgress);
-  const lastPlayAttemptRef = useRef<number>(0);
-  
-  // Use animation that respects the current progress position
-  useEffect(() => {
-    prevProgressRef.current = playbackProgress;
-  }, [playbackProgress]);
-
-  // Add enhanced debug logging for playback actions with debouncing
-  const handlePlayClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation(); // Prevent event bubbling
-    
-    // Debounce rapid clicks (prevent multiple rapid clicks)
-    const now = Date.now();
-    if (now - lastPlayAttemptRef.current < 300) {
-      console.log("Debouncing play click - too soon after last attempt");
-      return;
-    }
-    lastPlayAttemptRef.current = now;
-    
-    console.log("Play/Pause button clicked with details:", {
-      isPlaying: isPlaying,
-      audioBlob: audioBlob ? `Size: ${audioBlob.size}, Type: ${audioBlob.type}` : 'null',
-      audioDuration: audioDuration,
-      playbackProgress: playbackProgress
-    });
-    
-    if (!audioBlob) {
-      console.error("Cannot play: No audio blob available");
-      toast.error("No audio to play", { duration: 3000 });
-      return;
-    }
-    
-    try {
-      onTogglePlayback();
-      console.log("Toggled playback successfully");
-    } catch (err) {
-      console.error("Error in play/pause handler:", err);
-      toast.error("Error playing audio", { duration: 3000 });
-    }
-  };
-  
-  // Handle save click with error prevention
-  const handleSaveClick = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent any default form actions
-    e.stopPropagation(); // Prevent event bubbling
-    
-    if (!isProcessing && audioBlob) {
-      try {
-        console.log("Save button clicked, calling onSaveEntry with audio blob size:", audioBlob.size);
-        onSaveEntry();
-      } catch (err) {
-        console.error("Error in save handler:", err);
-        toast.error("Error saving recording", { duration: 3000 });
-      }
-    } else {
-      console.log("Save button clicked but disabled condition: isProcessing=", isProcessing, "audioBlob=", !!audioBlob);
-    }
-  };
-  
-  // Handle restart click
-  const handleRestartClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("Restart button clicked");
-    onRestart();
-  };
+  const formattedProgress = formatTime(playbackProgress * audioDuration);
+  const formattedDuration = formatTime(audioDuration);
   
   return (
     <div className="w-full px-4">
@@ -108,9 +35,9 @@ export function PlaybackControls({
         <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-primary rounded-full"
-            initial={{ width: `${(prevProgressRef.current || 0) * 100}%` }}
+            initial={{ width: 0 }}
             animate={{ width: `${playbackProgress * 100}%` }}
-            transition={{ type: "tween", duration: 0.1 }}
+            transition={{ type: "tween" }}
           />
         </div>
         <div className="flex justify-between mt-1.5 text-xs text-slate-500">
@@ -120,9 +47,9 @@ export function PlaybackControls({
       </div>
 
       <div className="flex items-center justify-center gap-4 mt-6">
-        {/* Play/Pause Button with better logging */}
+        {/* Play/Pause Button */}
         <Button 
-          onClick={handlePlayClick}
+          onClick={onTogglePlayback}
           variant="ghost" 
           size="icon"
           className="w-10 h-10 rounded-full border"
@@ -137,10 +64,9 @@ export function PlaybackControls({
         
         {/* Save Button */}
         <Button 
-          onClick={handleSaveClick}
+          onClick={onSaveEntry}
           disabled={isProcessing || !audioBlob}
           variant="default"
-          className="relative"
         >
           {isProcessing ? (
             <>
@@ -152,7 +78,7 @@ export function PlaybackControls({
         
         {/* Restart Button */}
         <Button 
-          onClick={handleRestartClick}
+          onClick={onRestart}
           variant="ghost" 
           size="icon"
           className="w-10 h-10 rounded-full border"
@@ -166,8 +92,6 @@ export function PlaybackControls({
 }
 
 function formatTime(seconds: number): string {
-  if (isNaN(seconds)) return "0:00";
-  
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;

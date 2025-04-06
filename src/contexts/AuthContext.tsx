@@ -15,20 +15,16 @@ import {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Add global auth initialized flag to prevent race conditions
-let AUTH_INITIALIZED = false;
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [profileCreationInProgress, setProfileCreationInProgress] = useState(false);
-  const [maxRetryAttempts] = useState(5); // Maximum number of automatic retries
-  const [retryDelay] = useState(800); // Base delay between retries in ms
+  const [profileCreationAttempts, setProfileCreationAttempts] = useState(0);
+  const [lastProfileAttemptTime, setLastProfileAttemptTime] = useState<number>(0);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
-  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -42,61 +38,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const ensureProfileExists = async (): Promise<boolean> => {
-    if (!user) return false;
+    if (!user || profileCreationInProgress) return false;
     
     if (profileExistsStatus === true || profileCreationComplete) {
       return true;
     }
     
-    // Start automatic retry process with exponential backoff if not already in progress
-    if (!profileCreationInProgress) {
-      return autoRetryProfileCreation();
+    const now = Date.now();
+    if (now - lastProfileAttemptTime < 2000) {
+      console.log('[AuthContext] Skipping profile check - too soon after last attempt');
+      return profileExistsStatus || false;
     }
-    
-    return profileExistsStatus || false;
-  };
-
-  // New function for automatic profile creation with retries
-  const autoRetryProfileCreation = async (): Promise<boolean> => {
-    if (!user || profileCreationComplete) return profileExistsStatus || false;
     
     try {
       setProfileCreationInProgress(true);
+      setLastProfileAttemptTime(now);
+      setProfileCreationAttempts(prev => prev + 1);
       
-      let attempt = 0;
-      let success = false;
+      console.log(`[AuthContext] Attempt #${profileCreationAttempts + 1} to ensure profile exists for user:`, user.id);
       
-      // Try up to maxRetryAttempts times with exponential backoff
-      while (attempt < maxRetryAttempts && !success) {
-        console.log(`[AuthContext] Profile creation attempt #${attempt + 1}`);
-        
-        // Add delay with exponential backoff, except for first attempt
-        if (attempt > 0) {
-          const backoffDelay = retryDelay * Math.pow(1.5, attempt - 1);
-          await new Promise(resolve => setTimeout(resolve, backoffDelay));
-        }
-        
-        success = await ensureProfileExistsService(user);
-        
-        if (success) {
-          console.log('[AuthContext] Profile created or verified successfully');
-          setProfileExistsStatus(true);
-          setProfileCreationComplete(true);
-          return true;
-        }
-        
-        attempt++;
-      }
+      const result = await ensureProfileExistsService(user);
       
-      // If we still failed after all retries, set the status but don't surface error to user
-      if (!success) {
-        console.error('[AuthContext] Profile creation failed after multiple attempts');
+      if (result) {
+        console.log('[AuthContext] Profile created or verified successfully');
+        setProfileCreationAttempts(0);
+        setProfileExistsStatus(true);
+        setProfileCreationComplete(true);
+      } else if (profileCreationAttempts < 3) {
+        console.log(`[AuthContext] Profile creation failed on attempt #${profileCreationAttempts + 1}, status: ${result}`);
         setProfileExistsStatus(false);
       }
       
-      return success;
+      return result;
     } catch (error) {
-      console.error('[AuthContext] Error in autoRetryProfileCreation:', error);
+      console.error('[AuthContext] Error in ensureProfileExists:', error);
       setProfileExistsStatus(false);
       return false;
     } finally {
@@ -185,8 +160,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       
-      // Start automatic retry process
-      return await autoRetryProfileCreation();
+      const profileCreated = await ensureProfileExistsService(currentUser);
+      
+      if (profileCreated) {
+        console.log('[AuthContext] Profile created or verified for user:', currentUser.email);
+        setProfileCreationAttempts(0);
+        setProfileExistsStatus(true);
+        setProfileCreationComplete(true);
+        return true;
+      } else {
+        console.warn('[AuthContext] First attempt to create profile failed, retrying once...');
+        
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        const retryResult = await ensureProfileExistsService(currentUser);
+        if (retryResult) {
+          console.log('[AuthContext] Profile created or verified on retry for user:', currentUser.email);
+          setProfileCreationAttempts(0);
+          setProfileExistsStatus(true);
+          setProfileCreationComplete(true);
+          return true;
+        }
+        
+        setProfileExistsStatus(false);
+        return false;
+      }
     } catch (error) {
       console.error('[AuthContext] Error in profile creation:', error);
       setProfileExistsStatus(false);
@@ -196,73 +194,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // New function to forcibly re-initialize auth context
-  const forceRefreshAuth = async (): Promise<boolean> => {
-    try {
-      console.log('[AuthContext] Force refreshing auth state');
-      const { data } = await supabase.auth.getSession();
-      
-      if (data?.session) {
-        setSession(data.session);
-        setUser(data.session.user);
-        
-        if (data.session.user) {
-          const profileExists = await createOrVerifyProfile(data.session.user);
-          return profileExists;
-        }
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('[AuthContext] Error in force refresh:', error);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
     console.log("[AuthContext] Setting up auth state listener");
     
-    // Initialize auth state from last session first
-    const initializeAuth = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        console.log('[AuthContext] Initial session check:', data?.session?.user?.email);
-        
-        if (data?.session) {
-          setSession(data.session);
-          setUser(data.session.user);
-          
-          if (data.session.user) {
-            const delay = isMobileDevice ? 1200 : 800;
-            console.log(`[AuthContext] Delaying initial profile creation by ${delay}ms for platform stability`);
-            
-            // Delay profile creation slightly to ensure auth is fully initialized
-            setTimeout(() => {
-              createOrVerifyProfile(data.session.user)
-                .catch(error => console.error('[AuthContext] Error in initial profile creation:', error));
-            }, delay);
-          }
-        }
-        
-        // Mark auth as initialized - IMPORTANT
-        AUTH_INITIALIZED = true;
-        setAuthInitialized(true);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('[AuthContext] Error in initial auth check:', error);
-        // Mark auth as initialized even on error to prevent hanging
-        AUTH_INITIALIZED = true;
-        setAuthInitialized(true);
-        setIsLoading(false);
-      }
-    };
-    
-    // Start initialization
-    initializeAuth();
-    
-    // Set up ongoing auth change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
         console.log('[AuthContext] Auth state changed:', event, currentSession?.user?.email);
@@ -279,12 +213,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }, delay);
         }
         
-        // Update initialization state
-        if (!AUTH_INITIALIZED) {
-          AUTH_INITIALIZED = true;
-          setAuthInitialized(true);
-        }
-        
         setIsLoading(false);
 
         if (event === 'SIGNED_IN') {
@@ -297,12 +225,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+      console.log('[AuthContext] Initial session check:', currentSession?.user?.email);
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      
+      if (currentSession?.user) {
+        const delay = isMobileDevice ? 1200 : 800;
+        console.log(`[AuthContext] Delaying initial profile creation by ${delay}ms for platform stability`);
+        
+        setTimeout(() => {
+          createOrVerifyProfile(currentSession.user)
+            .catch(error => console.error('[AuthContext] Error in initial profile creation:', error));
+        }, delay);
+      }
+      
+      setIsLoading(false);
+    });
+
     return () => {
       subscription.unsubscribe();
     };
   }, [isMobileDevice]);
 
-  // Add value of forceRefreshAuth to context
   const value = {
     session,
     user,
@@ -315,8 +260,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetPassword,
     updateUserProfile,
     ensureProfileExists,
-    forceRefreshAuth,
-    authInitialized
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

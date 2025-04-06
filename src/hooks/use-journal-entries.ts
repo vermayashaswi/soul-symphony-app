@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { checkUserProfile, createUserProfile, fetchJournalEntries } from '@/services/journalService';
@@ -31,49 +30,25 @@ export function useJournalEntries(
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const consecutiveEmptyFetchesRef = useRef(0);
   const entriesRef = useRef<JournalEntry[]>([]);
-  const profileCheckAttemptsRef = useRef(0);
-  const maxProfileAttempts = 3;
 
   useEffect(() => {
     entriesRef.current = entries;
   }, [entries]);
 
-  const verifyUserProfile = useCallback(async (userId: string): Promise<boolean> => {
+  const verifyUserProfile = useCallback(async (userId: string) => {
     try {
       console.log('[useJournalEntries] Verifying user profile:', userId);
-      
-      // First try checking if profile exists
       const exists = await checkUserProfile(userId);
       setProfileExists(exists);
       
-      if (exists) {
-        return true;
+      if (!exists) {
+        console.log('[useJournalEntries] Profile does not exist, creating one');
+        const created = await createUserProfile(userId);
+        setProfileExists(created);
+        return created;
       }
       
-      // If profile doesn't exist, try creating it with multiple attempts
-      let profileCreated = false;
-      profileCheckAttemptsRef.current++;
-      
-      if (profileCheckAttemptsRef.current <= maxProfileAttempts) {
-        console.log(`[useJournalEntries] Profile does not exist, creating one (attempt ${profileCheckAttemptsRef.current}/${maxProfileAttempts})`);
-        
-        profileCreated = await createUserProfile(userId);
-        setProfileExists(profileCreated);
-        
-        if (!profileCreated && profileCheckAttemptsRef.current < maxProfileAttempts) {
-          // Wait a bit before the next attempt
-          await new Promise(resolve => setTimeout(resolve, 800));
-          
-          console.log(`[useJournalEntries] Retrying profile creation (attempt ${profileCheckAttemptsRef.current + 1}/${maxProfileAttempts})`);
-          profileCheckAttemptsRef.current++;
-          
-          // Try one more time
-          profileCreated = await createUserProfile(userId);
-          setProfileExists(profileCreated);
-        }
-      }
-      
-      return profileCreated;
+      return exists;
     } catch (error) {
       console.error('[useJournalEntries] Error verifying user profile:', error);
       return false;
@@ -95,18 +70,22 @@ export function useJournalEntries(
       return;
     }
     
-    // Only check profile if not already verified and this isn't passed in as a prop
-    if (profileExists === false && profileCheckAttemptsRef.current < maxProfileAttempts) {
+    if (profileExists === false) {
       const created = await createUserProfile(userId);
       if (!created) {
-        // Don't show error to user, just log it
-        console.error('[useJournalEntries] Failed to create user profile');
+        setLoading(false);
+        setError('Failed to create user profile');
+        return;
       }
     } else if (profileExists === null && !isProfileChecked) {
-      await verifyUserProfile(userId);
+      const exists = await verifyUserProfile(userId);
+      if (!exists) {
+        setLoading(false);
+        setError('Failed to create user profile');
+        return;
+      }
     }
     
-    // Always clear errors to avoid showing them to users
     setError(null);
     
     try {
@@ -150,13 +129,7 @@ export function useJournalEntries(
       initialFetchDoneRef.current = true;
     } catch (error: any) {
       console.error('[useJournalEntries] Error fetching entries:', error);
-      
-      // Only set error if it's definitely not a profile issue
-      if (!error.message?.includes('profile') && !error.message?.includes('auth')) {
-        setError('Failed to load entries: ' + error.message);
-      } else {
-        console.log('[useJournalEntries] Suppressing profile-related error:', error.message);
-      }
+      setError('Failed to load entries: ' + error.message);
       
       // Don't clear entries on error if we already have entries
       if (entriesRef.current.length === 0) {

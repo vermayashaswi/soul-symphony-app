@@ -1,6 +1,5 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Loader2, ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
@@ -8,12 +7,12 @@ import { useAudioPlayback } from '@/hooks/use-audio-playback';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
-import { useNavigate } from 'react-router-dom';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -25,12 +24,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
-  const [navigationAttempted, setNavigationAttempted] = useState(false);
-  const [navigationCompleted, setNavigationCompleted] = useState(false);
-  const [processingCompleted, setProcessingCompleted] = useState(false);
-  const { user, forceRefreshAuth } = useAuth();
+  const { user } = useAuth();
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
   
   const {
     isRecording,
@@ -54,50 +49,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     audioDuration,
     togglePlayback,
     audioRef,
-    audioLoaded,
-    lastError,
     reset: resetPlayback
   } = useAudioPlayback({ audioBlob });
-
-  // Debug Effects
-  useEffect(() => {
-    if (audioBlob) {
-      console.log("VoiceRecorder: Audio blob available", {
-        size: audioBlob.size,
-        type: audioBlob.type,
-        audioDuration
-      });
-    }
-  }, [audioBlob, audioDuration]);
-  
-  useEffect(() => {
-    if (lastError) {
-      console.error("VoiceRecorder: Audio playback error:", lastError);
-    }
-  }, [lastError]);
-
-  useEffect(() => {
-    console.log("VoiceRecorder: Audio loaded state changed:", audioLoaded);
-  }, [audioLoaded]);
-
-  const checkAuthBeforeSaving = useCallback(async () => {
-    if (!user) {
-      try {
-        const authValid = await forceRefreshAuth();
-        if (!authValid) {
-          console.error("[VoiceRecorder] Auth validation failed before saving");
-          toast.error("Session expired. Please refresh and try again.", { duration: 5000 });
-          return false;
-        }
-        return true;
-      } catch (error) {
-        console.error("[VoiceRecorder] Auth refresh error:", error);
-        toast.error("Authentication error. Please refresh and try again.", { duration: 5000 });
-        return false;
-      }
-    }
-    return true;
-  }, [user, forceRefreshAuth]);
 
   useEffect(() => {
     if (isRecording) {
@@ -108,7 +61,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   useEffect(() => {
     if (isRecording && recordingTime >= 120) {
       toast.warning("Your recording is quite long. Consider stopping now for better processing.", {
-        duration: 5000,
+        duration: 3000,
       });
     }
   }, [isRecording, recordingTime]);
@@ -124,23 +77,17 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const handleSaveEntry = async () => {
     if (!audioBlob) {
       setRecordingError("No audio recording available");
-      toast.error("No audio recording available", { duration: 3000 });
+      return;
+    }
+    
+    if (audioDuration < 0.5) {
+      setRecordingError("Recording is too short. Please try again.");
       return;
     }
     
     try {
       setIsProcessing(true);
       setRecordingError(null);
-      setNavigationAttempted(false);
-      setNavigationCompleted(false);
-      setProcessingCompleted(false);
-      
-      const isAuthValid = await checkAuthBeforeSaving();
-      if (!isAuthValid) {
-        setIsProcessing(false);
-        setRecordingError("Authentication error. Please refresh the page and try again.");
-        return;
-      }
       
       const normalizedBlob = normalizeAudioBlob(audioBlob);
       
@@ -152,71 +99,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       });
       
       if (onRecordingComplete) {
-        // Call the completion handler but with a try/catch to prevent navigation issues
-        try {
-          console.log("Calling onRecordingComplete callback");
-          
-          // Indicate that processing is starting
-          toast.loading("Processing your journal entry...", { 
-            id: "processing-journal",
-            duration: 30000 // Long duration to avoid disappearing during processing
-          });
-          
-          // Handle successful recording with proper timeout for UI feedback
-          onRecordingComplete(normalizedBlob);
-          setProcessingCompleted(true);
-          
-          // Set navigation attempted flag before trying to navigate
-          setNavigationAttempted(true);
-          
-          // Wait before navigating to ensure the journal page is ready
-          setTimeout(() => {
-            if (window.location.pathname === '/') {
-              console.log("Navigating to journal page after processing");
-              
-              // Update toast to indicate navigation
-              toast.success("Recording saved! Navigating to journal...", { 
-                id: "processing-journal",
-                duration: 5000
-              });
-              
-              // Set a slight delay to ensure toast is visible
-              setTimeout(() => {
-                console.log("Actually navigating to journal page now");
-                navigate('/journal');
-                setNavigationCompleted(true);
-              }, 1000);
-            } else {
-              setNavigationCompleted(true);
-              setIsProcessing(false);
-            }
-          }, 1000);
-        } catch (error) {
-          console.error("Error in recording complete callback:", error);
-          toast.error("Error processing your recording", { duration: 5000 });
-          setIsProcessing(false);
-          setNavigationAttempted(false);
-        }
-      } else {
-        // If no callback is provided, we're done
-        setIsProcessing(false);
-        toast.success("Recording saved successfully", { duration: 3000 });
-        
-        // If we're on the root route, navigate to journal
-        if (window.location.pathname === '/') {
-          console.log("Navigating to journal page");
-          setTimeout(() => {
-            navigate('/journal');
-            setNavigationCompleted(true);
-          }, 1000);
-        }
+        onRecordingComplete(normalizedBlob);
       }
     } catch (error: any) {
       console.error('Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
-      toast.error("Error saving recording", { duration: 5000 });
+      toast.error("Error saving recording");
+    } finally {
       setIsProcessing(false);
-      setNavigationAttempted(false);
     }
   };
 
@@ -225,15 +115,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     resetPlayback();
     setRecordingError(null);
     setShowAnimation(true);
-    setNavigationAttempted(false);
-    setNavigationCompleted(false);
-    setProcessingCompleted(false);
-    toast.info("Starting a new recording", { duration: 3000 });
+    toast.info("Starting a new recording");
   };
 
   return (
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
-      {/* Ensure audio element is always in the DOM */}
       <audio ref={audioRef} className="hidden" />
       
       <div className={cn(
@@ -250,7 +136,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
           <div className="relative z-10 flex justify-center items-center mt-40">
             <RecordingButton
               isRecording={isRecording}
-              isProcessing={isProcessing || navigationAttempted}
+              isProcessing={isProcessing}
               hasPermission={hasPermission}
               onRecordingStart={() => {
                 startRecording();
@@ -273,7 +159,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
                 <PlaybackControls
                   audioBlob={audioBlob}
                   isPlaying={isPlaying}
-                  isProcessing={isProcessing || navigationAttempted}
+                  isProcessing={isProcessing}
                   playbackProgress={playbackProgress}
                   audioDuration={audioDuration}
                   onTogglePlayback={togglePlayback}
@@ -307,16 +193,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
             </motion.div>
           )}
           
-          {(isProcessing || navigationAttempted) && !navigationCompleted && (
+          {isProcessing && (
             <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground relative z-10 absolute bottom-4">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>
-                {processingCompleted 
-                  ? "Navigating to journal..." 
-                  : navigationAttempted 
-                    ? "Processing entry..." 
-                    : "Saving recording..."}
-              </span>
+              <span>Processing...</span>
             </div>
           )}
         </div>
