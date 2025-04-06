@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, RefreshCw, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -236,7 +236,7 @@ const JournalProfileDebug = () => {
                    '';
       } else {
         addEvent({
-          type: 'warning',
+          type: 'info',
           message: 'No user metadata found',
           source: 'debugger'
         });
@@ -433,7 +433,7 @@ const JournalProfileDebug = () => {
                       {event.type === 'error' && <AlertCircle className="h-4 w-4 text-red-500" />}
                       {event.type === 'success' && <CheckCircle className="h-4 w-4 text-green-500" />}
                       {event.type === 'api' && <RefreshCw className="h-4 w-4 text-blue-500" />}
-                      {(event.type === 'check' || event.type === 'create' || event.type === 'info') && <div className="h-4 w-4 rounded-full bg-orange-500" />}
+                      {(event.type === 'check' || event.type === 'create' || event.type === 'info') && <Info className="h-4 w-4 text-orange-500" />}
                       
                       <Badge variant={
                         event.type === 'error' ? 'destructive' : 

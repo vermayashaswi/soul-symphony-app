@@ -7,93 +7,127 @@ import { toast } from 'sonner';
  * Ensures a profile exists for the given user
  */
 export const ensureProfileExists = async (user: User | null): Promise<boolean> => {
-  if (!user) return false;
+  if (!user) {
+    console.log('Cannot create profile: No user provided');
+    return false;
+  }
   
   try {
-    console.log('Checking if profile exists for user:', user.id);
+    console.log('[ProfileService] Checking if profile exists for user:', user.id);
+    console.log('[ProfileService] User metadata:', user.user_metadata);
+    console.log('[ProfileService] Auth provider:', user.app_metadata?.provider);
     
     // First check if the profile already exists
     const { data, error } = await supabase
       .from('profiles')
       .select('id')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
       
     if (error) {
-      if (error.code === 'PGRST116') {
-        console.log('Profile not found, creating new profile');
+      if (error.code === 'PGRST116') { // Profile not found
+        console.log('[ProfileService] Profile not found, creating new profile');
         
-        // Extract user metadata - handle different metadata formats (Google vs. Email)
+        // Extract user metadata - handle different metadata formats for different auth providers
         let fullName = '';
         let avatarUrl = '';
         const email = user.email || '';
         
+        // Log all metadata to help debug
+        console.log('[ProfileService] Full user metadata:', JSON.stringify(user.user_metadata, null, 2));
+        
         // Try different metadata paths for different auth providers
         if (user.user_metadata) {
-          // Google auth often uses these fields
-          fullName = user.user_metadata?.full_name || 
-                    user.user_metadata?.name ||
-                    `${user.user_metadata?.given_name || ''} ${user.user_metadata?.family_name || ''}`.trim();
-          
-          avatarUrl = user.user_metadata?.avatar_url || 
-                     user.user_metadata?.picture || 
-                     '';
+          // Google auth uses these fields
+          if (user.app_metadata?.provider === 'google') {
+            console.log('[ProfileService] Extracting Google-specific metadata');
+            fullName = user.user_metadata?.name || 
+                      user.user_metadata?.full_name ||
+                      `${user.user_metadata?.given_name || ''} ${user.user_metadata?.family_name || ''}`.trim();
+            
+            avatarUrl = user.user_metadata?.picture || 
+                       user.user_metadata?.avatar_url || 
+                       '';
+          } else {
+            // Email auth or other providers
+            fullName = user.user_metadata?.full_name || 
+                      user.user_metadata?.name ||
+                      `${user.user_metadata?.given_name || ''} ${user.user_metadata?.family_name || ''}`.trim();
+            
+            avatarUrl = user.user_metadata?.avatar_url || 
+                       user.user_metadata?.picture || 
+                       '';
+          }
         }
         
-        console.log('Creating profile with data:', {
+        console.log('[ProfileService] Creating profile with data:', {
           id: user.id,
           email,
           full_name: fullName,
           avatar_url: avatarUrl
         });
         
-        // Try upsert approach directly (handles both insert and update cases)
+        // Explicit handling for different auth providers
+        const profileData = {
+          id: user.id,
+          email,
+          full_name: fullName,
+          avatar_url: avatarUrl,
+          onboarding_completed: false,
+          updated_at: new Date().toISOString()
+        };
+        
+        // First, try upsert with explicit conflict handling
         const { error: upsertError } = await supabase
           .from('profiles')
-          .upsert([{
-            id: user.id,
-            email,
-            full_name: fullName,
-            avatar_url: avatarUrl,
-            onboarding_completed: false,
-            updated_at: new Date().toISOString()
-          }], { 
+          .upsert([profileData], { 
             onConflict: 'id',
-            ignoreDuplicates: false 
+            ignoreDuplicates: false
           });
             
         if (upsertError) {
-          console.error('Error upserting profile:', upsertError);
+          console.error('[ProfileService] Error upserting profile:', upsertError);
           
-          // One more fallback attempt with a direct insert
+          // If upsert fails, try direct insert as fallback
+          console.log('[ProfileService] Attempting direct insert as fallback');
           const { error: insertError } = await supabase
             .from('profiles')
-            .insert([{
-              id: user.id,
-              email,
-              full_name: fullName,
-              avatar_url: avatarUrl,
-              onboarding_completed: false
-            }]);
+            .insert([profileData]);
             
           if (insertError) {
-            console.error('Final fallback insert failed:', insertError);
-            return false;
+            console.error('[ProfileService] Final fallback insert failed:', insertError);
+            
+            // Last resort - try without updated_at field which might cause issues
+            console.log('[ProfileService] Trying simplified insert without updated_at');
+            const { error: finalError } = await supabase
+              .from('profiles')
+              .insert([{
+                id: user.id,
+                email,
+                full_name: fullName,
+                avatar_url: avatarUrl,
+                onboarding_completed: false
+              }]);
+              
+            if (finalError) {
+              console.error('[ProfileService] All insert attempts failed:', finalError);
+              return false;
+            }
           }
         }
         
-        console.log('Profile created successfully');
+        console.log('[ProfileService] Profile created successfully');
         return true;
       } else {
-        console.error('Error checking if profile exists:', error);
+        console.error('[ProfileService] Error checking if profile exists:', error);
         return false;
       }
     }
     
-    console.log('Profile exists:', data.id);
+    console.log('[ProfileService] Profile already exists:', data.id);
     return true;
   } catch (error: any) {
-    console.error('Error ensuring profile exists:', error);
+    console.error('[ProfileService] Error ensuring profile exists:', error);
     return false;
   }
 };

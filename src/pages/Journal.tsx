@@ -41,14 +41,14 @@ const Journal = () => {
     try {
       setIsCheckingProfile(true);
       
-      console.log('Checking user profile for ID:', userId);
+      console.log('[Journal] Checking user profile for ID:', userId);
       
       // Ensure profile exists with retry mechanism
       let profileCreated = await ensureProfileExists();
       
       // If profile creation failed and we haven't retried too many times
       if (!profileCreated && profileCheckRetryCount < 5) {
-        console.log('Profile check failed, retrying...', profileCheckRetryCount + 1);
+        console.log('[Journal] Profile check failed, retrying...', profileCheckRetryCount + 1);
         
         // Wait a bit longer each time (exponential backoff)
         const delay = 1000 * Math.pow(1.5, profileCheckRetryCount);
@@ -60,10 +60,10 @@ const Journal = () => {
       }
       
       if (profileCreated) {
-        console.log('Profile created or verified successfully');
+        console.log('[Journal] Profile created or verified successfully');
         setIsProfileChecked(true);
       } else if (profileCheckRetryCount >= 5) {
-        console.error('Failed to create profile after multiple retries');
+        console.error('[Journal] Failed to create profile after multiple retries');
         
         // Only show error toast occasionally (max once per minute)
         const now = Date.now();
@@ -76,7 +76,7 @@ const Journal = () => {
         setIsProfileChecked(true);
       }
     } catch (error: any) {
-      console.error('Error checking/creating user profile:', error);
+      console.error('[Journal] Error checking/creating user profile:', error);
       
       // Only show error toast occasionally (max once per minute)
       const now = Date.now();
