@@ -164,19 +164,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
                   audioDuration={audioDuration}
                   onTogglePlayback={togglePlayback}
                   onSaveEntry={handleSaveEntry}
+                  onRestart={handleRestart}
                 />
-                
-                <div className="w-full flex justify-center mt-auto pt-8">
-                  <Button
-                    onClick={handleRestart}
-                    variant="outline"
-                    className="flex items-center gap-2 bg-background/80 backdrop-blur-sm"
-                    disabled={isProcessing}
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    <span>Start Over</span>
-                  </Button>
-                </div>
               </div>
             ) : hasPermission === false ? (
               <motion.p

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, RotateCcw, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { formatTime } from '@/utils/format-time';
@@ -14,6 +14,7 @@ interface PlaybackControlsProps {
   audioDuration: number;
   onTogglePlayback: () => void;
   onSaveEntry: () => void;
+  onRestart?: () => void;
 }
 
 export function PlaybackControls({
@@ -23,7 +24,8 @@ export function PlaybackControls({
   playbackProgress,
   audioDuration,
   onTogglePlayback,
-  onSaveEntry
+  onSaveEntry,
+  onRestart
 }: PlaybackControlsProps) {
   if (!audioBlob) return null;
 
@@ -35,25 +37,6 @@ export function PlaybackControls({
       className="flex flex-col items-center gap-3 w-full max-w-xs"
     >
       <div className="w-full">
-        <Button 
-          onClick={onTogglePlayback} 
-          variant="outline"
-          disabled={isProcessing}
-          className="rounded-full h-10 px-4 flex items-center gap-2 w-full mb-1"
-        >
-          {isPlaying ? (
-            <>
-              <Pause className="w-4 h-4" />
-              <span>Pause</span>
-            </>
-          ) : (
-            <>
-              <Play className="w-4 h-4" />
-              <span>Play Recording</span>
-            </>
-          )}
-        </Button>
-        
         {/* Playback progress indicator */}
         <div className="w-full space-y-1 mb-4">
           <Progress value={playbackProgress} className="h-2" />
@@ -64,15 +47,42 @@ export function PlaybackControls({
             <span>{formatTime(Math.floor(audioDuration || 0))}</span>
           </div>
         </div>
+        
+        {/* Control buttons in a single row */}
+        <div className="flex items-center justify-between w-full gap-2 mb-4">
+          <Button
+            onClick={onTogglePlayback}
+            variant="outline"
+            disabled={isProcessing}
+            size="icon"
+            className="h-10 w-10 rounded-full flex-shrink-0"
+          >
+            {isPlaying ? (
+              <Pause className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+          </Button>
+          
+          <Button
+            onClick={onSaveEntry}
+            disabled={isProcessing}
+            className="flex-grow rounded-lg flex items-center justify-center"
+          >
+            <span>Save Entry</span>
+          </Button>
+          
+          <Button
+            onClick={onRestart}
+            variant="outline"
+            disabled={isProcessing}
+            size="icon"
+            className="h-10 w-10 rounded-full flex-shrink-0"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
-      
-      <Button 
-        onClick={onSaveEntry}
-        disabled={isProcessing}
-        className="w-full rounded-lg flex items-center justify-center gap-2 mb-4"
-      >
-        <span>Save Entry</span>
-      </Button>
     </motion.div>
   );
 }
