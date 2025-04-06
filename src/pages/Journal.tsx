@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const Journal = () => {
-  const { user } = useAuth();
+  const { user, ensureProfileExists } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
@@ -29,7 +29,6 @@ const Journal = () => {
     }
   }, [user?.id]);
 
-  // Let's modify just the checkUserProfile function in Journal.tsx
   const checkUserProfile = async (userId: string) => {
     try {
       const event = new CustomEvent('journalOperationStart', {
@@ -38,13 +37,12 @@ const Journal = () => {
           message: 'Checking user profile'
         }
       });
-      const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
+      window.dispatchEvent(event);
       
       console.log('Checking user profile for ID:', userId);
       
-      // Use the ensureProfileExists function from AuthContext instead
-      const { ensureProfileExists } = useAuth();
-      await ensureProfileExists();
+      // Ensure profile exists
+      const profileCreated = await ensureProfileExists();
       
       // Still check the profile to get the onboarding status
       const { data: profile, error } = await supabase
@@ -55,15 +53,6 @@ const Journal = () => {
       
       if (error) {
         console.error('Error checking profile:', error);
-        if (opId) {
-          window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
-            detail: {
-              id: opId,
-              status: 'error',
-              details: `Profile error: ${error.message}`
-            }
-          }));
-        }
         throw error;
       }
       
@@ -71,14 +60,12 @@ const Journal = () => {
       setIsFirstTimeUser(!profile.onboarding_completed);
       setIsProfileChecked(true);
       
-      if (opId) {
-        window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
-          detail: {
-            id: opId,
-            status: 'success'
-          }
-        }));
-      }
+      window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+        detail: {
+          id: (event as any).detail?.id,
+          status: 'success'
+        }
+      }));
     } catch (error: any) {
       console.error('Error checking/creating user profile:', error);
       toast.error('Error setting up profile. Please try again.');
@@ -91,7 +78,7 @@ const Journal = () => {
   };
 
   // Handle when a recording is completed
-  const handleRecordingComplete = async (audioBlob: Blob | null) => {
+  const handleRecordingComplete = async (audioBlob: Blob) => {
     if (!audioBlob || !user?.id) return;
     
     try {
@@ -131,7 +118,7 @@ const Journal = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
-      <JournalHeader />
+      <JournalHeader isFirstTime={isFirstTimeUser} />
       
       {/* Voice recorder component */}
       <div className="mb-8">

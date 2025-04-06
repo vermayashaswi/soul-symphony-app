@@ -36,6 +36,11 @@ const JournalHeader = ({ isFirstTime }: JournalHeaderProps = {}) => {
             >
               <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500 shrink-0" />
               <span className="inline-block">Your <SouloLogo className="inline-flex" useColorTheme={true} /> Journal</span>
+              {isFirstTime && (
+                <span className="text-sm font-normal text-primary ml-2 bg-primary/10 px-2 py-0.5 rounded">
+                  New User
+                </span>
+              )}
             </motion.h1>
             <motion.p 
               className="text-muted-foreground mt-0.5 text-sm sm:text-base"
@@ -43,7 +48,9 @@ const JournalHeader = ({ isFirstTime }: JournalHeaderProps = {}) => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              Record your thoughts and feelings through voice journaling
+              {isFirstTime 
+                ? "Welcome! Start your journaling journey by recording your first entry" 
+                : "Record your thoughts and feelings through voice journaling"}
             </motion.p>
           </div>
         </div>

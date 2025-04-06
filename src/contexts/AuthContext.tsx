@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(currentSession?.user ?? null);
         
         // If user just signed in or signed up, ensure profile exists
-        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'SIGNED_UP') && currentSession?.user) {
+        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || 
+            event === 'SIGNED_UP') && currentSession?.user) {
           // Using setTimeout to prevent auth deadlock
           setTimeout(async () => {
             await ensureProfileExists(currentSession.user);
