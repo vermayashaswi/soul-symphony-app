@@ -26,7 +26,9 @@ export function PlaybackControls({
   onSaveEntry,
   onRestart
 }: PlaybackControlsProps) {
-  const formattedProgress = formatTime(playbackProgress * audioDuration);
+  // Calculate the current time based on the progress and total duration
+  const currentTime = playbackProgress * audioDuration;
+  const formattedProgress = formatTime(currentTime);
   const formattedDuration = formatTime(audioDuration);
   
   return (

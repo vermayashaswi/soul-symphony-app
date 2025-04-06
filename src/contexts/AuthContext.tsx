@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -195,6 +196,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log("[AuthContext] Setting up auth state listener");
     
+    // Initialize auth state from last session first
+    const initializeAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        console.log('[AuthContext] Initial session check:', data?.session?.user?.email);
+        
+        if (data?.session) {
+          setSession(data.session);
+          setUser(data.session.user);
+          
+          if (data.session.user) {
+            const delay = isMobileDevice ? 1200 : 800;
+            console.log(`[AuthContext] Delaying initial profile creation by ${delay}ms for platform stability`);
+            
+            // Delay profile creation slightly to ensure auth is fully initialized
+            setTimeout(() => {
+              createOrVerifyProfile(data.session.user)
+                .catch(error => console.error('[AuthContext] Error in initial profile creation:', error));
+            }, delay);
+          }
+        }
+        
+        setIsLoading(false);
+      } catch (error) {
+        console.error('[AuthContext] Error in initial auth check:', error);
+        setIsLoading(false);
+      }
+    };
+    
+    // Start initialization
+    initializeAuth();
+    
+    // Set up ongoing auth change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
         console.log('[AuthContext] Auth state changed:', event, currentSession?.user?.email);
@@ -222,24 +256,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     );
-
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      console.log('[AuthContext] Initial session check:', currentSession?.user?.email);
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      if (currentSession?.user) {
-        const delay = isMobileDevice ? 1200 : 800;
-        console.log(`[AuthContext] Delaying initial profile creation by ${delay}ms for platform stability`);
-        
-        setTimeout(() => {
-          createOrVerifyProfile(currentSession.user)
-            .catch(error => console.error('[AuthContext] Error in initial profile creation:', error));
-        }, delay);
-      }
-      
-      setIsLoading(false);
-    });
 
     return () => {
       subscription.unsubscribe();
