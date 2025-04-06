@@ -1,9 +1,47 @@
 
 import { toast } from "sonner";
 
+// Duration constants
+const STANDARD_DURATION = 1000; // 1 second for regular toasts
+const ACTIVE_JOB_DURATION = null; // null means the toast won't auto-dismiss
+
 // Check if we're in a browser environment
 const isBrowser = (): boolean => {
   return typeof window !== 'undefined';
+};
+
+// Enhanced toast functions for different types of notifications
+export const showToast = (
+  message: string, 
+  type: "default" | "success" | "error" | "info" | "warning" = "default",
+  isActiveJob = false
+) => {
+  const duration = isActiveJob ? ACTIVE_JOB_DURATION : STANDARD_DURATION;
+  
+  let toastId;
+  switch (type) {
+    case "success":
+      toastId = toast.success(message, { duration });
+      break;
+    case "error":
+      toastId = toast.error(message, { duration });
+      break;
+    case "info":
+      toastId = toast.info(message, { duration });
+      break;
+    case "warning":
+      toastId = toast.warning(message, { duration });
+      break;
+    default:
+      toastId = toast(message, { duration });
+  }
+  
+  return toastId;
+};
+
+// Clear a specific toast
+export const clearToast = (toastId: string | number) => {
+  toast.dismiss(toastId);
 };
 
 // Function to request notification permissions (web only for now)
@@ -55,13 +93,13 @@ export const setupJournalReminder = async (enabled: boolean): Promise<void> => {
         "It's time to check in with yourself. Take a moment to record your thoughts.",
         24 // Daily reminder
       );
-      toast.success("Journal reminders enabled");
+      showToast("Journal reminders enabled", "success");
     } else {
-      toast.error("Could not enable notifications. Please check your browser settings.");
+      showToast("Could not enable notifications. Please check your browser settings.", "error");
     }
   } catch (error) {
     console.error("Error setting up journal reminder:", error);
-    toast.error("Failed to set up notification");
+    showToast("Failed to set up notification", "error");
   }
 };
 
@@ -69,5 +107,5 @@ export const setupJournalReminder = async (enabled: boolean): Promise<void> => {
 export const initializeCapacitorNotifications = (): void => {
   // This is a placeholder function that would be implemented when Capacitor is added
   console.log("Mobile notifications are not available in this browser version.");
-  toast.info("Mobile notifications require the app to be installed on your device.");
+  showToast("Mobile notifications require the app to be installed on your device.", "info");
 };

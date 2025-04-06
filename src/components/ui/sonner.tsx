@@ -11,9 +11,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group z-[100]" // Increased z-index for better visibility
-      // Default duration is set to 3000ms (3 seconds) for better visibility
-      duration={3000}
-      closeButton={true} // Ensure close button is visible
+      // Short duration (1000ms = 1 second) for regular notifications
+      duration={1000}
+      closeButton={false} // Remove close button
       richColors={true} // Use rich colors for better visibility
       toastOptions={{
         classNames: {
@@ -29,7 +29,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
           success: "dark:group-[.toast]:text-white group-[.toast]:text-black font-medium",
           warning: "dark:group-[.toast]:text-white group-[.toast]:text-black font-medium",
           error: "dark:group-[.toast]:text-white group-[.toast]:text-black font-medium",
-          closeButton: "dark:group-[.toast]:text-white/70 dark:group-[.toast]:hover:text-white group-[.toast]:text-black/70 group-[.toast]:hover:text-black",
           loader: "dark:group-[.toast]:border-t-white/80 dark:group-[.toast]:border-l-white/80"
         },
         style: {
