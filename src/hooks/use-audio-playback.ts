@@ -18,6 +18,7 @@ export function useAudioPlayback({
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioUrl = useRef<string | null>(null);
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const metadataListenerAddedRef = useRef(false);
   
   // Clean up previous URL when audioBlob changes
   useEffect(() => {
@@ -32,6 +33,8 @@ export function useAudioPlayback({
   // Create new audio URL when blob changes
   useEffect(() => {
     if (audioBlob && audioRef.current) {
+      console.log('[useAudioPlayback] New audio blob detected:', audioBlob.size, 'bytes');
+      
       // Clean up old URL
       if (audioUrl.current) {
         URL.revokeObjectURL(audioUrl.current);
@@ -41,23 +44,16 @@ export function useAudioPlayback({
       audioUrl.current = URL.createObjectURL(audioBlob);
       audioRef.current.src = audioUrl.current;
       
+      // Reset metadata listener flag
+      metadataListenerAddedRef.current = false;
+      
       // Load audio to get duration
       audioRef.current.load();
       
-      // When metadata is loaded, we can access the duration
-      const handleLoadedMetadata = () => {
-        if (audioRef.current) {
-          setAudioDuration(audioRef.current.duration);
-        }
-      };
-      
-      audioRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
-      
-      return () => {
-        if (audioRef.current) {
-          audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        }
-      };
+      // Prepare the audio immediately if it's a new blob
+      prepareAudio().then(duration => {
+        console.log('[useAudioPlayback] Audio prepared with duration:', duration);
+      });
     }
   }, [audioBlob]);
   
@@ -67,6 +63,7 @@ export function useAudioPlayback({
     
     if (audioElement) {
       const handlePlay = () => {
+        console.log('[useAudioPlayback] Audio playback started');
         setIsPlaying(true);
         if (onPlaybackStart) onPlaybackStart();
         
@@ -79,6 +76,7 @@ export function useAudioPlayback({
       };
       
       const handlePause = () => {
+        console.log('[useAudioPlayback] Audio playback paused');
         setIsPlaying(false);
         if (updateIntervalRef.current) {
           clearInterval(updateIntervalRef.current);
@@ -87,6 +85,7 @@ export function useAudioPlayback({
       };
       
       const handleEnded = () => {
+        console.log('[useAudioPlayback] Audio playback ended');
         setIsPlaying(false);
         setPlaybackProgress(0);
         if (onPlaybackEnd) onPlaybackEnd();
@@ -130,6 +129,8 @@ export function useAudioPlayback({
     const audio = audioRef.current;
     if (!audio) return;
     
+    console.log('[useAudioPlayback] Toggle playback called, current state:', isPlaying);
+    
     if (isPlaying) {
       audio.pause();
     } else {
@@ -137,8 +138,12 @@ export function useAudioPlayback({
       if (audio.currentTime >= audio.duration) {
         audio.currentTime = 0;
       }
-      audio.play().catch((error) => {
-        console.error('Error playing audio:', error);
+      
+      // Ensure audio is prepared before playing
+      prepareAudio().then(() => {
+        audio.play().catch((error) => {
+          console.error('[useAudioPlayback] Error playing audio:', error);
+        });
       });
     }
   };
@@ -150,9 +155,12 @@ export function useAudioPlayback({
     const seekTime = position * audio.duration;
     audio.currentTime = seekTime;
     setPlaybackProgress(position);
+    
+    console.log('[useAudioPlayback] Seeking to:', seekTime, 'seconds');
   };
   
   const reset = () => {
+    console.log('[useAudioPlayback] Resetting audio player');
     setIsPlaying(false);
     setPlaybackProgress(0);
     setAudioDuration(0);
@@ -177,47 +185,63 @@ export function useAudioPlayback({
         return;
       }
       
+      console.log('[useAudioPlayback] Preparing audio...');
+      
       // If we already have duration loaded, return it immediately
       if (audioDuration > 0) {
+        console.log('[useAudioPlayback] Already have duration:', audioDuration);
         resolve(audioDuration);
         return;
       }
       
-      // Otherwise, load the audio and wait for metadata
-      const handleMetadata = () => {
-        const duration = audio.duration;
-        setAudioDuration(duration);
-        audio.removeEventListener('loadedmetadata', handleMetadata);
-        resolve(duration);
-      };
+      // Only add the listener once
+      if (!metadataListenerAddedRef.current) {
+        // Otherwise, load the audio and wait for metadata
+        const handleMetadata = () => {
+          const duration = audio.duration;
+          console.log('[useAudioPlayback] Metadata loaded, duration:', duration);
+          setAudioDuration(duration);
+          audio.removeEventListener('loadedmetadata', handleMetadata);
+          metadataListenerAddedRef.current = false;
+          resolve(duration);
+        };
+        
+        audio.addEventListener('loadedmetadata', handleMetadata);
+        metadataListenerAddedRef.current = true;
+      }
       
       // If metadata is already loaded
       if (audio.readyState >= 2 && audio.duration) {
+        console.log('[useAudioPlayback] Metadata already loaded, duration:', audio.duration);
         setAudioDuration(audio.duration);
         resolve(audio.duration);
         return;
       }
       
-      // Otherwise wait for it to load
-      audio.addEventListener('loadedmetadata', handleMetadata);
-      
       // In case we never get the event, resolve after a timeout
       setTimeout(() => {
         if (audio.duration) {
+          console.log('[useAudioPlayback] Got duration after timeout:', audio.duration);
           setAudioDuration(audio.duration);
           resolve(audio.duration);
         } else {
           // If we can't get the duration, estimate it from the blob size
           // Rough estimate: ~128kbps audio = 16KB per second
           const estimatedDuration = audioBlob.size / (16 * 1024);
+          console.log('[useAudioPlayback] Estimating duration from size:', estimatedDuration);
           setAudioDuration(estimatedDuration);
           resolve(estimatedDuration);
         }
-        audio.removeEventListener('loadedmetadata', handleMetadata);
+        
+        if (metadataListenerAddedRef.current) {
+          audio.removeEventListener('loadedmetadata', () => {});
+          metadataListenerAddedRef.current = false;
+        }
       }, 1000);
       
       // Trigger the load if needed
       if (audio.readyState === 0) {
+        console.log('[useAudioPlayback] Triggering audio load');
         audio.load();
       }
     });

@@ -1,4 +1,3 @@
-
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
@@ -17,9 +16,6 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   tempId?: string;
   error?: string;
 }> {
-  // Clear any lingering toasts from previous sessions
-  clearAllToasts();
-  
   console.log('[AudioProcessing] Starting processing with blob:', audioBlob?.size, audioBlob?.type);
   
   // 1. Validate the audio blob
@@ -199,9 +195,6 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       
       isEntryBeingProcessed = false;
       
-      // Clear any remaining toasts to ensure no processing notifications are left
-      clearAllToasts();
-      
       // Verify the entry was saved by querying the database
       if (result.data?.entryId) {
         const { data: savedEntry, error: fetchError } = await supabase
@@ -219,16 +212,10 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     } else {
       console.error('Failed to process recording after multiple attempts:', result?.error);
       isEntryBeingProcessed = false;
-      
-      // Also clear toasts here in case of error
-      clearAllToasts();
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
     isEntryBeingProcessed = false;
-    
-    // Clear toasts in case of any error
-    clearAllToasts();
   }
 }
 

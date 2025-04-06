@@ -65,6 +65,8 @@ const Journal = () => {
       if (autoRetryTimeoutRef.current) {
         clearTimeout(autoRetryTimeoutRef.current);
       }
+      
+      clearAllToasts();
     };
   }, []);
 
@@ -309,8 +311,12 @@ const Journal = () => {
     console.log(`[Journal] Tab change requested to: ${value}. Current safeToSwitchTab: ${safeToSwitchTab}`);
     
     if (value === 'entries' && !safeToSwitchTab) {
-      console.log('[Journal] Attempted to switch to entries but waiting for processing');
-      return;
+      console.log('[Journal] User attempting to switch to entries while processing');
+      
+      toast.info('Processing in progress...', { 
+        duration: 2000,
+        closeButton: false
+      });
     }
     
     setActiveTab(value);

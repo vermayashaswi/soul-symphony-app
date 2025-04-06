@@ -13,6 +13,7 @@ import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
+import { clearAllToasts } from '@/services/notificationService';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -131,6 +132,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       if (isProcessing && !saveCompleteRef.current) {
         console.warn('[VoiceRecorder] Component unmounted during processing - potential source of UI errors');
       }
+      
+      // Clear all toasts when component unmounts to prevent lingering toasts
+      clearAllToasts();
     };
   }, [isProcessing]);
   
@@ -151,7 +155,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       setRecordingError(null);
       setHasSaved(true);
       
-      // If recording hasn't been played, make sure audio is prepared
+      // Clear existing toasts to prevent interference with save process
+      clearAllToasts();
+      
+      // If recording hasn't been played, ensure audio is prepared
       if (!hasPlayedOnce || audioDuration === 0) {
         console.log('[VoiceRecorder] Recording not played yet, preparing audio...');
         const duration = await prepareAudio();
@@ -195,15 +202,32 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           console.log('[VoiceRecorder] Calling recording completion callback');
           saveCompleteRef.current = false;
           
+          // Show a toast independent of the save process
+          toast.loading('Processing your journal entry...', {
+            id: 'processing-toast',
+            duration: 3000
+          });
+          
           await onRecordingComplete(normalizedBlob);
           
           saveCompleteRef.current = true;
           
           console.log('[VoiceRecorder] Recording callback completed successfully');
+          
+          // Dismiss the loading toast to avoid lingering UI elements
+          toast.dismiss('processing-toast');
         } catch (error: any) {
           console.error('[VoiceRecorder] Error in recording callback:', error);
           setRecordingError(error?.message || "An unexpected error occurred");
-          toast.error("Error saving recording");
+          
+          // Dismiss any loading toasts
+          toast.dismiss('processing-toast');
+          
+          toast.error("Error saving recording", {
+            id: 'error-toast',
+            duration: 3000
+          });
+          
           setIsProcessing(false);
           setHasSaved(false);
         }
@@ -211,13 +235,21 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     } catch (error: any) {
       console.error('[VoiceRecorder] Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
-      toast.error("Error saving recording");
+      
+      toast.error("Error saving recording", {
+        id: 'error-toast',
+        duration: 3000
+      });
+      
       setIsProcessing(false);
       setHasSaved(false);
     }
   };
 
   const handleRestart = () => {
+    // Clear all toasts when restarting to avoid UI conflicts
+    clearAllToasts();
+    
     resetRecording();
     resetPlayback();
     setRecordingError(null);
@@ -227,7 +259,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     setHasPlayedOnce(false);
     setAudioPrepared(false);
     saveCompleteRef.current = false;
-    toast.info("Starting a new recording");
+    
+    toast.info("Starting a new recording", {
+      duration: 2000
+    });
   };
 
   return (
