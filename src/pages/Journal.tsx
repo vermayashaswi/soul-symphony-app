@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -27,6 +28,7 @@ const Journal = () => {
   const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
   const [isRecordingComplete, setIsRecordingComplete] = useState(false);
+  const [isSavingRecording, setIsSavingRecording] = useState(false);
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   
@@ -52,6 +54,7 @@ const Journal = () => {
     };
   }, []);
 
+  // Monitor for new entries
   useEffect(() => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
@@ -73,12 +76,14 @@ const Journal = () => {
         
         setProcessingEntries([]);
         setToastIds({});
+        setIsSavingRecording(false);
       }
       
       previousEntriesRef.current = currentEntryIds;
     }
   }, [entries, processingEntries, toastIds]);
 
+  // Cleanup toasts on unmount
   useEffect(() => {
     return () => {
       Object.values(toastIds).forEach(id => {
@@ -91,6 +96,7 @@ const Journal = () => {
     };
   }, [toastIds, profileCheckTimeoutId]);
 
+  // Profile check timeout
   useEffect(() => {
     if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
       const timeoutId = setTimeout(() => {
@@ -109,12 +115,14 @@ const Journal = () => {
     }
   }, [user?.id, isCheckingProfile]);
 
+  // Check user profile on load
   useEffect(() => {
     if (user?.id && !isProfileChecked && !isCheckingProfile && !profileCheckedOnceRef.current) {
       checkUserProfile(user.id);
     }
   }, [user?.id, isProfileChecked, isCheckingProfile]);
 
+  // Monitor for completed processing entries
   useEffect(() => {
     if (!loading && entries.length > 0 && processingEntries.length > 0) {
       const entryIds = entries.map(entry => entry.id.toString());
@@ -145,10 +153,12 @@ const Journal = () => {
           delete newToastIds[tempId];
         });
         setToastIds(newToastIds);
+        setIsSavingRecording(false);
       }
     }
   }, [entries, loading, processingEntries, toastIds]);
 
+  // Notify about new entries
   useEffect(() => {
     if (loading || entries.length === 0) return;
     
@@ -186,11 +196,16 @@ const Journal = () => {
         }
       });
       setToastIds(newToastIds);
+      
+      if (newProcessingEntries.length === 0 && processingEntries.length > 0) {
+        setIsSavingRecording(false);
+      }
     }
   }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
 
+  // Poll for updates while processing
   useEffect(() => {
-    if (processingEntries.length > 0) {
+    if (processingEntries.length > 0 || isSavingRecording) {
       const interval = setInterval(() => {
         console.log('[Journal] Polling for updates while processing entries');
         setRefreshKey(prev => prev + 1);
@@ -199,7 +214,7 @@ const Journal = () => {
       
       return () => clearInterval(interval);
     }
-  }, [processingEntries.length, fetchEntries]);
+  }, [processingEntries.length, fetchEntries, isSavingRecording]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -256,6 +271,7 @@ const Journal = () => {
     
     try {
       setIsRecordingComplete(true);
+      setIsSavingRecording(true);
       
       setActiveTab('entries');
       
@@ -301,6 +317,7 @@ const Journal = () => {
           }, interval);
         });
         
+        // Set a maximum timeout to clean up if entry is never processed
         setTimeout(() => {
           if (processingEntries.includes(tempId)) {
             console.log('[Journal] Maximum processing time reached for tempId:', tempId);
@@ -326,6 +343,7 @@ const Journal = () => {
             setRefreshKey(prev => prev + 1);
             
             setIsRecordingComplete(false);
+            setIsSavingRecording(false);
           }
         }, 20000);
       } else {
@@ -338,6 +356,7 @@ const Journal = () => {
         });
         
         setIsRecordingComplete(false);
+        setIsSavingRecording(false);
       }
     } catch (error) {
       console.error('Error processing recording:', error);
@@ -347,6 +366,7 @@ const Journal = () => {
       });
       
       setIsRecordingComplete(false);
+      setIsSavingRecording(false);
       
       setRefreshKey(prev => prev + 1);
     }
@@ -419,7 +439,7 @@ const Journal = () => {
     );
   }
 
-  const showLoadingFeedback = isRecordingComplete && entries.length === 0 && !error;
+  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && entries.length === 0 && !error;
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">

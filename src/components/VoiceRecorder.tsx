@@ -101,13 +101,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       });
       
       if (onRecordingComplete) {
-        onRecordingComplete(normalizedBlob);
+        // Make sure we wait for the callback to complete before resetting anything
+        await onRecordingComplete(normalizedBlob);
       }
     } catch (error: any) {
       console.error('Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
       toast.error("Error saving recording");
-    } finally {
       setIsProcessing(false);
     }
   };

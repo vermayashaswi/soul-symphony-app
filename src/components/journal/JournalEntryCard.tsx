@@ -103,8 +103,10 @@ export function JournalEntryCard({
           
           // Check if data exists and is not an error
           if (data && typeof data === 'object') {
-            // Safely check if data has the properties we need with type assertion
+            // Use type assertion to safely access properties
             const entryData = data as { master_themes?: string[], themes?: string[] };
+            
+            // Now TypeScript knows these properties exist on entryData
             const updatedThemes = entryData.master_themes || entryData.themes || [];
             
             // If we now have themes, update them and stop loading
