@@ -6,6 +6,8 @@ import { clearAllToasts } from '@/services/notificationService';
 
 // Flag to track if an entry is being processed to prevent duplicate notifications
 let isEntryBeingProcessed = false;
+let processingLock = false;
+let processingTimeoutId: NodeJS.Timeout | null = null;
 
 /**
  * Processes an audio recording for transcription and analysis
@@ -18,6 +20,26 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
 }> {
   console.log('[AudioProcessing] Starting processing with blob:', audioBlob?.size, audioBlob?.type);
   
+  // Clear all toasts to ensure UI is clean before processing
+  clearAllToasts();
+  
+  // If there's already a processing operation in progress, wait briefly
+  if (processingLock) {
+    console.log('[AudioProcessing] Processing lock detected, waiting briefly...');
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // If lock is still active after waiting, return an error
+      if (processingLock) {
+        console.error('[AudioProcessing] Processing lock still active, cannot process multiple recordings simultaneously');
+        return { success: false, error: 'Another recording is already being processed' };
+      }
+    } catch (err) {
+      console.error('[AudioProcessing] Error waiting for processing lock:', err);
+    }
+  }
+  
   // 1. Validate the audio blob
   const validation = validateAudioBlob(audioBlob);
   if (!validation.isValid) {
@@ -26,6 +48,20 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   }
   
   try {
+    // Set processing lock to prevent multiple simultaneous processing
+    processingLock = true;
+    
+    // Set a timeout to release the lock after a maximum time to prevent deadlocks
+    if (processingTimeoutId) {
+      clearTimeout(processingTimeoutId);
+    }
+    
+    processingTimeoutId = setTimeout(() => {
+      console.log('[AudioProcessing] Releasing processing lock due to timeout');
+      processingLock = false;
+      isEntryBeingProcessed = false;
+    }, 30000); // 30 second maximum lock time
+    
     // Generate a temporary ID for this recording
     const tempId = `temp-${Date.now()}`;
     isEntryBeingProcessed = true;
@@ -41,6 +77,13 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     if (!userId) {
       console.error('No user ID provided for audio processing');
       isEntryBeingProcessed = false;
+      processingLock = false;
+      
+      if (processingTimeoutId) {
+        clearTimeout(processingTimeoutId);
+        processingTimeoutId = null;
+      }
+      
       return { success: false, error: 'Authentication required' };
     }
     
@@ -49,6 +92,12 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       .catch(err => {
         console.error('Background processing error:', err);
         isEntryBeingProcessed = false;
+        processingLock = false;
+        
+        if (processingTimeoutId) {
+          clearTimeout(processingTimeoutId);
+          processingTimeoutId = null;
+        }
       });
     
     // Return immediately with the temp ID
@@ -56,6 +105,13 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   } catch (error: any) {
     console.error('Error initiating recording process:', error);
     isEntryBeingProcessed = false;
+    processingLock = false;
+    
+    if (processingTimeoutId) {
+      clearTimeout(processingTimeoutId);
+      processingTimeoutId = null;
+    }
+    
     return { success: false, error: error.message || 'Unknown error' };
   }
 }
@@ -71,6 +127,13 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     if (!audioBlob) {
       console.error('No audio data to process');
       isEntryBeingProcessed = false;
+      processingLock = false;
+      
+      if (processingTimeoutId) {
+        clearTimeout(processingTimeoutId);
+        processingTimeoutId = null;
+      }
+      
       return;
     }
     
@@ -78,6 +141,13 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     if (audioBlob.size < 1000) {
       console.error('Audio recording is too small to process');
       isEntryBeingProcessed = false;
+      processingLock = false;
+      
+      if (processingTimeoutId) {
+        clearTimeout(processingTimeoutId);
+        processingTimeoutId = null;
+      }
+      
       return;
     }
     
@@ -88,6 +158,13 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     if (!base64Audio || base64Audio.length < 100) {
       console.error('Invalid base64 audio data');
       isEntryBeingProcessed = false;
+      processingLock = false;
+      
+      if (processingTimeoutId) {
+        clearTimeout(processingTimeoutId);
+        processingTimeoutId = null;
+      }
+      
       return;
     }
     
@@ -102,6 +179,13 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     if (!authStatus.isAuthenticated) {
       console.error('User authentication failed:', authStatus.error);
       isEntryBeingProcessed = false;
+      processingLock = false;
+      
+      if (processingTimeoutId) {
+        clearTimeout(processingTimeoutId);
+        processingTimeoutId = null;
+      }
+      
       return;
     }
 
@@ -113,11 +197,25 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       if (!profileExists) {
         console.error('Failed to ensure user profile exists');
         isEntryBeingProcessed = false;
+        processingLock = false;
+        
+        if (processingTimeoutId) {
+          clearTimeout(processingTimeoutId);
+          processingTimeoutId = null;
+        }
+        
         return;
       }
     } else {
       console.error('Cannot identify user ID');
       isEntryBeingProcessed = false;
+      processingLock = false;
+      
+      if (processingTimeoutId) {
+        clearTimeout(processingTimeoutId);
+        processingTimeoutId = null;
+      }
+      
       return;
     }
     
@@ -151,6 +249,15 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     
     if (result?.success) {
       console.log('Journal entry saved successfully:', result);
+      
+      // Release locks
+      isEntryBeingProcessed = false;
+      processingLock = false;
+      
+      if (processingTimeoutId) {
+        clearTimeout(processingTimeoutId);
+        processingTimeoutId = null;
+      }
       
       // Manually trigger theme extraction when we have a new entry
       if (result.data?.entryId) {
@@ -192,36 +299,46 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
           console.error("Error manually triggering theme extraction:", themeErr);
         }
       }
-      
-      isEntryBeingProcessed = false;
-      
-      // Verify the entry was saved by querying the database
-      if (result.data?.entryId) {
-        const { data: savedEntry, error: fetchError } = await supabase
-          .from('Journal Entries')
-          .select('id, "refined text", duration')
-          .eq('id', result.data.entryId)
-          .single();
-          
-        if (fetchError || !savedEntry) {
-          console.error('Failed to verify journal entry was saved:', fetchError);
-        } else {
-          console.log('Journal entry verified in database:', savedEntry);
-        }
-      }
     } else {
       console.error('Failed to process recording after multiple attempts:', result?.error);
       isEntryBeingProcessed = false;
+      processingLock = false;
+      
+      if (processingTimeoutId) {
+        clearTimeout(processingTimeoutId);
+        processingTimeoutId = null;
+      }
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
     isEntryBeingProcessed = false;
+    processingLock = false;
+    
+    if (processingTimeoutId) {
+      clearTimeout(processingTimeoutId);
+      processingTimeoutId = null;
+    }
   }
 }
 
 // Check if a journal entry is currently being processed
 export function isProcessingEntry(): boolean {
   return isEntryBeingProcessed;
+}
+
+// Release all locks and reset processing state (useful for recovery)
+export function resetProcessingState(): void {
+  console.log('[AudioProcessing] Manually resetting processing state');
+  isEntryBeingProcessed = false;
+  processingLock = false;
+  
+  if (processingTimeoutId) {
+    clearTimeout(processingTimeoutId);
+    processingTimeoutId = null;
+  }
+  
+  // Clear all toasts to ensure UI is clean
+  clearAllToasts();
 }
 
 // Variable to check if user has previous entries

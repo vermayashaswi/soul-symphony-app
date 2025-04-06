@@ -34,7 +34,8 @@ const Journal = () => {
   const [hasRenderError, setHasRenderError] = useState(false);
   const [safeToSwitchTab, setSafeToSwitchTab] = useState(true);
   const [profileCreationAttempts, setProfileCreationAttempts] = useState(0);
-  const maxProfileAttempts = 3;
+  const [tabChangeInProgress, setTabChangeInProgress] = useState(false);
+  const [maxProfileAttempts, setMaxProfileAttempts] = useState(3);
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   const entriesListRef = useRef<HTMLDivElement>(null);
@@ -319,11 +320,26 @@ const Journal = () => {
       });
     }
     
-    setActiveTab(value);
+    setTabChangeInProgress(true);
     
-    if (value === 'entries') {
-      fetchEntries();
-    }
+    setTimeout(() => {
+      if (value === 'entries' && !safeToSwitchTab) {
+        console.log('[Journal] User attempting to switch to entries while processing');
+        
+        toast.info('Processing in progress...', { 
+          duration: 2000,
+          closeButton: false
+        });
+      }
+      
+      setActiveTab(value);
+      
+      if (value === 'entries') {
+        fetchEntries();
+      }
+      
+      setTabChangeInProgress(false);
+    }, 50);
   };
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
@@ -337,6 +353,8 @@ const Journal = () => {
     }
     
     try {
+      clearAllToasts();
+      
       setIsRecordingComplete(true);
       setIsSavingRecording(true);
       setProcessingError(null);
@@ -345,7 +363,9 @@ const Journal = () => {
       setSafeToSwitchTab(false);
       setEntriesReady(false);
       
-      setActiveTab('entries');
+      setTimeout(() => {
+        setActiveTab('entries');
+      }, 50);
       
       const toastId = toast.loading('Processing your journal entry with AI...', {
         duration: 15000,
@@ -421,18 +441,23 @@ const Journal = () => {
         console.error('[Journal] Processing failed:', error);
         setProcessingError(error || 'Unknown error occurred');
         setLastAction(`Processing Failed: ${error || 'Unknown'}`);
+        
         toast.dismiss(toastId);
         
-        toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
-          duration: 3000,
-          closeButton: false
-        });
+        setTimeout(() => {
+          toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
+            duration: 3000,
+            closeButton: false
+          });
+        }, 100);
         
         setIsRecordingComplete(false);
         setIsSavingRecording(false);
         setSafeToSwitchTab(true);
         
-        setActiveTab('record');
+        setTimeout(() => {
+          setActiveTab('record');
+        }, 100);
       }
     } catch (error: any) {
       console.error('Error processing recording:', error);
@@ -448,7 +473,9 @@ const Journal = () => {
       setIsSavingRecording(false);
       setSafeToSwitchTab(true);
       
-      setActiveTab('record');
+      setTimeout(() => {
+        setActiveTab('record');
+      }, 100);
     }
   };
 

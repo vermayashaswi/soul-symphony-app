@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 
 interface UseAudioPlaybackOptions {
@@ -14,11 +15,13 @@ export function useAudioPlayback({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  const [isAudioPrepared, setIsAudioPrepared] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioUrl = useRef<string | null>(null);
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const metadataListenerAddedRef = useRef(false);
+  const prepareAttemptCountRef = useRef(0);
   
   // Clean up previous URL when audioBlob changes
   useEffect(() => {
@@ -34,6 +37,10 @@ export function useAudioPlayback({
   useEffect(() => {
     if (audioBlob && audioRef.current) {
       console.log('[useAudioPlayback] New audio blob detected:', audioBlob.size, 'bytes');
+      
+      // Reset prep state
+      setIsAudioPrepared(false);
+      prepareAttemptCountRef.current = 0;
       
       // Clean up old URL
       if (audioUrl.current) {
@@ -95,14 +102,26 @@ export function useAudioPlayback({
         }
       };
       
+      // Add error handling
+      const handleError = (e: any) => {
+        console.error('[useAudioPlayback] Audio error:', e);
+        setIsPlaying(false);
+        if (updateIntervalRef.current) {
+          clearInterval(updateIntervalRef.current);
+          updateIntervalRef.current = null;
+        }
+      };
+      
       audioElement.addEventListener('play', handlePlay);
       audioElement.addEventListener('pause', handlePause);
       audioElement.addEventListener('ended', handleEnded);
+      audioElement.addEventListener('error', handleError);
       
       return () => {
         audioElement.removeEventListener('play', handlePlay);
         audioElement.removeEventListener('pause', handlePause);
         audioElement.removeEventListener('ended', handleEnded);
+        audioElement.removeEventListener('error', handleError);
         
         if (updateIntervalRef.current) {
           clearInterval(updateIntervalRef.current);
@@ -164,6 +183,7 @@ export function useAudioPlayback({
     setIsPlaying(false);
     setPlaybackProgress(0);
     setAudioDuration(0);
+    setIsAudioPrepared(false);
     
     if (audioRef.current) {
       audioRef.current.pause();
@@ -176,31 +196,51 @@ export function useAudioPlayback({
     }
   };
   
-  // Function to prepare audio to ensure duration is loaded - similar to what happens on play
-  const prepareAudio = (): Promise<number> => {
+  // Function to forcefully prepare audio with exponential backoff retry
+  const prepareAudio = async (): Promise<number> => {
+    if (isAudioPrepared && audioDuration > 0) {
+      console.log('[useAudioPlayback] Audio already prepared, duration:', audioDuration);
+      return audioDuration;
+    }
+    
     return new Promise((resolve) => {
       const audio = audioRef.current;
       if (!audio || !audioBlob) {
+        setIsAudioPrepared(false);
         resolve(0);
         return;
       }
       
-      console.log('[useAudioPlayback] Preparing audio...');
+      prepareAttemptCountRef.current++;
+      const attempt = prepareAttemptCountRef.current;
+      console.log(`[useAudioPlayback] Preparing audio... (attempt ${attempt})`);
       
       // If we already have duration loaded, return it immediately
       if (audioDuration > 0) {
         console.log('[useAudioPlayback] Already have duration:', audioDuration);
+        setIsAudioPrepared(true);
         resolve(audioDuration);
         return;
       }
       
+      // Force reload the audio to ensure metadata is loaded
+      try {
+        if (audioUrl.current) {
+          audio.src = audioUrl.current;
+          audio.load();
+        }
+      } catch (e) {
+        console.error('[useAudioPlayback] Error reloading audio:', e);
+      }
+      
       // Only add the listener once
       if (!metadataListenerAddedRef.current) {
-        // Otherwise, load the audio and wait for metadata
+        // Add a metadata listener
         const handleMetadata = () => {
           const duration = audio.duration;
           console.log('[useAudioPlayback] Metadata loaded, duration:', duration);
           setAudioDuration(duration);
+          setIsAudioPrepared(true);
           audio.removeEventListener('loadedmetadata', handleMetadata);
           metadataListenerAddedRef.current = false;
           resolve(duration);
@@ -214,22 +254,27 @@ export function useAudioPlayback({
       if (audio.readyState >= 2 && audio.duration) {
         console.log('[useAudioPlayback] Metadata already loaded, duration:', audio.duration);
         setAudioDuration(audio.duration);
+        setIsAudioPrepared(true);
         resolve(audio.duration);
         return;
       }
       
-      // In case we never get the event, resolve after a timeout
+      // In case we never get the event, resolve after a timeout with exponential backoff
+      const timeoutDuration = Math.min(1000 * Math.pow(1.5, attempt - 1), 5000);
+      
       setTimeout(() => {
         if (audio.duration) {
-          console.log('[useAudioPlayback] Got duration after timeout:', audio.duration);
+          console.log(`[useAudioPlayback] Got duration after timeout (${timeoutDuration}ms):`, audio.duration);
           setAudioDuration(audio.duration);
+          setIsAudioPrepared(true);
           resolve(audio.duration);
         } else {
           // If we can't get the duration, estimate it from the blob size
           // Rough estimate: ~128kbps audio = 16KB per second
           const estimatedDuration = audioBlob.size / (16 * 1024);
-          console.log('[useAudioPlayback] Estimating duration from size:', estimatedDuration);
+          console.log(`[useAudioPlayback] Estimating duration from size (attempt ${attempt}):`, estimatedDuration);
           setAudioDuration(estimatedDuration);
+          setIsAudioPrepared(true);
           resolve(estimatedDuration);
         }
         
@@ -237,7 +282,13 @@ export function useAudioPlayback({
           audio.removeEventListener('loadedmetadata', () => {});
           metadataListenerAddedRef.current = false;
         }
-      }, 1000);
+        
+        // If we're still not successful and have attempts left, retry
+        if (audio.duration === 0 && attempt < 3) {
+          console.log(`[useAudioPlayback] Retrying prepare audio (attempt ${attempt + 1})`);
+          prepareAudio().then(resolve);
+        }
+      }, timeoutDuration);
       
       // Trigger the load if needed
       if (audio.readyState === 0) {
@@ -256,5 +307,6 @@ export function useAudioPlayback({
     reset,
     audioRef,
     prepareAudio,
+    isAudioPrepared
   };
 }

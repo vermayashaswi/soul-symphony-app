@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 
 // Duration constants
@@ -158,11 +157,7 @@ export const clearAllToasts = () => {
         toastContainers.forEach(container => {
           // Manual removal since we've disabled close buttons
           if (container.parentNode) {
-            setTimeout(() => {
-              if (document.body.contains(container as Node)) {
-                container.parentNode?.removeChild(container);
-              }
-            }, 200);
+            container.parentNode?.removeChild(container);
           }
         });
       }
