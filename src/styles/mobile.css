@@ -362,6 +362,30 @@
       transform: translateY(0);
     }
   }
+  
+  /* Improve profile picture cropping dialog for mobile */
+  .DialogContent {
+    max-width: 90vw !important;
+    width: 90vw !important;
+    padding: 16px !important;
+  }
+  
+  /* Fix touch interactions for profile image cropping */
+  [ref="containerRef"] {
+    touch-action: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  
+  /* Ensure drag and pinch gestures work on profile picture editor */
+  .relative.h-64.w-64.rounded-full.overflow-hidden.border-2.border-muted.cursor-grab.touch-none {
+    touch-action: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
 }
 
 /* Dark mode support for sticky elements */

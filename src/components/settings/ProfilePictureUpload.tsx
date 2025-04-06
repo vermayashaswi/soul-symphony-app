@@ -21,6 +21,7 @@ export function ProfilePictureUpload() {
   const inputRef = useRef<HTMLInputElement>(null);
   const startPosRef = useRef({ x: 0, y: 0 });
   const lastTouchDistance = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
   
   // Get the avatar URL from the user metadata or default to an empty string
   const avatarUrl = user?.user_metadata?.avatar_url || '';
@@ -146,13 +147,18 @@ export function ProfilePictureUpload() {
     const imageContainer = containerRef.current;
     if (!imageContainer || !showImageEditor) return;
 
+    // Touch handlers
     const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault(); // Prevent scrolling
+      
       if (e.touches.length === 1) {
         // Single touch - move the image
+        const touch = e.touches[0];
         startPosRef.current = {
-          x: e.touches[0].clientX - position.x,
-          y: e.touches[0].clientY - position.y
+          x: touch.clientX - position.x,
+          y: touch.clientY - position.y
         };
+        isDraggingRef.current = true;
       } else if (e.touches.length === 2) {
         // Two touches - pinch to zoom
         const dist = Math.hypot(
@@ -164,12 +170,13 @@ export function ProfilePictureUpload() {
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      e.preventDefault(); // Prevent scrolling when touching the image
-
-      if (e.touches.length === 1) {
+      e.preventDefault(); // Prevent scrolling
+      
+      if (e.touches.length === 1 && isDraggingRef.current) {
         // Single touch - move the image
-        const newX = e.touches[0].clientX - startPosRef.current.x;
-        const newY = e.touches[0].clientY - startPosRef.current.y;
+        const touch = e.touches[0];
+        const newX = touch.clientX - startPosRef.current.x;
+        const newY = touch.clientY - startPosRef.current.y;
         setPosition({ x: newX, y: newY });
       } else if (e.touches.length === 2 && lastTouchDistance.current !== null) {
         // Two touches - pinch to zoom
@@ -187,23 +194,23 @@ export function ProfilePictureUpload() {
     };
 
     const handleTouchEnd = () => {
+      isDraggingRef.current = false;
       lastTouchDistance.current = null;
     };
 
     // Mouse drag support for desktop
-    let isDragging = false;
     let startX = 0;
     let startY = 0;
 
     const handleMouseDown = (e: MouseEvent) => {
-      isDragging = true;
+      isDraggingRef.current = true;
       startX = e.clientX - position.x;
       startY = e.clientY - position.y;
       imageContainer.style.cursor = 'grabbing';
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
+      if (!isDraggingRef.current) return;
       
       const newX = e.clientX - startX;
       const newY = e.clientY - startY;
@@ -211,7 +218,7 @@ export function ProfilePictureUpload() {
     };
 
     const handleMouseUp = () => {
-      isDragging = false;
+      isDraggingRef.current = false;
       imageContainer.style.cursor = 'grab';
     };
 
@@ -222,6 +229,7 @@ export function ProfilePictureUpload() {
       setZoom(newZoom);
     };
 
+    // Add event listeners with proper parameters
     imageContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
     imageContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
     imageContainer.addEventListener('touchend', handleTouchEnd);
