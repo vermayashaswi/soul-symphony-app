@@ -41,7 +41,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
           background: "var(--background)",
           color: "var(--foreground)",
         }
-        // The 'loading' property was removed from here as it's not a valid option in ToastOptions
       }}
       {...props}
     />

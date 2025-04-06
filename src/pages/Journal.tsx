@@ -70,6 +70,42 @@ const Journal = () => {
     }
   }, [user?.id, isCheckingProfile, isProfileChecked]);
 
+  // Check if any processing entries appear in the loaded entries list, and dismiss their loading toasts
+  useEffect(() => {
+    if (!loading && entries.length > 0 && processingEntries.length > 0) {
+      const entryIds = entries.map(entry => entry.id.toString());
+      const completedProcessingEntries = processingEntries.filter(tempId => 
+        entryIds.includes(tempId)
+      );
+      
+      if (completedProcessingEntries.length > 0) {
+        console.log('[Journal] Found completed processing entries, dismissing their toasts:', completedProcessingEntries);
+        
+        // Dismiss the loading toasts for completed entries
+        completedProcessingEntries.forEach(tempId => {
+          if (toastIds[tempId]) {
+            toast.success('Journal entry processed!', { 
+              id: toastIds[tempId], 
+              duration: 1000
+            });
+            
+            // Remove from toastIds
+            setToastIds(prev => {
+              const newToastIds = { ...prev };
+              delete newToastIds[tempId];
+              return newToastIds;
+            });
+          }
+        });
+        
+        // Remove completed entries from processingEntries
+        setProcessingEntries(prev => 
+          prev.filter(tempId => !completedProcessingEntries.includes(tempId))
+        );
+      }
+    }
+  }, [entries, loading, processingEntries, toastIds]);
+
   // Only show success notification when new entries are added and not for the initial load
   useEffect(() => {
     if (loading || entries.length === 0) return;
@@ -187,6 +223,8 @@ const Journal = () => {
         // Set a maximum processing time after which we'll dismiss the loading toast
         setTimeout(() => {
           if (processingEntries.includes(tempId)) {
+            console.log('[Journal] Maximum processing time reached for tempId:', tempId);
+            
             setProcessingEntries(prev => prev.filter(id => id !== tempId));
             
             if (toastIds[tempId]) {
