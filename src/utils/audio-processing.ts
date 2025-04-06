@@ -23,6 +23,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   // 1. Validate the audio blob
   const validation = validateAudioBlob(audioBlob);
   if (!validation.isValid) {
+    console.error('Audio validation failed:', validation.errorMessage);
     return { success: false, error: validation.errorMessage };
   }
   
@@ -71,12 +72,14 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     
     if (!audioBlob) {
       console.error('No audio data to process');
+      isEntryBeingProcessed = false;
       return;
     }
     
     // Check if audio blob is too small to be useful
     if (audioBlob.size < 1000) {
       console.error('Audio recording is too small to process');
+      isEntryBeingProcessed = false;
       return;
     }
     
@@ -86,6 +89,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     // Validate base64 data
     if (!base64Audio || base64Audio.length < 100) {
       console.error('Invalid base64 audio data');
+      isEntryBeingProcessed = false;
       return;
     }
     
@@ -99,6 +103,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     const authStatus = await verifyUserAuthentication();
     if (!authStatus.isAuthenticated) {
       console.error('User authentication failed:', authStatus.error);
+      isEntryBeingProcessed = false;
       return;
     }
 
@@ -109,10 +114,12 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       const profileExists = await ensureUserProfileExists(authStatus.userId);
       if (!profileExists) {
         console.error('Failed to ensure user profile exists');
+        isEntryBeingProcessed = false;
         return;
       }
     } else {
       console.error('Cannot identify user ID');
+      isEntryBeingProcessed = false;
       return;
     }
     

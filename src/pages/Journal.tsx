@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -11,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
+import JournalDebugger from '@/components/journal/JournalDebugger';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -27,6 +27,9 @@ const Journal = () => {
   const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
   const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
+  const [isRecordingComplete, setIsRecordingComplete] = useState(false);
+  const [isSavingRecording, setIsSavingRecording] = useState(false);
+  const [processingError, setProcessingError] = useState<string | null>(null);
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   
@@ -36,7 +39,6 @@ const Journal = () => {
     isProfileChecked
   );
 
-  // Clear toasts on mount and unmount
   useEffect(() => {
     clearAllToasts();
     
@@ -53,7 +55,6 @@ const Journal = () => {
     };
   }, []);
 
-  // Check for new entries
   useEffect(() => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
@@ -75,13 +76,13 @@ const Journal = () => {
         
         setProcessingEntries([]);
         setToastIds({});
+        setIsSavingRecording(false);
       }
       
       previousEntriesRef.current = currentEntryIds;
     }
   }, [entries, processingEntries, toastIds]);
 
-  // Clean up toasts on unmount
   useEffect(() => {
     return () => {
       Object.values(toastIds).forEach(id => {
@@ -94,7 +95,6 @@ const Journal = () => {
     };
   }, [toastIds, profileCheckTimeoutId]);
 
-  // Profile check timeout
   useEffect(() => {
     if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
       const timeoutId = setTimeout(() => {
@@ -113,14 +113,12 @@ const Journal = () => {
     }
   }, [user?.id, isCheckingProfile]);
 
-  // Initial profile check
   useEffect(() => {
     if (user?.id && !isProfileChecked && !isCheckingProfile && !profileCheckedOnceRef.current) {
       checkUserProfile(user.id);
     }
   }, [user?.id, isProfileChecked, isCheckingProfile]);
 
-  // Check for completed processing entries
   useEffect(() => {
     if (!loading && entries.length > 0 && processingEntries.length > 0) {
       const entryIds = entries.map(entry => entry.id.toString());
@@ -151,11 +149,11 @@ const Journal = () => {
           delete newToastIds[tempId];
         });
         setToastIds(newToastIds);
+        setIsSavingRecording(false);
       }
     }
   }, [entries, loading, processingEntries, toastIds]);
 
-  // Notify about new entries
   useEffect(() => {
     if (loading || entries.length === 0) return;
     
@@ -193,21 +191,24 @@ const Journal = () => {
         }
       });
       setToastIds(newToastIds);
+      
+      if (newProcessingEntries.length === 0 && processingEntries.length > 0) {
+        setIsSavingRecording(false);
+      }
     }
   }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
 
-  // Poll for updates while processing entries
   useEffect(() => {
-    if (processingEntries.length > 0) {
+    if (processingEntries.length > 0 || isSavingRecording) {
       const interval = setInterval(() => {
         console.log('[Journal] Polling for updates while processing entries');
         setRefreshKey(prev => prev + 1);
         fetchEntries();
-      }, 2000); // Decreased from 3000 to 2000 for faster updates
+      }, 2000);
       
       return () => clearInterval(interval);
     }
-  }, [processingEntries.length, fetchEntries]);
+  }, [processingEntries.length, fetchEntries, isSavingRecording]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -254,16 +255,23 @@ const Journal = () => {
   const handleStartRecording = () => {
     console.log('Starting new recording');
     setActiveTab('record');
+    setProcessingError(null);
   };
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
     if (!audioBlob || !user?.id) {
       console.error('[Journal] Cannot process recording: missing audio blob or user ID');
+      setProcessingError('Cannot process recording: missing required information');
+      setIsRecordingComplete(false);
+      setIsSavingRecording(false);
       return;
     }
     
     try {
-      // Switch to entries tab before starting processing - important to do this first
+      setIsRecordingComplete(true);
+      setIsSavingRecording(true);
+      setProcessingError(null);
+      
       setActiveTab('entries');
       
       setEntryHasBeenProcessed(false);
@@ -293,65 +301,77 @@ const Journal = () => {
         setProcessingEntries(prev => [...prev, tempId]);
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         
-        // Trigger immediate fetch
-        fetchEntries();
+        await fetchEntries();
         setRefreshKey(prev => prev + 1);
         
-        // Set up polling at regular intervals
         const pollIntervals = [1000, 2000, 3000, 5000, 8000, 12000];
         
-        pollIntervals.forEach(interval => {
+        for (const interval of pollIntervals) {
           setTimeout(() => {
-            if (processingEntries.includes(tempId)) {
-              console.log(`[Journal] Polling for entry at ${interval}ms interval`);
-              fetchEntries();
-              setRefreshKey(prev => prev + 1);
-            }
-          }, interval);
-        });
-        
-        // Failsafe: If entry is still processing after max time, remove it from processing list
-        setTimeout(() => {
-          if (processingEntries.includes(tempId)) {
-            console.log('[Journal] Maximum processing time reached for tempId:', tempId);
-            
-            setProcessingEntries(prev => prev.filter(id => id !== tempId));
-            
-            if (toastIds[tempId]) {
-              toast.dismiss(toastIds[tempId]);
-              
-              toast.success('Journal entry analyzed and saved', { 
-                duration: 3000,
-                closeButton: false
-              });
-              
-              setToastIds(prev => {
-                const newToastIds = { ...prev };
-                delete newToastIds[tempId];
-                return newToastIds;
-              });
-            }
-            
-            // Final fetch attempt
+            console.log(`[Journal] Polling for entry at ${interval}ms interval`);
             fetchEntries();
             setRefreshKey(prev => prev + 1);
-          }
+          }, interval);
+        }
+        
+        setTimeout(() => {
+          console.log('[Journal] Maximum processing time check for tempId:', tempId);
+          setProcessingEntries(prev => {
+            if (prev.includes(tempId)) {
+              console.log('[Journal] Maximum processing time reached for tempId:', tempId);
+              
+              if (toastIds[tempId]) {
+                toast.dismiss(toastIds[tempId]);
+                
+                toast.success('Journal entry processed', { 
+                  duration: 3000,
+                  closeButton: false
+                });
+                
+                setToastIds(prev => {
+                  const newToastIds = { ...prev };
+                  delete newToastIds[tempId];
+                  return newToastIds;
+                });
+              }
+              
+              fetchEntries();
+              setRefreshKey(prev => prev + 1);
+              setIsSavingRecording(false);
+              
+              return prev.filter(id => id !== tempId);
+            }
+            return prev;
+          });
         }, 20000);
       } else {
         console.error('[Journal] Processing failed:', error);
+        setProcessingError(error || 'Unknown error occurred');
         toast.dismiss(toastId);
         
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
           duration: 3000,
           closeButton: false
         });
+        
+        setIsRecordingComplete(false);
+        setIsSavingRecording(false);
+        
+        setActiveTab('record');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing recording:', error);
+      setProcessingError(error?.message || 'Unknown error occurred');
+      
       toast.error('Error processing your recording', { 
         duration: 3000,
         closeButton: false
       });
+      
+      setIsRecordingComplete(false);
+      setIsSavingRecording(false);
+      
+      setActiveTab('record');
     }
   };
 
@@ -382,98 +402,140 @@ const Journal = () => {
     }
   };
 
-  // Handle profile check loading state
-  if (isCheckingProfile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Setting up your profile...</p>
-        </div>
-      </div>
-    );
-  }
+  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && !error && !processingError;
 
-  if (error && !loading) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
-        <JournalHeader />
-        <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-              <p className="text-red-800 dark:text-red-200">
-                Error loading your journal entries: {error}
-              </p>
-            </div>
-            <Button 
-              variant="outline" 
-              className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
-              onClick={() => {
-                setRefreshKey(prev => prev + 1);
-                fetchEntries();
-              }}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" /> 
-              Retry Loading
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const renderDebugger = () => (
+    <JournalDebugger 
+      processingEntries={processingEntries}
+      isSavingRecording={isSavingRecording}
+      isRecordingComplete={isRecordingComplete}
+      activeTab={activeTab}
+      processingError={processingError}
+    />
+  );
 
   return (
-    <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
-      <JournalHeader />
+    <>
+      {renderDebugger()}
       
-      {showRetryButton && (
-        <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-amber-800 dark:text-amber-200">
-                We're having trouble setting up your profile. Your entries may not be saved correctly.
-              </p>
+      <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
+        <JournalHeader />
+        
+        {isCheckingProfile ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <p className="text-muted-foreground">Setting up your profile...</p>
             </div>
-            <Button 
-              variant="outline" 
-              className="w-full sm:w-auto border-amber-500 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
-              onClick={handleRetryProfileCreation}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" /> 
-              Retry Profile Setup
-            </Button>
           </div>
-        </div>
-      )}
-      
-      <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="record">Record Entry</TabsTrigger>
-          <TabsTrigger value="entries">Past Entries</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="record" className="mt-0">
-          <div className="mb-4">
-            <VoiceRecorder 
-              onRecordingComplete={handleRecordingComplete}
-            />
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="entries" className="mt-0">
-          <JournalEntriesList
-            entries={entries}
-            loading={loading}
-            processingEntries={processingEntries}
-            processedEntryIds={processedEntryIds}
-            onStartRecording={handleStartRecording}
-            onDeleteEntry={handleDeleteEntry}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
+        ) : error && !loading ? (
+          <>
+            <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <p className="text-red-800 dark:text-red-200">
+                    Error loading your journal entries: {error}
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+                  onClick={() => {
+                    setRefreshKey(prev => prev + 1);
+                    fetchEntries();
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" /> 
+                  Retry Loading
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {showRetryButton && (
+              <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-amber-800 dark:text-amber-200">
+                      We're having trouble setting up your profile. Your entries may not be saved correctly.
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto border-amber-500 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                    onClick={handleRetryProfileCreation}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> 
+                    Retry Profile Setup
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {processingError && (
+              <div className="mb-6 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-red-800 dark:text-red-200">
+                      Error processing your recording: {processingError}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+                    onClick={() => {
+                      setProcessingError(null);
+                      setActiveTab('record');
+                    }}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> 
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="record">Record Entry</TabsTrigger>
+                <TabsTrigger value="entries">Past Entries</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="record" className="mt-0">
+                <div className="mb-4">
+                  <VoiceRecorder 
+                    onRecordingComplete={handleRecordingComplete}
+                  />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="entries" className="mt-0">
+                {showLoadingFeedback ? (
+                  <div className="mt-8 flex flex-col items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                    <p className="text-muted-foreground">Processing your recording...</p>
+                    <p className="text-muted-foreground text-sm mt-2">This may take a moment. Your journal entries will appear here shortly.</p>
+                  </div>
+                ) : (
+                  <JournalEntriesList
+                    entries={entries}
+                    loading={loading}
+                    processingEntries={processingEntries}
+                    processedEntryIds={processedEntryIds}
+                    onStartRecording={handleStartRecording}
+                    onDeleteEntry={handleDeleteEntry}
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </div>
+    </>
   );
 };
 
