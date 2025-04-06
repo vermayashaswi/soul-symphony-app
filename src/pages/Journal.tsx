@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
+import JournalProfileDebug from '@/components/journal/JournalProfileDebug';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -196,6 +197,9 @@ const Journal = () => {
           )}
         </TabsContent>
       </Tabs>
+      
+      {/* Add the Profile Debug Component */}
+      <JournalProfileDebug />
     </div>
   );
 };
