@@ -21,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [profileCreationInProgress, setProfileCreationInProgress] = useState(false);
+  const [profileCreationAttempts, setProfileCreationAttempts] = useState(0);
 
   // Ensure profile exists wrapper with improved error handling
   const ensureProfileExists = async (): Promise<boolean> => {
@@ -28,7 +29,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     try {
       setProfileCreationInProgress(true);
+      setProfileCreationAttempts(prev => prev + 1);
+      
+      console.log(`Attempt #${profileCreationAttempts + 1} to ensure profile exists for user:`, user.id);
       const result = await ensureProfileExistsService(user);
+      
+      if (!result && profileCreationAttempts < 3) {
+        console.log(`Profile creation failed on attempt #${profileCreationAttempts + 1}, will retry later`);
+        // We'll let the next attempt happen naturally when needed
+      } else if (result) {
+        console.log('Profile created or verified successfully');
+        // Reset attempts counter on success
+        setProfileCreationAttempts(0);
+      }
+      
       return result;
     } catch (error) {
       console.error('Error in ensureProfileExists:', error);
@@ -122,20 +136,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (profileCreated) {
         console.log('Profile created or verified for user:', currentUser.email);
+        setProfileCreationAttempts(0);
         return true;
       } else {
         console.warn('First attempt to create profile failed, retrying...');
         
         // Retry once after a short delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 1500));
         const retryResult = await ensureProfileExistsService(currentUser);
         
         if (retryResult) {
           console.log('Profile created or verified on retry for user:', currentUser.email);
+          setProfileCreationAttempts(0);
           return true;
         } else {
-          console.error('Failed to create profile after retry for user:', currentUser.email);
-          return false;
+          // Try one more time with a longer delay
+          console.warn('Second attempt to create profile failed, final retry...');
+          await new Promise(resolve => setTimeout(resolve, 2500));
+          const finalResult = await ensureProfileExistsService(currentUser);
+          
+          if (finalResult) {
+            console.log('Profile created or verified on final retry for user:', currentUser.email);
+            setProfileCreationAttempts(0);
+            return true;
+          } else {
+            console.error('Failed to create profile after multiple retries for user:', currentUser.email);
+            return false;
+          }
         }
       }
     } catch (error) {
@@ -161,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(() => {
             createOrVerifyProfile(currentSession.user)
               .catch(error => console.error('Error in delayed profile creation:', error));
-          }, 500);
+          }, 800);
         }
         
         setIsLoading(false);
@@ -185,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTimeout(() => {
           createOrVerifyProfile(currentSession.user)
             .catch(error => console.error('Error in initial profile creation:', error));
-        }, 500);
+        }, 800);
       }
       
       setIsLoading(false);

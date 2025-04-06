@@ -24,7 +24,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         console.log('Profile not found, creating new profile');
         
         // Extract user metadata for profile creation
-        const fullName = user.user_metadata?.full_name || '';
+        const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
         const avatarUrl = user.user_metadata?.avatar_url || '';
         const email = user.email || '';
         
@@ -59,7 +59,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
               full_name: fullName,
               avatar_url: avatarUrl,
               onboarding_completed: false
-            }]);
+            }], { onConflict: 'id' });
             
           if (upsertError) {
             console.error('Error upserting profile:', upsertError);
