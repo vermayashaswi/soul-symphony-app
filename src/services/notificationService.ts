@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 
 // Duration constants
@@ -132,7 +133,7 @@ export const clearToast = (toastId: string | number) => {
   }
 };
 
-// Enhanced aggressive toast clearing function
+// Enhanced aggressive toast clearing function with retries and DOM manipulation
 export const clearAllToasts = (): Promise<boolean> => {
   console.log('[NotificationService] Clearing all toasts');
   
@@ -150,33 +151,67 @@ export const clearAllToasts = (): Promise<boolean> => {
     // get all toast elements and remove them manually if needed
     if (isBrowser()) {
       try {
-        // Try to find any toast container elements that might be persisting
-        const toastContainers = document.querySelectorAll('[data-sonner-toast]');
-        console.log(`[NotificationService] Found ${toastContainers.length} persistent toast containers`);
+        // Find all active toast elements
+        const toastElements = document.querySelectorAll('[data-sonner-toast]');
+        console.log(`[NotificationService] Found ${toastElements.length} active toast elements`);
         
-        if (toastContainers.length > 0) {
-          toastContainers.forEach(container => {
-            // Manual removal since we've disabled close buttons
-            if (container.parentNode) {
-              container.parentNode?.removeChild(container);
+        if (toastElements.length > 0) {
+          toastElements.forEach(element => {
+            try {
+              // Add a fade-out effect for smoother transition
+              const el = element as HTMLElement;
+              el.style.opacity = '0';
+              el.style.transform = 'translateY(-10px)';
+              el.style.transition = 'opacity 100ms ease, transform 100ms ease';
+              
+              // Remove after transition
+              setTimeout(() => {
+                if (el.parentNode) {
+                  el.parentNode.removeChild(el);
+                }
+              }, 100);
+            } catch (removeErr) {
+              console.error('[NotificationService] Error applying fade-out to toast:', removeErr);
+              
+              // Fallback to direct removal
+              if (element.parentNode) {
+                element.parentNode.removeChild(element);
+              }
             }
           });
         }
         
-        // Also try to clear any toast containers
-        const sonnerRoots = document.querySelectorAll('[data-sonner-toaster]');
-        console.log(`[NotificationService] Found ${sonnerRoots.length} sonner root containers`);
+        // Also clear any toast containers
+        const toastContainers = document.querySelectorAll('[data-sonner-toaster]');
+        console.log(`[NotificationService] Found ${toastContainers.length} toast containers`);
         
-        if (sonnerRoots.length > 0) {
-          sonnerRoots.forEach(root => {
-            // Don't remove the container, but clear its children
-            while (root.firstChild) {
-              root.removeChild(root.firstChild);
+        toastContainers.forEach(container => {
+          // Don't remove the container, but clear its children
+          try {
+            while (container.firstChild) {
+              container.removeChild(container.firstChild);
+            }
+          } catch (clearErr) {
+            console.error('[NotificationService] Error clearing container children:', clearErr);
+          }
+        });
+        
+        // Additionally look for any toast portals
+        const toastPortals = document.querySelectorAll('[id^="sonner"]');
+        if (toastPortals.length > 0) {
+          console.log(`[NotificationService] Found ${toastPortals.length} toast portals`);
+          toastPortals.forEach(portal => {
+            try {
+              while (portal.firstChild) {
+                portal.removeChild(portal.firstChild);
+              }
+            } catch (clearErr) {
+              console.error('[NotificationService] Error clearing toast portal:', clearErr);
             }
           });
         }
       } catch (e) {
-        console.error('[NotificationService] Error trying to clean up persistent toasts:', e);
+        console.error('[NotificationService] Error in DOM toast cleanup:', e);
       }
     }
     
@@ -206,39 +241,94 @@ export const clearAllToasts = (): Promise<boolean> => {
   });
 };
 
-// Function to ensure toasts are completely cleared through multiple attempts
+// More thorough toast clearing function with multiple strategies
 export const ensureAllToastsCleared = async (): Promise<boolean> => {
   console.log('[NotificationService] Ensuring all toasts are completely cleared');
   
-  // First attempt
+  // First attempt - standard clearing
   await clearAllToasts();
   
-  // Wait a bit and check if any toasts remain
+  // Wait for DOM updates
   await new Promise(resolve => setTimeout(resolve, 50));
   
+  // Second attempt - check if any toasts remain and use more aggressive approach
   if (isBrowser()) {
     const remainingToasts = document.querySelectorAll('[data-sonner-toast]');
     if (remainingToasts.length > 0) {
       console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after first cleanup`);
       
-      // Second attempt with more aggressive DOM manipulation
+      // Try using toast.dismiss again
       toast.dismiss();
-      await new Promise(resolve => setTimeout(resolve, 50));
       
+      // Wait a bit longer for animations to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Direct DOM manipulation for any remaining toasts
       try {
         document.querySelectorAll('[data-sonner-toast]').forEach(toast => {
           if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
+            // Apply fade-out animation
+            const el = toast as HTMLElement;
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-10px)';
+            el.style.transition = 'opacity 100ms ease, transform 100ms ease';
+            
+            // Remove after transition
+            setTimeout(() => {
+              if (el.parentNode) {
+                el.parentNode.removeChild(el);
+              }
+            }, 100);
           }
         });
       } catch (e) {
         console.error('[NotificationService] Error in second toast cleanup:', e);
       }
+      
+      // Try to reset internal Sonner state if possible
+      try {
+        // This is a hack to try to reset Sonner's internal state
+        // It looks for any Sonner containers and tries to click their close buttons
+        const closeButtons = document.querySelectorAll('[data-sonner-toast] [data-close-button]');
+        closeButtons.forEach(button => {
+          try {
+            (button as HTMLButtonElement).click();
+          } catch (clickErr) {
+            console.error('[NotificationService] Error clicking close button:', clickErr);
+          }
+        });
+      } catch (stateErr) {
+        console.error('[NotificationService] Error resetting Sonner state:', stateErr);
+      }
     }
   }
   
-  // Final attempt to ensure cleanup is complete
+  // Third attempt - final check and cleanup
   await clearAllToasts();
+  
+  // Wait one more time and do a final check
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  if (isBrowser()) {
+    const finalCheck = document.querySelectorAll('[data-sonner-toast]');
+    if (finalCheck.length > 0) {
+      console.warn(`[NotificationService] Still found ${finalCheck.length} toasts after multiple cleanup attempts`);
+      
+      // Final aggressive removal
+      try {
+        finalCheck.forEach(toast => {
+          if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+          }
+        });
+      } catch (finalErr) {
+        console.error('[NotificationService] Error in final aggressive cleanup:', finalErr);
+      }
+    } else {
+      console.log('[NotificationService] Successfully cleared all toasts');
+    }
+  }
+  
   return true;
 };
 
