@@ -65,7 +65,8 @@ const Journal = () => {
         
         toast.success('Journal entry analyzed and saved', {
           duration: 1000,
-          id: 'journal-success-toast'
+          id: 'journal-success-toast',
+          closeButton: false
         });
         
         setProcessingEntries([]);
@@ -126,7 +127,8 @@ const Journal = () => {
           if (toastIds[tempId]) {
             toast.success('Journal entry analyzed and saved', { 
               id: toastIds[tempId], 
-              duration: 1000
+              duration: 1000,
+              closeButton: false
             });
           }
         });
@@ -154,7 +156,7 @@ const Journal = () => {
     
     if (newEntries.length > 0 && notifiedEntryIds.size > 0) {
       if (!entryHasBeenProcessed) {
-        toast.success('Journal entry analyzed and saved', { duration: 1000 });
+        toast.success('Journal entry analyzed and saved', { duration: 1000, closeButton: false });
         setEntryHasBeenProcessed(true);
       }
       
@@ -215,7 +217,10 @@ const Journal = () => {
       
       const now = Date.now();
       if (now - lastProfileErrorTime > 60000) {
-        toast.error('Having trouble with your profile. You can try again or continue using the app.', { duration: 3000 });
+        toast.error('Having trouble with your profile. You can try again or continue using the app.', { 
+          duration: 3000,
+          closeButton: false
+        });
         setLastProfileErrorTime(now);
       }
       
@@ -251,6 +256,7 @@ const Journal = () => {
       
       const toastId = toast.loading('Processing your journal entry with AI...', {
         duration: 15000,
+        closeButton: false,
         onAutoClose: () => {
           if (toastId) {
             const updatedToastIds = { ...toastIds };
@@ -288,7 +294,8 @@ const Journal = () => {
               toast.dismiss(toastIds[tempId]);
               
               toast.success('Journal entry analyzed and saved', { 
-                duration: 1000
+                duration: 1000,
+                closeButton: false
               });
               
               setToastIds(prev => {
@@ -306,12 +313,16 @@ const Journal = () => {
         toast.dismiss(toastId);
         
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
-          duration: 3000
+          duration: 3000,
+          closeButton: false
         });
       }
     } catch (error) {
       console.error('Error processing recording:', error);
-      toast.error('Error processing your recording', { duration: 3000 });
+      toast.error('Error processing your recording', { 
+        duration: 3000,
+        closeButton: false
+      });
     }
   };
 

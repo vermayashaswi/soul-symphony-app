@@ -33,35 +33,35 @@ export const showToast = (
       toastId = toast.success(message, { 
         duration, 
         onDismiss: () => activeToasts.delete(message),
-        closeButton: true
+        closeButton: false
       });
       break;
     case "error":
       toastId = toast.error(message, { 
         duration, 
         onDismiss: () => activeToasts.delete(message),
-        closeButton: true
+        closeButton: false
       });
       break;
     case "info":
       toastId = toast.info(message, { 
         duration, 
         onDismiss: () => activeToasts.delete(message),
-        closeButton: true
+        closeButton: false
       });
       break;
     case "warning":
       toastId = toast.warning(message, { 
         duration, 
         onDismiss: () => activeToasts.delete(message),
-        closeButton: true
+        closeButton: false
       });
       break;
     default:
       toastId = toast(message, { 
         duration, 
         onDismiss: () => activeToasts.delete(message),
-        closeButton: true
+        closeButton: false
       });
   }
   
@@ -101,14 +101,7 @@ export const clearAllToasts = () => {
       const toastContainers = document.querySelectorAll('[data-sonner-toast]');
       if (toastContainers.length > 0) {
         toastContainers.forEach(container => {
-          // Try to find and click any close buttons
-          const closeButton = container.querySelector('[data-close-button]');
-          if (closeButton && closeButton instanceof HTMLElement) {
-            closeButton.click();
-          }
-          
-          // As a last resort, try to remove the element directly
-          // This is an edge case and should be used carefully
+          // Manual removal since we've disabled close buttons
           if (container.parentNode) {
             setTimeout(() => {
               if (document.body.contains(container as Node)) {

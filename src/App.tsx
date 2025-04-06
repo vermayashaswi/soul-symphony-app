@@ -28,7 +28,7 @@ const App = () => {
             <div className="relative min-h-screen">
               <div className="relative z-10">
                 <Toaster />
-                <Sonner position="top-center" closeButton={true} />
+                <Sonner position="top-center" closeButton={false} />
                 <BrowserRouter>
                   <AnimatePresence mode="wait">
                     <AppRoutes />

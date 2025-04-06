@@ -13,7 +13,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group z-[100]" // Increased z-index for better visibility
       // Short duration (1000ms = 1 second) for regular notifications
       duration={1000}
-      closeButton={true} // Add close button to ensure users can dismiss toasts
+      closeButton={false} // Remove close buttons to enforce swipe-only dismissal
       richColors={true} // Use rich colors for better visibility
       toastOptions={{
         classNames: {
