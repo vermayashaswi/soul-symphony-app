@@ -133,11 +133,11 @@ export default function Settings() {
   
   const handleLogout = async () => {
     try {
+      toast.info('Logging out...');
       await signOut();
-      toast.success('Logged out successfully');
     } catch (error) {
-      console.error('Error logging out:', error);
-      toast.error('Failed to log out');
+      console.error('Error logging out from Settings page:', error);
+      window.location.href = '/';
     }
   };
   

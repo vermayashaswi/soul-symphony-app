@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -129,18 +128,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async (): Promise<void> => {
     try {
-      // Pass a callback function instead of the navigate object
-      await signOutService((path: string) => {
-        // Use window.location.href for navigation instead of useNavigate
-        window.location.href = path;
-      });
+      console.log('[AuthContext] Attempting to sign out user');
       
       setSession(null);
       setUser(null);
       setProfileExistsStatus(null);
       setProfileCreationComplete(false);
-    } catch (error) {
-      // Error handling is done in the service
+      
+      await signOutService((path: string) => {
+        console.log(`[AuthContext] Redirecting to ${path} after signout`);
+        window.location.href = path;
+      });
+    } catch (error: any) {
+      console.error('[AuthContext] Error during sign out:', error);
+      toast.error(`Error signing out: ${error.message}`);
+      
+      window.location.href = '/';
     }
   };
 

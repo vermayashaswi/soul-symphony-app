@@ -103,6 +103,23 @@ export const resetPassword = async (email: string): Promise<void> => {
  */
 export const signOut = async (navigate?: (path: string) => void): Promise<void> => {
   try {
+    // Check if there's a session before trying to sign out
+    const { data: sessionData } = await supabase.auth.getSession();
+    
+    // If no session exists, just clean up local state and redirect
+    if (!sessionData?.session) {
+      console.log('No active session found, cleaning up local state only');
+      // Clear any auth-related items from local storage
+      localStorage.removeItem('authRedirectTo');
+      
+      // Redirect to home page if navigate function is provided
+      if (navigate) {
+        navigate('/');
+      }
+      return;
+    }
+    
+    // If session exists, proceed with normal sign out
     const { error } = await supabase.auth.signOut();
     if (error) {
       throw error;
@@ -117,8 +134,15 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     }
   } catch (error: any) {
     console.error('Error signing out:', error);
-    toast.error(`Error signing out: ${error.message}`);
-    throw error;
+    
+    // Still navigate and clean up even if there's an error
+    if (navigate) {
+      navigate('/');
+    }
+    localStorage.removeItem('authRedirectTo');
+    
+    // Show error toast but don't prevent logout flow
+    toast.error(`Error while logging out: ${error.message}`);
   }
 };
 
