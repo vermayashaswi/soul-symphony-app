@@ -20,13 +20,10 @@ const Journal = () => {
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
   const [activeTab, setActiveTab] = useState('record');
-  const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
-  const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
-  const [showRetryButton, setShowRetryButton] = useState(false);
-  const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
-  const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
   const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
+  const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
+  const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   
@@ -120,7 +117,7 @@ const Journal = () => {
     }
   }, [user?.id, isCheckingProfile]);
 
-  // Initial profile check
+  // Initial profile check - silently attempt to ensure profile exists
   useEffect(() => {
     if (user?.id && !isProfileChecked && !isCheckingProfile && !profileCheckedOnceRef.current) {
       checkUserProfile(user.id);
@@ -247,46 +244,24 @@ const Journal = () => {
     }
   }, [processingEntries.length, fetchEntries]);
 
+  // Silently check and create user profile if needed
   const checkUserProfile = async (userId: string) => {
     try {
       setIsCheckingProfile(true);
-      setShowRetryButton(false);
       
       console.log('[Journal] Checking user profile for ID:', userId);
       
-      const profileCreated = await ensureProfileExists();
+      // Silently try to ensure profile exists - no UI indication of failure
+      await ensureProfileExists();
       profileCheckedOnceRef.current = true;
-      
-      console.log('[Journal] Profile check result:', profileCreated);
-      
-      if (!profileCreated) {
-        setShowRetryButton(true);
-      }
       
       setIsProfileChecked(true);
     } catch (error: any) {
       console.error('[Journal] Error checking/creating user profile:', error);
-      
-      const now = Date.now();
-      if (now - lastProfileErrorTime > 60000) {
-        setLastProfileErrorTime(now);
-      }
-      
-      setShowRetryButton(true);
-      
       setIsProfileChecked(true);
     } finally {
       setIsCheckingProfile(false);
     }
-  };
-
-  const handleRetryProfileCreation = () => {
-    if (!user?.id) return;
-    
-    setProfileCheckRetryCount(0);
-    profileCheckedOnceRef.current = false;
-    setIsProfileChecked(false);
-    checkUserProfile(user.id);
   };
 
   const handleStartRecording = () => {
@@ -468,27 +443,6 @@ const Journal = () => {
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
       <JournalHeader />
-      
-      {showRetryButton && (
-        <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-amber-800 dark:text-amber-200">
-                We're having trouble setting up your profile. Your entries may not be saved correctly.
-              </p>
-            </div>
-            <Button 
-              variant="outline" 
-              className="w-full sm:w-auto border-amber-500 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
-              onClick={handleRetryProfileCreation}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" /> 
-              Retry Profile Setup
-            </Button>
-          </div>
-        </div>
-      )}
       
       <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
         <TabsList className="grid w-full grid-cols-2 mb-6">

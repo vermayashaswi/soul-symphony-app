@@ -20,8 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [profileCreationInProgress, setProfileCreationInProgress] = useState(false);
-  const [profileCreationAttempts, setProfileCreationAttempts] = useState(0);
-  const [lastProfileAttemptTime, setLastProfileAttemptTime] = useState<number>(0);
+  const [maxRetryAttempts] = useState(5); // Maximum number of automatic retries
+  const [retryDelay] = useState(800); // Base delay between retries in ms
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
@@ -38,40 +38,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const ensureProfileExists = async (): Promise<boolean> => {
-    if (!user || profileCreationInProgress) return false;
+    if (!user) return false;
     
     if (profileExistsStatus === true || profileCreationComplete) {
       return true;
     }
     
-    const now = Date.now();
-    if (now - lastProfileAttemptTime < 2000) {
-      console.log('[AuthContext] Skipping profile check - too soon after last attempt');
-      return profileExistsStatus || false;
+    // Start automatic retry process with exponential backoff if not already in progress
+    if (!profileCreationInProgress) {
+      return autoRetryProfileCreation();
     }
+    
+    return profileExistsStatus || false;
+  };
+
+  // New function for automatic profile creation with retries
+  const autoRetryProfileCreation = async (): Promise<boolean> => {
+    if (!user || profileCreationComplete) return profileExistsStatus || false;
     
     try {
       setProfileCreationInProgress(true);
-      setLastProfileAttemptTime(now);
-      setProfileCreationAttempts(prev => prev + 1);
       
-      console.log(`[AuthContext] Attempt #${profileCreationAttempts + 1} to ensure profile exists for user:`, user.id);
+      let attempt = 0;
+      let success = false;
       
-      const result = await ensureProfileExistsService(user);
+      // Try up to maxRetryAttempts times with exponential backoff
+      while (attempt < maxRetryAttempts && !success) {
+        console.log(`[AuthContext] Profile creation attempt #${attempt + 1}`);
+        
+        // Add delay with exponential backoff, except for first attempt
+        if (attempt > 0) {
+          const backoffDelay = retryDelay * Math.pow(1.5, attempt - 1);
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
+        }
+        
+        success = await ensureProfileExistsService(user);
+        
+        if (success) {
+          console.log('[AuthContext] Profile created or verified successfully');
+          setProfileExistsStatus(true);
+          setProfileCreationComplete(true);
+          return true;
+        }
+        
+        attempt++;
+      }
       
-      if (result) {
-        console.log('[AuthContext] Profile created or verified successfully');
-        setProfileCreationAttempts(0);
-        setProfileExistsStatus(true);
-        setProfileCreationComplete(true);
-      } else if (profileCreationAttempts < 3) {
-        console.log(`[AuthContext] Profile creation failed on attempt #${profileCreationAttempts + 1}, status: ${result}`);
+      // If we still failed after all retries, set the status but don't surface error to user
+      if (!success) {
+        console.error('[AuthContext] Profile creation failed after multiple attempts');
         setProfileExistsStatus(false);
       }
       
-      return result;
+      return success;
     } catch (error) {
-      console.error('[AuthContext] Error in ensureProfileExists:', error);
+      console.error('[AuthContext] Error in autoRetryProfileCreation:', error);
       setProfileExistsStatus(false);
       return false;
     } finally {
@@ -160,31 +181,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       
-      const profileCreated = await ensureProfileExistsService(currentUser);
-      
-      if (profileCreated) {
-        console.log('[AuthContext] Profile created or verified for user:', currentUser.email);
-        setProfileCreationAttempts(0);
-        setProfileExistsStatus(true);
-        setProfileCreationComplete(true);
-        return true;
-      } else {
-        console.warn('[AuthContext] First attempt to create profile failed, retrying once...');
-        
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        const retryResult = await ensureProfileExistsService(currentUser);
-        if (retryResult) {
-          console.log('[AuthContext] Profile created or verified on retry for user:', currentUser.email);
-          setProfileCreationAttempts(0);
-          setProfileExistsStatus(true);
-          setProfileCreationComplete(true);
-          return true;
-        }
-        
-        setProfileExistsStatus(false);
-        return false;
-      }
+      // Start automatic retry process
+      return await autoRetryProfileCreation();
     } catch (error) {
       console.error('[AuthContext] Error in profile creation:', error);
       setProfileExistsStatus(false);
