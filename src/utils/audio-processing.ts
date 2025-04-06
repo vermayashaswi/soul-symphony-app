@@ -147,6 +147,9 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       console.log('Journal entry saved successfully:', result);
       isEntryBeingProcessed = false;
       
+      // Clear any remaining toasts to ensure no processing notifications are left
+      clearAllToasts();
+      
       // Verify the entry was saved by querying the database
       if (result.data?.entryId) {
         const { data: savedEntry, error: fetchError } = await supabase
@@ -164,10 +167,16 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     } else {
       console.error('Failed to process recording after multiple attempts:', result?.error);
       isEntryBeingProcessed = false;
+      
+      // Also clear toasts here in case of error
+      clearAllToasts();
     }
   } catch (error: any) {
     console.error('Error processing recording in background:', error);
     isEntryBeingProcessed = false;
+    
+    // Clear toasts in case of any error
+    clearAllToasts();
   }
 }
 

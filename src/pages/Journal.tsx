@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, isProcessingEntry } from '@/utils/audio-processing';
@@ -35,14 +34,12 @@ const Journal = () => {
     isProfileChecked
   );
 
-  // Clear all toasts when component mounts or unmounts
   useEffect(() => {
     clearAllToasts();
     
     return () => {
       clearAllToasts();
       
-      // Dismiss all toasts by ID when component unmounts
       Object.values(toastIds).forEach(id => {
         if (id) toast.dismiss(id);
       });
@@ -66,13 +63,11 @@ const Journal = () => {
         
         setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
         
-        // Show a single toast for all new entries with auto-dismiss
         toast.success('Journal entry analyzed and saved', {
           duration: 1000,
           id: 'journal-success-toast'
         });
         
-        // Clear processing entries and toast IDs
         setProcessingEntries([]);
         setToastIds({});
       }
@@ -252,11 +247,21 @@ const Journal = () => {
       setActiveTab('entries');
       setEntryHasBeenProcessed(false);
       
-      // Clear any existing toasts first
       clearAllToasts();
       
       const toastId = toast.loading('Processing your journal entry with AI...', {
-        duration: 15000 // Set a maximum duration even for loading toasts
+        duration: 15000,
+        onAutoClose: () => {
+          if (toastId) {
+            const updatedToastIds = { ...toastIds };
+            Object.keys(updatedToastIds).forEach(key => {
+              if (updatedToastIds[key] === String(toastId)) {
+                delete updatedToastIds[key];
+              }
+            });
+            setToastIds(updatedToastIds);
+          }
+        }
       });
       
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
@@ -273,7 +278,6 @@ const Journal = () => {
           fetchEntries();
         }, 5000);
         
-        // Always clear processing state and toasts after maximum time
         setTimeout(() => {
           if (processingEntries.includes(tempId)) {
             console.log('[Journal] Maximum processing time reached for tempId:', tempId);
@@ -281,8 +285,9 @@ const Journal = () => {
             setProcessingEntries(prev => prev.filter(id => id !== tempId));
             
             if (toastIds[tempId]) {
+              toast.dismiss(toastIds[tempId]);
+              
               toast.success('Journal entry analyzed and saved', { 
-                id: toastIds[tempId], 
                 duration: 1000
               });
               
@@ -298,8 +303,9 @@ const Journal = () => {
           fetchEntries();
         }, 15000);
       } else {
+        toast.dismiss(toastId);
+        
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
-          id: toastId,
           duration: 3000
         });
       }
@@ -313,7 +319,6 @@ const Journal = () => {
     if (!user?.id) return;
     
     try {
-      // Clear all toasts when deleting an entry
       clearAllToasts();
       
       processingEntries.forEach(tempId => {

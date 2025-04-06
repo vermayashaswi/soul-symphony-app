@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 
 // Duration constants
@@ -31,19 +30,39 @@ export const showToast = (
   let toastId;
   switch (type) {
     case "success":
-      toastId = toast.success(message, { duration, onDismiss: () => activeToasts.delete(message) });
+      toastId = toast.success(message, { 
+        duration, 
+        onDismiss: () => activeToasts.delete(message),
+        closeButton: true
+      });
       break;
     case "error":
-      toastId = toast.error(message, { duration, onDismiss: () => activeToasts.delete(message) });
+      toastId = toast.error(message, { 
+        duration, 
+        onDismiss: () => activeToasts.delete(message),
+        closeButton: true
+      });
       break;
     case "info":
-      toastId = toast.info(message, { duration, onDismiss: () => activeToasts.delete(message) });
+      toastId = toast.info(message, { 
+        duration, 
+        onDismiss: () => activeToasts.delete(message),
+        closeButton: true
+      });
       break;
     case "warning":
-      toastId = toast.warning(message, { duration, onDismiss: () => activeToasts.delete(message) });
+      toastId = toast.warning(message, { 
+        duration, 
+        onDismiss: () => activeToasts.delete(message),
+        closeButton: true
+      });
       break;
     default:
-      toastId = toast(message, { duration, onDismiss: () => activeToasts.delete(message) });
+      toastId = toast(message, { 
+        duration, 
+        onDismiss: () => activeToasts.delete(message),
+        closeButton: true
+      });
   }
   
   activeToasts.add(message);
@@ -66,10 +85,43 @@ export const clearToast = (toastId: string | number) => {
   }
 };
 
-// Clear all toasts
+// Clear all toasts - enhanced to be more aggressive
 export const clearAllToasts = () => {
+  // First use the standard dismiss method
   toast.dismiss();
+  
+  // Then clear our tracking set
   activeToasts.clear();
+  
+  // As a safety measure for any persistent toasts with the loading state,
+  // get all toast elements and remove them manually if needed
+  if (isBrowser()) {
+    try {
+      // Try to find any toast container elements that might be persisting
+      const toastContainers = document.querySelectorAll('[data-sonner-toast]');
+      if (toastContainers.length > 0) {
+        toastContainers.forEach(container => {
+          // Try to find and click any close buttons
+          const closeButton = container.querySelector('[data-close-button]');
+          if (closeButton && closeButton instanceof HTMLElement) {
+            closeButton.click();
+          }
+          
+          // As a last resort, try to remove the element directly
+          // This is an edge case and should be used carefully
+          if (container.parentNode) {
+            setTimeout(() => {
+              if (document.body.contains(container as Node)) {
+                container.parentNode?.removeChild(container);
+              }
+            }, 200);
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Error trying to clean up persistent toasts:', e);
+    }
+  }
 };
 
 // Function to request notification permissions (web only for now)
