@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -53,10 +52,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     reset: resetPlayback
   } = useAudioPlayback({ audioBlob });
 
-  // Before saving, verify auth is still valid
   const checkAuthBeforeSaving = useCallback(async () => {
     if (!user) {
-      // Try to refresh auth state
       const authValid = await forceRefreshAuth();
       if (!authValid) {
         console.error("[VoiceRecorder] Auth validation failed before saving");
@@ -104,7 +101,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       setIsProcessing(true);
       setRecordingError(null);
       
-      // Verify auth is valid before proceeding
       const isAuthValid = await checkAuthBeforeSaving();
       if (!isAuthValid) {
         setIsProcessing(false);
@@ -112,7 +108,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         return;
       }
       
-      // Normalize the audio blob
       const normalizedBlob = normalizeAudioBlob(audioBlob);
       
       console.log('Processing audio:', {
