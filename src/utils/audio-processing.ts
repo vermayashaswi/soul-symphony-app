@@ -23,6 +23,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   // 1. Validate the audio blob
   const validation = validateAudioBlob(audioBlob);
   if (!validation.isValid) {
+    console.error('Audio validation failed:', validation.errorMessage);
     return { success: false, error: validation.errorMessage };
   }
   

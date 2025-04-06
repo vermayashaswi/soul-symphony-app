@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -95,7 +96,10 @@ export function JournalEntryCard({
             .eq('id', entry.id)
             .single();
             
-          if (error) throw error;
+          if (error) {
+            console.error("Error polling for themes:", error);
+            throw error;
+          }
           
           // Check if data exists and is not an error
           if (data && typeof data === 'object') {

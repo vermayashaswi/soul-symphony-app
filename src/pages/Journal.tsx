@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -27,6 +26,7 @@ const Journal = () => {
   const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
   const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
+  const [isRecordingComplete, setIsRecordingComplete] = useState(false);
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   
@@ -36,7 +36,6 @@ const Journal = () => {
     isProfileChecked
   );
 
-  // Clear toasts on mount and unmount
   useEffect(() => {
     clearAllToasts();
     
@@ -53,7 +52,6 @@ const Journal = () => {
     };
   }, []);
 
-  // Check for new entries
   useEffect(() => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
@@ -81,7 +79,6 @@ const Journal = () => {
     }
   }, [entries, processingEntries, toastIds]);
 
-  // Clean up toasts on unmount
   useEffect(() => {
     return () => {
       Object.values(toastIds).forEach(id => {
@@ -94,7 +91,6 @@ const Journal = () => {
     };
   }, [toastIds, profileCheckTimeoutId]);
 
-  // Profile check timeout
   useEffect(() => {
     if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
       const timeoutId = setTimeout(() => {
@@ -113,14 +109,12 @@ const Journal = () => {
     }
   }, [user?.id, isCheckingProfile]);
 
-  // Initial profile check
   useEffect(() => {
     if (user?.id && !isProfileChecked && !isCheckingProfile && !profileCheckedOnceRef.current) {
       checkUserProfile(user.id);
     }
   }, [user?.id, isProfileChecked, isCheckingProfile]);
 
-  // Check for completed processing entries
   useEffect(() => {
     if (!loading && entries.length > 0 && processingEntries.length > 0) {
       const entryIds = entries.map(entry => entry.id.toString());
@@ -155,7 +149,6 @@ const Journal = () => {
     }
   }, [entries, loading, processingEntries, toastIds]);
 
-  // Notify about new entries
   useEffect(() => {
     if (loading || entries.length === 0) return;
     
@@ -196,14 +189,13 @@ const Journal = () => {
     }
   }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
 
-  // Poll for updates while processing entries
   useEffect(() => {
     if (processingEntries.length > 0) {
       const interval = setInterval(() => {
         console.log('[Journal] Polling for updates while processing entries');
         setRefreshKey(prev => prev + 1);
         fetchEntries();
-      }, 2000); // Decreased from 3000 to 2000 for faster updates
+      }, 2000);
       
       return () => clearInterval(interval);
     }
@@ -263,7 +255,8 @@ const Journal = () => {
     }
     
     try {
-      // Switch to entries tab before starting processing - important to do this first
+      setIsRecordingComplete(true);
+      
       setActiveTab('entries');
       
       setEntryHasBeenProcessed(false);
@@ -293,11 +286,9 @@ const Journal = () => {
         setProcessingEntries(prev => [...prev, tempId]);
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         
-        // Trigger immediate fetch
         fetchEntries();
         setRefreshKey(prev => prev + 1);
         
-        // Set up polling at regular intervals
         const pollIntervals = [1000, 2000, 3000, 5000, 8000, 12000];
         
         pollIntervals.forEach(interval => {
@@ -310,7 +301,6 @@ const Journal = () => {
           }, interval);
         });
         
-        // Failsafe: If entry is still processing after max time, remove it from processing list
         setTimeout(() => {
           if (processingEntries.includes(tempId)) {
             console.log('[Journal] Maximum processing time reached for tempId:', tempId);
@@ -332,9 +322,10 @@ const Journal = () => {
               });
             }
             
-            // Final fetch attempt
             fetchEntries();
             setRefreshKey(prev => prev + 1);
+            
+            setIsRecordingComplete(false);
           }
         }, 20000);
       } else {
@@ -345,6 +336,8 @@ const Journal = () => {
           duration: 3000,
           closeButton: false
         });
+        
+        setIsRecordingComplete(false);
       }
     } catch (error) {
       console.error('Error processing recording:', error);
@@ -352,6 +345,10 @@ const Journal = () => {
         duration: 3000,
         closeButton: false
       });
+      
+      setIsRecordingComplete(false);
+      
+      setRefreshKey(prev => prev + 1);
     }
   };
 
@@ -382,7 +379,6 @@ const Journal = () => {
     }
   };
 
-  // Handle profile check loading state
   if (isCheckingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -422,6 +418,8 @@ const Journal = () => {
       </div>
     );
   }
+
+  const showLoadingFeedback = isRecordingComplete && entries.length === 0 && !error;
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
@@ -463,14 +461,22 @@ const Journal = () => {
         </TabsContent>
         
         <TabsContent value="entries" className="mt-0">
-          <JournalEntriesList
-            entries={entries}
-            loading={loading}
-            processingEntries={processingEntries}
-            processedEntryIds={processedEntryIds}
-            onStartRecording={handleStartRecording}
-            onDeleteEntry={handleDeleteEntry}
-          />
+          {showLoadingFeedback ? (
+            <div className="mt-8 flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+              <p className="text-muted-foreground">Processing your recording...</p>
+              <p className="text-muted-foreground text-sm mt-2">This may take a moment. Your journal entries will appear here shortly.</p>
+            </div>
+          ) : (
+            <JournalEntriesList
+              entries={entries}
+              loading={loading}
+              processingEntries={processingEntries}
+              processedEntryIds={processedEntryIds}
+              onStartRecording={handleStartRecording}
+              onDeleteEntry={handleDeleteEntry}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>
