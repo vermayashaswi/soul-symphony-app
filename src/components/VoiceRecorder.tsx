@@ -103,8 +103,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         try {
           // Make sure we wait for the callback to complete before resetting anything
           await onRecordingComplete(normalizedBlob);
-          // Only reset after successful completion
           // We don't reset the recorder here since Journal.tsx will handle the UI transition
+          
+          // Debug information
+          console.log('[VoiceRecorder] Recording callback completed successfully');
         } catch (error: any) {
           console.error('Error in recording callback:', error);
           setRecordingError(error?.message || "An unexpected error occurred");
@@ -128,6 +130,17 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     setIsProcessing(false);
     toast.info("Starting a new recording");
   };
+
+  // Add debugging information to console
+  useEffect(() => {
+    console.log('[VoiceRecorder] State update:', {
+      isProcessing,
+      hasAudioBlob: !!audioBlob,
+      isRecording,
+      hasPermission,
+      audioDuration
+    });
+  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration]);
 
   return (
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>

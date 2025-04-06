@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -11,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
+import JournalDebugger from '@/components/journal/JournalDebugger';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -55,7 +55,6 @@ const Journal = () => {
     };
   }, []);
 
-  // Monitor for new entries
   useEffect(() => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
@@ -84,7 +83,6 @@ const Journal = () => {
     }
   }, [entries, processingEntries, toastIds]);
 
-  // Cleanup toasts on unmount
   useEffect(() => {
     return () => {
       Object.values(toastIds).forEach(id => {
@@ -97,7 +95,6 @@ const Journal = () => {
     };
   }, [toastIds, profileCheckTimeoutId]);
 
-  // Profile check timeout
   useEffect(() => {
     if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
       const timeoutId = setTimeout(() => {
@@ -116,14 +113,12 @@ const Journal = () => {
     }
   }, [user?.id, isCheckingProfile]);
 
-  // Check user profile on load
   useEffect(() => {
     if (user?.id && !isProfileChecked && !isCheckingProfile && !profileCheckedOnceRef.current) {
       checkUserProfile(user.id);
     }
   }, [user?.id, isProfileChecked, isCheckingProfile]);
 
-  // Monitor for completed processing entries
   useEffect(() => {
     if (!loading && entries.length > 0 && processingEntries.length > 0) {
       const entryIds = entries.map(entry => entry.id.toString());
@@ -159,7 +154,6 @@ const Journal = () => {
     }
   }, [entries, loading, processingEntries, toastIds]);
 
-  // Notify about new entries
   useEffect(() => {
     if (loading || entries.length === 0) return;
     
@@ -204,7 +198,6 @@ const Journal = () => {
     }
   }, [entries, loading, notifiedEntryIds, processingEntries, entryHasBeenProcessed, toastIds]);
 
-  // Poll for updates while processing - this helps ensure we detect new entries
   useEffect(() => {
     if (processingEntries.length > 0 || isSavingRecording) {
       const interval = setInterval(() => {
@@ -279,7 +272,6 @@ const Journal = () => {
       setIsSavingRecording(true);
       setProcessingError(null);
       
-      // Switch to entries tab to show progress
       setActiveTab('entries');
       
       setEntryHasBeenProcessed(false);
@@ -309,11 +301,9 @@ const Journal = () => {
         setProcessingEntries(prev => [...prev, tempId]);
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         
-        // Force immediate fetch to ensure we get any entries that were already processed
         await fetchEntries();
         setRefreshKey(prev => prev + 1);
         
-        // Polling for updates
         const pollIntervals = [1000, 2000, 3000, 5000, 8000, 12000];
         
         for (const interval of pollIntervals) {
@@ -324,7 +314,6 @@ const Journal = () => {
           }, interval);
         }
         
-        // Set a maximum timeout to clean up if entry is never processed
         setTimeout(() => {
           console.log('[Journal] Maximum processing time check for tempId:', tempId);
           setProcessingEntries(prev => {
@@ -368,7 +357,6 @@ const Journal = () => {
         setIsRecordingComplete(false);
         setIsSavingRecording(false);
         
-        // Show record tab again if there was an error
         setActiveTab('record');
       }
     } catch (error: any) {
@@ -383,7 +371,6 @@ const Journal = () => {
       setIsRecordingComplete(false);
       setIsSavingRecording(false);
       
-      // Show record tab again if there was an error
       setActiveTab('record');
     }
   };
@@ -415,6 +402,18 @@ const Journal = () => {
     }
   };
 
+  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && !error && !processingError;
+
+  const renderDebugger = () => (
+    <JournalDebugger 
+      processingEntries={processingEntries}
+      isSavingRecording={isSavingRecording}
+      isRecordingComplete={isRecordingComplete}
+      activeTab={activeTab}
+      processingError={processingError}
+    />
+  );
+
   if (isCheckingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -422,6 +421,7 @@ const Journal = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           <p className="text-muted-foreground">Setting up your profile...</p>
         </div>
+        {renderDebugger()}
       </div>
     );
   }
@@ -451,12 +451,10 @@ const Journal = () => {
             </Button>
           </div>
         </div>
+        {renderDebugger()}
       </div>
     );
   }
-
-  // Important state to show proper loading feedback
-  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && !error && !processingError;
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
@@ -540,6 +538,8 @@ const Journal = () => {
           )}
         </TabsContent>
       </Tabs>
+      
+      {renderDebugger()}
     </div>
   );
 };
