@@ -1,9 +1,10 @@
+
 import { toast } from "sonner";
 
 // Duration constants
-const STANDARD_DURATION = 1000; // 1 second for regular toasts
-const ACTIVE_JOB_DURATION = 5000; // 5 seconds for active jobs (previously null which made them permanent)
-const ERROR_DURATION = 3000; // 3 seconds for errors
+const STANDARD_DURATION = 3000; // 3 seconds for regular toasts (improved from 1 second)
+const ACTIVE_JOB_DURATION = 5000; // 5 seconds for active jobs
+const ERROR_DURATION = 4000; // 4 seconds for errors (increased from 3 seconds)
 
 // Check if we're in a browser environment
 const isBrowser = (): boolean => {
@@ -33,35 +34,35 @@ export const showToast = (
       toastId = toast.success(message, { 
         duration, 
         onDismiss: () => activeToasts.delete(message),
-        closeButton: false
+        closeButton: true
       });
       break;
     case "error":
       toastId = toast.error(message, { 
         duration, 
         onDismiss: () => activeToasts.delete(message),
-        closeButton: false
+        closeButton: true
       });
       break;
     case "info":
       toastId = toast.info(message, { 
         duration, 
         onDismiss: () => activeToasts.delete(message),
-        closeButton: false
+        closeButton: true
       });
       break;
     case "warning":
       toastId = toast.warning(message, { 
         duration, 
         onDismiss: () => activeToasts.delete(message),
-        closeButton: false
+        closeButton: true
       });
       break;
     default:
       toastId = toast(message, { 
         duration, 
         onDismiss: () => activeToasts.delete(message),
-        closeButton: false
+        closeButton: true
       });
   }
   

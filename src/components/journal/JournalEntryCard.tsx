@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -98,7 +97,8 @@ export function JournalEntryCard({
             
           if (error) throw error;
           
-          const updatedThemes = data.master_themes || data.themes || [];
+          // Safely check if data exists and has the properties we need
+          const updatedThemes = data?.master_themes || data?.themes || [];
           
           // If we now have themes, update them and stop loading
           if (updatedThemes.length > 0) {
