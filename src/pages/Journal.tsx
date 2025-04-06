@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
-import JournalDebugger from '@/components/journal/JournalDebugger';
+import { JournalDebugger } from '@/components/journal/debugger';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
