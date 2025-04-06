@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,7 +10,7 @@ import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
 import { debugLogger, logError, logInfo } from './components/debug/DebugPanel';
 import DebugPanel from './components/debug/DebugPanel';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 // Enable debugger globally
 debugLogger.setEnabled(true);
@@ -40,9 +39,6 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  // State to track debug panel visibility
-  const [showDebugPanel, setShowDebugPanel] = useState(false);
-  
   // Log application startup
   debugLogger.log('info', 'Application initialized', 'App');
   
@@ -96,7 +92,7 @@ const App = () => {
                     <AppRoutes />
                   </AnimatePresence>
                 </div>
-                {/* Debug Panel is hidden by default, but still active for logging */}
+                {/* Hidden debug panel for logging only */}
                 <DebugPanel isOpen={false} />
               </div>
             </AuthProvider>

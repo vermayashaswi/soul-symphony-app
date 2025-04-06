@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Bug } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Bug, Download } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -171,6 +171,33 @@ export default function Settings() {
     debugLogger.setEnabled(true);
     logInfo('Debug logging enabled from Settings page', 'Settings');
   }, []);
+
+  const downloadDebugLogs = () => {
+    logAction('Downloading debug logs', 'Settings');
+    
+    const logs = debugLogger.getLogs();
+    
+    const content = logs.map(log => (
+      `[${log.level.toUpperCase()}] [${log.timestamp}] [${log.source}] ${log.message}` +
+      (log.details ? `\nDetails: ${JSON.stringify(log.details, null, 2)}` : '') +
+      (log.stack ? `\nStack: ${log.stack}` : '') +
+      '\n'
+    )).join('\n');
+    
+    const filename = `debug-logs-${new Date().toISOString().slice(0, 10)}.txt`;
+    
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    toast.success('Debug logs downloaded');
+  };
 
   const handleContactSupport = () => {
     logAction('Contact support clicked', 'Settings');
@@ -421,21 +448,17 @@ export default function Settings() {
               <SettingItem
                 icon={Bug}
                 title="Debug Mode"
-                description="Show developer debug tools and logs"
+                description="Download all application logs and errors"
               >
-                <Switch 
-                  checked={showDebugPanel}
-                  onCheckedChange={(checked) => {
-                    logAction(`Debug panel ${checked ? 'enabled' : 'disabled'}`, 'Settings');
-                    setShowDebugPanel(checked);
-                    
-                    if (checked) {
-                      toast.success('Debug panel enabled');
-                    } else {
-                      toast.success('Debug panel disabled');
-                    }
-                  }}
-                />
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="gap-2"
+                  onClick={downloadDebugLogs}
+                >
+                  <Download className="h-4 w-4" />
+                  Download Logs
+                </Button>
               </SettingItem>
             </div>
           </motion.div>
@@ -774,7 +797,7 @@ export default function Settings() {
       </Dialog>
 
       <DebugPanel 
-        isOpen={showDebugPanel}
+        isOpen={false}
         onClose={() => setShowDebugPanel(false)}
       />
     </div>
