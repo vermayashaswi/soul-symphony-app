@@ -94,7 +94,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             <Button
               variant="ghost"
               size="sm"
-              className="p-0 h-6 text-xs font-medium flex items-center gap-1 text-muted-foreground"
+              className="p-0 h-6 text-xs font-medium flex items-center gap-1 text-muted-foreground dark:text-white/70 dark:hover:text-white"
               onClick={() => setShowReferences(!showReferences)}
             >
               <FileText className="h-3 w-3 mr-1" />
@@ -116,16 +116,16 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                 >
                   {message.references!.slice(0, 2).map((ref, idx) => (
                     <div key={idx} className="mb-1 py-1">
-                      <div className="font-medium">
+                      <div className="font-medium dark:text-white/90">
                         {ref.date && !isNaN(new Date(ref.date).getTime()) 
                           ? new Date(ref.date).toLocaleDateString() 
                           : "Unknown date"}
                       </div>
-                      <div className="text-muted-foreground">{ref.snippet}</div>
+                      <div className="text-muted-foreground dark:text-white/70">{ref.snippet}</div>
                     </div>
                   ))}
                   {message.references!.length > 2 && (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground dark:text-white/60">
                       +{message.references!.length - 2} more entries
                     </div>
                   )}

@@ -15,12 +15,18 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
+            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg dark:group-[.toaster]:text-white",
+          description: "group-[.toast]:text-muted-foreground dark:group-[.toast]:text-white/80",
           actionButton:
             "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
           cancelButton:
-            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground dark:group-[.toast]:text-white/80",
+          title: "dark:group-[.toast]:text-white",
+          info: "dark:group-[.toast]:text-white",
+          success: "dark:group-[.toast]:text-white",
+          warning: "dark:group-[.toast]:text-white",
+          error: "dark:group-[.toast]:text-white",
+          closeButton: "dark:group-[.toast]:text-white/70 dark:group-[.toast]:hover:text-white"
         },
       }}
       {...props}
