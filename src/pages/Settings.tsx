@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor } from 'lucide-react';
@@ -416,15 +417,15 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle className="text-xl text-theme-color">Frequently Asked Questions</DialogTitle>
             <DialogDescription>
-              Find answers to common questions about Feelosophy
+              Find answers to common questions about SOuLO
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="h-[60vh] pr-4">
             <div className="space-y-6 py-2">
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">What is Feelosophy?</h3>
+                <h3 className="text-base font-semibold">What is SOuLO?</h3>
                 <p className="text-sm text-muted-foreground">
-                  Feelosophy is an AI-powered journaling app designed to help you track, analyze, and understand your emotions through voice recordings and text entries. Our app creates a safe space for self-reflection and personal growth.
+                  SOuLO is an AI-powered journaling app designed to help you track, analyze, and understand your emotions through voice recordings and text entries. Our app creates a safe space for self-reflection and personal growth.
                 </p>
               </div>
               
@@ -471,9 +472,9 @@ export default function Settings() {
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Can I use Feelosophy offline?</h3>
+                <h3 className="text-base font-semibold">Can I use SOuLO offline?</h3>
                 <p className="text-sm text-muted-foreground">
-                  Some features of Feelosophy require an internet connection, especially voice recording and AI analysis. However, you can view your past entries and create text entries offline. They'll sync once you're back online.
+                  Some features of SOuLO require an internet connection, especially voice recording and AI analysis. However, you can view your past entries and create text entries offline. They'll sync once you're back online.
                 </p>
               </div>
               
@@ -485,9 +486,9 @@ export default function Settings() {
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Is Feelosophy available on all devices?</h3>
+                <h3 className="text-base font-semibold">Is SOuLO available on all devices?</h3>
                 <p className="text-sm text-muted-foreground">
-                  Feelosophy is available as a web application that works on all modern browsers. We're currently developing native mobile applications for iOS and Android to provide an enhanced experience on mobile devices.
+                  SOuLO is available as a web application that works on all modern browsers. We're currently developing native mobile applications for iOS and Android to provide an enhanced experience on mobile devices.
                 </p>
               </div>
             </div>
@@ -510,7 +511,7 @@ export default function Settings() {
               <div className="space-y-2">
                 <h3 className="text-base font-semibold">Introduction</h3>
                 <p className="text-sm text-muted-foreground">
-                  Welcome to Feelosophy ("we," "our," or "us"). We are committed to protecting your privacy and handling your data with transparency and care. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our journaling application.
+                  Welcome to SOuLO ("we," "our," or "us"). We are committed to protecting your privacy and handling your data with transparency and care. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our journaling application.
                 </p>
               </div>
               
