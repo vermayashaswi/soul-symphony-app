@@ -24,7 +24,7 @@ interface VoiceRecorderProps {
 export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
-  const [showAnimation, setShowAnimation] = useState(true); // Always show animation by default
+  const [showAnimation, setShowAnimation] = useState(true);
   const { user } = useAuth();
   const isMobile = useIsMobile();
   
@@ -53,12 +53,21 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     reset: resetPlayback
   } = useAudioPlayback({ audioBlob });
 
-  // Only hide animation when actively recording
+  // Control animation visibility based on recording state
   useEffect(() => {
+    // Hide animation when recording starts
     if (isRecording) {
       setShowAnimation(false);
+    } 
+    // Only show animation in the initial state (no recording yet)
+    else if (!audioBlob) {
+      setShowAnimation(true);
     }
-  }, [isRecording]);
+    // Hide animation once recording is stopped and we have audio
+    else {
+      setShowAnimation(false);
+    }
+  }, [isRecording, audioBlob]);
 
   useEffect(() => {
     if (isRecording) {
@@ -114,6 +123,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     resetRecording();
     resetPlayback();
     setRecordingError(null);
+    setShowAnimation(true);
     toast.info("Starting a new recording");
   };
 
@@ -125,13 +135,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
         "relative w-full h-full flex flex-col items-center justify-between overflow-hidden rounded-2xl border border-slate-200/20",
         isMobile ? "min-h-[calc(80vh-160px)]" : "min-h-[500px]"
       )}>
-        <div className="absolute inset-0 flex items-center justify-center">
-          {showAnimation && (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center">
-              <FloatingLanguages size="md" />
-            </div>
-          )}
-        </div>
+        {/* Single animation container */}
+        {showAnimation && (
+          <div className="absolute inset-0 w-full h-full flex items-center justify-center">
+            <FloatingLanguages size="md" />
+          </div>
+        )}
         
         <div className="relative z-10 flex flex-col items-center justify-start w-full h-full pt-20">
           <div className="relative z-10 flex justify-center items-center mt-40">
@@ -140,13 +149,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               isProcessing={isProcessing}
               hasPermission={hasPermission}
               onRecordingStart={() => {
-                setShowAnimation(false);
                 startRecording();
               }}
               onRecordingStop={stopRecording}
               onPermissionRequest={requestPermissions}
               audioLevel={audioLevel}
-              showAnimation={true} // Always show animation in the button
+              showAnimation={false} // Remove animation from the button itself
             />
           </div>
 

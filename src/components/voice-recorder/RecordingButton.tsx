@@ -2,7 +2,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import FloatingLanguages from './FloatingLanguages';
 
 interface RecordingButtonProps {
   isRecording: boolean;
@@ -49,12 +48,6 @@ export function RecordingButton({
   
   return (
     <div className="relative flex items-center justify-center">
-      {showAnimation && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <FloatingLanguages size="md" />
-        </div>
-      )}
-      
       <motion.button
         onClick={isRecording ? onRecordingStop : onRecordingStart}
         disabled={isProcessing}
