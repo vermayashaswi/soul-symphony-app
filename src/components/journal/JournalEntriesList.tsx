@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -208,6 +209,7 @@ export default function JournalEntriesList({
               </div>
             )}
             
+            {/* Always show existing entries, even when processing is happening */}
             {safeLocalEntries.length === 0 && !hasProcessingEntries && !loading ? (
               <div className="flex flex-col items-center justify-center h-64 p-8 border border-dashed border-muted rounded-lg">
                 <p className="text-muted-foreground mb-4">No journal entries to display</p>
