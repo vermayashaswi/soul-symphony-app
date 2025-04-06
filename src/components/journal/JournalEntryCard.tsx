@@ -97,10 +97,11 @@ export function JournalEntryCard({
             
           if (error) throw error;
           
-          // Check if data exists before trying to access properties
-          if (data) {
-            // Safely check if data exists and has the properties we need
-            const updatedThemes = data.master_themes || data.themes || [];
+          // Check if data exists and is not an error
+          if (data && typeof data === 'object') {
+            // Safely check if data has the properties we need with type assertion
+            const entryData = data as { master_themes?: string[], themes?: string[] };
+            const updatedThemes = entryData.master_themes || entryData.themes || [];
             
             // If we now have themes, update them and stop loading
             if (updatedThemes.length > 0) {
