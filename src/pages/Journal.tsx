@@ -35,7 +35,10 @@ const Journal = () => {
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
   const entriesListRef = useRef<HTMLDivElement>(null);
-  
+  const [lastAction, setLastAction] = useState<string>('Page Loaded');
+  const [audioStatus, setAudioStatus] = useState<string>('No Recording');
+  const [recordingDuration, setRecordingDuration] = useState<number>(0);
+
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       console.error('[Journal] Caught render error:', event);
@@ -45,7 +48,7 @@ const Journal = () => {
     window.addEventListener('error', handleError);
     return () => window.removeEventListener('error', handleError);
   }, []);
-  
+
   const { 
     entries, 
     loading, 
@@ -154,6 +157,7 @@ const Journal = () => {
     try {
       setIsCheckingProfile(true);
       setShowRetryButton(false);
+      setLastAction('Checking Profile');
       
       console.log('[Journal] Checking user profile for ID:', userId);
       
@@ -164,6 +168,9 @@ const Journal = () => {
       
       if (!profileCreated) {
         setShowRetryButton(true);
+        setLastAction('Profile Check Failed');
+      } else {
+        setLastAction('Profile Check Success');
       }
       
       setIsProfileChecked(true);
@@ -176,6 +183,7 @@ const Journal = () => {
       }
       
       setShowRetryButton(true);
+      setLastAction('Profile Check Error');
       
       setIsProfileChecked(true);
     } finally {
@@ -189,12 +197,14 @@ const Journal = () => {
     setProfileCheckRetryCount(0);
     profileCheckedOnceRef.current = false;
     setIsProfileChecked(false);
+    setLastAction('Retry Profile Creation');
     checkUserProfile(user.id);
   };
 
   const handleStartRecording = () => {
     console.log('Starting new recording');
     setActiveTab('record');
+    setLastAction('Start Recording Tab');
     setProcessingError(null);
   };
 
@@ -204,6 +214,7 @@ const Journal = () => {
       setProcessingError('Cannot process recording: missing required information');
       setIsRecordingComplete(false);
       setIsSavingRecording(false);
+      setLastAction('Recording Failed - Missing Data');
       return;
     }
     
@@ -211,6 +222,8 @@ const Journal = () => {
       setIsRecordingComplete(true);
       setIsSavingRecording(true);
       setProcessingError(null);
+      setLastAction('Recording Complete - Processing');
+      setAudioStatus(`Processing (${formatBytes(audioBlob.size)})`);
       
       setActiveTab('entries');
       
@@ -240,6 +253,7 @@ const Journal = () => {
         console.log('[Journal] Processing started with tempId:', tempId);
         setProcessingEntries(prev => [...prev, tempId]);
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
+        setLastAction(`Processing Started (${tempId})`);
         
         await fetchEntries();
         setRefreshKey(prev => prev + 1);
@@ -259,6 +273,7 @@ const Journal = () => {
           setProcessingEntries(prev => {
             if (prev.includes(tempId)) {
               console.log('[Journal] Maximum processing time reached for tempId:', tempId);
+              setLastAction(`Max Processing Time Reached (${tempId})`);
               
               if (toastIds[tempId]) {
                 toast.dismiss(toastIds[tempId]);
@@ -287,6 +302,7 @@ const Journal = () => {
       } else {
         console.error('[Journal] Processing failed:', error);
         setProcessingError(error || 'Unknown error occurred');
+        setLastAction(`Processing Failed: ${error || 'Unknown'}`);
         toast.dismiss(toastId);
         
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
@@ -302,6 +318,7 @@ const Journal = () => {
     } catch (error: any) {
       console.error('Error processing recording:', error);
       setProcessingError(error?.message || 'Unknown error occurred');
+      setLastAction(`Exception: ${error?.message || 'Unknown'}`);
       
       toast.error('Error processing your recording', { 
         duration: 3000,
@@ -320,6 +337,7 @@ const Journal = () => {
     
     try {
       console.log(`[Journal] Deleting entry ${entryId}`);
+      setLastAction(`Deleting Entry ${entryId}`);
       
       clearAllToasts();
       
@@ -357,6 +375,7 @@ const Journal = () => {
       
     } catch (error) {
       console.error('[Journal] Error deleting entry:', error);
+      setLastAction(`Delete Entry Error (${entryId})`);
       toast.error('Failed to delete entry');
       
       setTimeout(() => {
@@ -371,6 +390,7 @@ const Journal = () => {
     setProcessingError(null);
     setActiveTab('entries');
     setRefreshKey(Date.now());
+    setLastAction('Reset Error State');
     setTimeout(() => {
       fetchEntries();
     }, 100);
@@ -381,7 +401,28 @@ const Journal = () => {
   if (hasRenderError) {
     console.error('[Journal] Recovering from render error');
     setHasRenderError(false);
+    setLastAction('Recovering from Render Error');
   }
+
+  const formatBytes = (bytes: number, decimals = 2) => {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  };
+
+  const updateDebugInfo = (info: {status: string, duration?: number}) => {
+    setAudioStatus(info.status);
+    if (info.duration !== undefined) {
+      setRecordingDuration(info.duration);
+    }
+    setLastAction(`Recorder: ${info.status}`);
+  };
 
   return (
     <ErrorBoundary onReset={resetError}>
@@ -391,6 +432,9 @@ const Journal = () => {
         isRecordingComplete={isRecordingComplete}
         activeTab={activeTab}
         processingError={processingError}
+        lastAction={lastAction}
+        audioStatus={audioStatus}
+        recordingDuration={recordingDuration}
       />
       
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
@@ -484,6 +528,7 @@ const Journal = () => {
                 <div className="mb-4">
                   <VoiceRecorder 
                     onRecordingComplete={handleRecordingComplete}
+                    updateDebugInfo={updateDebugInfo}
                   />
                 </div>
               </TabsContent>

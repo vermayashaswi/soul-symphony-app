@@ -18,6 +18,11 @@ interface DebugPanelProps {
   loading: boolean;
   error: string | null;
   processingError: string | null;
+  lastAction?: string;
+  audioStatus?: string;
+  recordingDuration?: number;
+  lastRenderTime?: string;
+  mountStatus?: string;
   onToggleExpanded: () => void;
   onClose: () => void;
 }
@@ -35,6 +40,11 @@ export function DebugPanel({
   loading,
   error,
   processingError,
+  lastAction,
+  audioStatus,
+  recordingDuration,
+  lastRenderTime,
+  mountStatus,
   onToggleExpanded,
   onClose
 }: DebugPanelProps) {
@@ -73,6 +83,11 @@ export function DebugPanel({
           loading={loading}
           error={error}
           processingError={processingError}
+          lastAction={lastAction}
+          audioStatus={audioStatus}
+          recordingDuration={recordingDuration}
+          lastRenderTime={lastRenderTime}
+          mountStatus={mountStatus}
         />
         
         {isExpanded && <DebugHistory debugHistory={debugHistory} />}

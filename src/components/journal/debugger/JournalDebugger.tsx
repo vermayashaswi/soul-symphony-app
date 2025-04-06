@@ -11,6 +11,9 @@ interface JournalDebuggerProps {
   isRecordingComplete: boolean;
   activeTab: string;
   processingError: string | null;
+  lastAction?: string;
+  audioStatus?: string;
+  recordingDuration?: number;
 }
 
 const JournalDebugger = (props: JournalDebuggerProps) => {
@@ -24,6 +27,8 @@ const JournalDebugger = (props: JournalDebuggerProps) => {
     entries,
     loading,
     error,
+    lastRenderTime,
+    mountStatus,
     toggleOpen,
     toggleExpanded
   } = useJournalDebugger(props);
@@ -58,6 +63,11 @@ const JournalDebugger = (props: JournalDebuggerProps) => {
           loading={loading}
           error={error}
           processingError={props.processingError}
+          lastAction={props.lastAction}
+          audioStatus={props.audioStatus}
+          recordingDuration={props.recordingDuration}
+          lastRenderTime={lastRenderTime}
+          mountStatus={mountStatus}
           onToggleExpanded={toggleExpanded}
           onClose={toggleOpen}
         />

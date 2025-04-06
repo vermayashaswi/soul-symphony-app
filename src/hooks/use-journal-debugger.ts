@@ -13,6 +13,10 @@ interface DebugState {
   lastRefresh: string;
   error?: string | null;
   processingError?: string | null;
+  lastAction?: string;
+  audioStatus?: string;
+  recordingDuration?: number;
+  mountStatus?: string;
 }
 
 export function useJournalDebugger({
@@ -20,19 +24,27 @@ export function useJournalDebugger({
   isSavingRecording,
   isRecordingComplete,
   activeTab,
-  processingError
+  processingError,
+  lastAction,
+  audioStatus,
+  recordingDuration
 }: {
   processingEntries: string[];
   isSavingRecording: boolean;
   isRecordingComplete: boolean;
   activeTab: string;
   processingError: string | null;
+  lastAction?: string;
+  audioStatus?: string;
+  recordingDuration?: number;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [debugHistory, setDebugHistory] = useState<DebugState[]>([]);
   const [renderCount, setRenderCount] = useState(0);
   const [hasErrorState, setHasErrorState] = useState(false);
+  const [lastRenderTime, setLastRenderTime] = useState<string>(new Date().toLocaleTimeString());
+  const [mountStatus, setMountStatus] = useState<string>("Mounted");
   const { user } = useAuth();
   const componentMounted = useRef(true);
   
@@ -52,6 +64,7 @@ export function useJournalDebugger({
     // Provide cleanup function
     return () => {
       componentMounted.current = false;
+      setMountStatus("Unmounted");
     };
   }, []);
 
@@ -59,6 +72,7 @@ export function useJournalDebugger({
     // Increment render count on each render
     if (componentMounted.current) {
       setRenderCount(prev => prev + 1);
+      setLastRenderTime(new Date().toLocaleTimeString());
     }
   });
 
@@ -86,11 +100,27 @@ export function useJournalDebugger({
       activeTab,
       lastRefresh: new Date().toISOString(),
       error,
-      processingError
+      processingError,
+      lastAction,
+      audioStatus,
+      recordingDuration,
+      mountStatus
     };
 
     setDebugHistory(prev => [currentState, ...prev].slice(0, 20));
-  }, [entries.length, processingEntries, isSavingRecording, isRecordingComplete, activeTab, error, processingError]);
+  }, [
+    entries.length, 
+    processingEntries, 
+    isSavingRecording, 
+    isRecordingComplete, 
+    activeTab, 
+    error, 
+    processingError,
+    lastAction,
+    audioStatus,
+    recordingDuration,
+    mountStatus
+  ]);
 
   return {
     isOpen,
@@ -101,6 +131,8 @@ export function useJournalDebugger({
     entries,
     loading,
     error,
+    lastRenderTime,
+    mountStatus,
     toggleOpen,
     toggleExpanded
   };

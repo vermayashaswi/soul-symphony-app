@@ -11,6 +11,11 @@ interface CurrentDebugStateProps {
   loading: boolean;
   error: string | null;
   processingError: string | null;
+  lastAction?: string;
+  audioStatus?: string;
+  recordingDuration?: number;
+  lastRenderTime?: string;
+  mountStatus?: string;
 }
 
 export function CurrentDebugState({
@@ -22,7 +27,12 @@ export function CurrentDebugState({
   activeTab,
   loading,
   error,
-  processingError
+  processingError,
+  lastAction,
+  audioStatus,
+  recordingDuration,
+  lastRenderTime,
+  mountStatus
 }: CurrentDebugStateProps) {
   return (
     <div className="bg-gray-900 p-2 rounded">
@@ -31,11 +41,20 @@ export function CurrentDebugState({
         <div>User ID:</div>
         <div className="font-mono text-green-400">{userId || 'Not logged in'}</div>
         
-        <div>Entries:</div>
+        <div>Mount Status:</div>
+        <div className="font-mono text-green-400">{mountStatus || 'Normal'}</div>
+        
+        <div>Last Render:</div>
+        <div className="font-mono text-green-400">{lastRenderTime || new Date().toLocaleTimeString()}</div>
+        
+        <div>Entries Count:</div>
         <div className="font-mono text-green-400">{entriesCount}</div>
         
         <div>Processing Entries:</div>
         <div className="font-mono text-green-400">{processingEntries.length > 0 ? processingEntries.join(', ') : 'None'}</div>
+        
+        <div>Last Action:</div>
+        <div className="font-mono text-green-400">{lastAction || 'None'}</div>
         
         <div>Saving Recording:</div>
         <div className={`font-mono ${isSavingRecording ? 'text-yellow-400' : 'text-green-400'}`}>
@@ -46,6 +65,12 @@ export function CurrentDebugState({
         <div className={`font-mono ${isRecordingComplete ? 'text-yellow-400' : 'text-green-400'}`}>
           {isRecordingComplete ? 'Yes' : 'No'}
         </div>
+        
+        <div>Audio Status:</div>
+        <div className="font-mono text-green-400">{audioStatus || 'N/A'}</div>
+        
+        <div>Recording Duration:</div>
+        <div className="font-mono text-green-400">{recordingDuration !== undefined ? `${recordingDuration}s` : 'N/A'}</div>
         
         <div>Active Tab:</div>
         <div className="font-mono text-green-400">{activeTab}</div>

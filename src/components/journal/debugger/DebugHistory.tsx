@@ -11,6 +11,10 @@ interface DebugState {
   lastRefresh: string;
   error?: string | null;
   processingError?: string | null;
+  lastAction?: string;
+  audioStatus?: string;
+  recordingDuration?: number;
+  mountStatus?: string;
 }
 
 interface DebugHistoryProps {
@@ -39,16 +43,32 @@ export function DebugHistory({ debugHistory }: DebugHistoryProps) {
                 }
               </div>
               
+              <div>Action:</div>
+              <div className="font-mono">{state.lastAction || 'None'}</div>
+              
+              <div>Audio:</div>
+              <div className="font-mono">{state.audioStatus || 'N/A'}</div>
+              
               <div>Saving Recording:</div>
               <div className="font-mono">{state.isSavingRecording ? 'Yes' : 'No'}</div>
               
               <div>Tab:</div>
               <div className="font-mono">{state.activeTab}</div>
               
+              <div>Status:</div>
+              <div className="font-mono">{state.mountStatus || 'Normal'}</div>
+              
               {state.error && (
                 <>
                   <div className="text-red-400">Error:</div>
                   <div className="font-mono text-red-400">{state.error}</div>
+                </>
+              )}
+              
+              {state.processingError && (
+                <>
+                  <div className="text-red-400">Proc Error:</div>
+                  <div className="font-mono text-red-400">{state.processingError}</div>
                 </>
               )}
             </div>

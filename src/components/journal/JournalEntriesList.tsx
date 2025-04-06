@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -68,7 +69,7 @@ export default function JournalEntriesList({
     }
   }, [entries.length, prevEntriesLength, entries]);
   
-  const handleEntryDelete = (entryId: number) => {
+  const handleEntryDelete = async (entryId: number) => {
     console.log(`[JournalEntriesList] Handling deletion of entry ${entryId}`);
     
     pendingDeletions.current.add(entryId);
@@ -76,25 +77,13 @@ export default function JournalEntriesList({
     setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
     
     if (onDeleteEntry) {
-      setTimeout(() => {
+      setTimeout(async () => {
         if (componentMounted.current) {
           try {
-            const result = onDeleteEntry(entryId);
-            
-            if (result && typeof result.then === 'function') {
-              result
-                .then(() => {
-                  pendingDeletions.current.delete(entryId);
-                })
-                .catch(error => {
-                  console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
-                  pendingDeletions.current.delete(entryId);
-                });
-            } else {
-              pendingDeletions.current.delete(entryId);
-            }
+            await onDeleteEntry(entryId);
+            pendingDeletions.current.delete(entryId);
           } catch (error) {
-            console.error(`[JournalEntriesList] Error calling onDeleteEntry for ${entryId}:`, error);
+            console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
             pendingDeletions.current.delete(entryId);
           }
         }

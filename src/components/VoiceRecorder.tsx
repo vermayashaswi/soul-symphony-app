@@ -17,9 +17,10 @@ interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
   onCancel?: () => void;
   className?: string;
+  updateDebugInfo?: (info: {status: string, duration?: number}) => void;
 }
 
-export function VoiceRecorder({ onRecordingComplete, onCancel, className }: VoiceRecorderProps) {
+export function VoiceRecorder({ onRecordingComplete, onCancel, className, updateDebugInfo }: VoiceRecorderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
