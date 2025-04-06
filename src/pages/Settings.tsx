@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Bug } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -409,6 +409,25 @@ export default function Settings() {
                   onCheckedChange={(checked) => {
                     logAction(`Notifications ${checked ? 'enabled' : 'disabled'}`, 'Settings');
                     setNotificationsEnabled(checked);
+                  }}
+                />
+              </SettingItem>
+              
+              <SettingItem
+                icon={Bug}
+                title="Debug Mode"
+                description="Show developer debug tools and logs"
+              >
+                <Switch 
+                  checked={showDebugPanel}
+                  onCheckedChange={(checked) => {
+                    logAction(`Debug panel ${checked ? 'enabled' : 'disabled'}`, 'Settings');
+                    setShowDebugPanel(checked);
+                    if (checked) {
+                      toast.success('Debug panel enabled');
+                    } else {
+                      toast.success('Debug panel disabled');
+                    }
                   }}
                 />
               </SettingItem>
