@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 
 interface UseAudioPlaybackOptions {
@@ -104,7 +103,7 @@ export function useAudioPlayback({
       return () => {
         audioElement.removeEventListener('play', handlePlay);
         audioElement.removeEventListener('pause', handlePause);
-        audioElement.addEventListener('ended', handleEnded);
+        audioElement.removeEventListener('ended', handleEnded);
         
         if (updateIntervalRef.current) {
           clearInterval(updateIntervalRef.current);
@@ -169,6 +168,61 @@ export function useAudioPlayback({
     }
   };
   
+  // Function to prepare audio to ensure duration is loaded - similar to what happens on play
+  const prepareAudio = (): Promise<number> => {
+    return new Promise((resolve) => {
+      const audio = audioRef.current;
+      if (!audio || !audioBlob) {
+        resolve(0);
+        return;
+      }
+      
+      // If we already have duration loaded, return it immediately
+      if (audioDuration > 0) {
+        resolve(audioDuration);
+        return;
+      }
+      
+      // Otherwise, load the audio and wait for metadata
+      const handleMetadata = () => {
+        const duration = audio.duration;
+        setAudioDuration(duration);
+        audio.removeEventListener('loadedmetadata', handleMetadata);
+        resolve(duration);
+      };
+      
+      // If metadata is already loaded
+      if (audio.readyState >= 2 && audio.duration) {
+        setAudioDuration(audio.duration);
+        resolve(audio.duration);
+        return;
+      }
+      
+      // Otherwise wait for it to load
+      audio.addEventListener('loadedmetadata', handleMetadata);
+      
+      // In case we never get the event, resolve after a timeout
+      setTimeout(() => {
+        if (audio.duration) {
+          setAudioDuration(audio.duration);
+          resolve(audio.duration);
+        } else {
+          // If we can't get the duration, estimate it from the blob size
+          // Rough estimate: ~128kbps audio = 16KB per second
+          const estimatedDuration = audioBlob.size / (16 * 1024);
+          setAudioDuration(estimatedDuration);
+          resolve(estimatedDuration);
+        }
+        audio.removeEventListener('loadedmetadata', handleMetadata);
+      }, 1000);
+      
+      // Trigger the load if needed
+      if (audio.readyState === 0) {
+        audio.load();
+      }
+    });
+  };
+  
   return {
     isPlaying,
     playbackProgress,
@@ -177,5 +231,6 @@ export function useAudioPlayback({
     seekTo,
     reset,
     audioRef,
+    prepareAudio,
   };
 }

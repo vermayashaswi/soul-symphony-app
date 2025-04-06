@@ -27,6 +27,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [showAnimation, setShowAnimation] = useState(true);
   const [hasSaved, setHasSaved] = useState(false);
   const [hasPlayedOnce, setHasPlayedOnce] = useState(false);
+  const [audioPrepared, setAudioPrepared] = useState(false);
   const saveCompleteRef = useRef(false);
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -54,11 +55,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     togglePlayback,
     audioRef,
     reset: resetPlayback,
-    seekTo
+    seekTo,
+    prepareAudio
   } = useAudioPlayback({ 
     audioBlob,
     onPlaybackStart: () => {
+      console.log('[VoiceRecorder] Playback started');
       setHasPlayedOnce(true);
+    },
+    onPlaybackEnd: () => {
+      console.log('[VoiceRecorder] Playback ended');
     }
   });
 
@@ -84,6 +90,17 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   }, [isRecording, audioBlob]);
   
+  // When we get an audio blob, prepare audio to ensure duration is loaded
+  useEffect(() => {
+    if (audioBlob && !audioPrepared) {
+      console.log('[VoiceRecorder] New audio blob detected, preparing audio...');
+      prepareAudio().then(duration => {
+        console.log('[VoiceRecorder] Audio prepared with duration:', duration);
+        setAudioPrepared(true);
+      });
+    }
+  }, [audioBlob, audioPrepared, prepareAudio]);
+  
   useEffect(() => {
     console.log('[VoiceRecorder] State update:', {
       isProcessing,
@@ -93,7 +110,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       hasPermission,
       audioDuration,
       hasSaved,
-      hasPlayedOnce
+      hasPlayedOnce,
+      audioPrepared
     });
     
     if (updateDebugInfo) {
@@ -104,7 +122,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         duration: audioDuration || recordingTime
       });
     }
-  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, updateDebugInfo]);
+  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, updateDebugInfo]);
   
   useEffect(() => {
     return () => {
@@ -122,11 +140,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       return;
     }
     
-    if (audioDuration < 0.5) {
-      setRecordingError("Recording is too short. Please try again.");
-      return;
-    }
-    
     if (hasSaved) {
       console.log('[VoiceRecorder] Already saved this recording, ignoring duplicate save request');
       return;
@@ -138,6 +151,26 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       setRecordingError(null);
       setHasSaved(true);
       
+      // If recording hasn't been played, make sure audio is prepared
+      if (!hasPlayedOnce || audioDuration === 0) {
+        console.log('[VoiceRecorder] Recording not played yet, preparing audio...');
+        const duration = await prepareAudio();
+        console.log('[VoiceRecorder] Audio prepared with duration:', duration);
+        setAudioPrepared(true);
+        
+        if (duration < 0.5) {
+          setRecordingError("Recording is too short. Please try again.");
+          setIsProcessing(false);
+          setHasSaved(false);
+          return;
+        }
+      } else if (audioDuration < 0.5) {
+        setRecordingError("Recording is too short. Please try again.");
+        setIsProcessing(false);
+        setHasSaved(false);
+        return;
+      }
+      
       const normalizedBlob = normalizeAudioBlob(audioBlob);
       
       console.log('[VoiceRecorder] Processing audio:', {
@@ -145,7 +178,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         size: normalizedBlob.size,
         duration: audioDuration,
         recordingTime: recordingTime,
-        hasPlayedOnce: hasPlayedOnce
+        hasPlayedOnce: hasPlayedOnce,
+        audioPrepared: audioPrepared
       });
       
       // If the recording hasn't been played yet, we'll initialize audioDuration 
@@ -191,6 +225,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     setIsProcessing(false);
     setHasSaved(false);
     setHasPlayedOnce(false);
+    setAudioPrepared(false);
     saveCompleteRef.current = false;
     toast.info("Starting a new recording");
   };
