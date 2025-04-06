@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,6 +26,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
   const [hasSaved, setHasSaved] = useState(false);
+  const [hasPlayedOnce, setHasPlayedOnce] = useState(false);
   const saveCompleteRef = useRef(false);
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -53,7 +55,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     audioRef,
     reset: resetPlayback,
     seekTo
-  } = useAudioPlayback({ audioBlob });
+  } = useAudioPlayback({ 
+    audioBlob,
+    onPlaybackStart: () => {
+      setHasPlayedOnce(true);
+    }
+  });
 
   useEffect(() => {
     if (isRecording) {
@@ -85,9 +92,19 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       isRecording,
       hasPermission,
       audioDuration,
-      hasSaved
+      hasSaved,
+      hasPlayedOnce
     });
-  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved]);
+    
+    if (updateDebugInfo) {
+      updateDebugInfo({
+        status: isRecording 
+          ? 'Recording' 
+          : (audioBlob ? 'Recorded' : 'No Recording'),
+        duration: audioDuration || recordingTime
+      });
+    }
+  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, updateDebugInfo]);
   
   useEffect(() => {
     return () => {
@@ -127,8 +144,17 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         type: normalizedBlob.type,
         size: normalizedBlob.size,
         duration: audioDuration,
-        recordingTime: recordingTime
+        recordingTime: recordingTime,
+        hasPlayedOnce: hasPlayedOnce
       });
+      
+      // If the recording hasn't been played yet, we'll initialize audioDuration 
+      // based on recording time to ensure proper UI transitions
+      if (!hasPlayedOnce && audioDuration === 0 && recordingTime > 0) {
+        // Convert recordingTime from milliseconds to seconds for consistency with audioDuration
+        const estimatedDuration = recordingTime / 1000;
+        console.log(`[VoiceRecorder] Recording not played yet, estimating duration as ${estimatedDuration}s`);
+      }
       
       if (onRecordingComplete) {
         try {
@@ -164,6 +190,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     setShowAnimation(true);
     setIsProcessing(false);
     setHasSaved(false);
+    setHasPlayedOnce(false);
     saveCompleteRef.current = false;
     toast.info("Starting a new recording");
   };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -46,7 +45,6 @@ const Journal = () => {
   const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Log component mount
     logInfo('Journal page mounted', 'Journal');
     
     const handleError = (event: ErrorEvent) => {
@@ -220,7 +218,6 @@ const Journal = () => {
       logInfo(`Profile check result: ${profileCreated}`, 'Journal');
       
       if (!profileCreated) {
-        // Automatic retry logic
         if (profileCreationAttempts < maxProfileAttempts) {
           setProfileCreationAttempts(prev => prev + 1);
           logInfo(`Scheduling automatic profile creation retry ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
@@ -235,7 +232,6 @@ const Journal = () => {
             logInfo(`Executing automatic profile creation retry ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
             setLastAction(`Auto Retry Profile ${profileCreationAttempts + 1}`);
             
-            // Only show retry button after all auto-retries fail
             if (profileCreationAttempts >= maxProfileAttempts - 1) {
               setShowRetryButton(true);
             }
@@ -261,7 +257,6 @@ const Journal = () => {
         setLastProfileErrorTime(now);
       }
       
-      // Automatic retry logic
       if (profileCreationAttempts < maxProfileAttempts) {
         setProfileCreationAttempts(prev => prev + 1);
         logInfo(`Scheduling automatic profile creation retry after error ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
@@ -276,7 +271,6 @@ const Journal = () => {
           logInfo(`Executing automatic profile creation retry after error ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
           setLastAction(`Auto Retry Profile After Error ${profileCreationAttempts + 1}`);
           
-          // Only show retry button after all auto-retries fail
           if (profileCreationAttempts >= maxProfileAttempts - 1) {
             setShowRetryButton(true);
           }

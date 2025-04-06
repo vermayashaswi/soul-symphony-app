@@ -20,6 +20,8 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   // Clear any lingering toasts from previous sessions
   clearAllToasts();
   
+  console.log('[AudioProcessing] Starting processing with blob:', audioBlob?.size, audioBlob?.type);
+  
   // 1. Validate the audio blob
   const validation = validateAudioBlob(audioBlob);
   if (!validation.isValid) {
