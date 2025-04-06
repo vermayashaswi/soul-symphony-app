@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
@@ -28,16 +28,23 @@ export default function JournalEntriesList({
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
   const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
   const hasProcessingEntries = processingEntries.length > 0;
+  const componentMounted = useRef(true);
 
   // Initialize and update local entries
   useEffect(() => {
     if (entries.length >= 0) {
       setLocalEntries(entries);
     }
+
+    return () => {
+      componentMounted.current = false;
+    };
   }, [entries]);
 
   // Update entries count when entries change to trigger animation for new entries
   useEffect(() => {
+    if (!componentMounted.current) return;
+    
     if (entries.length > 0) {
       if (entries.length > prevEntriesLength) {
         // New entries have been added, highlight them
@@ -49,7 +56,9 @@ export default function JournalEntriesList({
         
         // Remove animation after 5 seconds
         setTimeout(() => {
-          setAnimatedEntryIds([]);
+          if (componentMounted.current) {
+            setAnimatedEntryIds([]);
+          }
         }, 5000);
       }
       
@@ -66,10 +75,14 @@ export default function JournalEntriesList({
     // Update local entries immediately to avoid blank screen
     setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
     
-    // Call the parent handler
+    // Call the parent handler with a slight delay to avoid state conflicts
     if (onDeleteEntry) {
       console.log(`[JournalEntriesList] Calling onDeleteEntry for entry ${entryId}`);
-      onDeleteEntry(entryId);
+      setTimeout(() => {
+        if (componentMounted.current) {
+          onDeleteEntry(entryId);
+        }
+      }, 50);
     }
   };
   

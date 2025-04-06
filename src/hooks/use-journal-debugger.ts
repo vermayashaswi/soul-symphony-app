@@ -34,8 +34,9 @@ export function useJournalDebugger({
   const [renderCount, setRenderCount] = useState(0);
   const [hasErrorState, setHasErrorState] = useState(false);
   const { user } = useAuth();
+  const componentMounted = useRef(true);
   
-  // Use try-catch to safely access journal entries
+  // Safe journal state access with fallback
   const journalState = (() => {
     try {
       return useJournalEntries(user?.id, Date.now(), true);
@@ -48,8 +49,17 @@ export function useJournalDebugger({
   const { entries = [], loading = false, error = null } = journalState;
 
   useEffect(() => {
+    // Provide cleanup function
+    return () => {
+      componentMounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     // Increment render count on each render
-    setRenderCount(prev => prev + 1);
+    if (componentMounted.current) {
+      setRenderCount(prev => prev + 1);
+    }
   });
 
   const toggleOpen = () => setIsOpen(!isOpen);
@@ -57,11 +67,15 @@ export function useJournalDebugger({
 
   // Detect if we have error states in the component hierarchy
   useEffect(() => {
+    if (!componentMounted.current) return;
+    
     const hasErrors = !!error || !!processingError;
     setHasErrorState(hasErrors);
   }, [error, processingError]);
 
   useEffect(() => {
+    if (!componentMounted.current) return;
+    
     // Record the current state
     const currentState: DebugState = {
       timestamp: new Date().toISOString(),

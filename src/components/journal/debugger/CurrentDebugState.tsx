@@ -75,5 +75,3 @@ export function CurrentDebugState({
     </div>
   );
 }
-
-export default CurrentDebugState;

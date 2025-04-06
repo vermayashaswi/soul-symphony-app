@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import { 
@@ -21,6 +21,13 @@ export function DeleteEntryDialog({ onDelete }: DeleteEntryDialogProps) {
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
+  const componentMounted = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      componentMounted.current = false;
+    };
+  }, []);
 
   const handleDelete = async () => {
     try {
@@ -32,7 +39,10 @@ export function DeleteEntryDialog({ onDelete }: DeleteEntryDialogProps) {
       await onDelete();
     } catch (error) {
       console.error('[DeleteEntryDialog] Error deleting entry:', error);
-      setIsDeleting(false);
+      // Only update state if component is still mounted
+      if (componentMounted.current) {
+        setIsDeleting(false);
+      }
     }
   };
 

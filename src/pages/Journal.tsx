@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
@@ -11,6 +11,7 @@ import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import { JournalDebugger } from '@/components/journal/debugger';
+import ErrorBoundary from '@/components/journal/ErrorBoundary';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -314,7 +315,7 @@ const Journal = () => {
     }
   };
 
-  const handleDeleteEntry = async (entryId: number) => {
+  const handleDeleteEntry = useCallback(async (entryId: number) => {
     if (!user?.id) return;
     
     try {
@@ -347,11 +348,10 @@ const Journal = () => {
         return updated;
       });
       
-      setRefreshKey(Date.now());
-      
       setTimeout(() => {
+        setRefreshKey(Date.now());
         fetchEntries();
-      }, 500);
+      }, 100);
       
       toast.success('Entry deleted successfully');
       
@@ -364,7 +364,17 @@ const Journal = () => {
         fetchEntries();
       }, 500);
     }
-  };
+  }, [user?.id, processingEntries, toastIds, fetchEntries, setRefreshKey, setProcessingEntries, setToastIds, setNotifiedEntryIds]);
+
+  const resetError = useCallback(() => {
+    setHasRenderError(false);
+    setProcessingError(null);
+    setActiveTab('entries');
+    setRefreshKey(Date.now());
+    setTimeout(() => {
+      fetchEntries();
+    }, 100);
+  }, [fetchEntries]);
 
   const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && !entriesError && !processingError;
 
@@ -374,7 +384,7 @@ const Journal = () => {
   }
 
   return (
-    <>
+    <ErrorBoundary onReset={resetError}>
       <JournalDebugger 
         processingEntries={processingEntries}
         isSavingRecording={isSavingRecording}
@@ -500,7 +510,7 @@ const Journal = () => {
           </>
         )}
       </div>
-    </>
+    </ErrorBoundary>
   );
 };
 
