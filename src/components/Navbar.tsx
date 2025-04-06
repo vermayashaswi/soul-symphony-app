@@ -72,6 +72,15 @@ export function Navbar() {
     closeMenu();
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      closeMenu();
+    } catch (error) {
+      console.error('Error signing out from navbar:', error);
+    }
+  };
+
   const closeMenu = () => setIsOpen(false);
 
   // Only return null after all hooks have been called
@@ -168,7 +177,7 @@ export function Navbar() {
                     <span>Settings</span>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={signOut}>
+                <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
@@ -198,7 +207,7 @@ export function Navbar() {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut}>
+                <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>

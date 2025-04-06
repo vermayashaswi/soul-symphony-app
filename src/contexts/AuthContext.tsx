@@ -12,6 +12,7 @@ import {
   signOut as signOutService,
   refreshSession as refreshSessionService
 } from '@/services/authService';
+import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -25,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const checkMobile = () => {
@@ -128,7 +130,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async (): Promise<void> => {
     try {
-      await signOutService();
+      await signOutService(navigate);
+      
+      setSession(null);
+      setUser(null);
+      setProfileExistsStatus(null);
+      setProfileCreationComplete(false);
     } catch (error) {
       // Error handling is done in the service
     }

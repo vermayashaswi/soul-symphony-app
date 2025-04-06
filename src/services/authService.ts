@@ -99,14 +99,22 @@ export const resetPassword = async (email: string): Promise<void> => {
 
 /**
  * Sign out
+ * @param navigate Optional navigation function to redirect after logout
  */
-export const signOut = async (): Promise<void> => {
+export const signOut = async (navigate?: (path: string) => void): Promise<void> => {
   try {
     const { error } = await supabase.auth.signOut();
     if (error) {
       throw error;
     }
+    
+    // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
+    
+    // Redirect to home page if navigate function is provided
+    if (navigate) {
+      navigate('/');
+    }
   } catch (error: any) {
     console.error('Error signing out:', error);
     toast.error(`Error signing out: ${error.message}`);
