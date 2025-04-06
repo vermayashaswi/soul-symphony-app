@@ -12,6 +12,15 @@ interface ThemeLoaderProps {
   isNew?: boolean;
 }
 
+// Define a type for the Journal Entry data structure
+interface JournalEntry {
+  id: number;
+  master_themes?: string[];
+  themes?: string[];
+  created_at?: string;
+  [key: string]: any; // Allow for additional properties
+}
+
 export function ThemeLoader({ 
   entryId, 
   initialThemes = [], 
@@ -118,15 +127,17 @@ export function ThemeLoader({
             return;
           }
             
-          // Check if data exists and is not an error with additional null check
+          // Check if data exists and is not an error with additional null checks and type casting
           if (data && typeof data === 'object') {
-            // Safely extract themes with fallbacks - fixed null checks with additional type guards
-            const updatedMasterThemes = (data && 'master_themes' in data && data.master_themes && Array.isArray(data.master_themes))
-              ? data.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
+            const entryData = data as JournalEntry;
+            
+            // Safely extract themes with fallbacks using the typed interface
+            const updatedMasterThemes = Array.isArray(entryData.master_themes)
+              ? entryData.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
               : [];
               
-            const updatedThemes = (data && 'themes' in data && data.themes && Array.isArray(data.themes))
-              ? data.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
+            const updatedThemes = Array.isArray(entryData.themes)
+              ? entryData.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
               : [];
               
             const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
