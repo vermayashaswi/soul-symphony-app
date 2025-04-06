@@ -11,10 +11,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group z-[100]" // Increased z-index for better visibility
-      // Short duration (3000ms = 3 seconds) for better readability
-      duration={3000}
+      // Longer duration (5000ms = 5 seconds) for better readability
+      duration={5000}
       closeButton={true}
       richColors={true} // Use rich colors for better visibility
+      expand={false} // Don't expand toast on hover
       toastOptions={{
         classNames: {
           toast:

@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import type {
@@ -6,7 +7,7 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 3000 // Set to 3000ms (3s) for better readability
+const TOAST_REMOVE_DELAY = 5000 // Increased from 3000ms to 5000ms for better readability
 
 type ToasterToast = ToastProps & {
   id: string
@@ -53,8 +54,16 @@ interface State {
   toasts: ToasterToast[]
 }
 
+// Global toasts state
+let memoryState: State = { toasts: [] }
+
+// Global listeners for state updates
+const listeners: Array<(state: State) => void> = []
+
+// Map to store and manage toast timeouts
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
+// Function to add a toast to the removal queue
 const addToRemoveQueue = (toastId: string) => {
   if (toastTimeouts.has(toastId)) {
     return
@@ -71,6 +80,15 @@ const addToRemoveQueue = (toastId: string) => {
   toastTimeouts.set(toastId, timeout)
 }
 
+// Clear all toast timeouts (used for cleanup)
+const clearToastTimeouts = () => {
+  toastTimeouts.forEach((timeout) => {
+    clearTimeout(timeout)
+  })
+  toastTimeouts.clear()
+}
+
+// The reducer function to handle toast actions
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "ADD_TOAST":
@@ -90,8 +108,7 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
+      // Side effects - Add toast to remove queue
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -126,10 +143,7 @@ export const reducer = (state: State, action: Action): State => {
   }
 }
 
-const listeners: Array<(state: State) => void> = []
-
-let memoryState: State = { toasts: [] }
-
+// Dispatch function to update state and notify listeners
 function dispatch(action: Action) {
   memoryState = reducer(memoryState, action)
   listeners.forEach((listener) => {
@@ -139,6 +153,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
+// Main toast function for creating toasts
 function toast({ ...props }: Toast) {
   const id = genId()
 
@@ -147,6 +162,7 @@ function toast({ ...props }: Toast) {
       type: "UPDATE_TOAST",
       toast: { ...props, id },
     })
+    
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
 
   dispatch({
@@ -168,11 +184,13 @@ function toast({ ...props }: Toast) {
   }
 }
 
+// useToast hook for React components
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
 
   React.useEffect(() => {
     listeners.push(setState)
+    
     return () => {
       const index = listeners.indexOf(setState)
       if (index > -1) {
@@ -181,10 +199,21 @@ function useToast() {
     }
   }, [state])
 
+  // Cleanup function to remove all toasts when unmounting
+  React.useEffect(() => {
+    return () => {
+      clearToastTimeouts()
+    }
+  }, [])
+
   return {
     ...state,
     toast,
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+    clearAll: () => {
+      clearToastTimeouts()
+      dispatch({ type: "REMOVE_TOAST" })
+    }
   }
 }
 

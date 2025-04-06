@@ -11,6 +11,7 @@ import {
   ThemeLoader, 
   DeleteEntryDialog 
 } from './entry-card';
+import ErrorBoundary from './ErrorBoundary';
 
 export interface JournalEntry {
   id: number;
@@ -47,6 +48,7 @@ export function JournalEntryCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const [highlightNew, setHighlightNew] = useState(isNew);
   const [deletionCompleted, setDeletionCompleted] = useState(false);
+  const [deletionInProgress, setDeletionInProgress] = useState(false);
   const mountedRef = useRef<boolean>(true);
   
   // Extract themes from the entry
@@ -111,13 +113,16 @@ export function JournalEntryCard({
   };
 
   const handleDelete = async () => {
-    if (!entry.id || deletionCompleted) return;
+    if (!entry.id || deletionCompleted || deletionInProgress) {
+      console.log(`[JournalEntryCard] Skipping deletion for entry ${entry.id} - already completed or in progress`);
+      return;
+    }
     
     try {
-      console.log(`[JournalEntryCard] Deleting entry ${entry.id}`);
+      console.log(`[JournalEntryCard] Starting deletion of entry ${entry.id}`);
       
-      // Mark as completed to prevent duplicate deletion attempts
-      setDeletionCompleted(true);
+      // Mark as in progress to prevent duplicate deletion attempts
+      setDeletionInProgress(true);
       
       const { error } = await supabase
         .from('Journal Entries')
@@ -128,10 +133,13 @@ export function JournalEntryCard({
         throw error;
       }
       
-      console.log(`[JournalEntryCard] Successfully deleted entry ${entry.id}`);
+      console.log(`[JournalEntryCard] Successfully deleted entry ${entry.id} from database`);
+      
+      // Mark as completed
+      setDeletionCompleted(true);
       
       // Call parent handler with a small delay to ensure UI updates properly
-      if (onDelete) {
+      if (onDelete && mountedRef.current) {
         console.log(`[JournalEntryCard] Calling onDelete for entry ${entry.id}`);
         onDelete(entry.id);
       }
@@ -139,13 +147,22 @@ export function JournalEntryCard({
       toast.success('Journal entry deleted');
     } catch (error) {
       console.error('[JournalEntryCard] Error deleting journal entry:', error);
-      setDeletionCompleted(false);
+      
+      // Reset state if still mounted
+      if (mountedRef.current) {
+        setDeletionInProgress(false);
+        setDeletionCompleted(false);
+      }
+      
       toast.error('Failed to delete entry');
       
       // Still try to update the UI even if the database operation failed
-      if (onDelete) {
+      if (onDelete && mountedRef.current) {
+        console.log(`[JournalEntryCard] Calling onDelete after error for entry ${entry.id}`);
         setTimeout(() => {
-          onDelete(entry.id);
+          if (mountedRef.current) {
+            onDelete(entry.id);
+          }
         }, 100);
       }
     }
@@ -162,50 +179,52 @@ export function JournalEntryCard({
   };
 
   return (
-    <motion.div
-      initial={isNew ? { borderColor: 'rgba(var(--color-primary), 0.7)' } : {}}
-      animate={highlightNew 
-        ? { 
-            borderColor: ['rgba(var(--color-primary), 0.7)', 'rgba(var(--color-primary), 0)'],
-            boxShadow: ['0 0 15px rgba(var(--color-primary), 0.3)', '0 0 0px rgba(var(--color-primary), 0)']
-          } 
-        : {}}
-      transition={{ duration: 3 }}
-      className="journal-entry-card" 
-      data-entry-id={entry.id}
-    >
-      <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
-        <div className="flex justify-between items-start p-3 md:p-4">
-          <div>
-            <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-            <div className="mt-1">
-              <SentimentEmoji sentiment={entry.sentiment} />
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2 md:space-x-3">
-            <FloatingDotsToggle onClick={toggleExpanded} />
-            <DeleteEntryDialog onDelete={handleDelete} />
-          </div>
-        </div>
-
-        <div className="p-3 md:p-4">
-          {isExpanded ? (
+    <ErrorBoundary>
+      <motion.div
+        initial={isNew ? { borderColor: 'rgba(var(--color-primary), 0.7)' } : {}}
+        animate={highlightNew 
+          ? { 
+              borderColor: ['rgba(var(--color-primary), 0.7)', 'rgba(var(--color-primary), 0)'],
+              boxShadow: ['0 0 15px rgba(var(--color-primary), 0.3)', '0 0 0px rgba(var(--color-primary), 0)']
+            } 
+          : {}}
+        transition={{ duration: 3 }}
+        className="journal-entry-card" 
+        data-entry-id={entry.id}
+      >
+        <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
+          <div className="flex justify-between items-start p-3 md:p-4">
             <div>
-              <p className="text-xs md:text-sm text-foreground">{entry.content}</p>
-              <ThemeLoader 
-                entryId={entry.id}
-                initialThemes={initialThemes}
-                content={entry.content}
-                isProcessing={isProcessing || isEntryBeingProcessed()}
-                isNew={isNew}
-              />
+              <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
+              <div className="mt-1">
+                <SentimentEmoji sentiment={entry.sentiment} />
+              </div>
             </div>
-          ) : (
-            <p className="text-xs md:text-sm text-foreground line-clamp-3">{entry.content}</p>
-          )}
-        </div>
-      </Card>
-    </motion.div>
+
+            <div className="flex items-center space-x-2 md:space-x-3">
+              <FloatingDotsToggle onClick={toggleExpanded} />
+              <DeleteEntryDialog onDelete={handleDelete} />
+            </div>
+          </div>
+
+          <div className="p-3 md:p-4">
+            {isExpanded ? (
+              <div>
+                <p className="text-xs md:text-sm text-foreground">{entry.content}</p>
+                <ThemeLoader 
+                  entryId={entry.id}
+                  initialThemes={initialThemes}
+                  content={entry.content}
+                  isProcessing={isProcessing || isEntryBeingProcessed()}
+                  isNew={isNew}
+                />
+              </div>
+            ) : (
+              <p className="text-xs md:text-sm text-foreground line-clamp-3">{entry.content}</p>
+            )}
+          </div>
+        </Card>
+      </motion.div>
+    </ErrorBoundary>
   );
 }

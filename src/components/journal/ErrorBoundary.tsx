@@ -1,3 +1,4 @@
+
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,14 +21,17 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
+    console.error('ErrorBoundary caught an error in getDerivedStateFromError:', error);
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, info);
+    console.error('ErrorBoundary caught an error:', error);
+    console.error('Component stack:', info.componentStack);
   }
   
   resetErrorState = () => {
+    console.log('Resetting error state');
     if (this.props.onReset) {
       this.props.onReset();
     }
