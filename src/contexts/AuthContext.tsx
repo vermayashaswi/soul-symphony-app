@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +12,7 @@ import {
   signOut as signOutService,
   refreshSession as refreshSessionService
 } from '@/services/authService';
-import { debugLogger, logInfo, logError, logAuthError, logProfile } from '@/components/debug/DebugPanel';
+import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } from '@/components/debug/DebugPanel';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

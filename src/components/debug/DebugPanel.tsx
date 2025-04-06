@@ -180,6 +180,10 @@ export const logAuth = (message: string, source: string, details?: any) => {
   debugLogger.log('auth', message, source, details);
 };
 
+export const logAuthError = (message: string, source: string, details?: any) => {
+  debugLogger.log('error', `Auth Error: ${message}`, source, details);
+};
+
 export const logRender = (message: string, source: string, details?: any) => {
   debugLogger.log('debug', `Render: ${message}`, source, details);
 };
