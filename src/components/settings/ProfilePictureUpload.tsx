@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 
 export function ProfilePictureUpload() {
   const { user, updateUserProfile } = useAuth();
@@ -142,7 +143,12 @@ export function ProfilePictureUpload() {
     }
   };
 
-  // Touch event handlers for image positioning
+  // Handle zoom changes from the slider
+  const handleZoomChange = (value: number[]) => {
+    setZoom(value[0]);
+  };
+
+  // Improved touch and mouse event handlers for image manipulation
   useEffect(() => {
     const imageContainer = containerRef.current;
     if (!imageContainer || !showImageEditor) return;
@@ -186,6 +192,7 @@ export function ProfilePictureUpload() {
         );
         
         const delta = dist - lastTouchDistance.current;
+        // Adjust the zoom sensitivity for better control
         const newZoom = Math.max(0.5, Math.min(3, zoom + delta * 0.01));
         
         setZoom(newZoom);
@@ -203,6 +210,7 @@ export function ProfilePictureUpload() {
     let startY = 0;
 
     const handleMouseDown = (e: MouseEvent) => {
+      e.preventDefault();
       isDraggingRef.current = true;
       startX = e.clientX - position.x;
       startY = e.clientY - position.y;
@@ -289,37 +297,52 @@ export function ProfilePictureUpload() {
           <DialogHeader>
             <DialogTitle>Adjust Your Profile Picture</DialogTitle>
             <DialogDescription>
-              Pinch to zoom and drag to position your profile picture.
+              Drag to position and use the slider to zoom your profile picture.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex flex-col items-center space-y-4 py-4">
+          <div className="flex flex-col items-center space-y-6 py-4">
             <div 
               ref={containerRef}
-              className="relative h-64 w-64 rounded-full overflow-hidden border-2 border-muted cursor-grab touch-none"
+              className="relative h-64 w-64 rounded-full overflow-hidden border-2 border-muted cursor-grab touch-none select-none"
               style={{ touchAction: 'none' }}
             >
               {selectedImage && (
-                <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
+                <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
                   <img
                     ref={imageRef}
                     src={selectedImage}
                     alt="Profile Preview"
-                    className="transition-transform duration-100 ease-in-out pointer-events-none"
+                    className="transition-transform duration-100 ease-in-out pointer-events-none will-change-transform"
                     style={{
                       transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
                       maxWidth: 'none',
                       maxHeight: 'none',
-                      willChange: 'transform'
                     }}
+                    draggable={false}
                   />
                 </div>
               )}
             </div>
             
+            <div className="w-full space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Zoom</span>
+                <span className="text-sm text-muted-foreground">{(zoom * 100).toFixed(0)}%</span>
+              </div>
+              <Slider 
+                defaultValue={[1]} 
+                min={0.5} 
+                max={3} 
+                step={0.1} 
+                value={[zoom]}
+                onValueChange={handleZoomChange}
+              />
+            </div>
+            
             <p className="text-sm text-muted-foreground text-center">
-              <span className="block sm:inline">Use pinch gestures to zoom in/out.</span>{" "}
-              <span className="block sm:inline">Drag to position the image.</span>
+              <span className="block">Drag the image to adjust position.</span>
+              <span className="block">On mobile: pinch to zoom in/out.</span>
             </p>
           </div>
           
