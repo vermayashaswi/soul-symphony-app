@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
+import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
 
 export function ProfilePictureUpload() {
   const { user, updateUserProfile } = useAuth();
@@ -143,15 +143,20 @@ export function ProfilePictureUpload() {
     }
   };
 
-  // Handle zoom changes from the slider
-  const handleZoomChange = (value: number[]) => {
-    setZoom(value[0]);
+  // Handle zoom with pinch gesture and mouse wheel
+  const handleZoomAdjust = (delta: number) => {
+    // Adjust zoom with limiting boundaries
+    const newZoom = Math.max(0.5, Math.min(3, zoom + delta));
+    setZoom(newZoom);
   };
 
   // Improved touch and mouse event handlers for image manipulation
   useEffect(() => {
     const imageContainer = containerRef.current;
     if (!imageContainer || !showImageEditor) return;
+
+    // Ensure we initialize touch interactions immediately when dialog opens
+    imageContainer.style.cursor = 'grab';
 
     // Touch handlers
     const handleTouchStart = (e: TouchEvent) => {
@@ -165,6 +170,7 @@ export function ProfilePictureUpload() {
           y: touch.clientY - position.y
         };
         isDraggingRef.current = true;
+        imageContainer.style.cursor = 'grabbing';
       } else if (e.touches.length === 2) {
         // Two touches - pinch to zoom
         const dist = Math.hypot(
@@ -193,9 +199,8 @@ export function ProfilePictureUpload() {
         
         const delta = dist - lastTouchDistance.current;
         // Adjust the zoom sensitivity for better control
-        const newZoom = Math.max(0.5, Math.min(3, zoom + delta * 0.01));
+        handleZoomAdjust(delta * 0.01);
         
-        setZoom(newZoom);
         lastTouchDistance.current = dist;
       }
     };
@@ -203,6 +208,7 @@ export function ProfilePictureUpload() {
     const handleTouchEnd = () => {
       isDraggingRef.current = false;
       lastTouchDistance.current = null;
+      imageContainer.style.cursor = 'grab';
     };
 
     // Mouse drag support for desktop
@@ -233,8 +239,7 @@ export function ProfilePictureUpload() {
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY * -0.01;
-      const newZoom = Math.max(0.5, Math.min(3, zoom + delta));
-      setZoom(newZoom);
+      handleZoomAdjust(delta);
     };
 
     // Add event listeners with proper parameters
@@ -297,7 +302,7 @@ export function ProfilePictureUpload() {
           <DialogHeader>
             <DialogTitle>Adjust Your Profile Picture</DialogTitle>
             <DialogDescription>
-              Drag to position and use the slider to zoom your profile picture.
+              Drag to position and pinch or use mouse wheel to zoom your profile picture.
             </DialogDescription>
           </DialogHeader>
           
@@ -326,23 +331,15 @@ export function ProfilePictureUpload() {
             </div>
             
             <div className="w-full space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Zoom</span>
-                <span className="text-sm text-muted-foreground">{(zoom * 100).toFixed(0)}%</span>
-              </div>
-              <Slider 
-                defaultValue={[1]} 
-                min={0.5} 
-                max={3} 
-                step={0.1} 
-                value={[zoom]}
-                onValueChange={handleZoomChange}
-              />
+              <p className="text-sm text-center">
+                <span className="text-sm text-muted-foreground font-medium">Current zoom: {(zoom * 100).toFixed(0)}%</span>
+              </p>
             </div>
             
             <p className="text-sm text-muted-foreground text-center">
               <span className="block">Drag the image to adjust position.</span>
               <span className="block">On mobile: pinch to zoom in/out.</span>
+              <span className="block">On desktop: use mouse wheel to zoom.</span>
             </p>
           </div>
           
