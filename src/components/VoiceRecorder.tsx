@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -24,6 +23,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
+  const [hasSaved, setHasSaved] = useState(false);
+  const saveCompleteRef = useRef(false);
   const { user } = useAuth();
   const isMobile = useIsMobile();
   
@@ -75,6 +76,28 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     }
   }, [isRecording, audioBlob]);
   
+  useEffect(() => {
+    console.log('[VoiceRecorder] State update:', {
+      isProcessing,
+      hasAudioBlob: !!audioBlob,
+      audioSize: audioBlob?.size || 0,
+      isRecording,
+      hasPermission,
+      audioDuration,
+      hasSaved
+    });
+  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved]);
+  
+  useEffect(() => {
+    return () => {
+      console.log('[VoiceRecorder] Component unmounting, resetting state');
+      
+      if (isProcessing && !saveCompleteRef.current) {
+        console.warn('[VoiceRecorder] Component unmounted during processing - potential source of UI errors');
+      }
+    };
+  }, [isProcessing]);
+  
   const handleSaveEntry = async () => {
     if (!audioBlob) {
       setRecordingError("No audio recording available");
@@ -86,13 +109,20 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       return;
     }
     
+    if (hasSaved) {
+      console.log('[VoiceRecorder] Already saved this recording, ignoring duplicate save request');
+      return;
+    }
+    
     try {
+      console.log('[VoiceRecorder] Starting save process');
       setIsProcessing(true);
       setRecordingError(null);
+      setHasSaved(true);
       
       const normalizedBlob = normalizeAudioBlob(audioBlob);
       
-      console.log('Processing audio:', {
+      console.log('[VoiceRecorder] Processing audio:', {
         type: normalizedBlob.type,
         size: normalizedBlob.size,
         duration: audioDuration,
@@ -101,24 +131,28 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
       
       if (onRecordingComplete) {
         try {
-          // Make sure we wait for the callback to complete before resetting anything
-          await onRecordingComplete(normalizedBlob);
-          // We don't reset the recorder here since Journal.tsx will handle the UI transition
+          console.log('[VoiceRecorder] Calling recording completion callback');
+          saveCompleteRef.current = false;
           
-          // Debug information
+          await onRecordingComplete(normalizedBlob);
+          
+          saveCompleteRef.current = true;
+          
           console.log('[VoiceRecorder] Recording callback completed successfully');
         } catch (error: any) {
-          console.error('Error in recording callback:', error);
+          console.error('[VoiceRecorder] Error in recording callback:', error);
           setRecordingError(error?.message || "An unexpected error occurred");
           toast.error("Error saving recording");
           setIsProcessing(false);
+          setHasSaved(false);
         }
       }
     } catch (error: any) {
-      console.error('Error in save entry:', error);
+      console.error('[VoiceRecorder] Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
       toast.error("Error saving recording");
       setIsProcessing(false);
+      setHasSaved(false);
     }
   };
 
@@ -128,19 +162,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
     setRecordingError(null);
     setShowAnimation(true);
     setIsProcessing(false);
+    setHasSaved(false);
+    saveCompleteRef.current = false;
     toast.info("Starting a new recording");
   };
-
-  // Add debugging information to console
-  useEffect(() => {
-    console.log('[VoiceRecorder] State update:', {
-      isProcessing,
-      hasAudioBlob: !!audioBlob,
-      isRecording,
-      hasPermission,
-      audioDuration
-    });
-  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration]);
 
   return (
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
@@ -163,10 +188,17 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
               isProcessing={isProcessing}
               hasPermission={hasPermission}
               onRecordingStart={() => {
+                console.log('[VoiceRecorder] Starting new recording');
                 startRecording();
               }}
-              onRecordingStop={stopRecording}
-              onPermissionRequest={requestPermissions}
+              onRecordingStop={() => {
+                console.log('[VoiceRecorder] Stopping recording');
+                stopRecording();
+              }}
+              onPermissionRequest={() => {
+                console.log('[VoiceRecorder] Requesting permissions');
+                requestPermissions();
+              }}
               audioLevel={audioLevel}
               showAnimation={false}
             />
@@ -187,7 +219,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className }: Voic
                   playbackProgress={playbackProgress}
                   audioDuration={audioDuration}
                   onTogglePlayback={togglePlayback}
-                  onSaveEntry={handleSaveEntry}
+                  onSaveEntry={() => {
+                    console.log('[VoiceRecorder] Save button clicked');
+                    handleSaveEntry();
+                  }}
                   onRestart={handleRestart}
                   onSeek={seekTo}
                 />

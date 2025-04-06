@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/utils/format-time';
@@ -42,7 +42,7 @@ interface JournalEntryCardProps {
   entry: JournalEntry;
   onDelete?: (entryId: number) => void;
   isNew?: boolean;
-  isProcessing?: boolean; // Add prop to indicate if entry is being processed
+  isProcessing?: boolean;
 }
 
 export function JournalEntryCard({ 
@@ -52,13 +52,27 @@ export function JournalEntryCard({
   isProcessing = false 
 }: JournalEntryCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const [highlightNew, setHighlightNew] = useState(isNew);
   const [isThemesLoading, setIsThemesLoading] = useState(true);
   const [refreshTime, setRefreshTime] = useState(0);
   const [themes, setThemes] = useState<string[]>([]);
+  const entryRef = useRef<HTMLDivElement>(null);
+  const lastRenderTimeRef = useRef<number>(Date.now());
+  const mountedRef = useRef<boolean>(true);
+  
+  // Log when the component is mounted/unmounted
+  useEffect(() => {
+    console.log(`[JournalEntryCard] Mounted entry ${entry.id}`);
+    mountedRef.current = true;
+    
+    return () => {
+      console.log(`[JournalEntryCard] Unmounted entry ${entry.id}`);
+      mountedRef.current = false;
+    };
+  }, [entry.id]);
 
   // Auto-expand new entries
   useEffect(() => {
@@ -68,7 +82,9 @@ export function JournalEntryCard({
       
       // Remove highlight after 5 seconds
       const timer = setTimeout(() => {
-        setHighlightNew(false);
+        if (mountedRef.current) {
+          setHighlightNew(false);
+        }
       }, 5000);
       
       return () => clearTimeout(timer);
@@ -77,11 +93,22 @@ export function JournalEntryCard({
   
   // Handle theme loading and extraction
   useEffect(() => {
-    // Safely access master_themes and themes, providing fallback empty arrays
-    const masterThemes = Array.isArray(entry.master_themes) ? entry.master_themes : [];
-    const entryThemes = Array.isArray(entry.themes) ? entry.themes : [];
-    const currentThemes = masterThemes.length > 0 ? masterThemes : entryThemes;
+    if (!mountedRef.current) return;
     
+    // Safely extract themes from the entry
+    const extractThemes = () => {
+      try {
+        // Safely access master_themes and themes, providing fallback empty arrays
+        const masterThemes = Array.isArray(entry.master_themes) ? entry.master_themes : [];
+        const entryThemes = Array.isArray(entry.themes) ? entry.themes : [];
+        return masterThemes.length > 0 ? masterThemes : entryThemes;
+      } catch (error) {
+        console.error("[JournalEntryCard] Error extracting themes:", error);
+        return [];
+      }
+    };
+    
+    const currentThemes = extractThemes();
     setThemes(currentThemes);
     
     // Determine if themes are still loading
@@ -89,9 +116,16 @@ export function JournalEntryCard({
     setIsThemesLoading(shouldBeLoading);
     
     // Set up polling for theme updates if they're loading
-    if (shouldBeLoading) {
+    if (shouldBeLoading && entry.id) {
       const pollInterval = setInterval(async () => {
+        if (!mountedRef.current) {
+          clearInterval(pollInterval);
+          return;
+        }
+        
         try {
+          console.log(`[JournalEntryCard] Polling for themes for entry ${entry.id}, attempt ${refreshTime + 1}`);
+          
           // Fetch the latest version of the entry
           const { data, error } = await supabase
             .from('Journal Entries')
@@ -100,7 +134,6 @@ export function JournalEntryCard({
             .single();
             
           if (error) {
-            console.error("Error polling for themes:", error);
             throw error;
           }
           
@@ -116,24 +149,48 @@ export function JournalEntryCard({
             
             // If we now have themes, update them and stop loading
             if (updatedCurrentThemes.length > 0) {
-              setThemes(updatedCurrentThemes);
-              setIsThemesLoading(false);
+              console.log(`[JournalEntryCard] Found themes for entry ${entry.id}:`, updatedCurrentThemes);
+              
+              if (mountedRef.current) {
+                setThemes(updatedCurrentThemes);
+                setIsThemesLoading(false);
+              }
+              
               clearInterval(pollInterval);
             }
           }
           
-          setRefreshTime(prev => prev + 1);
+          if (mountedRef.current) {
+            setRefreshTime(prev => prev + 1);
+          }
+          
+          // After several attempts, stop showing loading state
+          if (refreshTime >= 10) {
+            console.log(`[JournalEntryCard] Maximum polling attempts reached for entry ${entry.id}`);
+            
+            if (mountedRef.current) {
+              setIsThemesLoading(false);
+            }
+            
+            clearInterval(pollInterval);
+          }
         } catch (error) {
-          console.error("Error polling for themes:", error);
-          // After multiple retries (30 seconds), stop showing loading state
+          console.error(`[JournalEntryCard] Error polling for themes for entry ${entry.id}:`, error);
+          
+          // After multiple retries, stop showing loading state
           if (refreshTime > 10) {
-            setIsThemesLoading(false);
+            if (mountedRef.current) {
+              setIsThemesLoading(false);
+            }
+            
             clearInterval(pollInterval);
           }
         }
       }, 3000); // Poll every 3 seconds
       
-      return () => clearInterval(pollInterval);
+      return () => {
+        clearInterval(pollInterval);
+      };
     }
   }, [entry.id, entry.master_themes, entry.themes, isProcessing, refreshTime]);
 
@@ -147,6 +204,8 @@ export function JournalEntryCard({
     try {
       setIsDeleting(true);
       
+      console.log(`[JournalEntryCard] Deleting entry ${entry.id}`);
+      
       const { error } = await supabase
         .from('Journal Entries')
         .delete()
@@ -156,18 +215,22 @@ export function JournalEntryCard({
         throw error;
       }
       
+      console.log(`[JournalEntryCard] Successfully deleted entry ${entry.id}`);
+      
       setOpen(false);
       
-      if (onDelete) {
-        onDelete(entry.id);
-      }
+      // Wrap in setTimeout to ensure this component unmounts cleanly before deletion handler runs
+      setTimeout(() => {
+        if (onDelete) {
+          onDelete(entry.id);
+        }
+      }, 0);
       
       toast.success('Journal entry deleted');
     } catch (error) {
-      console.error('Error deleting journal entry:', error);
-      toast.error('Failed to delete entry');
-    } finally {
+      console.error('[JournalEntryCard] Error deleting journal entry:', error);
       setIsDeleting(false);
+      toast.error('Failed to delete entry');
     }
   };
 
@@ -279,8 +342,19 @@ export function JournalEntryCard({
     </motion.div>
   );
 
+  // Calculate time since last render to detect performance issues
+  const now = Date.now();
+  const timeSinceLastRender = now - lastRenderTimeRef.current;
+  lastRenderTimeRef.current = now;
+  
+  // Log slow renders
+  if (timeSinceLastRender > 100) {
+    console.log(`[JournalEntryCard] Slow render for entry ${entry.id}: ${timeSinceLastRender}ms`);
+  }
+
   return (
     <motion.div
+      ref={entryRef}
       initial={isNew ? { borderColor: 'rgba(var(--color-primary), 0.7)' } : {}}
       animate={highlightNew 
         ? { 
@@ -289,6 +363,8 @@ export function JournalEntryCard({
           } 
         : {}}
       transition={{ duration: 3 }}
+      className="journal-entry-card" // Add a class for debugging
+      data-entry-id={entry.id} // Add data attribute for debugging
     >
       <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
         <div className="flex justify-between items-start p-3 md:p-4">

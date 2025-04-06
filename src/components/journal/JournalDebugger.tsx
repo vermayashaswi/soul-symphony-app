@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Code, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Code, X, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -33,11 +33,24 @@ const JournalDebugger = ({
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [debugHistory, setDebugHistory] = useState<DebugState[]>([]);
+  const [renderCount, setRenderCount] = useState(0);
+  const [hasErrorState, setHasErrorState] = useState(false);
   const { user } = useAuth();
   const { entries, loading, error } = useJournalEntries(user?.id, Date.now(), true);
 
+  useEffect(() => {
+    // Increment render count on each render
+    setRenderCount(prev => prev + 1);
+  });
+
   const toggleOpen = () => setIsOpen(!isOpen);
   const toggleExpanded = () => setIsExpanded(!isExpanded);
+
+  // Detect if we have error states in the component hierarchy
+  useEffect(() => {
+    const hasErrors = !!error || !!processingError;
+    setHasErrorState(hasErrors);
+  }, [error, processingError]);
 
   useEffect(() => {
     // Record the current state
@@ -59,12 +72,20 @@ const JournalDebugger = ({
   return (
     <div className="fixed top-2 right-2 z-50">
       {!isOpen ? (
-        <div 
-          className="bg-yellow-500 text-black p-2 rounded-full cursor-pointer shadow-lg hover:bg-yellow-400 transition-colors"
+        <motion.div 
+          className={`p-2 rounded-full cursor-pointer shadow-lg hover:opacity-90 transition-colors flex items-center justify-center ${hasErrorState ? 'bg-red-500 text-white' : 'bg-yellow-500 text-black'}`}
           onClick={toggleOpen}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
         >
-          <Code size={20} />
-        </div>
+          {hasErrorState ? (
+            <AlertCircle size={20} />
+          ) : (
+            <Code size={20} />
+          )}
+        </motion.div>
       ) : (
         <motion.div 
           className="bg-gray-950 text-white p-4 rounded-lg shadow-xl border border-yellow-500 max-w-[90vw]"
@@ -77,6 +98,7 @@ const JournalDebugger = ({
             <div className="flex gap-2 items-center">
               <Code size={18} className="text-yellow-500" />
               <h3 className="font-semibold text-yellow-500">Journal Debugger</h3>
+              <span className="text-xs text-gray-400">Renders: {renderCount}</span>
             </div>
             <div className="flex gap-2">
               {isExpanded ? (
@@ -118,6 +140,9 @@ const JournalDebugger = ({
                 <div className={`font-mono ${loading ? 'text-yellow-400' : 'text-green-400'}`}>
                   {loading ? 'Yes' : 'No'}
                 </div>
+                
+                <div>Time:</div>
+                <div className="font-mono text-green-400">{new Date().toLocaleTimeString()}</div>
                 
                 {error && (
                   <>

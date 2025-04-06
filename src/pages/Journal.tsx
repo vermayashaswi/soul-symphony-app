@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -30,14 +31,42 @@ const Journal = () => {
   const [isRecordingComplete, setIsRecordingComplete] = useState(false);
   const [isSavingRecording, setIsSavingRecording] = useState(false);
   const [processingError, setProcessingError] = useState<string | null>(null);
+  const [hasRenderError, setHasRenderError] = useState(false);
   const previousEntriesRef = useRef<number[]>([]);
   const profileCheckedOnceRef = useRef(false);
+  const entriesListRef = useRef<HTMLDivElement>(null);
   
-  const { entries, loading, fetchEntries, error } = useJournalEntries(
+  // Use try-catch to detect render errors
+  useEffect(() => {
+    window.addEventListener('error', (event) => {
+      console.error('[Journal] Caught render error:', event);
+      setHasRenderError(true);
+    });
+    return () => window.removeEventListener('error', () => {});
+  }, []);
+  
+  const { 
+    entries, 
+    loading, 
+    fetchEntries, 
+    error: entriesError, 
+    profileExists 
+  } = useJournalEntries(
     user?.id,
     refreshKey,
     isProfileChecked
   );
+
+  // Log component render cycles for debugging
+  useEffect(() => {
+    console.log('[Journal] Component rendered with state:', {
+      entries: entries.length,
+      loading,
+      processingEntries,
+      activeTab,
+      hasRenderError
+    });
+  });
 
   useEffect(() => {
     clearAllToasts();
@@ -397,26 +426,35 @@ const Journal = () => {
       });
       
       setRefreshKey(prev => prev + 1);
+      
+      // Force a re-fetch of entries after deletion
+      setTimeout(() => {
+        fetchEntries();
+      }, 300);
+      
     } catch (error) {
       console.error('Error deleting entry:', error);
     }
   };
 
-  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && !error && !processingError;
+  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && !entriesError && !processingError;
 
-  const renderDebugger = () => (
-    <JournalDebugger 
-      processingEntries={processingEntries}
-      isSavingRecording={isSavingRecording}
-      isRecordingComplete={isRecordingComplete}
-      activeTab={activeTab}
-      processingError={processingError}
-    />
-  );
+  // Force the component to render visibly even if there are errors
+  if (hasRenderError) {
+    console.error('[Journal] Recovering from render error');
+    setHasRenderError(false);
+  }
 
   return (
     <>
-      {renderDebugger()}
+      {/* Always render debugger regardless of other component states */}
+      <JournalDebugger 
+        processingEntries={processingEntries}
+        isSavingRecording={isSavingRecording}
+        isRecordingComplete={isRecordingComplete}
+        activeTab={activeTab}
+        processingError={processingError}
+      />
       
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
         <JournalHeader />
@@ -428,14 +466,14 @@ const Journal = () => {
               <p className="text-muted-foreground">Setting up your profile...</p>
             </div>
           </div>
-        ) : error && !loading ? (
+        ) : entriesError && !loading ? (
           <>
             <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
               <div className="flex flex-col gap-3">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                   <p className="text-red-800 dark:text-red-200">
-                    Error loading your journal entries: {error}
+                    Error loading your journal entries: {entriesError}
                   </p>
                 </div>
                 <Button 
@@ -513,7 +551,7 @@ const Journal = () => {
                 </div>
               </TabsContent>
               
-              <TabsContent value="entries" className="mt-0">
+              <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
                 {showLoadingFeedback ? (
                   <div className="mt-8 flex flex-col items-center justify-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
