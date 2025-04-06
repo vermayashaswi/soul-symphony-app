@@ -13,12 +13,12 @@ interface ThemeLoaderProps {
 
 export function ThemeLoader({ 
   entryId, 
-  initialThemes, 
-  content, 
+  initialThemes = [], // Add default value for safety
+  content = "", // Add default value for safety
   isProcessing = false, 
   isNew = false 
 }: ThemeLoaderProps) {
-  const [themes, setThemes] = useState<string[]>(initialThemes);
+  const [themes, setThemes] = useState<string[]>([]);
   const [isThemesLoading, setIsThemesLoading] = useState(isProcessing);
   const mountedRef = useRef<boolean>(true);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -46,6 +46,28 @@ export function ThemeLoader({
     };
   }, [entryId]);
 
+  // Safely initialize themes with defensive checks
+  useEffect(() => {
+    try {
+      // Safety check for initialThemes
+      const safeInitialThemes = Array.isArray(initialThemes) ? initialThemes : [];
+      
+      // Filter out empty themes
+      const filteredThemes = safeInitialThemes.filter(theme => 
+        theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
+      );
+      
+      setThemes(filteredThemes);
+      
+      // Determine if themes are still loading
+      const shouldBeLoading = isProcessing || (filteredThemes.length === 0 && isNew);
+      setIsThemesLoading(shouldBeLoading);
+    } catch (error) {
+      console.error('[ThemeLoader] Error setting initial themes:', error);
+      setThemes([]);
+    }
+  }, [initialThemes, isProcessing, isNew]);
+
   // Set up polling for themes if needed
   useEffect(() => {
     if (!mountedRef.current) return;
@@ -61,19 +83,8 @@ export function ThemeLoader({
       safetyTimeoutRef.current = null;
     }
     
-    // Filter out empty themes
-    const filteredThemes = initialThemes.filter(theme => 
-      theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
-    );
-    
-    setThemes(filteredThemes);
-    
-    // Determine if themes are still loading
-    const shouldBeLoading = isProcessing || (filteredThemes.length === 0 && isNew);
-    setIsThemesLoading(shouldBeLoading);
-    
     // If themes are loading and we have an entry ID, poll for themes
-    if (shouldBeLoading && entryId) {
+    if (isThemesLoading && entryId) {
       let pollAttempts = 0;
       const maxAttempts = 5;
       
@@ -208,20 +219,27 @@ export function ThemeLoader({
         }
       };
     }
-  }, [entryId, initialThemes, content, isProcessing, isNew]);
+  }, [entryId, isThemesLoading, themes.length, content]);
 
   // Generate fallback themes from content
   const generateFallbackThemes = (text: string): string[] => {
-    const words = text.split(/\s+/);
-    const longWords = words
-      .filter(word => word.length > 5)
-      .slice(0, 3)
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
-    
-    if (longWords.length > 0) {
-      return [...new Set(longWords)]; // Remove duplicates
+    try {
+      if (!text || typeof text !== 'string') return [];
+      
+      const words = text.split(/\s+/);
+      const longWords = words
+        .filter(word => word.length > 5)
+        .slice(0, 3)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+      
+      if (longWords.length > 0) {
+        return [...new Set(longWords)]; // Remove duplicates
+      }
+      return [];
+    } catch (error) {
+      console.error('[ThemeLoader] Error generating fallback themes:', error);
+      return [];
     }
-    return [];
   };
 
   return (

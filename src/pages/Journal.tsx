@@ -254,6 +254,8 @@ const Journal = () => {
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
         
+        setActiveTab('entries');
+        
         await fetchEntries();
         setRefreshKey(prev => prev + 1);
         
@@ -395,7 +397,10 @@ const Journal = () => {
     }, 100);
   }, [fetchEntries]);
 
-  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && !entriesError && !processingError;
+  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && 
+                             !entriesError && 
+                             !processingError && 
+                             processingEntries.length > 0;
 
   if (hasRenderError) {
     console.error('[Journal] Recovering from render error');
@@ -529,14 +534,16 @@ const Journal = () => {
                     <p className="text-muted-foreground text-sm mt-2">This may take a moment. Your journal entries will appear here shortly.</p>
                   </div>
                 ) : (
-                  <JournalEntriesList
-                    entries={entries}
-                    loading={loading}
-                    processingEntries={processingEntries}
-                    processedEntryIds={processedEntryIds}
-                    onStartRecording={handleStartRecording}
-                    onDeleteEntry={handleDeleteEntry}
-                  />
+                  <ErrorBoundary>
+                    <JournalEntriesList
+                      entries={entries}
+                      loading={loading}
+                      processingEntries={processingEntries}
+                      processedEntryIds={processedEntryIds}
+                      onStartRecording={handleStartRecording}
+                      onDeleteEntry={handleDeleteEntry}
+                    />
+                  </ErrorBoundary>
                 )}
               </TabsContent>
             </Tabs>

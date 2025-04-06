@@ -18,8 +18,8 @@ interface JournalEntriesListProps {
 }
 
 export default function JournalEntriesList({ 
-  entries, 
-  loading, 
+  entries = [], // Add default value for safety
+  loading = false, 
   processingEntries = [], 
   processedEntryIds = [],
   onStartRecording, 
@@ -31,13 +31,25 @@ export default function JournalEntriesList({
   const hasProcessingEntries = processingEntries.length > 0;
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
+  const [renderError, setRenderError] = useState<Error | null>(null);
 
+  // Safely handle entries updates with error boundaries
   useEffect(() => {
-    if (entries.length >= 0) {
-      const filteredEntries = entries.filter(
-        entry => !pendingDeletions.current.has(entry.id)
-      );
-      setLocalEntries(filteredEntries);
+    try {
+      if (Array.isArray(entries)) {
+        const filteredEntries = entries.filter(
+          entry => entry && typeof entry === 'object' && entry.id && !pendingDeletions.current.has(entry.id)
+        );
+        setLocalEntries(filteredEntries);
+      } else {
+        console.warn('[JournalEntriesList] Entries is not an array:', entries);
+        setLocalEntries([]);
+      }
+    } catch (error) {
+      console.error('[JournalEntriesList] Error processing entries:', error);
+      setRenderError(error instanceof Error ? error : new Error('Unknown error processing entries'));
+      // Fallback to empty array
+      setLocalEntries([]);
     }
 
     return () => {
@@ -45,49 +57,72 @@ export default function JournalEntriesList({
     };
   }, [entries]);
 
+  // Track new entries for animation
   useEffect(() => {
     if (!componentMounted.current) return;
     
-    if (entries.length > 0) {
-      if (entries.length > prevEntriesLength) {
-        const newEntryIds = entries
-          .slice(0, entries.length - prevEntriesLength)
-          .map(entry => entry.id);
+    try {
+      if (Array.isArray(entries) && entries.length > 0) {
+        if (entries.length > prevEntriesLength) {
+          const newEntryIds: number[] = [];
           
-        setAnimatedEntryIds(prev => [...prev, ...newEntryIds]);
-        
-        setTimeout(() => {
-          if (componentMounted.current) {
-            setAnimatedEntryIds([]);
+          // Safely extract new entry IDs
+          for (let i = 0; i < Math.min(entries.length - prevEntriesLength, entries.length); i++) {
+            const entry = entries[i];
+            if (entry && typeof entry === 'object' && entry.id) {
+              newEntryIds.push(entry.id);
+            }
           }
-        }, 5000);
+            
+          if (newEntryIds.length > 0) {
+            setAnimatedEntryIds(prev => [...prev, ...newEntryIds]);
+            
+            setTimeout(() => {
+              if (componentMounted.current) {
+                setAnimatedEntryIds([]);
+              }
+            }, 5000);
+          }
+        }
+        
+        setPrevEntriesLength(entries.length);
+      } else {
+        setPrevEntriesLength(0);
       }
-      
-      setPrevEntriesLength(entries.length);
-    } else {
-      setPrevEntriesLength(0);
+    } catch (error) {
+      console.error('[JournalEntriesList] Error processing entry animations:', error);
+      setAnimatedEntryIds([]);
     }
   }, [entries.length, prevEntriesLength, entries]);
   
   const handleEntryDelete = async (entryId: number) => {
-    console.log(`[JournalEntriesList] Handling deletion of entry ${entryId}`);
-    
-    pendingDeletions.current.add(entryId);
-    
-    setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
-    
-    if (onDeleteEntry) {
-      setTimeout(async () => {
-        if (componentMounted.current) {
-          try {
-            await onDeleteEntry(entryId);
-            pendingDeletions.current.delete(entryId);
-          } catch (error) {
-            console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
-            pendingDeletions.current.delete(entryId);
+    try {
+      console.log(`[JournalEntriesList] Handling deletion of entry ${entryId}`);
+      
+      pendingDeletions.current.add(entryId);
+      
+      setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
+      
+      if (onDeleteEntry) {
+        setTimeout(async () => {
+          if (componentMounted.current) {
+            try {
+              await onDeleteEntry(entryId);
+              pendingDeletions.current.delete(entryId);
+            } catch (error) {
+              console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
+              pendingDeletions.current.delete(entryId);
+            }
           }
-        }
-      }, 100);
+        }, 100);
+      }
+    } catch (error) {
+      console.error(`[JournalEntriesList] Error in handleEntryDelete for entry ${entryId}:`, error);
+      
+      // Ensure we clean up even if there's an error
+      if (componentMounted.current) {
+        pendingDeletions.current.delete(entryId);
+      }
     }
   };
   
@@ -99,9 +134,33 @@ export default function JournalEntriesList({
     };
   }, []);
   
-  const showInitialLoading = loading && localEntries.length === 0 && !hasProcessingEntries;
+  // Safe calculation of loading states with fallbacks
+  const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !hasProcessingEntries;
+  
+  // Safe calculation for new user state
+  const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !processingEntries.length;
 
-  const isLikelyNewUser = !loading && localEntries.length === 0 && !processingEntries.length;
+  // If we have a render error, show a friendly message with retry option
+  if (renderError) {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-4 p-8 border border-red-200 rounded-lg bg-red-50 dark:bg-red-900/20">
+        <p className="text-red-700 dark:text-red-300">We had trouble displaying your entries</p>
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            setRenderError(null);
+            if (Array.isArray(entries)) {
+              setLocalEntries(entries.filter(entry => 
+                entry && typeof entry === 'object' && entry.id && !pendingDeletions.current.has(entry.id)
+              ));
+            }
+          }}
+        >
+          Try Again
+        </Button>
+      </div>
+    );
+  }
 
   if (showInitialLoading) {
     return (
@@ -115,6 +174,9 @@ export default function JournalEntriesList({
   if (isLikelyNewUser) {
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
+
+  // Ensure localEntries is actually an array before rendering
+  const safeLocalEntries = Array.isArray(localEntries) ? localEntries : [];
 
   return (
     <ErrorBoundary>
@@ -141,41 +203,51 @@ export default function JournalEntriesList({
               </div>
             )}
             
-            {localEntries.map((entry, index) => (
-              <ErrorBoundary key={entry.id}>
-                <motion.div
-                  key={entry.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ 
-                    opacity: 1, 
-                    y: 0,
-                    boxShadow: animatedEntryIds.includes(entry.id) ? 
-                      '0 0 0 2px rgba(var(--color-primary), 0.5)' : 
-                      'none'
-                  }}
-                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  transition={{ 
-                    duration: 0.3, 
-                    delay: index === 0 && localEntries.length > prevEntriesLength ? 0 : 0.05 * Math.min(index, 5) 
-                  }}
-                  className={animatedEntryIds.includes(entry.id) ? 
-                    "rounded-lg shadow-md relative overflow-hidden" : 
-                    "relative overflow-hidden"
-                  }
-                >
-                  <JournalEntryCard 
-                    entry={entry} 
-                    onDelete={handleEntryDelete} 
-                    isNew={animatedEntryIds.includes(entry.id)}
-                    isProcessing={processingEntries.some(id => id.includes(String(entry.id)))}
-                  />
-                </motion.div>
-              </ErrorBoundary>
-            ))}
+            {safeLocalEntries.length === 0 && !hasProcessingEntries && !loading ? (
+              <div className="flex flex-col items-center justify-center h-64 p-8 border border-dashed border-muted rounded-lg">
+                <p className="text-muted-foreground mb-4">No journal entries to display</p>
+                <Button onClick={onStartRecording} size="sm" className="gap-1">
+                  <Plus className="h-4 w-4" />
+                  Create Your First Entry
+                </Button>
+              </div>
+            ) : (
+              safeLocalEntries.map((entry, index) => (
+                <ErrorBoundary key={`entry-boundary-${entry.id}`}>
+                  <motion.div
+                    key={`entry-${entry.id}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ 
+                      opacity: 1, 
+                      y: 0,
+                      boxShadow: animatedEntryIds.includes(entry.id) ? 
+                        '0 0 0 2px rgba(var(--color-primary), 0.5)' : 
+                        'none'
+                    }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    transition={{ 
+                      duration: 0.3, 
+                      delay: index === 0 && safeLocalEntries.length > prevEntriesLength ? 0 : 0.05 * Math.min(index, 5) 
+                    }}
+                    className={animatedEntryIds.includes(entry.id) ? 
+                      "rounded-lg shadow-md relative overflow-hidden" : 
+                      "relative overflow-hidden"
+                    }
+                  >
+                    <JournalEntryCard 
+                      entry={entry} 
+                      onDelete={handleEntryDelete} 
+                      isNew={animatedEntryIds.includes(entry.id)}
+                      isProcessing={processingEntries.some(id => id.includes(String(entry.id)))}
+                    />
+                  </motion.div>
+                </ErrorBoundary>
+              ))
+            )}
           </div>
         </AnimatePresence>
         
-        {loading && localEntries.length > 0 && !hasProcessingEntries && (
+        {loading && safeLocalEntries.length > 0 && !hasProcessingEntries && (
           <div className="flex items-center justify-center h-16 mt-4">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>

@@ -45,6 +45,16 @@ export function JournalEntryCard({
   isNew = false, 
   isProcessing = false 
 }: JournalEntryCardProps) {
+  // Safe defaults for entry properties
+  const safeEntry = {
+    id: entry?.id || 0,
+    content: entry?.content || "Processing entry...",
+    created_at: entry?.created_at || new Date().toISOString(),
+    sentiment: entry?.sentiment || "",
+    master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
+    themes: Array.isArray(entry?.themes) ? entry.themes : []
+  };
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [highlightNew, setHighlightNew] = useState(isNew);
   const [deletionCompleted, setDeletionCompleted] = useState(false);
@@ -55,8 +65,8 @@ export function JournalEntryCard({
   const extractThemes = (): string[] => {
     try {
       // Fall back to empty arrays if properties are undefined
-      const masterThemes = Array.isArray(entry.master_themes) ? entry.master_themes : [];
-      const entryThemes = Array.isArray(entry.themes) ? entry.themes : [];
+      const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
+      const entryThemes = Array.isArray(safeEntry.themes) ? safeEntry.themes : [];
       
       // Filter out empty themes
       const filteredMasterThemes = masterThemes.filter(theme => 
@@ -82,14 +92,14 @@ export function JournalEntryCard({
   
   // Log when the component is mounted/unmounted
   useEffect(() => {
-    console.log(`[JournalEntryCard] Mounted entry ${entry.id}`);
+    console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id}`);
     mountedRef.current = true;
     
     return () => {
-      console.log(`[JournalEntryCard] Unmounted entry ${entry.id}`);
+      console.log(`[JournalEntryCard] Unmounted entry ${safeEntry.id}`);
       mountedRef.current = false;
     };
-  }, [entry.id]);
+  }, [safeEntry.id]);
 
   // Auto-expand new entries
   useEffect(() => {
@@ -113,13 +123,13 @@ export function JournalEntryCard({
   };
 
   const handleDelete = async () => {
-    if (!entry.id || deletionCompleted || deletionInProgress) {
-      console.log(`[JournalEntryCard] Skipping deletion for entry ${entry.id} - already completed or in progress`);
+    if (!safeEntry.id || deletionCompleted || deletionInProgress) {
+      console.log(`[JournalEntryCard] Skipping deletion for entry ${safeEntry.id} - already completed or in progress`);
       return;
     }
     
     try {
-      console.log(`[JournalEntryCard] Starting deletion of entry ${entry.id}`);
+      console.log(`[JournalEntryCard] Starting deletion of entry ${safeEntry.id}`);
       
       // Mark as in progress to prevent duplicate deletion attempts
       setDeletionInProgress(true);
@@ -127,21 +137,21 @@ export function JournalEntryCard({
       const { error } = await supabase
         .from('Journal Entries')
         .delete()
-        .eq('id', entry.id);
+        .eq('id', safeEntry.id);
         
       if (error) {
         throw error;
       }
       
-      console.log(`[JournalEntryCard] Successfully deleted entry ${entry.id} from database`);
+      console.log(`[JournalEntryCard] Successfully deleted entry ${safeEntry.id} from database`);
       
       // Mark as completed
       setDeletionCompleted(true);
       
       // Call parent handler with a small delay to ensure UI updates properly
       if (onDelete && mountedRef.current) {
-        console.log(`[JournalEntryCard] Calling onDelete for entry ${entry.id}`);
-        onDelete(entry.id);
+        console.log(`[JournalEntryCard] Calling onDelete for entry ${safeEntry.id}`);
+        onDelete(safeEntry.id);
       }
       
       toast.success('Journal entry deleted');
@@ -158,23 +168,23 @@ export function JournalEntryCard({
       
       // Still try to update the UI even if the database operation failed
       if (onDelete && mountedRef.current) {
-        console.log(`[JournalEntryCard] Calling onDelete after error for entry ${entry.id}`);
+        console.log(`[JournalEntryCard] Calling onDelete after error for entry ${safeEntry.id}`);
         setTimeout(() => {
           if (mountedRef.current) {
-            onDelete(entry.id);
+            onDelete(safeEntry.id);
           }
         }, 100);
       }
     }
   };
 
-  const createdAtFormatted = formatRelativeTime(entry.created_at);
+  const createdAtFormatted = formatRelativeTime(safeEntry.created_at);
   const initialThemes = extractThemes();
   
   // Check if an entry is still being processed
   const isEntryBeingProcessed = () => {
-    return (!entry.themes || entry.themes.length === 0) && 
-           (!entry.master_themes || entry.master_themes.length === 0) &&
+    return (!safeEntry.themes || safeEntry.themes.length === 0) && 
+           (!safeEntry.master_themes || safeEntry.master_themes.length === 0) &&
            isNew;
   };
 
@@ -190,14 +200,14 @@ export function JournalEntryCard({
           : {}}
         transition={{ duration: 3 }}
         className="journal-entry-card" 
-        data-entry-id={entry.id}
+        data-entry-id={safeEntry.id}
       >
         <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
           <div className="flex justify-between items-start p-3 md:p-4">
             <div>
               <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
               <div className="mt-1">
-                <SentimentEmoji sentiment={entry.sentiment} />
+                <SentimentEmoji sentiment={safeEntry.sentiment} />
               </div>
             </div>
 
@@ -210,17 +220,19 @@ export function JournalEntryCard({
           <div className="p-3 md:p-4">
             {isExpanded ? (
               <div>
-                <p className="text-xs md:text-sm text-foreground">{entry.content}</p>
-                <ThemeLoader 
-                  entryId={entry.id}
-                  initialThemes={initialThemes}
-                  content={entry.content}
-                  isProcessing={isProcessing || isEntryBeingProcessed()}
-                  isNew={isNew}
-                />
+                <p className="text-xs md:text-sm text-foreground">{safeEntry.content}</p>
+                <ErrorBoundary>
+                  <ThemeLoader 
+                    entryId={safeEntry.id}
+                    initialThemes={initialThemes}
+                    content={safeEntry.content}
+                    isProcessing={isProcessing || isEntryBeingProcessed()}
+                    isNew={isNew}
+                  />
+                </ErrorBoundary>
               </div>
             ) : (
-              <p className="text-xs md:text-sm text-foreground line-clamp-3">{entry.content}</p>
+              <p className="text-xs md:text-sm text-foreground line-clamp-3">{safeEntry.content}</p>
             )}
           </div>
         </Card>
