@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -155,7 +154,6 @@ export default function MobileChatInterface({
       console.log(`[Mobile] Loaded ${data?.length || 0} messages`);
       
       if (data && data.length > 0) {
-        // Fix the mapping to handle potential missing fields
         const formattedMessages = data.map((msg: any) => ({
           role: msg.sender === 'user' ? 'user' : 'assistant',
           content: msg.content,
