@@ -8,7 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
 
 export function ProfilePictureUpload() {
   const { user, updateUserProfile } = useAuth();
@@ -112,7 +111,7 @@ export function ProfilePictureUpload() {
   // Touch event handlers for image positioning
   useEffect(() => {
     const imageContainer = containerRef.current;
-    if (!imageContainer) return;
+    if (!imageContainer || !showImageEditor) return;
 
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
@@ -209,7 +208,7 @@ export function ProfilePictureUpload() {
       window.removeEventListener('mouseup', handleMouseUp);
       imageContainer.removeEventListener('wheel', handleWheel);
     };
-  }, [position, zoom]);
+  }, [position, zoom, showImageEditor]);
 
   return (
     <div className="flex flex-col items-center">
@@ -257,22 +256,40 @@ export function ProfilePictureUpload() {
             <div 
               ref={containerRef}
               className="relative h-64 w-64 rounded-full overflow-hidden border-2 border-muted cursor-grab touch-none"
+              style={{ touchAction: 'none' }}
             >
               {selectedImage && (
-                <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
                   <img
                     ref={imageRef}
                     src={selectedImage}
                     alt="Profile Preview"
-                    className="transition-all duration-100 ease-in-out"
+                    className="transition-transform duration-100 ease-in-out pointer-events-none"
                     style={{
                       transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
                       maxWidth: 'none',
                       maxHeight: 'none',
+                      willChange: 'transform'
                     }}
                   />
                 </div>
               )}
+            </div>
+            
+            <div className="w-full px-2">
+              <label htmlFor="zoom-slider" className="text-sm font-medium block mb-2 text-center">
+                Zoom: {zoom.toFixed(1)}x
+              </label>
+              <input 
+                id="zoom-slider"
+                type="range" 
+                min="0.5" 
+                max="3" 
+                step="0.1" 
+                value={zoom}
+                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
+              />
             </div>
             
             <p className="text-sm text-muted-foreground text-center">
