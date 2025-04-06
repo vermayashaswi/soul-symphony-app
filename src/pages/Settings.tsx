@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor } from 'lucide-react';
@@ -56,6 +55,7 @@ export default function Settings() {
   
   const [showFAQ, setShowFAQ] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
   
   const colorThemes = [
     { name: 'Default', color: 'bg-blue-500' },
@@ -63,7 +63,6 @@ export default function Settings() {
     { name: 'Soothing', color: 'bg-pink-200' },
     { name: 'Energy', color: 'bg-amber-400' },
     { name: 'Focus', color: 'bg-emerald-400' },
-    { name: 'Custom', color: 'custom' },
   ];
 
   useEffect(() => {
@@ -157,13 +156,6 @@ export default function Settings() {
     };
   };
 
-  const getCustomStyle = (themeName: string) => {
-    if (themeName === 'Custom') {
-      return { backgroundColor: customColor };
-    }
-    return {};
-  };
-  
   return (
     <div className="min-h-screen pb-20">
       <Navbar />
@@ -289,12 +281,11 @@ export default function Settings() {
                       <div
                         className={cn(
                           "h-10 w-10 rounded-full flex items-center justify-center border-2 transition-all",
-                          themeOption.color !== 'custom' ? themeOption.color : '',
+                          themeOption.color,
                           colorTheme === themeOption.name 
                             ? "border-foreground ring-2 ring-background ring-offset-2" 
                             : "border-muted"
                         )}
-                        style={themeOption.name === 'Custom' ? getCustomStyle('Custom') : {}}
                       >
                         {colorTheme === themeOption.name && (
                           <CheckIcon className="h-5 w-5 text-white" />
@@ -312,20 +303,17 @@ export default function Settings() {
                   ))}
                 </div>
 
-                {colorTheme === 'Custom' && (
-                  <div className="mt-6">
-                    <label className="text-sm font-medium mb-2 block text-foreground">
-                      Customize Your Color
-                    </label>
-                    <ColorPicker 
-                      value={customColor}
-                      onChange={(color) => {
-                        setCustomColor(color);
-                      }}
-                      className="mt-2"
-                    />
-                  </div>
-                )}
+                <div className="mt-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex items-center gap-2"
+                    onClick={() => setShowColorPicker(true)}
+                  >
+                    <Palette className="h-4 w-4" />
+                    Customize Your Color
+                  </Button>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -622,6 +610,39 @@ export default function Settings() {
               </div>
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={showColorPicker} onOpenChange={setShowColorPicker}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-theme-color">Customize Your Color</DialogTitle>
+            <DialogDescription>
+              Select a custom color for your app theme
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <ColorPicker
+              value={customColor}
+              onChange={(color) => {
+                setCustomColor(color);
+                setColorTheme('Custom');
+              }}
+            />
+          </div>
+          
+          <div className="flex justify-end mt-2">
+            <Button 
+              onClick={() => {
+                setShowColorPicker(false);
+                toast.success('Custom color applied');
+              }}
+              className="bg-theme-color hover:bg-theme-color/90"
+            >
+              Apply Color
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
