@@ -101,27 +101,15 @@ export function useJournalEntries(
       // Fetch journal entries
       const journalEntries = await fetchJournalEntries(userId, fetchTimeoutRef);
       
-      // If we got new entries after previously having none, show a success toast
-      if (entries.length === 0 && journalEntries.length > 0 && initialFetchDoneRef.current) {
-        toast.success('New journal entry added!');
-        consecutiveEmptyFetchesRef.current = 0;
-      } else if (journalEntries.length === 0) {
-        // Track consecutive empty fetches for new users
+      // Track consecutive empty fetches
+      if (journalEntries.length === 0) {
         consecutiveEmptyFetchesRef.current += 1;
       } else {
         consecutiveEmptyFetchesRef.current = 0;
       }
       
-      // Check if we have new entries compared to last fetch
-      const prevEntryIds = new Set(entries.map(e => e.id));
-      const newEntries = journalEntries.filter(e => !prevEntryIds.has(e.id));
-      
-      if (newEntries.length > 0 && initialFetchDoneRef.current && entries.length > 0) {
-        console.log(`[useJournalEntries] Found ${newEntries.length} new entries!`);
-        // New entry has been added after initial load
-        toast.success('New journal entry processed!');
-      }
-      
+      // Update entries state without showing toasts
+      // (Toast management is now handled in the Journal component)
       setEntries(journalEntries);
       setLastFetchTime(new Date());
       setFetchCount(prev => prev + 1);

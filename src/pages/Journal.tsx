@@ -23,6 +23,8 @@ const Journal = () => {
   const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
   const [showRetryButton, setShowRetryButton] = useState(false);
   const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
+  // New state to track entries we've already shown notifications for
+  const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
   
   const { entries, loading, fetchEntries } = useJournalEntries(
     user?.id,
@@ -47,6 +49,34 @@ const Journal = () => {
       });
     };
   }, [toastIds]);
+
+  // Check for new entries that we haven't shown notifications for
+  useEffect(() => {
+    // Skip if we're loading or if we don't have entries
+    if (loading || entries.length === 0) return;
+    
+    // Find new entries that we haven't notified about
+    const newEntries = entries.filter(entry => 
+      !notifiedEntryIds.has(entry.id) && 
+      !processingEntries.some(tempId => tempId === entry.id.toString())
+    );
+    
+    // If we have new entries and we've already loaded entries before
+    if (newEntries.length > 0 && notifiedEntryIds.size > 0) {
+      // Show a notification for new entries only once
+      toast.success('Journal entry processed!');
+      
+      // Add these entries to our notified set
+      const updatedNotifiedIds = new Set(notifiedEntryIds);
+      newEntries.forEach(entry => updatedNotifiedIds.add(entry.id));
+      setNotifiedEntryIds(updatedNotifiedIds);
+    } 
+    else if (notifiedEntryIds.size === 0 && entries.length > 0) {
+      // Initialize our set with existing entries the first time
+      const initialIds = new Set(entries.map(entry => entry.id));
+      setNotifiedEntryIds(initialIds);
+    }
+  }, [entries, loading, notifiedEntryIds, processingEntries]);
 
   const checkUserProfile = async (userId: string) => {
     try {
@@ -130,44 +160,40 @@ const Journal = () => {
         // Add tempId to processing entries
         setProcessingEntries(prev => [...prev, tempId]);
         
-        // Store the toast ID with the tempId - ensure toastId is treated as string
+        // Store the toast ID with the tempId
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         
         // Refresh entries list immediately to show processing indicator
         setRefreshKey(prev => prev + 1);
         fetchEntries();
         
-        // Set up a polling mechanism to check for new entries
-        const checkInterval = setInterval(() => {
-          console.log('[Journal] Checking for processed entries...');
-          fetchEntries();
-          
-          // After 15 seconds, stop polling regardless (reduced from 30 seconds)
-          setTimeout(() => {
-            clearInterval(checkInterval);
-            
-            // Clear the processing entry
-            setProcessingEntries(prev => prev.filter(id => id !== tempId));
-            
-            // Show success message if toast is still showing
-            if (toastIds[tempId]) {
-              toast.success('Journal entry processed!', { id: toastIds[tempId] });
-              
-              // Remove the toast ID from our tracking
-              setToastIds(prev => {
-                const newToastIds = { ...prev };
-                delete newToastIds[tempId];
-                return newToastIds;
-              });
-            }
-            
-            // Perform final refresh
-            setRefreshKey(prev => prev + 1);
-            fetchEntries();
-          }, 15000);
-        }, 3000); // Poll every 3 seconds
+        // Set up polling but only do one success notification
+        let hasNotifiedSuccess = false;
         
-        // Clear after 5 seconds for the first check
+        // Start a timeout to check for completion
+        const checkTimeout = setTimeout(() => {
+          // Clear the processing entry
+          setProcessingEntries(prev => prev.filter(id => id !== tempId));
+          
+          // Update toast to success only if we haven't already done so
+          if (toastIds[tempId] && !hasNotifiedSuccess) {
+            toast.success('Journal entry processed!', { id: toastIds[tempId] });
+            hasNotifiedSuccess = true;
+            
+            // Remove the toast ID from our tracking
+            setToastIds(prev => {
+              const newToastIds = { ...prev };
+              delete newToastIds[tempId];
+              return newToastIds;
+            });
+          }
+          
+          // Do a final refresh
+          setRefreshKey(prev => prev + 1);
+          fetchEntries();
+        }, 15000);
+        
+        // Do an initial check after 5 seconds
         setTimeout(() => {
           setRefreshKey(prev => prev + 1);
           fetchEntries();
@@ -205,6 +231,13 @@ const Journal = () => {
         });
         
         return [];
+      });
+      
+      // Also remove the entry from our notified set
+      setNotifiedEntryIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(entryId);
+        return updated;
       });
       
       setRefreshKey(prev => prev + 1);
