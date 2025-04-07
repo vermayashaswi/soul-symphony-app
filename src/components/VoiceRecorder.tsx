@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,6 +34,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [playbackAudioLevel, setPlaybackAudioLevel] = useState(0);
   const [lastPlaybackTime, setLastPlaybackTime] = useState(0);
   const [localRipples, setLocalRipples] = useState<number[]>([]);
+  const [actualDuration, setActualDuration] = useState<number | null>(null);
   const playbackLevelInterval = useRef<number | null>(null);
   const saveCompleteRef = useRef(false);
   const savingInProgressRef = useRef(false);
@@ -55,7 +55,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     resetRecording
   } = useRecordRTCRecorder({ 
     noiseReduction: false,
-    maxDuration: 300
+    maxDuration: 300,
+    onAudioLevelChange: (level) => {
+      console.log('[VoiceRecorder] Audio level update:', level);
+    }
   });
   
   const {
@@ -99,9 +102,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           ));
           
           setPlaybackAudioLevel(newLevel);
+          console.log('[VoiceRecorder] Playback audio level:', newLevel);
           
           // Occasionally add a ripple for visual interest
-          if (Math.random() < 0.03 && newLevel > 40) {
+          if (Math.random() < 0.05 && newLevel > 40) {
             setLocalRipples(prev => [...prev, Date.now()]);
           }
         }
@@ -117,7 +121,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   });
 
-  // Clear toasts when component mounts
   useEffect(() => {
     const clearToastsOnMount = async () => {
       await ensureAllToastsCleared();
@@ -157,15 +160,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   }, [isRecording, audioBlob]);
   
-  // When we get an audio blob, prepare audio to ensure duration is loaded
   useEffect(() => {
     if (audioBlob && !audioPrepared) {
       console.log('[VoiceRecorder] New audio blob detected, preparing audio...');
       prepareAudio().then(duration => {
         console.log('[VoiceRecorder] Audio prepared with duration:', duration);
         setAudioPrepared(true);
+        setActualDuration(duration);
         
-        // Update debug info with actual duration
         if (updateDebugInfo) {
           updateDebugInfo({
             status: 'Audio Prepared',
@@ -184,11 +186,15 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       isRecording,
       hasPermission,
       audioDuration,
+      actualDuration,
+      audioLevel,
+      playbackAudioLevel,
       hasSaved,
       hasPlayedOnce,
       audioPrepared,
       waitingForClear,
-      toastsCleared
+      toastsCleared,
+      currentPlaybackTime
     });
     
     if (updateDebugInfo) {
@@ -196,10 +202,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         status: isRecording 
           ? 'Recording' 
           : (isPlaying ? 'Playing' : (audioBlob ? 'Recorded' : 'No Recording')),
-        duration: audioDuration || recordingTime
+        duration: actualDuration || audioDuration || recordingTime
       });
     }
-  }, [isProcessing, audioBlob, isRecording, isPlaying, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
+  }, [isProcessing, audioBlob, isRecording, isPlaying, hasPermission, audioDuration, actualDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo, audioLevel, playbackAudioLevel, currentPlaybackTime]);
   
   useEffect(() => {
     return () => {
@@ -209,7 +215,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         console.warn('[VoiceRecorder] Component unmounted during processing - potential source of UI errors');
       }
       
-      // Clear all toasts when component unmounts to prevent lingering toasts
       clearAllToasts();
       
       if (playbackLevelInterval.current) {
@@ -234,18 +239,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.log('[VoiceRecorder] Starting save process');
       savingInProgressRef.current = true;
       
-      // Set waiting state to update UI
       setWaitingForClear(true);
       
-      // Aggressively clear all toasts to prevent UI interference (multiple attempts)
-      console.log('[VoiceRecorder] Ensuring all toasts are cleared before processing');
       await ensureAllToastsCleared();
       
-      // Force clear DOM if not attempted yet
       if (!domClearAttemptedRef.current) {
         domClearAttemptedRef.current = true;
         try {
-          // Find and remove any lingering toast elements
           const toastElements = document.querySelectorAll('[data-sonner-toast]');
           if (toastElements.length > 0) {
             console.log(`[VoiceRecorder] Found ${toastElements.length} lingering toasts, removing manually`);
@@ -260,7 +260,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         }
       }
       
-      // Final safety check - wait a bit more to ensure UI is clean
       await new Promise(resolve => setTimeout(resolve, 100));
       
       setIsProcessing(true);
@@ -269,12 +268,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       setWaitingForClear(false);
       setToastsCleared(true);
       
-      // If recording hasn't been played, ensure audio is prepared
       if (!hasPlayedOnce || audioDuration === 0) {
         console.log('[VoiceRecorder] Recording not played yet, preparing audio...');
         const duration = await prepareAudio();
         console.log('[VoiceRecorder] Audio prepared with duration:', duration);
         setAudioPrepared(true);
+        setActualDuration(duration);
         
         if (duration < 0.5) {
           setRecordingError("Recording is too short. Please try again.");
@@ -297,15 +296,15 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         type: normalizedBlob.type,
         size: normalizedBlob.size,
         duration: audioDuration,
+        actualDuration: actualDuration,
         recordingTime: recordingTime,
         hasPlayedOnce: hasPlayedOnce,
         audioPrepared: audioPrepared
       });
       
-      // If the recording hasn't been played yet, we'll initialize audioDuration 
-      // based on recording time to ensure proper UI transitions
+      const finalDuration = actualDuration || audioDuration || (recordingTime / 1000);
+      
       if (!hasPlayedOnce && audioDuration === 0 && recordingTime > 0) {
-        // Convert recordingTime from milliseconds to seconds for consistency with audioDuration
         const estimatedDuration = recordingTime / 1000;
         console.log(`[VoiceRecorder] Recording not played yet, estimating duration as ${estimatedDuration}s`);
       }
@@ -315,8 +314,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           console.log('[VoiceRecorder] Calling recording completion callback');
           saveCompleteRef.current = false;
           
-          // Don't create any new toasts here - ensure clean UI state
-          await onRecordingComplete(normalizedBlob);
+          const tempId = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+          
+          await onRecordingComplete(normalizedBlob, tempId);
           
           saveCompleteRef.current = true;
           savingInProgressRef.current = false;
@@ -326,7 +326,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           console.error('[VoiceRecorder] Error in recording callback:', error);
           setRecordingError(error?.message || "An unexpected error occurred");
           
-          // Use a setTimeout to ensure we don't create toasts too quickly after clearing
           setTimeout(() => {
             toast.error("Error saving recording", {
               id: 'error-toast',
@@ -343,7 +342,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.error('[VoiceRecorder] Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
       
-      // Use a setTimeout to ensure we don't create toasts too quickly after clearing
       setTimeout(() => {
         toast.error("Error saving recording", {
           id: 'error-toast',
@@ -358,7 +356,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   };
 
   const handleRestart = async () => {
-    // Clear all toasts when restarting to avoid UI conflicts
     await ensureAllToastsCleared();
     
     resetRecording();
@@ -371,6 +368,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     setAudioPrepared(false);
     setPlaybackAudioLevel(0);
     setLocalRipples([]);
+    setActualDuration(null);
     saveCompleteRef.current = false;
     savingInProgressRef.current = false;
     domClearAttemptedRef.current = false;
@@ -380,7 +378,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       playbackLevelInterval.current = null;
     }
     
-    // Wait a bit before showing any new toasts
     await new Promise(resolve => setTimeout(resolve, 300));
     
     toast.info("Starting a new recording", {
@@ -388,7 +385,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     });
   };
 
-  // Cleanup on unmount to prevent memory leaks
   useEffect(() => {
     return () => {
       if (playbackLevelInterval.current) {
@@ -413,7 +409,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         )}
         
         <div className="relative z-10 flex flex-col items-center justify-start w-full h-full pt-20">
-          {/* Visualizer for playback */}
           {(isPlaying && audioBlob) && (
             <div className="absolute top-1/3 left-0 right-0 z-0 w-full">
               <RecordingVisualizer 
@@ -434,7 +429,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               hasPermission={hasPermission}
               onRecordingStart={async () => {
                 console.log('[VoiceRecorder] Starting new recording');
-                await ensureAllToastsCleared(); // Clear all toasts before starting a new recording
+                await ensureAllToastsCleared();
                 startRecording();
               }}
               onRecordingStop={() => {
@@ -447,7 +442,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               }}
               audioLevel={isRecording ? audioLevel : (isPlaying ? playbackAudioLevel : 0)}
               showAnimation={false}
-              disabled={!isRecording && audioBlob !== null} // Disable mic button after recording
+              disabled={!isRecording && audioBlob !== null}
             />
           </div>
 
@@ -464,10 +459,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                   isPlaying={isPlaying}
                   isProcessing={isProcessing || waitingForClear}
                   playbackProgress={playbackProgress}
-                  audioDuration={audioDuration}
+                  audioDuration={actualDuration || audioDuration || (recordingTime / 1000)}
                   onTogglePlayback={async () => {
                     console.log('[VoiceRecorder] Toggle playback clicked');
-                    // Clear toasts before playing to ensure clean UI state
                     await ensureAllToastsCleared();
                     togglePlayback();
                   }}

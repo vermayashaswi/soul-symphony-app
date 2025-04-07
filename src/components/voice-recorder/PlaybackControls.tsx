@@ -41,8 +41,24 @@ export function PlaybackControls({
     setCurrentTime(timeInSeconds);
   }, [playbackProgress, audioDuration]);
   
-  const formattedProgress = formatTime(Math.floor(currentTime * 1000));
-  const formattedDuration = formatTime(Math.floor(audioDuration * 1000));
+  // Safely convert time to milliseconds for formatting
+  const timeToMilliseconds = (timeInSeconds: number) => {
+    return Math.floor(timeInSeconds * 1000);
+  };
+  
+  const formattedProgress = formatTime(timeToMilliseconds(currentTime));
+  const formattedDuration = formatTime(timeToMilliseconds(audioDuration || 0));
+  
+  // Log important timing values for debugging
+  useEffect(() => {
+    console.log('[PlaybackControls] Time values:', {
+      playbackProgress,
+      audioDuration,
+      currentTime,
+      formattedProgress,
+      formattedDuration
+    });
+  }, [playbackProgress, audioDuration, currentTime]);
 
   // Function to ensure all toasts are completely cleared
   const handleSaveClick = async () => {

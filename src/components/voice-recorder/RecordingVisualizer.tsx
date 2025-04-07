@@ -32,6 +32,16 @@ export function RecordingVisualizer({
   const lastUpdateRef = useRef<number>(0);
   const prevLevelsRef = useRef<number[]>([]);
   
+  // Log important props to debug
+  useEffect(() => {
+    console.log('[RecordingVisualizer] Render with props:', { 
+      isRecording, 
+      isPlaying, 
+      audioLevel, 
+      rippleCount: ripples?.length || 0 
+    });
+  }, [isRecording, isPlaying, audioLevel, ripples?.length]);
+  
   // Initialize previous levels array on mount
   useEffect(() => {
     prevLevelsRef.current = Array(actualBarCount).fill(0);
@@ -47,7 +57,7 @@ export function RecordingVisualizer({
   const generateBars = () => {
     const bars = [];
     const maxHeight = typeof height === 'number' ? height : 100;
-    const scaledLevel = audioLevel / 100;
+    const scaledLevel = Math.max(5, audioLevel) / 100; // Ensure some minimum level for visibility
     
     // Save the current audioLevel for animation smoothing
     if (isPlaying || isRecording) {
