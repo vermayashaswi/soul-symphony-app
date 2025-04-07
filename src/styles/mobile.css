@@ -388,6 +388,9 @@
     -webkit-touch-callout: none !important;
     -webkit-tap-highlight-color: transparent !important;
   }
+
+  /* Remove the chat thread buttons styling as they're no longer used */
+  
 }
 
 /* Dark mode support for sticky elements */
