@@ -129,6 +129,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     return sentimentData.filter(item => item.date >= fromDate && item.date <= toDate);
   }, [sentimentData, timeRange]);
 
+  // For the month view, we need ALL entries to show in the calendar
   const allSentimentData = React.useMemo(() => {
     return sentimentData;
   }, [sentimentData]);
@@ -136,7 +137,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const dailySentiment = React.useMemo(() => {
     const sentimentMap = new Map<string, { total: number, count: number }>();
     
-    allSentimentData.forEach(item => {
+    // Use the appropriate dataset based on the timeRange and view
+    const dataToProcess = (timeRange === 'month' && viewMode === 'calendar') 
+      ? allSentimentData 
+      : filteredData;
+    
+    dataToProcess.forEach(item => {
       const dateKey = format(item.date, 'yyyy-MM-dd');
       if (!sentimentMap.has(dateKey)) {
         sentimentMap.set(dateKey, { total: 0, count: 0 });
@@ -152,7 +158,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     });
     
     return result;
-  }, [allSentimentData]);
+  }, [filteredData, allSentimentData, timeRange, viewMode]);
 
   const sentimentInfo = React.useMemo(() => {
     const infoMap = new Map<string, {
@@ -234,7 +240,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     if (timeRange === 'year') {
       const monthlyData = new Map<number, { total: number, count: number }>();
       
-      allSentimentData.forEach(item => {
+      filteredData.forEach(item => {
         const month = item.date.getMonth();
         if (!monthlyData.has(month)) {
           monthlyData.set(month, { total: 0, count: 0 });
@@ -256,7 +262,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     }
     
     return [];
-  }, [filteredData, timeRange, dailySentiment, allSentimentData]);
+  }, [filteredData, timeRange, dailySentiment]);
 
   const renderTodayView = () => {
     const today = new Date();
@@ -311,6 +317,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
 
   const navigateToNextWeek = () => {
     const nextWeekStart = addWeeks(currentWeekStart, 1);
+    // Only allow navigating up to the current week
     if (nextWeekStart <= startOfWeek(new Date(), { weekStartsOn: 1 })) {
       setCurrentWeekStart(nextWeekStart);
     }
@@ -424,7 +431,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             day_today: "bg-primary/5 text-primary font-medium",
             day_selected: "!bg-transparent !text-foreground",
             day_disabled: "text-muted-foreground opacity-50",
-            day_outside: "text-muted-foreground opacity-50 pointer-events-none", // Disable outside dates
+            day_outside: "text-muted-foreground opacity-50",
             day_range_middle: "aria-selected:bg-transparent",
             day_hidden: "invisible",
             caption: "px-4 py-3 text-lg font-semibold",
@@ -456,11 +463,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               
               const isToday = isSameDay(date, new Date());
               const isSameMonthValue = isSameMonth(date, currentMonth);
-              
-              // Skip rendering content for dates outside the current month
-              if (!isSameMonthValue) {
-                return <div {...props} className="invisible" />;
-              }
               
               return (
                 <div

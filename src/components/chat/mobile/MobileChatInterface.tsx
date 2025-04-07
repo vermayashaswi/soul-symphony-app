@@ -1,15 +1,8 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { 
-  Menu, 
-  X, 
-  Brain, 
-  BarChart2, 
-  Search, 
-  Lightbulb,
-  Trash
-} from "lucide-react";
+import { Menu, X, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage } from "@/services/chatService";
@@ -20,16 +13,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -73,27 +56,18 @@ export default function MobileChatInterface({
   const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const suggestionQuestions = [
     {
-      text: "What are the top 3 reasons that make me happy?",
-      icon: <Lightbulb className="h-4 w-4 flex-shrink-0 mr-1" />
+      text: "How did I feel yesterday?",
+      icon: <BarChart2 className="h-4 w-4 mr-1" />
     },
     {
-      text: "What time of the day do i usually journal?",
-      icon: <Search className="h-4 w-4 flex-shrink-0 mr-1" />
+      text: "What makes me happy?", 
+      icon: <Lightbulb className="h-4 w-4 mr-1" />
     },
     {
-      text: "Top 3 issues in my life?",
-      icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-1" />
-    },
-    {
-      text: "Suggest me ways to improve my negative traits.",
-      icon: <Brain className="h-4 w-4 flex-shrink-0 mr-1" />
-    },
-    {
-      text: "Rate my top positive emotions out of 10.",
-      icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-1" />
+      text: "Find entries about work",
+      icon: <Search className="h-4 w-4 mr-1" />
     }
   ];
   const { toast } = useToast();
@@ -101,9 +75,6 @@ export default function MobileChatInterface({
   const [sheetOpen, setSheetOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [currentThreadTitle, setCurrentThreadTitle] = useState("");
 
   useEffect(() => {
     if (propThreadId) {
@@ -131,37 +102,6 @@ export default function MobileChatInterface({
     scrollToBottom();
   }, [messages, loading]);
 
-  useEffect(() => {
-    if (currentThreadId && user?.id && !initialLoadComplete) {
-      setInitialLoadComplete(true);
-      loadThreadMessages(currentThreadId);
-    }
-  }, [currentThreadId, user?.id, initialLoadComplete]);
-
-  useEffect(() => {
-    if (currentThreadId) {
-      fetchThreadTitle(currentThreadId);
-    }
-  }, [currentThreadId]);
-
-  const fetchThreadTitle = async (threadId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('chat_threads')
-        .select('title')
-        .eq('id', threadId)
-        .single();
-        
-      if (error) throw error;
-      
-      if (data) {
-        setCurrentThreadTitle(data.title);
-      }
-    } catch (error) {
-      console.error("[Mobile] Error fetching thread title:", error);
-    }
-  };
-
   const scrollToBottom = () => {
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -173,8 +113,6 @@ export default function MobileChatInterface({
     
     try {
       console.log(`[Mobile] Loading messages for thread ${threadId}`);
-      setLoading(true);
-      
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
@@ -203,17 +141,8 @@ export default function MobileChatInterface({
         setMessages([]);
         setShowSuggestions(true);
       }
-      
-      setHasLoadedMessages(true);
     } catch (error) {
       console.error("[Mobile] Error loading messages:", error);
-      toast({
-        title: "Error",
-        description: "Unable to load conversation history",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -231,11 +160,6 @@ export default function MobileChatInterface({
     let threadId = currentThreadId;
     let isFirstMessage = false;
     
-    setMessages(prev => [...prev, { role: 'user', content: message }]);
-    scrollToBottom();
-    setLoading(true);
-    setProcessingStage("Analyzing your question...");
-    
     if (!threadId) {
       try {
         if (onCreateNewThread) {
@@ -244,7 +168,6 @@ export default function MobileChatInterface({
             throw new Error("Failed to create new thread");
           }
           threadId = newThreadId;
-          setCurrentThreadId(newThreadId);
         } else {
           const newThreadId = uuidv4();
           const { error } = await supabase
@@ -282,6 +205,10 @@ export default function MobileChatInterface({
       isFirstMessage = !error && count === 0;
     }
     
+    setMessages(prev => [...prev, { role: 'user', content: message }]);
+    setLoading(true);
+    setProcessingStage("Analyzing your question...");
+    
     try {
       const { error: msgError } = await supabase
         .from('chat_messages')
@@ -292,127 +219,114 @@ export default function MobileChatInterface({
         });
         
       if (msgError) {
-        console.error("[Mobile] Error saving user message:", msgError);
-        // Don't return here - continue processing
-      } else {
-        window.dispatchEvent(
-          new CustomEvent('messageCreated', { 
-            detail: { 
-              threadId, 
-              isFirstMessage,
-              content: message
-            } 
-          })
-        );
+        throw msgError;
       }
-    } catch (saveError) {
-      console.error("[Mobile] Error saving user message:", saveError);
-      // Continue processing anyway
-    }
-    
-    setProcessingStage("Analyzing patterns in your journal...");
-    const queryTypes = analyzeQueryTypes(message);
-    
-    const analysisDetails = {
-      isEmotionFocused: queryTypes.isEmotionFocused,
-      isQuantitative: queryTypes.isQuantitative,
-      isWhyQuestion: queryTypes.isWhyQuestion,
-      isTemporalQuery: queryTypes.isTemporalQuery,
-      timeRange: queryTypes.timeRange.periodName,
-      emotion: queryTypes.emotion || 'none detected'
-    };
-    
-    console.log("[Mobile] Query analysis result:", queryTypes);
-    
-    setProcessingStage("Searching for insights...");
-    const response = await processChatMessage(
-      message, 
-      user.id, 
-      queryTypes, 
-      threadId,
-      false
-    );
-    
-    console.log("[Mobile] Response received:", {
-      role: response.role,
-      hasReferences: !!response.references?.length,
-      refCount: response.references?.length || 0,
-      hasAnalysis: !!response.analysis,
-      hasNumericResult: response.hasNumericResult,
-      errorState: response.role === 'error'
-    });
-    
-    const uiResponse: UIChatMessage = {
-      role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
-      content: response.content,
-      ...(response.references && { references: response.references }),
-      ...(response.analysis && { analysis: response.analysis }),
-      ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
-    };
-    
-    if (response.role === 'error' || response.content.includes("issue retrieving")) {
-      console.error("[Mobile] Received error response:", response.content);
-    }
-    
-    let savedAssistantMessage = false;
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    while (!savedAssistantMessage && retryCount < maxRetries) {
-      try {
-        const { error: storeError } = await supabase
-          .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            content: response.content,
-            sender: 'assistant',
-            reference_entries: response.references || null,
-            has_numeric_result: response.hasNumericResult || false,
-            analysis_data: response.analysis || null
-          });
-            
-        if (storeError) {
-          console.error(`[Mobile] Error storing assistant response (attempt ${retryCount + 1}):`, storeError);
-          retryCount++;
-          if (retryCount >= maxRetries) {
-            toast({
-              title: "Warning",
-              description: "Response shown but might not persist after refresh.",
-              variant: "destructive"
-            });
-          } else {
-            // Wait before retry
-            await new Promise(resolve => setTimeout(resolve, 1000)); 
-          }
-        } else {
-          savedAssistantMessage = true;
-        }
-      } catch (saveError) {
-        console.error(`[Mobile] Error saving assistant message (attempt ${retryCount + 1}):`, saveError);
-        retryCount++;
+      
+      window.dispatchEvent(
+        new CustomEvent('messageCreated', { 
+          detail: { 
+            threadId, 
+            isFirstMessage,
+            content: message
+          } 
+        })
+      );
+      
+      console.log("[Mobile] Performing comprehensive query analysis for:", message);
+      setProcessingStage("Analyzing patterns in your journal...");
+      const queryTypes = analyzeQueryTypes(message);
+      
+      const analysisDetails = {
+        isEmotionFocused: queryTypes.isEmotionFocused,
+        isQuantitative: queryTypes.isQuantitative,
+        isWhyQuestion: queryTypes.isWhyQuestion,
+        isTemporalQuery: queryTypes.isTemporalQuery,
+        timeRange: queryTypes.timeRange.periodName,
+        emotion: queryTypes.emotion || 'none detected'
+      };
+      
+      console.log("[Mobile] Query analysis result:", queryTypes);
+      
+      setProcessingStage("Searching for insights...");
+      const response = await processChatMessage(
+        message, 
+        user.id, 
+        queryTypes, 
+        threadId,
+        false
+      );
+      
+      console.log("[Mobile] Response received:", {
+        role: response.role,
+        hasReferences: !!response.references?.length,
+        refCount: response.references?.length || 0,
+        hasAnalysis: !!response.analysis,
+        hasNumericResult: response.hasNumericResult,
+        errorState: response.role === 'error'
+      });
+      
+      const uiResponse: UIChatMessage = {
+        role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
+        content: response.content,
+        ...(response.references && { references: response.references }),
+        ...(response.analysis && { analysis: response.analysis }),
+        ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
+      };
+      
+      if (response.role === 'error' || response.content.includes("issue retrieving")) {
+        console.error("[Mobile] Received error response:", response.content);
       }
-    }
-    
-    if (messages.length === 0) {
-      const truncatedTitle = message.length > 30 
-        ? message.substring(0, 30) + "..." 
-        : message;
+      
+      const { error: storeError } = await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: threadId,
+          content: response.content,
+          sender: 'assistant',
+          reference_entries: response.references || null,
+          has_numeric_result: response.hasNumericResult || false,
+          analysis_data: response.analysis || null
+        });
         
+      if (storeError) {
+        console.error("[Mobile] Error storing assistant response:", storeError);
+      }
+      
+      if (messages.length === 0) {
+        const truncatedTitle = message.length > 30 
+          ? message.substring(0, 30) + "..." 
+          : message;
+          
+        await supabase
+          .from('chat_threads')
+          .update({ 
+            title: truncatedTitle,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', threadId);
+      }
+      
       await supabase
         .from('chat_threads')
-        .update({ 
-          title: truncatedTitle,
-          updated_at: new Date().toISOString()
-        })
+        .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
+      
+      setMessages(prev => [...prev, uiResponse]);
+    } catch (error: any) {
+      console.error("[Mobile] Error sending message:", error);
+      
+      setMessages(prev => [
+        ...prev, 
+        { 
+          role: 'assistant', 
+          content: "I'm having trouble processing your request. Please try again later. " + 
+                   (error?.message ? `Error: ${error.message}` : "")
+        }
+      ]);
+    } finally {
+      setLoading(false);
+      setProcessingStage(null);
     }
-    
-    await supabase
-      .from('chat_threads')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', threadId);
-    
-    setMessages(prev => [...prev, uiResponse]);
   };
 
   const handleSelectThread = (threadId: string) => {
@@ -432,139 +346,6 @@ export default function MobileChatInterface({
       return newThreadId;
     }
     return null;
-  };
-  
-  const handleDeleteThread = async () => {
-    if (!currentThreadId) return;
-    
-    try {
-      const { data: allThreads, error: fetchError } = await supabase
-        .from('chat_threads')
-        .select('id, title')
-        .eq('user_id', user?.id)
-        .order('updated_at', { ascending: false });
-        
-      if (fetchError) throw fetchError;
-      
-      const otherThreads = allThreads ? allThreads.filter(thread => thread.id !== currentThreadId) : [];
-      
-      const { error: messagesError } = await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('thread_id', currentThreadId);
-        
-      if (messagesError) throw messagesError;
-      
-      const { error: threadError } = await supabase
-        .from('chat_threads')
-        .delete()
-        .eq('id', currentThreadId);
-        
-      if (threadError) throw threadError;
-      
-      let targetThreadId = null;
-      let emptyThreadFound = false;
-      
-      if (otherThreads.length > 0) {
-        for (const thread of otherThreads) {
-          const { count, error: countError } = await supabase
-            .from('chat_messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('thread_id', thread.id);
-            
-          if (!countError && count === 0) {
-            targetThreadId = thread.id;
-            emptyThreadFound = true;
-            break;
-          }
-          
-          if (thread.title === "New Conversation") {
-            targetThreadId = thread.id;
-            break;
-          }
-        }
-        
-        if (!emptyThreadFound && targetThreadId === null) {
-          targetThreadId = otherThreads[0].id;
-        }
-      }
-      
-      setMessages([]);
-      setIsDeleteDialogOpen(false);
-      setShowSuggestions(true);
-      
-      toast({
-        title: "Thread deleted",
-        description: "The conversation has been deleted successfully.",
-      });
-      
-      if (!targetThreadId) {
-        if (onCreateNewThread) {
-          const newThreadId = await onCreateNewThread();
-          if (newThreadId) {
-            setCurrentThreadId(newThreadId);
-            localStorage.setItem("lastActiveChatThreadId", newThreadId);
-            window.dispatchEvent(
-              new CustomEvent('threadSelected', { 
-                detail: { threadId: newThreadId } 
-              })
-            );
-          }
-        } else {
-          const newThreadId = uuidv4();
-          if (user?.id) {
-            const { error } = await supabase
-              .from('chat_threads')
-              .insert({
-                id: newThreadId,
-                user_id: user.id,
-                title: "New Conversation",
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              });
-            
-            if (!error) {
-              setCurrentThreadId(newThreadId);
-              localStorage.setItem("lastActiveChatThreadId", newThreadId);
-              window.dispatchEvent(
-                new CustomEvent('threadSelected', { 
-                  detail: { threadId: newThreadId } 
-                })
-              );
-            }
-          }
-        }
-      } else {
-        setCurrentThreadId(targetThreadId);
-        localStorage.setItem("lastActiveChatThreadId", targetThreadId);
-        
-        if (onSelectThread) {
-          onSelectThread(targetThreadId);
-        } else {
-          window.dispatchEvent(
-            new CustomEvent('threadSelected', { 
-              detail: { threadId: targetThreadId } 
-            })
-          );
-          
-          loadThreadMessages(targetThreadId);
-        }
-      }
-      
-      window.dispatchEvent(
-        new CustomEvent('threadDeleted', { 
-          detail: { threadId: currentThreadId } 
-        })
-      );
-    } catch (error) {
-      console.error("[Mobile] Error deleting thread:", error);
-      
-      toast({
-        title: "Error",
-        description: "Failed to delete the conversation.",
-        variant: "destructive"
-      });
-    }
   };
 
   return (
@@ -597,17 +378,6 @@ export default function MobileChatInterface({
           </SheetContent>
         </Sheet>
         <h2 className="text-lg font-semibold flex-1 text-center">Roha</h2>
-        {messages.length > 0 && currentThreadId && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-destructive hover:bg-destructive/10"
-            onClick={() => setIsDeleteDialogOpen(true)}
-          >
-            <Trash className="h-5 w-5" />
-            <span className="sr-only">Delete</span>
-          </Button>
-        )}
       </div>
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
@@ -631,13 +401,11 @@ export default function MobileChatInterface({
                       key={index}
                       variant="outline"
                       size="sm"
-                      className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
+                      className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted"
                       onClick={() => handleSendMessage(question.text)}
                     >
-                      <div className="flex gap-1 items-start w-full overflow-hidden">
-                        <span className="flex-shrink-0">{question.icon}</span>
-                        <span className="break-words overflow-hidden flex-1">{question.text}</span>
-                      </div>
+                      {question.icon}
+                      <span>{question.text}</span>
                     </Button>
                   ))}
                 </motion.div>
@@ -673,25 +441,6 @@ export default function MobileChatInterface({
           userId={userId || user?.id}
         />
       </div>
-      
-      <AlertDialog 
-        open={isDeleteDialogOpen} 
-        onOpenChange={setIsDeleteDialogOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete conversation</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this conversation and all its messages.
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDeleteThread}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -27,44 +26,7 @@ serve(async (req) => {
   }
 
   try {
-    // Parse the request body
-    const requestData = await req.json();
-    
-    // Special case for title generation - skip normal processing
-    if (requestData.generateTitleOnly) {
-      console.log("Generating title for thread");
-      
-      // Generate a title based on provided messages
-      const messages = requestData.messages || [];
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: messages,
-        }),
-      });
-      
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to generate title: ${error}`);
-      }
-      
-      const data = await response.json();
-      const title = data.choices[0]?.message?.content.trim() || "New Conversation";
-      
-      return new Response(
-        JSON.stringify({ title }),
-        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-      );
-    }
-    
-    // Normal processing for chat
-    const { message, userId, timeRange, threadId } = requestData;
+    const { message, userId, timeRange } = await req.json();
 
     if (!message) {
       throw new Error('Message is required');
@@ -76,7 +38,6 @@ serve(async (req) => {
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
     console.log("Time range received:", timeRange);
-    console.log("Thread ID received:", threadId);
     
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
@@ -111,14 +72,12 @@ serve(async (req) => {
     
     // Use different search function based on whether we have a time range
     let entries = [];
-    const matchCount = 50; // Increased from 10 to 50 to retrieve more relevant entries
-    
     if (timeRange && (timeRange.startDate || timeRange.endDate)) {
       console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
-      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange, matchCount);
+      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
     } else {
       console.log("Using standard vector search without time filtering");
-      entries = await searchEntriesWithVector(userId, queryEmbedding, matchCount);
+      entries = await searchEntriesWithVector(userId, queryEmbedding);
     }
     
     console.log(`Found ${entries.length} relevant entries`);
@@ -171,139 +130,7 @@ serve(async (req) => {
     const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
     console.log("Response generated successfully");
 
-    // 5. Save message to database if threadId is provided
-    if (threadId) {
-      console.log(`Saving messages to thread ${threadId}`);
-      
-      try {
-        // First, ensure the thread exists - create it if it doesn't
-        const { data: threadExists, error: threadCheckError } = await supabase
-          .from('chat_threads')
-          .select('id')
-          .eq('id', threadId)
-          .limit(1);
-          
-        if (threadCheckError) {
-          console.error('Error checking if thread exists:', threadCheckError);
-          throw threadCheckError;
-        }
-        
-        // Create thread if it doesn't exist
-        if (!threadExists || threadExists.length === 0) {
-          console.log(`Thread ${threadId} doesn't exist, creating it`);
-          const { error: createThreadError } = await supabase
-            .from('chat_threads')
-            .insert({
-              id: threadId,
-              user_id: userId,
-              title: "New Conversation",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-            
-          if (createThreadError) {
-            console.error('Error creating thread:', createThreadError);
-            throw createThreadError;
-          }
-        }
-        
-        // First save user message 
-        const { error: userMsgError } = await supabase
-          .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            content: message,
-            sender: 'user'
-          });
-          
-        if (userMsgError) {
-          console.error('Error saving user message:', userMsgError);
-          throw userMsgError;
-        }
-        
-        // Implement retry logic for saving assistant message
-        let assistantMsgError = null;
-        let saveAttempts = 0;
-        const maxAttempts = 3;
-        let assistantMessageSaved = false;
-        
-        while (!assistantMessageSaved && saveAttempts < maxAttempts) {
-          saveAttempts++;
-          
-          console.log(`Attempt ${saveAttempts} to save assistant message`);
-          
-          try {
-            const { error } = await supabase
-              .from('chat_messages')
-              .insert({
-                thread_id: threadId,
-                content: responseContent,
-                sender: 'assistant'
-              });
-              
-            if (error) {
-              console.error(`Error saving assistant message (attempt ${saveAttempts}):`, error);
-              assistantMsgError = error;
-              // Wait before retrying
-              if (saveAttempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, 1000 * saveAttempts));
-              }
-            } else {
-              assistantMessageSaved = true;
-              console.log('Successfully saved assistant message');
-            }
-          } catch (error) {
-            console.error(`Exception when saving assistant message (attempt ${saveAttempts}):`, error);
-            assistantMsgError = error;
-            if (saveAttempts < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * saveAttempts));
-            }
-          }
-        }
-        
-        if (!assistantMessageSaved) {
-          console.error('Failed to save assistant message after multiple attempts:', assistantMsgError);
-          // Continue execution but include the error in the response
-        }
-        
-        // Update thread's updated_at timestamp
-        const { error: threadUpdateError } = await supabase
-          .from('chat_threads')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', threadId);
-          
-        if (threadUpdateError) {
-          console.error('Error updating thread timestamp:', threadUpdateError);
-          // Continue execution but log the error
-        }
-        
-        if (assistantMessageSaved) {
-          console.log('Successfully saved both messages to database');
-        } else {
-          return new Response(
-            JSON.stringify({ 
-              data: responseContent,
-              dbError: "Failed to save assistant message after multiple attempts",
-              saveFailure: true
-            }),
-            { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-          );
-        }
-      } catch (dbError) {
-        console.error('Database error when saving messages:', dbError);
-        // Return the response but include the DB error for debugging
-        return new Response(
-          JSON.stringify({ 
-            data: responseContent,
-            dbError: dbError.message,
-            saveFailure: true
-          }),
-          { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-        );
-      }
-    }
-
-    // 6. Return response
+    // 5. Return response
     return new Response(
       JSON.stringify({ data: responseContent }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
@@ -323,8 +150,7 @@ serve(async (req) => {
 // Standard vector search without time filtering
 async function searchEntriesWithVector(
   userId: string, 
-  queryEmbedding: any[],
-  matchCount: number = 50
+  queryEmbedding: any[]
 ) {
   try {
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
@@ -334,7 +160,7 @@ async function searchEntriesWithVector(
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
-        match_count: matchCount,
+        match_count: 10,
         user_id_filter: userId
       }
     );
@@ -356,8 +182,7 @@ async function searchEntriesWithVector(
 async function searchEntriesWithTimeRange(
   userId: string, 
   queryEmbedding: any[], 
-  timeRange: { startDate?: string; endDate?: string },
-  matchCount: number = 50
+  timeRange: { startDate?: string; endDate?: string }
 ) {
   try {
     console.log(`Searching entries with time range for userId: ${userId}`);
@@ -368,7 +193,7 @@ async function searchEntriesWithTimeRange(
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
-        match_count: matchCount,
+        match_count: 10,
         user_id_filter: userId,
         start_date: timeRange.startDate || null,
         end_date: timeRange.endDate || null

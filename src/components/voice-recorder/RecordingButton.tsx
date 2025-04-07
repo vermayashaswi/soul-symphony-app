@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Square } from 'lucide-react';
@@ -29,7 +28,7 @@ export function RecordingButton({
     return (
       <motion.button
         onClick={onPermissionRequest}
-        className="relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg bg-destructive border-destructive/30 w-20 h-20"
+        className="relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg bg-red-500 border-red-600 w-20 h-20"
         whileTap={{ scale: 0.95 }}
       >
         <Mic className="w-8 h-8 text-white" />
@@ -37,14 +36,14 @@ export function RecordingButton({
     );
   }
   
-  // Dynamic glow effect based on audio level
+  // Dynamic glow effect based on audio level - keep this prominent
   const glowSize = isRecording ? Math.max(12, Math.min(60, audioLevel / 5 * 3)) : 0;
   
   // Get button color based on state
   const getButtonColor = () => {
-    if (isProcessing) return "bg-muted/80 border-muted/50";
-    if (!isRecording) return "bg-theme border-theme/20 hover:bg-theme-hover";
-    return "bg-destructive border-destructive/30";
+    if (isProcessing) return "bg-gray-400 border-gray-500";
+    if (!isRecording) return "bg-theme-color hover:bg-theme-color/90 border-theme-color/20";
+    return "bg-red-500 border-red-600";
   };
   
   return (

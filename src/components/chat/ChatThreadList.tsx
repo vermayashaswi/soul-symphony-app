@@ -3,24 +3,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   PlusCircle, 
   MessageCircle, 
-  Search,
-  Pencil
+  Search, 
+  Trash2,
+  Edit2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 interface ChatThreadListProps {
   userId?: string;
@@ -40,9 +34,10 @@ export default function ChatThreadList({
   const [threads, setThreads] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [editThreadId, setEditThreadId] = useState<string | null>(null);
-  const [newThreadTitle, setNewThreadTitle] = useState('');
-  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [threadToDelete, setThreadToDelete] = useState<string | null>(null);
+  const [editingThread, setEditingThread] = useState<string | null>(null);
+  const [newTitle, setNewTitle] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -82,22 +77,18 @@ export default function ChatThreadList({
       }
     };
     
-    const handleThreadDeleted = (event: CustomEvent) => {
-      if (event.detail?.threadId) {
-        setThreads(prevThreads => 
-          prevThreads.filter(thread => thread.id !== event.detail.threadId)
-        );
-      }
-    };
-    
     window.addEventListener('threadTitleUpdated' as any, handleTitleUpdated);
-    window.addEventListener('threadDeleted' as any, handleThreadDeleted);
     
     return () => {
       window.removeEventListener('threadTitleUpdated' as any, handleTitleUpdated);
-      window.removeEventListener('threadDeleted' as any, handleThreadDeleted);
     };
   }, [userId]);
+
+  useEffect(() => {
+    if (editingThread && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingThread]);
 
   const filteredThreads = threads.filter(thread =>
     thread.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -108,73 +99,97 @@ export default function ChatThreadList({
       await onStartNewThread();
     }
   };
+
+  const handleDeleteThread = async () => {
+    if (!threadToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('chat_threads')
+        .delete()
+        .eq('id', threadToDelete);
+
+      if (error) {
+        console.error("Error deleting thread:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete conversation"
+        });
+      } else {
+        setThreads(threads.filter(thread => thread.id !== threadToDelete));
+        toast({
+          title: "Success",
+          description: "Conversation deleted"
+        });
+        
+        // If the currently selected thread was deleted, create a new one
+        if (currentThreadId === threadToDelete) {
+          onStartNewThread();
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting thread:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete conversation"
+      });
+    } finally {
+      setThreadToDelete(null);
+    }
+  };
   
-  const handleRenameThread = async () => {
-    if (!editThreadId || !newThreadTitle.trim()) return;
+  const startEditingThread = (thread: any) => {
+    setEditingThread(thread.id);
+    setNewTitle(thread.title);
+  };
+  
+  const handleUpdateThreadTitle = async (threadId: string) => {
+    if (!newTitle.trim()) {
+      setEditingThread(null);
+      return;
+    }
     
     try {
       const { error } = await supabase
         .from('chat_threads')
         .update({ 
-          title: newThreadTitle,
+          title: newTitle.trim(),
           updated_at: new Date().toISOString()
         })
-        .eq('id', editThreadId);
+        .eq('id', threadId);
         
-      if (error) throw error;
-      
-      // Update local threads state
-      setThreads(prevThreads => 
-        prevThreads.map(thread => 
-          thread.id === editThreadId 
-            ? { ...thread, title: newThreadTitle } 
+      if (error) {
+        console.error("Error updating thread title:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update conversation title"
+        });
+      } else {
+        setThreads(threads.map(thread => 
+          thread.id === threadId 
+            ? { ...thread, title: newTitle.trim() } 
             : thread
-        )
-      );
-      
-      // Close the dialog
-      setIsRenameDialogOpen(false);
-      setEditThreadId(null);
-      
-      // Dispatch event to update other components with new title
-      window.dispatchEvent(
-        new CustomEvent('threadTitleUpdated', { 
-          detail: { 
-            threadId: editThreadId, 
-            title: newThreadTitle 
-          } 
-        })
-      );
-      
-      toast({
-        title: "Thread renamed",
-        description: "The conversation has been renamed successfully.",
-      });
+        ));
+        toast({
+          title: "Success",
+          description: "Conversation title updated"
+        });
+      }
     } catch (error) {
-      console.error("Error renaming thread:", error);
-      
-      toast({
-        title: "Error",
-        description: "Failed to rename the conversation.",
-        variant: "destructive"
-      });
+      console.error("Error updating thread title:", error);
+    } finally {
+      setEditingThread(null);
     }
-  };
-  
-  const openRenameDialog = (threadId: string, currentTitle: string) => {
-    setEditThreadId(threadId);
-    setNewThreadTitle(currentTitle);
-    setIsRenameDialogOpen(true);
   };
 
   return (
     <div className="chat-thread-list h-full flex flex-col">
       <div className="p-3 border-b flex items-center justify-between gap-2">
         <Button
-          variant="theme"
+          variant="default"
           onClick={handleNewThread}
           className={cn(
-            "text-white flex items-center gap-1",
+            "bg-theme-color hover:bg-theme-color/90 text-white flex items-center gap-1",
             "w-full"
           )}
         >
@@ -210,81 +225,118 @@ export default function ChatThreadList({
         ) : (
           <div className="space-y-1 py-2">
             {filteredThreads.map((thread) => (
-              <div key={thread.id} className="relative flex items-center">
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full justify-start relative h-auto py-3 px-3 text-left",
-                    thread.id === currentThreadId && "bg-muted"
-                  )}
-                  onClick={() => onSelectThread(thread.id)}
-                >
-                  <div className="truncate mr-10">
-                    <div className="flex items-center">
-                      <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
-                      <span className="truncate">{thread.title}</span>
+              <div key={thread.id} className="relative">
+                {editingThread === thread.id ? (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+                    <Input
+                      ref={editInputRef}
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleUpdateThreadTitle(thread.id);
+                        } else if (e.key === 'Escape') {
+                          setEditingThread(null);
+                        }
+                      }}
+                      className="h-8"
+                      maxLength={30}
+                    />
+                    <div className="flex gap-1">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 px-2"
+                        onClick={() => handleUpdateThreadTitle(thread.id)}
+                      >
+                        Save
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-8 px-2"
+                        onClick={() => setEditingThread(null)}
+                      >
+                        Cancel
+                      </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {format(new Date(thread.updated_at), 'MMM d, h:mm a')}
-                    </p>
                   </div>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 h-8 w-8"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openRenameDialog(thread.id, thread.title);
-                  }}
-                >
-                  <Pencil className="h-4 w-4" />
-                  <span className="sr-only">Edit</span>
-                </Button>
+                ) : (
+                  <div className="flex items-center bg-background hover:bg-accent/50 rounded-md">
+                    <Button
+                      key={thread.id}
+                      variant="ghost"
+                      className={cn(
+                        "flex-1 justify-start relative h-auto py-3 px-2 text-left rounded-r-none",
+                        thread.id === currentThreadId && "bg-muted"
+                      )}
+                      onClick={() => onSelectThread(thread.id)}
+                    >
+                      <div className="flex-1 truncate mr-2">
+                        <div className="flex items-center">
+                          <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
+                          <span className="truncate">{thread.title}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {format(new Date(thread.updated_at), 'MMM d, h:mm a')}
+                        </p>
+                      </div>
+                    </Button>
+                    
+                    <div className="flex items-center pr-1 chat-thread-buttons opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 thread-edit-button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditingThread(thread);
+                        }}
+                        title="Edit conversation title"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 thread-delete-button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setThreadToDelete(thread.id);
+                        }}
+                        title="Delete conversation"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </ScrollArea>
       
-      <Dialog 
-        open={isRenameDialogOpen} 
-        onOpenChange={setIsRenameDialogOpen}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rename Conversation</DialogTitle>
-            <DialogDescription>
-              Enter a new name for this conversation
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center space-y-2">
-            <Input
-              id="name"
-              value={newThreadTitle}
-              onChange={(e) => setNewThreadTitle(e.target.value)}
-              placeholder="Conversation name"
-              className="w-full"
-              autoFocus
-            />
-          </div>
-          <DialogFooter className="sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setIsRenameDialogOpen(false);
-                setEditThreadId(null);
-              }}
+      <AlertDialog open={!!threadToDelete} onOpenChange={(open) => !open && setThreadToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this conversation and all of its messages.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteThread}
+              className="bg-red-500 hover:bg-red-600 text-white"
             >
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleRenameThread}>
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

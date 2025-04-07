@@ -1,41 +1,8 @@
 /* Mobile-specific styles */
 @media (max-width: 768px) {
-  /* Global app background in dark mode */
-  body.dark {
-    background-color: #000000;
-  }
-
-  /* Main header styling */
-  .mobile-chat-header {
-    background-color: #000000;
-    color: #ffffff;
-    border-bottom: 1px solid #333333;
-  }
-
-  .mobile-chat-header h2 {
-    color: #f759ab;
-    font-weight: bold;
-  }
-
-  /* Chat container */
-  .mobile-chat-content {
-    background-color: #000000;
-    padding-bottom: 80px !important;
-  }
-
-  /* Message spacing for better visual hierarchy */
-  .mobile-chat-content > div {
-    margin-bottom: 16px;
-  }
-
   /* Rounded corners for mobile UI elements */
   .mobile-chat-interface .rounded-full {
     border-radius: 24px;
-  }
-  
-  /* Purple top border for the interface */
-  .smart-chat-container {
-    border-top: 3px solid #f759ab;
   }
   
   /* Add padding to the bottom of the page content to make room for the navigation bar */
@@ -44,7 +11,6 @@
   .insights-container,
   .settings-container {
     padding-bottom: 4rem !important;
-    background-color: #000000;
   }
   
   /* Remove extra space at the top of mobile pages */
@@ -67,187 +33,28 @@
   .mobile-chat-interface button {
     min-height: 40px;
   }
-
-  /* Styling for message bubbles - Updated to match design */
-  .user-message,
-  .mobile-chat-content [role="user"],
-  .mobile-chat-interface .bg-fuchsia-500 {
-    background-color: #f759ab !important;
-    color: white !important;
-    border-radius: 24px !important;
-    border-bottom-right-radius: 4px !important;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
-  }
-
-  .assistant-message,
-  .mobile-chat-content [role="assistant"],
-  .mobile-chat-interface .bg-gray-800 {
-    background-color: #222833 !important;
-    color: white !important;
-    border-radius: 24px !important;
-    border-top-left-radius: 4px !important;
-    border: 1px solid #333 !important;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
-  }
-
-  /* IMPROVED: Chat suggestion text wrapping and alignment */
-  .mobile-chat-content .text-sm,
-  .mobile-chat-content li,
-  .mobile-chat-content button {
-    max-width: 100% !important;
-    width: 100% !important;
-    white-space: normal !important;
-    overflow-wrap: break-word !important;
-    word-wrap: break-word !important;
-    word-break: break-word !important;
-    overflow-x: hidden !important;
-    overflow-y: visible !important;
-    display: flex !important;
-  }
-  
-  /* IMPROVED: Prevent horizontal overflow in chat interface */
-  .mobile-chat-interface,
-  .mobile-chat-content,
-  .mobile-chat-content div,
-  .mobile-chat-content ul,
-  .mobile-chat-content li {
-    max-width: 100vw !important;
-    overflow-x: hidden !important;
-  }
   
   /* Optimize space usage in chat interface */
   .smart-chat-interface .prose,
   .mobile-chat-interface .prose {
-    font-size: 0.95rem !important;
-    line-height: 1.5 !important;
-    overflow-wrap: break-word !important;
-    word-wrap: break-word !important;
-    word-break: break-word !important;
-    color: white !important;
-  }
-
-  /* Updated prose styling for mobile */
-  .mobile-chat-interface .prose p,
-  .mobile-chat-interface .prose li {
-    margin-top: 0.5em !important;
-    margin-bottom: 0.5em !important;
-    color: white !important;
-  }
-
-  .mobile-chat-interface .prose h1,
-  .mobile-chat-interface .prose h2,
-  .mobile-chat-interface .prose h3 {
-    margin-top: 0.5em !important;
-    margin-bottom: 0.5em !important;
-    color: white !important;
-    font-weight: bold !important;
-  }
-
-  .mobile-chat-interface .prose ul,
-  .mobile-chat-interface .prose ol {
-    padding-left: 1.5em !important;
-    margin-top: 0.5em !important;
-    margin-bottom: 0.5em !important;
-  }
-
-  .mobile-chat-interface .prose li::marker {
-    color: #f759ab !important;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    margin: 0.5rem 0;
   }
   
   /* Reduce padding in chat messages */
   .smart-chat-interface .p-4,
   .mobile-chat-interface .p-4 {
-    padding: 1rem !important;
+    padding: 0.75rem !important;
   }
   
-  /* Journal entries reference style */
-  .chat-message .journal-entries-ref,
-  .journal-reference {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    transform: translateY(-100%) !important;
-    background-color: rgba(17, 24, 39, 0.85) !important;
-    border-radius: 9999px !important;
-    padding: 2px 10px !important;
-    z-index: 10 !important;
-    backdrop-filter: blur(4px) !important;
-    border: none !important;
-    margin-top: 0 !important;
-    color: rgba(255, 255, 255, 0.8) !important;
-  }
-
-  /* Journal reference button styling */
-  .journal-entries-ref button,
-  .journal-reference button {
-    color: #f78dc4 !important;
-    font-size: 11px !important;
-    padding: 0 !important;
-    height: auto !important;
-  }
-
-  /* Journal entries dropdown container */
-  .journal-entries-dropdown,
-  .chat-message .border-l-2.border-fuchsia-500\/30 {
-    border: 1px solid rgba(247, 89, 171, 0.3) !important;
-    border-radius: 6px !important;
-    background-color: rgba(17, 24, 39, 0.9) !important;
-    backdrop-filter: blur(8px) !important;
-    padding: 6px !important;
-    margin-top: 4px !important;
-    max-height: 150px !important;
-    overflow-y: auto !important;
-    z-index: 20 !important;
-    width: 200px !important;
-  }
-
-  /* Journal entries button */
-  .mobile-chat-interface button.text-white\/80 {
-    color: rgba(255, 255, 255, 0.8) !important;
-  }
-
-  .mobile-chat-interface button.text-white\/80:hover {
-    color: rgba(255, 255, 255, 1) !important;
+  /* Reduce margins between chat messages */
+  .smart-chat-interface .space-y-4,
+  .mobile-chat-interface .space-y-4 {
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
   }
   
-  /* IMPROVED: Ensure suggestion buttons have proper text wrapping */
-  .suggestion-button,
-  .suggestion-button span,
-  .mobile-chat-content button,
-  .mobile-chat-content button div {
-    white-space: normal !important;
-    overflow-wrap: break-word !important;
-    word-wrap: break-word !important;
-    word-break: break-word !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
-  }
-
-  /* FIXED: Ensure flex items properly align and wrap */
-  .flex.gap-1,
-  .flex.gap-2,
-  .flex.items-start {
-    flex-wrap: nowrap !important;
-    max-width: 100% !important;
-    overflow: hidden !important;
-  }
-
-  /* FIXED: Ensure icon stays aligned with text */
-  .flex.gap-1 .mt-0.5,
-  .flex.gap-2 .mt-0.5,
-  .flex.items-start .mt-0.5 {
-    flex-shrink: 0 !important;
-    margin-right: 8px !important;
-  }
-
-  /* FIXED: Ensure text portion wraps properly */
-  .flex.gap-1 .break-words,
-  .flex.gap-2 .break-words,
-  .flex.items-start .break-words {
-    flex: 1 !important;
-    min-width: 0 !important;
-  }
-
   /* Adjust card headers on home page */
   .card .card-header {
     padding-top: 0.75rem;
@@ -261,31 +68,35 @@
     font-size: 1.25rem !important;
   }
   
-  /* Custom loading spinner */
-  .loading-spinner {
-    border: 3px solid rgba(247, 89, 171, 0.3);
-    border-top: 3px solid #f759ab;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    animation: spin 1s linear infinite;
+  /* IMPROVED: Chat thread list buttons - always visible and more obvious */
+  .chat-thread-list .chat-thread-buttons {
+    display: flex !important;
+    opacity: 1 !important;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 0 0.375rem 0.375rem 0;
+    padding: 8px 2px;
+    margin-left: auto;
+    height: 100%;
   }
   
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  /* Ensure the thread buttons have adequate spacing */
+  .chat-thread-list .thread-edit-button,
+  .chat-thread-list .thread-delete-button {
+    margin: 0 2px !important;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
   }
   
-  /* Make thread buttons more touchable on mobile with purple highlights */
+  /* Make thread buttons more touchable on mobile */
   .chat-thread-list .h-8.w-8 {
-    min-height: 38px;
-    min-width: 38px;
+    min-height: 36px;
+    min-width: 36px;
     display: flex !important;
     align-items: center;
     justify-content: center;
   }
   
-  /* Ensure the thread buttons are always visible with strong purple styling */
+  /* Ensure the thread buttons are not hidden */
   .chat-thread-list .flex-shrink-0,
   .chat-thread-list .chat-thread-buttons {
     display: flex !important;
@@ -356,16 +167,52 @@
     padding-bottom: 0 !important;
   }
   
+  /* Position the recorder at the bottom */
+  .journal-container .card {
+    margin-bottom: 0 !important;
+    position: relative;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    border-radius: 16px; /* Add consistent rounded corners */
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    height: auto; /* Let it size naturally */
+  }
+  
+  /* Make recording card fit within the green box */
+  .journal-container .tabs-content > div > .card {
+    min-height: calc(70vh - 180px); /* Adjusted to better fit the green box */
+    max-height: calc(100vh - 270px);
+    border-radius: 16px !important;
+    margin: 0 8px !important;
+  }
+  
+  /* Adjust spacing of journal tabs container */
+  .journal-container .container {
+    padding: 0.5rem 1rem !important;
+  }
+  
+  /* Make voice recorder component fit the green box */
+  .journal-container .tabs-content {
+    overflow: visible;
+  }
+  
+  /* Make voice recorder fit within bounds */
+  .journal-container .card-content {
+    padding: 0.5rem !important;
+  }
+  
   /* Mobile chat input specific fixes */
   .mobile-chat-input-container {
     position: fixed;
     bottom: 16px;
     left: 0;
     right: 0;
-    background-color: black;
+    background-color: hsl(var(--background));
     z-index: 50;
     padding-bottom: env(safe-area-inset-bottom, 16px);
-    border-top: 1px solid #333;
   }
   
   /* Add space at the bottom of the chat content to prevent messages from being hidden behind the input */
@@ -381,17 +228,74 @@
     z-index: 10;
   }
   
-  /* Mobile loading indicator */
-  .mobile-chat-content .loading-indicator {
-    color: #f759ab;
-    text-align: center;
-    padding: 1rem;
+  /* Calendar specific mobile adjustments */
+  .rdp-caption {
+    padding: 0 !important;
   }
   
-  .mobile-chat-content .loading-text {
-    color: #f759ab;
-    margin-top: 8px;
-    font-size: 14px;
+  .rdp-nav {
+    padding: 0 !important;
+  }
+  
+  .rdp-months {
+    justify-content: center !important;
+  }
+  
+  .rdp-month {
+    width: 100% !important;
+  }
+  
+  .rdp-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+  }
+  
+  .rdp-cell {
+    padding: 0 !important;
+    width: 14.28% !important; /* 100% / 7 = 14.28% */
+  }
+  
+  .rdp-head_cell {
+    width: 14.28% !important; /* 100% / 7 = 14.28% */
+    font-size: 0.7rem !important;
+  }
+  
+  .rdp-day {
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    aspect-ratio: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  
+  /* Fix for month view calendar to ensure all days are visible */
+  .calendar .month {
+    width: 100% !important;
+  }
+  
+  .calendar .table {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
+  
+  .calendar .head_row, 
+  .calendar .row {
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr) !important;
+    width: 100% !important;
+  }
+  
+  .calendar .head_cell,
+  .calendar .cell,
+  .calendar .day {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
   
   /* Improve loading state and progress indicators */
@@ -407,72 +311,81 @@
     margin: 8px !important;
     max-width: 90% !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-    color: white !important;
   }
   
   /* Style toast based on type */
   [data-sonner-toast][data-type="success"] {
-    background-color: #222833 !important;
-    border-color: #f759ab !important;
-    color: white !important;
+    background-color: #dcfce7 !important;
+    border-color: #22c55e !important;
   }
   
   [data-sonner-toast][data-type="error"] {
-    background-color: #222833 !important;
+    background-color: #fee2e2 !important;
     border-color: #ef4444 !important;
-    color: white !important;
   }
   
   [data-sonner-toast][data-type="loading"] {
-    background-color: #222833 !important;
+    background-color: #e0f2fe !important;
     border-color: #0ea5e9 !important;
-    color: white !important;
   }
   
-  /* Dark mode specific styles */
-  .dark .mobile-chat-content,
-  .dark .mobile-chat-interface,
-  .dark .smart-chat-container {
-    background-color: #000000 !important;
+  /* Improve voice recording UI for new users */
+  .voice-recorder .recording-button-container {
+    transform: scale(1.05);
+    transition: transform 0.2s ease;
   }
   
-  .dark .mobile-chat-header {
-    background-color: #000000 !important;
-    border-bottom: 1px solid #333 !important;
+  /* First-time user guidance */
+  .first-time-user-hint {
+    position: absolute;
+    bottom: 120px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin: 0 auto;
+    max-width: 90%;
+    animation: fade-in-up 0.5s ease-out;
+    z-index: 20;
   }
   
-  .dark .mobile-chat-input-container {
-    background-color: #000000 !important;
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-
-  /* Chat messages should not overflow horizontally */
-  .smart-chat-interface .card-content,
-  .mobile-chat-interface .card-content,
-  .smart-chat-interface .prose p,
-  .mobile-chat-interface .prose p,
-  .smart-chat-interface .break-words,
-  .mobile-chat-interface .break-words {
-    overflow-wrap: break-word !important;
-    word-wrap: break-word !important;
-    word-break: break-word !important;
-    overflow-x: hidden !important;
+  
+  /* Improve profile picture cropping dialog for mobile */
+  .DialogContent {
+    max-width: 90vw !important;
+    width: 90vw !important;
+    padding: 16px !important;
   }
-}
-
-/* Ensure chat components don't overflow horizontally on any screen size */
-.smart-chat-interface,
-.mobile-chat-interface,
-.message-container,
-.suggestion-container {
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-.break-words {
-  overflow-wrap: break-word;
-  word-wrap: break-word;
-  word-break: break-word;
-  hyphens: auto;
+  
+  /* Fix touch interactions for profile image cropping */
+  [ref="containerRef"] {
+    touch-action: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  
+  /* Ensure drag and pinch gestures work on profile picture editor */
+  .relative.h-64.w-64.rounded-full.overflow-hidden.border-2.border-muted.cursor-grab.touch-none {
+    touch-action: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
 }
 
 /* Dark mode support for sticky elements */
@@ -481,99 +394,99 @@
   border-bottom: 1px solid hsl(var(--border));
 }
 
-/* Message-specific styles for both mobile and desktop */
-.mobile-chat-message,
-.chat-message {
-  border-radius: 24px !important;
+/* Add new animations for language elements */
+@keyframes float-in {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.user-message {
-  background-color: #f759ab !important;
-  color: white !important;
-  border-radius: 24px !important;
-  border-bottom-right-radius: 4px !important;
+@keyframes float-around {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(5px, -5px);
+  }
+  50% {
+    transform: translate(0, -10px);
+  }
+  75% {
+    transform: translate(-5px, -5px);
+  }
 }
 
-.assistant-message {
-  background-color: #222833 !important;
-  color: white !important;
-  border-radius: 24px !important;
-  border-top-left-radius: 4px !important;
-  border: 1px solid #444444 !important;
+.float-in {
+  animation: float-in 0.8s ease-out forwards;
 }
 
-/* Journal entries reference styling */
-.journal-entries-ref {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  transform: translateY(-100%) !important;
-  background-color: rgba(17, 24, 39, 0.85) !important;
-  border-radius: 9999px !important;
-  padding: 2px 10px !important;
-  z-index: 10 !important;
-  backdrop-filter: blur(4px) !important;
-  border: none !important;
-  margin-top: 0 !important;
-  color: rgba(255, 255, 255, 0.8) !important;
+.float-around {
+  animation: float-around 10s ease-in-out infinite;
 }
 
-/* Application title/header styling */
-.app-title {
-  color: #f759ab !important;
-  font-weight: bold !important;
-  text-align: center !important;
+/* Improved animation related styles */
+.language-animation-word {
+  transition: all 0.3s ease;
+  opacity: 0.8;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
-/* Loading state styling */
-.loading-state {
-  background-color: rgba(0, 0, 0, 0.7) !important;
-  color: white !important;
-  border-radius: 12px !important;
-  border: 1px solid #444 !important;
+.language-animation-container {
+  perspective: 1000px;
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
-.loading-state .spinner {
-  color: #f759ab !important;
+.language-animation-3d {
+  transform-style: preserve-3d;
 }
 
-/* Toast notification styling for all modes */
-.Toaster__toast {
-  background-color: #222833 !important;
-  color: white !important;
-  border-color: #f759ab !important;
+/* Optimize animation performance */
+.will-change-transform {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
-.Toaster__toast-title {
-  color: white !important;
+/* Add fluid motion to animations */
+.fluid-motion {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.Toaster__toast-description {
-  color: #ccc !important;
+/* Improve animation smoothness */
+.smooth-float {
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-fill-mode: both;
 }
 
-/* Custom dark gradients */
-.grad-dark-purple {
-  background: linear-gradient(135deg, #333 0%, #222 100%) !important;
-}
-
-/* Thread Edit Button - Always visible with purple styling */
-.chat-thread-list .thread-edit-button {
-  color: #f759ab;
-  background-color: rgba(247, 89, 171, 0.3);
-}
-
-.chat-thread-list .thread-edit-button:active {
-  background-color: rgba(247, 89, 171, 0.5);
-}
-
-/* Thread Delete Button - Always visible with purple styling */
+/* Chat Thread List Styles */
+.chat-thread-list .thread-edit-button,
 .chat-thread-list .thread-delete-button {
-  color: #f759ab;
-  background-color: rgba(247, 89, 171, 0.3);
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
 }
 
-.chat-thread-list .thread-delete-button:active {
-  background-color: rgba(255, 0, 0, 0.2);
-  color: #ff5757;
+.chat-thread-list [data-state="open"] .thread-edit-button,
+.chat-thread-list [data-state="open"] .thread-delete-button,
+.chat-thread-list div:hover .thread-edit-button,
+.chat-thread-list div:hover .thread-delete-button {
+  opacity: 1;
+}
+
+/* Thread Edit Button */
+.chat-thread-list .thread-edit-button:hover {
+  color: var(--theme-color);
+}
+
+/* Thread Delete Button */
+.chat-thread-list .thread-delete-button:hover {
+  color: red;
 }

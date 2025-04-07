@@ -1,14 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { 
-  Loader2, 
-  BarChart4, 
-  Brain, 
-  BarChart2, 
-  Search, 
-  Lightbulb,
-  Trash
-} from "lucide-react";
+import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -20,16 +12,6 @@ import { motion } from "framer-motion";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatDiagnostics from './ChatDiagnostics';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -60,8 +42,6 @@ export default function SmartChatInterface() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
-  const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [ragDiagnostics, setRagDiagnostics] = useState<any>({
     steps: [],
     isActive: false,
@@ -75,29 +55,23 @@ export default function SmartChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-  const [currentThreadTitle, setCurrentThreadTitle] = useState("");
-  const [interfaceKey, setInterfaceKey] = useState(0);
 
   const demoQuestions = [
     {
-      text: "What are the top 3 reasons that make me happy?",
-      icon: <Lightbulb className="h-4 w-4 flex-shrink-0 mr-2" />
+      text: "How did I feel yesterday?",
+      icon: <BarChart2 className="h-4 w-4 mr-2" />
     },
     {
-      text: "What time of the day do i usually journal?",
-      icon: <Search className="h-4 w-4 flex-shrink-0 mr-2" />
+      text: "What makes me happy?",
+      icon: <Lightbulb className="h-4 w-4 mr-2" />
     },
     {
-      text: "Top 3 issues in my life?",
-      icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
+      text: "Find entries about work",
+      icon: <Search className="h-4 w-4 mr-2" />
     },
     {
-      text: "Suggest me ways to improve my negative traits.",
-      icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
-    },
-    {
-      text: "Rate my top positive emotions out of 10.",
-      icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-2" />
+      text: "What were my top 3 positive and negative emotions last month?",
+      icon: <Brain className="h-4 w-4 mr-2" />
     }
   ];
 
@@ -140,21 +114,16 @@ export default function SmartChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatHistory, isLoading]);
-  
-  useEffect(() => {
-    if (currentThreadId && user?.id && !hasLoadedMessages) {
+    
+    if (currentThreadId) {
       loadThreadMessages(currentThreadId);
     }
-  }, [currentThreadId, user?.id, hasLoadedMessages]);
+  }, [chatHistory, isLoading, currentThreadId]);
 
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !user?.id) return;
     
     try {
-      console.log(`Loading messages for thread ${threadId}`);
-      setIsLoading(true);
-      
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
@@ -162,8 +131,6 @@ export default function SmartChatInterface() {
         .order('created_at', { ascending: true });
         
       if (error) throw error;
-      
-      console.log(`Found ${data?.length || 0} messages for thread ${threadId}`);
       
       if (data && data.length > 0) {
         const formattedMessages = data.map((msg: DbChatMessage) => ({
@@ -180,17 +147,8 @@ export default function SmartChatInterface() {
         setChatHistory([]);
         setShowSuggestions(true);
       }
-      
-      setHasLoadedMessages(true);
     } catch (error) {
       console.error("Error loading messages:", error);
-      toast({
-        title: "Error",
-        description: "Unable to load conversation history",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -199,11 +157,11 @@ export default function SmartChatInterface() {
       if (event.detail.threadId) {
         setCurrentThreadId(event.detail.threadId);
         localStorage.setItem(THREAD_ID_STORAGE_KEY, event.detail.threadId);
-        setHasLoadedMessages(false);
       }
     };
     
     window.addEventListener('threadSelected' as any, onThreadChange);
+    
     window.addEventListener('newThreadCreated' as any, onThreadChange);
     
     return () => {
@@ -211,30 +169,6 @@ export default function SmartChatInterface() {
       window.removeEventListener('newThreadCreated' as any, onThreadChange);
     };
   }, []);
-
-  useEffect(() => {
-    if (currentThreadId) {
-      fetchThreadTitle(currentThreadId);
-    }
-  }, [currentThreadId]);
-
-  const fetchThreadTitle = async (threadId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('chat_threads')
-        .select('title')
-        .eq('id', threadId)
-        .single();
-        
-      if (error) throw error;
-      
-      if (data) {
-        setCurrentThreadTitle(data.title);
-      }
-    } catch (error) {
-      console.error("Error fetching thread title:", error);
-    }
-  };
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -281,11 +215,6 @@ export default function SmartChatInterface() {
     
     addRagDiagnosticStep("Initializing chat request", "success", "Starting to process your query");
     
-    setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
-    scrollToBottom();
-    setIsLoading(true);
-    setShowSuggestions(false);
-    
     let threadId = currentThreadId;
     if (!threadId) {
       try {
@@ -329,8 +258,13 @@ export default function SmartChatInterface() {
       }
     }
     
+    setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsLoading(true);
+    setShowSuggestions(false);
+    
+    addRagDiagnosticStep("Saving user message", "loading");
+    
     try {
-      addRagDiagnosticStep("Saving user message", "loading");
       const { error: msgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -341,60 +275,55 @@ export default function SmartChatInterface() {
         
       if (msgError) {
         addRagDiagnosticStep("Saving user message", "error", msgError.message);
-        console.error("Failed to save user message:", msgError);
+        throw msgError;
+      }
+      
+      addRagDiagnosticStep("Saving user message", "success");
+      
+      const queryTypes = analyzeQueryTypes(userMessage);
+      
+      addRagDiagnosticStep("Analyzing query intent", "loading");
+      addRagDiagnosticStep("Analyzing query intent", "success", 
+        `Detected: ${JSON.stringify({
+          isEmotionFocused: queryTypes.isEmotionFocused,
+          isQuantitative: queryTypes.isQuantitative,
+          isWhyQuestion: queryTypes.isWhyQuestion,
+          needsVectorSearch: queryTypes.needsVectorSearch
+        })}`);
+      
+      if (queryTypes.isQuantitative && queryTypes.isEmotionFocused) {
+        setProcessingStage("Analyzing your emotions and calculating results...");
+      } else if (queryTypes.isWhyQuestion) {
+        setProcessingStage("Analyzing your question and looking for explanations...");
+      } else if (queryTypes.isEmotionFocused) {
+        setProcessingStage("Analyzing emotion patterns in your journal...");
       } else {
-        addRagDiagnosticStep("Saving user message", "success");
+        setProcessingStage("Analyzing your question...");
       }
-    } catch (saveError) {
-      console.error("Error saving user message:", saveError);
-    }
-    
-    const queryTypes = analyzeQueryTypes(userMessage);
       
-    addRagDiagnosticStep("Analyzing query intent", "loading");
-    addRagDiagnosticStep("Analyzing query intent", "success", 
-      `Detected: ${JSON.stringify({
-        isEmotionFocused: queryTypes.isEmotionFocused,
-        isQuantitative: queryTypes.isQuantitative,
-        isWhyQuestion: queryTypes.isWhyQuestion,
-        needsVectorSearch: queryTypes.needsVectorSearch
-      })}`);
-    
-    if (queryTypes.isQuantitative && queryTypes.isEmotionFocused) {
-      setProcessingStage("Analyzing your emotions and calculating results...");
-    } else if (queryTypes.isWhyQuestion) {
-      setProcessingStage("Analyzing your question and looking for explanations...");
-    } else if (queryTypes.isEmotionFocused) {
-      setProcessingStage("Analyzing emotion patterns in your journal...");
-    } else {
-      setProcessingStage("Analyzing your question...");
-    }
-    
-    if (queryTypes.needsDataAggregation) {
-      setProcessingStage("Aggregating data from your journal entries...");
-    } else if (queryTypes.needsVectorSearch) {
-      setProcessingStage("Searching for related entries in your journal...");
-    }
-    
-    setRagDiagnostics(prev => ({
-      ...prev,
-      queryAnalysis: {
-        queryType: queryTypes.isEmotionFocused ? 'emotional' : 'general',
-        emotion: queryTypes.isEmotionFocused ? queryTypes.emotion || null : null,
-        theme: queryTypes.isThemeFocused ? queryTypes.theme || null : null,
-        timeframe: {
-          timeType: queryTypes.timeRange,
-          startDate: queryTypes.startDate || null,
-          endDate: queryTypes.endDate || null
-        },
-        isWhenQuestion: queryTypes.isWhenQuestion || false
+      if (queryTypes.needsDataAggregation) {
+        setProcessingStage("Aggregating data from your journal entries...");
+      } else if (queryTypes.needsVectorSearch) {
+        setProcessingStage("Searching for related entries in your journal...");
       }
-    }));
       
-    addRagDiagnosticStep("Processing with RAG service", "loading");
-    setProcessingStage("Searching for insights...");
-    
-    try {
+      setRagDiagnostics(prev => ({
+        ...prev,
+        queryAnalysis: {
+          queryType: queryTypes.isEmotionFocused ? 'emotional' : 'general',
+          emotion: queryTypes.isEmotionFocused ? queryTypes.emotion || null : null,
+          theme: queryTypes.isThemeFocused ? queryTypes.theme || null : null,
+          timeframe: {
+            timeType: queryTypes.timeRange,
+            startDate: queryTypes.startDate || null,
+            endDate: queryTypes.endDate || null
+          },
+          isWhenQuestion: queryTypes.isWhenQuestion || false
+        }
+      }));
+      
+      addRagDiagnosticStep("Processing with RAG service", "loading");
+      setProcessingStage("Searching for insights...");
       const response = await processChatMessage(
         userMessage, 
         user.id, 
@@ -402,21 +331,21 @@ export default function SmartChatInterface() {
         threadId, 
         true
       );
-        
+      
       if (response.diagnostics) {
         if (response.diagnostics.steps) {
           response.diagnostics.steps.forEach((step: any) => {
             addRagDiagnosticStep(step.name, step.status, step.details);
           });
         }
-          
+        
         if (response.diagnostics.functionCalls) {
           setRagDiagnostics(prev => ({
             ...prev,
             functionExecutions: response.diagnostics.functionCalls
           }));
         }
-          
+        
         if (response.diagnostics.similarityScores) {
           setRagDiagnostics(prev => ({
             ...prev,
@@ -424,17 +353,17 @@ export default function SmartChatInterface() {
           }));
         }
       }
-        
+      
       if (response.references) {
         setRagDiagnostics(prev => ({
           ...prev,
           references: response.references
         }));
       }
-        
+      
       addRagDiagnosticStep("Processing with RAG service", "success", 
         `Received response with ${response.references?.length || 0} references`);
-        
+      
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
         content: response.content,
@@ -443,63 +372,29 @@ export default function SmartChatInterface() {
         ...(response.diagnostics && { diagnostics: response.diagnostics }),
         ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
       };
-        
-      let savedAssistantMessage = false;
-      let retryCount = 0;
-      const maxRetries = 3;
-        
-      while (!savedAssistantMessage && retryCount < maxRetries) {
-        try {
-          addRagDiagnosticStep("Saving assistant response", "loading");
-            
-          const { error: assistantMsgError } = await supabase
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: response.content,
-              sender: 'assistant',
-              reference_entries: response.references || null,
-              has_numeric_result: response.hasNumericResult || false,
-              analysis_data: response.analysis || null
-            });
-              
-          if (assistantMsgError) {
-            addRagDiagnosticStep("Saving assistant response", "error", `Attempt ${retryCount + 1}: ${assistantMsgError.message}`);
-            retryCount++;
-            if (retryCount >= maxRetries) {
-              console.error("Failed to save assistant message after multiple attempts:", assistantMsgError);
-              toast({
-                title: "Warning",
-                description: "Your conversation may not be saved properly. The response is displayed but might not persist after refresh.",
-                variant: "destructive"
-              });
-            } else {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-          } else {
-            addRagDiagnosticStep("Saving assistant response", "success");
-            savedAssistantMessage = true;
-          }
-        } catch (saveError) {
-          console.error(`Error saving assistant message (attempt ${retryCount + 1}):`, saveError);
-          retryCount++;
-          if (retryCount >= maxRetries) {
-            toast({
-              title: "Warning",
-              description: "Your conversation may not be saved properly. The response is displayed but might not persist after refresh.",
-              variant: "destructive"
-            });
-          }
-        }
-      }
-        
+      
+      addRagDiagnosticStep("Saving assistant response", "loading");
+      
+      await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: threadId,
+          content: response.content,
+          sender: 'assistant',
+          reference_entries: response.references || null,
+          has_numeric_result: response.hasNumericResult || false,
+          analysis_data: response.analysis || null
+        });
+      
+      addRagDiagnosticStep("Saving assistant response", "success");
+      
       if (chatHistory.length === 0) {
         addRagDiagnosticStep("Updating thread title", "loading");
-          
+        
         const truncatedTitle = userMessage.length > 30 
           ? userMessage.substring(0, 30) + "..." 
           : userMessage;
-            
+          
         await supabase
           .from('chat_threads')
           .update({ 
@@ -507,39 +402,39 @@ export default function SmartChatInterface() {
             updated_at: new Date().toISOString()
           })
           .eq('id', threadId);
-            
+          
         addRagDiagnosticStep("Updating thread title", "success");
       }
-        
+      
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
-        
+      
       addRagDiagnosticStep("Processing complete", "success", "All steps completed successfully");
-        
+      
       setChatHistory(prev => [...prev, uiResponse]);
     } catch (error: any) {
       console.error("Error sending message:", error);
-        
+      
       addRagDiagnosticStep("Processing error", "error", error?.message || "Unknown error");
       setRagDiagnostics(prev => ({
         ...prev,
         error: error?.message || "Unknown error"
       }));
-        
+      
       toast({
         title: "Error",
         description: "Failed to get a response. Please try again.",
         variant: "destructive"
       });
-        
+      
       setChatHistory(prev => [
         ...prev, 
         { 
           role: 'assistant', 
           content: "I'm having trouble processing your request. Please try again later. " + 
-                 (error?.message ? `Error: ${error.message}` : "")
+                   (error?.message ? `Error: ${error.message}` : "")
         }
       ]);
     } finally {
@@ -548,56 +443,8 @@ export default function SmartChatInterface() {
     }
   };
 
-  const handleDeleteThread = async () => {
-    if (!currentThreadId) return;
-    
-    try {
-      const { error: messagesError } = await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('thread_id', currentThreadId);
-        
-      if (messagesError) throw messagesError;
-      
-      const { error: threadError } = await supabase
-        .from('chat_threads')
-        .delete()
-        .eq('id', currentThreadId);
-        
-      if (threadError) throw threadError;
-      
-      setChatHistory([]);
-      setCurrentThreadId(null);
-      localStorage.removeItem(THREAD_ID_STORAGE_KEY);
-      setIsDeleteDialogOpen(false);
-      setShowSuggestions(true);
-      
-      toast({
-        title: "Thread deleted",
-        description: "The conversation has been deleted successfully.",
-      });
-      
-      setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent('threadDeleted', { 
-            detail: { threadId: currentThreadId } 
-          })
-        );
-        fetchUserThreads();
-      }, 100);
-    } catch (error) {
-      console.error("Error deleting thread:", error);
-      
-      toast({
-        title: "Error",
-        description: "Failed to delete the conversation.",
-        variant: "destructive"
-      });
-    }
-  };
-
   return (
-    <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background" key={interfaceKey}>
+    <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background">
       <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b sticky top-0 z-10">
         <div className="flex items-center">
           <h2 className="text-xl font-semibold">Roha</h2>
@@ -623,29 +470,17 @@ export default function SmartChatInterface() {
                 <Brain className="h-4 w-4" />
                 {ragDiagnostics.isActive ? "Hide Debug" : "Show Debug"}
               </Button>
-              
-              {currentThreadId && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                >
-                  <Trash className="h-5 w-5" />
-                  <span className="sr-only">Delete</span>
-                </Button>
-              )}
             </>
           )}
         </div>
       </CardHeader>
       
-      <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 flex flex-col overflow-x-hidden">
+      <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 flex flex-col">
         {chatHistory.length === 0 ? (
-          <div className="flex flex-col h-full overflow-hidden">
-            <div className="text-center max-w-lg mx-auto px-4 overflow-x-hidden">
+          <div className="flex flex-col h-full">
+            <div className="text-center max-w-lg mx-auto px-4">
               <h1 className="text-2xl md:text-3xl font-bold mb-3">How can I help you?</h1>
-              <p className="text-muted-foreground mb-6 break-words">
+              <p className="text-muted-foreground mb-6">
                 Hey, I am Roha, your personal AI assistant. You can ask me anything about your mental well-being and I will answer your queries basis your own journal insights.
               </p>
               
@@ -654,20 +489,18 @@ export default function SmartChatInterface() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="grid grid-cols-1 gap-3 max-w-md mx-auto"
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto"
                 >
                   {demoQuestions.map((question, index) => (
                     <Button
                       key={index}
                       variant="outline"
                       size="default"
-                      className="px-4 py-3 h-auto flex items-start text-left bg-muted/50 hover:bg-muted suggestion-button overflow-hidden"
+                      className="px-4 py-3 h-auto flex items-center justify-start text-left bg-muted/50 hover:bg-muted"
                       onClick={() => handleSendMessage(question.text)}
                     >
-                      <div className="flex gap-2 items-start w-full overflow-hidden">
-                        <span className="mt-0.5 flex-shrink-0">{question.icon}</span>
-                        <span className="break-words">{question.text}</span>
-                      </div>
+                      {question.icon}
+                      <span>{question.text}</span>
                     </Button>
                   ))}
                 </motion.div>
@@ -720,25 +553,6 @@ export default function SmartChatInterface() {
           userId={user?.id}
         />
       </CardFooter>
-      
-      <AlertDialog 
-        open={isDeleteDialogOpen} 
-        onOpenChange={setIsDeleteDialogOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete conversation</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this conversation and all its messages.
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDeleteThread}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Card>
   );
 }

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export type ChatMessage = {
@@ -19,21 +20,11 @@ export const processChatMessage = async (
   console.log("Processing chat message:", message.substring(0, 30) + "...");
   
   try {
-    // Determine the query complexity for optimal match count
-    const isComplexQuery = message.length > 150 || 
-                         message.includes("compare") || 
-                         message.includes("analyze all") || 
-                         message.includes("comprehensive") ||
-                         message.includes("over time") || 
-                         message.includes("pattern") ||
-                         (queryTypes?.needsDataAggregation === true);
-    
-    // Use dynamic match parameters for comprehensive analysis
+    // Use fixed parameters for vector search - let the retriever handle the filtering
     const matchThreshold = 0.5;
-    // For complex queries, use higher match count, otherwise use moderate count
-    const matchCount = isComplexQuery ? 500 : 200;
+    const matchCount = 10; // Fixed count, let the retriever determine the actual number
     
-    console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}, complex=${isComplexQuery}`);
+    console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
     
     // Extract time range if this is a temporal query and ensure it's not undefined
     let timeRange = null;
@@ -50,7 +41,7 @@ export const processChatMessage = async (
     const requiresTimeAnalysis = queryTypes && queryTypes.requiresTimeAnalysis ? true : false;
     
     // Check if the query is complex and needs segmentation
-    const isComplexQueryByStructure = queryTypes && queryTypes.needsDataAggregation ? true : 
+    const isComplexQuery = queryTypes && queryTypes.needsDataAggregation ? true : 
                           message.includes(" and ") || message.includes("also") || 
                           message.split("?").length > 2 || 
                           message.length > 100;
@@ -68,7 +59,7 @@ export const processChatMessage = async (
       diagnostics.steps.push({
         name: "Query Analysis", 
         status: "success", 
-        details: `Query identified as ${isComplexQueryByStructure ? 'complex' : 'simple'}, using match count: ${matchCount}`
+        details: `Query identified as ${isComplexQuery ? 'complex' : 'simple'}`
       });
     }
     
@@ -323,32 +314,7 @@ export const processChatMessage = async (
       });
     }
     
-    // Try using the direct smart-chat function first for improved persistence
-    if (threadId) {
-      try {
-        const { data: directData, error: directError } = await supabase.functions.invoke('smart-chat', {
-          body: {
-            message,
-            userId,
-            timeRange,
-            threadId
-          }
-        });
-        
-        if (!directError && directData) {
-          console.log("Successfully used direct smart-chat function with threading");
-          
-          return {
-            role: "assistant",
-            content: directData.data
-          };
-        }
-      } catch (directError) {
-        console.error("Error using direct smart-chat function, falling back to chat-with-rag:", directError);
-      }
-    }
-    
-    // Fall back to the chat-with-rag function if direct method fails
+    // Call the Supabase Edge Function with fixed vector search parameters
     const { data, error } = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,
@@ -358,8 +324,7 @@ export const processChatMessage = async (
         includeDiagnostics: enableDiagnostics,
         vectorSearch: {
           matchThreshold,
-          matchCount,
-          isComplexQuery
+          matchCount
         },
         isEmotionQuery,
         isWhyEmotionQuery,

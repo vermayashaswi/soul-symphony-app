@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -110,27 +109,14 @@ serve(async (req) => {
     console.log("Searching for relevant entries");
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "loading"));
     
-    // Remove fixed match count limit or use a very high value
-    // We'll use a dynamic approach based on query complexity
-    // For simple queries: 100 entries, for complex ones: 200+
-    const isComplexQuery = message.length > 150 || message.includes("compare") || 
-                          message.includes("analyze all") || message.includes("comprehensive") ||
-                          message.includes("over time") || message.includes("pattern");
-    
-    // Set a reasonable upper limit to avoid performance issues
-    // but still allow comprehensive analysis
-    const matchCount = isComplexQuery ? 500 : 200;
-    
-    console.log(`Using dynamic match count: ${matchCount} for ${isComplexQuery ? 'complex' : 'simple'} query`);
-    
     // Use different search function based on whether we have a time range
     let entries = [];
     if (timeRange && (timeRange.startDate || timeRange.endDate)) {
       console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
-      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange, matchCount);
+      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
     } else {
       console.log("Using standard vector search without time filtering");
-      entries = await searchEntriesWithVector(userId, queryEmbedding, matchCount);
+      entries = await searchEntriesWithVector(userId, queryEmbedding);
     }
     
     console.log(`Found ${entries.length} relevant entries`);
@@ -156,7 +142,7 @@ serve(async (req) => {
       );
     }
 
-    // 3. Prepare prompt with formatting instructions
+    // 3. Prepare prompt
     const prompt = `You are a personal mental well-being assistant. Your goal is to provide helpful, empathetic, and insightful responses based on the user's journal entries.
       Here are some of the user's journal entries:
       ${entries.map((entry) => `- ${entry.content}`).join('\n')}
@@ -164,12 +150,7 @@ serve(async (req) => {
       Now, respond to the following message from the user:
       ${message}
       
-      FORMATTING INSTRUCTIONS:
-      - Use bullet points (•) for lists and key points
-      - Use **bold text** for important information, headings, or emphasis
-      - Create clear visual separation between different sections of your response
-      - Keep your answers concise and to the point
-      - Focus on providing actionable insights and support`;
+      Keep your answers concise and to the point. Focus on providing actionable insights and support.`;
 
     // 4. Call OpenAI
     console.log("Calling OpenAI for completion");
@@ -244,8 +225,7 @@ serve(async (req) => {
 // Standard vector search without time filtering
 async function searchEntriesWithVector(
   userId: string, 
-  queryEmbedding: any[],
-  matchCount: number = 200
+  queryEmbedding: any[]
 ) {
   try {
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
@@ -255,7 +235,7 @@ async function searchEntriesWithVector(
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
-        match_count: matchCount,
+        match_count: 10,
         user_id_filter: userId
       }
     );
@@ -277,8 +257,7 @@ async function searchEntriesWithVector(
 async function searchEntriesWithTimeRange(
   userId: string, 
   queryEmbedding: any[], 
-  timeRange: { startDate?: string; endDate?: string },
-  matchCount: number = 200
+  timeRange: { startDate?: string; endDate?: string }
 ) {
   try {
     console.log(`Searching entries with time range for userId: ${userId}`);
@@ -289,7 +268,7 @@ async function searchEntriesWithTimeRange(
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
-        match_count: matchCount,
+        match_count: 10,
         user_id_filter: userId,
         start_date: timeRange.startDate || null,
         end_date: timeRange.endDate || null
