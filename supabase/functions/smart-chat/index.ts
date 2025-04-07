@@ -23,6 +23,9 @@ const corsHeaders = {
 // Maximum number of previous messages to include for context
 const MAX_CONTEXT_MESSAGES = 5;
 
+// Define the general question prompt
+const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.`;
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -116,6 +119,85 @@ serve(async (req) => {
       }
     }
     
+    // NEW: First categorize if this is a general question or a journal-specific question
+    console.log("Categorizing question type");
+    const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
+            Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
+            
+            Examples:
+            - "How are you doing?" -> "GENERAL"
+            - "What is journaling?" -> "GENERAL"
+            - "Who is the president of India?" -> "GENERAL"
+            - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
+            - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
+            - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
+            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"`
+          },
+          { role: 'user', content: message }
+        ],
+        temperature: 0.1,
+        max_tokens: 10
+      }),
+    });
+
+    if (!categorizationResponse.ok) {
+      const error = await categorizationResponse.text();
+      console.error('Failed to categorize question:', error);
+      throw new Error('Failed to categorize question');
+    }
+
+    const categorization = await categorizationResponse.json();
+    const questionType = categorization.choices[0]?.message?.content.trim();
+    console.log(`Question categorized as: ${questionType}`);
+
+    // If it's a general question, respond directly without journal entry retrieval
+    if (questionType === "GENERAL") {
+      console.log("Processing as general question, skipping journal entry retrieval");
+      
+      const generalCompletionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: GENERAL_QUESTION_PROMPT },
+            ...(conversationContext.length > 0 ? conversationContext : []),
+            { role: 'user', content: message }
+          ],
+        }),
+      });
+
+      if (!generalCompletionResponse.ok) {
+        const error = await generalCompletionResponse.text();
+        console.error('Failed to get general completion:', error);
+        throw new Error('Failed to generate response');
+      }
+
+      const generalCompletionData = await generalCompletionResponse.json();
+      const generalResponse = generalCompletionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+      console.log("General response generated successfully");
+
+      return new Response(
+        JSON.stringify({ data: generalResponse }),
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+    
+    // If it's a journal-specific question, continue with the existing RAG flow
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
