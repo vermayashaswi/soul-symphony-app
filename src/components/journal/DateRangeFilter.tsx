@@ -42,19 +42,19 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
         
         // If only start date is set, filter entries after start date
         if (startDate && !endDate) {
-          return isAfter(entryDate, startOfDay(startDate)) || isEqual(entryDate, startOfDay(startDate));
+          return isAfter(entryDate, startOfDay(startDate)) || isSameDay(entryDate, startDate);
         }
         
         // If only end date is set, filter entries before end date
         if (endDate && !startDate) {
-          return isBefore(entryDate, endOfDay(endDate)) || isEqual(entryDate, endOfDay(endDate));
+          return isBefore(entryDate, endOfDay(endDate)) || isSameDay(entryDate, endDate);
         }
         
         // If both dates are set, filter entries between start and end dates
         if (startDate && endDate) {
           return (
-            (isAfter(entryDate, startOfDay(startDate)) || isEqual(entryDate, startOfDay(startDate))) &&
-            (isBefore(entryDate, endOfDay(endDate)) || isEqual(entryDate, endOfDay(endDate)))
+            (isAfter(entryDate, startOfDay(startDate)) || isSameDay(entryDate, startDate)) &&
+            (isBefore(entryDate, endOfDay(endDate)) || isSameDay(entryDate, endDate))
           );
         }
         
@@ -119,8 +119,11 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
   };
 
   // Custom day rendering to highlight the selected range
-  const renderDay = (dayDate: Date, cellProps: any) => {
-    const isSelected = dayDate && cellProps.selected;
+  const customDayRender = (dayProps: any) => {
+    if (!dayProps || !dayProps.date) return null;
+    
+    const dayDate = dayProps.date;
+    const isSelected = dayProps.selected;
     
     // Check if day is within the selected range
     const isInRange = startDate && endDate && 
@@ -175,6 +178,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
               variant="outline"
               size="sm"
               className="text-muted-foreground flex items-center gap-1"
+              onClick={() => setIsCalendarOpen(true)}
             >
               <CalendarRange className="h-4 w-4" />
               <span>Filter by date</span>
@@ -189,7 +193,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
               onMonthChange={setMonth}
               initialFocus
               components={{
-                Day: (props) => renderDay(props.date, props)
+                Day: customDayRender
               }}
               footer={
                 <div className="p-3 border-t border-border">
