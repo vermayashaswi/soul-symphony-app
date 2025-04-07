@@ -53,29 +53,22 @@ interface SentimentCalendarProps {
   timeRange: 'today' | 'week' | 'month' | 'year';
 }
 
-// Get color based on sentiment value using the new color scale
 function getSentimentColor(sentiment: number): string {
-  // Red spectrum: -1 to -0.2
-  if (sentiment <= -0.8) return "bg-red-900"; // Dark red
+  if (sentiment <= -0.8) return "bg-red-900";
   if (sentiment <= -0.6) return "bg-red-800";
   if (sentiment <= -0.4) return "bg-red-700";
-  if (sentiment <= -0.2) return "bg-red-600"; // Light red
-  
-  // Yellow spectrum: -0.2 to 0.2
+  if (sentiment <= -0.2) return "bg-red-600";
   if (sentiment <= -0.1) return "bg-amber-500";
-  if (sentiment < 0.1) return "bg-amber-400"; // Light yellow
-  if (sentiment < 0.2) return "bg-amber-600"; // Dark yellow
-  
-  // Green spectrum: 0.2 to 1
-  if (sentiment < 0.4) return "bg-green-600"; // Light green
+  if (sentiment < 0.1) return "bg-amber-400";
+  if (sentiment < 0.2) return "bg-amber-600";
+  if (sentiment < 0.4) return "bg-green-600";
   if (sentiment < 0.6) return "bg-green-700";
   if (sentiment < 0.8) return "bg-green-800";
-  return "bg-green-900"; // Dark green
+  return "bg-green-900";
 }
 
-// Empty placeholder for days without data
 const EmptyBox = () => (
-  <div className="w-6 h-6 rounded-md border-2 border-gray-300 dark:border-gray-600">
+  <div className="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600">
     <span className="sr-only">No data</span>
   </div>
 );
@@ -100,7 +93,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         fromDate = startOfDay(now);
         break;
       case 'week':
-        fromDate = startOfWeek(now, { weekStartsOn: 1 }); // Week starts on Monday
+        fromDate = startOfWeek(now, { weekStartsOn: 1 });
         toDate = endOfWeek(now, { weekStartsOn: 1 });
         break;
       case 'month':
@@ -117,7 +110,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         }
         break;
       default:
-        fromDate = subDays(now, 30); // Default to last 30 days
+        fromDate = subDays(now, 30);
     }
     
     return sentimentData.filter(item => item.date >= fromDate && item.date <= toDate);
@@ -535,10 +528,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         </div>
         
         <div className="w-full">
-          <div className="grid grid-cols-[2rem_repeat(12,1fr)] mb-4">
+          <div className="grid grid-cols-[2rem_repeat(12,1fr)] mb-2">
             <div></div>
             {months.map(month => (
-              <div key={month} className="text-center text-muted-foreground text-sm font-medium">
+              <div key={month} className="text-center text-muted-foreground text-xs font-medium">
                 {month}
               </div>
             ))}
@@ -548,8 +541,8 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             const day = i + 1;
             
             return (
-              <div key={`day-${day}`} className="grid grid-cols-[2rem_repeat(12,1fr)] mb-1 items-center">
-                <div className="text-center text-muted-foreground text-sm">
+              <div key={`day-${day}`} className="grid grid-cols-[2rem_repeat(12,1fr)] mb-0.5 items-center">
+                <div className="text-center text-muted-foreground text-xs">
                   {day}
                 </div>
                 
@@ -575,16 +568,16 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                       {colorClass ? (
                         <div 
                           className={cn(
-                            "w-6 h-6 rounded-full", 
+                            "w-4 h-4 rounded-full", 
                             colorClass,
-                            isToday && "ring-2 ring-primary"
+                            isToday && "ring-1 ring-primary"
                           )} 
                         />
                       ) : (
                         <div 
                           className={cn(
-                            "w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600",
-                            isToday && "ring-2 ring-primary"
+                            "w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600",
+                            isToday && "ring-1 ring-primary"
                           )} 
                         />
                       )}
@@ -620,21 +613,21 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             <ReferenceArea 
               y1={0.2} 
               y2={1} 
-              fill="#22c55e" // Green
+              fill="#22c55e" 
               fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-0.2} 
               y2={0.2} 
-              fill="#f59e0b" // Yellow
+              fill="#f59e0b" 
               fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-1} 
               y2={-0.2} 
-              fill="#ef4444" // Red
+              fill="#ef4444" 
               fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
               strokeOpacity={0}
             />
