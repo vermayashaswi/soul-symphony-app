@@ -113,16 +113,16 @@ export default function ChatThreadList({
         console.error("Error deleting thread:", error);
         toast({
           title: "Error",
-          description: "Failed to delete conversation",
-          variant: "destructive"
+          description: "Failed to delete conversation"
         });
       } else {
         setThreads(threads.filter(thread => thread.id !== threadToDelete));
         toast({
           title: "Success",
-          description: "Conversation deleted",
+          description: "Conversation deleted"
         });
         
+        // If the currently selected thread was deleted, create a new one
         if (currentThreadId === threadToDelete) {
           onStartNewThread();
         }
@@ -131,8 +131,7 @@ export default function ChatThreadList({
       console.error("Error deleting thread:", error);
       toast({
         title: "Error",
-        description: "Failed to delete conversation",
-        variant: "destructive"
+        description: "Failed to delete conversation"
       });
     } finally {
       setThreadToDelete(null);
@@ -163,8 +162,7 @@ export default function ChatThreadList({
         console.error("Error updating thread title:", error);
         toast({
           title: "Error",
-          description: "Failed to update conversation title",
-          variant: "destructive"
+          description: "Failed to update conversation title"
         });
       } else {
         setThreads(threads.map(thread => 
@@ -174,7 +172,7 @@ export default function ChatThreadList({
         ));
         toast({
           title: "Success",
-          description: "Conversation title updated",
+          description: "Conversation title updated"
         });
       }
     } catch (error) {
@@ -285,7 +283,7 @@ export default function ChatThreadList({
                       </div>
                     </Button>
                     
-                    <div className="flex items-center pr-1 chat-thread-buttons">
+                    <div className="flex items-center pr-1 chat-thread-buttons opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
                         size="icon"

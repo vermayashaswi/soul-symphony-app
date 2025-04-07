@@ -466,3 +466,27 @@
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   animation-fill-mode: both;
 }
+
+/* Chat Thread List Styles */
+.chat-thread-list .thread-edit-button,
+.chat-thread-list .thread-delete-button {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.chat-thread-list [data-state="open"] .thread-edit-button,
+.chat-thread-list [data-state="open"] .thread-delete-button,
+.chat-thread-list div:hover .thread-edit-button,
+.chat-thread-list div:hover .thread-delete-button {
+  opacity: 1;
+}
+
+/* Thread Edit Button */
+.chat-thread-list .thread-edit-button:hover {
+  color: var(--theme-color);
+}
+
+/* Thread Delete Button */
+.chat-thread-list .thread-delete-button:hover {
+  color: red;
+}
