@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
@@ -45,7 +46,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
           <AvatarImage 
             src="/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png" 
             alt="Roha"
-            className="bg-primary/10"
+            className="bg-primary/10 object-cover object-[center_15%]"
             loading="eager"
           />
           <AvatarFallback className="bg-primary/10 text-primary">R</AvatarFallback>
