@@ -30,6 +30,7 @@ export default function SmartChat() {
   const { toast } = useToast();
   const previousThreadIdRef = useRef<string | null>(null);
   const titleGeneratedForThreads = useRef<Set<string>>(new Set());
+  const [isLoadingThreads, setIsLoadingThreads] = useState(true);
   
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -45,6 +46,7 @@ export default function SmartChat() {
     
     const checkOrCreateThread = async () => {
       if (!user?.id) return;
+      setIsLoadingThreads(true);
 
       // Try to get the last active thread from localStorage first
       const lastActiveThreadId = localStorage.getItem(THREAD_ID_STORAGE_KEY);
@@ -67,6 +69,7 @@ export default function SmartChat() {
                 detail: { threadId: lastActiveThreadId } 
               })
             );
+            setIsLoadingThreads(false);
             return;
           }
         } catch (error) {
@@ -99,6 +102,8 @@ export default function SmartChat() {
         }
       } catch (error) {
         console.error("Error checking threads:", error);
+      } finally {
+        setIsLoadingThreads(false);
       }
     };
 
@@ -138,9 +143,7 @@ export default function SmartChat() {
     };
   }, [isMobile, mobileDemo, user]);
   
-  // Generate title ONLY when switching away from a thread and if it hasn't been generated before
   useEffect(() => {
-    // If we have a previous thread ID and it's different from the current one
     const generateTitleForPreviousThread = async () => {
       if (previousThreadIdRef.current && 
           previousThreadIdRef.current !== currentThreadId &&

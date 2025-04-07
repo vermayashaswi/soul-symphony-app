@@ -76,6 +76,7 @@ export default function MobileChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
     if (propThreadId) {
@@ -103,12 +104,14 @@ export default function MobileChatInterface({
     scrollToBottom();
   }, [messages, loading]);
 
-  // Load messages on initial mount if we have a thread ID
+  // Improved loading strategy with better state management
   useEffect(() => {
-    if (currentThreadId && user?.id && !hasLoadedMessages) {
+    // Only attempt to load messages if user is authenticated and we have a thread ID
+    if (currentThreadId && user?.id && !initialLoadComplete) {
+      setInitialLoadComplete(true); // Prevent multiple loads
       loadThreadMessages(currentThreadId);
     }
-  }, [currentThreadId, user?.id, hasLoadedMessages]);
+  }, [currentThreadId, user?.id, initialLoadComplete]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -296,22 +299,20 @@ export default function MobileChatInterface({
         console.error("[Mobile] Received error response:", response.content);
       }
       
-      // Check if the response came from smart-chat function which already persisted the message
-      if (!response.fromPersistedFunction) {
-        const { error: storeError } = await supabase
-          .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            content: response.content,
-            sender: 'assistant',
-            reference_entries: response.references || null,
-            has_numeric_result: response.hasNumericResult || false,
-            analysis_data: response.analysis || null
-          });
+      // Remove the problematic property check and just ensure response is saved properly
+      const { error: storeError } = await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: threadId,
+          content: response.content,
+          sender: 'assistant',
+          reference_entries: response.references || null,
+          has_numeric_result: response.hasNumericResult || false,
+          analysis_data: response.analysis || null
+        });
           
-        if (storeError) {
-          console.error("[Mobile] Error storing assistant response:", storeError);
-        }
+      if (storeError) {
+        console.error("[Mobile] Error storing assistant response:", storeError);
       }
       
       if (messages.length === 0) {

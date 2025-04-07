@@ -27,7 +27,44 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, timeRange, threadId } = await req.json();
+    // Parse the request body
+    const requestData = await req.json();
+    
+    // Special case for title generation - skip normal processing
+    if (requestData.generateTitleOnly) {
+      console.log("Generating title for thread");
+      
+      // Generate a title based on provided messages
+      const messages = requestData.messages || [];
+      
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: messages,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to generate title: ${error}`);
+      }
+      
+      const data = await response.json();
+      const title = data.choices[0]?.message?.content.trim() || "New Conversation";
+      
+      return new Response(
+        JSON.stringify({ title }),
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+    
+    // Normal processing for chat
+    const { message, userId, timeRange, threadId } = requestData;
 
     if (!message) {
       throw new Error('Message is required');
@@ -137,30 +174,68 @@ serve(async (req) => {
       console.log(`Saving messages to thread ${threadId}`);
       
       try {
-        // Save user message
-        const { error: userMsgError } = await supabase
+        // Check if user message already exists (to prevent duplicates on retries)
+        const { data: existingUserMsgs, error: checkError } = await supabase
           .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            content: message,
-            sender: 'user'
-          });
+          .select('id')
+          .eq('thread_id', threadId)
+          .eq('content', message)
+          .eq('sender', 'user')
+          .order('created_at', { ascending: false })
+          .limit(1);
           
-        if (userMsgError) {
-          console.error('Error saving user message:', userMsgError);
+        if (checkError) {
+          console.error('Error checking for existing messages:', checkError);
         }
         
-        // Save assistant response
-        const { error: assistantMsgError } = await supabase
+        // Only save user message if it doesn't already exist
+        if (!existingUserMsgs || existingUserMsgs.length === 0) {
+          // Save user message
+          const { error: userMsgError } = await supabase
+            .from('chat_messages')
+            .insert({
+              thread_id: threadId,
+              content: message,
+              sender: 'user'
+            });
+            
+          if (userMsgError) {
+            console.error('Error saving user message:', userMsgError);
+          }
+        } else {
+          console.log('User message already exists, skipping insertion');
+        }
+        
+        // Check if assistant message already exists (to prevent duplicates on retries)
+        const { data: existingAssistantMsgs, error: checkAssistantError } = await supabase
           .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            content: responseContent,
-            sender: 'assistant'
-          });
+          .select('id')
+          .eq('thread_id', threadId)
+          .eq('content', responseContent)
+          .eq('sender', 'assistant')
+          .order('created_at', { ascending: false })
+          .limit(1);
           
-        if (assistantMsgError) {
-          console.error('Error saving assistant message:', assistantMsgError);
+        if (checkAssistantError) {
+          console.error('Error checking for existing assistant messages:', checkAssistantError);
+        }
+        
+        // Only save assistant message if it doesn't already exist
+        if (!existingAssistantMsgs || existingAssistantMsgs.length === 0) {
+          // Save assistant response
+          const { error: assistantMsgError } = await supabase
+            .from('chat_messages')
+            .insert({
+              thread_id: threadId,
+              content: responseContent,
+              sender: 'assistant'
+            });
+            
+          if (assistantMsgError) {
+            console.error('Error saving assistant message:', assistantMsgError);
+          }
+        } else {
+          console.log('Assistant message already exists, skipping insertion');
         }
         
         // Update thread's updated_at timestamp
