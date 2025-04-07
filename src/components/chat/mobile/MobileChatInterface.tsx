@@ -438,6 +438,16 @@ export default function MobileChatInterface({
     if (!currentThreadId) return;
     
     try {
+      const { data: allThreads, error: fetchError } = await supabase
+        .from('chat_threads')
+        .select('id, title')
+        .eq('user_id', user?.id)
+        .order('updated_at', { ascending: false });
+        
+      if (fetchError) throw fetchError;
+      
+      const otherThreads = allThreads ? allThreads.filter(thread => thread.id !== currentThreadId) : [];
+      
       const { error: messagesError } = await supabase
         .from('chat_messages')
         .delete()
@@ -452,10 +462,34 @@ export default function MobileChatInterface({
         
       if (threadError) throw threadError;
       
-      // Reset states
+      let targetThreadId = null;
+      let emptyThreadFound = false;
+      
+      if (otherThreads.length > 0) {
+        for (const thread of otherThreads) {
+          const { count, error: countError } = await supabase
+            .from('chat_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('thread_id', thread.id);
+            
+          if (!countError && count === 0) {
+            targetThreadId = thread.id;
+            emptyThreadFound = true;
+            break;
+          }
+          
+          if (thread.title === "New Conversation") {
+            targetThreadId = thread.id;
+            break;
+          }
+        }
+        
+        if (!emptyThreadFound && targetThreadId === null) {
+          targetThreadId = otherThreads[0].id;
+        }
+      }
+      
       setMessages([]);
-      setCurrentThreadId(null);
-      localStorage.removeItem("lastActiveChatThreadId");
       setIsDeleteDialogOpen(false);
       setShowSuggestions(true);
       
@@ -464,23 +498,10 @@ export default function MobileChatInterface({
         description: "The conversation has been deleted successfully.",
       });
       
-      // Create a new thread automatically
-      if (onCreateNewThread) {
-        await onCreateNewThread();
-      } else {
-        const newThreadId = uuidv4();
-        if (user?.id) {
-          const { error } = await supabase
-            .from('chat_threads')
-            .insert({
-              id: newThreadId,
-              user_id: user.id,
-              title: "New Conversation",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-          
-          if (!error) {
+      if (!targetThreadId) {
+        if (onCreateNewThread) {
+          const newThreadId = await onCreateNewThread();
+          if (newThreadId) {
             setCurrentThreadId(newThreadId);
             localStorage.setItem("lastActiveChatThreadId", newThreadId);
             window.dispatchEvent(
@@ -489,10 +510,47 @@ export default function MobileChatInterface({
               })
             );
           }
+        } else {
+          const newThreadId = uuidv4();
+          if (user?.id) {
+            const { error } = await supabase
+              .from('chat_threads')
+              .insert({
+                id: newThreadId,
+                user_id: user.id,
+                title: "New Conversation",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+            
+            if (!error) {
+              setCurrentThreadId(newThreadId);
+              localStorage.setItem("lastActiveChatThreadId", newThreadId);
+              window.dispatchEvent(
+                new CustomEvent('threadSelected', { 
+                  detail: { threadId: newThreadId } 
+                })
+              );
+            }
+          }
+        }
+      } else {
+        setCurrentThreadId(targetThreadId);
+        localStorage.setItem("lastActiveChatThreadId", targetThreadId);
+        
+        if (onSelectThread) {
+          onSelectThread(targetThreadId);
+        } else {
+          window.dispatchEvent(
+            new CustomEvent('threadSelected', { 
+              detail: { threadId: targetThreadId } 
+            })
+          );
+          
+          loadThreadMessages(targetThreadId);
         }
       }
       
-      // Notify other components that thread was deleted
       window.dispatchEvent(
         new CustomEvent('threadDeleted', { 
           detail: { threadId: currentThreadId } 

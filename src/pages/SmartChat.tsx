@@ -241,6 +241,82 @@ export default function SmartChat() {
     );
   };
 
+  const handleThreadDeleted = async (deletedThreadId: string) => {
+    if (deletedThreadId !== currentThreadId) {
+      // Not the current thread, no need to do anything
+      return;
+    }
+    
+    try {
+      // Find another thread to switch to
+      const { data: threads, error } = await supabase
+        .from('chat_threads')
+        .select('id')
+        .eq('user_id', user?.id)
+        .order('updated_at', { ascending: false })
+        .limit(5);
+        
+      if (error) throw error;
+      
+      if (threads && threads.length > 0) {
+        // Filter out the deleted thread
+        const otherThreads = threads.filter(thread => thread.id !== deletedThreadId);
+        
+        if (otherThreads.length > 0) {
+          // Find an empty thread
+          for (const thread of otherThreads) {
+            const { count, error: countError } = await supabase
+              .from('chat_messages')
+              .select('*', { count: 'exact', head: true })
+              .eq('thread_id', thread.id);
+              
+            if (!countError && count === 0) {
+              // Empty thread found, switch to it
+              handleSelectThread(thread.id);
+              return;
+            }
+          }
+          
+          // No empty threads, just use the most recent one
+          handleSelectThread(otherThreads[0].id);
+        } else {
+          // No other threads available, create a new one
+          const newThreadId = await createNewThread();
+          if (newThreadId) {
+            handleSelectThread(newThreadId);
+          }
+        }
+      } else {
+        // No threads available, create a new one
+        const newThreadId = await createNewThread();
+        if (newThreadId) {
+          handleSelectThread(newThreadId);
+        }
+      }
+    } catch (error) {
+      console.error("Error handling thread deletion:", error);
+      // Create a new thread as fallback
+      const newThreadId = await createNewThread();
+      if (newThreadId) {
+        handleSelectThread(newThreadId);
+      }
+    }
+  };
+  
+  useEffect(() => {
+    const handleThreadDeletedEvent = (event: CustomEvent) => {
+      if (event.detail?.threadId) {
+        handleThreadDeleted(event.detail.threadId);
+      }
+    };
+    
+    window.addEventListener('threadDeleted' as any, handleThreadDeletedEvent);
+    
+    return () => {
+      window.removeEventListener('threadDeleted' as any, handleThreadDeletedEvent);
+    };
+  }, [currentThreadId, user?.id]);
+
   const desktopContent = (
     <>
       <Navbar />
