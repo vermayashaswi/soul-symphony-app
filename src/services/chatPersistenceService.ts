@@ -58,13 +58,21 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
     }
     
     // Transform the data to ensure sender is of type 'user' | 'assistant'
-    return (data || []).map(msg => ({
-      ...msg,
-      sender: msg.sender === 'user' ? 'user' : 'assistant' as 'user' | 'assistant',
-      reference_entries: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-      analysis_data: msg.analysis_data || undefined,
-      has_numeric_result: msg.has_numeric_result || undefined
-    }));
+    // and handle other optional fields correctly
+    return (data || []).map(msg => {
+      // Create a properly typed object that includes all the fields we need
+      const typedMessage: ChatMessage = {
+        id: msg.id,
+        thread_id: msg.thread_id,
+        content: msg.content,
+        created_at: msg.created_at,
+        sender: msg.sender === 'user' ? 'user' : 'assistant',
+        reference_entries: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
+        has_numeric_result: msg.has_numeric_result || false
+      };
+      
+      return typedMessage;
+    });
   } catch (error) {
     console.error("Failed to get thread messages:", error);
     return [];
@@ -105,14 +113,23 @@ export const saveMessage = async (
       .update({ updated_at: new Date().toISOString() })
       .eq('id', threadId);
     
-    // Transform the data to ensure sender is of type 'user' | 'assistant'
-    return {
-      ...data,
-      sender: data.sender === 'user' ? 'user' : 'assistant' as 'user' | 'assistant',
+    // Create a properly typed object that includes all the fields we need
+    const typedMessage: ChatMessage = {
+      id: data.id,
+      thread_id: data.thread_id,
+      content: data.content,
+      created_at: data.created_at,
+      sender: data.sender === 'user' ? 'user' : 'assistant',
       reference_entries: data.reference_entries ? Array.isArray(data.reference_entries) ? data.reference_entries : [] : undefined,
-      analysis_data: data.analysis_data || undefined,
-      has_numeric_result: data.has_numeric_result || undefined
-    } as ChatMessage;
+      has_numeric_result: data.has_numeric_result || false
+    };
+    
+    // Include analysis_data if it was provided
+    if (analysisData) {
+      typedMessage.analysis_data = analysisData;
+    }
+    
+    return typedMessage;
   } catch (error) {
     console.error("Failed to save message:", error);
     return null;
