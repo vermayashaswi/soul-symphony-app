@@ -1,7 +1,8 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const EmptyChatState: React.FC = () => {
   return (
@@ -22,13 +23,26 @@ const EmptyChatState: React.FC = () => {
       
       <div className="mt-6 text-sm text-muted-foreground/70">
         <p>Try questions like:</p>
-        <ul className="mt-1">
-          <li>"How did I feel last week?"</li>
-          <li>"What makes me happy?"</li>
-          <li>"Which entries mention work stress?"</li>
-          <li>"Show me my emotional trends"</li>
+        <ul className="mt-1 space-y-1">
+          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "How did I feel last week?"</li>
+          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "What makes me happy?"</li>
+          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "Which entries mention work stress?"</li>
+          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "Show me my emotional trends"</li>
         </ul>
       </div>
+      
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="mt-6"
+        onClick={() => {
+          // Trigger a new chat creation
+          const newChatButton = document.querySelector('[data-testid="new-chat-button"]') as HTMLButtonElement;
+          if (newChatButton) newChatButton.click();
+        }}
+      >
+        Start New Conversation
+      </Button>
     </motion.div>
   );
 };
