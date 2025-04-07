@@ -97,9 +97,11 @@ export default function Insights() {
   }, [loading, insightsData]);
 
   const getSentimentData = () => {
-    if (!insightsData.entries || insightsData.entries.length === 0) return [];
+    // Use all entries instead of just the filtered ones for the current time range
+    const entries = insightsData.allEntries || [];
+    if (entries.length === 0) return [];
     
-    return insightsData.entries.map(entry => ({
+    return entries.map(entry => ({
       date: new Date(entry.created_at),
       sentiment: parseFloat(entry.sentiment || 0)
     }));

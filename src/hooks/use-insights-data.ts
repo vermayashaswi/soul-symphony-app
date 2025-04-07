@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
@@ -37,11 +38,13 @@ interface InsightsData {
   biggestImprovement: BiggestImprovement | null;
   journalActivity: JournalActivity;
   aggregatedEmotionData: AggregatedEmotionData;
+  allEntries: any[]; // Store all entries separately for full calendar view
 }
 
 export const useInsightsData = (userId: string | undefined, timeRange: TimeRange) => {
   const [insightsData, setInsightsData] = useState<InsightsData>({
     entries: [],
+    allEntries: [],
     dominantMood: null,
     biggestImprovement: null,
     journalActivity: {
@@ -63,7 +66,21 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
 
     setLoading(true);
     try {
-      // Get date range based on timeRange
+      // First, fetch ALL entries for this user (for the full calendar view)
+      const { data: allEntries, error: allEntriesError } = await supabase
+        .from('Journal Entries')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (allEntriesError) {
+        console.error('Error fetching all journal entries:', allEntriesError);
+        throw allEntriesError;
+      }
+
+      console.log(`Found ${allEntries?.length || 0} total entries for user`);
+
+      // Get date range based on timeRange for filtered view
       const { startDate, endDate } = getDateRange(timeRange);
       
       console.log(`Fetching entries for ${timeRange}:`, {
@@ -72,25 +89,18 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
         userId
       });
 
-      // Fetch journal entries for the specified time range
-      const { data: entries, error } = await supabase
-        .from('Journal Entries')
-        .select('*')
-        .eq('user_id', userId)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
-        .order('created_at', { ascending: false });
+      // Filter entries for the current time range
+      const entries = allEntries?.filter(entry => {
+        const entryDate = new Date(entry.created_at);
+        return entryDate >= startDate && entryDate <= endDate;
+      }) || [];
 
-      if (error) {
-        console.error('Error fetching insights data:', error);
-        throw error;
-      }
-
-      console.log(`Found ${entries?.length || 0} entries for ${timeRange}`);
+      console.log(`Filtered ${entries.length} entries for ${timeRange}`);
 
       if (!entries || entries.length === 0) {
         setInsightsData({
           entries: [],
+          allEntries: allEntries || [],
           dominantMood: null,
           biggestImprovement: null,
           journalActivity: { entryCount: 0, streak: 0, maxStreak: 0 },
@@ -109,12 +119,14 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       // Log the processed data for debugging
       console.log(`[useInsightsData] Processed for ${timeRange}:`, {
         entryCount: entries.length,
+        totalEntryCount: allEntries?.length || 0,
         emotionCount: Object.keys(aggregatedEmotionData).length,
         timeRange
       });
 
       setInsightsData({
         entries,
+        allEntries: allEntries || [],
         dominantMood,
         biggestImprovement,
         journalActivity,

@@ -52,42 +52,19 @@ interface SentimentCalendarProps {
   timeRange: 'today' | 'week' | 'month' | 'year';
 }
 
-function getEmoji(sentiment: number): JSX.Element {
-  if (sentiment >= 0.2) {
-    return <span role="img" aria-label="happy" className="text-primary">🙂</span>;
-  }
-  if (sentiment >= -0.2) {
-    return <span role="img" aria-label="neutral" className="text-primary">😐</span>;
-  }
-  return <span role="img" aria-label="sad" className="text-primary">🙁</span>;
+// Get color based on sentiment value
+function getSentimentColor(sentiment: number): string {
+  if (sentiment >= 0.6) return "bg-green-500"; // Very Positive
+  if (sentiment >= 0.2) return "bg-emerald-400"; // Positive
+  if (sentiment >= 0) return "bg-blue-400"; // Slightly Positive
+  if (sentiment >= -0.2) return "bg-yellow-400"; // Neutral
+  if (sentiment >= -0.6) return "bg-orange-400"; // Negative
+  return "bg-red-500"; // Very Negative
 }
 
-function getEmojiColor(sentiment: number): string {
-  if (sentiment >= 0.2) return "text-green-500"; 
-  if (sentiment >= -0.2) return "text-yellow-500"; 
-  return "text-red-500";
-}
-
-function getMoodText(sentiment: number): string {
-  if (sentiment >= 0.2) return "Happy";
-  if (sentiment >= -0.2) return "Neutral";
-  return "Sad";
-}
-
-function getEmojiChar(sentiment: number): string {
-  if (sentiment >= 0.2) return "🙂";
-  if (sentiment >= -0.2) return "😐";
-  return "🙁";
-}
-
-function getContainerBgColor(sentiment: number): string {
-  if (sentiment >= 0.2) return "bg-green-500/75 dark:bg-green-700"; 
-  if (sentiment >= -0.2) return "bg-yellow-500/75 dark:bg-yellow-700"; 
-  return "bg-red-500/75 dark:bg-red-700";
-}
-
-const EmptyCircle = () => (
-  <div className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center">
+// Empty placeholder for days without data
+const EmptyBox = () => (
+  <div className="w-6 h-6 rounded-md border-2 border-gray-300 dark:border-gray-600">
     <span className="sr-only">No data</span>
   </div>
 );
@@ -97,7 +74,7 @@ type ViewMode = 'calendar' | 'graph';
 export default function SentimentCalendar({ sentimentData, timeRange }: SentimentCalendarProps) {
   const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
-  const { theme, colorTheme, customColor } = useTheme();
+  const { theme } = useTheme();
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   
@@ -163,19 +140,13 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const sentimentInfo = React.useMemo(() => {
     const infoMap = new Map<string, {
       sentiment: number;
-      emoji: JSX.Element;
       colorClass: string;
-      moodText: string;
-      emojiChar: string;
     }>();
     
     dailySentiment.forEach((avgSentiment, dateKey) => {
       infoMap.set(dateKey, {
         sentiment: avgSentiment,
-        emoji: getEmoji(avgSentiment),
-        colorClass: getEmojiColor(avgSentiment),
-        moodText: getMoodText(avgSentiment),
-        emojiChar: getEmojiChar(avgSentiment)
+        colorClass: getSentimentColor(avgSentiment)
       });
     });
     
@@ -276,24 +247,20 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         {todaySentiment ? (
           <motion.div 
             className={cn(
-              "rounded-full p-12 flex items-center justify-center",
-              getContainerBgColor(todaySentiment.sentiment)
+              "rounded-md w-28 h-28 flex items-center justify-center",
+              todaySentiment.colorClass
             )}
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, type: "spring" }}
-          >
-            <span className="text-6xl text-white">{todaySentiment.emojiChar}</span>
-          </motion.div>
+          />
         ) : (
           <motion.div 
-            className="rounded-full p-12 flex items-center justify-center"
+            className="rounded-md w-28 h-28 border-4 border-gray-300 dark:border-gray-600"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, type: "spring" }}
-          >
-            <div className="w-24 h-24 rounded-full border-4 border-gray-300 dark:border-gray-600"></div>
-          </motion.div>
+          />
         )}
         
         <div className="mt-6 text-lg">
@@ -397,13 +364,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 </div>
                 {daySentiment ? (
                   <div className={cn(
-                    "text-2xl flex items-center justify-center rounded-full w-full h-7",
-                    getContainerBgColor(daySentiment.sentiment)
-                  )}>
-                    <span className="text-white">{daySentiment.emojiChar}</span>
-                  </div>
+                    "w-7 h-7 rounded-md", 
+                    daySentiment.colorClass
+                  )}/>
                 ) : (
-                  <EmptyCircle />
+                  <EmptyBox />
                 )}
               </div>
             );
@@ -479,19 +444,17 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                     </span>
                     
                     {info ? (
-                      <motion.span 
+                      <motion.div 
                         className={cn(
-                          "text-base w-6 h-6 flex items-center justify-center rounded-full",
-                          getContainerBgColor(info.sentiment)
+                          "w-6 h-6 rounded-md",
+                          info.colorClass
                         )}
                         initial={{ scale: 0.5 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.1, duration: 0.2 }}
-                      >
-                        <span className="text-white">{info.emojiChar}</span>
-                      </motion.span>
+                      />
                     ) : isSameMonthValue ? (
-                      <EmptyCircle />
+                      <EmptyBox />
                     ) : null}
                   </div>
                 </div>
@@ -510,104 +473,109 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     
-    const monthlySentiment = new Map<number, { total: number, count: number }>();
-    
-    filteredData.forEach(item => {
-      const month = item.date.getMonth();
-      if (!monthlySentiment.has(month)) {
-        monthlySentiment.set(month, { total: 0, count: 0 });
-      }
-      const current = monthlySentiment.get(month)!;
-      current.total += item.sentiment;
-      current.count += 1;
+    // Get all days in the year and organize them by month
+    const yearData = Array.from({ length: 12 }, (_, month) => {
+      const daysInMonth = new Date(new Date().getFullYear(), month + 1, 0).getDate();
+      
+      // Create array of days for this month
+      return Array.from({ length: daysInMonth }, (_, day) => {
+        const date = new Date(new Date().getFullYear(), month, day + 1);
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const sentiment = dailySentiment.get(dateStr);
+        
+        return {
+          date,
+          dateStr,
+          day: day + 1,
+          sentiment,
+          colorClass: sentiment !== undefined ? getSentimentColor(sentiment) : null
+        };
+      });
     });
     
-    const monthlyAverages = new Map<number, number>();
-    monthlySentiment.forEach((value, month) => {
-      monthlyAverages.set(month, value.total / value.count);
-    });
-
-    const currentMonth = today.getMonth();
-
+    const maxDaysInMonth = Math.max(...yearData.map(month => month.length));
+    
     return (
-      <div className="py-4">
-        <div className="grid grid-cols-6 gap-0 text-center mb-2">
-          {months.slice(0, 6).map((month) => (
-            <div key={month} className="text-xs font-medium text-muted-foreground">
-              {month}
-            </div>
-          ))}
+      <div className="py-4 px-2">
+        <div className="text-center text-lg font-semibold mb-4">
+          Year in Pixels - {new Date().getFullYear()}
         </div>
         
-        <div className="grid grid-cols-6 gap-0 mb-4">
-          {months.slice(0, 6).map((month, index) => {
-            const monthSentiment = monthlyAverages.get(index);
-            const isCurrentMonth = index === currentMonth;
-            
-            return (
-              <div 
-                key={month}
-                className={cn(
-                  "aspect-square rounded-md flex flex-col items-center justify-center p-1",
-                  isCurrentMonth && "ring-2 ring-theme hover:ring-theme"
-                )}
-              >
-                <div className="text-xs font-medium mb-1">
+        <div className="overflow-x-auto">
+          <div className="min-w-max">
+            {/* Month headers */}
+            <div className="grid grid-cols-12 gap-1 mb-2">
+              <div className="w-6"></div> {/* Empty corner for day numbers */}
+              {months.map(month => (
+                <div key={month} className="text-xs font-medium text-center text-muted-foreground">
                   {month}
                 </div>
-                {monthSentiment !== undefined ? (
-                  <div className={cn(
-                    "text-2xl w-full h-7 flex items-center justify-center rounded-full",
-                    getContainerBgColor(monthSentiment)
-                  )}>
-                    <span className="text-white">{getEmojiChar(monthSentiment)}</span>
-                  </div>
-                ) : (
-                  <EmptyCircle />
-                )}
-              </div>
-            );
-          })}
-        </div>
-        
-        <div className="grid grid-cols-6 gap-0 text-center mb-2">
-          {months.slice(6, 12).map((month) => (
-            <div key={month} className="text-xs font-medium text-muted-foreground">
-              {month}
+              ))}
             </div>
-          ))}
+            
+            {/* Days grid */}
+            {Array.from({ length: maxDaysInMonth }, (_, dayIndex) => (
+              <div key={dayIndex} className="grid grid-cols-13 gap-1 mb-1">
+                {/* Day number on left */}
+                <div className="text-xs text-right pr-1 text-muted-foreground font-medium">
+                  {dayIndex + 1}
+                </div>
+                
+                {/* Month columns */}
+                {yearData.map((month, monthIndex) => {
+                  // Check if this day exists in this month
+                  const dayData = month[dayIndex];
+                  if (!dayData) return <div key={monthIndex} className="w-5 h-5"></div>;
+                  
+                  const isToday = isSameDay(dayData.date, today);
+                  
+                  return (
+                    <div 
+                      key={monthIndex} 
+                      className={cn(
+                        "w-5 h-5 rounded-full flex items-center justify-center",
+                        isToday && "ring-1 ring-primary"
+                      )}
+                    >
+                      {dayData.colorClass ? (
+                        <div className={cn("w-5 h-5 rounded-full", dayData.colorClass)} />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
         
-        <div className="grid grid-cols-6 gap-0">
-          {months.slice(6, 12).map((month, index) => {
-            const actualIndex = index + 6;
-            const monthSentiment = monthlyAverages.get(actualIndex);
-            const isCurrentMonth = actualIndex === currentMonth;
-            
-            return (
-              <div 
-                key={month}
-                className={cn(
-                  "aspect-square rounded-md flex flex-col items-center justify-center p-1",
-                  isCurrentMonth && "ring-2 ring-theme hover:ring-theme"
-                )}
-              >
-                <div className="text-xs font-medium mb-1">
-                  {month}
-                </div>
-                {monthSentiment !== undefined ? (
-                  <div className={cn(
-                    "text-2xl w-full h-7 flex items-center justify-center rounded-full",
-                    getContainerBgColor(monthSentiment)
-                  )}>
-                    <span className="text-white">{getEmojiChar(monthSentiment)}</span>
-                  </div>
-                ) : (
-                  <EmptyCircle />
-                )}
-              </div>
-            );
-          })}
+        {/* Legend */}
+        <div className="flex flex-wrap justify-center gap-3 mt-6">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-green-500"></div>
+            <span className="text-xs">Very Positive</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-emerald-400"></div>
+            <span className="text-xs">Positive</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-blue-400"></div>
+            <span className="text-xs">Slightly Positive</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-yellow-400"></div>
+            <span className="text-xs">Neutral</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-orange-400"></div>
+            <span className="text-xs">Negative</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-red-500"></div>
+            <span className="text-xs">Very Negative</span>
+          </div>
         </div>
       </div>
     );
@@ -700,7 +668,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             <span className="text-sm">Positive</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
             <span className="text-sm">Neutral</span>
           </div>
           <div className="flex items-center gap-2">
