@@ -129,11 +129,24 @@ export function useIsMobile() {
     };
   }, []);
 
-  return {
+  // Make this function backward compatible by allowing it to be used as a boolean directly
+  const result = {
     isMobile: isInitialized ? isMobile : false,
     isIOS: isInitialized ? isIOS : false,
     isAndroid: isInitialized ? isAndroid : false
-  };
+  } as const;
+  
+  // Add a valueOf method to make the object behave like a boolean
+  Object.defineProperty(result, 'valueOf', {
+    value: function() { return this.isMobile; }
+  });
+  
+  // Add toString method for string coercion
+  Object.defineProperty(result, 'toString', {
+    value: function() { return String(this.isMobile); }
+  });
+
+  return result;
 }
 
 // Add an alias export so that Chat.tsx can import it as useMobile

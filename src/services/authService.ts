@@ -14,9 +14,17 @@ export const getRedirectUrl = (): string => {
   }
   
   // For iOS in standalone mode (PWA), we need to handle redirects differently
-  const isInStandaloneMode = () => 
-    window.navigator.standalone || 
-    window.matchMedia('(display-mode: standalone)').matches;
+  // Check for standalone mode in a type-safe way
+  const isInStandaloneMode = () => {
+    // Check for display-mode: standalone media query (PWA)
+    const standaloneCheck = window.matchMedia('(display-mode: standalone)').matches;
+    
+    // Check for navigator.standalone (iOS Safari)
+    // @ts-ignore - This is valid on iOS Safari but not in the TypeScript types
+    const iosSafariStandalone = window.navigator.standalone;
+    
+    return standaloneCheck || iosSafariStandalone;
+  };
     
   // For PWA on iOS, we want to avoid redirects that might break the app
   if (isInStandaloneMode() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
