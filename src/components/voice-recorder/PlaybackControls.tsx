@@ -33,7 +33,7 @@ export function PlaybackControls({
 }: PlaybackControlsProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [isClearingToasts, setIsClearingToasts] = useState(false);
-  const isMobile = useIsMobile();
+  const { isMobile } = useIsMobile();
   
   // Update current time based on playback progress
   useEffect(() => {

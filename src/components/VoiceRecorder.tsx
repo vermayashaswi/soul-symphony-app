@@ -32,6 +32,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [audioPrepared, setAudioPrepared] = useState(false);
   const [waitingForClear, setWaitingForClear] = useState(false);
   const [toastsCleared, setToastsCleared] = useState(false);
+  const [playbackAudioLevel, setPlaybackAudioLevel] = useState(0);
+  const [lastPlaybackTime, setLastPlaybackTime] = useState(0);
+  const playbackLevelInterval = useRef<number | null>(null);
   const saveCompleteRef = useRef(false);
   const savingInProgressRef = useRef(false);
   const domClearAttemptedRef = useRef(false);
@@ -62,15 +65,54 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     audioRef,
     reset: resetPlayback,
     seekTo,
-    prepareAudio
+    prepareAudio,
+    currentPlaybackTime
   } = useAudioPlayback({ 
     audioBlob,
     onPlaybackStart: () => {
       console.log('[VoiceRecorder] Playback started');
       setHasPlayedOnce(true);
+      
+      // Initialize playback visualization
+      if (playbackLevelInterval.current) {
+        window.clearInterval(playbackLevelInterval.current);
+      }
+      
+      playbackLevelInterval.current = window.setInterval(() => {
+        if (isPlaying) {
+          // Generate somewhat realistic audio levels based on playback time and progress
+          const now = Date.now();
+          const timeDiff = now - lastPlaybackTime;
+          setLastPlaybackTime(now);
+          
+          // Create variations in the audio level that seem natural
+          const baseLevel = 30 + (Math.sin(currentPlaybackTime * 3) * 15); 
+          const randomFactor = Math.random() * 20;
+          const timeFactorFluctuation = Math.sin(now / 500) * 10;
+          
+          // Every few seconds, add a "peak" in audio level to simulate speech patterns
+          const peakFactor = (now % 2000 < 200) ? 20 : 0;
+          
+          const newLevel = Math.min(90, Math.max(10, 
+            baseLevel + randomFactor + timeFactorFluctuation + peakFactor
+          ));
+          
+          setPlaybackAudioLevel(newLevel);
+          
+          // Occasionally add a ripple for visual interest
+          if (Math.random() < 0.03 && newLevel > 40) {
+            setRipples(prev => [...prev, Date.now()]);
+          }
+        }
+      }, 50);
     },
     onPlaybackEnd: () => {
       console.log('[VoiceRecorder] Playback ended');
+      if (playbackLevelInterval.current) {
+        window.clearInterval(playbackLevelInterval.current);
+        playbackLevelInterval.current = null;
+      }
+      setPlaybackAudioLevel(0);
     }
   });
 
@@ -85,6 +127,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     
     return () => {
       clearAllToasts();
+      if (playbackLevelInterval.current) {
+        window.clearInterval(playbackLevelInterval.current);
+        playbackLevelInterval.current = null;
+      }
     };
   }, []);
 
@@ -117,9 +163,17 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       prepareAudio().then(duration => {
         console.log('[VoiceRecorder] Audio prepared with duration:', duration);
         setAudioPrepared(true);
+        
+        // Update debug info with actual duration
+        if (updateDebugInfo) {
+          updateDebugInfo({
+            status: 'Audio Prepared',
+            duration: duration
+          });
+        }
       });
     }
-  }, [audioBlob, audioPrepared, prepareAudio]);
+  }, [audioBlob, audioPrepared, prepareAudio, updateDebugInfo]);
   
   useEffect(() => {
     console.log('[VoiceRecorder] State update:', {
@@ -140,11 +194,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       updateDebugInfo({
         status: isRecording 
           ? 'Recording' 
-          : (audioBlob ? 'Recorded' : 'No Recording'),
+          : (isPlaying ? 'Playing' : (audioBlob ? 'Recorded' : 'No Recording')),
         duration: audioDuration || recordingTime
       });
     }
-  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
+  }, [isProcessing, audioBlob, isRecording, isPlaying, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
   useEffect(() => {
     return () => {
@@ -156,6 +210,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       
       // Clear all toasts when component unmounts to prevent lingering toasts
       clearAllToasts();
+      
+      if (playbackLevelInterval.current) {
+        window.clearInterval(playbackLevelInterval.current);
+        playbackLevelInterval.current = null;
+      }
     };
   }, [isProcessing]);
   
@@ -309,9 +368,15 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     setHasSaved(false);
     setHasPlayedOnce(false);
     setAudioPrepared(false);
+    setPlaybackAudioLevel(0);
     saveCompleteRef.current = false;
     savingInProgressRef.current = false;
     domClearAttemptedRef.current = false;
+    
+    if (playbackLevelInterval.current) {
+      window.clearInterval(playbackLevelInterval.current);
+      playbackLevelInterval.current = null;
+    }
     
     // Wait a bit before showing any new toasts
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -320,6 +385,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       duration: 2000
     });
   };
+
+  // Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (playbackLevelInterval.current) {
+        window.clearInterval(playbackLevelInterval.current);
+        playbackLevelInterval.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
@@ -342,8 +417,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               <RecordingVisualizer 
                 isRecording={false} 
                 isPlaying={isPlaying}
-                audioLevel={audioLevel > 0 ? audioLevel : (playbackProgress * 100 * 0.7) + 
-                  (Math.sin(Date.now() / 200) * 20) + 30}
+                audioLevel={isPlaying ? playbackAudioLevel : audioLevel}
                 height={80}
                 color="primary"
               />
@@ -368,7 +442,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                 console.log('[VoiceRecorder] Requesting permissions');
                 requestPermissions();
               }}
-              audioLevel={audioLevel}
+              audioLevel={isRecording ? audioLevel : (isPlaying ? playbackAudioLevel : 0)}
               showAnimation={false}
               disabled={!isRecording && audioBlob !== null} // Disable mic button after recording
             />
