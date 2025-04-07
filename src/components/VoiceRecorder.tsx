@@ -34,6 +34,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [toastsCleared, setToastsCleared] = useState(false);
   const [playbackAudioLevel, setPlaybackAudioLevel] = useState(0);
   const [lastPlaybackTime, setLastPlaybackTime] = useState(0);
+  const [localRipples, setLocalRipples] = useState<number[]>([]);
   const playbackLevelInterval = useRef<number | null>(null);
   const saveCompleteRef = useRef(false);
   const savingInProgressRef = useRef(false);
@@ -101,7 +102,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           
           // Occasionally add a ripple for visual interest
           if (Math.random() < 0.03 && newLevel > 40) {
-            setRipples(prev => [...prev, Date.now()]);
+            setLocalRipples(prev => [...prev, Date.now()]);
           }
         }
       }, 50);
@@ -369,6 +370,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     setHasPlayedOnce(false);
     setAudioPrepared(false);
     setPlaybackAudioLevel(0);
+    setLocalRipples([]);
     saveCompleteRef.current = false;
     savingInProgressRef.current = false;
     domClearAttemptedRef.current = false;
@@ -420,6 +422,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                 audioLevel={isPlaying ? playbackAudioLevel : audioLevel}
                 height={80}
                 color="primary"
+                ripples={isPlaying ? localRipples : ripples}
               />
             </div>
           )}
