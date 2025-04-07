@@ -34,6 +34,10 @@
     --ring: 222.2 84% 4.9%;
 
     --radius: 0.5rem;
+    
+    /* Theme color variables for the app - adding purple */
+    --theme-color: 258 83% 90%;
+    --theme-color-dark: 258 83% 35%;
   }
 
   .dark {
@@ -64,6 +68,10 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+    
+    /* Dark theme color variables */
+    --theme-color: 258 83% 65%;
+    --theme-color-dark: 258 83% 45%;
   }
 }
 
@@ -76,11 +84,29 @@
   }
 }
 
-/* Add styles for chat thread buttons that appear on hover */
-.chat-thread-list .flex.items-center:hover .chat-thread-buttons {
+/* Add styles for chat thread buttons that are always visible */
+.chat-thread-list .chat-thread-buttons {
   opacity: 1;
+  display: flex;
 }
 
-.thread-edit-button:hover, .thread-delete-button:hover {
-  @apply bg-accent/70;
+.thread-edit-button, .thread-delete-button {
+  @apply bg-accent/30;
+  color: #9b87f5;
+}
+
+.bg-theme-color {
+  background-color: #9b87f5;
+}
+
+.hover\:bg-theme-color\/90:hover {
+  background-color: rgba(155, 135, 245, 0.9);
+}
+
+.text-theme-color {
+  color: #9b87f5;
+}
+
+.border-theme-color\/20 {
+  border-color: rgba(155, 135, 245, 0.2);
 }

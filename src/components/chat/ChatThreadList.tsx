@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   PlusCircle, 
@@ -122,7 +121,6 @@ export default function ChatThreadList({
           description: "Conversation deleted"
         });
         
-        // If the currently selected thread was deleted, create a new one
         if (currentThreadId === threadToDelete) {
           onStartNewThread();
         }
@@ -246,7 +244,7 @@ export default function ChatThreadList({
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        className="h-8 px-2"
+                        className="h-8 px-2 bg-primary/10 text-primary"
                         onClick={() => handleUpdateThreadTitle(thread.id)}
                       >
                         Save
@@ -283,7 +281,7 @@ export default function ChatThreadList({
                       </div>
                     </Button>
                     
-                    <div className="flex items-center pr-1 chat-thread-buttons opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center pr-1 chat-thread-buttons">
                       <Button
                         variant="ghost"
                         size="icon"

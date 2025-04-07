@@ -68,26 +68,27 @@
     font-size: 1.25rem !important;
   }
   
-  /* IMPROVED: Chat thread list buttons - always visible and more obvious */
+  /* IMPROVED: Chat thread list buttons - always visible and with purple color */
   .chat-thread-list .chat-thread-buttons {
     display: flex !important;
     opacity: 1 !important;
-    background-color: rgba(0, 0, 0, 0.03);
+    background-color: rgba(155, 135, 245, 0.1);
     border-radius: 0 0.375rem 0.375rem 0;
     padding: 8px 2px;
     margin-left: auto;
     height: 100%;
   }
   
-  /* Ensure the thread buttons have adequate spacing */
+  /* Ensure the thread buttons have adequate spacing and purple styling */
   .chat-thread-list .thread-edit-button,
   .chat-thread-list .thread-delete-button {
     margin: 0 2px !important;
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(155, 135, 245, 0.15);
     border-radius: 6px;
+    color: #9b87f5;
   }
   
-  /* Make thread buttons more touchable on mobile */
+  /* Make thread buttons more touchable on mobile with purple highlights */
   .chat-thread-list .h-8.w-8 {
     min-height: 36px;
     min-width: 36px;
@@ -96,7 +97,7 @@
     justify-content: center;
   }
   
-  /* Ensure the thread buttons are not hidden */
+  /* Ensure the thread buttons are not hidden and have consistent purple styling */
   .chat-thread-list .flex-shrink-0,
   .chat-thread-list .chat-thread-buttons {
     display: flex !important;
@@ -470,8 +471,9 @@
 /* Chat Thread List Styles */
 .chat-thread-list .thread-edit-button,
 .chat-thread-list .thread-delete-button {
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
+  opacity: 1;
+  color: #9b87f5;
+  transition: background-color 0.2s ease-in-out;
 }
 
 .chat-thread-list [data-state="open"] .thread-edit-button,
@@ -481,12 +483,23 @@
   opacity: 1;
 }
 
-/* Thread Edit Button */
-.chat-thread-list .thread-edit-button:hover {
-  color: var(--theme-color);
+/* Thread Edit Button - Always visible with purple styling */
+.chat-thread-list .thread-edit-button {
+  color: #9b87f5;
+  background-color: rgba(155, 135, 245, 0.1);
 }
 
-/* Thread Delete Button */
-.chat-thread-list .thread-delete-button:hover {
-  color: red;
+.chat-thread-list .thread-edit-button:active {
+  background-color: rgba(155, 135, 245, 0.3);
+}
+
+/* Thread Delete Button - Always visible with purple styling */
+.chat-thread-list .thread-delete-button {
+  color: #9b87f5;
+  background-color: rgba(155, 135, 245, 0.1);
+}
+
+.chat-thread-list .thread-delete-button:active {
+  background-color: rgba(255, 0, 0, 0.2);
+  color: #ff5757;
 }
