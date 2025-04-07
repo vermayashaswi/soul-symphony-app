@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { 
@@ -96,7 +97,7 @@ export default function SmartChatInterface() {
       icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
     },
     {
-      text: "Rate my top 3 emotions out of 10 for each of them.",
+      text: "Rate my top positive emotions out of 10.",
       icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-2" />
     }
   ];

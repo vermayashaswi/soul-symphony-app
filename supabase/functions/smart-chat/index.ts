@@ -221,18 +221,49 @@ serve(async (req) => {
           throw userMsgError;
         }
         
-        // Then save assistant response
-        const { error: assistantMsgError } = await supabase
-          .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            content: responseContent,
-            sender: 'assistant'
-          });
+        // Implement retry logic for saving assistant message
+        let assistantMsgError = null;
+        let saveAttempts = 0;
+        const maxAttempts = 3;
+        let assistantMessageSaved = false;
+        
+        while (!assistantMessageSaved && saveAttempts < maxAttempts) {
+          saveAttempts++;
           
-        if (assistantMsgError) {
-          console.error('Error saving assistant message:', assistantMsgError);
-          throw assistantMsgError;
+          console.log(`Attempt ${saveAttempts} to save assistant message`);
+          
+          try {
+            const { error } = await supabase
+              .from('chat_messages')
+              .insert({
+                thread_id: threadId,
+                content: responseContent,
+                sender: 'assistant'
+              });
+              
+            if (error) {
+              console.error(`Error saving assistant message (attempt ${saveAttempts}):`, error);
+              assistantMsgError = error;
+              // Wait before retrying
+              if (saveAttempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * saveAttempts));
+              }
+            } else {
+              assistantMessageSaved = true;
+              console.log('Successfully saved assistant message');
+            }
+          } catch (error) {
+            console.error(`Exception when saving assistant message (attempt ${saveAttempts}):`, error);
+            assistantMsgError = error;
+            if (saveAttempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * saveAttempts));
+            }
+          }
+        }
+        
+        if (!assistantMessageSaved) {
+          console.error('Failed to save assistant message after multiple attempts:', assistantMsgError);
+          // Continue execution but include the error in the response
         }
         
         // Update thread's updated_at timestamp
@@ -243,17 +274,29 @@ serve(async (req) => {
           
         if (threadUpdateError) {
           console.error('Error updating thread timestamp:', threadUpdateError);
-          throw threadUpdateError;
+          // Continue execution but log the error
         }
         
-        console.log('Successfully saved both messages to database');
+        if (assistantMessageSaved) {
+          console.log('Successfully saved both messages to database');
+        } else {
+          return new Response(
+            JSON.stringify({ 
+              data: responseContent,
+              dbError: "Failed to save assistant message after multiple attempts",
+              saveFailure: true
+            }),
+            { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
+        }
       } catch (dbError) {
         console.error('Database error when saving messages:', dbError);
         // Return the response but include the DB error for debugging
         return new Response(
           JSON.stringify({ 
             data: responseContent,
-            dbError: dbError.message
+            dbError: dbError.message,
+            saveFailure: true
           }),
           { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
         );
