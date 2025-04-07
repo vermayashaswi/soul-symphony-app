@@ -138,6 +138,8 @@ export default function SmartChatInterface() {
         
       if (error) throw error;
       
+      console.log(`Found ${data?.length || 0} messages for thread ${threadId}`);
+      
       if (data && data.length > 0) {
         const formattedMessages = data.map((msg: DbChatMessage) => ({
           role: msg.sender === 'user' ? 'user' : 'assistant',

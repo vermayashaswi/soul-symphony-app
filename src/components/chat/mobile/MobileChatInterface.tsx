@@ -190,6 +190,7 @@ export default function MobileChatInterface({
             throw new Error("Failed to create new thread");
           }
           threadId = newThreadId;
+          setCurrentThreadId(newThreadId);
         } else {
           const newThreadId = uuidv4();
           const { error } = await supabase
@@ -232,6 +233,7 @@ export default function MobileChatInterface({
     setProcessingStage("Analyzing your question...");
     
     try {
+      // Save user message to database
       const { error: msgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -299,7 +301,7 @@ export default function MobileChatInterface({
         console.error("[Mobile] Received error response:", response.content);
       }
       
-      // Store the response in Supabase, removing the problematic property check
+      // Store the assistant response in database
       const { error: storeError } = await supabase
         .from('chat_messages')
         .insert({
@@ -329,6 +331,7 @@ export default function MobileChatInterface({
           .eq('id', threadId);
       }
       
+      // Update thread's timestamp
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
