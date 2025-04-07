@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -328,7 +329,7 @@ Please respond with the following guidelines:
    - Suggest gentle, practical self-reflections or actions, only if relevant.
    - Keep responses between 120–180 words, formatted for easy reading.
 
-Example format:
+Example format (only to be used when you feel the need to) :
 - "On Mar 18 and Mar 20, you mentioned feeling drained after social interactions."
 - "Your entry on Apr 2 reflects a desire for deeper connection with others."
 - "Based on these entries, it seems you may lean toward introversion, but more context would help."
