@@ -70,10 +70,20 @@ export default function ChatThreadList({
       }
     };
     
+    const handleThreadDeleted = (event: CustomEvent) => {
+      if (event.detail?.threadId) {
+        setThreads(prevThreads => 
+          prevThreads.filter(thread => thread.id !== event.detail.threadId)
+        );
+      }
+    };
+    
     window.addEventListener('threadTitleUpdated' as any, handleTitleUpdated);
+    window.addEventListener('threadDeleted' as any, handleThreadDeleted);
     
     return () => {
       window.removeEventListener('threadTitleUpdated' as any, handleTitleUpdated);
+      window.removeEventListener('threadDeleted' as any, handleThreadDeleted);
     };
   }, [userId]);
 

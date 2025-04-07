@@ -1,6 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Loader2, BarChart4, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
+import { 
+  Loader2, 
+  BarChart4, 
+  Brain, 
+  BarChart2, 
+  Search, 
+  Lightbulb,
+  MoreVertical,
+  Pencil,
+  Trash,
+  Share2
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -12,6 +23,33 @@ import { motion } from "framer-motion";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatDiagnostics from './ChatDiagnostics';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -56,6 +94,10 @@ export default function SmartChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [newThreadTitle, setNewThreadTitle] = useState("");
+  const [currentThreadTitle, setCurrentThreadTitle] = useState("");
 
   const demoQuestions = [
     {
@@ -186,6 +228,31 @@ export default function SmartChatInterface() {
       window.removeEventListener('newThreadCreated' as any, onThreadChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (currentThreadId) {
+      fetchThreadTitle(currentThreadId);
+    }
+  }, [currentThreadId]);
+
+  const fetchThreadTitle = async (threadId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_threads')
+        .select('title')
+        .eq('id', threadId)
+        .single();
+        
+      if (error) throw error;
+      
+      if (data) {
+        setCurrentThreadTitle(data.title);
+        setNewThreadTitle(data.title);
+      }
+    } catch (error) {
+      console.error("Error fetching thread title:", error);
+    }
+  };
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -460,6 +527,115 @@ export default function SmartChatInterface() {
     }
   };
 
+  const handleRenameThread = async () => {
+    if (!currentThreadId || !newThreadTitle.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from('chat_threads')
+        .update({ 
+          title: newThreadTitle,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentThreadId);
+        
+      if (error) throw error;
+      
+      setCurrentThreadTitle(newThreadTitle);
+      setIsRenameDialogOpen(false);
+      
+      window.dispatchEvent(
+        new CustomEvent('threadTitleUpdated', { 
+          detail: { 
+            threadId: currentThreadId, 
+            title: newThreadTitle 
+          } 
+        })
+      );
+      
+      toast({
+        title: "Thread renamed",
+        description: "The conversation has been renamed successfully.",
+      });
+    } catch (error) {
+      console.error("Error renaming thread:", error);
+      toast({
+        title: "Error",
+        description: "Failed to rename the conversation.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteThread = async () => {
+    if (!currentThreadId) return;
+    
+    try {
+      const { error: messagesError } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('thread_id', currentThreadId);
+        
+      if (messagesError) throw messagesError;
+      
+      const { error: threadError } = await supabase
+        .from('chat_threads')
+        .delete()
+        .eq('id', currentThreadId);
+        
+      if (threadError) throw threadError;
+      
+      setChatHistory([]);
+      setCurrentThreadId(null);
+      localStorage.removeItem(THREAD_ID_STORAGE_KEY);
+      
+      window.dispatchEvent(
+        new CustomEvent('threadDeleted', { 
+          detail: { threadId: currentThreadId } 
+        })
+      );
+      
+      setIsDeleteDialogOpen(false);
+      
+      toast({
+        title: "Thread deleted",
+        description: "The conversation has been deleted successfully.",
+      });
+      
+      fetchUserThreads();
+    } catch (error) {
+      console.error("Error deleting thread:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the conversation.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleShareThread = () => {
+    if (!currentThreadId) return;
+    
+    const url = `${window.location.origin}/chat?thread=${currentThreadId}`;
+    
+    navigator.clipboard.writeText(url).then(
+      () => {
+        toast({
+          title: "URL copied to clipboard",
+          description: "You can now share this conversation with others.",
+        });
+      },
+      (err) => {
+        console.error("Could not copy text: ", err);
+        toast({
+          title: "Error",
+          description: "Failed to copy URL to clipboard.",
+          variant: "destructive"
+        });
+      }
+    );
+  };
+
   return (
     <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background">
       <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b sticky top-0 z-10">
@@ -487,6 +663,37 @@ export default function SmartChatInterface() {
                 <Brain className="h-4 w-4" />
                 {ragDiagnostics.isActive ? "Hide Debug" : "Show Debug"}
               </Button>
+              
+              {currentThreadId && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onClick={() => {
+                      setNewThreadTitle(currentThreadTitle);
+                      setIsRenameDialogOpen(true);
+                    }}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      <span>Rename</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleShareThread}>
+                      <Share2 className="mr-2 h-4 w-4" />
+                      <span>Share</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      className="text-destructive focus:text-destructive" 
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                    >
+                      <Trash className="mr-2 h-4 w-4" />
+                      <span>Delete</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </>
           )}
         </div>
@@ -570,6 +777,56 @@ export default function SmartChatInterface() {
           userId={user?.id}
         />
       </CardFooter>
+      
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename Conversation</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this conversation
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-y-2">
+            <Input
+              id="name"
+              value={newThreadTitle}
+              onChange={(e) => setNewThreadTitle(e.target.value)}
+              placeholder="Conversation name"
+              className="w-full"
+            />
+          </div>
+          <DialogFooter className="sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsRenameDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleRenameThread}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete conversation</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this conversation and all its messages.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteThread}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
