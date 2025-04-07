@@ -54,12 +54,58 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       
       <div
         className={cn(
-          "min-w-0 max-w-[85%] p-4 text-sm shadow-md overflow-hidden",
+          "min-w-0 max-w-[85%] p-4 text-sm shadow-md overflow-hidden relative",
           message.role === 'user' 
             ? 'bg-fuchsia-500 text-white rounded-3xl rounded-br-none' 
             : 'bg-gray-800 text-white rounded-3xl rounded-tl-none border border-gray-700'
         )}
       >
+        {hasReferences && (
+          <div className="absolute top-0 left-0 transform -translate-y-6 z-10">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-0 h-5 flex items-center gap-1 text-fuchsia-400 hover:text-fuchsia-300 text-xs bg-gray-900/80 rounded-full px-2 backdrop-blur-sm"
+              onClick={() => setShowReferences(!showReferences)}
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              {message.references!.length} journal entries
+              {showReferences ? (
+                <ChevronUp className="h-2 w-2 ml-1" />
+              ) : (
+                <ChevronDown className="h-2 w-2 ml-1" />
+              )}
+            </Button>
+            
+            <AnimatePresence>
+              {showReferences && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-1 text-xs max-h-32 overflow-y-auto border border-fuchsia-500/30 rounded-md p-2 bg-gray-900/90 backdrop-blur-sm"
+                >
+                  {message.references!.slice(0, 2).map((ref, idx) => (
+                    <div key={idx} className="mb-1 py-1">
+                      <div className="font-medium text-white/90">
+                        {ref.date && !isNaN(new Date(ref.date).getTime()) 
+                          ? formatShortDate(new Date(ref.date))
+                          : "Unknown date"}
+                      </div>
+                      <div className="text-white/70">{ref.snippet}</div>
+                    </div>
+                  ))}
+                  {message.references!.length > 2 && (
+                    <div className="text-xs text-white/60">
+                      +{message.references!.length - 2} more entries
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+        
         {message.role === 'assistant' ? (
           <div className="prose dark:prose-invert prose-sm max-w-none break-words overflow-hidden text-white">
             <ReactMarkdown>
@@ -83,52 +129,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                 </pre>
               </>
             )}
-          </div>
-        )}
-        
-        {hasReferences && (
-          <div className="mt-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-0 h-7 flex items-center gap-1 text-white/80 hover:text-white"
-              onClick={() => setShowReferences(!showReferences)}
-            >
-              <FileText className="h-4 w-4 mr-1" />
-              {message.references!.length} journal entries
-              {showReferences ? (
-                <ChevronUp className="h-3 w-3 ml-1" />
-              ) : (
-                <ChevronDown className="h-3 w-3 ml-1" />
-              )}
-            </Button>
-            
-            <AnimatePresence>
-              {showReferences && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-1 text-xs max-h-32 overflow-y-auto border-l-2 border-fuchsia-500/30 pl-2 pr-1"
-                >
-                  {message.references!.slice(0, 2).map((ref, idx) => (
-                    <div key={idx} className="mb-1 py-1">
-                      <div className="font-medium text-white/90">
-                        {ref.date && !isNaN(new Date(ref.date).getTime()) 
-                          ? formatShortDate(new Date(ref.date))
-                          : "Unknown date"}
-                      </div>
-                      <div className="text-white/70">{ref.snippet}</div>
-                    </div>
-                  ))}
-                  {message.references!.length > 2 && (
-                    <div className="text-xs text-white/60">
-                      +{message.references!.length - 2} more entries
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         )}
       </div>
