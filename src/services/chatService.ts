@@ -17,36 +17,14 @@ const logUserQuery = async (
   messageId?: string
 ): Promise<void> => {
   try {
-    // Generate embedding for the query to enable semantic search later
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY || ''}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-ada-002',
-        input: queryText,
-      }),
-    });
-
-    let queryEmbedding = null;
-    if (embeddingResponse.ok) {
-      const embeddingData = await embeddingResponse.json();
-      if (embeddingData.data && embeddingData.data.length > 0) {
-        queryEmbedding = embeddingData.data[0].embedding;
-      }
-    }
-
-    // Insert the query into the user_queries table
+    // Insert the query into the user_queries table without generating embeddings
     const { error } = await supabase
       .from('user_queries')
       .insert({
         user_id: userId,
         query_text: queryText,
         thread_id: threadId,
-        message_id: messageId,
-        embedding: queryEmbedding
+        message_id: messageId
       });
 
     if (error) {

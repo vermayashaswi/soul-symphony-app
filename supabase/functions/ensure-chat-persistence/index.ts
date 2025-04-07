@@ -7,13 +7,6 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Get OpenAI API key from environment variable
-const apiKey = Deno.env.get('OPENAI_API_KEY');
-if (!apiKey) {
-  console.error('OPENAI_API_KEY is not set');
-  // We'll continue and just log queries without embeddings if the key is missing
-}
-
 // Define CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,51 +32,14 @@ serve(async (req) => {
 
     console.log(`Ensuring chat persistence for user ${userId}`);
     
-    // Generate embedding for the message if OpenAI API key is available
-    let queryEmbedding = null;
-    
-    if (apiKey) {
-      try {
-        console.log("Generating embedding for query:", queryText.substring(0, 50) + "...");
-        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-ada-002',
-            input: queryText,
-          }),
-        });
-
-        if (!embeddingResponse.ok) {
-          const error = await embeddingResponse.text();
-          console.error('Failed to generate embedding:', error);
-        } else {
-          const embeddingData = await embeddingResponse.json();
-          if (embeddingData.data && embeddingData.data.length > 0) {
-            queryEmbedding = embeddingData.data[0].embedding;
-            console.log("Embedding generated successfully");
-          }
-        }
-      } catch (error) {
-        console.error("Error generating embedding:", error);
-        // Continue without embedding
-      }
-    } else {
-      console.log("Skipping embedding generation - OPENAI_API_KEY not set");
-    }
-    
-    // Insert the query into the user_queries table
+    // Insert the query into the user_queries table without generating embeddings
     const { data, error } = await supabase
       .from('user_queries')
       .insert({
         user_id: userId,
         query_text: queryText,
         thread_id: threadId,
-        message_id: messageId,
-        embedding: queryEmbedding
+        message_id: messageId
       })
       .select()
       .single();
