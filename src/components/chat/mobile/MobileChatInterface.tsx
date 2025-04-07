@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -77,16 +76,24 @@ export default function MobileChatInterface({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const suggestionQuestions = [
     {
-      text: "How did I feel yesterday?",
-      icon: <BarChart2 className="h-4 w-4 mr-1" />
-    },
-    {
-      text: "What makes me happy?", 
+      text: "What are the top 3 reasons that make me happy?",
       icon: <Lightbulb className="h-4 w-4 mr-1" />
     },
     {
-      text: "Find entries about work",
+      text: "What time of the day do i usually journal?",
       icon: <Search className="h-4 w-4 mr-1" />
+    },
+    {
+      text: "Top 3 issues in my life?",
+      icon: <BarChart2 className="h-4 w-4 mr-1" />
+    },
+    {
+      text: "Suggest me ways to improve my negative traits.",
+      icon: <Brain className="h-4 w-4 mr-1" />
+    },
+    {
+      text: "Rate my top 3 emotions out of 10 for each of them.",
+      icon: <BarChart2 className="h-4 w-4 mr-1" />
     }
   ];
   const { toast } = useToast();

@@ -80,20 +80,24 @@ export default function SmartChatInterface() {
 
   const demoQuestions = [
     {
-      text: "How did I feel yesterday?",
-      icon: <BarChart2 className="h-4 w-4 mr-2" />
-    },
-    {
-      text: "What makes me happy?",
+      text: "What are the top 3 reasons that make me happy?",
       icon: <Lightbulb className="h-4 w-4 mr-2" />
     },
     {
-      text: "Find entries about work",
+      text: "What time of the day do i usually journal?",
       icon: <Search className="h-4 w-4 mr-2" />
     },
     {
-      text: "What were my top 3 positive and negative emotions last month?",
+      text: "Top 3 issues in my life?",
       icon: <Brain className="h-4 w-4 mr-2" />
+    },
+    {
+      text: "Suggest me ways to improve my negative traits.",
+      icon: <Brain className="h-4 w-4 mr-2" />
+    },
+    {
+      text: "Rate my top 3 emotions out of 10 for each of them.",
+      icon: <BarChart2 className="h-4 w-4 mr-2" />
     }
   ];
 
