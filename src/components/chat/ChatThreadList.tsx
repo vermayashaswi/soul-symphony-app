@@ -261,17 +261,17 @@ export default function ChatThreadList({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center bg-background hover:bg-accent/50 rounded-md">
+                  <div className="flex items-center w-full bg-background hover:bg-accent/50 rounded-md">
                     <Button
                       key={thread.id}
                       variant="ghost"
                       className={cn(
-                        "flex-1 justify-start relative h-auto py-3 px-2 text-left rounded-r-none",
+                        "justify-start relative h-auto py-3 px-2 text-left rounded-r-none max-w-[65%]",
                         thread.id === currentThreadId && "bg-muted"
                       )}
                       onClick={() => onSelectThread(thread.id)}
                     >
-                      <div className="flex-1 truncate mr-2">
+                      <div className="truncate mr-2">
                         <div className="flex items-center">
                           <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
                           <span className="truncate">{thread.title}</span>
@@ -282,7 +282,7 @@ export default function ChatThreadList({
                       </div>
                     </Button>
                     
-                    <div className="flex items-center pr-1 chat-thread-buttons">
+                    <div className="flex items-center pr-1 chat-thread-buttons ml-auto">
                       <Button
                         variant="ghost"
                         size="icon"
