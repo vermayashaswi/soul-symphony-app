@@ -40,7 +40,7 @@ const fixViewportHeight = () => {
 // Detect if running as standalone PWA on iOS
 const detectPWA = () => {
   // For iOS
-  const isIOSPWA = navigator.standalone === true;
+  const isIOSPWA = window.navigator.standalone === true;
   
   // For Android Chrome
   const isAndroidPWA = window.matchMedia('(display-mode: standalone)').matches;
@@ -59,6 +59,11 @@ detectPWA();
 declare global {
   interface Window {
     __setVhTimeout: any;
+  }
+  
+  // Add standalone property to Navigator interface
+  interface Navigator {
+    standalone?: boolean;
   }
 }
 
