@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -96,15 +97,29 @@ serve(async (req) => {
       );
     }
 
-    // 3. Prepare prompt
+    // Format entries for the prompt with dates
+    const entriesWithDates = entries.map(entry => {
+      const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+      return `- Entry from ${formattedDate}: ${entry.content}`;
+    }).join('\n\n');
+
+    // 3. Prepare prompt with modified instructions to include specific references
     const prompt = `You are a personal mental well-being assistant. Your goal is to provide helpful, empathetic, and insightful responses based on the user's journal entries.
-      Here are some of the user's journal entries:
-      ${entries.map((entry) => `- ${entry.content}`).join('\n')}
-      
-      Now, respond to the following message from the user:
-      ${message}
-      
-      Keep your answers concise and to the point. Focus on providing actionable insights and support.`;
+
+Here are some of the user's journal entries:
+${entriesWithDates}
+
+When responding to the user's query, please include specific references to their journal entries with dates when relevant. Format these references as bullet points that support your insights. For example:
+- "You mentioned feeling anxious about your presentation (Apr 5, Apr 7)"
+- "You wrote about conflicts with your colleague (Apr 2)"
+
+Now, respond to the following message from the user:
+${message}
+
+Keep your answers concise and to the point. Focus on providing actionable insights and support, backed by specific references to their journal entries.`;
 
     // 4. Call OpenAI
     console.log("Calling OpenAI for completion");
