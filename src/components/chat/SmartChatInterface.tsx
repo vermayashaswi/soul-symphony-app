@@ -76,6 +76,43 @@ export default function SmartChatInterface() {
   ];
 
   useEffect(() => {
+    if (user?.id) {
+      const storedThreadId = localStorage.getItem(THREAD_ID_STORAGE_KEY);
+      
+      if (storedThreadId) {
+        console.log("Restoring chat thread from localStorage:", storedThreadId);
+        setCurrentThreadId(storedThreadId);
+      } else {
+        fetchUserThreads();
+      }
+    }
+  }, [user]);
+
+  const fetchUserThreads = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data: threads, error } = await supabase
+        .from('chat_threads')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+        
+      if (error) throw error;
+      
+      if (threads && threads.length > 0) {
+        const mostRecentThreadId = threads[0].id;
+        console.log("Found most recent thread:", mostRecentThreadId);
+        setCurrentThreadId(mostRecentThreadId);
+        localStorage.setItem(THREAD_ID_STORAGE_KEY, mostRecentThreadId);
+      }
+    } catch (error) {
+      console.error("Error fetching user threads:", error);
+    }
+  };
+
+  useEffect(() => {
     scrollToBottom();
     
     if (currentThreadId) {
@@ -125,8 +162,11 @@ export default function SmartChatInterface() {
     
     window.addEventListener('threadSelected' as any, onThreadChange);
     
+    window.addEventListener('newThreadCreated' as any, onThreadChange);
+    
     return () => {
       window.removeEventListener('threadSelected' as any, onThreadChange);
+      window.removeEventListener('newThreadCreated' as any, onThreadChange);
     };
   }, []);
 
@@ -199,6 +239,7 @@ export default function SmartChatInterface() {
         addRagDiagnosticStep("Creating new thread", "success", `Thread created with ID: ${newThreadId}`);
         threadId = newThreadId;
         setCurrentThreadId(newThreadId);
+        localStorage.setItem(THREAD_ID_STORAGE_KEY, newThreadId);
         
         window.dispatchEvent(
           new CustomEvent('newThreadCreated', { 
