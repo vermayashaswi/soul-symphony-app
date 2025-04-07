@@ -525,7 +525,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           </button>
           
           <div className="text-lg font-semibold">
-            Year in Pixels - {currentYear.getFullYear()}
+            Annual Mood Calendar {currentYear.getFullYear()}
             {isCurrentYear(currentYear) && (
               <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
                 Current Year
@@ -547,65 +547,66 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           </button>
         </div>
         
-        <div className="overflow-x-auto">
-          <div className="min-w-max">
+        <div className="overflow-x-auto no-scrollbar">
+          <div className="min-w-full grid grid-cols-[auto_repeat(12,minmax(28px,1fr))]">
             {/* Month headers */}
-            <div className="grid grid-cols-13 gap-0">
-              <div className="w-10 pl-2"></div> {/* Empty corner */}
-              {months.map(month => (
-                <div key={month} className="text-xs font-medium text-center w-8 text-muted-foreground">
-                  {month}
-                </div>
-              ))}
-            </div>
-            
-            {/* Days grid */}
-            {Array.from({ length: maxDaysInMonth }, (_, dayIndex) => (
-              <div key={dayIndex} className="grid grid-cols-13 gap-0 h-8">
-                {/* Day number on left */}
-                <div className="w-10 pl-2 flex items-center text-xs text-muted-foreground font-medium">
-                  {dayIndex + 1}
-                </div>
-                
-                {/* Month columns */}
-                {months.map((_, monthIndex) => {
-                  // Check if this day exists in this month
-                  const isValidDay = dayIndex < daysInMonths[monthIndex];
-                  if (!isValidDay) return <div key={monthIndex} className="w-8 h-8"></div>;
-                  
-                  const date = new Date(currentYear.getFullYear(), monthIndex, dayIndex + 1);
-                  const dateStr = format(date, 'yyyy-MM-dd');
-                  const sentiment = dailySentiment.get(dateStr);
-                  const colorClass = sentiment !== undefined ? getSentimentColor(sentiment) : null;
-                  
-                  const isToday = isSameDay(date, new Date());
-                  
-                  return (
-                    <div 
-                      key={monthIndex} 
-                      className="w-8 h-8 flex items-center justify-center"
-                    >
-                      {colorClass ? (
-                        <div 
-                          className={cn(
-                            "w-6 h-6 rounded-md", 
-                            colorClass,
-                            isToday && "ring-2 ring-primary"
-                          )} 
-                        />
-                      ) : (
-                        <div 
-                          className={cn(
-                            "w-6 h-6 rounded-md border-2 border-gray-300 dark:border-gray-600",
-                            isToday && "ring-2 ring-primary"
-                          )} 
-                        />
-                      )}
-                    </div>
-                  );
-                })}
+            <div className="h-8"></div> {/* Empty corner cell */}
+            {months.map(month => (
+              <div key={month} className="h-8 text-xs font-medium text-center text-muted-foreground">
+                {month}
               </div>
             ))}
+            
+            {/* Days grid */}
+            {Array.from({ length: maxDaysInMonth }, (_, dayIndex) => {
+              const day = dayIndex + 1;
+              return (
+                <div key={`day-${day}`} className="grid grid-cols-[auto_repeat(12,minmax(28px,1fr))]">
+                  {/* Day number */}
+                  <div className="text-xs text-muted-foreground font-medium p-1 w-6 text-right">
+                    {day}
+                  </div>
+                  
+                  {/* Month cells */}
+                  {months.map((_, monthIndex) => {
+                    // Check if this day exists in this month
+                    const isValidDay = day <= daysInMonths[monthIndex];
+                    if (!isValidDay) return <div key={`empty-${monthIndex}-${day}`} className="h-7"></div>;
+                    
+                    const date = new Date(currentYear.getFullYear(), monthIndex, day);
+                    const dateStr = format(date, 'yyyy-MM-dd');
+                    const sentiment = dailySentiment.get(dateStr);
+                    const colorClass = sentiment !== undefined ? getSentimentColor(sentiment) : null;
+                    
+                    const isToday = isSameDay(date, new Date());
+                    
+                    return (
+                      <div 
+                        key={`cell-${monthIndex}-${day}`} 
+                        className="h-7 flex items-center justify-center p-0.5"
+                      >
+                        {colorClass ? (
+                          <div 
+                            className={cn(
+                              "w-5 h-5 rounded-sm", 
+                              colorClass,
+                              isToday && "ring-1 ring-primary"
+                            )} 
+                          />
+                        ) : (
+                          <div 
+                            className={cn(
+                              "w-5 h-5 rounded-sm border border-gray-300 dark:border-gray-600",
+                              isToday && "ring-1 ring-primary"
+                            )} 
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         </div>
         
