@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { 
@@ -393,145 +392,147 @@ export default function SmartChatInterface() {
       
     addRagDiagnosticStep("Processing with RAG service", "loading");
     setProcessingStage("Searching for insights...");
-    const response = await processChatMessage(
-      userMessage, 
-      user.id, 
-      queryTypes, 
-      threadId, 
-      true
-    );
-      
-    if (response.diagnostics) {
-      if (response.diagnostics.steps) {
-        response.diagnostics.steps.forEach((step: any) => {
-          addRagDiagnosticStep(step.name, step.status, step.details);
-        });
-      }
+    
+    try {
+      const response = await processChatMessage(
+        userMessage, 
+        user.id, 
+        queryTypes, 
+        threadId, 
+        true
+      );
         
-      if (response.diagnostics.functionCalls) {
-        setRagDiagnostics(prev => ({
-          ...prev,
-          functionExecutions: response.diagnostics.functionCalls
-        }));
-      }
-        
-      if (response.diagnostics.similarityScores) {
-        setRagDiagnostics(prev => ({
-          ...prev,
-          similarityScores: response.diagnostics.similarityScores
-        }));
-      }
-    }
-      
-    if (response.references) {
-      setRagDiagnostics(prev => ({
-        ...prev,
-        references: response.references
-      }));
-    }
-      
-    addRagDiagnosticStep("Processing with RAG service", "success", 
-      `Received response with ${response.references?.length || 0} references`);
-      
-    const uiResponse: UIChatMessage = {
-      role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
-      content: response.content,
-      ...(response.references && { references: response.references }),
-      ...(response.analysis && { analysis: response.analysis }),
-      ...(response.diagnostics && { diagnostics: response.diagnostics }),
-      ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
-    };
-      
-    let savedAssistantMessage = false;
-    let retryCount = 0;
-    const maxRetries = 3;
-      
-    while (!savedAssistantMessage && retryCount < maxRetries) {
-      try {
-        addRagDiagnosticStep("Saving assistant response", "loading");
-          
-        const { error: assistantMsgError } = await supabase
-          .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            content: response.content,
-            sender: 'assistant',
-            reference_entries: response.references || null,
-            has_numeric_result: response.hasNumericResult || false,
-            analysis_data: response.analysis || null
+      if (response.diagnostics) {
+        if (response.diagnostics.steps) {
+          response.diagnostics.steps.forEach((step: any) => {
+            addRagDiagnosticStep(step.name, step.status, step.details);
           });
+        }
+          
+        if (response.diagnostics.functionCalls) {
+          setRagDiagnostics(prev => ({
+            ...prev,
+            functionExecutions: response.diagnostics.functionCalls
+          }));
+        }
+          
+        if (response.diagnostics.similarityScores) {
+          setRagDiagnostics(prev => ({
+            ...prev,
+            similarityScores: response.diagnostics.similarityScores
+          }));
+        }
+      }
+        
+      if (response.references) {
+        setRagDiagnostics(prev => ({
+          ...prev,
+          references: response.references
+        }));
+      }
+        
+      addRagDiagnosticStep("Processing with RAG service", "success", 
+        `Received response with ${response.references?.length || 0} references`);
+        
+      const uiResponse: UIChatMessage = {
+        role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
+        content: response.content,
+        ...(response.references && { references: response.references }),
+        ...(response.analysis && { analysis: response.analysis }),
+        ...(response.diagnostics && { diagnostics: response.diagnostics }),
+        ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
+      };
+        
+      let savedAssistantMessage = false;
+      let retryCount = 0;
+      const maxRetries = 3;
+        
+      while (!savedAssistantMessage && retryCount < maxRetries) {
+        try {
+          addRagDiagnosticStep("Saving assistant response", "loading");
             
-        if (assistantMsgError) {
-          addRagDiagnosticStep("Saving assistant response", "error", `Attempt ${retryCount + 1}: ${assistantMsgError.message}`);
+          const { error: assistantMsgError } = await supabase
+            .from('chat_messages')
+            .insert({
+              thread_id: threadId,
+              content: response.content,
+              sender: 'assistant',
+              reference_entries: response.references || null,
+              has_numeric_result: response.hasNumericResult || false,
+              analysis_data: response.analysis || null
+            });
+              
+          if (assistantMsgError) {
+            addRagDiagnosticStep("Saving assistant response", "error", `Attempt ${retryCount + 1}: ${assistantMsgError.message}`);
+            retryCount++;
+            if (retryCount >= maxRetries) {
+              console.error("Failed to save assistant message after multiple attempts:", assistantMsgError);
+              toast({
+                title: "Warning",
+                description: "Your conversation may not be saved properly. The response is displayed but might not persist after refresh.",
+                variant: "destructive"
+              });
+            } else {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } else {
+            addRagDiagnosticStep("Saving assistant response", "success");
+            savedAssistantMessage = true;
+          }
+        } catch (saveError) {
+          console.error(`Error saving assistant message (attempt ${retryCount + 1}):`, saveError);
           retryCount++;
           if (retryCount >= maxRetries) {
-            console.error("Failed to save assistant message after multiple attempts:", assistantMsgError);
             toast({
               title: "Warning",
               description: "Your conversation may not be saved properly. The response is displayed but might not persist after refresh.",
               variant: "destructive"
             });
-          } else {
-            await new Promise(resolve => setTimeout(resolve, 1000));
           }
-        } else {
-          addRagDiagnosticStep("Saving assistant response", "success");
-          savedAssistantMessage = true;
-        }
-      } catch (saveError) {
-        console.error(`Error saving assistant message (attempt ${retryCount + 1}):`, saveError);
-        retryCount++;
-        if (retryCount >= maxRetries) {
-          toast({
-            title: "Warning",
-            description: "Your conversation may not be saved properly. The response is displayed but might not persist after refresh.",
-            variant: "destructive"
-          });
         }
       }
-    }
-      
-    if (chatHistory.length === 0) {
-      addRagDiagnosticStep("Updating thread title", "loading");
         
-      const truncatedTitle = userMessage.length > 30 
-        ? userMessage.substring(0, 30) + "..." 
-        : userMessage;
+      if (chatHistory.length === 0) {
+        addRagDiagnosticStep("Updating thread title", "loading");
           
+        const truncatedTitle = userMessage.length > 30 
+          ? userMessage.substring(0, 30) + "..." 
+          : userMessage;
+            
+        await supabase
+          .from('chat_threads')
+          .update({ 
+            title: truncatedTitle,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', threadId);
+            
+        addRagDiagnosticStep("Updating thread title", "success");
+      }
+        
       await supabase
         .from('chat_threads')
-        .update({ 
-          title: truncatedTitle,
-          updated_at: new Date().toISOString()
-        })
+        .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
-          
-      addRagDiagnosticStep("Updating thread title", "success");
-    }
-      
-    await supabase
-      .from('chat_threads')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', threadId);
-      
-    addRagDiagnosticStep("Processing complete", "success", "All steps completed successfully");
-      
-    setChatHistory(prev => [...prev, uiResponse]);
+        
+      addRagDiagnosticStep("Processing complete", "success", "All steps completed successfully");
+        
+      setChatHistory(prev => [...prev, uiResponse]);
     } catch (error: any) {
       console.error("Error sending message:", error);
-      
+        
       addRagDiagnosticStep("Processing error", "error", error?.message || "Unknown error");
       setRagDiagnostics(prev => ({
         ...prev,
         error: error?.message || "Unknown error"
       }));
-      
+        
       toast({
         title: "Error",
         description: "Failed to get a response. Please try again.",
         variant: "destructive"
       });
-      
+        
       setChatHistory(prev => [
         ...prev, 
         { 
