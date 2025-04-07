@@ -185,6 +185,7 @@ serve(async (req) => {
           
         if (threadCheckError) {
           console.error('Error checking if thread exists:', threadCheckError);
+          throw threadCheckError;
         }
         
         // Create thread if it doesn't exist
@@ -202,71 +203,36 @@ serve(async (req) => {
             
           if (createThreadError) {
             console.error('Error creating thread:', createThreadError);
+            throw createThreadError;
           }
         }
         
-        // Check if user message already exists (to prevent duplicates on retries)
-        const { data: existingUserMsgs, error: checkError } = await supabase
+        // First save user message 
+        const { error: userMsgError } = await supabase
           .from('chat_messages')
-          .select('id')
-          .eq('thread_id', threadId)
-          .eq('content', message)
-          .eq('sender', 'user')
-          .order('created_at', { ascending: false })
-          .limit(1);
+          .insert({
+            thread_id: threadId,
+            content: message,
+            sender: 'user'
+          });
           
-        if (checkError) {
-          console.error('Error checking for existing messages:', checkError);
+        if (userMsgError) {
+          console.error('Error saving user message:', userMsgError);
+          throw userMsgError;
         }
         
-        // Only save user message if it doesn't already exist
-        if (!existingUserMsgs || existingUserMsgs.length === 0) {
-          // Save user message
-          const { error: userMsgError } = await supabase
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: message,
-              sender: 'user'
-            });
-            
-          if (userMsgError) {
-            console.error('Error saving user message:', userMsgError);
-          }
-        } else {
-          console.log('User message already exists, skipping insertion');
-        }
-        
-        // Check if assistant message already exists (to prevent duplicates on retries)
-        const { data: existingAssistantMsgs, error: checkAssistantError } = await supabase
+        // Then save assistant response
+        const { error: assistantMsgError } = await supabase
           .from('chat_messages')
-          .select('id')
-          .eq('thread_id', threadId)
-          .eq('content', responseContent)
-          .eq('sender', 'assistant')
-          .order('created_at', { ascending: false })
-          .limit(1);
+          .insert({
+            thread_id: threadId,
+            content: responseContent,
+            sender: 'assistant'
+          });
           
-        if (checkAssistantError) {
-          console.error('Error checking for existing assistant messages:', checkAssistantError);
-        }
-        
-        // Only save assistant message if it doesn't already exist
-        if (!existingAssistantMsgs || existingAssistantMsgs.length === 0) {
-          // Save assistant response
-          const { error: assistantMsgError } = await supabase
-            .from('chat_messages')
-            .insert({
-              thread_id: threadId,
-              content: responseContent,
-              sender: 'assistant'
-            });
-            
-          if (assistantMsgError) {
-            console.error('Error saving assistant message:', assistantMsgError);
-          }
-        } else {
-          console.log('Assistant message already exists, skipping insertion');
+        if (assistantMsgError) {
+          console.error('Error saving assistant message:', assistantMsgError);
+          throw assistantMsgError;
         }
         
         // Update thread's updated_at timestamp
@@ -277,9 +243,20 @@ serve(async (req) => {
           
         if (threadUpdateError) {
           console.error('Error updating thread timestamp:', threadUpdateError);
+          throw threadUpdateError;
         }
+        
+        console.log('Successfully saved both messages to database');
       } catch (dbError) {
         console.error('Database error when saving messages:', dbError);
+        // Return the response but include the DB error for debugging
+        return new Response(
+          JSON.stringify({ 
+            data: responseContent,
+            dbError: dbError.message
+          }),
+          { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
       }
     }
 

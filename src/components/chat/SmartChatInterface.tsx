@@ -328,9 +328,8 @@ export default function SmartChatInterface() {
     setIsLoading(true);
     setShowSuggestions(false);
     
-    addRagDiagnosticStep("Saving user message", "loading");
-    
     try {
+      addRagDiagnosticStep("Saving user message", "loading");
       const { error: msgError } = await supabase
         .from('chat_messages')
         .insert({
@@ -341,173 +340,210 @@ export default function SmartChatInterface() {
         
       if (msgError) {
         addRagDiagnosticStep("Saving user message", "error", msgError.message);
-        throw msgError;
-      }
-      
-      addRagDiagnosticStep("Saving user message", "success");
-      
-      const queryTypes = analyzeQueryTypes(userMessage);
-      
-      addRagDiagnosticStep("Analyzing query intent", "loading");
-      addRagDiagnosticStep("Analyzing query intent", "success", 
-        `Detected: ${JSON.stringify({
-          isEmotionFocused: queryTypes.isEmotionFocused,
-          isQuantitative: queryTypes.isQuantitative,
-          isWhyQuestion: queryTypes.isWhyQuestion,
-          needsVectorSearch: queryTypes.needsVectorSearch
-        })}`);
-      
-      if (queryTypes.isQuantitative && queryTypes.isEmotionFocused) {
-        setProcessingStage("Analyzing your emotions and calculating results...");
-      } else if (queryTypes.isWhyQuestion) {
-        setProcessingStage("Analyzing your question and looking for explanations...");
-      } else if (queryTypes.isEmotionFocused) {
-        setProcessingStage("Analyzing emotion patterns in your journal...");
+        console.error("Failed to save user message:", msgError);
       } else {
-        setProcessingStage("Analyzing your question...");
+        addRagDiagnosticStep("Saving user message", "success");
       }
+    } catch (saveError) {
+      console.error("Error saving user message:", saveError);
+    }
+    
+    const queryTypes = analyzeQueryTypes(userMessage);
       
-      if (queryTypes.needsDataAggregation) {
-        setProcessingStage("Aggregating data from your journal entries...");
-      } else if (queryTypes.needsVectorSearch) {
-        setProcessingStage("Searching for related entries in your journal...");
+    addRagDiagnosticStep("Analyzing query intent", "loading");
+    addRagDiagnosticStep("Analyzing query intent", "success", 
+      `Detected: ${JSON.stringify({
+        isEmotionFocused: queryTypes.isEmotionFocused,
+        isQuantitative: queryTypes.isQuantitative,
+        isWhyQuestion: queryTypes.isWhyQuestion,
+        needsVectorSearch: queryTypes.needsVectorSearch
+      })}`);
+    
+    if (queryTypes.isQuantitative && queryTypes.isEmotionFocused) {
+      setProcessingStage("Analyzing your emotions and calculating results...");
+    } else if (queryTypes.isWhyQuestion) {
+      setProcessingStage("Analyzing your question and looking for explanations...");
+    } else if (queryTypes.isEmotionFocused) {
+      setProcessingStage("Analyzing emotion patterns in your journal...");
+    } else {
+      setProcessingStage("Analyzing your question...");
+    }
+    
+    if (queryTypes.needsDataAggregation) {
+      setProcessingStage("Aggregating data from your journal entries...");
+    } else if (queryTypes.needsVectorSearch) {
+      setProcessingStage("Searching for related entries in your journal...");
+    }
+    
+    setRagDiagnostics(prev => ({
+      ...prev,
+      queryAnalysis: {
+        queryType: queryTypes.isEmotionFocused ? 'emotional' : 'general',
+        emotion: queryTypes.isEmotionFocused ? queryTypes.emotion || null : null,
+        theme: queryTypes.isThemeFocused ? queryTypes.theme || null : null,
+        timeframe: {
+          timeType: queryTypes.timeRange,
+          startDate: queryTypes.startDate || null,
+          endDate: queryTypes.endDate || null
+        },
+        isWhenQuestion: queryTypes.isWhenQuestion || false
       }
+    }));
       
-      setRagDiagnostics(prev => ({
-        ...prev,
-        queryAnalysis: {
-          queryType: queryTypes.isEmotionFocused ? 'emotional' : 'general',
-          emotion: queryTypes.isEmotionFocused ? queryTypes.emotion || null : null,
-          theme: queryTypes.isThemeFocused ? queryTypes.theme || null : null,
-          timeframe: {
-            timeType: queryTypes.timeRange,
-            startDate: queryTypes.startDate || null,
-            endDate: queryTypes.endDate || null
-          },
-          isWhenQuestion: queryTypes.isWhenQuestion || false
-        }
-      }));
+    addRagDiagnosticStep("Processing with RAG service", "loading");
+    setProcessingStage("Searching for insights...");
+    const response = await processChatMessage(
+      userMessage, 
+      user.id, 
+      queryTypes, 
+      threadId, 
+      true
+    );
       
-      addRagDiagnosticStep("Processing with RAG service", "loading");
-      setProcessingStage("Searching for insights...");
-      const response = await processChatMessage(
-        userMessage, 
-        user.id, 
-        queryTypes, 
-        threadId, 
-        true
-      );
-      
-      if (response.diagnostics) {
-        if (response.diagnostics.steps) {
-          response.diagnostics.steps.forEach((step: any) => {
-            addRagDiagnosticStep(step.name, step.status, step.details);
-          });
-        }
+    if (response.diagnostics) {
+      if (response.diagnostics.steps) {
+        response.diagnostics.steps.forEach((step: any) => {
+          addRagDiagnosticStep(step.name, step.status, step.details);
+        });
+      }
         
-        if (response.diagnostics.functionCalls) {
-          setRagDiagnostics(prev => ({
-            ...prev,
-            functionExecutions: response.diagnostics.functionCalls
-          }));
-        }
-        
-        if (response.diagnostics.similarityScores) {
-          setRagDiagnostics(prev => ({
-            ...prev,
-            similarityScores: response.diagnostics.similarityScores
-          }));
-        }
-      }
-      
-      if (response.references) {
+      if (response.diagnostics.functionCalls) {
         setRagDiagnostics(prev => ({
           ...prev,
-          references: response.references
+          functionExecutions: response.diagnostics.functionCalls
         }));
       }
-      
-      addRagDiagnosticStep("Processing with RAG service", "success", 
-        `Received response with ${response.references?.length || 0} references`);
-      
-      const uiResponse: UIChatMessage = {
-        role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
-        content: response.content,
-        ...(response.references && { references: response.references }),
-        ...(response.analysis && { analysis: response.analysis }),
-        ...(response.diagnostics && { diagnostics: response.diagnostics }),
-        ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
-      };
-      
-      addRagDiagnosticStep("Saving assistant response", "loading");
-      
-      await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: threadId,
-          content: response.content,
-          sender: 'assistant',
-          reference_entries: response.references || null,
-          has_numeric_result: response.hasNumericResult || false,
-          analysis_data: response.analysis || null
-        });
-      
-      addRagDiagnosticStep("Saving assistant response", "success");
-      
-      if (chatHistory.length === 0) {
-        addRagDiagnosticStep("Updating thread title", "loading");
         
-        const truncatedTitle = userMessage.length > 30 
-          ? userMessage.substring(0, 30) + "..." 
-          : userMessage;
-          
-        await supabase
-          .from('chat_threads')
-          .update({ 
-            title: truncatedTitle,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', threadId);
-          
-        addRagDiagnosticStep("Updating thread title", "success");
+      if (response.diagnostics.similarityScores) {
+        setRagDiagnostics(prev => ({
+          ...prev,
+          similarityScores: response.diagnostics.similarityScores
+        }));
       }
+    }
       
-      await supabase
-        .from('chat_threads')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', threadId);
-      
-      addRagDiagnosticStep("Processing complete", "success", "All steps completed successfully");
-      
-      setChatHistory(prev => [...prev, uiResponse]);
-    } catch (error: any) {
-      console.error("Error sending message:", error);
-      
-      addRagDiagnosticStep("Processing error", "error", error?.message || "Unknown error");
+    if (response.references) {
       setRagDiagnostics(prev => ({
         ...prev,
-        error: error?.message || "Unknown error"
+        references: response.references
       }));
-      
-      toast({
-        title: "Error",
-        description: "Failed to get a response. Please try again.",
-        variant: "destructive"
-      });
-      
-      setChatHistory(prev => [
-        ...prev, 
-        { 
-          role: 'assistant', 
-          content: "I'm having trouble processing your request. Please try again later. " + 
-                   (error?.message ? `Error: ${error.message}` : "")
-        }
-      ]);
-    } finally {
-      setIsLoading(false);
-      setProcessingStage(null);
     }
-  };
+      
+    addRagDiagnosticStep("Processing with RAG service", "success", 
+      `Received response with ${response.references?.length || 0} references`);
+      
+    const uiResponse: UIChatMessage = {
+      role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
+      content: response.content,
+      ...(response.references && { references: response.references }),
+      ...(response.analysis && { analysis: response.analysis }),
+      ...(response.diagnostics && { diagnostics: response.diagnostics }),
+      ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
+    };
+      
+    let savedAssistantMessage = false;
+    let retryCount = 0;
+    const maxRetries = 3;
+      
+    while (!savedAssistantMessage && retryCount < maxRetries) {
+      try {
+        addRagDiagnosticStep("Saving assistant response", "loading");
+          
+        const { error: assistantMsgError } = await supabase
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            content: response.content,
+            sender: 'assistant',
+            reference_entries: response.references || null,
+            has_numeric_result: response.hasNumericResult || false,
+            analysis_data: response.analysis || null
+          });
+            
+        if (assistantMsgError) {
+          addRagDiagnosticStep("Saving assistant response", "error", `Attempt ${retryCount + 1}: ${assistantMsgError.message}`);
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            console.error("Failed to save assistant message after multiple attempts:", assistantMsgError);
+            toast({
+              title: "Warning",
+              description: "Your conversation may not be saved properly. The response is displayed but might not persist after refresh.",
+              variant: "destructive"
+            });
+          } else {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } else {
+          addRagDiagnosticStep("Saving assistant response", "success");
+          savedAssistantMessage = true;
+        }
+      } catch (saveError) {
+        console.error(`Error saving assistant message (attempt ${retryCount + 1}):`, saveError);
+        retryCount++;
+        if (retryCount >= maxRetries) {
+          toast({
+            title: "Warning",
+            description: "Your conversation may not be saved properly. The response is displayed but might not persist after refresh.",
+            variant: "destructive"
+          });
+        }
+      }
+    }
+      
+    if (chatHistory.length === 0) {
+      addRagDiagnosticStep("Updating thread title", "loading");
+        
+      const truncatedTitle = userMessage.length > 30 
+        ? userMessage.substring(0, 30) + "..." 
+        : userMessage;
+          
+      await supabase
+        .from('chat_threads')
+        .update({ 
+          title: truncatedTitle,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', threadId);
+          
+      addRagDiagnosticStep("Updating thread title", "success");
+    }
+      
+    await supabase
+      .from('chat_threads')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', threadId);
+      
+    addRagDiagnosticStep("Processing complete", "success", "All steps completed successfully");
+      
+    setChatHistory(prev => [...prev, uiResponse]);
+  } catch (error: any) {
+    console.error("Error sending message:", error);
+      
+    addRagDiagnosticStep("Processing error", "error", error?.message || "Unknown error");
+    setRagDiagnostics(prev => ({
+      ...prev,
+      error: error?.message || "Unknown error"
+    }));
+      
+    toast({
+      title: "Error",
+      description: "Failed to get a response. Please try again.",
+      variant: "destructive"
+    });
+      
+    setChatHistory(prev => [
+      ...prev, 
+      { 
+        role: 'assistant', 
+        content: "I'm having trouble processing your request. Please try again later. " + 
+                 (error?.message ? `Error: ${error.message}` : "")
+      }
+    ]);
+  } finally {
+    setIsLoading(false);
+    setProcessingStage(null);
+  }
+};
 
   const handleDeleteThread = async () => {
     if (!currentThreadId) return;
