@@ -6,6 +6,8 @@ const MOBILE_BREAKPOINT = 768
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean>(false);
   const [isInitialized, setIsInitialized] = React.useState<boolean>(false);
+  const [isIOS, setIsIOS] = React.useState<boolean>(false); 
+  const [isAndroid, setIsAndroid] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     // Function to check if mobile
@@ -32,16 +34,36 @@ export function useIsMobile() {
       // But combine with user agent for edge cases
       return viewportWidth || (userAgentMobile && touchCapable);
     };
+    
+    // Function to check iOS
+    const checkIfIOS = () => {
+      return /iPhone|iPad|iPod/i.test(navigator.userAgent) || 
+             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    };
+    
+    // Function to check Android
+    const checkIfAndroid = () => {
+      return /Android/i.test(navigator.userAgent);
+    };
 
     // Set initial state immediately
     const initialIsMobile = checkIfMobile();
+    const initialIsIOS = checkIfIOS();
+    const initialIsAndroid = checkIfAndroid();
+    
     setIsMobile(initialIsMobile);
+    setIsIOS(initialIsIOS);
+    setIsAndroid(initialIsAndroid);
     setIsInitialized(true);
     
-    console.log("Mobile detection initialized:", initialIsMobile, 
-                "width:", window.innerWidth, 
-                "userAgent:", navigator.userAgent,
-                "touch:", 'ontouchstart' in window || navigator.maxTouchPoints > 0);
+    console.log("Mobile detection initialized:", {
+      isMobile: initialIsMobile, 
+      isIOS: initialIsIOS,
+      isAndroid: initialIsAndroid,
+      width: window.innerWidth, 
+      userAgent: navigator.userAgent,
+      touch: 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    });
     
     // Create event listeners for resize and orientation change
     const handleResize = () => {
@@ -107,7 +129,11 @@ export function useIsMobile() {
     };
   }, []);
 
-  return isInitialized ? isMobile : false;
+  return {
+    isMobile: isInitialized ? isMobile : false,
+    isIOS: isInitialized ? isIOS : false,
+    isAndroid: isInitialized ? isAndroid : false
+  };
 }
 
 // Add an alias export so that Chat.tsx can import it as useMobile

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { clearAllToasts } from '@/services/notificationService';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -33,13 +34,18 @@ export function PlaybackControls({
   const [currentTime, setCurrentTime] = useState(0);
   const [isClearingToasts, setIsClearingToasts] = useState(false);
   const [sliderValue, setSliderValue] = useState(0);
+  const [isTouchActive, setIsTouchActive] = useState(false);
+  const isMobile = useIsMobile();
   
   // Update slider and current time based on playback progress
   useEffect(() => {
-    const timeInSeconds = (playbackProgress * audioDuration);
-    setCurrentTime(timeInSeconds);
-    setSliderValue(playbackProgress * 100);
-  }, [playbackProgress, audioDuration]);
+    // Only update if user is not currently interacting with the slider
+    if (!isTouchActive) {
+      const timeInSeconds = (playbackProgress * audioDuration);
+      setCurrentTime(timeInSeconds);
+      setSliderValue(playbackProgress * 100);
+    }
+  }, [playbackProgress, audioDuration, isTouchActive]);
   
   const formattedProgress = formatTime(currentTime);
   const formattedDuration = formatTime(audioDuration);
@@ -48,6 +54,7 @@ export function PlaybackControls({
     if (onSeek) {
       const position = value[0] / 100;
       setSliderValue(value[0]);
+      setCurrentTime(position * audioDuration);
       onSeek(position);
     }
   };
@@ -104,7 +111,7 @@ export function PlaybackControls({
   };
   
   return (
-    <div className="w-full px-4">
+    <div className={cn("w-full px-4", isMobile ? "px-2" : "px-4")}>
       <div className="mb-4 relative">
         <Slider
           defaultValue={[0]}
@@ -114,6 +121,10 @@ export function PlaybackControls({
           onValueChange={handleSliderChange}
           disabled={isProcessing || !audioBlob}
           className="mb-2"
+          onTouchStart={() => setIsTouchActive(true)}
+          onTouchEnd={() => setIsTouchActive(false)}
+          onPointerDown={() => setIsTouchActive(true)}
+          onPointerUp={() => setIsTouchActive(false)}
         />
         <div className="flex justify-between mt-1.5 text-xs text-slate-500">
           <span>{formattedProgress}</span>
@@ -121,19 +132,25 @@ export function PlaybackControls({
         </div>
       </div>
 
-      <div className="flex items-center justify-center gap-4 mt-6">
+      <div className={cn(
+        "flex items-center justify-center gap-4 mt-6",
+        isMobile ? "gap-2" : "gap-4"
+      )}>
         {/* Play/Pause Button */}
         <Button 
           onClick={onTogglePlayback}
           variant="ghost" 
           size="icon"
-          className="w-10 h-10 rounded-full border"
+          className={cn(
+            "rounded-full border",
+            isMobile ? "w-12 h-12" : "w-10 h-10"
+          )}
           disabled={isProcessing || !audioBlob}
         >
           {isPlaying ? (
-            <Pause className="h-5 w-5" />
+            <Pause className={cn(isMobile ? "h-6 w-6" : "h-5 w-5")} />
           ) : (
-            <Play className="h-5 w-5 ml-0.5" />
+            <Play className={cn(isMobile ? "h-6 w-6 ml-0.5" : "h-5 w-5 ml-0.5")} />
           )}
         </Button>
         
@@ -142,10 +159,11 @@ export function PlaybackControls({
           onClick={handleSaveClick}
           disabled={isProcessing || !audioBlob || isClearingToasts}
           variant="default"
+          className={cn(isMobile ? "px-6 py-2 text-sm h-10" : "")}
         >
           {isProcessing || isClearingToasts ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className={cn("mr-2 animate-spin", isMobile ? "h-4 w-4" : "h-4 w-4")} />
               {isClearingToasts ? "Preparing..." : "Processing..."}
             </>
           ) : "Save"}
@@ -156,10 +174,13 @@ export function PlaybackControls({
           onClick={onRestart}
           variant="ghost" 
           size="icon"
-          className="w-10 h-10 rounded-full border"
+          className={cn(
+            "rounded-full border",
+            isMobile ? "w-12 h-12" : "w-10 h-10"
+          )}
           disabled={isProcessing}
         >
-          <RotateCcw className="h-5 w-5" />
+          <RotateCcw className={cn(isMobile ? "h-6 w-6" : "h-5 w-5")} />
         </Button>
       </div>
     </div>

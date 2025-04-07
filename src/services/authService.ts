@@ -12,6 +12,19 @@ export const getRedirectUrl = (): string => {
   if (redirectTo) {
     localStorage.setItem('authRedirectTo', redirectTo);
   }
+  
+  // For iOS in standalone mode (PWA), we need to handle redirects differently
+  const isInStandaloneMode = () => 
+    window.navigator.standalone || 
+    window.matchMedia('(display-mode: standalone)').matches;
+    
+  // For PWA on iOS, we want to avoid redirects that might break the app
+  if (isInStandaloneMode() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    console.log('Auth in standalone mode (PWA), using in-app auth flow');
+    // Use a special auth flow that works better in PWA context
+    return `${origin}/auth?pwa_mode=true`;
+  }
+  
   return `${origin}/auth`;
 };
 
@@ -184,6 +197,30 @@ export const getCurrentUser = async () => {
     return data.user;
   } catch (error) {
     console.error('Error getting current user:', error);
+    return null;
+  }
+};
+
+/**
+ * Handle PWA authentication completion
+ * This is specifically for handling auth in PWA contexts where redirects can be problematic
+ */
+export const handlePWAAuthCompletion = async () => {
+  try {
+    // Check if we have a hash in the URL that might contain auth params
+    if (window.location.hash) {
+      console.log('Detected hash params, attempting to process auth result');
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        throw error;
+      }
+      
+      return data.session;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error handling PWA auth completion:', error);
     return null;
   }
 };
