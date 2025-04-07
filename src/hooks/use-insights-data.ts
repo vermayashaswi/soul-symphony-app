@@ -97,36 +97,42 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
 
       console.log(`Filtered ${entries.length} entries for ${timeRange}`);
 
-      if (!entries || entries.length === 0) {
-        setInsightsData({
-          entries: [],
-          allEntries: allEntries || [],
-          dominantMood: null,
-          biggestImprovement: null,
-          journalActivity: { entryCount: 0, streak: 0, maxStreak: 0 },
-          aggregatedEmotionData: {}
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Process the data
+      // Process the data - pass ALL entries to ensure the calendar has complete data
       const dominantMood = calculateDominantMood(entries);
       const biggestImprovement = calculateBiggestImprovement(entries);
       const journalActivity = calculateJournalActivity(entries, timeRange);
       const aggregatedEmotionData = processEmotionData(entries, timeRange);
 
-      // Log the processed data for debugging
-      console.log(`[useInsightsData] Processed for ${timeRange}:`, {
-        entryCount: entries.length,
-        totalEntryCount: allEntries?.length || 0,
-        emotionCount: Object.keys(aggregatedEmotionData).length,
-        timeRange
-      });
+      // Make sure all entries have a sentiment value
+      const processedAllEntries = allEntries?.map(entry => {
+        if (!entry.sentiment && entry.emotions) {
+          // If sentiment is missing but emotions are present, calculate an average sentiment
+          try {
+            const emotions = typeof entry.emotions === 'string' 
+              ? JSON.parse(entry.emotions) 
+              : entry.emotions;
+            
+            let totalSentiment = 0;
+            let count = 0;
+            
+            Object.values(emotions).forEach((score: any) => {
+              totalSentiment += Number(score);
+              count++;
+            });
+            
+            if (count > 0) {
+              entry.sentiment = (totalSentiment / count).toFixed(2);
+            }
+          } catch (e) {
+            console.error('Error processing emotions for sentiment:', e);
+          }
+        }
+        return entry;
+      }) || [];
 
       setInsightsData({
         entries,
-        allEntries: allEntries || [],
+        allEntries: processedAllEntries,
         dominantMood,
         biggestImprovement,
         journalActivity,

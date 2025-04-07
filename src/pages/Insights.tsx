@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -97,7 +96,7 @@ export default function Insights() {
   }, [loading, insightsData]);
 
   const getSentimentData = () => {
-    // Use all entries instead of just the filtered ones for the current time range
+    // Use all entries from the backend for the sentiment calendar
     const entries = insightsData.allEntries || [];
     if (entries.length === 0) return [];
     

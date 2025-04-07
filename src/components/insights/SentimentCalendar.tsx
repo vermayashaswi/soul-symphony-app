@@ -22,7 +22,9 @@ import {
   getMonth,
   addWeeks,
   subWeeks,
-  parseISO 
+  parseISO,
+  addYears,
+  subYears 
 } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CalendarDays, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -52,14 +54,24 @@ interface SentimentCalendarProps {
   timeRange: 'today' | 'week' | 'month' | 'year';
 }
 
-// Get color based on sentiment value
+// Get color based on sentiment value using the new color scale
 function getSentimentColor(sentiment: number): string {
-  if (sentiment >= 0.6) return "bg-green-500"; // Very Positive
-  if (sentiment >= 0.2) return "bg-emerald-400"; // Positive
-  if (sentiment >= 0) return "bg-blue-400"; // Slightly Positive
-  if (sentiment >= -0.2) return "bg-yellow-400"; // Neutral
-  if (sentiment >= -0.6) return "bg-orange-400"; // Negative
-  return "bg-red-500"; // Very Negative
+  // Red spectrum: -1 to -0.2
+  if (sentiment <= -0.8) return "bg-red-900"; // Dark red
+  if (sentiment <= -0.6) return "bg-red-800";
+  if (sentiment <= -0.4) return "bg-red-700";
+  if (sentiment <= -0.2) return "bg-red-600"; // Light red
+  
+  // Yellow spectrum: -0.2 to 0.2
+  if (sentiment <= -0.1) return "bg-amber-500";
+  if (sentiment < 0.1) return "bg-amber-400"; // Light yellow
+  if (sentiment < 0.2) return "bg-amber-600"; // Dark yellow
+  
+  // Green spectrum: 0.2 to 1
+  if (sentiment < 0.4) return "bg-green-600"; // Light green
+  if (sentiment < 0.6) return "bg-green-700";
+  if (sentiment < 0.8) return "bg-green-800";
+  return "bg-green-900"; // Dark green
 }
 
 // Empty placeholder for days without data
@@ -77,6 +89,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const { theme } = useTheme();
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [currentYear, setCurrentYear] = useState<Date>(new Date());
   
   const filteredData = React.useMemo(() => {
     const now = new Date();
@@ -96,17 +109,22 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         toDate = endOfMonth(now);
         break;
       case 'year':
-        fromDate = startOfYear(now);
-        toDate = endOfYear(now);
+        if (isSameYear(currentYear, now)) {
+          fromDate = startOfYear(now);
+          toDate = endOfYear(now);
+        } else {
+          fromDate = startOfYear(currentYear);
+          toDate = endOfYear(currentYear);
+        }
         break;
       default:
         fromDate = subDays(now, 30); // Default to last 30 days
     }
     
     return sentimentData.filter(item => item.date >= fromDate && item.date <= toDate);
-  }, [sentimentData, timeRange]);
+  }, [sentimentData, timeRange, currentYear]);
 
-  // For the month view, we need ALL entries to show in the calendar
+  // For the month and year views, we need ALL entries to show in the calendar
   const allSentimentData = React.useMemo(() => {
     return sentimentData;
   }, [sentimentData]);
@@ -114,10 +132,8 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const dailySentiment = React.useMemo(() => {
     const sentimentMap = new Map<string, { total: number, count: number }>();
     
-    // Use the appropriate dataset based on the timeRange and view
-    const dataToProcess = (timeRange === 'month' && viewMode === 'calendar') 
-      ? allSentimentData 
-      : filteredData;
+    // Use all sentiment data to ensure we capture everything
+    const dataToProcess = allSentimentData;
     
     dataToProcess.forEach(item => {
       const dateKey = format(item.date, 'yyyy-MM-dd');
@@ -135,7 +151,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     });
     
     return result;
-  }, [filteredData, allSentimentData, timeRange, viewMode]);
+  }, [allSentimentData]);
 
   const sentimentInfo = React.useMemo(() => {
     const infoMap = new Map<string, {
@@ -222,7 +238,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       });
       
       return Array.from({ length: 12 }, (_, month) => {
-        const date = new Date(new Date().getFullYear(), month, 1);
+        const date = new Date(currentYear.getFullYear(), month, 1);
         const data = monthlyData.get(month);
         return {
           time: format(date, 'MMM'),
@@ -233,7 +249,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     }
     
     return [];
-  }, [filteredData, timeRange, dailySentiment]);
+  }, [filteredData, timeRange, dailySentiment, currentYear]);
 
   const renderTodayView = () => {
     const today = new Date();
@@ -290,10 +306,30 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     }
   };
 
+  const navigateToPreviousYear = () => {
+    setCurrentYear(prevYear => subYears(prevYear, 1));
+  };
+
+  const navigateToNextYear = () => {
+    const nextYear = addYears(currentYear, 1);
+    // Only allow navigating up to the current year
+    if (nextYear.getFullYear() <= new Date().getFullYear()) {
+      setCurrentYear(nextYear);
+    }
+  };
+
   const isCurrentWeek = (date: Date) => {
     const currentWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
     return format(date, 'yyyy-MM-dd') === format(currentWeek, 'yyyy-MM-dd');
   };
+
+  const isCurrentYear = (date: Date) => {
+    return date.getFullYear() === new Date().getFullYear();
+  };
+
+  function isSameYear(dateLeft: Date, dateRight: Date): boolean {
+    return dateLeft.getFullYear() === dateRight.getFullYear();
+  }
 
   const renderWeekView = () => {
     const days = Array.from({ length: 7 }, (_, i) => {
@@ -467,47 +503,57 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   };
 
   const renderYearView = () => {
-    const today = new Date();
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     
-    // Get all days in the year and organize them by month
-    const yearData = Array.from({ length: 12 }, (_, month) => {
-      const daysInMonth = new Date(new Date().getFullYear(), month + 1, 0).getDate();
-      
-      // Create array of days for this month
-      return Array.from({ length: daysInMonth }, (_, day) => {
-        const date = new Date(new Date().getFullYear(), month, day + 1);
-        const dateStr = format(date, 'yyyy-MM-dd');
-        const sentiment = dailySentiment.get(dateStr);
-        
-        return {
-          date,
-          dateStr,
-          day: day + 1,
-          sentiment,
-          colorClass: sentiment !== undefined ? getSentimentColor(sentiment) : null
-        };
-      });
-    });
-    
-    const maxDaysInMonth = Math.max(...yearData.map(month => month.length));
+    // Maximum days across all months for the current year
+    const daysInMonths = months.map((_, monthIndex) => 
+      new Date(currentYear.getFullYear(), monthIndex + 1, 0).getDate()
+    );
+    const maxDaysInMonth = Math.max(...daysInMonths);
     
     return (
       <div className="py-4 px-2">
-        <div className="text-center text-lg font-semibold mb-4">
-          Year in Pixels - {new Date().getFullYear()}
+        <div className="flex justify-between items-center mb-6">
+          <button 
+            onClick={navigateToPreviousYear}
+            className="p-1 rounded-full hover:bg-muted transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          
+          <div className="text-lg font-semibold">
+            Year in Pixels - {currentYear.getFullYear()}
+            {isCurrentYear(currentYear) && (
+              <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                Current Year
+              </span>
+            )}
+          </div>
+          
+          <button 
+            onClick={navigateToNextYear}
+            disabled={isCurrentYear(currentYear)}
+            className={cn(
+              "p-1 rounded-full transition-colors",
+              isCurrentYear(currentYear) 
+                ? "text-muted-foreground cursor-not-allowed" 
+                : "hover:bg-muted"
+            )}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
         </div>
         
         <div className="overflow-x-auto">
           <div className="min-w-max">
             {/* Month headers */}
-            <div className="grid grid-cols-12 gap-1 mb-2">
-              <div className="w-6"></div> {/* Empty corner for day numbers */}
+            <div className="grid grid-cols-13 gap-0">
+              <div className="w-10 pl-2"></div> {/* Empty corner */}
               {months.map(month => (
-                <div key={month} className="text-xs font-medium text-center text-muted-foreground">
+                <div key={month} className="text-xs font-medium text-center w-8 text-muted-foreground">
                   {month}
                 </div>
               ))}
@@ -515,32 +561,45 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             
             {/* Days grid */}
             {Array.from({ length: maxDaysInMonth }, (_, dayIndex) => (
-              <div key={dayIndex} className="grid grid-cols-13 gap-1 mb-1">
+              <div key={dayIndex} className="grid grid-cols-13 gap-0 h-8">
                 {/* Day number on left */}
-                <div className="text-xs text-right pr-1 text-muted-foreground font-medium">
+                <div className="w-10 pl-2 flex items-center text-xs text-muted-foreground font-medium">
                   {dayIndex + 1}
                 </div>
                 
                 {/* Month columns */}
-                {yearData.map((month, monthIndex) => {
+                {months.map((_, monthIndex) => {
                   // Check if this day exists in this month
-                  const dayData = month[dayIndex];
-                  if (!dayData) return <div key={monthIndex} className="w-5 h-5"></div>;
+                  const isValidDay = dayIndex < daysInMonths[monthIndex];
+                  if (!isValidDay) return <div key={monthIndex} className="w-8 h-8"></div>;
                   
-                  const isToday = isSameDay(dayData.date, today);
+                  const date = new Date(currentYear.getFullYear(), monthIndex, dayIndex + 1);
+                  const dateStr = format(date, 'yyyy-MM-dd');
+                  const sentiment = dailySentiment.get(dateStr);
+                  const colorClass = sentiment !== undefined ? getSentimentColor(sentiment) : null;
+                  
+                  const isToday = isSameDay(date, new Date());
                   
                   return (
                     <div 
                       key={monthIndex} 
-                      className={cn(
-                        "w-5 h-5 rounded-full flex items-center justify-center",
-                        isToday && "ring-1 ring-primary"
-                      )}
+                      className="w-8 h-8 flex items-center justify-center"
                     >
-                      {dayData.colorClass ? (
-                        <div className={cn("w-5 h-5 rounded-full", dayData.colorClass)} />
+                      {colorClass ? (
+                        <div 
+                          className={cn(
+                            "w-6 h-6 rounded-md", 
+                            colorClass,
+                            isToday && "ring-2 ring-primary"
+                          )} 
+                        />
                       ) : (
-                        <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600" />
+                        <div 
+                          className={cn(
+                            "w-6 h-6 rounded-md border-2 border-gray-300 dark:border-gray-600",
+                            isToday && "ring-2 ring-primary"
+                          )} 
+                        />
                       )}
                     </div>
                   );
@@ -552,29 +611,38 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         
         {/* Legend */}
         <div className="flex flex-wrap justify-center gap-3 mt-6">
+          {/* Red spectrum */}
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-green-500"></div>
-            <span className="text-xs">Very Positive</span>
+            <div className="w-4 h-4 rounded-full bg-red-900"></div>
+            <span className="text-xs">Very Negative</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-emerald-400"></div>
-            <span className="text-xs">Positive</span>
+            <div className="w-4 h-4 rounded-full bg-red-700"></div>
+            <span className="text-xs">Negative</span>
+          </div>
+          
+          {/* Yellow spectrum */}
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-amber-500"></div>
+            <span className="text-xs">Slightly Negative</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-blue-400"></div>
-            <span className="text-xs">Slightly Positive</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-yellow-400"></div>
+            <div className="w-4 h-4 rounded-full bg-amber-400"></div>
             <span className="text-xs">Neutral</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-orange-400"></div>
-            <span className="text-xs">Negative</span>
+            <div className="w-4 h-4 rounded-full bg-amber-600"></div>
+            <span className="text-xs">Slightly Positive</span>
+          </div>
+          
+          {/* Green spectrum */}
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-green-600"></div>
+            <span className="text-xs">Positive</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-red-500"></div>
-            <span className="text-xs">Very Negative</span>
+            <div className="w-4 h-4 rounded-full bg-green-900"></div>
+            <span className="text-xs">Very Positive</span>
           </div>
         </div>
       </div>
@@ -602,21 +670,21 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             <ReferenceArea 
               y1={0.2} 
               y2={1} 
-              fill="#4ade80" 
+              fill="#22c55e" // Green
               fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-0.2} 
               y2={0.2} 
-              fill="#facc15" 
+              fill="#f59e0b" // Yellow
               fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
               strokeOpacity={0}
             />
             <ReferenceArea 
               y1={-1} 
               y2={-0.2} 
-              fill="#ef4444" 
+              fill="#ef4444" // Red
               fillOpacity={theme === 'dark' ? 0.5 : 0.4} 
               strokeOpacity={0}
             />
@@ -664,15 +732,15 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
 
         <div className="flex justify-center gap-6 mt-4">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            <div className="w-3 h-3 rounded-full bg-green-700"></div>
             <span className="text-sm">Positive</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
             <span className="text-sm">Neutral</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+            <div className="w-3 h-3 rounded-full bg-red-700"></div>
             <span className="text-sm">Negative</span>
           </div>
         </div>
