@@ -299,7 +299,7 @@ export default function MobileChatInterface({
         console.error("[Mobile] Received error response:", response.content);
       }
       
-      // Remove the problematic property check and just ensure response is saved properly
+      // Store the response in Supabase, removing the problematic property check
       const { error: storeError } = await supabase
         .from('chat_messages')
         .insert({
