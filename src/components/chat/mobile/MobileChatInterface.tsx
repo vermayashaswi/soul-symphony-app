@@ -92,7 +92,7 @@ export default function MobileChatInterface({
       icon: <Brain className="h-4 w-4 flex-shrink-0 mr-1" />
     },
     {
-      text: "Rate my top 3 emotions out of 10 for each of them.",
+      text: "Rate my top 3 emotions out of 10.",
       icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-1" />
     }
   ];
@@ -559,12 +559,12 @@ export default function MobileChatInterface({
                       key={index}
                       variant="outline"
                       size="sm"
-                      className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted"
+                      className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
                       onClick={() => handleSendMessage(question.text)}
                     >
-                      <div className="flex gap-1 items-start">
-                        <span className="mt-0.5">{question.icon}</span>
-                        <span className="break-words">{question.text}</span>
+                      <div className="flex gap-1 items-start w-full overflow-hidden">
+                        <span className="flex-shrink-0">{question.icon}</span>
+                        <span className="break-words overflow-hidden flex-1">{question.text}</span>
                       </div>
                     </Button>
                   ))}

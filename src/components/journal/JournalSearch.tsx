@@ -112,10 +112,6 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     setSearchQuery(value);
   };
 
-  const handleEntrySelect = (entry: JournalEntry) => {
-    onSelectEntry(entry);
-  };
-
   return (
     <Card className="w-full sticky top-0 z-10 bg-background shadow-sm">
       <CardContent className="p-4">
