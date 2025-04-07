@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const MobileNavbar = () => {
   const location = useLocation();
@@ -19,19 +19,42 @@ const MobileNavbar = () => {
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
+  // Force refresh function to ensure UI responsiveness
+  const forceRefresh = useCallback(() => {
+    console.log('[MobileNavbar] Forcing refresh via increment key');
+    setNavKey(prev => prev + 1);
+  }, []);
+
   // Listen for dialog events to force UI refresh
   useEffect(() => {
     const handleDialogClosed = () => {
-      // Increment key to force re-render
-      setNavKey(prev => prev + 1);
+      console.log('[MobileNavbar] Dialog closed event detected');
+      // Increment key to force re-render with slight delay
+      setTimeout(() => {
+        forceRefresh();
+      }, 50);
+    };
+    
+    const handleThreadDeleted = () => {
+      console.log('[MobileNavbar] Thread deleted event detected');
+      forceRefresh();
+    };
+    
+    const handleThreadTitleUpdated = () => {
+      console.log('[MobileNavbar] Thread title updated event detected');
+      forceRefresh();
     };
     
     window.addEventListener('dialogClosed', handleDialogClosed as EventListener);
+    window.addEventListener('threadDeleted', handleThreadDeleted as EventListener);
+    window.addEventListener('threadTitleUpdated', handleThreadTitleUpdated as EventListener);
     
     return () => {
       window.removeEventListener('dialogClosed', handleDialogClosed as EventListener);
+      window.removeEventListener('threadDeleted', handleThreadDeleted as EventListener);
+      window.removeEventListener('threadTitleUpdated', handleThreadTitleUpdated as EventListener);
     };
-  }, []);
+  }, [forceRefresh]);
 
   // Only show the navbar if the user is logged in or on the home page
   if (!user && location.pathname !== '/') {

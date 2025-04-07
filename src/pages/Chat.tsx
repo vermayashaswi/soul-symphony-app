@@ -34,6 +34,7 @@ const Chat = () => {
 
   // Set up a callback for handling event listeners to prevent closure issues
   const handleForceRefresh = useCallback(() => {
+    console.log('[Chat] Force refreshing entire component');
     // Force re-render of the entire component
     setKey(prevKey => prevKey + 1);
   }, []);
@@ -42,7 +43,13 @@ const Chat = () => {
   useEffect(() => {
     const handleThreadDeleted = handleForceRefresh;
     const handleThreadTitleUpdated = handleForceRefresh;
-    const handleDialogClosed = handleForceRefresh;
+    const handleDialogClosed = () => {
+      console.log('[Chat] Dialog closed event detected');
+      // Add a slight delay to ensure all UI updates happen in correct order
+      setTimeout(() => {
+        handleForceRefresh();
+      }, 100);
+    };
     
     window.addEventListener('threadDeleted', handleThreadDeleted as EventListener);
     window.addEventListener('threadTitleUpdated', handleThreadTitleUpdated as EventListener);
