@@ -231,6 +231,11 @@ export default function MobileChatInterface({
     let threadId = currentThreadId;
     let isFirstMessage = false;
     
+    setMessages(prev => [...prev, { role: 'user', content: message }]);
+    scrollToBottom();
+    setLoading(true);
+    setProcessingStage("Analyzing your question...");
+    
     if (!threadId) {
       try {
         if (onCreateNewThread) {
@@ -277,12 +282,6 @@ export default function MobileChatInterface({
       isFirstMessage = !error && count === 0;
     }
     
-    // Add user message to UI immediately
-    setMessages(prev => [...prev, { role: 'user', content: message }]);
-    setLoading(true);
-    setProcessingStage("Analyzing your question...");
-    
-    // Save user message to database immediately
     try {
       const { error: msgError } = await supabase
         .from('chat_messages')

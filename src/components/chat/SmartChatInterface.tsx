@@ -281,6 +281,11 @@ export default function SmartChatInterface() {
     
     addRagDiagnosticStep("Initializing chat request", "success", "Starting to process your query");
     
+    setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
+    scrollToBottom();
+    setIsLoading(true);
+    setShowSuggestions(false);
+    
     let threadId = currentThreadId;
     if (!threadId) {
       try {
@@ -323,10 +328,6 @@ export default function SmartChatInterface() {
         return;
       }
     }
-    
-    setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
-    setIsLoading(true);
-    setShowSuggestions(false);
     
     try {
       addRagDiagnosticStep("Saving user message", "loading");
