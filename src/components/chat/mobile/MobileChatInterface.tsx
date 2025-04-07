@@ -10,8 +10,7 @@ import {
   Lightbulb, 
   MoreVertical,
   Pencil,
-  Trash,
-  Share2
+  Trash
 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
@@ -522,29 +521,6 @@ export default function MobileChatInterface({
       });
     }
   };
-  
-  const handleShareThread = () => {
-    if (!currentThreadId) return;
-    
-    const url = `${window.location.origin}/chat?thread=${currentThreadId}`;
-    
-    navigator.clipboard.writeText(url).then(
-      () => {
-        toast({
-          title: "URL copied to clipboard",
-          description: "You can now share this conversation with others.",
-        });
-      },
-      (err) => {
-        console.error("[Mobile] Could not copy text: ", err);
-        toast({
-          title: "Error",
-          description: "Failed to copy URL to clipboard.",
-          variant: "destructive"
-        });
-      }
-    );
-  };
 
   return (
     <div className="flex flex-col h-full" ref={containerRef}>
@@ -590,10 +566,6 @@ export default function MobileChatInterface({
               }}>
                 <Pencil className="mr-2 h-4 w-4" />
                 <span>Rename</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleShareThread}>
-                <Share2 className="mr-2 h-4 w-4" />
-                <span>Share</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 

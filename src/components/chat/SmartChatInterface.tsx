@@ -9,8 +9,7 @@ import {
   Lightbulb,
   MoreVertical,
   Pencil,
-  Trash,
-  Share2
+  Trash
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -613,29 +612,6 @@ export default function SmartChatInterface() {
     }
   };
 
-  const handleShareThread = () => {
-    if (!currentThreadId) return;
-    
-    const url = `${window.location.origin}/chat?thread=${currentThreadId}`;
-    
-    navigator.clipboard.writeText(url).then(
-      () => {
-        toast({
-          title: "URL copied to clipboard",
-          description: "You can now share this conversation with others.",
-        });
-      },
-      (err) => {
-        console.error("Could not copy text: ", err);
-        toast({
-          title: "Error",
-          description: "Failed to copy URL to clipboard.",
-          variant: "destructive"
-        });
-      }
-    );
-  };
-
   return (
     <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background">
       <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b sticky top-0 z-10">
@@ -678,10 +654,6 @@ export default function SmartChatInterface() {
                     }}>
                       <Pencil className="mr-2 h-4 w-4" />
                       <span>Rename</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleShareThread}>
-                      <Share2 className="mr-2 h-4 w-4" />
-                      <span>Share</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
