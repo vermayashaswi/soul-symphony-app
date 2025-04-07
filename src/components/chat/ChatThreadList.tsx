@@ -210,7 +210,7 @@ export default function ChatThreadList({
         ) : (
           <div className="space-y-1 py-2">
             {filteredThreads.map((thread) => (
-              <div key={thread.id} className="relative group">
+              <div key={thread.id} className="relative flex items-center">
                 <Button
                   variant="ghost"
                   className={cn(
@@ -219,7 +219,7 @@ export default function ChatThreadList({
                   )}
                   onClick={() => onSelectThread(thread.id)}
                 >
-                  <div className="truncate mr-2">
+                  <div className="truncate mr-10">
                     <div className="flex items-center">
                       <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
                       <span className="truncate">{thread.title}</span>
@@ -232,7 +232,7 @@ export default function ChatThreadList({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                  className="absolute right-1 h-8 w-8"
                   onClick={(e) => {
                     e.stopPropagation();
                     openRenameDialog(thread.id, thread.title);
