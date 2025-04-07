@@ -4,10 +4,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
 
 const MobileNavbar = () => {
   const location = useLocation();
   const { user } = useAuth();
+  const [navKey, setNavKey] = useState(0);
   
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
@@ -17,6 +19,20 @@ const MobileNavbar = () => {
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
+  // Listen for dialog events to force UI refresh
+  useEffect(() => {
+    const handleDialogClosed = () => {
+      // Increment key to force re-render
+      setNavKey(prev => prev + 1);
+    };
+    
+    window.addEventListener('dialogClosed', handleDialogClosed as EventListener);
+    
+    return () => {
+      window.removeEventListener('dialogClosed', handleDialogClosed as EventListener);
+    };
+  }, []);
+
   // Only show the navbar if the user is logged in or on the home page
   if (!user && location.pathname !== '/') {
     return null;
@@ -24,6 +40,7 @@ const MobileNavbar = () => {
 
   return (
     <motion.div 
+      key={navKey}
       className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t flex items-center justify-around z-50 px-1"
       initial={{ y: 100 }}
       animate={{ y: 0 }}

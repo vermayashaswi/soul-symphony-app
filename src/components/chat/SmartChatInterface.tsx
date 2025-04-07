@@ -542,10 +542,11 @@ export default function SmartChatInterface() {
       if (error) throw error;
       
       setCurrentThreadTitle(newThreadTitle);
-      
       setIsRenameDialogOpen(false);
       
       setInterfaceKey(prev => prev + 1);
+      
+      window.dispatchEvent(new CustomEvent('dialogClosed'));
       
       setTimeout(() => {
         window.dispatchEvent(
@@ -565,6 +566,8 @@ export default function SmartChatInterface() {
     } catch (error) {
       console.error("Error renaming thread:", error);
       setIsRenameDialogOpen(false);
+      
+      window.dispatchEvent(new CustomEvent('dialogClosed'));
       
       toast({
         title: "Error",
@@ -598,22 +601,27 @@ export default function SmartChatInterface() {
       setIsDeleteDialogOpen(false);
       setShowSuggestions(true);
       
-      window.dispatchEvent(
-        new CustomEvent('threadDeleted', { 
-          detail: { threadId: currentThreadId } 
-        })
-      );
-      
-      toast({
-        title: "Thread deleted",
-        description: "The conversation has been deleted successfully.",
-      });
+      window.dispatchEvent(new CustomEvent('dialogClosed'));
       
       setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent('threadDeleted', { 
+            detail: { threadId: currentThreadId } 
+          })
+        );
+        
+        toast({
+          title: "Thread deleted",
+          description: "The conversation has been deleted successfully.",
+        });
+        
         fetchUserThreads();
       }, 100);
     } catch (error) {
       console.error("Error deleting thread:", error);
+      
+      window.dispatchEvent(new CustomEvent('dialogClosed'));
+      
       toast({
         title: "Error",
         description: "Failed to delete the conversation.",
@@ -765,6 +773,7 @@ export default function SmartChatInterface() {
         onOpenChange={(open) => {
           setIsRenameDialogOpen(open);
           if (!open) {
+            window.dispatchEvent(new CustomEvent('dialogClosed'));
             setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
           }
         }}
@@ -792,6 +801,7 @@ export default function SmartChatInterface() {
               variant="outline"
               onClick={() => {
                 setIsRenameDialogOpen(false);
+                window.dispatchEvent(new CustomEvent('dialogClosed'));
                 setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
               }}
             >
@@ -809,6 +819,7 @@ export default function SmartChatInterface() {
         onOpenChange={(open) => {
           setIsDeleteDialogOpen(open);
           if (!open) {
+            window.dispatchEvent(new CustomEvent('dialogClosed'));
             setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
           }
         }}
@@ -822,7 +833,10 @@ export default function SmartChatInterface() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false);
+              window.dispatchEvent(new CustomEvent('dialogClosed'));
+            }}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteThread}>
               Delete
             </AlertDialogAction>

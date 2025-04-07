@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -449,11 +450,15 @@ export default function MobileChatInterface({
       if (error) throw error;
       
       setCurrentThreadTitle(newThreadTitle);
-      
       setIsRenameDialogOpen(false);
       
+      // Force immediate re-render to ensure UI updates
       setInterfaceKey(prev => prev + 1);
       
+      // Dispatch dialog closed event to parent components
+      window.dispatchEvent(new CustomEvent('dialogClosed'));
+      
+      // Dispatch thread title updated event after a short delay
       setTimeout(() => {
         window.dispatchEvent(
           new CustomEvent('threadTitleUpdated', { 
@@ -472,6 +477,9 @@ export default function MobileChatInterface({
     } catch (error) {
       console.error("[Mobile] Error renaming thread:", error);
       setIsRenameDialogOpen(false);
+      
+      // Dispatch dialog closed event even on error
+      window.dispatchEvent(new CustomEvent('dialogClosed'));
       
       toast({
         title: "Error",
@@ -504,17 +512,21 @@ export default function MobileChatInterface({
       setIsDeleteDialogOpen(false);
       setShowSuggestions(true);
       
-      window.dispatchEvent(
-        new CustomEvent('threadDeleted', { 
-          detail: { threadId: currentThreadId } 
-        })
-      );
+      // Dispatch dialog closed event to parent components
+      window.dispatchEvent(new CustomEvent('dialogClosed'));
       
-      if (onSelectThread) {
-        setTimeout(() => {
+      // Dispatch thread deleted event after a short delay
+      setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent('threadDeleted', { 
+            detail: { threadId: currentThreadId } 
+          })
+        );
+        
+        if (onSelectThread) {
           onSelectThread('');
-        }, 100);
-      }
+        }
+      }, 50);
       
       toast({
         title: "Thread deleted",
@@ -522,6 +534,10 @@ export default function MobileChatInterface({
       });
     } catch (error) {
       console.error("[Mobile] Error deleting thread:", error);
+      
+      // Dispatch dialog closed event even on error
+      window.dispatchEvent(new CustomEvent('dialogClosed'));
+      
       toast({
         title: "Error",
         description: "Failed to delete the conversation.",
@@ -655,6 +671,10 @@ export default function MobileChatInterface({
         onOpenChange={(open) => {
           setIsRenameDialogOpen(open);
           if (!open) {
+            // Dispatch dialog closed event when dialog is closed by any means
+            window.dispatchEvent(new CustomEvent('dialogClosed'));
+            
+            // Force re-render
             setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
           }
         }}
@@ -682,6 +702,8 @@ export default function MobileChatInterface({
               variant="outline"
               onClick={() => {
                 setIsRenameDialogOpen(false);
+                // Dispatch dialog closed event
+                window.dispatchEvent(new CustomEvent('dialogClosed'));
                 setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
               }}
             >
@@ -699,6 +721,10 @@ export default function MobileChatInterface({
         onOpenChange={(open) => {
           setIsDeleteDialogOpen(open);
           if (!open) {
+            // Dispatch dialog closed event when dialog is closed by any means
+            window.dispatchEvent(new CustomEvent('dialogClosed'));
+            
+            // Force re-render
             setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
           }
         }}
@@ -712,7 +738,11 @@ export default function MobileChatInterface({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false);
+              // Dispatch dialog closed event
+              window.dispatchEvent(new CustomEvent('dialogClosed'));
+            }}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteThread}>
               Delete
             </AlertDialogAction>
