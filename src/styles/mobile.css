@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -68,36 +69,36 @@
     font-size: 1.25rem !important;
   }
   
-  /* IMPROVED: Chat thread list buttons - always visible and with purple color */
+  /* ENHANCED: Chat thread list buttons - always visible with prominent purple background */
   .chat-thread-list .chat-thread-buttons {
     display: flex !important;
     opacity: 1 !important;
-    background-color: rgba(155, 135, 245, 0.1);
+    background-color: rgba(155, 135, 245, 0.25);
     border-radius: 0 0.375rem 0.375rem 0;
-    padding: 8px 2px;
+    padding: 8px 4px;
     margin-left: auto;
     height: 100%;
   }
   
-  /* Ensure the thread buttons have adequate spacing and purple styling */
+  /* IMPROVED: Ensure the thread buttons have adequate spacing and purple styling */
   .chat-thread-list .thread-edit-button,
   .chat-thread-list .thread-delete-button {
-    margin: 0 2px !important;
-    background-color: rgba(155, 135, 245, 0.15);
-    border-radius: 6px;
+    margin: 0 3px !important;
+    background-color: rgba(155, 135, 245, 0.3);
+    border-radius: 8px;
     color: #9b87f5;
   }
   
   /* Make thread buttons more touchable on mobile with purple highlights */
   .chat-thread-list .h-8.w-8 {
-    min-height: 36px;
-    min-width: 36px;
+    min-height: 38px;
+    min-width: 38px;
     display: flex !important;
     align-items: center;
     justify-content: center;
   }
   
-  /* Ensure the thread buttons are not hidden and have consistent purple styling */
+  /* Ensure the thread buttons are always visible with strong purple styling */
   .chat-thread-list .flex-shrink-0,
   .chat-thread-list .chat-thread-buttons {
     display: flex !important;
@@ -486,17 +487,17 @@
 /* Thread Edit Button - Always visible with purple styling */
 .chat-thread-list .thread-edit-button {
   color: #9b87f5;
-  background-color: rgba(155, 135, 245, 0.1);
+  background-color: rgba(155, 135, 245, 0.3);
 }
 
 .chat-thread-list .thread-edit-button:active {
-  background-color: rgba(155, 135, 245, 0.3);
+  background-color: rgba(155, 135, 245, 0.5);
 }
 
 /* Thread Delete Button - Always visible with purple styling */
 .chat-thread-list .thread-delete-button {
   color: #9b87f5;
-  background-color: rgba(155, 135, 245, 0.1);
+  background-color: rgba(155, 135, 245, 0.3);
 }
 
 .chat-thread-list .thread-delete-button:active {
