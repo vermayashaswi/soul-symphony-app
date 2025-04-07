@@ -1,11 +1,24 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0"
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
+// Define Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Get OpenAI API key from environment variable
+const apiKey = Deno.env.get('OPENAI_API_KEY');
+if (!apiKey) {
+  console.error('OPENAI_API_KEY is not set');
+  // We'll continue and just log queries without embeddings if the key is missing
+}
+
+// Define CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -14,114 +27,85 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    
-    const { threadId, userId } = await req.json();
-    
-    if (!threadId || !userId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required parameters: threadId or userId' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-          status: 400 
-        }
-      );
+    const { userId, messageId, threadId, queryText } = await req.json();
+
+    if (!userId) {
+      throw new Error('User ID is required');
     }
+
+    if (!queryText) {
+      throw new Error('Query text is required');
+    }
+
+    console.log(`Ensuring chat persistence for user ${userId}`);
     
-    // Check if thread exists and belongs to user
-    const { data: thread, error: threadError } = await supabaseAdmin
-      .from('chat_threads')
-      .select('*')
-      .eq('id', threadId)
-      .eq('user_id', userId)
-      .single();
+    // Generate embedding for the message if OpenAI API key is available
+    let queryEmbedding = null;
     
-    if (threadError || !thread) {
-      console.error('Thread not found or access denied:', threadError);
-      
-      // Create a new thread if the requested one doesn't exist
-      const { data: newThread, error: createError } = await supabaseAdmin
-        .from('chat_threads')
-        .insert({
-          id: threadId, // Use the requested ID
-          user_id: userId,
-          title: "Restored Conversation",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-      
-      if (createError) {
-        return new Response(
-          JSON.stringify({ error: 'Failed to create replacement thread', details: createError }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-            status: 500 
+    if (apiKey) {
+      try {
+        console.log("Generating embedding for query:", queryText.substring(0, 50) + "...");
+        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-ada-002',
+            input: queryText,
+          }),
+        });
+
+        if (!embeddingResponse.ok) {
+          const error = await embeddingResponse.text();
+          console.error('Failed to generate embedding:', error);
+        } else {
+          const embeddingData = await embeddingResponse.json();
+          if (embeddingData.data && embeddingData.data.length > 0) {
+            queryEmbedding = embeddingData.data[0].embedding;
+            console.log("Embedding generated successfully");
           }
-        );
+        }
+      } catch (error) {
+        console.error("Error generating embedding:", error);
+        // Continue without embedding
       }
+    } else {
+      console.log("Skipping embedding generation - OPENAI_API_KEY not set");
+    }
+    
+    // Insert the query into the user_queries table
+    const { data, error } = await supabase
+      .from('user_queries')
+      .insert({
+        user_id: userId,
+        query_text: queryText,
+        thread_id: threadId,
+        message_id: messageId,
+        embedding: queryEmbedding
+      })
+      .select()
+      .single();
       
-      return new Response(
-        JSON.stringify({ 
-          thread: newThread, 
-          messages: [],
-          created: true,
-          restored: true
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-          status: 200 
-        }
-      );
+    if (error) {
+      console.error("Error logging user query:", error);
+      throw error;
     }
     
-    // Get messages for the thread
-    const { data: messages, error: messagesError } = await supabaseAdmin
-      .from('chat_messages')
-      .select('*')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: true });
-    
-    if (messagesError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch messages', details: messagesError }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-          status: 500 
-        }
-      );
-    }
-    
-    // Update the thread's last activity timestamp
-    await supabaseAdmin
-      .from('chat_threads')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', threadId);
-    
+    console.log("User query logged successfully with ID:", data.id);
+
     return new Response(
-      JSON.stringify({ 
-        thread,
-        messages: messages || [],
-        restored: false,
-        messageCount: messages?.length || 0
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-        status: 200 
-      }
+      JSON.stringify({ success: true, queryId: data.id }),
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } catch (error) {
-    console.error('Error in ensure-chat-persistence function:', error);
-    
+    console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-        status: 500 
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       }
     );
   }

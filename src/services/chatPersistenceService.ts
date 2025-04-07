@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -57,10 +56,7 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       throw error;
     }
     
-    // Transform the data to ensure sender is of type 'user' | 'assistant'
-    // and handle other optional fields correctly
     return (data || []).map(msg => {
-      // Create a properly typed object that includes all the fields we need
       const typedMessage: ChatMessage = {
         id: msg.id,
         thread_id: msg.thread_id,
@@ -79,7 +75,7 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
   }
 };
 
-// Function to save a new message
+// Function to save a new message and record it in user_queries if it's from a user
 export const saveMessage = async (
   threadId: string, 
   content: string, 
@@ -107,13 +103,34 @@ export const saveMessage = async (
       throw error;
     }
     
-    // Update thread's updated_at timestamp
     await supabase
       .from('chat_threads')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', threadId);
     
-    // Create a properly typed object that includes all the fields we need
+    if (sender === 'user') {
+      const { data: threadData, error: threadError } = await supabase
+        .from('chat_threads')
+        .select('user_id')
+        .eq('id', threadId)
+        .single();
+        
+      if (!threadError && threadData) {
+        try {
+          await supabase.functions.invoke('ensure-chat-persistence', {
+            body: {
+              userId: threadData.user_id,
+              messageId: data.id,
+              threadId: threadId,
+              queryText: content
+            }
+          });
+        } catch (queryError) {
+          console.error("Error logging user query:", queryError);
+        }
+      }
+    }
+    
     const typedMessage: ChatMessage = {
       id: data.id,
       thread_id: data.thread_id,
@@ -124,7 +141,6 @@ export const saveMessage = async (
       has_numeric_result: data.has_numeric_result || false
     };
     
-    // Include analysis_data if it was provided
     if (analysisData) {
       typedMessage.analysis_data = analysisData;
     }
