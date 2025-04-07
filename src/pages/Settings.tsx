@@ -20,6 +20,7 @@ import { ColorPicker } from '@/components/settings/ColorPicker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import DebugPanel, { debugLogger, logInfo, logError, logRender, logAPI, logAction, logAuth } from '@/components/debug/DebugPanel';
+import { startOfDay, subDays, isWithinInterval } from 'date-fns';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -104,6 +105,9 @@ export default function Settings() {
         try {
           logAPI('Fetching journal entries for streak calculation', 'Settings', { userId: user.id });
           
+          const yesterday = startOfDay(subDays(new Date(), 1));
+          logInfo(`Calculating streak up to: ${yesterday.toISOString()}`, 'Settings');
+          
           const { data, error } = await supabase
             .from('Journal Entries')
             .select('created_at')
@@ -122,11 +126,32 @@ export default function Settings() {
             return;
           }
           
-          let streak = 1;
-          let currentDate = new Date(data[0].created_at);
+          const eligibleEntries = data.filter(entry => {
+            const entryDate = new Date(entry.created_at);
+            return entryDate <= yesterday;
+          });
           
-          for (let i = 1; i < data.length; i++) {
-            const entryDate = new Date(data[i].created_at);
+          if (eligibleEntries.length === 0) {
+            logInfo("No eligible entries for streak calculation (all entries are from today)", 'Settings');
+            setStreakDays(0);
+            return;
+          }
+          
+          eligibleEntries.sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          
+          let streak = 1;
+          let currentDate = startOfDay(new Date(eligibleEntries[0].created_at));
+          
+          if (currentDate.getTime() !== yesterday.getTime()) {
+            logInfo(`Most recent entry (${currentDate.toISOString()}) is not from yesterday (${yesterday.toISOString()}), streak is 0`, 'Settings');
+            setStreakDays(0);
+            return;
+          }
+          
+          for (let i = 1; i < eligibleEntries.length; i++) {
+            const entryDate = startOfDay(new Date(eligibleEntries[i].created_at));
             
             const timeDiff = currentDate.getTime() - entryDate.getTime();
             const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
@@ -134,14 +159,19 @@ export default function Settings() {
             if (daysDiff === 1) {
               streak++;
               currentDate = entryDate;
-            } else if (daysDiff > 1) {
-              break;
             } else if (daysDiff === 0) {
               currentDate = entryDate;
+            } else {
+              break;
             }
           }
           
-          logInfo(`Streak calculation complete: ${streak} days`, 'Settings', { streak });
+          logInfo(`Streak calculation complete: ${streak} days`, 'Settings', { 
+            streak,
+            yesterday: yesterday.toISOString(),
+            mostRecentEntryDate: new Date(eligibleEntries[0].created_at).toISOString()
+          });
+          
           setStreakDays(streak);
         } catch (error) {
           logError("Error calculating streak", 'Settings', error);
