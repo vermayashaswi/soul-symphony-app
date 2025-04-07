@@ -9,6 +9,7 @@ const Chat = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [threadId, setThreadId] = useState<string | null>(null);
+  const [key, setKey] = useState<number>(0); // Add a key to force re-render when needed
 
   // Get thread from URL if present
   useEffect(() => {
@@ -31,8 +32,22 @@ const Chat = () => {
     }
   }, [user, navigate]);
 
+  // Listen for thread deletion events to refresh the component
+  useEffect(() => {
+    const handleThreadDeleted = () => {
+      // Force re-render of the entire component
+      setKey(prevKey => prevKey + 1);
+    };
+
+    window.addEventListener('threadDeleted', handleThreadDeleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('threadDeleted', handleThreadDeleted as EventListener);
+    };
+  }, []);
+
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col" key={key}>
       <SmartChatInterface />
     </div>
   );

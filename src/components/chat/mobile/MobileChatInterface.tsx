@@ -493,6 +493,8 @@ export default function MobileChatInterface({
       
       setMessages([]);
       setCurrentThreadId(null);
+      setIsDeleteDialogOpen(false);
+      setShowSuggestions(true);
       
       window.dispatchEvent(
         new CustomEvent('threadDeleted', { 
@@ -500,18 +502,16 @@ export default function MobileChatInterface({
         })
       );
       
-      setIsDeleteDialogOpen(false);
+      if (onSelectThread) {
+        setTimeout(() => {
+          onSelectThread('');
+        }, 100);
+      }
       
       toast({
         title: "Thread deleted",
         description: "The conversation has been deleted successfully.",
       });
-      
-      setShowSuggestions(true);
-      
-      if (onSelectThread) {
-        onSelectThread('');
-      }
     } catch (error) {
       console.error("[Mobile] Error deleting thread:", error);
       toast({

@@ -587,6 +587,8 @@ export default function SmartChatInterface() {
       setChatHistory([]);
       setCurrentThreadId(null);
       localStorage.removeItem(THREAD_ID_STORAGE_KEY);
+      setIsDeleteDialogOpen(false);
+      setShowSuggestions(true);
       
       window.dispatchEvent(
         new CustomEvent('threadDeleted', { 
@@ -594,14 +596,14 @@ export default function SmartChatInterface() {
         })
       );
       
-      setIsDeleteDialogOpen(false);
-      
       toast({
         title: "Thread deleted",
         description: "The conversation has been deleted successfully.",
       });
       
-      fetchUserThreads();
+      setTimeout(() => {
+        fetchUserThreads();
+      }, 100);
     } catch (error) {
       console.error("Error deleting thread:", error);
       toast({
