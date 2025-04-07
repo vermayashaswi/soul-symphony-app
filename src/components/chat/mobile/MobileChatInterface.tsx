@@ -75,6 +75,7 @@ export default function MobileChatInterface({
   const [sheetOpen, setSheetOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
 
   useEffect(() => {
     if (propThreadId) {
@@ -102,6 +103,13 @@ export default function MobileChatInterface({
     scrollToBottom();
   }, [messages, loading]);
 
+  // Load messages on initial mount if we have a thread ID
+  useEffect(() => {
+    if (currentThreadId && user?.id && !hasLoadedMessages) {
+      loadThreadMessages(currentThreadId);
+    }
+  }, [currentThreadId, user?.id, hasLoadedMessages]);
+
   const scrollToBottom = () => {
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -113,6 +121,8 @@ export default function MobileChatInterface({
     
     try {
       console.log(`[Mobile] Loading messages for thread ${threadId}`);
+      setLoading(true);
+      
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
@@ -141,8 +151,17 @@ export default function MobileChatInterface({
         setMessages([]);
         setShowSuggestions(true);
       }
+      
+      setHasLoadedMessages(true);
     } catch (error) {
       console.error("[Mobile] Error loading messages:", error);
+      toast({
+        title: "Error",
+        description: "Unable to load conversation history",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -277,19 +296,22 @@ export default function MobileChatInterface({
         console.error("[Mobile] Received error response:", response.content);
       }
       
-      const { error: storeError } = await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: threadId,
-          content: response.content,
-          sender: 'assistant',
-          reference_entries: response.references || null,
-          has_numeric_result: response.hasNumericResult || false,
-          analysis_data: response.analysis || null
-        });
-        
-      if (storeError) {
-        console.error("[Mobile] Error storing assistant response:", storeError);
+      // Check if the response came from smart-chat function which already persisted the message
+      if (!response.fromPersistedFunction) {
+        const { error: storeError } = await supabase
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            content: response.content,
+            sender: 'assistant',
+            reference_entries: response.references || null,
+            has_numeric_result: response.hasNumericResult || false,
+            analysis_data: response.analysis || null
+          });
+          
+        if (storeError) {
+          console.error("[Mobile] Error storing assistant response:", storeError);
+        }
       }
       
       if (messages.length === 0) {

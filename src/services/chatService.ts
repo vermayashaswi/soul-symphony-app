@@ -314,7 +314,32 @@ export const processChatMessage = async (
       });
     }
     
-    // Call the Supabase Edge Function with fixed vector search parameters
+    // Try using the direct smart-chat function first for improved persistence
+    if (threadId) {
+      try {
+        const { data: directData, error: directError } = await supabase.functions.invoke('smart-chat', {
+          body: {
+            message,
+            userId,
+            timeRange,
+            threadId
+          }
+        });
+        
+        if (!directError && directData) {
+          console.log("Successfully used direct smart-chat function with threading");
+          
+          return {
+            role: "assistant",
+            content: directData.data
+          };
+        }
+      } catch (directError) {
+        console.error("Error using direct smart-chat function, falling back to chat-with-rag:", directError);
+      }
+    }
+    
+    // Fall back to the chat-with-rag function if direct method fails
     const { data, error } = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,

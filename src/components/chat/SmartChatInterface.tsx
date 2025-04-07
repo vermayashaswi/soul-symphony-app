@@ -42,6 +42,7 @@ export default function SmartChatInterface() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
   const [ragDiagnostics, setRagDiagnostics] = useState<any>({
     steps: [],
     isActive: false,
@@ -114,16 +115,21 @@ export default function SmartChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-    
-    if (currentThreadId) {
+  }, [chatHistory, isLoading]);
+  
+  useEffect(() => {
+    if (currentThreadId && user?.id && !hasLoadedMessages) {
       loadThreadMessages(currentThreadId);
     }
-  }, [chatHistory, isLoading, currentThreadId]);
+  }, [currentThreadId, user?.id, hasLoadedMessages]);
 
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !user?.id) return;
     
     try {
+      console.log(`Loading messages for thread ${threadId}`);
+      setIsLoading(true);
+      
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
@@ -147,8 +153,17 @@ export default function SmartChatInterface() {
         setChatHistory([]);
         setShowSuggestions(true);
       }
+      
+      setHasLoadedMessages(true);
     } catch (error) {
       console.error("Error loading messages:", error);
+      toast({
+        title: "Error",
+        description: "Unable to load conversation history",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -157,11 +172,11 @@ export default function SmartChatInterface() {
       if (event.detail.threadId) {
         setCurrentThreadId(event.detail.threadId);
         localStorage.setItem(THREAD_ID_STORAGE_KEY, event.detail.threadId);
+        setHasLoadedMessages(false);
       }
     };
     
     window.addEventListener('threadSelected' as any, onThreadChange);
-    
     window.addEventListener('newThreadCreated' as any, onThreadChange);
     
     return () => {

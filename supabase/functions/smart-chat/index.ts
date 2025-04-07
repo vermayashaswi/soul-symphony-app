@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -26,7 +27,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, timeRange } = await req.json();
+    const { message, userId, timeRange, threadId } = await req.json();
 
     if (!message) {
       throw new Error('Message is required');
@@ -38,6 +39,7 @@ serve(async (req) => {
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
     console.log("Time range received:", timeRange);
+    console.log("Thread ID received:", threadId);
     
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
@@ -130,7 +132,52 @@ serve(async (req) => {
     const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
     console.log("Response generated successfully");
 
-    // 5. Return response
+    // 5. Save message to database if threadId is provided
+    if (threadId) {
+      console.log(`Saving messages to thread ${threadId}`);
+      
+      try {
+        // Save user message
+        const { error: userMsgError } = await supabase
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            content: message,
+            sender: 'user'
+          });
+          
+        if (userMsgError) {
+          console.error('Error saving user message:', userMsgError);
+        }
+        
+        // Save assistant response
+        const { error: assistantMsgError } = await supabase
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            content: responseContent,
+            sender: 'assistant'
+          });
+          
+        if (assistantMsgError) {
+          console.error('Error saving assistant message:', assistantMsgError);
+        }
+        
+        // Update thread's updated_at timestamp
+        const { error: threadUpdateError } = await supabase
+          .from('chat_threads')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', threadId);
+          
+        if (threadUpdateError) {
+          console.error('Error updating thread timestamp:', threadUpdateError);
+        }
+      } catch (dbError) {
+        console.error('Database error when saving messages:', dbError);
+      }
+    }
+
+    // 6. Return response
     return new Response(
       JSON.stringify({ data: responseContent }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
