@@ -24,10 +24,11 @@ const EmptyChatState: React.FC = () => {
       <div className="mt-6 text-sm text-muted-foreground/70">
         <p>Try questions like:</p>
         <ul className="mt-1 space-y-1">
-          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "How did I feel last week?"</li>
-          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "What makes me happy?"</li>
-          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "Which entries mention work stress?"</li>
-          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "Show me my emotional trends"</li>
+          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "What were my top emotions last week?"</li>
+          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "What time of the day do I usually like journaling?"</li>
+          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "Am i am introvert? Do i like people in general?"</li>
+          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "What should i particularly do to help my mental health?"</li>
+          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "Rate my top 3 negative traits out of 100? What do i do to improve them?"</li>
         </ul>
       </div>
       

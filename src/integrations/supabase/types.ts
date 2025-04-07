@@ -243,51 +243,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_queries: {
-        Row: {
-          created_at: string
-          embedding: string | null
-          id: string
-          message_id: string | null
-          query_text: string
-          thread_id: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          embedding?: string | null
-          id?: string
-          message_id?: string | null
-          query_text: string
-          thread_id?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          embedding?: string | null
-          id?: string
-          message_id?: string | null
-          query_text?: string
-          thread_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_queries_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "chat_messages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_queries_thread_id_fkey"
-            columns: ["thread_id"]
-            isOneToOne: false
-            referencedRelation: "chat_threads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_sessions: {
         Row: {
           created_at: string

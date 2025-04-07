@@ -58,16 +58,24 @@ export default function MobileChatInterface({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const suggestionQuestions = [
     {
-      text: "How did I feel yesterday?",
+      text: "What were my top emotions last week?",
       icon: <BarChart2 className="h-4 w-4 mr-1" />
     },
     {
-      text: "What makes me happy?", 
+      text: "What time of the day do I usually like journaling?", 
       icon: <Lightbulb className="h-4 w-4 mr-1" />
     },
     {
-      text: "Find entries about work",
+      text: "Am i am introvert? Do i like people in general?",
       icon: <Search className="h-4 w-4 mr-1" />
+    },
+    {
+      text: "What should i particularly do to help my mental health?",
+      icon: <Brain className="h-4 w-4 mr-1" />
+    },
+    {
+      text: "Rate my top 3 negative traits out of 100? What do i do to improve them?",
+      icon: <Brain className="h-4 w-4 mr-1" />
     }
   ];
   const { toast } = useToast();
@@ -401,7 +409,7 @@ export default function MobileChatInterface({
                       key={index}
                       variant="outline"
                       size="sm"
-                      className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted"
+                      className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted flex-wrap"
                       onClick={() => handleSendMessage(question.text)}
                     >
                       {question.icon}
