@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { 
@@ -516,226 +517,226 @@ export default function SmartChatInterface() {
     addRagDiagnosticStep("Processing complete", "success", "All steps completed successfully");
       
     setChatHistory(prev => [...prev, uiResponse]);
-  } catch (error: any) {
-    console.error("Error sending message:", error);
+    } catch (error: any) {
+      console.error("Error sending message:", error);
       
-    addRagDiagnosticStep("Processing error", "error", error?.message || "Unknown error");
-    setRagDiagnostics(prev => ({
-      ...prev,
-      error: error?.message || "Unknown error"
-    }));
+      addRagDiagnosticStep("Processing error", "error", error?.message || "Unknown error");
+      setRagDiagnostics(prev => ({
+        ...prev,
+        error: error?.message || "Unknown error"
+      }));
       
-    toast({
-      title: "Error",
-      description: "Failed to get a response. Please try again.",
-      variant: "destructive"
-    });
+      toast({
+        title: "Error",
+        description: "Failed to get a response. Please try again.",
+        variant: "destructive"
+      });
       
-    setChatHistory(prev => [
-      ...prev, 
-      { 
-        role: 'assistant', 
-        content: "I'm having trouble processing your request. Please try again later. " + 
+      setChatHistory(prev => [
+        ...prev, 
+        { 
+          role: 'assistant', 
+          content: "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "")
-      }
-    ]);
-  } finally {
-    setIsLoading(false);
-    setProcessingStage(null);
-  }
-};
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+      setProcessingStage(null);
+    }
+  };
 
-const handleDeleteThread = async () => {
-  if (!currentThreadId) return;
-  
-  try {
-    const { error: messagesError } = await supabase
-      .from('chat_messages')
-      .delete()
-      .eq('thread_id', currentThreadId);
+  const handleDeleteThread = async () => {
+    if (!currentThreadId) return;
+    
+    try {
+      const { error: messagesError } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('thread_id', currentThreadId);
+        
+      if (messagesError) throw messagesError;
       
-    if (messagesError) throw messagesError;
-    
-    const { error: threadError } = await supabase
-      .from('chat_threads')
-      .delete()
-      .eq('id', currentThreadId);
+      const { error: threadError } = await supabase
+        .from('chat_threads')
+        .delete()
+        .eq('id', currentThreadId);
+        
+      if (threadError) throw threadError;
       
-    if (threadError) throw threadError;
-    
-    setChatHistory([]);
-    setCurrentThreadId(null);
-    localStorage.removeItem(THREAD_ID_STORAGE_KEY);
-    setIsDeleteDialogOpen(false);
-    setShowSuggestions(true);
-    
-    toast({
-      title: "Thread deleted",
-      description: "The conversation has been deleted successfully.",
-    });
-    
-    setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent('threadDeleted', { 
-          detail: { threadId: currentThreadId } 
-        })
-      );
-      fetchUserThreads();
-    }, 100);
-  } catch (error) {
-    console.error("Error deleting thread:", error);
-    
-    toast({
-      title: "Error",
-      description: "Failed to delete the conversation.",
-      variant: "destructive"
-    });
-  }
-};
+      setChatHistory([]);
+      setCurrentThreadId(null);
+      localStorage.removeItem(THREAD_ID_STORAGE_KEY);
+      setIsDeleteDialogOpen(false);
+      setShowSuggestions(true);
+      
+      toast({
+        title: "Thread deleted",
+        description: "The conversation has been deleted successfully.",
+      });
+      
+      setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent('threadDeleted', { 
+            detail: { threadId: currentThreadId } 
+          })
+        );
+        fetchUserThreads();
+      }, 100);
+    } catch (error) {
+      console.error("Error deleting thread:", error);
+      
+      toast({
+        title: "Error",
+        description: "Failed to delete the conversation.",
+        variant: "destructive"
+      });
+    }
+  };
 
-return (
-  <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background" key={interfaceKey}>
-    <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b sticky top-0 z-10">
-      <div className="flex items-center">
-        <h2 className="text-xl font-semibold">Roha</h2>
-      </div>
-      <div className="flex items-center gap-2">
-        {chatHistory.length > 0 && (
-          <>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowAnalysis(!showAnalysis)}
-              className="flex items-center gap-1 text-sm"
-            >
-              <BarChart4 className="h-4 w-4" />
-              {showAnalysis ? "Hide Analysis" : "Show Analysis"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRagDiagnostics(prev => ({ ...prev, isActive: !prev.isActive }))}
-              className="flex items-center gap-1 text-sm"
-            >
-              <Brain className="h-4 w-4" />
-              {ragDiagnostics.isActive ? "Hide Debug" : "Show Debug"}
-            </Button>
-            
-            {currentThreadId && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                onClick={() => setIsDeleteDialogOpen(true)}
+  return (
+    <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background" key={interfaceKey}>
+      <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b sticky top-0 z-10">
+        <div className="flex items-center">
+          <h2 className="text-xl font-semibold">Roha</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          {chatHistory.length > 0 && (
+            <>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowAnalysis(!showAnalysis)}
+                className="flex items-center gap-1 text-sm"
               >
-                <Trash className="h-5 w-5" />
-                <span className="sr-only">Delete</span>
+                <BarChart4 className="h-4 w-4" />
+                {showAnalysis ? "Hide Analysis" : "Show Analysis"}
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRagDiagnostics(prev => ({ ...prev, isActive: !prev.isActive }))}
+                className="flex items-center gap-1 text-sm"
+              >
+                <Brain className="h-4 w-4" />
+                {ragDiagnostics.isActive ? "Hide Debug" : "Show Debug"}
+              </Button>
+              
+              {currentThreadId && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                >
+                  <Trash className="h-5 w-5" />
+                  <span className="sr-only">Delete</span>
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </CardHeader>
+      
+      <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 flex flex-col overflow-x-hidden">
+        {chatHistory.length === 0 ? (
+          <div className="flex flex-col h-full overflow-hidden">
+            <div className="text-center max-w-lg mx-auto px-4 overflow-x-hidden">
+              <h1 className="text-2xl md:text-3xl font-bold mb-3">How can I help you?</h1>
+              <p className="text-muted-foreground mb-6 break-words">
+                Hey, I am Roha, your personal AI assistant. You can ask me anything about your mental well-being and I will answer your queries basis your own journal insights.
+              </p>
+              
+              {showSuggestions && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="grid grid-cols-1 gap-3 max-w-md mx-auto"
+                >
+                  {demoQuestions.map((question, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="default"
+                      className="px-4 py-3 h-auto flex items-start text-left bg-muted/50 hover:bg-muted suggestion-button overflow-hidden"
+                      onClick={() => handleSendMessage(question.text)}
+                    >
+                      <div className="flex gap-2 items-start w-full overflow-hidden">
+                        <span className="mt-0.5 flex-shrink-0">{question.icon}</span>
+                        <span className="break-words">{question.text}</span>
+                      </div>
+                    </Button>
+                  ))}
+                </motion.div>
+              )}
+            </div>
+            <div className="flex-1"></div>
+          </div>
+        ) : (
+          <>
+            <div className="flex-grow space-y-4">
+              {chatHistory.map((msg, idx) => (
+                <ChatMessage 
+                  key={idx} 
+                  message={msg} 
+                  showAnalysis={showAnalysis} 
+                />
+              ))}
+            </div>
+            
+            {ragDiagnostics.isActive && ragDiagnostics.steps.length > 0 && ragDiagnostics.queryText && (
+              <div className="mt-4">
+                <ChatDiagnostics 
+                  queryText={ragDiagnostics.queryText}
+                  isVisible={ragDiagnostics.isActive}
+                  ragSteps={ragDiagnostics.steps}
+                  references={ragDiagnostics.references}
+                  similarityScores={ragDiagnostics.similarityScores}
+                  queryAnalysis={ragDiagnostics.queryAnalysis}
+                  functionExecutions={ragDiagnostics.functionExecutions}
+                />
+              </div>
             )}
           </>
         )}
-      </div>
-    </CardHeader>
-    
-    <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 flex flex-col overflow-x-hidden">
-      {chatHistory.length === 0 ? (
-        <div className="flex flex-col h-full overflow-hidden">
-          <div className="text-center max-w-lg mx-auto px-4 overflow-x-hidden">
-            <h1 className="text-2xl md:text-3xl font-bold mb-3">How can I help you?</h1>
-            <p className="text-muted-foreground mb-6 break-words">
-              Hey, I am Roha, your personal AI assistant. You can ask me anything about your mental well-being and I will answer your queries basis your own journal insights.
-            </p>
-            
-            {showSuggestions && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="grid grid-cols-1 gap-3 max-w-md mx-auto"
-              >
-                {demoQuestions.map((question, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="default"
-                    className="px-4 py-3 h-auto flex items-start text-left bg-muted/50 hover:bg-muted suggestion-button overflow-hidden"
-                    onClick={() => handleSendMessage(question.text)}
-                  >
-                    <div className="flex gap-2 items-start w-full overflow-hidden">
-                      <span className="mt-0.5 flex-shrink-0">{question.icon}</span>
-                      <span className="break-words">{question.text}</span>
-                    </div>
-                  </Button>
-                ))}
-              </motion.div>
-            )}
+        
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">{processingStage || "Processing..."}</p>
           </div>
-          <div className="flex-1"></div>
-        </div>
-      ) : (
-        <>
-          <div className="flex-grow space-y-4">
-            {chatHistory.map((msg, idx) => (
-              <ChatMessage 
-                key={idx} 
-                message={msg} 
-                showAnalysis={showAnalysis} 
-              />
-            ))}
-          </div>
-          
-          {ragDiagnostics.isActive && ragDiagnostics.steps.length > 0 && ragDiagnostics.queryText && (
-            <div className="mt-4">
-              <ChatDiagnostics 
-                queryText={ragDiagnostics.queryText}
-                isVisible={ragDiagnostics.isActive}
-                ragSteps={ragDiagnostics.steps}
-                references={ragDiagnostics.references}
-                similarityScores={ragDiagnostics.similarityScores}
-                queryAnalysis={ragDiagnostics.queryAnalysis}
-                functionExecutions={ragDiagnostics.functionExecutions}
-              />
-            </div>
-          )}
-        </>
-      )}
+        )}
+        
+        <div ref={messagesEndRef} />
+      </CardContent>
       
-      {isLoading && (
-        <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">{processingStage || "Processing..."}</p>
-        </div>
-      )}
+      <CardFooter className="border-t bg-muted/30 p-4 md:p-6">
+        <ChatInput 
+          onSendMessage={handleSendMessage} 
+          isLoading={isLoading} 
+          userId={user?.id}
+        />
+      </CardFooter>
       
-      <div ref={messagesEndRef} />
-    </CardContent>
-    
-    <CardFooter className="border-t bg-muted/30 p-4 md:p-6">
-      <ChatInput 
-        onSendMessage={handleSendMessage} 
-        isLoading={isLoading} 
-        userId={user?.id}
-      />
-    </CardFooter>
-    
-    <AlertDialog 
-      open={isDeleteDialogOpen} 
-      onOpenChange={setIsDeleteDialogOpen}
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete conversation</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will permanently delete this conversation and all its messages.
-            This action cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={handleDeleteThread}>Delete</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  </Card>
-);
+      <AlertDialog 
+        open={isDeleteDialogOpen} 
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete conversation</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this conversation and all its messages.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteThread}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
 }
