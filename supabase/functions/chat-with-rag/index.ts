@@ -110,8 +110,18 @@ serve(async (req) => {
     console.log("Searching for relevant entries");
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "loading"));
     
-    // Increase match count for more comprehensive analysis
-    const matchCount = 50; // Increased from 10 to 50
+    // Remove fixed match count limit or use a very high value
+    // We'll use a dynamic approach based on query complexity
+    // For simple queries: 100 entries, for complex ones: 200+
+    const isComplexQuery = message.length > 150 || message.includes("compare") || 
+                          message.includes("analyze all") || message.includes("comprehensive") ||
+                          message.includes("over time") || message.includes("pattern");
+    
+    // Set a reasonable upper limit to avoid performance issues
+    // but still allow comprehensive analysis
+    const matchCount = isComplexQuery ? 500 : 200;
+    
+    console.log(`Using dynamic match count: ${matchCount} for ${isComplexQuery ? 'complex' : 'simple'} query`);
     
     // Use different search function based on whether we have a time range
     let entries = [];
@@ -235,7 +245,7 @@ serve(async (req) => {
 async function searchEntriesWithVector(
   userId: string, 
   queryEmbedding: any[],
-  matchCount: number = 50
+  matchCount: number = 200
 ) {
   try {
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
@@ -268,7 +278,7 @@ async function searchEntriesWithTimeRange(
   userId: string, 
   queryEmbedding: any[], 
   timeRange: { startDate?: string; endDate?: string },
-  matchCount: number = 50
+  matchCount: number = 200
 ) {
   try {
     console.log(`Searching entries with time range for userId: ${userId}`);
