@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   PlusCircle, 
   MessageCircle, 
-  Search
+  Search,
+  Pencil
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,14 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ChatThreadListProps {
   userId?: string;
@@ -31,6 +40,9 @@ export default function ChatThreadList({
   const [threads, setThreads] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [editThreadId, setEditThreadId] = useState<string | null>(null);
+  const [newThreadTitle, setNewThreadTitle] = useState('');
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -96,6 +108,64 @@ export default function ChatThreadList({
       await onStartNewThread();
     }
   };
+  
+  const handleRenameThread = async () => {
+    if (!editThreadId || !newThreadTitle.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from('chat_threads')
+        .update({ 
+          title: newThreadTitle,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editThreadId);
+        
+      if (error) throw error;
+      
+      // Update local threads state
+      setThreads(prevThreads => 
+        prevThreads.map(thread => 
+          thread.id === editThreadId 
+            ? { ...thread, title: newThreadTitle } 
+            : thread
+        )
+      );
+      
+      // Close the dialog
+      setIsRenameDialogOpen(false);
+      setEditThreadId(null);
+      
+      // Dispatch event to update other components with new title
+      window.dispatchEvent(
+        new CustomEvent('threadTitleUpdated', { 
+          detail: { 
+            threadId: editThreadId, 
+            title: newThreadTitle 
+          } 
+        })
+      );
+      
+      toast({
+        title: "Thread renamed",
+        description: "The conversation has been renamed successfully.",
+      });
+    } catch (error) {
+      console.error("Error renaming thread:", error);
+      
+      toast({
+        title: "Error",
+        description: "Failed to rename the conversation.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const openRenameDialog = (threadId: string, currentTitle: string) => {
+    setEditThreadId(threadId);
+    setNewThreadTitle(currentTitle);
+    setIsRenameDialogOpen(true);
+  };
 
   return (
     <div className="chat-thread-list h-full flex flex-col">
@@ -140,9 +210,8 @@ export default function ChatThreadList({
         ) : (
           <div className="space-y-1 py-2">
             {filteredThreads.map((thread) => (
-              <div key={thread.id} className="relative">
+              <div key={thread.id} className="relative group">
                 <Button
-                  key={thread.id}
                   variant="ghost"
                   className={cn(
                     "w-full justify-start relative h-auto py-3 px-3 text-left",
@@ -160,11 +229,62 @@ export default function ChatThreadList({
                     </p>
                   </div>
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openRenameDialog(thread.id, thread.title);
+                  }}
+                >
+                  <Pencil className="h-4 w-4" />
+                  <span className="sr-only">Edit</span>
+                </Button>
               </div>
             ))}
           </div>
         )}
       </ScrollArea>
+      
+      <Dialog 
+        open={isRenameDialogOpen} 
+        onOpenChange={setIsRenameDialogOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename Conversation</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this conversation
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-y-2">
+            <Input
+              id="name"
+              value={newThreadTitle}
+              onChange={(e) => setNewThreadTitle(e.target.value)}
+              placeholder="Conversation name"
+              className="w-full"
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsRenameDialogOpen(false);
+                setEditThreadId(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleRenameThread}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

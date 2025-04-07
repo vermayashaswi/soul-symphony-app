@@ -7,8 +7,6 @@ import {
   BarChart2, 
   Search, 
   Lightbulb,
-  MoreVertical,
-  Pencil,
   Trash
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -22,23 +20,6 @@ import { motion } from "framer-motion";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatDiagnostics from './ChatDiagnostics';
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,6 +61,7 @@ export default function SmartChatInterface() {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [ragDiagnostics, setRagDiagnostics] = useState<any>({
     steps: [],
     isActive: false,
@@ -93,9 +75,6 @@ export default function SmartChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [newThreadTitle, setNewThreadTitle] = useState("");
   const [currentThreadTitle, setCurrentThreadTitle] = useState("");
   const [interfaceKey, setInterfaceKey] = useState(0);
 
@@ -247,7 +226,6 @@ export default function SmartChatInterface() {
       
       if (data) {
         setCurrentThreadTitle(data.title);
-        setNewThreadTitle(data.title);
       }
     } catch (error) {
       console.error("Error fetching thread title:", error);
@@ -527,56 +505,6 @@ export default function SmartChatInterface() {
     }
   };
 
-  const handleRenameThread = async () => {
-    if (!currentThreadId || !newThreadTitle.trim()) return;
-    
-    try {
-      const { error } = await supabase
-        .from('chat_threads')
-        .update({ 
-          title: newThreadTitle,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentThreadId);
-        
-      if (error) throw error;
-      
-      setCurrentThreadTitle(newThreadTitle);
-      setIsRenameDialogOpen(false);
-      
-      setInterfaceKey(prev => prev + 1);
-      
-      window.dispatchEvent(new CustomEvent('dialogClosed'));
-      
-      setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent('threadTitleUpdated', { 
-            detail: { 
-              threadId: currentThreadId, 
-              title: newThreadTitle 
-            } 
-          })
-        );
-        
-        toast({
-          title: "Thread renamed",
-          description: "The conversation has been renamed successfully.",
-        });
-      }, 50);
-    } catch (error) {
-      console.error("Error renaming thread:", error);
-      setIsRenameDialogOpen(false);
-      
-      window.dispatchEvent(new CustomEvent('dialogClosed'));
-      
-      toast({
-        title: "Error",
-        description: "Failed to rename the conversation.",
-        variant: "destructive"
-      });
-    }
-  };
-
   const handleDeleteThread = async () => {
     if (!currentThreadId) return;
     
@@ -601,7 +529,10 @@ export default function SmartChatInterface() {
       setIsDeleteDialogOpen(false);
       setShowSuggestions(true);
       
-      window.dispatchEvent(new CustomEvent('dialogClosed'));
+      toast({
+        title: "Thread deleted",
+        description: "The conversation has been deleted successfully.",
+      });
       
       setTimeout(() => {
         window.dispatchEvent(
@@ -609,18 +540,10 @@ export default function SmartChatInterface() {
             detail: { threadId: currentThreadId } 
           })
         );
-        
-        toast({
-          title: "Thread deleted",
-          description: "The conversation has been deleted successfully.",
-        });
-        
         fetchUserThreads();
       }, 100);
     } catch (error) {
       console.error("Error deleting thread:", error);
-      
-      window.dispatchEvent(new CustomEvent('dialogClosed'));
       
       toast({
         title: "Error",
@@ -659,30 +582,15 @@ export default function SmartChatInterface() {
               </Button>
               
               {currentThreadId && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="h-5 w-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem onClick={() => {
-                      setNewThreadTitle(currentThreadTitle);
-                      setIsRenameDialogOpen(true);
-                    }}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      <span>Rename</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      className="text-destructive focus:text-destructive" 
-                      onClick={() => setIsDeleteDialogOpen(true)}
-                    >
-                      <Trash className="mr-2 h-4 w-4" />
-                      <span>Delete</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                >
+                  <Trash className="h-5 w-5" />
+                  <span className="sr-only">Delete</span>
+                </Button>
               )}
             </>
           )}
@@ -768,61 +676,9 @@ export default function SmartChatInterface() {
         />
       </CardFooter>
       
-      <Dialog 
-        open={isRenameDialogOpen} 
-        onOpenChange={(open) => {
-          setIsRenameDialogOpen(open);
-          if (!open) {
-            window.dispatchEvent(new CustomEvent('dialogClosed'));
-            setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rename Conversation</DialogTitle>
-            <DialogDescription>
-              Enter a new name for this conversation
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center space-y-2">
-            <Input
-              id="name"
-              value={newThreadTitle}
-              onChange={(e) => setNewThreadTitle(e.target.value)}
-              placeholder="Conversation name"
-              className="w-full"
-              autoFocus
-            />
-          </div>
-          <DialogFooter className="sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setIsRenameDialogOpen(false);
-                window.dispatchEvent(new CustomEvent('dialogClosed'));
-                setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleRenameThread}>
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <AlertDialog 
         open={isDeleteDialogOpen} 
-        onOpenChange={(open) => {
-          setIsDeleteDialogOpen(open);
-          if (!open) {
-            window.dispatchEvent(new CustomEvent('dialogClosed'));
-            setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
-          }
-        }}
+        onOpenChange={setIsDeleteDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -833,13 +689,8 @@ export default function SmartChatInterface() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setIsDeleteDialogOpen(false);
-              window.dispatchEvent(new CustomEvent('dialogClosed'));
-            }}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteThread}>
-              Delete
-            </AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteThread}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
