@@ -3,10 +3,10 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { clearAllToasts } from '@/services/notificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { formatTime } from '@/utils/format-time';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -33,31 +33,16 @@ export function PlaybackControls({
 }: PlaybackControlsProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [isClearingToasts, setIsClearingToasts] = useState(false);
-  const [sliderValue, setSliderValue] = useState(0);
-  const [isTouchActive, setIsTouchActive] = useState(false);
   const isMobile = useIsMobile();
   
-  // Update slider and current time based on playback progress
+  // Update current time based on playback progress
   useEffect(() => {
-    // Only update if user is not currently interacting with the slider
-    if (!isTouchActive) {
-      const timeInSeconds = (playbackProgress * audioDuration);
-      setCurrentTime(timeInSeconds);
-      setSliderValue(playbackProgress * 100);
-    }
-  }, [playbackProgress, audioDuration, isTouchActive]);
+    const timeInSeconds = (playbackProgress * audioDuration);
+    setCurrentTime(timeInSeconds);
+  }, [playbackProgress, audioDuration]);
   
-  const formattedProgress = formatTime(currentTime);
-  const formattedDuration = formatTime(audioDuration);
-  
-  const handleSliderChange = (value: number[]) => {
-    if (onSeek) {
-      const position = value[0] / 100;
-      setSliderValue(value[0]);
-      setCurrentTime(position * audioDuration);
-      onSeek(position);
-    }
-  };
+  const formattedProgress = formatTime(Math.floor(currentTime * 1000));
+  const formattedDuration = formatTime(Math.floor(audioDuration * 1000));
 
   // Function to ensure all toasts are completely cleared
   const handleSaveClick = async () => {
@@ -112,23 +97,9 @@ export function PlaybackControls({
   
   return (
     <div className={cn("w-full px-4", isMobile ? "px-2" : "px-4")}>
-      <div className="mb-4 relative">
-        <Slider
-          defaultValue={[0]}
-          value={[sliderValue]}
-          max={100}
-          step={0.1}
-          onValueChange={handleSliderChange}
-          disabled={isProcessing || !audioBlob}
-          className="mb-2"
-          onTouchStart={() => setIsTouchActive(true)}
-          onTouchEnd={() => setIsTouchActive(false)}
-          onPointerDown={() => setIsTouchActive(true)}
-          onPointerUp={() => setIsTouchActive(false)}
-        />
-        <div className="flex justify-between mt-1.5 text-xs text-slate-500">
-          <span>{formattedProgress}</span>
-          <span>{formattedDuration}</span>
+      <div className="mb-4 relative text-center">
+        <div className="text-base font-medium tracking-wide">
+          {formattedProgress} / {formattedDuration}
         </div>
       </div>
 
@@ -185,10 +156,4 @@ export function PlaybackControls({
       </div>
     </div>
   );
-}
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }

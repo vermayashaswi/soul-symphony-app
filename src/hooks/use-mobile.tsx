@@ -3,7 +3,13 @@ import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
 
-export function useIsMobile() {
+interface MobileDetectionResult {
+  isMobile: boolean;
+  isIOS: boolean;
+  isAndroid: boolean;
+}
+
+export function useIsMobile(): MobileDetectionResult {
   const [isMobile, setIsMobile] = React.useState<boolean>(false);
   const [isInitialized, setIsInitialized] = React.useState<boolean>(false);
   const [isIOS, setIsIOS] = React.useState<boolean>(false); 
@@ -144,5 +150,10 @@ declare global {
   interface Window {
     __forceMobileView?: boolean;
     toggleMobileView?: () => void;
+  }
+  
+  // Add standalone property for iOS PWA detection
+  interface Navigator {
+    standalone?: boolean;
   }
 }

@@ -13,6 +13,7 @@ import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
+import { RecordingVisualizer } from '@/components/voice-recorder/RecordingVisualizer';
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
 
 interface VoiceRecorderProps {
@@ -35,7 +36,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const savingInProgressRef = useRef(false);
   const domClearAttemptedRef = useRef(false);
   const { user } = useAuth();
-  const isMobile = useIsMobile();
+  const { isMobile } = useIsMobile();
   
   const {
     isRecording,
@@ -335,6 +336,20 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         )}
         
         <div className="relative z-10 flex flex-col items-center justify-start w-full h-full pt-20">
+          {/* Visualizer for playback */}
+          {(isPlaying && audioBlob) && (
+            <div className="absolute top-1/3 left-0 right-0 z-0 w-full">
+              <RecordingVisualizer 
+                isRecording={false} 
+                isPlaying={isPlaying}
+                audioLevel={audioLevel > 0 ? audioLevel : (playbackProgress * 100 * 0.7) + 
+                  (Math.sin(Date.now() / 200) * 20) + 30}
+                height={80}
+                color="primary"
+              />
+            </div>
+          )}
+          
           <div className="relative z-10 flex justify-center items-center mt-40">
             <RecordingButton
               isRecording={isRecording}
@@ -355,6 +370,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               }}
               audioLevel={audioLevel}
               showAnimation={false}
+              disabled={!isRecording && audioBlob !== null} // Disable mic button after recording
             />
           </div>
 
