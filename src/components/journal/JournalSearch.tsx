@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
+import DateRangeFilter from './DateRangeFilter';
 
 interface JournalSearchProps {
   entries: JournalEntry[];
@@ -31,6 +32,8 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [dateFilteredEntries, setDateFilteredEntries] = useState<JournalEntry[]>([]);
+  const [isDateFilterActive, setIsDateFilterActive] = useState(false);
 
   // Set up the animation for the placeholder text
   useEffect(() => {
@@ -45,16 +48,19 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     return () => clearInterval(interval);
   }, []);
 
-  // Handle search functionality
+  // Handle search functionality with date filter integration
   useEffect(() => {
-    // When search query is empty, pass all entries
+    // Base data to filter from
+    const dataToFilter = isDateFilterActive ? dateFilteredEntries : entries;
+    
+    // When search query is empty, use the date filtered results or all entries
     if (!searchQuery.trim()) {
-      setFilteredEntries(entries);
-      onSearchResults(entries);
+      setFilteredEntries(dataToFilter);
+      onSearchResults(dataToFilter);
       return;
     }
 
-    const filtered = entries.filter(entry => {
+    const filtered = dataToFilter.filter(entry => {
       const content = (entry.content || '').toLowerCase();
       const query = searchQuery.toLowerCase();
       
@@ -105,7 +111,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
 
     setFilteredEntries(filtered);
     onSearchResults(filtered); // Pass filtered entries back to parent
-  }, [searchQuery, entries, onSearchResults]);
+  }, [searchQuery, entries, onSearchResults, isDateFilterActive, dateFilteredEntries]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -116,39 +122,89 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     onSelectEntry(entry);
   };
 
+  // Handle date filter change
+  const handleDateFilterChange = (filteredByDate: JournalEntry[]) => {
+    setDateFilteredEntries(filteredByDate);
+    
+    // If there's an active search, apply it to the date-filtered results
+    if (searchQuery.trim()) {
+      const searchFiltered = filteredByDate.filter(entry => {
+        const content = (entry.content || '').toLowerCase();
+        const query = searchQuery.toLowerCase();
+        return content.includes(query);
+      });
+      
+      setFilteredEntries(searchFiltered);
+      onSearchResults(searchFiltered);
+    } else {
+      // If no search, just use the date-filtered results
+      setFilteredEntries(filteredByDate);
+      onSearchResults(filteredByDate);
+    }
+  };
+
+  // Handle date filter active state
+  const handleDateFilterActive = (isActive: boolean) => {
+    setIsDateFilterActive(isActive);
+    if (!isActive) {
+      // Reset to just search results when date filter is cleared
+      if (searchQuery.trim()) {
+        const searchFiltered = entries.filter(entry => {
+          const content = (entry.content || '').toLowerCase();
+          const query = searchQuery.toLowerCase();
+          return content.includes(query);
+        });
+        
+        setFilteredEntries(searchFiltered);
+        onSearchResults(searchFiltered);
+      } else {
+        // No search, no date filter, show all entries
+        setFilteredEntries(entries);
+        onSearchResults(entries);
+      }
+    }
+  };
+
+  const totalEntriesCount = entries.length;
+  const displayedCount = isDateFilterActive || searchQuery.trim() ? filteredEntries.length : entries.length;
+
   return (
     <Card className="w-full sticky top-0 z-10 bg-background shadow-sm">
       <CardContent className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder={showPlaceholder ? `Search for ${searchPrompts[placeholderIndex]}...` : "Search journal entries..."}
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="w-full pl-9"
-          />
-        </div>
+        <div className="flex flex-col space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder={showPlaceholder ? `Search for ${searchPrompts[placeholderIndex]}...` : "Search journal entries..."}
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="w-full pl-9"
+            />
+          </div>
 
-        <div className="mt-4">
-          {searchQuery ? (
-            <>
-              {filteredEntries.length > 0 ? (
-                <div className="py-2">
-                  <Badge variant="secondary" className="mb-2">
-                    {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} found
-                  </Badge>
-                </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <DateRangeFilter 
+              entries={entries}
+              onFilterChange={handleDateFilterChange}
+              onFilterActive={handleDateFilterActive}
+            />
+            
+            <div className="text-sm text-muted-foreground ml-auto">
+              {totalEntriesCount} total {totalEntriesCount === 1 ? 'entry' : 'entries'}
+            </div>
+          </div>
+
+          {(searchQuery.trim() || isDateFilterActive) && (
+            <div className="pt-2">
+              {displayedCount > 0 ? (
+                <Badge variant="secondary" className="mb-2">
+                  {displayedCount} {displayedCount === 1 ? 'entry' : 'entries'} found
+                </Badge>
               ) : (
                 <div className="text-muted-foreground">No entries found.</div>
               )}
-            </>
-          ) : (
-            <div className="py-2">
-              <Badge variant="secondary" className="mb-2">
-                {entries.length} total {entries.length === 1 ? 'entry' : 'entries'}
-              </Badge>
             </div>
           )}
         </div>

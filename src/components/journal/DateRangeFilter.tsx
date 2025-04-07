@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { format, isValid, endOfDay, startOfDay, isAfter, isBefore, isEqual } from 'date-fns';
+import { format, isValid, endOfDay, startOfDay, isAfter, isBefore, isEqual, isSameDay, isWithinInterval } from 'date-fns';
 import { JournalEntry } from './JournalEntryCard';
 import { Badge } from '@/components/ui/badge';
 
@@ -103,6 +103,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
     setIsFilterActive(false);
     onFilterActive(false);
     setTotalFiltered(0);
+    setIsCalendarOpen(false);
   };
 
   const formatDateRange = () => {
@@ -116,80 +117,116 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
     return 'Set date range';
   };
 
-  return (
-    <div className="flex flex-col space-y-2">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
-        <div className="flex flex-row items-center gap-2">
-          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className={cn(
-                  "justify-start text-left font-normal sm:w-[260px] text-xs sm:text-sm",
-                  isFilterActive ? "border-primary text-primary" : "text-muted-foreground"
-                )}
-              >
-                <CalendarRange className="mr-2 h-4 w-4" />
-                <span className="truncate">
-                  {isFilterActive ? formatDateRange() : "Filter by date"}
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={handleSelect}
-                month={month}
-                onMonthChange={setMonth}
-                initialFocus
-                footer={
-                  <div className="p-3 border-t border-border">
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-muted-foreground">
-                        {startDate && endDate 
-                          ? `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d')}`
-                          : startDate 
-                            ? `From ${format(startDate, 'MMM d')}`
-                            : endDate 
-                              ? `Until ${format(endDate, 'MMM d')}`
-                              : 'Select dates'
-                        }
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={clearFilters}
-                      >
-                        Reset
-                      </Button>
-                    </div>
-                  </div>
-                }
-              />
-            </PopoverContent>
-          </Popover>
-          
-          {isFilterActive && (
-            <Badge 
-              variant="outline" 
-              className="gap-1 px-2 py-1 bg-primary/10 text-primary text-xs"
-            >
-              {totalFiltered} of {totalEntries} entries
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-4 w-4 p-0 hover:bg-primary/20"
-                onClick={clearFilters}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </Badge>
+  // Custom day rendering to highlight the selected range
+  const renderDay = (day: Date) => {
+    const isSelected = date ? isSameDay(day, date) : false;
+    
+    // Check if day is within the selected range
+    const isInRange = startDate && endDate && 
+      isWithinInterval(day, { 
+        start: startOfDay(startDate), 
+        end: endOfDay(endDate) 
+      });
+
+    // Check if day is the start or end of the range
+    const isRangeStart = startDate && isSameDay(day, startDate);
+    const isRangeEnd = endDate && isSameDay(day, endDate);
+    
+    return (
+      <div
+        className={cn(
+          "w-full h-9 relative flex items-center justify-center",
+          isSelected && "font-semibold text-primary-foreground",
+          isInRange && !isRangeStart && !isRangeEnd && "bg-primary/15",
+          isRangeStart && endDate && "rounded-l-md bg-primary text-primary-foreground",
+          isRangeEnd && startDate && "rounded-r-md bg-primary text-primary-foreground",
+          // Single date selection (start without end or vice versa)
+          ((isRangeStart && !endDate) || (isRangeEnd && !startDate)) && "bg-primary text-primary-foreground rounded-md"
+        )}
+      >
+        <div className="absolute inset-0 flex items-center justify-center">
+          {(isInRange && !isRangeStart && !isRangeEnd) && (
+            <div className="absolute inset-0 bg-primary/15"></div>
           )}
         </div>
+        <span className="relative z-10">{format(day, 'd')}</span>
       </div>
+    );
+  };
+
+  return (
+    <div>
+      {isFilterActive ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-1 bg-primary/10 text-primary border-primary"
+          onClick={clearFilters}
+        >
+          <CalendarRange className="h-4 w-4" />
+          <span className="truncate max-w-[200px]">{formatDateRange()}</span>
+          <X className="h-3.5 w-3.5 ml-1" />
+        </Button>
+      ) : (
+        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-muted-foreground flex items-center gap-1"
+            >
+              <CalendarRange className="h-4 w-4" />
+              <span>Filter by date</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={handleSelect}
+              month={month}
+              onMonthChange={setMonth}
+              initialFocus
+              components={{
+                Day: ({ day, ...props }) => renderDay(day)
+              }}
+              footer={
+                <div className="p-3 border-t border-border">
+                  <div className="flex justify-between items-center">
+                    <div className="text-xs text-muted-foreground">
+                      {startDate && endDate 
+                        ? `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d')}`
+                        : startDate 
+                          ? `From ${format(startDate, 'MMM d')}`
+                          : endDate 
+                            ? `Until ${format(endDate, 'MMM d')}`
+                            : 'Select dates'
+                      }
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={clearFilters}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+              }
+            />
+          </PopoverContent>
+        </Popover>
+      )}
+      
+      {isFilterActive && (
+        <Badge 
+          variant="outline" 
+          className="ml-2 gap-1 px-2 py-1 bg-primary/10 text-primary text-xs"
+        >
+          {totalFiltered} of {totalEntries} entries
+        </Badge>
+      )}
     </div>
   );
 }

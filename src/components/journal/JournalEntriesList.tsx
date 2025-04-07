@@ -9,7 +9,6 @@ import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import { Skeleton } from '@/components/ui/skeleton';
 import JournalSearch from './JournalSearch';
-import DateRangeFilter from './DateRangeFilter';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -39,7 +38,6 @@ export default function JournalEntriesList({
   const [renderError, setRenderError] = useState<Error | null>(null);
   const hasNoValidEntries = useRef(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
-  const [isDateFilterActive, setIsDateFilterActive] = useState(false);
 
   useEffect(() => {
     try {
@@ -153,28 +151,7 @@ export default function JournalEntriesList({
 
   const handleSearchResults = (results: JournalEntry[]) => {
     setFilteredEntries(results);
-    setIsSearchActive(true);
-    setIsDateFilterActive(false);
-  };
-
-  const handleDateFilterResults = (results: JournalEntry[]) => {
-    // If search is active, apply date filter to search results
-    if (isSearchActive) {
-      const searchResults = filteredEntries;
-      const dateFilteredSearchResults = searchResults.filter(entry => 
-        results.some(filteredEntry => filteredEntry.id === entry.id)
-      );
-      setFilteredEntries(dateFilteredSearchResults);
-    } else {
-      setFilteredEntries(results);
-    }
-  };
-
-  const handleDateFilterActive = (isActive: boolean) => {
-    setIsDateFilterActive(isActive);
-    if (!isActive && !isSearchActive) {
-      setFilteredEntries(localEntries);
-    }
+    setIsSearchActive(results.length !== localEntries.length);
   };
   
   const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !hasProcessingEntries;
@@ -203,9 +180,8 @@ export default function JournalEntriesList({
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
 
-  const displayEntries = (isSearchActive || isDateFilterActive) ? filteredEntries : localEntries;
+  const displayEntries = isSearchActive ? filteredEntries : localEntries;
   const safeLocalEntries = Array.isArray(displayEntries) ? displayEntries : [];
-  const totalEntryCount = localEntries.length;
 
   return (
     <ErrorBoundary>
@@ -217,17 +193,6 @@ export default function JournalEntriesList({
               <Plus className="h-4 w-4" />
               New Entry
             </Button>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-center justify-between">
-            <DateRangeFilter 
-              entries={isSearchActive ? filteredEntries : localEntries}
-              onFilterChange={handleDateFilterResults}
-              onFilterActive={handleDateFilterActive}
-            />
-            
-            <div className="text-sm text-muted-foreground">
-              {totalEntryCount} total {totalEntryCount === 1 ? 'entry' : 'entries'}
-            </div>
           </div>
         </div>
 
