@@ -44,15 +44,15 @@ export default function SmartChat() {
       metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
     }
     
+    document.body.classList.add('dark');
+    
     const checkOrCreateThread = async () => {
       if (!user?.id) return;
       setIsLoadingThreads(true);
 
-      // Try to get the last active thread from localStorage first
       const lastActiveThreadId = localStorage.getItem(THREAD_ID_STORAGE_KEY);
       
       if (lastActiveThreadId) {
-        // Verify this thread exists and belongs to the user
         try {
           const { data, error } = await supabase
             .from('chat_threads')
@@ -80,7 +80,6 @@ export default function SmartChat() {
         }
       }
       
-      // If no saved thread ID or it doesn't exist, get the most recent thread
       try {
         const { data: threads, error } = await supabase
           .from('chat_threads')
@@ -116,17 +115,12 @@ export default function SmartChat() {
       setShowSidebar(false);
     };
     
-    // Handle message creation events for title generation of first message only
     const handleMessageCreated = async (event: CustomEvent) => {
       if (event.detail?.threadId && event.detail?.isFirstMessage) {
-        // Wait a moment for the first message to be processed
         setTimeout(async () => {
           const title = await generateThreadTitle(event.detail.threadId, user?.id);
           if (title) {
-            // Mark this thread as having a generated title
             titleGeneratedForThreads.current.add(event.detail.threadId);
-            
-            // Dispatch event to update thread title in ChatThreadList
             window.dispatchEvent(
               new CustomEvent('threadTitleUpdated', { 
                 detail: { threadId: event.detail.threadId, title } 
@@ -145,6 +139,7 @@ export default function SmartChat() {
     return () => {
       window.removeEventListener('closeChatSidebar', handleCloseSidebar);
       window.removeEventListener('messageCreated' as any, handleMessageCreated);
+      document.body.classList.remove('dark');
     };
   }, [isMobile, mobileDemo, user]);
   
@@ -154,9 +149,7 @@ export default function SmartChat() {
           previousThreadIdRef.current !== currentThreadId &&
           user?.id) {
         
-        // Only generate title if we haven't already done so for this thread
         if (!titleGeneratedForThreads.current.has(previousThreadIdRef.current)) {
-          // Check if the thread has messages
           const { data, error } = await supabase
             .from('chat_messages')
             .select('count')
@@ -167,10 +160,7 @@ export default function SmartChat() {
             const title = await generateThreadTitle(previousThreadIdRef.current, user?.id);
             
             if (title) {
-              // Mark this thread as having a generated title
               titleGeneratedForThreads.current.add(previousThreadIdRef.current);
-              
-              // Dispatch event to update thread title in ChatThreadList
               window.dispatchEvent(
                 new CustomEvent('threadTitleUpdated', { 
                   detail: { threadId: previousThreadIdRef.current, title } 
@@ -180,7 +170,6 @@ export default function SmartChat() {
           }
         }
         
-        // Update the previous thread ID
         previousThreadIdRef.current = currentThreadId;
       }
     };
@@ -243,12 +232,10 @@ export default function SmartChat() {
 
   const handleThreadDeleted = async (deletedThreadId: string) => {
     if (deletedThreadId !== currentThreadId) {
-      // Not the current thread, no need to do anything
       return;
     }
     
     try {
-      // Find another thread to switch to
       const { data: threads, error } = await supabase
         .from('chat_threads')
         .select('id')
@@ -259,11 +246,9 @@ export default function SmartChat() {
       if (error) throw error;
       
       if (threads && threads.length > 0) {
-        // Filter out the deleted thread
         const otherThreads = threads.filter(thread => thread.id !== deletedThreadId);
         
         if (otherThreads.length > 0) {
-          // Find an empty thread
           for (const thread of otherThreads) {
             const { count, error: countError } = await supabase
               .from('chat_messages')
@@ -271,23 +256,19 @@ export default function SmartChat() {
               .eq('thread_id', thread.id);
               
             if (!countError && count === 0) {
-              // Empty thread found, switch to it
               handleSelectThread(thread.id);
               return;
             }
           }
           
-          // No empty threads, just use the most recent one
           handleSelectThread(otherThreads[0].id);
         } else {
-          // No other threads available, create a new one
           const newThreadId = await createNewThread();
           if (newThreadId) {
             handleSelectThread(newThreadId);
           }
         }
       } else {
-        // No threads available, create a new one
         const newThreadId = await createNewThread();
         if (newThreadId) {
           handleSelectThread(newThreadId);
@@ -295,7 +276,6 @@ export default function SmartChat() {
       }
     } catch (error) {
       console.error("Error handling thread deletion:", error);
-      // Create a new thread as fallback
       const newThreadId = await createNewThread();
       if (newThreadId) {
         handleSelectThread(newThreadId);
@@ -324,7 +304,7 @@ export default function SmartChat() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="smart-chat-container w-full h-[calc(100vh-4rem)] flex pt-16"
+        className="smart-chat-container w-full h-[calc(100vh-4rem)] flex pt-16 bg-black"
         ref={chatContainerRef}
       >
         {!hasEnoughEntries && !loading && (
@@ -345,7 +325,7 @@ export default function SmartChat() {
           </Alert>
         )}
         
-        <div className="w-72 h-full border-r">
+        <div className="w-72 h-full border-r border-gray-800 bg-black">
           <ChatThreadList 
             userId={user?.id} 
             onSelectThread={handleSelectThread}
@@ -354,7 +334,7 @@ export default function SmartChat() {
           />
         </div>
         
-        <div className="flex-1 p-4">
+        <div className="flex-1 p-4 bg-black">
           <SmartChatInterface />
         </div>
       </motion.div>
@@ -362,7 +342,7 @@ export default function SmartChat() {
   );
 
   const mobileContent = (
-    <div className="flex flex-col h-full" ref={chatContainerRef}>
+    <div className="flex flex-col h-full bg-black" ref={chatContainerRef}>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
