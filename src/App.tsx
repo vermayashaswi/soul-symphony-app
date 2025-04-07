@@ -9,7 +9,8 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
-import { useEffect } from 'react';
+import { useEffect, ErrorInfo } from 'react';
+import { toast } from "sonner";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,11 +20,52 @@ const queryClient = new QueryClient({
       meta: {
         onError: (error: unknown) => {
           console.error('Query error:', error);
+          toast.error('An error occurred while fetching data');
         }
       }
     },
   },
 });
+
+// Simple error boundary component to catch rendering errors
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode }, 
+  { hasError: boolean, errorMessage: string }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, errorMessage: '' };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, errorMessage: error.message };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-screen p-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-lg w-full">
+            <h2 className="text-xl font-semibold text-red-700 mb-2">Something went wrong</h2>
+            <p className="text-red-600 mb-4">{this.state.errorMessage}</p>
+            <button
+              onClick={() => this.setState({ hasError: false })}
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const App = () => {
   useEffect(() => {
@@ -35,6 +77,7 @@ const App = () => {
         colno: event.colno,
         stack: event.error?.stack
       });
+      toast.error('An unexpected error occurred');
     };
     
     // Add a global unhandled rejection listener
@@ -43,6 +86,7 @@ const App = () => {
         reason: event.reason,
         stack: event.reason?.stack
       });
+      toast.error('An unexpected error occurred in background processing');
     };
     
     window.addEventListener('error', handleGlobalError);
@@ -60,15 +104,17 @@ const App = () => {
         <BrowserRouter>
           <ThemeProvider>
             <AuthProvider>
-              <div className="relative min-h-screen">
-                <div className="relative z-10">
-                  <Toaster />
-                  <Sonner position="top-center" closeButton={false} />
-                  <AnimatePresence mode="wait">
-                    <AppRoutes />
-                  </AnimatePresence>
+              <ErrorBoundary>
+                <div className="relative min-h-screen">
+                  <div className="relative z-10">
+                    <Toaster />
+                    <Sonner position="top-center" closeButton={false} />
+                    <AnimatePresence mode="wait">
+                      <AppRoutes />
+                    </AnimatePresence>
+                  </div>
                 </div>
-              </div>
+              </ErrorBoundary>
             </AuthProvider>
           </ThemeProvider>
         </BrowserRouter>
