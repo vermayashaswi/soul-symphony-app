@@ -38,6 +38,22 @@ export const formatRelativeTime = (timestamp: string | number | Date): string =>
   return `${diffInYears} ${diffInYears === 1 ? 'year' : 'years'} ago`;
 };
 
+// Format a timestamp to a short date format (e.g., "Jan 5" or "Jan 5, 2024")
+export const formatShortDate = (timestamp: string | number | Date): string => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const isCurrentYear = date.getFullYear() === now.getFullYear();
+  
+  // Use options to format the date
+  if (isCurrentYear) {
+    // If it's the current year, show only the month and day (e.g., "Jan 5")
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } else {
+    // If it's a different year, include the year (e.g., "Jan 5, 2024")
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+};
+
 // Export the original format-time function to maintain compatibility
 export const formatTime = (seconds: number): string => {
   const minutes = Math.floor(seconds / 60);

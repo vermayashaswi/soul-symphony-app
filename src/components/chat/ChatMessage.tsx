@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
-import { formatRelativeTime } from "@/utils/format-time";
+import { formatShortDate } from "@/utils/format-time";
 
 interface ChatMessageProps {
   message: {
@@ -27,7 +27,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
   const [showReferences, setShowReferences] = useState(false);
   const { user } = useAuth();
   
-  // Format content if it contains object notation
   const formattedContent = React.useMemo(() => {
     return message.content;
   }, [message]);
@@ -116,7 +115,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                     <div key={idx} className="mb-2 py-1">
                       <div className="font-medium text-xs md:text-sm">
                         {ref.date && !isNaN(new Date(ref.date).getTime())
-                          ? new Date(ref.date).toLocaleDateString()
+                          ? formatShortDate(new Date(ref.date))
                           : "Unknown date"}
                       </div>
                       <div className="text-muted-foreground text-xs">{ref.snippet}</div>

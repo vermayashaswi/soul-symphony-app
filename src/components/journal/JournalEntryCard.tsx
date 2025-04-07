@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
-import { formatRelativeTime } from '@/utils/format-time';
+import { formatShortDate } from '@/utils/format-time';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -46,7 +45,6 @@ export function JournalEntryCard({
   isNew = false, 
   isProcessing = false 
 }: JournalEntryCardProps) {
-  // Safe defaults for entry properties - add more defensive checks
   const safeEntry = {
     id: entry?.id || 0,
     content: entry?.content || "Processing entry...",
@@ -63,14 +61,11 @@ export function JournalEntryCard({
   const [hasError, setHasError] = useState(false);
   const mountedRef = useRef<boolean>(true);
   
-  // Extract themes from the entry with robust error handling
   const extractThemes = (): string[] => {
     try {
-      // Fall back to empty arrays if properties are undefined
       const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
       const entryThemes = Array.isArray(safeEntry.themes) ? safeEntry.themes : [];
       
-      // Filter out empty themes and ensure they're valid strings
       const filteredMasterThemes = masterThemes.filter(theme => 
         theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
       );
@@ -78,7 +73,6 @@ export function JournalEntryCard({
         theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
       );
       
-      // Use master themes if available, otherwise use regular themes
       if (filteredMasterThemes.length > 0) {
         return filteredMasterThemes;
       } else if (filteredEntryThemes.length > 0) {
@@ -92,7 +86,6 @@ export function JournalEntryCard({
     }
   };
   
-  // Log when the component is mounted/unmounted
   useEffect(() => {
     console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id}`);
     mountedRef.current = true;
@@ -103,13 +96,11 @@ export function JournalEntryCard({
     };
   }, [safeEntry.id]);
 
-  // Auto-expand new entries
   useEffect(() => {
     if (isNew) {
       setIsExpanded(true);
       setHighlightNew(true);
       
-      // Remove highlight after 5 seconds
       const timer = setTimeout(() => {
         if (mountedRef.current) {
           setHighlightNew(false);
@@ -133,7 +124,6 @@ export function JournalEntryCard({
     try {
       console.log(`[JournalEntryCard] Starting deletion of entry ${safeEntry.id}`);
       
-      // Mark as in progress to prevent duplicate deletion attempts
       setDeletionInProgress(true);
       
       const { error } = await supabase
@@ -147,10 +137,8 @@ export function JournalEntryCard({
       
       console.log(`[JournalEntryCard] Successfully deleted entry ${safeEntry.id} from database`);
       
-      // Mark as completed
       setDeletionCompleted(true);
       
-      // Call parent handler with a small delay to ensure UI updates properly
       if (onDelete && mountedRef.current) {
         console.log(`[JournalEntryCard] Calling onDelete for entry ${safeEntry.id}`);
         onDelete(safeEntry.id);
@@ -160,7 +148,6 @@ export function JournalEntryCard({
     } catch (error) {
       console.error('[JournalEntryCard] Error deleting journal entry:', error);
       
-      // Reset state if still mounted
       if (mountedRef.current) {
         setDeletionInProgress(false);
         setDeletionCompleted(false);
@@ -169,7 +156,6 @@ export function JournalEntryCard({
       
       toast.error('Failed to delete entry');
       
-      // Still try to update the UI even if the database operation failed
       if (onDelete && mountedRef.current) {
         console.log(`[JournalEntryCard] Calling onDelete after error for entry ${safeEntry.id}`);
         setTimeout(() => {
@@ -181,10 +167,9 @@ export function JournalEntryCard({
     }
   };
 
-  // Add defensive formatting for creation date
   const createdAtFormatted = (() => {
     try {
-      return formatRelativeTime(safeEntry.created_at);
+      return formatShortDate(safeEntry.created_at);
     } catch (error) {
       console.error('[JournalEntryCard] Error formatting date:', error);
       return 'Recently';
@@ -193,7 +178,6 @@ export function JournalEntryCard({
   
   const initialThemes = extractThemes();
   
-  // Check if an entry is still being processed with detailed checks
   const isEntryBeingProcessed = () => {
     try {
       const noThemes = (!safeEntry.themes || safeEntry.themes.length === 0) && 
@@ -205,12 +189,10 @@ export function JournalEntryCard({
     }
   };
 
-  // Determine if each component is still processing
   const isSentimentProcessing = !safeEntry.sentiment && isNew;
   const isThemesProcessing = isProcessing || isEntryBeingProcessed();
   const isContentProcessing = !safeEntry.content || safeEntry.content === "Processing entry..." || isProcessing;
 
-  // Provide an error fallback if we had any rendering errors
   if (hasError) {
     return (
       <Card className="bg-background shadow-md border-red-300">

@@ -1,4 +1,3 @@
-
 import React from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatShortDate } from "@/utils/format-time";
 
 interface MobileChatMessageProps {
   message: {
@@ -28,7 +28,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
   
   const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
   
-  // Format content if it contains object notation
   const formattedContent = React.useMemo(() => {
     return message.content;
   }, [message]);
@@ -113,7 +112,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                     <div key={idx} className="mb-1 py-1">
                       <div className="font-medium dark:text-white/90">
                         {ref.date && !isNaN(new Date(ref.date).getTime()) 
-                          ? new Date(ref.date).toLocaleDateString() 
+                          ? formatShortDate(new Date(ref.date))
                           : "Unknown date"}
                       </div>
                       <div className="text-muted-foreground dark:text-white/70">{ref.snippet}</div>
