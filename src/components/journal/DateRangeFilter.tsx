@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { format, isValid, endOfDay, startOfDay, isAfter, isBefore, isEqual, isSameDay, isWithinInterval } from 'date-fns';
 import { JournalEntry } from './JournalEntryCard';
 import { Badge } from '@/components/ui/badge';
+import { DayPickerSingleProps } from 'react-day-picker';
 
 interface DateRangeFilterProps {
   entries: JournalEntry[];
@@ -118,19 +119,19 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
   };
 
   // Custom day rendering to highlight the selected range
-  const renderDay = (date: Date, cellProps: React.ComponentProps<typeof Calendar.Day>) => {
-    const isSelected = date && cellProps.selected;
+  const renderDay = (dayDate: Date, cellProps: any) => {
+    const isSelected = dayDate && cellProps.selected;
     
     // Check if day is within the selected range
     const isInRange = startDate && endDate && 
-      isWithinInterval(date, { 
+      isWithinInterval(dayDate, { 
         start: startOfDay(startDate), 
         end: endOfDay(endDate) 
       });
 
     // Check if day is the start or end of the range
-    const isRangeStart = startDate && isSameDay(date, startDate);
-    const isRangeEnd = endDate && isSameDay(date, endDate);
+    const isRangeStart = startDate && isSameDay(dayDate, startDate);
+    const isRangeEnd = endDate && isSameDay(dayDate, endDate);
     
     return (
       <div
@@ -149,7 +150,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
             <div className="absolute inset-0 bg-primary/15"></div>
           )}
         </div>
-        <span className="relative z-10">{format(date, 'd')}</span>
+        <span className="relative z-10">{format(dayDate, 'd')}</span>
       </div>
     );
   };
@@ -188,7 +189,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
               onMonthChange={setMonth}
               initialFocus
               components={{
-                Day: ({ date, ...props }) => renderDay(date, props)
+                Day: (props) => renderDay(props.date, props)
               }}
               footer={
                 <div className="p-3 border-t border-border">
