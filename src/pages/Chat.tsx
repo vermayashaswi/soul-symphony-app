@@ -32,17 +32,24 @@ const Chat = () => {
     }
   }, [user, navigate]);
 
-  // Listen for thread deletion events to refresh the component
+  // Listen for thread deletion and title update events to refresh the component
   useEffect(() => {
     const handleThreadDeleted = () => {
       // Force re-render of the entire component
       setKey(prevKey => prevKey + 1);
     };
+    
+    const handleThreadTitleUpdated = () => {
+      // Force re-render when thread title is updated
+      setKey(prevKey => prevKey + 1);
+    };
 
     window.addEventListener('threadDeleted', handleThreadDeleted as EventListener);
+    window.addEventListener('threadTitleUpdated', handleThreadTitleUpdated as EventListener);
     
     return () => {
       window.removeEventListener('threadDeleted', handleThreadDeleted as EventListener);
+      window.removeEventListener('threadTitleUpdated', handleThreadTitleUpdated as EventListener);
     };
   }, []);
 

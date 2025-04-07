@@ -97,6 +97,7 @@ export default function SmartChatInterface() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [newThreadTitle, setNewThreadTitle] = useState("");
   const [currentThreadTitle, setCurrentThreadTitle] = useState("");
+  const [interfaceKey, setInterfaceKey] = useState(0);
 
   const demoQuestions = [
     {
@@ -541,23 +542,30 @@ export default function SmartChatInterface() {
       if (error) throw error;
       
       setCurrentThreadTitle(newThreadTitle);
+      
       setIsRenameDialogOpen(false);
       
-      window.dispatchEvent(
-        new CustomEvent('threadTitleUpdated', { 
-          detail: { 
-            threadId: currentThreadId, 
-            title: newThreadTitle 
-          } 
-        })
-      );
+      setInterfaceKey(prev => prev + 1);
       
-      toast({
-        title: "Thread renamed",
-        description: "The conversation has been renamed successfully.",
-      });
+      setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent('threadTitleUpdated', { 
+            detail: { 
+              threadId: currentThreadId, 
+              title: newThreadTitle 
+            } 
+          })
+        );
+        
+        toast({
+          title: "Thread renamed",
+          description: "The conversation has been renamed successfully.",
+        });
+      }, 50);
     } catch (error) {
       console.error("Error renaming thread:", error);
+      setIsRenameDialogOpen(false);
+      
       toast({
         title: "Error",
         description: "Failed to rename the conversation.",
@@ -615,7 +623,7 @@ export default function SmartChatInterface() {
   };
 
   return (
-    <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background">
+    <Card className="smart-chat-interface w-full h-full flex flex-col shadow-md border rounded-xl overflow-hidden bg-background" key={interfaceKey}>
       <CardHeader className="pb-2 flex flex-row items-center justify-between bg-muted/30 border-b sticky top-0 z-10">
         <div className="flex items-center">
           <h2 className="text-xl font-semibold">Roha</h2>
@@ -752,7 +760,15 @@ export default function SmartChatInterface() {
         />
       </CardFooter>
       
-      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+      <Dialog 
+        open={isRenameDialogOpen} 
+        onOpenChange={(open) => {
+          setIsRenameDialogOpen(open);
+          if (!open) {
+            setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Rename Conversation</DialogTitle>
@@ -767,13 +783,17 @@ export default function SmartChatInterface() {
               onChange={(e) => setNewThreadTitle(e.target.value)}
               placeholder="Conversation name"
               className="w-full"
+              autoFocus
             />
           </div>
           <DialogFooter className="sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsRenameDialogOpen(false)}
+              onClick={() => {
+                setIsRenameDialogOpen(false);
+                setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
+              }}
             >
               Cancel
             </Button>
@@ -784,7 +804,15 @@ export default function SmartChatInterface() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog 
+        open={isDeleteDialogOpen} 
+        onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open);
+          if (!open) {
+            setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete conversation</AlertDialogTitle>
