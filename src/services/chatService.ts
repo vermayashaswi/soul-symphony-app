@@ -9,7 +9,7 @@ export type ChatMessage = {
   hasNumericResult?: boolean;
 };
 
-// Helper function to store user queries in the user_queries table
+// Helper function to store user queries in the user_queries table using an edge function instead
 const logUserQuery = async (
   userId: string,
   queryText: string,
@@ -17,19 +17,15 @@ const logUserQuery = async (
   messageId?: string
 ): Promise<void> => {
   try {
-    // Insert the query into the user_queries table without generating embeddings
-    const { error } = await supabase
-      .from('user_queries')
-      .insert({
-        user_id: userId,
-        query_text: queryText,
-        thread_id: threadId,
-        message_id: messageId
-      });
-
-    if (error) {
-      console.error("Error logging user query:", error);
-    }
+    // Use an edge function to log the query instead of direct table access
+    await supabase.functions.invoke('ensure-chat-persistence', {
+      body: {
+        userId,
+        queryText,
+        threadId,
+        messageId
+      }
+    });
   } catch (error) {
     console.error("Failed to log user query:", error);
   }

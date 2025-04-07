@@ -134,22 +134,46 @@ export default function MobileChatInterface({
       console.log(`[Mobile] Loaded ${data?.length || 0} messages`);
       
       if (data && data.length > 0) {
-        const formattedMessages = data.map((msg: any) => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.content,
-          ...(msg.reference_entries && { references: msg.reference_entries }),
-          ...(msg.analysis_data && { analysis: msg.analysis_data }),
-          ...(msg.has_numeric_result !== undefined && { hasNumericResult: msg.has_numeric_result })
-        })) as UIChatMessage[];
+        const formattedMessages = data.map((msg: ChatMessageFromDB) => {
+          const uiMessage: UIChatMessage = {
+            role: msg.sender === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          };
+          
+          if (msg.reference_entries) {
+            uiMessage.references = Array.isArray(msg.reference_entries) 
+              ? msg.reference_entries 
+              : typeof msg.reference_entries === 'object' 
+                ? [msg.reference_entries] 
+                : [];
+          }
+          
+          if (msg.analysis_data) {
+            uiMessage.analysis = msg.analysis_data;
+          }
+          
+          if (msg.has_numeric_result !== undefined) {
+            uiMessage.hasNumericResult = msg.has_numeric_result;
+          }
+          
+          return uiMessage;
+        });
         
         setMessages(formattedMessages);
         setShowSuggestions(false);
+        console.log("[Mobile] Set messages array with length:", formattedMessages.length);
       } else {
         setMessages([]);
         setShowSuggestions(true);
+        console.log("[Mobile] No messages found, showing suggestions");
       }
     } catch (error) {
       console.error("[Mobile] Error loading messages:", error);
+      toast({
+        title: "Error loading messages",
+        description: "Could not load conversation history.",
+        variant: "destructive"
+      });
     }
   };
 

@@ -128,31 +128,61 @@ export default function SmartChatInterface() {
     if (!threadId || !user?.id) return;
     
     try {
+      console.log(`Loading messages for thread ${threadId}`);
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('thread_id', threadId)
         .order('created_at', { ascending: true });
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error loading messages:", error);
+        throw error;
+      }
+      
+      console.log(`Found ${data?.length || 0} messages for thread`);
       
       if (data && data.length > 0) {
-        const formattedMessages = data.map((msg: DbChatMessage) => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.content,
-          ...(msg.reference_entries && { references: msg.reference_entries }),
-          ...(msg.analysis_data && { analysis: msg.analysis_data }),
-          ...(msg.has_numeric_result !== undefined && { hasNumericResult: msg.has_numeric_result })
-        })) as UIChatMessage[];
+        const formattedMessages = data.map((msg: DbChatMessage) => {
+          const uiMessage: UIChatMessage = {
+            role: msg.sender === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          };
+          
+          if (msg.reference_entries) {
+            uiMessage.references = Array.isArray(msg.reference_entries) 
+              ? msg.reference_entries 
+              : typeof msg.reference_entries === 'object' 
+                ? [msg.reference_entries] 
+                : [];
+          }
+          
+          if (msg.analysis_data) {
+            uiMessage.analysis = msg.analysis_data;
+          }
+          
+          if (msg.has_numeric_result !== undefined) {
+            uiMessage.hasNumericResult = msg.has_numeric_result;
+          }
+          
+          return uiMessage;
+        });
         
         setChatHistory(formattedMessages);
         setShowSuggestions(false);
+        console.log("Chat history updated with", formattedMessages.length, "messages");
       } else {
         setChatHistory([]);
         setShowSuggestions(true);
+        console.log("No messages found, showing suggestions");
       }
     } catch (error) {
       console.error("Error loading messages:", error);
+      toast({
+        title: "Error loading messages",
+        description: "Could not load conversation history.",
+        variant: "destructive"
+      });
     }
   };
 
