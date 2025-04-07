@@ -9,8 +9,11 @@ import {
   startOfDay, 
   endOfDay, 
   startOfWeek, 
+  endOfWeek, 
   startOfMonth, 
+  endOfMonth, 
   startOfYear, 
+  endOfYear, 
   format, 
   isSameDay, 
   isSameMonth, 
@@ -18,7 +21,8 @@ import {
   addDays, 
   getMonth,
   addWeeks,
-  subWeeks 
+  subWeeks,
+  parseISO 
 } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CalendarDays, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -95,10 +99,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const { theme, colorTheme, customColor } = useTheme();
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   
   const filteredData = React.useMemo(() => {
     const now = new Date();
     let fromDate: Date;
+    let toDate: Date = endOfDay(now);
     
     switch (timeRange) {
       case 'today':
@@ -106,24 +112,37 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         break;
       case 'week':
         fromDate = startOfWeek(now, { weekStartsOn: 1 }); // Week starts on Monday
+        toDate = endOfWeek(now, { weekStartsOn: 1 });
         break;
       case 'month':
         fromDate = startOfMonth(now);
+        toDate = endOfMonth(now);
         break;
       case 'year':
         fromDate = startOfYear(now);
+        toDate = endOfYear(now);
         break;
       default:
         fromDate = subDays(now, 30); // Default to last 30 days
     }
     
-    return sentimentData.filter(item => item.date >= fromDate && item.date <= endOfDay(now));
+    return sentimentData.filter(item => item.date >= fromDate && item.date <= toDate);
   }, [sentimentData, timeRange]);
+
+  // For the month view, we need ALL entries to show in the calendar
+  const allSentimentData = React.useMemo(() => {
+    return sentimentData;
+  }, [sentimentData]);
 
   const dailySentiment = React.useMemo(() => {
     const sentimentMap = new Map<string, { total: number, count: number }>();
     
-    filteredData.forEach(item => {
+    // Use the appropriate dataset based on the timeRange and view
+    const dataToProcess = (timeRange === 'month' && viewMode === 'calendar') 
+      ? allSentimentData 
+      : filteredData;
+    
+    dataToProcess.forEach(item => {
       const dateKey = format(item.date, 'yyyy-MM-dd');
       if (!sentimentMap.has(dateKey)) {
         sentimentMap.set(dateKey, { total: 0, count: 0 });
@@ -139,7 +158,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     });
     
     return result;
-  }, [filteredData]);
+  }, [filteredData, allSentimentData, timeRange, viewMode]);
 
   const sentimentInfo = React.useMemo(() => {
     const infoMap = new Map<string, {
@@ -403,6 +422,8 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       <div className="max-w-full overflow-visible pb-4">
         <Calendar
           mode="multiple"
+          month={currentMonth}
+          onMonthChange={setCurrentMonth}
           selected={filteredData.map(d => d.date)}
           className="rounded-xl w-full"
           defaultMonth={filteredData.length > 0 ? filteredData[0].date : undefined}
@@ -436,12 +457,12 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               const formattedDate = format(date, 'yyyy-MM-dd');
               const info = sentimentInfo.get(formattedDate);
               
-              const isSelected = filteredData.some(
+              const isSelected = allSentimentData.some(
                 d => isSameDay(d.date, date)
               );
               
               const isToday = isSameDay(date, new Date());
-              const isSameMonthValue = isSameMonth(date, new Date());
+              const isSameMonthValue = isSameMonth(date, currentMonth);
               
               return (
                 <div

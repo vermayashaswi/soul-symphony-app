@@ -140,7 +140,6 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
   return { insightsData, loading };
 };
 
-// Helper functions
 const getDateRange = (timeRange: TimeRange) => {
   const now = new Date();
   let startDate, endDate;
