@@ -118,19 +118,19 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
   };
 
   // Custom day rendering to highlight the selected range
-  const renderDay = (day: Date) => {
-    const isSelected = date ? isSameDay(day, date) : false;
+  const renderDay = (date: Date, cellProps: React.ComponentProps<typeof Calendar.Day>) => {
+    const isSelected = date && cellProps.selected;
     
     // Check if day is within the selected range
     const isInRange = startDate && endDate && 
-      isWithinInterval(day, { 
+      isWithinInterval(date, { 
         start: startOfDay(startDate), 
         end: endOfDay(endDate) 
       });
 
     // Check if day is the start or end of the range
-    const isRangeStart = startDate && isSameDay(day, startDate);
-    const isRangeEnd = endDate && isSameDay(day, endDate);
+    const isRangeStart = startDate && isSameDay(date, startDate);
+    const isRangeEnd = endDate && isSameDay(date, endDate);
     
     return (
       <div
@@ -149,7 +149,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
             <div className="absolute inset-0 bg-primary/15"></div>
           )}
         </div>
-        <span className="relative z-10">{format(day, 'd')}</span>
+        <span className="relative z-10">{format(date, 'd')}</span>
       </div>
     );
   };
@@ -188,7 +188,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
               onMonthChange={setMonth}
               initialFocus
               components={{
-                Day: ({ day, ...props }) => renderDay(day)
+                Day: ({ date, ...props }) => renderDay(date, props)
               }}
               footer={
                 <div className="p-3 border-t border-border">
