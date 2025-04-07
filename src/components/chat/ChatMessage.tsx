@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
@@ -39,7 +38,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+      className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'} overflow-hidden`}
     >
       {message.role === 'assistant' && (
         <Avatar className="h-10 w-10 border border-primary/20">
@@ -55,18 +54,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
       
       <div
         className={cn(
-          "max-w-[85%] md:max-w-[75%] rounded-2xl p-4 text-sm md:text-base shadow-sm",
+          "max-w-[85%] md:max-w-[75%] rounded-2xl p-4 text-sm md:text-base shadow-sm overflow-hidden",
           message.role === 'user' 
             ? 'bg-primary text-primary-foreground rounded-tr-none' 
             : 'bg-muted/60 border border-border/50 rounded-tl-none'
         )}
       >
         {message.role === 'assistant' ? (
-          <ReactMarkdown className="prose dark:prose-invert prose-sm md:prose-base max-w-none">
+          <ReactMarkdown className="prose dark:prose-invert prose-sm md:prose-base max-w-none break-words overflow-hidden">
             {formattedContent}
           </ReactMarkdown>
         ) : (
-          <p>{message.content}</p>
+          <p className="break-words overflow-hidden">{message.content}</p>
         )}
         
         {showAnalysis && message.role === 'assistant' && message.analysis && (

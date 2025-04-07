@@ -40,6 +40,9 @@
     font-size: 0.95rem;
     line-height: 1.4;
     margin: 0.5rem 0;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
   }
   
   /* Reduce padding in chat messages */
@@ -53,6 +56,24 @@
   .mobile-chat-interface .space-y-4 {
     margin-top: 0.5rem !important;
     margin-bottom: 0.5rem !important;
+  }
+  
+  /* Ensure no horizontal overflow in chat messages */
+  .smart-chat-interface,
+  .mobile-chat-interface,
+  .chat-message,
+  .suggestion-button {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  
+  /* Ensure suggestion buttons have proper text wrapping */
+  .suggestion-button,
+  .suggestion-button span {
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
   }
   
   /* Adjust card headers on home page */
@@ -391,12 +412,40 @@
 
   /* Remove the chat thread buttons styling as they're no longer used */
   
+  /* Chat messages should not overflow horizontally */
+  .smart-chat-interface .card-content,
+  .mobile-chat-interface .card-content,
+  .smart-chat-interface .prose p,
+  .mobile-chat-interface .prose p,
+  .smart-chat-interface .break-words,
+  .mobile-chat-interface .break-words {
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
+    overflow-x: hidden !important;
+  }
 }
 
 /* Dark mode support for sticky elements */
 .dark .sticky {
   background-color: hsl(var(--background));
   border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Ensure chat components don't overflow horizontally on any screen size */
+.smart-chat-interface,
+.mobile-chat-interface,
+.message-container,
+.suggestion-container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.break-words {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
 }
 
 /* Add new animations for language elements */

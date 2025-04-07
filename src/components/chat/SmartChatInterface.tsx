@@ -601,12 +601,12 @@ export default function SmartChatInterface() {
         </div>
       </CardHeader>
       
-      <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 flex flex-col">
+      <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 flex flex-col overflow-x-hidden">
         {chatHistory.length === 0 ? (
-          <div className="flex flex-col h-full">
-            <div className="text-center max-w-lg mx-auto px-4">
+          <div className="flex flex-col h-full overflow-hidden">
+            <div className="text-center max-w-lg mx-auto px-4 overflow-x-hidden">
               <h1 className="text-2xl md:text-3xl font-bold mb-3">How can I help you?</h1>
-              <p className="text-muted-foreground mb-6">
+              <p className="text-muted-foreground mb-6 break-words">
                 Hey, I am Roha, your personal AI assistant. You can ask me anything about your mental well-being and I will answer your queries basis your own journal insights.
               </p>
               
@@ -615,18 +615,18 @@ export default function SmartChatInterface() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto"
+                  className="grid grid-cols-1 gap-3 max-w-md mx-auto"
                 >
                   {demoQuestions.map((question, index) => (
                     <Button
                       key={index}
                       variant="outline"
                       size="default"
-                      className="px-4 py-3 h-auto flex items-start text-left bg-muted/50 hover:bg-muted"
+                      className="px-4 py-3 h-auto flex items-start text-left bg-muted/50 hover:bg-muted suggestion-button overflow-hidden"
                       onClick={() => handleSendMessage(question.text)}
                     >
-                      <div className="flex gap-2 items-start">
-                        <span className="mt-0.5">{question.icon}</span>
+                      <div className="flex gap-2 items-start w-full overflow-hidden">
+                        <span className="mt-0.5 flex-shrink-0">{question.icon}</span>
                         <span className="break-words">{question.text}</span>
                       </div>
                     </Button>

@@ -1,4 +1,3 @@
-
 import React from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
@@ -38,7 +37,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`relative flex items-start gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+      className={`relative flex items-start gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'} overflow-hidden`}
     >
       {message.role === 'assistant' && (
         <Avatar className="w-8 h-8 border border-primary/20">
@@ -54,18 +53,18 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       
       <div
         className={cn(
-          "min-w-0 max-w-[85%] rounded-2xl p-3.5 text-sm shadow-sm",
+          "min-w-0 max-w-[85%] rounded-2xl p-3.5 text-sm shadow-sm overflow-hidden",
           message.role === 'user' 
             ? 'bg-primary text-primary-foreground rounded-tr-none' 
             : 'bg-muted/60 border border-border/50 rounded-tl-none'
         )}
       >
         {message.role === 'assistant' ? (
-          <ReactMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words">
+          <ReactMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words overflow-hidden">
             {formattedContent}
           </ReactMarkdown>
         ) : (
-          <p className="break-words">{message.content}</p>
+          <p className="break-words overflow-hidden">{message.content}</p>
         )}
         
         {showAnalysis && message.role === 'assistant' && message.analysis && (
