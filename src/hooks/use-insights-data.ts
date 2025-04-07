@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
@@ -57,7 +56,6 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
   const [loading, setLoading] = useState(true);
   const [lastTimeRange, setLastTimeRange] = useState<TimeRange>(timeRange);
 
-  // Make the fetchInsightsData function with useCallback to prevent unnecessary recreations
   const fetchInsightsData = useCallback(async () => {
     if (!userId) {
       setLoading(false);
@@ -66,7 +64,6 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
 
     setLoading(true);
     try {
-      // First, fetch ALL entries for this user (for the full calendar view)
       const { data: allEntries, error: allEntriesError } = await supabase
         .from('Journal Entries')
         .select('*')
@@ -80,7 +77,6 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
 
       console.log(`Found ${allEntries?.length || 0} total entries for user`);
 
-      // Get date range based on timeRange for filtered view
       const { startDate, endDate } = getDateRange(timeRange);
       
       console.log(`Fetching entries for ${timeRange}:`, {
@@ -89,7 +85,6 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
         userId
       });
 
-      // Filter entries for the current time range
       const entries = allEntries?.filter(entry => {
         const entryDate = new Date(entry.created_at);
         return entryDate >= startDate && entryDate <= endDate;
@@ -97,16 +92,13 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
 
       console.log(`Filtered ${entries.length} entries for ${timeRange}`);
 
-      // Process the data - pass ALL entries to ensure the calendar has complete data
       const dominantMood = calculateDominantMood(entries);
-      const biggestImprovement = calculateBiggestImprovement(entries);
+      const biggestImprovement = calculateBiggestImprovement(allEntries, entries, timeRange);
       const journalActivity = calculateJournalActivity(entries, timeRange);
       const aggregatedEmotionData = processEmotionData(entries, timeRange);
 
-      // Make sure all entries have a sentiment value
       const processedAllEntries = allEntries?.map(entry => {
         if (!entry.sentiment && entry.emotions) {
-          // If sentiment is missing but emotions are present, calculate an average sentiment
           try {
             const emotions = typeof entry.emotions === 'string' 
               ? JSON.parse(entry.emotions) 
@@ -145,7 +137,6 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
     }
   }, [userId, timeRange]);
 
-  // Fetch data when userId or timeRange changes
   useEffect(() => {
     if (timeRange !== lastTimeRange) {
       console.log(`[useInsightsData] TimeRange changed from ${lastTimeRange} to ${timeRange}, refetching data`);
@@ -164,13 +155,10 @@ const getDateRange = (timeRange: TimeRange) => {
 
   switch (timeRange) {
     case 'today':
-      // For 'today', include the entire day from start to end
       startDate = startOfDay(now);
       endDate = endOfDay(now);
       break;
     case 'week':
-      // For 'week', use start of week (Monday) to end of week (Sunday)
-      // Setting weekStartsOn to 1 makes Monday the first day of the week
       startDate = startOfWeek(now, { weekStartsOn: 1 });
       endDate = endOfWeek(now, { weekStartsOn: 1 });
       break;
@@ -183,7 +171,6 @@ const getDateRange = (timeRange: TimeRange) => {
       endDate = endOfYear(now);
       break;
     default:
-      // Default to week if invalid timeRange
       startDate = startOfWeek(now, { weekStartsOn: 1 });
       endDate = endOfWeek(now, { weekStartsOn: 1 });
   }
@@ -194,7 +181,6 @@ const getDateRange = (timeRange: TimeRange) => {
 const calculateDominantMood = (entries: any[]): DominantMood | null => {
   if (!entries || entries.length === 0) return null;
 
-  // Aggregate emotions across entries
   const emotionCounts: Record<string, { count: number; score: number }> = {};
   
   entries.forEach(entry => {
@@ -217,7 +203,6 @@ const calculateDominantMood = (entries: any[]): DominantMood | null => {
     }
   });
 
-  // Find the emotion with the highest score
   let dominantEmotion = '';
   let highestScore = 0;
 
@@ -230,7 +215,6 @@ const calculateDominantMood = (entries: any[]): DominantMood | null => {
 
   if (!dominantEmotion) return null;
 
-  // Map emotion to emoji
   const emotionEmojis: Record<string, string> = {
     happy: '😊',
     sad: '😢',
@@ -257,94 +241,92 @@ const calculateDominantMood = (entries: any[]): DominantMood | null => {
   };
 };
 
-const calculateBiggestImprovement = (entries: any[]): BiggestImprovement | null => {
-  if (!entries || entries.length === 0) return null;
-
-  // For this example, we'll compare the first half of entries with the second half
-  // This is a simplified calculation
-  const halfLength = Math.floor(entries.length / 2);
-  const recentEntries = entries.slice(0, halfLength);
-  const olderEntries = entries.slice(halfLength);
-
-  const recentEmotions: Record<string, number> = {};
-  const olderEmotions: Record<string, number> = {};
-
-  // Process recent entries
-  recentEntries.forEach(entry => {
-    if (entry.emotions) {
-      try {
-        const emotions = typeof entry.emotions === 'string' 
-          ? JSON.parse(entry.emotions) 
-          : entry.emotions;
-        
-        Object.entries(emotions).forEach(([emotion, score]) => {
-          if (!recentEmotions[emotion]) {
-            recentEmotions[emotion] = 0;
-          }
-          recentEmotions[emotion] += Number(score);
-        });
-      } catch (e) {
-        console.error('Error parsing emotions:', e);
-      }
-    }
-  });
-
-  // Process older entries
-  olderEntries.forEach(entry => {
-    if (entry.emotions) {
-      try {
-        const emotions = typeof entry.emotions === 'string' 
-          ? JSON.parse(entry.emotions) 
-          : entry.emotions;
-        
-        Object.entries(emotions).forEach(([emotion, score]) => {
-          if (!olderEmotions[emotion]) {
-            olderEmotions[emotion] = 0;
-          }
-          olderEmotions[emotion] += Number(score);
-        });
-      } catch (e) {
-        console.error('Error parsing emotions:', e);
-      }
-    }
-  });
-
-  // Calculate improvement percentages
-  let biggestImprovement: BiggestImprovement | null = null;
-  let maxImprovement = 0;
-
-  // Check emotions that exist in both periods
-  Object.keys(recentEmotions).forEach(emotion => {
-    if (olderEmotions[emotion] && olderEmotions[emotion] > 0) {
-      const improvement = ((recentEmotions[emotion] - olderEmotions[emotion]) / olderEmotions[emotion]) * 100;
-      
-      // We're looking for positive improvements (growth in positive emotions)
-      if (improvement > maxImprovement) {
-        maxImprovement = improvement;
-        biggestImprovement = {
-          emotion,
-          percentage: Math.round(improvement)
-        };
-      }
-    }
-  });
-
-  // If we didn't find any improvement, return mock data
-  if (!biggestImprovement) {
-    return {
-      emotion: entries.length > 0 ? 'peaceful' : 'content',
-      percentage: 24
-    };
+const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[], timeRange: TimeRange): BiggestImprovement | null => {
+  if (!allEntries || allEntries.length === 0 || !timeRangeEntries || timeRangeEntries.length === 0) {
+    return null;
   }
-
-  return biggestImprovement;
+  
+  const sortedEntries = [...allEntries].sort((a, b) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  
+  const initialEmotionValues: Record<string, number> = {};
+  
+  const currentEmotionAverages: Record<string, { total: number, count: number }> = {};
+  
+  for (const entry of sortedEntries) {
+    if (entry.emotions) {
+      try {
+        const emotions = typeof entry.emotions === 'string' 
+          ? JSON.parse(entry.emotions) 
+          : entry.emotions;
+        
+        Object.entries(emotions).forEach(([emotion, score]) => {
+          if (!(emotion in initialEmotionValues)) {
+            initialEmotionValues[emotion] = Number(score);
+          }
+        });
+      } catch (e) {
+        console.error('Error parsing emotions for initial values:', e);
+      }
+    }
+  }
+  
+  for (const entry of timeRangeEntries) {
+    if (entry.emotions) {
+      try {
+        const emotions = typeof entry.emotions === 'string' 
+          ? JSON.parse(entry.emotions) 
+          : entry.emotions;
+        
+        Object.entries(emotions).forEach(([emotion, score]) => {
+          if (!currentEmotionAverages[emotion]) {
+            currentEmotionAverages[emotion] = { total: 0, count: 0 };
+          }
+          currentEmotionAverages[emotion].total += Number(score);
+          currentEmotionAverages[emotion].count += 1;
+        });
+      } catch (e) {
+        console.error('Error parsing emotions for current averages:', e);
+      }
+    }
+  }
+  
+  const emotionChanges: Array<{emotion: string, percentage: number}> = [];
+  
+  Object.keys(initialEmotionValues).forEach(emotion => {
+    if (currentEmotionAverages[emotion] && currentEmotionAverages[emotion].count > 0) {
+      const initialValue = initialEmotionValues[emotion];
+      const currentAverage = currentEmotionAverages[emotion].total / currentEmotionAverages[emotion].count;
+      
+      if (initialValue === 0) return;
+      
+      const percentageChange = ((currentAverage - initialValue) / initialValue) * 100;
+      
+      emotionChanges.push({
+        emotion,
+        percentage: Math.round(percentageChange)
+      });
+    }
+  });
+  
+  emotionChanges.sort((a, b) => Math.abs(b.percentage) - Math.abs(a.percentage));
+  
+  if (emotionChanges.length > 0) {
+    return emotionChanges[0];
+  }
+  
+  console.log('No emotion changes found, returning default');
+  
+  return {
+    emotion: timeRangeEntries.length > 0 ? 'peaceful' : 'content',
+    percentage: 24
+  };
 };
 
 const calculateJournalActivity = (entries: any[], timeRange: TimeRange): JournalActivity => {
-  // Get entry count
   const entryCount = entries.length;
   
-  // For 'today' timeframe, we're tracking individual entries instead of day streaks
   if (timeRange === 'today') {
     return {
       entryCount,
@@ -353,28 +335,23 @@ const calculateJournalActivity = (entries: any[], timeRange: TimeRange): Journal
     };
   }
   
-  // Sort entries by date (oldest first) for streak calculation
   const sortedEntries = [...entries].sort((a, b) => 
     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
   
-  // Group entries by date
   const dateMap = new Map<string, number>();
   
-  // Count entries per day
   sortedEntries.forEach(entry => {
     const dateKey = format(new Date(entry.created_at), 'yyyy-MM-dd');
     dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + 1);
   });
   
-  // Get sorted dates
   const sortedDates = Array.from(dateMap.keys()).sort();
   
   if (sortedDates.length === 0) {
     return { entryCount: 0, streak: 0, maxStreak: 0 };
   }
   
-  // Calculate current streak and max streak (consecutive days)
   let currentStreak = 1;
   let maxStreak = 1;
   
@@ -382,7 +359,6 @@ const calculateJournalActivity = (entries: any[], timeRange: TimeRange): Journal
     const currentDate = new Date(sortedDates[i]);
     const prevDate = new Date(sortedDates[i-1]);
     
-    // Check if dates are consecutive
     const timeDiff = currentDate.getTime() - prevDate.getTime();
     const daysDiff = Math.round(timeDiff / (1000 * 3600 * 24));
     
@@ -396,7 +372,7 @@ const calculateJournalActivity = (entries: any[], timeRange: TimeRange): Journal
   
   return {
     entryCount,
-    streak: Math.min(currentStreak, 7), // Limit streak to a max of 7 for display
+    streak: Math.min(currentStreak, 7),
     maxStreak
   };
 };
@@ -404,7 +380,6 @@ const calculateJournalActivity = (entries: any[], timeRange: TimeRange): Journal
 const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmotionData => {
   const emotionData: AggregatedEmotionData = {};
   
-  // Process entries and extract emotion data
   entries.forEach(entry => {
     const dateStr = format(new Date(entry.created_at), 'yyyy-MM-dd');
     
@@ -419,14 +394,11 @@ const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmo
             emotionData[emotion] = [];
           }
           
-          // Check if we already have an entry for this date
           const existingPoint = emotionData[emotion].find(point => point.date === dateStr);
           
           if (existingPoint) {
-            // Update existing data point
             existingPoint.value += Number(score);
           } else {
-            // Add new data point
             emotionData[emotion].push({
               date: dateStr,
               value: Number(score),
