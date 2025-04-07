@@ -21,11 +21,9 @@ export function FloatingDotsToggle({ onClick }: FloatingDotsToggleProps) {
           'bg-gradient-to-r from-green-400 to-cyan-500',
         ];
         
-        const positions = [
-          { x: 0, y: -6 },
-          { x: -5, y: 4 },
-          { x: 5, y: 4 },
-        ];
+        // Define the orbital radius and angles
+        const radius = 6;
+        const baseAngle = (i * 2 * Math.PI) / 3; // Evenly space dots in a circle
         
         return (
           <motion.div
@@ -34,61 +32,53 @@ export function FloatingDotsToggle({ onClick }: FloatingDotsToggleProps) {
             style={{ 
               left: '50%',
               top: '50%',
-              x: positions[i].x,
-              y: positions[i].y,
+              x: -1, // Center dot horizontally (-1 for half of width)
+              y: -1, // Center dot vertically (-1 for half of height)
             }}
             animate={{
+              x: [
+                Math.cos(baseAngle) * radius - 1, 
+                Math.cos(baseAngle + Math.PI/2) * radius - 1,
+                Math.cos(baseAngle + Math.PI) * radius - 1,
+                Math.cos(baseAngle + 1.5 * Math.PI) * radius - 1,
+                Math.cos(baseAngle) * radius - 1
+              ],
               y: [
-                positions[i].y, 
-                positions[i].y - 3, 
-                positions[i].y
+                Math.sin(baseAngle) * radius - 1,
+                Math.sin(baseAngle + Math.PI/2) * radius - 1,
+                Math.sin(baseAngle + Math.PI) * radius - 1,
+                Math.sin(baseAngle + 1.5 * Math.PI) * radius - 1,
+                Math.sin(baseAngle) * radius - 1
               ],
               boxShadow: [
                 '0 0 2px rgba(255, 255, 255, 0.5)',
-                '0 0 6px rgba(255, 255, 255, 0.8)',
+                '0 0 4px rgba(255, 255, 255, 0.7)',
                 '0 0 2px rgba(255, 255, 255, 0.5)',
               ],
-              scale: [1, 1.2, 1],
             }}
             transition={{
-              y: {
-                duration: 2,
+              x: {
+                duration: 4,
                 repeat: Infinity,
-                ease: "easeInOut",
+                ease: "linear",
                 delay: i * 0.3,
-                repeatType: "mirror"
+              },
+              y: {
+                duration: 4,
+                repeat: Infinity,
+                ease: "linear",
+                delay: i * 0.3,
               },
               boxShadow: {
                 duration: 2,
                 repeat: Infinity,
                 ease: "easeInOut",
                 delay: i * 0.3
-              },
-              scale: {
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: i * 0.3,
-                repeatType: "mirror"
               }
             }}
           />
         );
       })}
-      
-      <motion.div 
-        className="absolute top-1/2 left-1/2 w-5 h-5 rounded-full bg-gradient-to-br from-gray-200/30 to-gray-300/10"
-        style={{ transform: 'translate(-50%, -50%)' }}
-        animate={{ 
-          scale: [0.8, 1.1, 0.8],
-          opacity: [0.3, 0.5, 0.3]
-        }}
-        transition={{ 
-          duration: 3, 
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      />
     </motion.div>
   );
 }
