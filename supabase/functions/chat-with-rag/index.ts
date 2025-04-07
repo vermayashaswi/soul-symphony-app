@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -109,14 +110,17 @@ serve(async (req) => {
     console.log("Searching for relevant entries");
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "loading"));
     
+    // Increase match count for more comprehensive analysis
+    const matchCount = 50; // Increased from 10 to 50
+    
     // Use different search function based on whether we have a time range
     let entries = [];
     if (timeRange && (timeRange.startDate || timeRange.endDate)) {
       console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
-      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange, matchCount);
     } else {
       console.log("Using standard vector search without time filtering");
-      entries = await searchEntriesWithVector(userId, queryEmbedding);
+      entries = await searchEntriesWithVector(userId, queryEmbedding, matchCount);
     }
     
     console.log(`Found ${entries.length} relevant entries`);
@@ -225,7 +229,8 @@ serve(async (req) => {
 // Standard vector search without time filtering
 async function searchEntriesWithVector(
   userId: string, 
-  queryEmbedding: any[]
+  queryEmbedding: any[],
+  matchCount: number = 50
 ) {
   try {
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
@@ -235,7 +240,7 @@ async function searchEntriesWithVector(
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
-        match_count: 10,
+        match_count: matchCount,
         user_id_filter: userId
       }
     );
@@ -257,7 +262,8 @@ async function searchEntriesWithVector(
 async function searchEntriesWithTimeRange(
   userId: string, 
   queryEmbedding: any[], 
-  timeRange: { startDate?: string; endDate?: string }
+  timeRange: { startDate?: string; endDate?: string },
+  matchCount: number = 50
 ) {
   try {
     console.log(`Searching entries with time range for userId: ${userId}`);
@@ -268,7 +274,7 @@ async function searchEntriesWithTimeRange(
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
-        match_count: 10,
+        match_count: matchCount,
         user_id_filter: userId,
         start_date: timeRange.startDate || null,
         end_date: timeRange.endDate || null

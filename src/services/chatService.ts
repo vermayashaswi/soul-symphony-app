@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export type ChatMessage = {
@@ -19,9 +20,9 @@ export const processChatMessage = async (
   console.log("Processing chat message:", message.substring(0, 30) + "...");
   
   try {
-    // Use fixed parameters for vector search - let the retriever handle the filtering
+    // Use higher match parameters for comprehensive analysis
     const matchThreshold = 0.5;
-    const matchCount = 10; // Fixed count, let the retriever determine the actual number
+    const matchCount = 50; // Increased from 10 to 50 for more comprehensive analysis
     
     console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
     
