@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
@@ -29,6 +28,7 @@ export type BiggestImprovement = {
 export type JournalActivity = {
   entryCount: number;
   streak: number;
+  maxStreak: number;
 };
 
 interface InsightsData {
@@ -46,7 +46,8 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
     biggestImprovement: null,
     journalActivity: {
       entryCount: 0,
-      streak: 0
+      streak: 0,
+      maxStreak: 0
     },
     aggregatedEmotionData: {}
   });
@@ -92,7 +93,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
           entries: [],
           dominantMood: null,
           biggestImprovement: null,
-          journalActivity: { entryCount: 0, streak: 0 },
+          journalActivity: { entryCount: 0, streak: 0, maxStreak: 0 },
           aggregatedEmotionData: {}
         });
         setLoading(false);
@@ -102,7 +103,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       // Process the data
       const dominantMood = calculateDominantMood(entries);
       const biggestImprovement = calculateBiggestImprovement(entries);
-      const journalActivity = calculateJournalActivity(entries.length);
+      const journalActivity = calculateJournalActivity(entries, timeRange);
       const aggregatedEmotionData = processEmotionData(entries, timeRange);
 
       // Log the processed data for debugging
@@ -322,13 +323,64 @@ const calculateBiggestImprovement = (entries: any[]): BiggestImprovement | null 
   return biggestImprovement;
 };
 
-const calculateJournalActivity = (entryCount: number): JournalActivity => {
-  // Simplified streak calculation - in a real app you'd look at consecutive days
-  const streak = Math.min(entryCount, 7); // Limit streak to a max of 7
+const calculateJournalActivity = (entries: any[], timeRange: TimeRange): JournalActivity => {
+  // Get entry count
+  const entryCount = entries.length;
+  
+  // Sort entries by date (oldest first) for streak calculation
+  const sortedEntries = [...entries].sort((a, b) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  
+  // For 'today' timeframe, we count entries instead of days
+  if (timeRange === 'today') {
+    return {
+      entryCount,
+      streak: entryCount,
+      maxStreak: entryCount
+    };
+  }
+  
+  // For other timeframes, calculate day streaks
+  const dateMap = new Map<string, number>();
+  
+  // Count entries per day
+  sortedEntries.forEach(entry => {
+    const dateKey = format(new Date(entry.created_at), 'yyyy-MM-dd');
+    dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + 1);
+  });
+  
+  // Get sorted dates
+  const sortedDates = Array.from(dateMap.keys()).sort();
+  
+  if (sortedDates.length === 0) {
+    return { entryCount: 0, streak: 0, maxStreak: 0 };
+  }
+  
+  // Calculate current streak (consecutive days)
+  let currentStreak = 1;
+  let maxStreak = 1;
+  
+  for (let i = 1; i < sortedDates.length; i++) {
+    const currentDate = new Date(sortedDates[i]);
+    const prevDate = new Date(sortedDates[i-1]);
+    
+    // Check if dates are consecutive
+    const timeDiff = currentDate.getTime() - prevDate.getTime();
+    const daysDiff = Math.round(timeDiff / (1000 * 3600 * 24));
+    
+    if (daysDiff === 1) {
+      currentStreak++;
+      maxStreak = Math.max(maxStreak, currentStreak);
+    } else if (daysDiff > 1) {
+      currentStreak = 1;
+    }
+  }
   
   return {
     entryCount,
-    streak
+    streak: Math.min(currentStreak, 7), // Limit streak to a max of 7 for display
+    maxStreak
   };
 };
 

@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity } from 'lucide-react';
+import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import Navbar from '@/components/Navbar';
 import EmotionChart from '@/components/EmotionChart';
@@ -257,15 +257,19 @@ export default function Insights() {
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">Journal Activity</h2>
-                  {insightsData.journalActivity.streak > 0 && (
+                  {insightsData.journalActivity.maxStreak > 0 && (
                     <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded-full text-xs font-medium">
-                      {insightsData.journalActivity.streak} day streak
+                      Max streak: {insightsData.journalActivity.maxStreak} {timeRange === 'today' ? 'entries' : 'days'}
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="h-16 w-16 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                    <Activity className="h-8 w-8 text-purple-600 dark:text-purple-300" />
+                    {insightsData.journalActivity.streak > 0 ? (
+                      <Award className="h-8 w-8 text-purple-600 dark:text-purple-300" />
+                    ) : (
+                      <Activity className="h-8 w-8 text-purple-600 dark:text-purple-300" />
+                    )}
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold">{insightsData.journalActivity.entryCount} entries</h3>
