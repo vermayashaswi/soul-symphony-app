@@ -12,6 +12,7 @@ import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
+import { AnimatedPrompt } from '@/components/voice-recorder/AnimatedPrompt';
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
 
 interface VoiceRecorderProps {
@@ -34,7 +35,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const savingInProgressRef = useRef(false);
   const domClearAttemptedRef = useRef(false);
   const { user } = useAuth();
-  const isMobile = useIsMobile();
+  const { isMobile } = useIsMobile();
   
   const {
     isRecording,
@@ -301,6 +302,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     });
   };
 
+  // Determine if we should show the animated prompt
+  const shouldShowPrompt = !isRecording && !audioBlob;
+
   return (
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
       <audio ref={audioRef} className="hidden" />
@@ -316,6 +320,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         )}
         
         <div className="relative z-10 flex flex-col items-center justify-start w-full h-full pt-20">
+          {/* Add the animated prompt here */}
+          <AnimatedPrompt show={shouldShowPrompt} />
+          
           <div className="relative z-10 flex justify-center items-center mt-40">
             <RecordingButton
               isRecording={isRecording}
