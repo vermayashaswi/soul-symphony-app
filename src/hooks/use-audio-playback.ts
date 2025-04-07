@@ -15,7 +15,6 @@ export function useAudioPlayback({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
-  const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressIntervalRef = useRef<number | null>(null);
 
@@ -26,7 +25,6 @@ export function useAudioPlayback({
     }
     setIsPlaying(false);
     setPlaybackProgress(0);
-    setCurrentPlaybackTime(0);
   };
 
   const togglePlayback = () => {
@@ -78,7 +76,6 @@ export function useAudioPlayback({
               if (audioRef.current) {
                 const progress = audioRef.current.currentTime / (audioRef.current.duration || 1);
                 setPlaybackProgress(progress);
-                setCurrentPlaybackTime(audioRef.current.currentTime);
               }
             }, 16); // ~60fps for smoother progress updates
           })
@@ -111,7 +108,6 @@ export function useAudioPlayback({
     const newTime = position * audioDuration;
     audioRef.current.currentTime = newTime;
     setPlaybackProgress(position);
-    setCurrentPlaybackTime(newTime);
     
     // Fix for iOS where seeking doesn't update time immediately
     if (isPlaying && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
@@ -190,7 +186,6 @@ export function useAudioPlayback({
     const handleEnded = () => {
       setIsPlaying(false);
       setPlaybackProgress(0);
-      setCurrentPlaybackTime(0);
       if (onPlaybackEnd) onPlaybackEnd();
       if (progressIntervalRef.current) {
         window.clearInterval(progressIntervalRef.current);
@@ -239,7 +234,6 @@ export function useAudioPlayback({
     isPlaying,
     playbackProgress,
     audioDuration,
-    currentPlaybackTime,
     togglePlayback,
     audioRef,
     reset,

@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 interface UseRecordRTCRecorderOptions {
   noiseReduction?: boolean;
   maxDuration?: number;
-  onAudioLevelChange?: (level: number) => void;
 }
 
 interface UseRecordRTCRecorderReturn {
@@ -23,8 +22,7 @@ interface UseRecordRTCRecorderReturn {
 
 export function useRecordRTCRecorder({ 
   noiseReduction = false,
-  maxDuration = 300,
-  onAudioLevelChange
+  maxDuration = 300
 }: UseRecordRTCRecorderOptions = {}): UseRecordRTCRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -142,17 +140,9 @@ export function useRecordRTCRecorder({
             sum += dataArray[i];
           }
           const avg = sum / dataArray.length;
-          const scaledLevel = Math.min(100, Math.max(0, avg * 2.5));
+          const scaledLevel = Math.min(100, Math.max(0, avg * 2.0));
           
           setAudioLevel(scaledLevel);
-          
-          if (onAudioLevelChange) {
-            onAudioLevelChange(scaledLevel);
-          }
-          
-          if (Date.now() % 2000 < 100) {
-            console.log(`[useRecordRTCRecorder] Audio level: ${scaledLevel.toFixed(2)}`);
-          }
           
           if (isRecording) {
             if (scaledLevel > 15) {
@@ -163,7 +153,7 @@ export function useRecordRTCRecorder({
             }
           }
         }
-      }, 50);
+      }, 100);
       
       return audioContext;
     } catch (error) {

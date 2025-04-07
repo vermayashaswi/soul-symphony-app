@@ -24,7 +24,7 @@ interface ChatMessageProps {
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis }) => {
-  const { isMobile } = useIsMobile();
+  const isMobile = useIsMobile();
   const [showReferences, setShowReferences] = useState(false);
   const { user } = useAuth();
   

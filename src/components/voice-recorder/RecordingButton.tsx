@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Square } from 'lucide-react';
@@ -13,7 +12,6 @@ interface RecordingButtonProps {
   onPermissionRequest: () => void;
   audioLevel?: number;
   showAnimation?: boolean;
-  disabled?: boolean;
 }
 
 export function RecordingButton({
@@ -24,8 +22,7 @@ export function RecordingButton({
   onRecordingStop,
   onPermissionRequest,
   audioLevel = 0,
-  showAnimation = true,
-  disabled = false
+  showAnimation = true
 }: RecordingButtonProps) {
   if (hasPermission === false) {
     return (
@@ -44,7 +41,7 @@ export function RecordingButton({
   
   // Get button color based on state
   const getButtonColor = () => {
-    if (isProcessing || disabled) return "bg-gray-400 border-gray-500";
+    if (isProcessing) return "bg-gray-400 border-gray-500";
     if (!isRecording) return "bg-theme-color hover:bg-theme-color/90 border-theme-color/20";
     return "bg-red-500 border-red-600";
   };
@@ -53,11 +50,11 @@ export function RecordingButton({
     <div className="relative flex items-center justify-center">
       <motion.button
         onClick={isRecording ? onRecordingStop : onRecordingStart}
-        disabled={isProcessing || disabled}
+        disabled={isProcessing}
         className={cn(
           "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
           getButtonColor(),
-          isRecording ? "w-20 h-20" : isProcessing || disabled ? "w-20 h-20 opacity-50 cursor-not-allowed" : "w-20 h-20",
+          isRecording ? "w-20 h-20" : isProcessing ? "w-20 h-20 opacity-50 cursor-not-allowed" : "w-20 h-20",
         )}
         style={{
           boxShadow: isRecording ? `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.8)` : undefined

@@ -22,50 +22,10 @@ const fixViewportHeight = () => {
     // Slight delay to ensure viewport has updated after orientation change
     setTimeout(setVhProperty, 100);
   });
-  
-  // Also update on scroll for iOS Safari
-  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-    window.addEventListener('scroll', () => {
-      // Debounce for performance
-      if (!window.__setVhTimeout) {
-        window.__setVhTimeout = setTimeout(() => {
-          setVhProperty();
-          window.__setVhTimeout = null;
-        }, 50);
-      }
-    });
-  }
 };
 
-// Detect if running as standalone PWA on iOS
-const detectPWA = () => {
-  // For iOS
-  const isIOSPWA = window.navigator.standalone === true;
-  
-  // For Android Chrome
-  const isAndroidPWA = window.matchMedia('(display-mode: standalone)').matches;
-  
-  if (isIOSPWA || isAndroidPWA) {
-    document.documentElement.classList.add('is-pwa');
-    console.log('Running as PWA');
-  }
-};
-
-// Call fixes on page load
+// Call the fix on page load
 fixViewportHeight();
-detectPWA();
-
-// Extend Window interface
-declare global {
-  interface Window {
-    __setVhTimeout: any;
-  }
-  
-  // Add standalone property to Navigator interface
-  interface Navigator {
-    standalone?: boolean;
-  }
-}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
