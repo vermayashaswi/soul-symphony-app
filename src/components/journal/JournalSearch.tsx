@@ -5,7 +5,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
-import DateRangeFilter from './DateRangeFilter';
 
 interface JournalSearchProps {
   entries: JournalEntry[];
@@ -32,8 +31,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [dateFilteredEntries, setDateFilteredEntries] = useState<JournalEntry[]>([]);
-  const [isDateFilterActive, setIsDateFilterActive] = useState(false);
+  const totalEntriesCount = entries.length;
 
   // Set up the animation for the placeholder text
   useEffect(() => {
@@ -48,19 +46,16 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     return () => clearInterval(interval);
   }, []);
 
-  // Handle search functionality with date filter integration
+  // Handle search functionality
   useEffect(() => {
-    // Base data to filter from
-    const dataToFilter = isDateFilterActive ? dateFilteredEntries : entries;
-    
-    // When search query is empty, use the date filtered results or all entries
+    // When search query is empty, use all entries
     if (!searchQuery.trim()) {
-      setFilteredEntries(dataToFilter);
-      onSearchResults(dataToFilter);
+      setFilteredEntries(entries);
+      onSearchResults(entries);
       return;
     }
 
-    const filtered = dataToFilter.filter(entry => {
+    const filtered = entries.filter(entry => {
       const content = (entry.content || '').toLowerCase();
       const query = searchQuery.toLowerCase();
       
@@ -111,7 +106,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
 
     setFilteredEntries(filtered);
     onSearchResults(filtered); // Pass filtered entries back to parent
-  }, [searchQuery, entries, onSearchResults, isDateFilterActive, dateFilteredEntries]);
+  }, [searchQuery, entries, onSearchResults]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -122,51 +117,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     onSelectEntry(entry);
   };
 
-  // Handle date filter change
-  const handleDateFilterChange = (filteredByDate: JournalEntry[]) => {
-    setDateFilteredEntries(filteredByDate);
-    
-    // If there's an active search, apply it to the date-filtered results
-    if (searchQuery.trim()) {
-      const searchFiltered = filteredByDate.filter(entry => {
-        const content = (entry.content || '').toLowerCase();
-        const query = searchQuery.toLowerCase();
-        return content.includes(query);
-      });
-      
-      setFilteredEntries(searchFiltered);
-      onSearchResults(searchFiltered);
-    } else {
-      // If no search, just use the date-filtered results
-      setFilteredEntries(filteredByDate);
-      onSearchResults(filteredByDate);
-    }
-  };
-
-  // Handle date filter active state
-  const handleDateFilterActive = (isActive: boolean) => {
-    setIsDateFilterActive(isActive);
-    if (!isActive) {
-      // Reset to just search results when date filter is cleared
-      if (searchQuery.trim()) {
-        const searchFiltered = entries.filter(entry => {
-          const content = (entry.content || '').toLowerCase();
-          const query = searchQuery.toLowerCase();
-          return content.includes(query);
-        });
-        
-        setFilteredEntries(searchFiltered);
-        onSearchResults(searchFiltered);
-      } else {
-        // No search, no date filter, show all entries
-        setFilteredEntries(entries);
-        onSearchResults(entries);
-      }
-    }
-  };
-
-  const totalEntriesCount = entries.length;
-  const displayedCount = isDateFilterActive || searchQuery.trim() ? filteredEntries.length : entries.length;
+  const displayedCount = searchQuery.trim() ? filteredEntries.length : entries.length;
 
   return (
     <Card className="w-full sticky top-0 z-10 bg-background shadow-sm">
@@ -185,18 +136,12 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <DateRangeFilter 
-              entries={entries}
-              onFilterChange={handleDateFilterChange}
-              onFilterActive={handleDateFilterActive}
-            />
-            
             <div className="text-sm text-muted-foreground ml-auto">
               {totalEntriesCount} total {totalEntriesCount === 1 ? 'entry' : 'entries'}
             </div>
           </div>
 
-          {(searchQuery.trim() || isDateFilterActive) && (
+          {searchQuery.trim() && (
             <div className="pt-2">
               {displayedCount > 0 ? (
                 <Badge variant="secondary" className="mb-2">
