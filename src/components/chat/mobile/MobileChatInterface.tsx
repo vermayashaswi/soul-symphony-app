@@ -29,7 +29,7 @@ type ChatMessageFromDB = {
   created_at: string;
   id: string;
   reference_entries: Json | null;
-  analysis_data?: Json | null;  // Make analysis_data optional to match DB structure
+  analysis_data?: Json | null;
   has_numeric_result?: boolean;
   sender: string;
   thread_id: string;
@@ -137,11 +137,14 @@ export default function MobileChatInterface({
       
       if (data && data.length > 0) {
         const formattedMessages = data.map((msg: ChatMessageFromDB) => {
+          // Create the base message structure
           const uiMessage: UIChatMessage = {
+            // Fix: Ensure sender field is correctly mapped to 'user' or 'assistant'
             role: msg.sender === 'user' ? 'user' : 'assistant',
             content: msg.content
           };
           
+          // Add optional fields if they exist
           if (msg.reference_entries) {
             uiMessage.references = Array.isArray(msg.reference_entries) 
               ? msg.reference_entries 
@@ -160,6 +163,13 @@ export default function MobileChatInterface({
           
           return uiMessage;
         });
+        
+        // Log all messages for debugging purposes
+        console.log("[Mobile] Formatted messages:", formattedMessages.map(m => ({ 
+          role: m.role, 
+          content: m.content.substring(0, 20) + "...",
+          hasRefs: !!m.references 
+        })));
         
         setMessages(formattedMessages);
         setShowSuggestions(false);

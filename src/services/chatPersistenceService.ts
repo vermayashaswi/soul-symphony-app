@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -56,6 +57,7 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       throw error;
     }
     
+    // Fixed: Ensure proper typing of sender as either 'user' or 'assistant'
     return (data || []).map(msg => {
       const typedMessage: ChatMessage = {
         id: msg.id,
@@ -85,6 +87,12 @@ export const saveMessage = async (
   hasNumericResult?: boolean
 ): Promise<ChatMessage | null> => {
   try {
+    // Validate sender type - ensure it's exactly 'user' or 'assistant'
+    if (sender !== 'user' && sender !== 'assistant') {
+      console.error("Invalid sender type:", sender);
+      throw new Error("Invalid sender type. Must be 'user' or 'assistant'");
+    }
+
     const { data, error } = await supabase
       .from('chat_messages')
       .insert({

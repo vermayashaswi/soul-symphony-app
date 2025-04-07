@@ -128,7 +128,7 @@ export default function SmartChatInterface() {
     if (!threadId || !user?.id) return;
     
     try {
-      console.log(`Loading messages for thread ${threadId}`);
+      console.log(`[Desktop] Loading messages for thread ${threadId}`);
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
@@ -136,11 +136,11 @@ export default function SmartChatInterface() {
         .order('created_at', { ascending: true });
         
       if (error) {
-        console.error("Error loading messages:", error);
+        console.error("[Desktop] Error loading messages:", error);
         throw error;
       }
       
-      console.log(`Found ${data?.length || 0} messages for thread`);
+      console.log(`[Desktop] Found ${data?.length || 0} messages for thread`);
       
       if (data && data.length > 0) {
         const formattedMessages = data.map((msg: DbChatMessage) => {
@@ -168,16 +168,24 @@ export default function SmartChatInterface() {
           return uiMessage;
         });
         
+        console.log("[Desktop] Message roles after formatting:", 
+          formattedMessages.map(m => ({ 
+            role: m.role, 
+            content: m.content.substring(0, 20) + "...",
+            hasRefs: !!m.references
+          }))
+        );
+        
         setChatHistory(formattedMessages);
         setShowSuggestions(false);
-        console.log("Chat history updated with", formattedMessages.length, "messages");
+        console.log("[Desktop] Chat history updated with", formattedMessages.length, "messages");
       } else {
         setChatHistory([]);
         setShowSuggestions(true);
-        console.log("No messages found, showing suggestions");
+        console.log("[Desktop] No messages found, showing suggestions");
       }
     } catch (error) {
-      console.error("Error loading messages:", error);
+      console.error("[Desktop] Error loading messages:", error);
       toast({
         title: "Error loading messages",
         description: "Could not load conversation history.",
