@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
@@ -54,7 +55,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
       
       <div
         className={cn(
-          "max-w-[85%] md:max-w-[75%] rounded-2xl p-4 text-sm md:text-base shadow-sm overflow-hidden",
+          "max-w-[85%] md:max-w-[75%] rounded-2xl p-4 text-sm md:text-base shadow-sm overflow-hidden relative",
           message.role === 'user' 
             ? 'bg-primary text-primary-foreground rounded-tr-none' 
             : 'bg-muted/60 border border-border/50 rounded-tl-none'
@@ -87,7 +88,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
         {showAnalysis && message.role === 'assistant' && message.diagnostics && renderDiagnostics(message.diagnostics, isMobile)}
         
         {message.role === 'assistant' && message.references && message.references.length > 0 && (
-          <div className="mt-3">
+          <div className="mt-2 pb-1">
             <Button
               variant="ghost"
               size="sm"
