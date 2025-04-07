@@ -1,13 +1,15 @@
+
 // utils/audio-processing.ts
 
-import { supabase } from '@/supabaseClient';
+import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
-import { getStorageBucket } from '@/services/storageService';
-import { analyzeJournalEntry } from './ai-processing';
 import { formatTime } from './format-time';
 
+// Default bucket name since we don't have the storage service
+const DEFAULT_BUCKET = 'journal-audio';
+
 export const uploadAudio = async (audioBlob: Blob, userId: string): Promise<string | null> => {
-  const bucketName = getStorageBucket();
+  const bucketName = DEFAULT_BUCKET;
   const filename = `${uuidv4()}.webm`;
   const filePath = `audio/${userId}/${filename}`;
 
@@ -54,7 +56,7 @@ export const processRecording = async (audioBlob: Blob, userId: string): Promise
           duration: audioDuration
         }
       ])
-      .select()
+      .select();
 
     if (insertError) {
       console.error('Error inserting journal entry:', insertError);
@@ -69,12 +71,8 @@ export const processRecording = async (audioBlob: Blob, userId: string): Promise
     const newEntry = insertData[0];
     console.log('Journal entry saved successfully:', newEntry);
 
-    const { success: aiSuccess, error: aiError } = await analyzeJournalEntry(newEntry.id);
-
-    if (!aiSuccess) {
-      console.error('AI analysis failed:', aiError);
-      return { success: true, tempId };
-    }
+    // Note: We've removed the AI analysis part since we don't have the module
+    // In a real application, you would implement this functionality or use a different approach
 
     return { success: true, tempId };
   } catch (error) {

@@ -14,6 +14,7 @@ import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { RecordingVisualizer } from '@/components/voice-recorder/RecordingVisualizer';
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
+import { processRecording } from '@/utils/audio-processing';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -309,32 +310,29 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         console.log(`[VoiceRecorder] Recording not played yet, estimating duration as ${estimatedDuration}s`);
       }
       
-      if (onRecordingComplete) {
-        try {
-          console.log('[VoiceRecorder] Calling recording completion callback');
-          saveCompleteRef.current = false;
-          
-          const tempId = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-          
-          await onRecordingComplete(normalizedBlob, tempId);
-          
-          saveCompleteRef.current = true;
-          savingInProgressRef.current = false;
-          
-          console.log('[VoiceRecorder] Recording callback completed successfully');
-        } catch (error: any) {
-          console.error('[VoiceRecorder] Error in recording callback:', error);
-          setRecordingError(error?.message || "An unexpected error occurred");
-          
-          setTimeout(() => {
-            toast.error("Error saving recording", {
-              id: 'error-toast',
-              duration: 3000
-            });
-          }, 300);
-          
+      if (user && user.id) {
+        const { success, tempId, error } = await processRecording(normalizedBlob, user.id);
+        
+        if (!success) {
+          console.error('[VoiceRecorder] Error processing recording:', error);
+          setRecordingError(error || "Failed to process recording");
           setIsProcessing(false);
           setHasSaved(false);
+          savingInProgressRef.current = false;
+          return;
+        }
+        
+        if (onRecordingComplete) {
+          onRecordingComplete(normalizedBlob, tempId);
+        }
+        
+        saveCompleteRef.current = true;
+        savingInProgressRef.current = false;
+      } else {
+        if (onRecordingComplete) {
+          const tempId = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+          onRecordingComplete(normalizedBlob, tempId);
+          saveCompleteRef.current = true;
           savingInProgressRef.current = false;
         }
       }
@@ -417,7 +415,20 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                 audioLevel={isPlaying ? playbackAudioLevel : audioLevel}
                 height={80}
                 color="primary"
-                ripples={isPlaying ? localRipples : ripples}
+                ripples={localRipples}
+              />
+            </div>
+          )}
+          
+          {isRecording && (
+            <div className="absolute top-1/3 left-0 right-0 z-0 w-full">
+              <RecordingVisualizer 
+                isRecording={true}
+                isPlaying={false}
+                audioLevel={audioLevel}
+                height={80}
+                color="primary"
+                ripples={ripples}
               />
             </div>
           )}
