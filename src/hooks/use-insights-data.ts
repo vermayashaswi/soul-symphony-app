@@ -327,12 +327,7 @@ const calculateJournalActivity = (entries: any[], timeRange: TimeRange): Journal
   // Get entry count
   const entryCount = entries.length;
   
-  // Sort entries by date (oldest first) for streak calculation
-  const sortedEntries = [...entries].sort((a, b) => 
-    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
-  
-  // For 'today' timeframe, we count entries instead of days
+  // For 'today' timeframe, we're tracking individual entries instead of day streaks
   if (timeRange === 'today') {
     return {
       entryCount,
@@ -341,7 +336,12 @@ const calculateJournalActivity = (entries: any[], timeRange: TimeRange): Journal
     };
   }
   
-  // For other timeframes, calculate day streaks
+  // Sort entries by date (oldest first) for streak calculation
+  const sortedEntries = [...entries].sort((a, b) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  
+  // Group entries by date
   const dateMap = new Map<string, number>();
   
   // Count entries per day
@@ -357,7 +357,7 @@ const calculateJournalActivity = (entries: any[], timeRange: TimeRange): Journal
     return { entryCount: 0, streak: 0, maxStreak: 0 };
   }
   
-  // Calculate current streak (consecutive days)
+  // Calculate current streak and max streak (consecutive days)
   let currentStreak = 1;
   let maxStreak = 1;
   

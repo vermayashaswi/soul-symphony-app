@@ -56,7 +56,7 @@ export default function Settings() {
   const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { user, signOut } = useAuth();
-  const [streakDays, setStreakDays] = useState(0);
+  const [maxStreak, setMaxStreak] = useState(0);
   const { entries } = useJournalEntries(user?.id, 0, !!user);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -100,13 +100,10 @@ export default function Settings() {
   }, [theme, colorTheme, customColor, systemTheme]);
 
   useEffect(() => {
-    const calculateStreak = async () => {
+    const calculateMaxStreak = async () => {
       if (user?.id) {
         try {
           logAPI('Fetching journal entries for streak calculation', 'Settings', { userId: user.id });
-          
-          const yesterday = startOfDay(subDays(new Date(), 1));
-          logInfo(`Calculating streak up to: ${yesterday.toISOString()}`, 'Settings');
           
           const { data, error } = await supabase
             .from('Journal Entries')
@@ -122,66 +119,58 @@ export default function Settings() {
           
           if (!data || data.length === 0) {
             logInfo("No journal entries found for streak calculation", 'Settings');
-            setStreakDays(0);
+            setMaxStreak(0);
             return;
           }
           
-          const eligibleEntries = data.filter(entry => {
-            const entryDate = new Date(entry.created_at);
-            return entryDate <= yesterday;
-          });
-          
-          if (eligibleEntries.length === 0) {
-            logInfo("No eligible entries for streak calculation (all entries are from today)", 'Settings');
-            setStreakDays(0);
-            return;
-          }
-          
-          eligibleEntries.sort((a, b) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          const sortedEntries = [...data].sort((a, b) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           );
           
-          let streak = 1;
-          let currentDate = startOfDay(new Date(eligibleEntries[0].created_at));
+          const entriesByDate = sortedEntries.reduce((acc, entry) => {
+            const dateKey = startOfDay(new Date(entry.created_at)).toISOString();
+            if (!acc[dateKey]) {
+              acc[dateKey] = [];
+            }
+            acc[dateKey].push(entry);
+            return acc;
+          }, {} as Record<string, any[]>);
           
-          if (currentDate.getTime() !== yesterday.getTime()) {
-            logInfo(`Most recent entry (${currentDate.toISOString()}) is not from yesterday (${yesterday.toISOString()}), streak is 0`, 'Settings');
-            setStreakDays(0);
-            return;
-          }
+          const dates = Object.keys(entriesByDate).sort();
           
-          for (let i = 1; i < eligibleEntries.length; i++) {
-            const entryDate = startOfDay(new Date(eligibleEntries[i].created_at));
+          let currentStreak = 1;
+          let maxStreak = 1;
+          
+          for (let i = 1; i < dates.length; i++) {
+            const currentDate = new Date(dates[i]);
+            const prevDate = new Date(dates[i-1]);
             
-            const timeDiff = currentDate.getTime() - entryDate.getTime();
-            const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
+            const timeDiff = currentDate.getTime() - prevDate.getTime();
+            const daysDiff = Math.round(timeDiff / (1000 * 3600 * 24));
             
             if (daysDiff === 1) {
-              streak++;
-              currentDate = entryDate;
-            } else if (daysDiff === 0) {
-              currentDate = entryDate;
+              currentStreak++;
+              maxStreak = Math.max(maxStreak, currentStreak);
             } else {
-              break;
+              currentStreak = 1;
             }
           }
           
-          logInfo(`Streak calculation complete: ${streak} days`, 'Settings', { 
-            streak,
-            yesterday: yesterday.toISOString(),
-            mostRecentEntryDate: new Date(eligibleEntries[0].created_at).toISOString()
+          logInfo(`Max streak calculation complete: ${maxStreak} days`, 'Settings', { 
+            maxStreak,
+            totalDatesWithEntries: dates.length
           });
           
-          setStreakDays(streak);
+          setMaxStreak(maxStreak);
         } catch (error) {
-          logError("Error calculating streak", 'Settings', error);
-          console.error("Error calculating streak:", error);
+          logError("Error calculating max streak", 'Settings', error);
+          console.error("Error calculating max streak:", error);
         }
       }
     };
     
-    logInfo('Starting streak calculation', 'Settings');
-    calculateStreak();
+    logInfo('Starting max streak calculation', 'Settings');
+    calculateMaxStreak();
   }, [user, entries]);
 
   useEffect(() => {
@@ -313,8 +302,8 @@ export default function Settings() {
                     <p className="text-xl font-medium text-foreground">{entries.length}</p>
                   </div>
                   <div className="bg-secondary rounded-lg p-3">
-                    <p className="text-muted-foreground text-sm">Current Streak</p>
-                    <p className="text-xl font-medium text-foreground">{streakDays} days</p>
+                    <p className="text-muted-foreground text-sm">Max Streak</p>
+                    <p className="text-xl font-medium text-foreground">{maxStreak} days</p>
                   </div>
                 </div>
                 
