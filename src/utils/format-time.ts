@@ -11,7 +11,7 @@ export const formatRelativeTime = (timestamp: string | number | Date): string =>
 
   const diffInMinutes = Math.floor(diffInSeconds / 60);
   if (diffInMinutes < 60) {
-    return 'just now'; // Changed to show "just now" for entries within the last hour
+    return 'just now'; // Show "just now" for entries within the last hour
   }
 
   const diffInHours = Math.floor(diffInMinutes / 60);

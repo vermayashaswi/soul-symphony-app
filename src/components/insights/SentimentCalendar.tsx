@@ -135,9 +135,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const dailySentiment = React.useMemo(() => {
     const sentimentMap = new Map<string, { total: number, count: number }>();
     
-    const dataToProcess = allSentimentData;
-    
-    dataToProcess.forEach(item => {
+    allSentimentData.forEach(item => {
       const dateKey = format(item.date, 'yyyy-MM-dd');
       if (!sentimentMap.has(dateKey)) {
         sentimentMap.set(dateKey, { total: 0, count: 0 });
@@ -235,7 +233,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     if (timeRange === 'year') {
       const monthlyData = new Map<number, { total: number, count: number }>();
       
-      filteredData.forEach(item => {
+      allSentimentData.forEach(item => {
         const month = item.date.getMonth();
         if (!monthlyData.has(month)) {
           monthlyData.set(month, { total: 0, count: 0 });
@@ -257,7 +255,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     }
     
     return [];
-  }, [filteredData, timeRange, dailySentiment]);
+  }, [filteredData, timeRange, dailySentiment, allSentimentData]);
 
   const renderTodayView = () => {
     const today = new Date();
