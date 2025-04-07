@@ -77,23 +77,23 @@ export default function MobileChatInterface({
   const suggestionQuestions = [
     {
       text: "What are the top 3 reasons that make me happy?",
-      icon: <Lightbulb className="h-4 w-4 mr-1" />
+      icon: <Lightbulb className="h-4 w-4 flex-shrink-0 mr-1" />
     },
     {
       text: "What time of the day do i usually journal?",
-      icon: <Search className="h-4 w-4 mr-1" />
+      icon: <Search className="h-4 w-4 flex-shrink-0 mr-1" />
     },
     {
       text: "Top 3 issues in my life?",
-      icon: <BarChart2 className="h-4 w-4 mr-1" />
+      icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-1" />
     },
     {
       text: "Suggest me ways to improve my negative traits.",
-      icon: <Brain className="h-4 w-4 mr-1" />
+      icon: <Brain className="h-4 w-4 flex-shrink-0 mr-1" />
     },
     {
       text: "Rate my top 3 emotions out of 10 for each of them.",
-      icon: <BarChart2 className="h-4 w-4 mr-1" />
+      icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-1" />
     }
   ];
   const { toast } = useToast();
@@ -562,8 +562,10 @@ export default function MobileChatInterface({
                       className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted"
                       onClick={() => handleSendMessage(question.text)}
                     >
-                      {question.icon}
-                      <span>{question.text}</span>
+                      <div className="flex gap-1 items-start">
+                        <span className="mt-0.5">{question.icon}</span>
+                        <span className="break-words">{question.text}</span>
+                      </div>
                     </Button>
                   ))}
                 </motion.div>

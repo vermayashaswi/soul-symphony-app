@@ -1,9 +1,33 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const EmptyChatState: React.FC = () => {
+  const suggestionQuestions = [
+    {
+      text: "What are the top 3 reasons that make me happy?",
+      icon: <Lightbulb className="h-4 w-4 flex-shrink-0" />
+    },
+    {
+      text: "What time of the day do i usually journal?",
+      icon: <Search className="h-4 w-4 flex-shrink-0" />
+    },
+    {
+      text: "Top 3 issues in my life?",
+      icon: <BarChart2 className="h-4 w-4 flex-shrink-0" />
+    },
+    {
+      text: "Suggest me ways to improve my negative traits.",
+      icon: <Brain className="h-4 w-4 flex-shrink-0" />
+    },
+    {
+      text: "Rate my top 3 emotions out of 10 for each of them.",
+      icon: <BarChart2 className="h-4 w-4 flex-shrink-0" />
+    }
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -22,11 +46,13 @@ const EmptyChatState: React.FC = () => {
       
       <div className="mt-6 text-sm text-muted-foreground/70">
         <p>Try questions like:</p>
-        <ul className="mt-1">
-          <li>"How did I feel last week?"</li>
-          <li>"What makes me happy?"</li>
-          <li>"Which entries mention work stress?"</li>
-          <li>"Show me my emotional trends"</li>
+        <ul className="mt-2 space-y-2">
+          {suggestionQuestions.map((question, index) => (
+            <li key={index} className="flex items-start gap-1 text-left">
+              <span className="mt-0.5">{question.icon}</span>
+              <span>{question.text}</span>
+            </li>
+          ))}
         </ul>
       </div>
     </motion.div>

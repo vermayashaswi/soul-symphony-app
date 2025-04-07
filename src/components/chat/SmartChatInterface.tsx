@@ -81,23 +81,23 @@ export default function SmartChatInterface() {
   const demoQuestions = [
     {
       text: "What are the top 3 reasons that make me happy?",
-      icon: <Lightbulb className="h-4 w-4 mr-2" />
+      icon: <Lightbulb className="h-4 w-4 flex-shrink-0 mr-2" />
     },
     {
       text: "What time of the day do i usually journal?",
-      icon: <Search className="h-4 w-4 mr-2" />
+      icon: <Search className="h-4 w-4 flex-shrink-0 mr-2" />
     },
     {
       text: "Top 3 issues in my life?",
-      icon: <Brain className="h-4 w-4 mr-2" />
+      icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
     },
     {
       text: "Suggest me ways to improve my negative traits.",
-      icon: <Brain className="h-4 w-4 mr-2" />
+      icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
     },
     {
       text: "Rate my top 3 emotions out of 10 for each of them.",
-      icon: <BarChart2 className="h-4 w-4 mr-2" />
+      icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-2" />
     }
   ];
 
@@ -622,11 +622,13 @@ export default function SmartChatInterface() {
                       key={index}
                       variant="outline"
                       size="default"
-                      className="px-4 py-3 h-auto flex items-center justify-start text-left bg-muted/50 hover:bg-muted"
+                      className="px-4 py-3 h-auto flex items-start text-left bg-muted/50 hover:bg-muted"
                       onClick={() => handleSendMessage(question.text)}
                     >
-                      {question.icon}
-                      <span>{question.text}</span>
+                      <div className="flex gap-2 items-start">
+                        <span className="mt-0.5">{question.icon}</span>
+                        <span className="break-words">{question.text}</span>
+                      </div>
                     </Button>
                   ))}
                 </motion.div>
