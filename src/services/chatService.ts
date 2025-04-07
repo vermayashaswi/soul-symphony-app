@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export type ChatMessage = {
@@ -105,6 +106,7 @@ export const processChatMessage = async (
             query: message,
             userId,
             timeRange,
+            threadId, // Pass threadId for context
             vectorSearch: {
               matchThreshold,
               matchCount
@@ -178,7 +180,7 @@ export const processChatMessage = async (
               message: segment,
               userId,
               queryTypes: queryTypes || {},
-              threadId,
+              threadId, // Pass threadId for context
               includeDiagnostics: false,
               vectorSearch: {
                 matchThreshold,
@@ -260,7 +262,8 @@ export const processChatMessage = async (
           body: {
             originalQuery: message,
             segmentResults,
-            userId
+            userId,
+            threadId // Pass threadId for context
           }
         });
         
@@ -345,7 +348,7 @@ export const processChatMessage = async (
         message,
         userId,
         queryTypes: queryTypes || {},
-        threadId,
+        threadId, // Ensure threadId is passed for maintaining conversational context
         includeDiagnostics: enableDiagnostics,
         vectorSearch: {
           matchThreshold,

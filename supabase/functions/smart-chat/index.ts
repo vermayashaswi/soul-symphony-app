@@ -20,6 +20,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Maximum number of previous messages to include for context
+const MAX_CONTEXT_MESSAGES = 5;
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -61,7 +64,7 @@ serve(async (req) => {
     }
     
     // Normal chat processing flow
-    const { message, userId, timeRange } = reqBody;
+    const { message, userId, timeRange, threadId } = reqBody;
 
     if (!message) {
       throw new Error('Message is required');
@@ -73,6 +76,45 @@ serve(async (req) => {
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
     console.log("Time range received:", timeRange);
+    
+    // Fetch previous messages from this thread if a threadId is provided
+    let conversationContext = [];
+    if (threadId) {
+      try {
+        console.log(`Retrieving context from thread ${threadId}`);
+        const { data: previousMessages, error } = await supabase
+          .from('chat_messages')
+          .select('content, sender, created_at')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: false })
+          .limit(MAX_CONTEXT_MESSAGES * 2); // Get more messages than needed to ensure we have message pairs
+        
+        if (error) {
+          console.error('Error fetching thread context:', error);
+        } else if (previousMessages && previousMessages.length > 0) {
+          // Process messages to create conversation context
+          // We need to reverse the messages to get them in chronological order
+          const chronologicalMessages = [...previousMessages].reverse();
+          
+          // Format as conversation context
+          conversationContext = chronologicalMessages.map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          }));
+          
+          // Limit to the most recent messages to avoid context length issues
+          if (conversationContext.length > MAX_CONTEXT_MESSAGES) {
+            conversationContext = conversationContext.slice(-MAX_CONTEXT_MESSAGES);
+          }
+          
+          console.log(`Added ${conversationContext.length} previous messages as context`);
+        } else {
+          console.log("No previous messages found in thread");
+        }
+      } catch (contextError) {
+        console.error('Error processing thread context:', contextError);
+      }
+    }
     
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
@@ -180,6 +222,28 @@ Now generate your thoughtful, emotionally intelligent response:`;
 
     // 4. Call OpenAI
     console.log("Calling OpenAI for completion");
+    
+    // Prepare the messages array with system prompt and conversation context
+    const messages = [];
+    
+    // Add system prompt
+    messages.push({ role: 'system', content: prompt });
+    
+    // Add conversation context if available
+    if (conversationContext.length > 0) {
+      // Log that we're using conversation context
+      console.log(`Including ${conversationContext.length} messages of conversation context`);
+      
+      // Add the conversation context messages
+      messages.push(...conversationContext);
+      
+      // Add the current user message
+      messages.push({ role: 'user', content: message });
+    } else {
+      // If no context, just use the system prompt
+      console.log("No conversation context available, using only system prompt");
+    }
+    
     const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -188,7 +252,7 @@ Now generate your thoughtful, emotionally intelligent response:`;
       },
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
-        messages: [{ role: 'system', content: prompt }],
+        messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: prompt }],
       }),
     });
 
