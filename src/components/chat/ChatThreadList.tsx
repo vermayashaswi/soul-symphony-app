@@ -262,7 +262,7 @@ export default function ChatThreadList({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center bg-background hover:bg-accent/50 rounded-md">
+                  <div className="flex items-center bg-background hover:bg-accent/50 rounded-md group relative overflow-hidden">
                     <Button
                       key={thread.id}
                       variant="ghost"
@@ -283,7 +283,7 @@ export default function ChatThreadList({
                       </div>
                     </Button>
                     
-                    <div className="flex items-center pr-1 chat-thread-buttons opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center pr-1 chat-thread-buttons">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -293,6 +293,7 @@ export default function ChatThreadList({
                           startEditingThread(thread);
                         }}
                         title="Edit conversation title"
+                        aria-label="Edit conversation title"
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -306,6 +307,7 @@ export default function ChatThreadList({
                           setThreadToDelete(thread.id);
                         }}
                         title="Delete conversation"
+                        aria-label="Delete conversation"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

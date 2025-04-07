@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -72,28 +73,51 @@
   .chat-thread-list .chat-thread-buttons {
     display: flex !important;
     opacity: 1 !important;
-    background-color: rgba(0, 0, 0, 0.03);
+    background-color: rgba(255, 255, 255, 0.75);
     border-radius: 0 0.375rem 0.375rem 0;
     padding: 8px 2px;
     margin-left: auto;
     height: 100%;
+    position: relative;
+    z-index: 30;
+    box-shadow: -2px 0 4px rgba(0, 0, 0, 0.05);
   }
   
-  /* Ensure the thread buttons have adequate spacing */
+  /* Ensure the thread buttons have adequate spacing and are highly visible */
   .chat-thread-list .thread-edit-button,
   .chat-thread-list .thread-delete-button {
     margin: 0 2px !important;
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(255, 255, 255, 0.85);
     border-radius: 6px;
+    position: relative;
+    z-index: 35;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    opacity: 1 !important;
+    transition: transform 0.2s ease;
+  }
+  
+  /* Add hover/touch effect */
+  .chat-thread-list .thread-edit-button:active,
+  .chat-thread-list .thread-delete-button:active {
+    transform: scale(0.95);
   }
   
   /* Make thread buttons more touchable on mobile */
   .chat-thread-list .h-8.w-8 {
-    min-height: 36px;
-    min-width: 36px;
+    min-height: 42px;
+    min-width: 42px;
     display: flex !important;
     align-items: center;
     justify-content: center;
+  }
+  
+  /* Visual distinction between edit and delete */
+  .chat-thread-list .thread-edit-button {
+    color: hsl(var(--primary));
+  }
+  
+  .chat-thread-list .thread-delete-button {
+    color: hsl(var(--destructive));
   }
   
   /* Ensure the thread buttons are not hidden */
