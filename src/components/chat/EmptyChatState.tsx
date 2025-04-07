@@ -24,11 +24,26 @@ const EmptyChatState: React.FC = () => {
       <div className="mt-6 text-sm text-muted-foreground/70">
         <p>Try questions like:</p>
         <ul className="mt-1 space-y-1">
-          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "What were my top emotions last week?"</li>
-          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "What time of the day do I usually like journaling?"</li>
-          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "Am i am introvert? Do i like people in general?"</li>
-          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "What should i particularly do to help my mental health?"</li>
-          <li className="flex items-center"><ArrowRight className="h-3 w-3 mr-1 text-primary" /> "Rate my top 3 negative traits out of 100? What do i do to improve them?"</li>
+          <li className="flex items-start">
+            <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
+            <span className="text-left">"What were my top emotions last week?"</span>
+          </li>
+          <li className="flex items-start">
+            <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
+            <span className="text-left">"What time of the day do I usually like journaling?"</span>
+          </li>
+          <li className="flex items-start">
+            <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
+            <span className="text-left">"Am i am introvert? Do i like people in general?"</span>
+          </li>
+          <li className="flex items-start">
+            <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
+            <span className="text-left">"What should i particularly do to help my mental health?"</span>
+          </li>
+          <li className="flex items-start">
+            <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
+            <span className="text-left">"Rate my top 3 negative traits out of 100? What do i do to improve them?"</span>
+          </li>
         </ul>
       </div>
       

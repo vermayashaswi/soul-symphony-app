@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -59,23 +58,23 @@ export default function MobileChatInterface({
   const suggestionQuestions = [
     {
       text: "What were my top emotions last week?",
-      icon: <BarChart2 className="h-4 w-4 mr-1" />
+      icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-2" />
     },
     {
       text: "What time of the day do I usually like journaling?", 
-      icon: <Lightbulb className="h-4 w-4 mr-1" />
+      icon: <Lightbulb className="h-4 w-4 flex-shrink-0 mr-2" />
     },
     {
       text: "Am i am introvert? Do i like people in general?",
-      icon: <Search className="h-4 w-4 mr-1" />
+      icon: <Search className="h-4 w-4 flex-shrink-0 mr-2" />
     },
     {
       text: "What should i particularly do to help my mental health?",
-      icon: <Brain className="h-4 w-4 mr-1" />
+      icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
     },
     {
       text: "Rate my top 3 negative traits out of 100? What do i do to improve them?",
-      icon: <Brain className="h-4 w-4 mr-1" />
+      icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
     }
   ];
   const { toast } = useToast();
@@ -409,11 +408,13 @@ export default function MobileChatInterface({
                       key={index}
                       variant="outline"
                       size="sm"
-                      className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted flex-wrap"
+                      className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
                       onClick={() => handleSendMessage(question.text)}
                     >
-                      {question.icon}
-                      <span>{question.text}</span>
+                      <div className="flex items-start w-full">
+                        <span className="flex-shrink-0 mt-0.5">{question.icon}</span>
+                        <span className="ml-1 flex-grow break-words">{question.text}</span>
+                      </div>
                     </Button>
                   ))}
                 </motion.div>
