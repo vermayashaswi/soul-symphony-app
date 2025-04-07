@@ -1,3 +1,4 @@
+
 import React from "react";
 import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
@@ -42,7 +43,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       {message.role === 'assistant' && (
         <Avatar className="w-8 h-8 border border-primary/20">
           <AvatarImage 
-            src="/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png" 
+            src="/lovable-uploads/72655ba1-b64a-45bf-b7d9-a14e60827087.png" 
             alt="Roha"
             className="bg-primary/10"
             loading="eager"
