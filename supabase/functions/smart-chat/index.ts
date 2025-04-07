@@ -174,6 +174,35 @@ serve(async (req) => {
       console.log(`Saving messages to thread ${threadId}`);
       
       try {
+        // First, ensure the thread exists - create it if it doesn't
+        const { data: threadExists, error: threadCheckError } = await supabase
+          .from('chat_threads')
+          .select('id')
+          .eq('id', threadId)
+          .limit(1);
+          
+        if (threadCheckError) {
+          console.error('Error checking if thread exists:', threadCheckError);
+        }
+        
+        // Create thread if it doesn't exist
+        if (!threadExists || threadExists.length === 0) {
+          console.log(`Thread ${threadId} doesn't exist, creating it`);
+          const { error: createThreadError } = await supabase
+            .from('chat_threads')
+            .insert({
+              id: threadId,
+              user_id: userId,
+              title: "New Conversation",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+            
+          if (createThreadError) {
+            console.error('Error creating thread:', createThreadError);
+          }
+        }
+        
         // Check if user message already exists (to prevent duplicates on retries)
         const { data: existingUserMsgs, error: checkError } = await supabase
           .from('chat_messages')

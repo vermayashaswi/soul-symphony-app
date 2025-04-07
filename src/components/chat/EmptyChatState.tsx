@@ -4,7 +4,11 @@ import { motion } from "framer-motion";
 import { MessageSquare, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const EmptyChatState: React.FC = () => {
+interface EmptyChatStateProps {
+  onQuestionClick?: (question: string) => void;
+}
+
+const EmptyChatState: React.FC<EmptyChatStateProps> = ({ onQuestionClick }) => {
   const suggestionQuestions = [
     {
       text: "What are the top 3 reasons that make me happy?",
@@ -28,6 +32,12 @@ const EmptyChatState: React.FC = () => {
     }
   ];
 
+  const handleQuestionClick = (question: string) => {
+    if (onQuestionClick) {
+      onQuestionClick(question);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -48,7 +58,11 @@ const EmptyChatState: React.FC = () => {
         <p>Try questions like:</p>
         <ul className="mt-2 space-y-2 w-full">
           {suggestionQuestions.map((question, index) => (
-            <li key={index} className="flex items-start gap-2 text-left overflow-hidden break-words">
+            <li 
+              key={index} 
+              className="flex items-start gap-2 text-left overflow-hidden break-words cursor-pointer hover:bg-muted/50 p-2 rounded-md transition-colors"
+              onClick={() => handleQuestionClick(question.text)}
+            >
               <span className="mt-0.5 flex-shrink-0">{question.icon}</span>
               <span className="break-words overflow-hidden">{question.text}</span>
             </li>
