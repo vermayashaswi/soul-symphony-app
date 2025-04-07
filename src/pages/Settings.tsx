@@ -178,7 +178,7 @@ export default function Settings() {
       <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2 text-theme-color">Settings</h1>
-          <p className="text-muted-foreground">Personalize your Feelosophy experience</p>
+          <p className="text-muted-foreground">Personalize your SOuLO experience</p>
         </div>
         
         <div className="space-y-6">
