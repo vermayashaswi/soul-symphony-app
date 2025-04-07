@@ -39,13 +39,40 @@ export function PlaybackControls({
   
   // Update slider and current time based on playback progress
   useEffect(() => {
-    // Only update if user is not currently interacting with the slider
-    if (!isTouchActive) {
+    if (!isTouchActive && playbackProgress !== undefined) {
       const timeInSeconds = (playbackProgress * audioDuration);
       setCurrentTime(timeInSeconds);
       setSliderValue(playbackProgress * 100);
     }
   }, [playbackProgress, audioDuration, isTouchActive]);
+  
+  // Force update the slider position during playback with requestAnimationFrame
+  useEffect(() => {
+    let animationFrameId: number;
+    
+    if (isPlaying && !isTouchActive) {
+      const updateSlider = () => {
+        setSliderValue(prev => {
+          // Only update if there's a real change to prevent unnecessary renders
+          const newValue = playbackProgress * 100;
+          if (Math.abs(prev - newValue) > 0.1) {
+            return newValue;
+          }
+          return prev;
+        });
+        setCurrentTime(playbackProgress * audioDuration);
+        animationFrameId = requestAnimationFrame(updateSlider);
+      };
+      
+      animationFrameId = requestAnimationFrame(updateSlider);
+    }
+    
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [isPlaying, playbackProgress, audioDuration, isTouchActive]);
   
   const formattedProgress = formatTime(currentTime);
   const formattedDuration = formatTime(audioDuration);
