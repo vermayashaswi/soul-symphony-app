@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -9,7 +9,6 @@ const Chat = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [threadId, setThreadId] = useState<string | null>(null);
-  const [key, setKey] = useState<number>(0); // Add a key to force re-render when needed
 
   // Get thread from URL if present
   useEffect(() => {
@@ -32,38 +31,8 @@ const Chat = () => {
     }
   }, [user, navigate]);
 
-  // Set up a callback for handling event listeners to prevent closure issues
-  const handleForceRefresh = useCallback(() => {
-    console.log('[Chat] Force refreshing entire component');
-    // Force re-render of the entire component
-    setKey(prevKey => prevKey + 1);
-  }, []);
-
-  // Listen for various thread events to refresh the component
-  useEffect(() => {
-    const handleThreadDeleted = handleForceRefresh;
-    const handleThreadTitleUpdated = handleForceRefresh;
-    const handleDialogClosed = () => {
-      console.log('[Chat] Dialog closed event detected');
-      // Add a slight delay to ensure all UI updates happen in correct order
-      setTimeout(() => {
-        handleForceRefresh();
-      }, 100);
-    };
-    
-    window.addEventListener('threadDeleted', handleThreadDeleted as EventListener);
-    window.addEventListener('threadTitleUpdated', handleThreadTitleUpdated as EventListener);
-    window.addEventListener('dialogClosed', handleDialogClosed as EventListener);
-    
-    return () => {
-      window.removeEventListener('threadDeleted', handleThreadDeleted as EventListener);
-      window.removeEventListener('threadTitleUpdated', handleThreadTitleUpdated as EventListener);
-      window.removeEventListener('dialogClosed', handleDialogClosed as EventListener);
-    };
-  }, [handleForceRefresh]);
-
   return (
-    <div className="w-full h-full flex flex-col" key={key}>
+    <div className="w-full h-full flex flex-col">
       <SmartChatInterface />
     </div>
   );

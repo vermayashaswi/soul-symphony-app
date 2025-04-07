@@ -8,10 +8,7 @@ import {
   Brain, 
   BarChart2, 
   Search, 
-  Lightbulb, 
-  MoreVertical,
-  Pencil,
-  Trash
+  Lightbulb
 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
@@ -23,32 +20,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -113,11 +84,7 @@ export default function MobileChatInterface({
   const containerRef = useRef<HTMLDivElement>(null);
   const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [newThreadTitle, setNewThreadTitle] = useState("");
   const [currentThreadTitle, setCurrentThreadTitle] = useState("");
-  const [interfaceKey, setInterfaceKey] = useState(0);
 
   useEffect(() => {
     if (propThreadId) {
@@ -170,7 +137,6 @@ export default function MobileChatInterface({
       
       if (data) {
         setCurrentThreadTitle(data.title);
-        setNewThreadTitle(data.title);
       }
     } catch (error) {
       console.error("[Mobile] Error fetching thread title:", error);
@@ -435,119 +401,8 @@ export default function MobileChatInterface({
     return null;
   };
 
-  const handleRenameThread = async () => {
-    if (!currentThreadId || !newThreadTitle.trim()) return;
-    
-    try {
-      const { error } = await supabase
-        .from('chat_threads')
-        .update({ 
-          title: newThreadTitle,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentThreadId);
-        
-      if (error) throw error;
-      
-      setCurrentThreadTitle(newThreadTitle);
-      setIsRenameDialogOpen(false);
-      
-      // Force immediate re-render to ensure UI updates
-      setInterfaceKey(prev => prev + 1);
-      
-      // Dispatch dialog closed event to parent components
-      window.dispatchEvent(new CustomEvent('dialogClosed'));
-      
-      // Dispatch thread title updated event after a short delay
-      setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent('threadTitleUpdated', { 
-            detail: { 
-              threadId: currentThreadId, 
-              title: newThreadTitle 
-            } 
-          })
-        );
-        
-        toast({
-          title: "Thread renamed",
-          description: "The conversation has been renamed successfully.",
-        });
-      }, 50);
-    } catch (error) {
-      console.error("[Mobile] Error renaming thread:", error);
-      setIsRenameDialogOpen(false);
-      
-      // Dispatch dialog closed event even on error
-      window.dispatchEvent(new CustomEvent('dialogClosed'));
-      
-      toast({
-        title: "Error",
-        description: "Failed to rename the conversation.",
-        variant: "destructive"
-      });
-    }
-  };
-  
-  const handleDeleteThread = async () => {
-    if (!currentThreadId) return;
-    
-    try {
-      const { error: messagesError } = await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('thread_id', currentThreadId);
-        
-      if (messagesError) throw messagesError;
-      
-      const { error: threadError } = await supabase
-        .from('chat_threads')
-        .delete()
-        .eq('id', currentThreadId);
-        
-      if (threadError) throw threadError;
-      
-      setMessages([]);
-      setCurrentThreadId(null);
-      setIsDeleteDialogOpen(false);
-      setShowSuggestions(true);
-      
-      // Dispatch dialog closed event to parent components
-      window.dispatchEvent(new CustomEvent('dialogClosed'));
-      
-      // Dispatch thread deleted event after a short delay
-      setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent('threadDeleted', { 
-            detail: { threadId: currentThreadId } 
-          })
-        );
-        
-        if (onSelectThread) {
-          onSelectThread('');
-        }
-      }, 50);
-      
-      toast({
-        title: "Thread deleted",
-        description: "The conversation has been deleted successfully.",
-      });
-    } catch (error) {
-      console.error("[Mobile] Error deleting thread:", error);
-      
-      // Dispatch dialog closed event even on error
-      window.dispatchEvent(new CustomEvent('dialogClosed'));
-      
-      toast({
-        title: "Error",
-        description: "Failed to delete the conversation.",
-        variant: "destructive"
-      });
-    }
-  };
-
   return (
-    <div className="flex flex-col h-full" ref={containerRef} key={interfaceKey}>
+    <div className="flex flex-col h-full" ref={containerRef}>
       <div className="mobile-chat-header flex items-center justify-between py-2 px-3 sticky top-0 z-10 bg-background border-b">
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
@@ -576,32 +431,6 @@ export default function MobileChatInterface({
           </SheetContent>
         </Sheet>
         <h2 className="text-lg font-semibold flex-1 text-center">Roha</h2>
-        {currentThreadId && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={() => {
-                setNewThreadTitle(currentThreadTitle);
-                setIsRenameDialogOpen(true);
-              }}>
-                <Pencil className="mr-2 h-4 w-4" />
-                <span>Rename</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                className="text-destructive focus:text-destructive" 
-                onClick={() => setIsDeleteDialogOpen(true)}
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                <span>Delete</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
       </div>
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
@@ -665,90 +494,6 @@ export default function MobileChatInterface({
           userId={userId || user?.id}
         />
       </div>
-      
-      <Dialog 
-        open={isRenameDialogOpen} 
-        onOpenChange={(open) => {
-          setIsRenameDialogOpen(open);
-          if (!open) {
-            // Dispatch dialog closed event when dialog is closed by any means
-            window.dispatchEvent(new CustomEvent('dialogClosed'));
-            
-            // Force re-render
-            setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rename Conversation</DialogTitle>
-            <DialogDescription>
-              Enter a new name for this conversation
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center space-y-2">
-            <Input
-              id="name"
-              value={newThreadTitle}
-              onChange={(e) => setNewThreadTitle(e.target.value)}
-              placeholder="Conversation name"
-              className="w-full"
-              autoFocus
-            />
-          </div>
-          <DialogFooter className="sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setIsRenameDialogOpen(false);
-                // Dispatch dialog closed event
-                window.dispatchEvent(new CustomEvent('dialogClosed'));
-                setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleRenameThread}>
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog 
-        open={isDeleteDialogOpen} 
-        onOpenChange={(open) => {
-          setIsDeleteDialogOpen(open);
-          if (!open) {
-            // Dispatch dialog closed event when dialog is closed by any means
-            window.dispatchEvent(new CustomEvent('dialogClosed'));
-            
-            // Force re-render
-            setTimeout(() => setInterfaceKey(prev => prev + 1), 50);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete conversation</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this conversation and all its messages.
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setIsDeleteDialogOpen(false);
-              // Dispatch dialog closed event
-              window.dispatchEvent(new CustomEvent('dialogClosed'));
-            }}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteThread}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
