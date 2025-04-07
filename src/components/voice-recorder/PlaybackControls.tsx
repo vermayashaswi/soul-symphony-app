@@ -35,7 +35,7 @@ export function PlaybackControls({
   const [isClearingToasts, setIsClearingToasts] = useState(false);
   const [sliderValue, setSliderValue] = useState(0);
   const [isTouchActive, setIsTouchActive] = useState(false);
-  const isMobile = useIsMobile();
+  const { isMobile } = useIsMobile();
   
   // Update slider and current time based on playback progress
   useEffect(() => {

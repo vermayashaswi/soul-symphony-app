@@ -1,5 +1,5 @@
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface UseAudioPlaybackProps {
   audioBlob: Blob | null;
@@ -17,6 +17,7 @@ export function useAudioPlayback({
   const [audioDuration, setAudioDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressIntervalRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   const reset = () => {
     if (audioRef.current) {
@@ -25,7 +26,31 @@ export function useAudioPlayback({
     }
     setIsPlaying(false);
     setPlaybackProgress(0);
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    if (progressIntervalRef.current) {
+      window.clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
   };
+
+  const updateProgress = useCallback(() => {
+    if (audioRef.current && audioDuration) {
+      const currentTime = audioRef.current.currentTime;
+      const progress = currentTime / audioDuration;
+      
+      // Ensure progress is within valid range
+      const clampedProgress = Math.max(0, Math.min(1, progress));
+      setPlaybackProgress(clampedProgress);
+      
+      // Continue updating progress
+      animationFrameRef.current = requestAnimationFrame(updateProgress);
+    }
+  }, [audioDuration]);
 
   const togglePlayback = () => {
     if (!audioRef.current || !audioBlob) return;
@@ -33,6 +58,12 @@ export function useAudioPlayback({
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
+      
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      
       if (progressIntervalRef.current) {
         window.clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
@@ -67,17 +98,11 @@ export function useAudioPlayback({
             setIsPlaying(true);
             if (onPlaybackStart) onPlaybackStart();
             
-            if (progressIntervalRef.current) {
-              window.clearInterval(progressIntervalRef.current);
+            // Start updating progress with requestAnimationFrame for smoother updates
+            if (animationFrameRef.current) {
+              cancelAnimationFrame(animationFrameRef.current);
             }
-            
-            // Update progress more frequently for smoother slider movement
-            progressIntervalRef.current = window.setInterval(() => {
-              if (audioRef.current) {
-                const progress = audioRef.current.currentTime / (audioRef.current.duration || 1);
-                setPlaybackProgress(progress);
-              }
-            }, 16); // ~60fps for smoother progress updates
+            animationFrameRef.current = requestAnimationFrame(updateProgress);
           })
           .catch(err => {
             console.error('Error playing audio:', err);
@@ -88,6 +113,7 @@ export function useAudioPlayback({
                 .then(() => {
                   setIsPlaying(true);
                   if (onPlaybackStart) onPlaybackStart();
+                  animationFrameRef.current = requestAnimationFrame(updateProgress);
                   document.removeEventListener('touchend', resumeAudio);
                 })
                 .catch(innerErr => {
@@ -108,6 +134,10 @@ export function useAudioPlayback({
     const newTime = position * audioDuration;
     audioRef.current.currentTime = newTime;
     setPlaybackProgress(position);
+    
+    // Force update the playback progress display immediately
+    const currentProgress = newTime / audioDuration;
+    setPlaybackProgress(currentProgress);
     
     // Fix for iOS where seeking doesn't update time immediately
     if (isPlaying && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
@@ -187,17 +217,43 @@ export function useAudioPlayback({
       setIsPlaying(false);
       setPlaybackProgress(0);
       if (onPlaybackEnd) onPlaybackEnd();
+      
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      
       if (progressIntervalRef.current) {
         window.clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
+      
+      // Reset the playback position to the beginning
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+      }
+    };
+    
+    // Also listen for timeupdate events to ensure progress stays in sync
+    const handleTimeUpdate = () => {
+      if (audioRef.current && !isNaN(audioRef.current.duration)) {
+        const progress = audioRef.current.currentTime / audioRef.current.duration;
+        setPlaybackProgress(progress);
+      }
     };
     
     audioRef.current.addEventListener('ended', handleEnded);
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
     
     return () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('ended', handleEnded);
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+      }
+      
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
       
       if (progressIntervalRef.current) {
@@ -205,7 +261,7 @@ export function useAudioPlayback({
         progressIntervalRef.current = null;
       }
     };
-  }, [onPlaybackEnd]);
+  }, [onPlaybackEnd, isPlaying]);
 
   // Initialize or update audio source when blob changes
   useEffect(() => {
@@ -215,10 +271,7 @@ export function useAudioPlayback({
     }
     
     return () => {
-      if (progressIntervalRef.current) {
-        window.clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
+      reset();
     };
   }, [audioBlob]);
 
