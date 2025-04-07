@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -32,26 +32,28 @@ const Chat = () => {
     }
   }, [user, navigate]);
 
-  // Listen for thread deletion and title update events to refresh the component
-  useEffect(() => {
-    const handleThreadDeleted = () => {
-      // Force re-render of the entire component
-      setKey(prevKey => prevKey + 1);
-    };
-    
-    const handleThreadTitleUpdated = () => {
-      // Force re-render when thread title is updated
-      setKey(prevKey => prevKey + 1);
-    };
+  // Set up a callback for handling event listeners to prevent closure issues
+  const handleForceRefresh = useCallback(() => {
+    // Force re-render of the entire component
+    setKey(prevKey => prevKey + 1);
+  }, []);
 
+  // Listen for various thread events to refresh the component
+  useEffect(() => {
+    const handleThreadDeleted = handleForceRefresh;
+    const handleThreadTitleUpdated = handleForceRefresh;
+    const handleDialogClosed = handleForceRefresh;
+    
     window.addEventListener('threadDeleted', handleThreadDeleted as EventListener);
     window.addEventListener('threadTitleUpdated', handleThreadTitleUpdated as EventListener);
+    window.addEventListener('dialogClosed', handleDialogClosed as EventListener);
     
     return () => {
       window.removeEventListener('threadDeleted', handleThreadDeleted as EventListener);
       window.removeEventListener('threadTitleUpdated', handleThreadTitleUpdated as EventListener);
+      window.removeEventListener('dialogClosed', handleDialogClosed as EventListener);
     };
-  }, []);
+  }, [handleForceRefresh]);
 
   return (
     <div className="w-full h-full flex flex-col" key={key}>
