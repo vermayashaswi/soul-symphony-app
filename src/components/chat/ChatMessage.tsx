@@ -39,10 +39,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'} overflow-hidden`}
+      className={`flex items-start gap-3.5 ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-5`}
     >
       {message.role === 'assistant' && (
-        <Avatar className="h-10 w-10 border border-primary/20">
+        <Avatar className="h-10 w-10 mt-1 border border-primary/20">
           <AvatarImage 
             src="/lovable-uploads/72655ba1-b64a-45bf-b7d9-a14e60827087.png" 
             alt="Roha"
@@ -55,22 +55,24 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
       
       <div
         className={cn(
-          "max-w-[85%] md:max-w-[75%] rounded-3xl p-4 text-sm md:text-base shadow-sm overflow-hidden relative",
+          "max-w-[85%] md:max-w-[75%] p-4 text-base shadow-md overflow-hidden",
           message.role === 'user' 
-            ? 'bg-fuchsia-500 text-white rounded-br-none' 
-            : 'bg-gray-800 text-white rounded-tl-none border border-gray-700'
+            ? 'bg-fuchsia-500 text-white rounded-3xl rounded-br-none' 
+            : 'bg-gray-800 text-white rounded-3xl rounded-tl-none border border-gray-700'
         )}
       >
         {message.role === 'assistant' ? (
-          <ReactMarkdown className="prose dark:prose-invert prose-sm md:prose-base max-w-none break-words overflow-hidden text-white">
-            {formattedContent}
-          </ReactMarkdown>
+          <div className="prose dark:prose-invert prose-base max-w-none break-words overflow-hidden text-white">
+            <ReactMarkdown>
+              {formattedContent}
+            </ReactMarkdown>
+          </div>
         ) : (
           <p className="break-words overflow-hidden text-white">{message.content}</p>
         )}
         
         {showAnalysis && message.role === 'assistant' && message.analysis && (
-          <div className="mt-3 text-xs md:text-sm opacity-80">
+          <div className="mt-3 text-sm opacity-80">
             <Separator className="my-2" />
             <div className="font-semibold">Analysis:</div>
             <p>{message.analysis.analysis}</p>
@@ -87,20 +89,20 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
         
         {showAnalysis && message.role === 'assistant' && message.diagnostics && renderDiagnostics(message.diagnostics, isMobile)}
         
-        {message.role === 'assistant' && message.references && message.references.length > 0 && (
-          <div className="mt-2 border-t border-gray-700 pt-2">
+        {hasReferences && (
+          <div className="mt-3 pt-2 border-t border-gray-700">
             <Button
               variant="ghost"
               size="sm"
-              className="p-0 h-7 text-xs md:text-sm font-medium flex items-center gap-1 text-gray-300 hover:text-white"
+              className="p-0 h-8 flex items-center gap-1 text-white/80 hover:text-white"
               onClick={() => setShowReferences(!showReferences)}
             >
-              <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+              <FileText className="h-4 w-4 mr-1" />
               {message.references.length} journal entries
               {showReferences ? (
-                <ChevronUp className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+                <ChevronUp className="h-3 w-3 ml-1" />
               ) : (
-                <ChevronDown className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+                <ChevronDown className="h-3 w-3 ml-1" />
               )}
             </Button>
             
@@ -114,7 +116,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                 >
                   {message.references.slice(0, isMobile ? 2 : 3).map((ref, idx) => (
                     <div key={idx} className="mb-2 py-1">
-                      <div className="font-medium text-xs md:text-sm text-white/90">
+                      <div className="font-medium text-sm text-white/90">
                         {ref.date && !isNaN(new Date(ref.date).getTime())
                           ? formatShortDate(new Date(ref.date))
                           : "Unknown date"}
@@ -135,7 +137,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
       </div>
       
       {message.role === 'user' && (
-        <Avatar className="h-10 w-10 border border-fuchsia-500/20">
+        <Avatar className="h-10 w-10 mt-1 border border-fuchsia-500/20">
           <AvatarImage 
             src={user?.user_metadata?.avatar_url} 
             alt="User"

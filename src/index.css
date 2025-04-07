@@ -109,13 +109,13 @@
   --tw-ring-color: hsl(var(--theme-color));
 }
 
-/* Chat bubble styles */
+/* Chat bubble styles - Updated to match design */
 .user-message {
-  @apply bg-fuchsia-500 text-white rounded-3xl rounded-br-none;
+  @apply bg-fuchsia-500 text-white rounded-3xl rounded-br-none shadow-md;
 }
 
 .assistant-message {
-  @apply bg-gray-800 text-white rounded-3xl rounded-tl-none border border-gray-700;
+  @apply bg-gray-800 text-white rounded-3xl rounded-tl-none border border-gray-700 shadow-md;
 }
 
 /* Dark mode styling for app components */
@@ -177,4 +177,44 @@
 .loading-animation {
   animation: pulse-fuchsia 1.5s ease-in-out infinite;
   color: var(--fuchsia-primary);
+}
+
+/* Message prose styles */
+.prose h1, .prose h2, .prose h3 {
+  @apply text-white;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose p {
+  @apply text-white;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose ul, .prose ol {
+  @apply text-white pl-5;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose li {
+  @apply mb-1;
+}
+
+.prose li::marker {
+  @apply text-fuchsia-400;
+}
+
+/* Journal reference styling */
+.journal-reference {
+  @apply mt-2 pt-2 border-t border-gray-700 text-white/80;
+}
+
+.journal-reference-title {
+  @apply flex items-center gap-1 font-medium;
+}
+
+.journal-reference-content {
+  @apply text-sm text-white/70 mt-1;
 }

@@ -38,10 +38,10 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`relative flex items-start gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'} overflow-hidden`}
+      className={`relative flex items-start gap-2.5 ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
     >
       {message.role === 'assistant' && (
-        <Avatar className="w-8 h-8 border border-primary/20">
+        <Avatar className="w-9 h-9 mt-1 border border-primary/20">
           <AvatarImage 
             src="/lovable-uploads/72655ba1-b64a-45bf-b7d9-a14e60827087.png" 
             alt="Roha"
@@ -54,16 +54,18 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       
       <div
         className={cn(
-          "min-w-0 max-w-[85%] rounded-3xl p-3.5 text-sm shadow-sm overflow-hidden",
+          "min-w-0 max-w-[85%] p-4 text-sm shadow-md overflow-hidden",
           message.role === 'user' 
-            ? 'bg-fuchsia-500 text-white rounded-br-none' 
-            : 'bg-gray-800 text-white rounded-tl-none border border-gray-700'
+            ? 'bg-fuchsia-500 text-white rounded-3xl rounded-br-none' 
+            : 'bg-gray-800 text-white rounded-3xl rounded-tl-none border border-gray-700'
         )}
       >
         {message.role === 'assistant' ? (
-          <ReactMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words overflow-hidden text-white">
-            {formattedContent}
-          </ReactMarkdown>
+          <div className="prose dark:prose-invert prose-sm max-w-none break-words overflow-hidden text-white">
+            <ReactMarkdown>
+              {formattedContent}
+            </ReactMarkdown>
+          </div>
         ) : (
           <p className="break-words overflow-hidden text-white">{message.content}</p>
         )}
@@ -85,14 +87,14 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
         )}
         
         {hasReferences && (
-          <div className="mt-2 border-t border-gray-700 pt-2">
+          <div className="mt-2">
             <Button
               variant="ghost"
               size="sm"
-              className="p-0 h-6 text-xs font-medium flex items-center gap-1 text-gray-300 hover:text-white"
+              className="p-0 h-7 flex items-center gap-1 text-white/80 hover:text-white"
               onClick={() => setShowReferences(!showReferences)}
             >
-              <FileText className="h-3 w-3 mr-1" />
+              <FileText className="h-4 w-4 mr-1" />
               {message.references!.length} journal entries
               {showReferences ? (
                 <ChevronUp className="h-3 w-3 ml-1" />
@@ -132,7 +134,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       </div>
       
       {message.role === 'user' && (
-        <Avatar className="w-8 h-8 border border-fuchsia-500/20">
+        <Avatar className="w-9 h-9 mt-1 border border-fuchsia-500/20">
           <AvatarImage 
             src={user?.user_metadata?.avatar_url} 
             alt="User"
