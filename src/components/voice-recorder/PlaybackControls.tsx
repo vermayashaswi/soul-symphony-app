@@ -32,11 +32,13 @@ export function PlaybackControls({
 }: PlaybackControlsProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [isClearingToasts, setIsClearingToasts] = useState(false);
+  const [sliderValue, setSliderValue] = useState(0);
   
-  // Calculate current time based on progress and duration
+  // Update slider and current time based on playback progress
   useEffect(() => {
     const timeInSeconds = (playbackProgress * audioDuration);
     setCurrentTime(timeInSeconds);
+    setSliderValue(playbackProgress * 100);
   }, [playbackProgress, audioDuration]);
   
   const formattedProgress = formatTime(currentTime);
@@ -45,6 +47,7 @@ export function PlaybackControls({
   const handleSliderChange = (value: number[]) => {
     if (onSeek) {
       const position = value[0] / 100;
+      setSliderValue(value[0]);
       onSeek(position);
     }
   };
@@ -105,7 +108,7 @@ export function PlaybackControls({
       <div className="mb-4 relative">
         <Slider
           defaultValue={[0]}
-          value={[playbackProgress * 100]}
+          value={[sliderValue]}
           max={100}
           step={0.1}
           onValueChange={handleSliderChange}

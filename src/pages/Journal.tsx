@@ -135,6 +135,12 @@ const Journal = () => {
           closeButton: false
         });
         
+        setTimeout(() => {
+          console.log('[Journal] Doing additional fetch for complete entry data');
+          fetchEntries();
+          setRefreshKey(prev => prev + 1);
+        }, 1000);
+        
         setProcessingEntries([]);
         setToastIds({});
         setIsSavingRecording(false);
@@ -153,7 +159,7 @@ const Journal = () => {
         setEntriesReady(true);
       }
     }
-  }, [entries, processingEntries, toastIds, entriesReady, activeTab]);
+  }, [entries, processingEntries, toastIds, entriesReady, activeTab, fetchEntries]);
 
   useEffect(() => {
     return () => {
@@ -401,11 +407,11 @@ const Journal = () => {
         await fetchEntries();
         setRefreshKey(prev => prev + 1);
         
-        const pollIntervals = [1000, 2000, 3000, 5000, 8000, 12000];
+        const pollIntervals = [1000, 2000, 3000, 5000, 8000, 10000, 15000];
         
         for (const interval of pollIntervals) {
           setTimeout(() => {
-            console.log(`[Journal] Polling for entry at ${interval}ms interval`);
+            console.log(`[Journal] Polling for entry data at ${interval}ms interval`);
             fetchEntries();
             setRefreshKey(prev => prev + 1);
           }, interval);
