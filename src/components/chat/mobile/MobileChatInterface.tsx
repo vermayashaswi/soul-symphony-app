@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
+import { Json } from "@/integrations/supabase/types";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -26,8 +28,8 @@ type ChatMessageFromDB = {
   content: string;
   created_at: string;
   id: string;
-  reference_entries: any | null;
-  analysis_data: any | null;
+  reference_entries: Json | null;
+  analysis_data?: Json | null;  // Make analysis_data optional to match DB structure
   has_numeric_result?: boolean;
   sender: string;
   thread_id: string;
