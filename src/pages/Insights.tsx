@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -99,6 +98,8 @@ export default function Insights() {
   const getSentimentData = () => {
     if (!insightsData.entries || insightsData.entries.length === 0) return [];
     
+    // Map all entries to sentiment data points, regardless of time range
+    // This ensures we have complete data for the calendar display
     return insightsData.entries.map(entry => ({
       date: new Date(entry.created_at),
       sentiment: parseFloat(entry.sentiment || 0)

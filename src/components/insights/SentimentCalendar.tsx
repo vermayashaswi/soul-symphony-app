@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -129,7 +128,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     return sentimentData.filter(item => item.date >= fromDate && item.date <= toDate);
   }, [sentimentData, timeRange]);
 
-  // For the month view, we need ALL entries to show in the calendar
   const allSentimentData = React.useMemo(() => {
     return sentimentData;
   }, [sentimentData]);
@@ -137,10 +135,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const dailySentiment = React.useMemo(() => {
     const sentimentMap = new Map<string, { total: number, count: number }>();
     
-    // Use the appropriate dataset based on the timeRange and view
-    const dataToProcess = (timeRange === 'month' && viewMode === 'calendar') 
-      ? allSentimentData 
-      : filteredData;
+    const dataToProcess = allSentimentData;
     
     dataToProcess.forEach(item => {
       const dateKey = format(item.date, 'yyyy-MM-dd');
@@ -158,7 +153,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     });
     
     return result;
-  }, [filteredData, allSentimentData, timeRange, viewMode]);
+  }, [allSentimentData]);
 
   const sentimentInfo = React.useMemo(() => {
     const infoMap = new Map<string, {
@@ -317,7 +312,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
 
   const navigateToNextWeek = () => {
     const nextWeekStart = addWeeks(currentWeekStart, 1);
-    // Only allow navigating up to the current week
     if (nextWeekStart <= startOfWeek(new Date(), { weekStartsOn: 1 })) {
       setCurrentWeekStart(nextWeekStart);
     }

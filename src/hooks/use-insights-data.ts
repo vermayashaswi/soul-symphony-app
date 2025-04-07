@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
@@ -72,14 +73,23 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
         userId
       });
 
-      // Fetch journal entries for the specified time range
-      const { data: entries, error } = await supabase
+      // For the month view, we fetch ALL entries to ensure the calendar has complete data
+      // For other time ranges, we use the specific date range
+      const query = supabase
         .from('Journal Entries')
         .select('*')
-        .eq('user_id', userId)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
-        .order('created_at', { ascending: false });
+        .eq('user_id', userId);
+      
+      // Only apply date filtering for non-month views
+      // This ensures we have all entries for calendar display in month view
+      // For other views, we still need to filter by date
+      if (timeRange !== 'month') {
+        query.gte('created_at', startDate.toISOString())
+          .lte('created_at', endDate.toISOString());
+      }
+      
+      // Order by created_at descending (newest first)
+      const { data: entries, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching insights data:', error);
@@ -101,20 +111,29 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       }
 
       // Process the data
-      const dominantMood = calculateDominantMood(entries);
-      const biggestImprovement = calculateBiggestImprovement(entries);
-      const journalActivity = calculateJournalActivity(entries, timeRange);
-      const aggregatedEmotionData = processEmotionData(entries, timeRange);
+      // For calculation metrics (dominant mood, etc.), we only use entries in the selected time range
+      const filteredEntries = timeRange === 'month' 
+        ? entries.filter(entry => {
+            const entryDate = new Date(entry.created_at);
+            return entryDate >= startDate && entryDate <= endDate;
+          })
+        : entries;
+        
+      const dominantMood = calculateDominantMood(filteredEntries);
+      const biggestImprovement = calculateBiggestImprovement(filteredEntries);
+      const journalActivity = calculateJournalActivity(filteredEntries, timeRange);
+      const aggregatedEmotionData = processEmotionData(entries, timeRange); // Use all entries for emotion data
 
       // Log the processed data for debugging
       console.log(`[useInsightsData] Processed for ${timeRange}:`, {
         entryCount: entries.length,
+        filteredCount: filteredEntries.length,
         emotionCount: Object.keys(aggregatedEmotionData).length,
         timeRange
       });
 
       setInsightsData({
-        entries,
+        entries, // Store all entries for calendar display
         dominantMood,
         biggestImprovement,
         journalActivity,
