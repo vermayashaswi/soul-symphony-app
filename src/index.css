@@ -35,7 +35,7 @@
 
     --radius: 0.5rem;
     
-    /* Theme color variables for the app - adding purple */
+    /* Theme color variables for the app */
     --theme-color: 258 83% 90%;
     --theme-color-dark: 258 83% 35%;
   }
@@ -84,11 +84,11 @@
   }
 }
 
-/* Make chat thread buttons always visible with purple styling */
+/* Make chat thread buttons always visible with proper styling */
 .chat-thread-list .chat-thread-buttons {
   opacity: 1 !important;
   display: flex !important;
-  background-color: rgba(155, 135, 245, 0.25);
+  background-color: color-mix(in srgb, hsl(var(--theme-color)) 25%, transparent);
   border-radius: 0 0.375rem 0.375rem 0;
   padding: 4px;
   width: auto;
@@ -96,17 +96,17 @@
 }
 
 .thread-edit-button, .thread-delete-button {
-  background-color: rgba(155, 135, 245, 0.3);
-  color: #9b87f5;
+  background-color: color-mix(in srgb, hsl(var(--theme-color)) 30%, transparent);
+  color: hsl(var(--theme-color));
   margin: 0 3px;
 }
 
 .thread-edit-button:hover, .thread-delete-button:hover {
-  background-color: rgba(155, 135, 245, 0.4);
+  background-color: color-mix(in srgb, hsl(var(--theme-color)) 40%, transparent);
 }
 
 .thread-edit-button:active {
-  background-color: rgba(155, 135, 245, 0.5);
+  background-color: color-mix(in srgb, hsl(var(--theme-color)) 50%, transparent);
 }
 
 .thread-delete-button:active {
@@ -114,18 +114,27 @@
   color: #ff5757;
 }
 
-.bg-theme-color {
-  background-color: #9b87f5;
+/* Theme color utility classes */
+.bg-theme {
+  background-color: hsl(var(--theme-color));
 }
 
-.hover\:bg-theme-color\/90:hover {
-  background-color: rgba(155, 135, 245, 0.9);
+.hover\:bg-theme-hover:hover {
+  background-color: hsl(var(--theme-color-dark));
 }
 
-.text-theme-color {
-  color: #9b87f5;
+.text-theme {
+  color: hsl(var(--theme-color));
 }
 
-.border-theme-color\/20 {
-  border-color: rgba(155, 135, 245, 0.2);
+.border-theme {
+  border-color: hsl(var(--theme-color));
+}
+
+.border-theme\/20 {
+  border-color: color-mix(in srgb, hsl(var(--theme-color)) 20%, transparent);
+}
+
+.focus\:ring-theme:focus {
+  --tw-ring-color: hsl(var(--theme-color));
 }

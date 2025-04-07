@@ -185,10 +185,10 @@ export default function ChatThreadList({
     <div className="chat-thread-list h-full flex flex-col">
       <div className="p-3 border-b flex items-center justify-between gap-2">
         <Button
-          variant="default"
+          variant="theme"
           onClick={handleNewThread}
           className={cn(
-            "bg-theme-color hover:bg-theme-color/90 text-white flex items-center gap-1",
+            "text-white flex items-center gap-1",
             "w-full"
           )}
         >
@@ -244,8 +244,8 @@ export default function ChatThreadList({
                     <div className="flex gap-1">
                       <Button 
                         size="sm" 
-                        variant="outline" 
-                        className="h-8 px-2 bg-primary/10 text-primary"
+                        variant="theme" 
+                        className="h-8 px-2"
                         onClick={() => handleUpdateThreadTitle(thread.id)}
                       >
                         Save
@@ -329,7 +329,7 @@ export default function ChatThreadList({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteThread}
-              className="bg-red-500 hover:bg-red-600 text-white"
+              variant="destructive"
             >
               Delete
             </AlertDialogAction>
