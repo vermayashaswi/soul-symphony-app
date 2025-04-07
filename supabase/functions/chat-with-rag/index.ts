@@ -146,7 +146,7 @@ serve(async (req) => {
       );
     }
 
-    // 3. Prepare prompt
+    // 3. Prepare prompt with formatting instructions
     const prompt = `You are a personal mental well-being assistant. Your goal is to provide helpful, empathetic, and insightful responses based on the user's journal entries.
       Here are some of the user's journal entries:
       ${entries.map((entry) => `- ${entry.content}`).join('\n')}
@@ -154,7 +154,12 @@ serve(async (req) => {
       Now, respond to the following message from the user:
       ${message}
       
-      Keep your answers concise and to the point. Focus on providing actionable insights and support.`;
+      FORMATTING INSTRUCTIONS:
+      - Use bullet points (•) for lists and key points
+      - Use **bold text** for important information, headings, or emphasis
+      - Create clear visual separation between different sections of your response
+      - Keep your answers concise and to the point
+      - Focus on providing actionable insights and support`;
 
     // 4. Call OpenAI
     console.log("Calling OpenAI for completion");
