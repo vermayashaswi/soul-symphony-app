@@ -57,7 +57,14 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       throw error;
     }
     
-    return data || [];
+    // Transform the data to ensure sender is of type 'user' | 'assistant'
+    return (data || []).map(msg => ({
+      ...msg,
+      sender: msg.sender === 'user' ? 'user' : 'assistant' as 'user' | 'assistant',
+      reference_entries: msg.reference_entries || undefined,
+      analysis_data: msg.analysis_data || undefined,
+      has_numeric_result: msg.has_numeric_result || undefined
+    }));
   } catch (error) {
     console.error("Failed to get thread messages:", error);
     return [];
@@ -98,7 +105,14 @@ export const saveMessage = async (
       .update({ updated_at: new Date().toISOString() })
       .eq('id', threadId);
     
-    return data;
+    // Transform the data to ensure sender is of type 'user' | 'assistant'
+    return {
+      ...data,
+      sender: data.sender === 'user' ? 'user' : 'assistant' as 'user' | 'assistant',
+      reference_entries: data.reference_entries || undefined,
+      analysis_data: data.analysis_data || undefined,
+      has_numeric_result: data.has_numeric_result || undefined
+    };
   } catch (error) {
     console.error("Failed to save message:", error);
     return null;
