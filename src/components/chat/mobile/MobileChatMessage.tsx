@@ -61,7 +61,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
         )}
       >
         {hasReferences && (
-          <div className="absolute bottom-1 left-1 z-10">
+          <div className="absolute bottom-2 left-2 z-10">
             <Button
               variant="ghost"
               size="sm"
@@ -83,7 +83,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="absolute bottom-6 left-0 mb-1 text-xs max-h-32 overflow-y-auto border border-fuchsia-500/30 rounded-md p-2 bg-gray-900/90 backdrop-blur-sm w-60"
+                  className="absolute bottom-7 left-0 mb-1 text-xs max-h-32 overflow-y-auto border border-fuchsia-500/30 rounded-md p-2 bg-gray-900/90 backdrop-blur-sm w-60"
                 >
                   {message.references!.slice(0, 2).map((ref, idx) => (
                     <div key={idx} className="mb-1 py-1">
