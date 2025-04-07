@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -124,7 +123,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     return sentimentData.filter(item => item.date >= fromDate && item.date <= toDate);
   }, [sentimentData, timeRange, currentYear]);
 
-  // For the month and year views, we need ALL entries to show in the calendar
   const allSentimentData = React.useMemo(() => {
     return sentimentData;
   }, [sentimentData]);
@@ -132,7 +130,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const dailySentiment = React.useMemo(() => {
     const sentimentMap = new Map<string, { total: number, count: number }>();
     
-    // Use all sentiment data to ensure we capture everything
     const dataToProcess = allSentimentData;
     
     dataToProcess.forEach(item => {
@@ -300,7 +297,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
 
   const navigateToNextWeek = () => {
     const nextWeekStart = addWeeks(currentWeekStart, 1);
-    // Only allow navigating up to the current week
     if (nextWeekStart <= startOfWeek(new Date(), { weekStartsOn: 1 })) {
       setCurrentWeekStart(nextWeekStart);
     }
@@ -312,7 +308,6 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
 
   const navigateToNextYear = () => {
     const nextYear = addYears(currentYear, 1);
-    // Only allow navigating up to the current year
     if (nextYear.getFullYear() <= new Date().getFullYear()) {
       setCurrentYear(nextYear);
     }
@@ -503,19 +498,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   };
 
   const renderYearView = () => {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    
-    // Maximum days across all months for the current year
-    const daysInMonths = months.map((_, monthIndex) => 
-      new Date(currentYear.getFullYear(), monthIndex + 1, 0).getDate()
-    );
-    const maxDaysInMonth = Math.max(...daysInMonths);
+    const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+    const daysCount = 31;
     
     return (
-      <div className="py-4 px-2">
+      <div className="py-4">
         <div className="flex justify-between items-center mb-6">
           <button 
             onClick={navigateToPreviousYear}
@@ -525,7 +512,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           </button>
           
           <div className="text-lg font-semibold">
-            Annual Mood Calendar {currentYear.getFullYear()}
+            {currentYear.getFullYear()}
             {isCurrentYear(currentYear) && (
               <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
                 Current Year
@@ -547,104 +534,66 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           </button>
         </div>
         
-        <div className="overflow-x-auto no-scrollbar">
-          <div className="min-w-full grid grid-cols-[auto_repeat(12,minmax(28px,1fr))]">
-            {/* Month headers */}
-            <div className="h-8"></div> {/* Empty corner cell */}
+        <div className="w-full">
+          <div className="grid grid-cols-[2rem_repeat(12,1fr)] mb-4">
+            <div></div>
             {months.map(month => (
-              <div key={month} className="h-8 text-xs font-medium text-center text-muted-foreground">
+              <div key={month} className="text-center text-muted-foreground text-sm font-medium">
                 {month}
               </div>
             ))}
+          </div>
+          
+          {Array.from({ length: daysCount }, (_, i) => {
+            const day = i + 1;
             
-            {/* Days grid */}
-            {Array.from({ length: maxDaysInMonth }, (_, dayIndex) => {
-              const day = dayIndex + 1;
-              return (
-                <div key={`day-${day}`} className="grid grid-cols-[auto_repeat(12,minmax(28px,1fr))]">
-                  {/* Day number */}
-                  <div className="text-xs text-muted-foreground font-medium p-1 w-6 text-right">
-                    {day}
-                  </div>
-                  
-                  {/* Month cells */}
-                  {months.map((_, monthIndex) => {
-                    // Check if this day exists in this month
-                    const isValidDay = day <= daysInMonths[monthIndex];
-                    if (!isValidDay) return <div key={`empty-${monthIndex}-${day}`} className="h-7"></div>;
-                    
-                    const date = new Date(currentYear.getFullYear(), monthIndex, day);
-                    const dateStr = format(date, 'yyyy-MM-dd');
-                    const sentiment = dailySentiment.get(dateStr);
-                    const colorClass = sentiment !== undefined ? getSentimentColor(sentiment) : null;
-                    
-                    const isToday = isSameDay(date, new Date());
-                    
-                    return (
-                      <div 
-                        key={`cell-${monthIndex}-${day}`} 
-                        className="h-7 flex items-center justify-center p-0.5"
-                      >
-                        {colorClass ? (
-                          <div 
-                            className={cn(
-                              "w-5 h-5 rounded-sm", 
-                              colorClass,
-                              isToday && "ring-1 ring-primary"
-                            )} 
-                          />
-                        ) : (
-                          <div 
-                            className={cn(
-                              "w-5 h-5 rounded-sm border border-gray-300 dark:border-gray-600",
-                              isToday && "ring-1 ring-primary"
-                            )} 
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
+            return (
+              <div key={`day-${day}`} className="grid grid-cols-[2rem_repeat(12,1fr)] mb-1 items-center">
+                <div className="text-center text-muted-foreground text-sm">
+                  {day}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-        
-        {/* Legend */}
-        <div className="flex flex-wrap justify-center gap-3 mt-6">
-          {/* Red spectrum */}
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-red-900"></div>
-            <span className="text-xs">Very Negative</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-red-700"></div>
-            <span className="text-xs">Negative</span>
-          </div>
-          
-          {/* Yellow spectrum */}
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-amber-500"></div>
-            <span className="text-xs">Slightly Negative</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-amber-400"></div>
-            <span className="text-xs">Neutral</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-amber-600"></div>
-            <span className="text-xs">Slightly Positive</span>
-          </div>
-          
-          {/* Green spectrum */}
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-green-600"></div>
-            <span className="text-xs">Positive</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-green-900"></div>
-            <span className="text-xs">Very Positive</span>
-          </div>
+                
+                {months.map((_, monthIndex) => {
+                  const date = new Date(currentYear.getFullYear(), monthIndex, day);
+                  const dateStr = format(date, 'yyyy-MM-dd');
+                  const isValidDate = !isNaN(date.getTime());
+                  
+                  if (!isValidDate) {
+                    return <div key={`empty-${monthIndex}-${day}`}></div>;
+                  }
+                  
+                  const sentiment = dailySentiment.get(dateStr);
+                  const colorClass = sentiment !== undefined ? getSentimentColor(sentiment) : null;
+                  
+                  const isToday = isSameDay(date, new Date());
+                  
+                  return (
+                    <div 
+                      key={`cell-${monthIndex}-${day}`} 
+                      className="flex items-center justify-center"
+                    >
+                      {colorClass ? (
+                        <div 
+                          className={cn(
+                            "w-6 h-6 rounded-full", 
+                            colorClass,
+                            isToday && "ring-2 ring-primary"
+                          )} 
+                        />
+                      ) : (
+                        <div 
+                          className={cn(
+                            "w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600",
+                            isToday && "ring-2 ring-primary"
+                          )} 
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
