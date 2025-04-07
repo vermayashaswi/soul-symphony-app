@@ -62,7 +62,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
         )}
       >
         {hasReferences && (
-          <div className="absolute top-0 left-0 transform -translate-y-7 z-10">
+          <div className="absolute bottom-1 left-1 z-10">
             <Button
               variant="ghost"
               size="sm"
@@ -84,7 +84,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="mt-1 max-h-40 md:max-h-60 overflow-y-auto border border-fuchsia-500/30 rounded-md p-2 bg-gray-900/90 backdrop-blur-sm"
+                  className="absolute bottom-8 left-0 mb-1 max-h-40 md:max-h-60 overflow-y-auto border border-fuchsia-500/30 rounded-md p-2 bg-gray-900/90 backdrop-blur-sm w-72"
                 >
                   {message.references.slice(0, isMobile ? 2 : 3).map((ref, idx) => (
                     <div key={idx} className="mb-2 py-1">
