@@ -1,4 +1,5 @@
 
+import React, { useEffect, ErrorInfo } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,7 +10,6 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
-import { useEffect, ErrorInfo } from 'react';
 import { toast } from "sonner";
 
 const queryClient = new QueryClient({
