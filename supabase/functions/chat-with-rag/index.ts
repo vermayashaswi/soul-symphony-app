@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -34,7 +33,7 @@ function createDiagnosticStep(name: string, status: string, details: any = null)
 const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.`;
 
 // Maximum number of previous messages to include for context
-const MAX_CONTEXT_MESSAGES = 5;
+const MAX_CONTEXT_MESSAGES = 10;
 
 serve(async (req) => {
   // Handle CORS preflight requests
