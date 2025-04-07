@@ -27,7 +27,7 @@ const EmptyChatState: React.FC<EmptyChatStateProps> = ({ onQuestionClick }) => {
       icon: <Brain className="h-4 w-4 flex-shrink-0" />
     },
     {
-      text: "Rate my top 3 emotions out of 10.",
+      text: "Rate my top positive emotions out of 10.",
       icon: <BarChart2 className="h-4 w-4 flex-shrink-0" />
     }
   ];
