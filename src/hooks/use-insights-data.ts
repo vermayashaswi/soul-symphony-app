@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
@@ -70,6 +71,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
         userId
       });
 
+      // Fetch all entries for the user to ensure we have complete calendar data
       const { data: entries, error } = await supabase
         .from('Journal Entries')
         .select('*')
@@ -95,6 +97,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
         return;
       }
 
+      // Filter entries based on the selected time range for time-specific calculations
       const filteredEntries = entries.filter(entry => {
         const entryDate = new Date(entry.created_at);
         return entryDate >= startDate && entryDate <= endDate;
@@ -103,6 +106,8 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       const dominantMood = calculateDominantMood(filteredEntries);
       const biggestImprovement = calculateBiggestImprovement(filteredEntries);
       const journalActivity = calculateJournalActivity(filteredEntries, timeRange);
+      
+      // For aggregated emotion data, we pass all entries but still respect the time range for filtering
       const aggregatedEmotionData = processEmotionData(entries, timeRange);
 
       console.log(`[useInsightsData] Processed for ${timeRange}:`, {
@@ -113,6 +118,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       });
 
       setInsightsData({
+        // Store all entries to ensure complete calendar data
         entries,
         dominantMood,
         biggestImprovement,
@@ -359,9 +365,16 @@ const calculateJournalActivity = (entries: any[], timeRange: TimeRange): Journal
 };
 
 const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmotionData => {
+  const { startDate, endDate } = getDateRange(timeRange);
   const emotionData: AggregatedEmotionData = {};
   
-  entries.forEach(entry => {
+  // Filter entries for the selected time range when processing emotion data
+  const timeRangeEntries = entries.filter(entry => {
+    const entryDate = new Date(entry.created_at);
+    return entryDate >= startDate && entryDate <= endDate;
+  });
+  
+  timeRangeEntries.forEach(entry => {
     const dateStr = format(new Date(entry.created_at), 'yyyy-MM-dd');
     
     if (entry.emotions) {

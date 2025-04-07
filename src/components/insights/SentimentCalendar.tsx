@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -423,7 +424,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
             day_today: "bg-primary/5 text-primary font-medium",
             day_selected: "!bg-transparent !text-foreground",
             day_disabled: "text-muted-foreground opacity-50",
-            day_outside: "text-muted-foreground opacity-50",
+            day_outside: "text-muted-foreground opacity-50 pointer-events-none", // Disable outside dates
             day_range_middle: "aria-selected:bg-transparent",
             day_hidden: "invisible",
             caption: "px-4 py-3 text-lg font-semibold",
@@ -455,6 +456,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               
               const isToday = isSameDay(date, new Date());
               const isSameMonthValue = isSameMonth(date, currentMonth);
+              
+              // Skip rendering content for dates outside the current month
+              if (!isSameMonthValue) {
+                return <div {...props} className="invisible" />;
+              }
               
               return (
                 <div
