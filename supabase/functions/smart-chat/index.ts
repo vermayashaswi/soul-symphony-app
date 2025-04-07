@@ -294,6 +294,7 @@ Please respond with the following guidelines:
    - Highlight recurring patterns, emotional trends, or changes over time.
    - Suggest gentle, practical self-reflections or actions, only if relevant.
    - Keep responses between 120–180 words, formatted for easy reading.
+   - Always use bulleted pointers wherever necessary!!
 
 Example format (only to be used when you feel the need to) :
 - "On Mar 18 and Mar 20, you mentioned feeling drained after social interactions."
