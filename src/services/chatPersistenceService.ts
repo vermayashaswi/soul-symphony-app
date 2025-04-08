@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
@@ -225,9 +226,10 @@ export const saveMessage = async (
       has_numeric_result: data.has_numeric_result || false
     };
     
+    // The issue is here with analysis_data - using conditional assignment for type safety
     if (analysisData) {
       typedMessage.analysis_data = analysisData;
-    } else if (data.analysis_data) {
+    } else if ('analysis_data' in data && data.analysis_data) {
       typedMessage.analysis_data = data.analysis_data;
     }
     
