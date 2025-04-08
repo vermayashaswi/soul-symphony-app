@@ -30,7 +30,7 @@ export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
           transition={{ duration: 0.5, ease: "easeInOut" }}
         >
           <motion.span 
-            className="px-4 py-2 text-lg font-medium text-white dark:bg-theme-color/90 bg-theme-color/95 rounded-full shadow-md backdrop-blur-sm"
+            className="px-4 py-2 text-lg font-medium text-white dark:bg-theme-color/90 bg-theme-color/80 rounded-full shadow-md backdrop-blur-lg"
             animate={{ 
               scale: [1, 1.03, 1],
             }}
