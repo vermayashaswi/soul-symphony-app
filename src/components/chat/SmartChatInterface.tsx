@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
@@ -21,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChatMessage as ChatMessageType, getUserChatThreads, getThreadMessages } from "@/services/chatPersistenceService";
+import { ChatMessage as ChatMessageType, getUserChatThreads, getThreadMessages, saveMessage } from "@/services/chatPersistenceService";
 
 type ChatMessageRole = 'user' | 'assistant' | 'error';
 
@@ -143,11 +144,23 @@ export default function SmartChatInterface() {
       return;
     }
     
-    setChatHistory(prev => [...prev, { role: 'user', content: message }]);
+    // Create a proper message object
+    const userMessage: ChatMessageType = {
+      id: `temp-${Date.now()}`,
+      thread_id: threadId,
+      content: message,
+      sender: 'user',
+      created_at: new Date().toISOString()
+    };
+    
+    setChatHistory(prev => [...prev, userMessage]);
     setLoading(true);
     setProcessingStage("Analyzing your question...");
     
     try {
+      // Save the user message to database
+      await saveMessage(threadId, message, 'user');
+      
       console.log("Performing comprehensive query analysis for:", message);
       setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
@@ -181,27 +194,54 @@ export default function SmartChatInterface() {
         errorState: response.role === 'error'
       });
       
-      setChatHistory(prev => [
-        ...prev, 
-        { 
-          role: response.role === 'error' ? 'assistant' : response.role as ChatMessageRole,
+      // Save the assistant's response to database
+      const savedResponse = await saveMessage(
+        threadId,
+        response.content,
+        'assistant',
+        response.references,
+        response.analysis,
+        response.hasNumericResult
+      );
+      
+      if (savedResponse) {
+        setChatHistory(prev => [...prev, savedResponse]);
+      } else {
+        // Fallback if saving to DB fails
+        const assistantMessage: ChatMessageType = {
+          id: `temp-response-${Date.now()}`,
+          thread_id: threadId,
           content: response.content,
-          references: response.references,
-          analysis: response.analysis,
-          hasNumericResult: response.hasNumericResult
-        }
-      ]);
+          sender: 'assistant',
+          created_at: new Date().toISOString(),
+          reference_entries: response.references,
+          analysis_data: response.analysis,
+          has_numeric_result: response.hasNumericResult
+        };
+        
+        setChatHistory(prev => [...prev, assistantMessage]);
+      }
     } catch (error: any) {
       console.error("Error sending message:", error);
       
-      setChatHistory(prev => [
-        ...prev, 
-        { 
-          role: 'assistant', 
-          content: "I'm having trouble processing your request. Please try again later. " + 
-                   (error?.message ? `Error: ${error.message}` : "")
-        }
-      ]);
+      // Create error message with proper type
+      const errorMessage: ChatMessageType = {
+        id: `error-${Date.now()}`,
+        thread_id: threadId,
+        content: "I'm having trouble processing your request. Please try again later. " + 
+                 (error?.message ? `Error: ${error.message}` : ""),
+        sender: 'assistant',
+        created_at: new Date().toISOString()
+      };
+      
+      setChatHistory(prev => [...prev, errorMessage]);
+      
+      // Try to save the error message to the database
+      saveMessage(
+        threadId,
+        errorMessage.content,
+        'assistant'
+      ).catch(e => console.error("Failed to save error message:", e));
     } finally {
       setLoading(false);
       setProcessingStage(null);

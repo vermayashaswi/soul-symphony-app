@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Json } from "@/integrations/supabase/types";
 
 // Types
 export type ChatThread = {
@@ -62,7 +63,7 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
     
     console.log(`Found ${data?.length || 0} messages for thread ${threadId}`);
     
-    // Fixed: Ensure proper typing of sender as either 'user' or 'assistant'
+    // Fixed: Ensure proper mapping of database fields to ChatMessage type
     return (data || []).map(msg => {
       const typedMessage: ChatMessage = {
         id: msg.id,
@@ -70,10 +71,21 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         content: msg.content,
         created_at: msg.created_at,
         sender: msg.sender === 'user' ? 'user' : 'assistant',
-        reference_entries: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-        has_numeric_result: msg.has_numeric_result || false,
-        analysis_data: msg.analysis_data || undefined
+        reference_entries: msg.reference_entries ? 
+          Array.isArray(msg.reference_entries) ? 
+            msg.reference_entries : 
+            [] : 
+          undefined,
+        has_numeric_result: msg.has_numeric_result || false
       };
+      
+      // Only add analysis_data if it exists in the database response
+      if (msg.reference_entries && typeof msg.reference_entries === 'object') {
+        const refObj = msg.reference_entries as Record<string, any>;
+        if (refObj.analysis_data) {
+          typedMessage.analysis_data = refObj.analysis_data;
+        }
+      }
       
       return typedMessage;
     });
@@ -106,7 +118,6 @@ export const saveMessage = async (
         content,
         sender,
         reference_entries: references || null,
-        analysis_data: analysisData || null,
         has_numeric_result: hasNumericResult || false
       })
       .select()
@@ -151,7 +162,11 @@ export const saveMessage = async (
       content: data.content,
       created_at: data.created_at,
       sender: data.sender === 'user' ? 'user' : 'assistant',
-      reference_entries: data.reference_entries ? Array.isArray(data.reference_entries) ? data.reference_entries : [] : undefined,
+      reference_entries: data.reference_entries ? 
+        Array.isArray(data.reference_entries) ? 
+          data.reference_entries : 
+          [] : 
+        undefined,
       has_numeric_result: data.has_numeric_result || false
     };
     
