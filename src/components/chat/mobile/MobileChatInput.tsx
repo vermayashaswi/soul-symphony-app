@@ -1,82 +1,193 @@
 
-import React, { useState, useEffect } from "react";
-import { Send } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { motion, AnimatePresence } from "framer-motion";
+import { Send, Mic, MicOff, Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { recordAudio } from "@/utils/audioRecorder";
 
 interface MobileChatInputProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, isAudio?: boolean) => void;
   isLoading: boolean;
   userId?: string;
 }
 
-const MobileChatInput: React.FC<MobileChatInputProps> = ({ 
-  onSendMessage, 
+export default function MobileChatInput({
+  onSendMessage,
   isLoading,
   userId
-}) => {
-  const [message, setMessage] = useState("");
-  const [isFocused, setIsFocused] = useState(false);
-  const { toast } = useToast();
+}: MobileChatInputProps) {
+  const [inputValue, setInputValue] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recordingRef = useRef<any>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Reset scroll position when input is focused
   useEffect(() => {
-    if (isFocused) {
-      const chatContent = document.querySelector('.mobile-chat-content');
-      if (chatContent) {
-        chatContent.scrollTop = chatContent.scrollHeight;
+    if (isRecording) {
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setRecordingTime(0);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isRecording]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value);
+    adjustTextareaHeight(e.target);
+  };
+
+  const adjustTextareaHeight = (textarea: HTMLTextAreaElement) => {
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (isLoading || isSubmitting) return;
+
+    const trimmedValue = inputValue.trim();
+    if (trimmedValue) {
+      try {
+        console.log("Sending message:", trimmedValue);
+        setIsSubmitting(true);
+        onSendMessage(trimmedValue);
+        setInputValue("");
+        if (inputRef.current) {
+          inputRef.current.style.height = 'auto';
+          inputRef.current.focus();
+        }
+      } catch (error) {
+        console.error("Error sending message:", error);
+      } finally {
+        setIsSubmitting(false);
       }
     }
-  }, [isFocused]);
+  };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleStartRecording = async () => {
+    console.log("Starting audio recording...");
+    try {
+      const recorder = await recordAudio();
+      recordingRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      alert("Could not access microphone. Please check permissions.");
+    }
+  };
+
+  const handleStopRecording = async () => {
+    console.log("Stopping audio recording...");
+    if (!recordingRef.current) return;
     
-    if (!message.trim()) return;
-    
-    onSendMessage(message);
-    setMessage("");
-    setIsFocused(false);
+    try {
+      setIsSubmitting(true);
+      const audio = await recordingRef.current.stop();
+      setIsRecording(false);
+      
+      // Get audio blob from the recorder
+      const audioBlob = await fetch(audio.audioUrl).then(r => r.blob());
+      
+      // For now, just send a placeholder message
+      onSendMessage("I sent an audio message", true);
+      
+      // TODO: Implement actual audio processing
+      console.log("Audio recording complete. Duration:", recordingTime, "seconds");
+    } catch (error) {
+      console.error("Error stopping recording:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   return (
-    <div className="w-full py-2 px-3">
-      <form onSubmit={handleSubmit} className="relative flex items-end w-full gap-2">
-        <div className="flex items-center w-full relative">
-          <Textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Ask anything..."
-            className="min-h-[44px] max-h-[120px] text-sm resize-none rounded-full pl-4 pr-12 py-2.5 shadow-sm border-muted bg-background"
-            disabled={isLoading}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
-          />
-        </div>
-        
-        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-          {message.trim().length > 0 && (
-            <Button 
-              type="submit" 
-              size="sm"
-              className="rounded-full h-8 w-8 p-0 bg-primary text-primary-foreground"
-              disabled={isLoading || !message.trim()}
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </form>
+    <div className="p-3 bg-background border-t border-border flex items-end gap-2">
+      <div className="flex-1 relative">
+        <textarea
+          ref={inputRef}
+          value={inputValue}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyPress}
+          placeholder="Type your message..."
+          className="w-full border rounded-lg py-2 px-3 pr-10 focus:outline-none focus:ring-1 focus:ring-primary resize-none min-h-[40px] max-h-[120px] bg-background"
+          disabled={isLoading || isSubmitting || isRecording}
+        />
+      </div>
+      
+      <div className="flex-shrink-0">
+        {isRecording ? (
+          <Button
+            type="button"
+            size="icon"
+            className="h-10 w-10 rounded-full bg-red-500 hover:bg-red-600 text-white"
+            onClick={handleStopRecording}
+            disabled={isLoading || isSubmitting}
+          >
+            <MicOff className="h-5 w-5" />
+          </Button>
+        ) : inputValue.trim() ? (
+          <Button
+            type="button"
+            size="icon"
+            className="h-10 w-10 rounded-full"
+            onClick={handleSendMessage}
+            disabled={isLoading || isSubmitting}
+          >
+            {isSubmitting || isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="icon"
+            className="h-10 w-10 rounded-full"
+            onClick={handleStartRecording}
+            disabled={isLoading || isSubmitting || !userId}
+          >
+            <Mic className="h-5 w-5" />
+          </Button>
+        )}
+      </div>
+      
+      {isRecording && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute bottom-16 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-full flex items-center"
+        >
+          <div className="w-2 h-2 rounded-full bg-white animate-pulse mr-2"></div>
+          <span>Recording: {formatTime(recordingTime)}</span>
+        </motion.div>
+      )}
     </div>
   );
 }
-
-export default MobileChatInput;

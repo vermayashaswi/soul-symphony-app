@@ -167,15 +167,29 @@ export default function SmartChatInterface() {
     setProcessingStage("Analyzing your question...");
     
     try {
-      // Save user message to database
-      const savedUserMessage = await saveMessage(threadId, message, 'user');
-      console.log("User message saved:", savedUserMessage?.id);
-      
-      if (savedUserMessage) {
-        // Replace the temporary message with the saved one
-        setChatHistory(prev => prev.map(msg => 
-          msg.id === tempUserMessage.id ? savedUserMessage : msg
-        ));
+      // Save user message to database with better error handling
+      let savedUserMessage: ChatMessageType | null = null;
+      try {
+        savedUserMessage = await saveMessage(threadId, message, 'user');
+        console.log("User message saved with ID:", savedUserMessage?.id);
+        
+        if (savedUserMessage) {
+          // Replace the temporary message with the saved one
+          setChatHistory(prev => prev.map(msg => 
+            msg.id === tempUserMessage.id ? savedUserMessage! : msg
+          ));
+        } else {
+          console.error("Failed to save user message - null response");
+          throw new Error("Failed to save message");
+        }
+      } catch (saveError: any) {
+        console.error("Error saving user message:", saveError);
+        toast({
+          title: "Error saving message",
+          description: saveError.message || "Could not save your message",
+          variant: "destructive"
+        });
+        // Continue with the flow using the temporary message
       }
       
       console.log("Performing comprehensive query analysis for:", message);
@@ -211,22 +225,27 @@ export default function SmartChatInterface() {
         errorState: response.role === 'error'
       });
       
-      // Save assistant response to database
-      const savedResponse = await saveMessage(
-        threadId,
-        response.content,
-        'assistant',
-        response.references,
-        response.analysis,
-        response.hasNumericResult
-      );
-      
-      console.log("Assistant response saved:", savedResponse?.id);
-      
-      if (savedResponse) {
-        // Add the saved assistant message to the chat history
-        setChatHistory(prev => [...prev, savedResponse]);
-      } else {
+      // Save assistant response to database with enhanced error handling
+      try {
+        const savedResponse = await saveMessage(
+          threadId,
+          response.content,
+          'assistant',
+          response.references,
+          response.analysis,
+          response.hasNumericResult
+        );
+        
+        console.log("Assistant response saved with ID:", savedResponse?.id);
+        
+        if (savedResponse) {
+          // Add the saved assistant message to the chat history
+          setChatHistory(prev => [...prev, savedResponse]);
+        } else {
+          throw new Error("Failed to save assistant response");
+        }
+      } catch (saveError: any) {
+        console.error("Error saving assistant response:", saveError);
         // Fallback to using temporary message if database save fails
         const assistantMessage: ChatMessageType = {
           id: `temp-response-${Date.now()}`,
@@ -242,6 +261,12 @@ export default function SmartChatInterface() {
         
         setChatHistory(prev => [...prev, assistantMessage]);
         console.error("Failed to save assistant response to database, using temporary message");
+        
+        toast({
+          title: "Warning",
+          description: "Response displayed but couldn't be saved to your conversation history",
+          variant: "default"
+        });
       }
     } catch (error: any) {
       console.error("Error sending message:", error);
