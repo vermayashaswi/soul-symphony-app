@@ -1,59 +1,40 @@
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { createLogEntry } from './debugUtils';
-import { DebugLogContextType, DebugLogEntry, LogLevel } from './debugLogTypes';
+import React from 'react';
 
-// Create the context with a default value
-const DebugLogContext = createContext<DebugLogContextType>({
-  logs: [],
+// This is a stub implementation that doesn't do any debug logging
+export interface DebugEventType {
+  id: string;
+  type: string;
+  message: string;
+  details?: any;
+  timestamp: string;
+  level: 'info' | 'warning' | 'error' | 'success';
+}
+
+interface DebugContextType {
+  events: DebugEventType[];
+  addEvent: (type: string, message: string, level?: 'info' | 'warning' | 'error' | 'success', details?: any) => void;
+  clearEvents: () => void;
+  exportEvents: () => void;
+}
+
+export const DebugContext = React.createContext<DebugContextType>({
+  events: [],
   addEvent: () => {},
-  clearLogs: () => {},
-  isEnabled: false,
-  toggleEnabled: () => {}
+  clearEvents: () => {},
+  exportEvents: () => {},
 });
 
-// Debug provider component - now with UI components removed
-export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [logs, setLogs] = useState<DebugLogEntry[]>([]);
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
-  
-  // Add a new event log - now just logs to console in development
-  const addEvent = useCallback((
-    category: string, 
-    message: string, 
-    level: LogLevel = 'info',
-    details?: any
-  ) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[${level.toUpperCase()}][${category}] ${message}`, details || '');
-    }
-  }, []);
-  
-  // Clear all logs - no-op in production
-  const clearLogs = useCallback(() => {
-    // No visible UI, so nothing to clear
-  }, []);
-  
-  // Toggle debug mode - no-op in production
-  const toggleEnabled = useCallback(() => {
-    // Debug mode always disabled in production
-  }, []);
-  
-  // The context value
-  const value = {
-    logs,
-    addEvent,
-    clearLogs,
-    isEnabled: false, // Always false in production
-    toggleEnabled
-  };
-  
-  return (
-    <DebugLogContext.Provider value={value}>
-      {children}
-    </DebugLogContext.Provider>
-  );
+export const DebugLogProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Just return children, no actual debug functionality
+  return <React.Fragment>{children}</React.Fragment>;
 };
 
-// Hook to use the debug log context
-export const useDebugLog = () => useContext(DebugLogContext);
+export const useDebugLog = (): DebugContextType => {
+  return {
+    events: [],
+    addEvent: () => {},
+    clearEvents: () => {},
+    exportEvents: () => {},
+  };
+};

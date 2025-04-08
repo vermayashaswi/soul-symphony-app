@@ -1,19 +1,9 @@
 
-// This file is now deprecated, all debug functionality has been removed
-export const ChatDebugProvider = ({ children }: { children: React.ReactNode }) => {
-  return children;
+import React from 'react';
+
+// This is a stub implementation to avoid errors after debug functionality has been removed
+const ChatDebugPanel = () => {
+  return null;
 };
 
-// Create a no-op hook for backward compatibility
-export const useChatDebug = () => ({
-  logs: [],
-  addEvent: () => {},
-  clearLogs: () => {},
-  isEnabled: false,
-  toggleEnabled: () => {}
-});
-
-// Export an empty component for backward compatibility
-export default function EmptyDebugPanel() {
-  return null;
-}
+export default ChatDebugPanel;

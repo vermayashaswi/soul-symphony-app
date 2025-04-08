@@ -17,7 +17,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import { generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useToast } from "@/hooks/use-toast";
-import { DebugLogProvider } from "@/utils/debug/DebugContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +29,11 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
+
+// Simple wrapper that just returns children
+const DebugLogProvider = ({ children }: { children: React.ReactNode }) => {
+  return <>{children}</>;
+};
 
 export default function SmartChat() {
   const isMobile = useIsMobile();
