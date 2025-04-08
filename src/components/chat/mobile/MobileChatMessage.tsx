@@ -13,7 +13,7 @@ import { formatShortDate } from "@/utils/format-time";
 
 interface MobileChatMessageProps {
   message: {
-    role: 'user' | 'assistant';
+    role: 'user' | 'assistant' | 'error';
     content: string;
     analysis?: any;
     references?: any[];
@@ -33,14 +33,17 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
     return message.content;
   }, [message]);
   
+  // For UI purposes, treat 'error' role as 'assistant'
+  const displayRole = message.role === 'error' ? 'assistant' : message.role;
+  
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`relative flex items-start gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+      className={`relative flex items-start gap-2 ${displayRole === 'user' ? 'justify-end' : 'justify-start'}`}
     >
-      {message.role === 'assistant' && (
+      {displayRole === 'assistant' && (
         <Avatar className="w-8 h-8 border border-primary/20">
           <AvatarImage 
             src="/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png" 
@@ -55,12 +58,12 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       <div
         className={cn(
           "min-w-0 max-w-[85%] rounded-2xl p-3.5 text-sm shadow-sm",
-          message.role === 'user' 
+          displayRole === 'user' 
             ? 'bg-primary text-primary-foreground rounded-tr-none' 
             : 'bg-muted/60 border border-border/50 rounded-tl-none'
         )}
       >
-        {message.role === 'assistant' ? (
+        {displayRole === 'assistant' ? (
           <ReactMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words">
             {formattedContent}
           </ReactMarkdown>
@@ -68,7 +71,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
           <p className="break-words">{message.content}</p>
         )}
         
-        {showAnalysis && message.role === 'assistant' && message.analysis && (
+        {showAnalysis && displayRole === 'assistant' && message.analysis && (
           <div className="mt-3 text-xs opacity-70">
             <Separator className="my-2" />
             <div className="font-semibold">Analysis:</div>
@@ -131,7 +134,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
         )}
       </div>
       
-      {message.role === 'user' && (
+      {displayRole === 'user' && (
         <Avatar className="w-8 h-8 border border-primary/20">
           <AvatarImage 
             src={user?.user_metadata?.avatar_url} 

@@ -33,13 +33,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-        {chatMessages.map((message, index) => (
-          <ChatMessage 
-            key={index} 
-            message={message}
-            showAnalysis={false}
-          />
-        ))}
+        {chatMessages.map((message, index) => {
+          // Map 'error' role to 'assistant' for display purposes
+          const displayMessage = {
+            ...message,
+            role: message.role === 'error' ? 'assistant' as const : message.role
+          };
+          
+          return (
+            <ChatMessage 
+              key={index} 
+              message={displayMessage}
+              showAnalysis={false}
+            />
+          );
+        })}
         
         {isLoading && (
           <motion.div 

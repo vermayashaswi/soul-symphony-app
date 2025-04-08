@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
@@ -41,23 +40,6 @@ export default function SmartChatInterface() {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const suggestionQuestions = [
-    {
-      text: "What were my top emotions last week?",
-    },
-    {
-      text: "What time of the day do I usually like journaling?",
-    },
-    {
-      text: "Am i am introvert? Do i like people in general?",
-    },
-    {
-      text: "What should i particularly do to help my mental health?",
-    },
-    {
-      text: "Rate my top 3 negative traits out of 100? What do i do to improve them?",
-    }
-  ];
   const { toast } = useToast();
   const { user } = useAuth();
   const chatBottomRef = useRef<HTMLDivElement>(null);
