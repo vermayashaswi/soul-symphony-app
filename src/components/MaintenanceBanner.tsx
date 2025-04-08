@@ -23,12 +23,20 @@ const MaintenanceBanner = () => {
           <AlertDescription className="text-sm font-medium">
             We're currently under maintenance. Be Right Back!
           </AlertDescription>
-          <DialogTrigger asChild onClick={() => setIsDialogOpen(true)}>
-            <Button variant="ghost" size="sm" className="ml-2 text-xs h-6 px-2">
-              <Activity className="h-3 w-3 mr-1" />
-              Check Status
-            </Button>
-          </DialogTrigger>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="ml-2 text-xs h-6 px-2">
+                <Activity className="h-3 w-3 mr-1" />
+                Check Status
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>System Status</DialogTitle>
+              </DialogHeader>
+              <SupabaseStatusChecker />
+            </DialogContent>
+          </Dialog>
         </div>
         <Button 
           variant="ghost" 
@@ -40,15 +48,6 @@ const MaintenanceBanner = () => {
           <span className="sr-only">Close</span>
         </Button>
       </Alert>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>System Status</DialogTitle>
-          </DialogHeader>
-          <SupabaseStatusChecker />
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
