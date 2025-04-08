@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
-import { ChatMessage as ChatMessageType, getThreadMessages } from "@/services/chatPersistenceService";
+import { ChatMessage as ChatMessageType, getThreadMessages, saveMessage } from "@/services/chatPersistenceService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -261,17 +262,9 @@ export default function MobileChatInterface({
     setProcessingStage("Analyzing your question...");
     
     try {
-      const { error: msgError } = await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: threadId,
-          content: message,
-          sender: 'user'
-        });
-        
-      if (msgError) {
-        throw msgError;
-      }
+      // Save user message using the shared saveMessage function
+      const savedUserMessage = await saveMessage(threadId, message, 'user');
+      console.log("[Mobile] User message saved:", savedUserMessage?.id);
       
       window.dispatchEvent(
         new CustomEvent('messageCreated', { 
@@ -328,20 +321,17 @@ export default function MobileChatInterface({
         console.error("[Mobile] Received error response:", response.content);
       }
       
-      const { error: storeError } = await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: threadId,
-          content: response.content,
-          sender: 'assistant',
-          reference_entries: response.references || null,
-          has_numeric_result: response.hasNumericResult || false,
-          analysis_data: response.analysis || null
-        });
-        
-      if (storeError) {
-        console.error("[Mobile] Error storing assistant response:", storeError);
-      }
+      // Save assistant response using the shared saveMessage function
+      const savedResponse = await saveMessage(
+        threadId,
+        response.content,
+        'assistant',
+        response.references || null,
+        response.analysis || null,
+        response.hasNumericResult || false
+      );
+      
+      console.log("[Mobile] Assistant response saved:", savedResponse?.id);
       
       if (messages.length === 0) {
         const truncatedTitle = message.length > 30 
@@ -366,14 +356,28 @@ export default function MobileChatInterface({
     } catch (error: any) {
       console.error("[Mobile] Error sending message:", error);
       
+      const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
+                 (error?.message ? `Error: ${error.message}` : "");
+      
       setMessages(prev => [
         ...prev, 
         { 
           role: 'assistant', 
-          content: "I'm having trouble processing your request. Please try again later. " + 
-                   (error?.message ? `Error: ${error.message}` : "")
+          content: errorMessageContent
         }
       ]);
+      
+      // Ensure error message is saved to database
+      try {
+        const savedErrorMessage = await saveMessage(
+          threadId,
+          errorMessageContent,
+          'assistant'
+        );
+        console.log("[Mobile] Error message saved to database:", savedErrorMessage?.id);
+      } catch (e) {
+        console.error("[Mobile] Failed to save error message:", e);
+      }
     } finally {
       setLoading(false);
       setProcessingStage(null);

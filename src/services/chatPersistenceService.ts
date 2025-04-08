@@ -20,7 +20,7 @@ export type ChatMessage = {
   reference_entries?: any[];
   analysis_data?: any;
   has_numeric_result?: boolean;
-  role: 'user' | 'assistant'; // Changed from optional to required
+  role: 'user' | 'assistant';
 };
 
 // Function to get all chat threads for a user
@@ -63,7 +63,6 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
     
     console.log(`Found ${data?.length || 0} messages for thread ${threadId}`);
     
-    // Fixed: Ensure proper mapping of database fields to ChatMessage type
     return (data || []).map(msg => {
       const messageData: any = msg;
       
@@ -73,7 +72,7 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         content: messageData.content,
         created_at: messageData.created_at,
         sender: messageData.sender === 'user' ? 'user' : 'assistant',
-        role: messageData.sender === 'user' ? 'user' : 'assistant', // Always set role based on sender
+        role: messageData.sender === 'user' ? 'user' : 'assistant',
         reference_entries: messageData.reference_entries ? 
           Array.isArray(messageData.reference_entries) ? 
             messageData.reference_entries : 
@@ -82,7 +81,6 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         has_numeric_result: messageData.has_numeric_result || false
       };
       
-      // Only add analysis_data if it exists in the database response
       if (messageData.analysis_data) {
         typedMessage.analysis_data = messageData.analysis_data;
       } else if (messageData.reference_entries && typeof messageData.reference_entries === 'object') {
@@ -116,6 +114,8 @@ export const saveMessage = async (
       throw new Error("Invalid sender type. Must be 'user' or 'assistant'");
     }
 
+    console.log(`Saving ${sender} message to thread ${threadId}:`, content.substring(0, 50) + "...");
+    
     const { data, error } = await supabase
       .from('chat_messages')
       .insert({
@@ -124,7 +124,7 @@ export const saveMessage = async (
         sender,
         reference_entries: references || null,
         has_numeric_result: hasNumericResult || false,
-        analysis_data: analysisData || null // Store analysis data directly
+        analysis_data: analysisData || null
       })
       .select()
       .single();
@@ -134,11 +134,19 @@ export const saveMessage = async (
       throw error;
     }
     
-    await supabase
+    console.log("Message saved successfully:", data.id);
+    
+    // Update the thread's updated_at timestamp
+    const { error: updateError } = await supabase
       .from('chat_threads')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', threadId);
+      
+    if (updateError) {
+      console.error("Error updating thread timestamp:", updateError);
+    }
     
+    // If this is a user message, log it in user_queries table
     if (sender === 'user') {
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
@@ -156,6 +164,7 @@ export const saveMessage = async (
               queryText: content
             }
           });
+          console.log("User query logged successfully");
         } catch (queryError) {
           console.error("Error logging user query:", queryError);
         }
@@ -170,7 +179,7 @@ export const saveMessage = async (
       content: messageData.content,
       created_at: messageData.created_at,
       sender: messageData.sender === 'user' ? 'user' : 'assistant',
-      role: messageData.sender === 'user' ? 'user' : 'assistant', // Always set role based on sender
+      role: messageData.sender === 'user' ? 'user' : 'assistant',
       reference_entries: messageData.reference_entries ? 
         Array.isArray(messageData.reference_entries) ? 
           messageData.reference_entries : 

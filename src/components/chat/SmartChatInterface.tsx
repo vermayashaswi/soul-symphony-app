@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
@@ -157,7 +158,9 @@ export default function SmartChatInterface() {
     setProcessingStage("Analyzing your question...");
     
     try {
-      await saveMessage(threadId, message, 'user');
+      // Save user message to database
+      const savedUserMessage = await saveMessage(threadId, message, 'user');
+      console.log("User message saved:", savedUserMessage?.id);
       
       console.log("Performing comprehensive query analysis for:", message);
       setProcessingStage("Analyzing patterns in your journal...");
@@ -192,6 +195,7 @@ export default function SmartChatInterface() {
         errorState: response.role === 'error'
       });
       
+      // Save assistant response to database
       const savedResponse = await saveMessage(
         threadId,
         response.content,
@@ -201,9 +205,12 @@ export default function SmartChatInterface() {
         response.hasNumericResult
       );
       
+      console.log("Assistant response saved:", savedResponse?.id);
+      
       if (savedResponse) {
         setChatHistory(prev => [...prev, savedResponse]);
       } else {
+        // Fallback to using temporary message if database save fails
         const assistantMessage: ChatMessageType = {
           id: `temp-response-${Date.now()}`,
           thread_id: threadId,
@@ -217,6 +224,7 @@ export default function SmartChatInterface() {
         };
         
         setChatHistory(prev => [...prev, assistantMessage]);
+        console.error("Failed to save assistant response to database, using temporary message");
       }
     } catch (error: any) {
       console.error("Error sending message:", error);
@@ -233,11 +241,17 @@ export default function SmartChatInterface() {
       
       setChatHistory(prev => [...prev, errorMessage]);
       
-      saveMessage(
-        threadId,
-        errorMessage.content,
-        'assistant'
-      ).catch(e => console.error("Failed to save error message:", e));
+      // Ensure error message is saved to database
+      try {
+        const savedErrorMessage = await saveMessage(
+          threadId,
+          errorMessage.content,
+          'assistant'
+        );
+        console.log("Error message saved to database:", savedErrorMessage?.id);
+      } catch (e) {
+        console.error("Failed to save error message:", e);
+      }
     } finally {
       setLoading(false);
       setProcessingStage(null);
