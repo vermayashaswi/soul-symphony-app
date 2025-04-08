@@ -30,11 +30,24 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     }
   }, [chatMessages, isLoading, prevMessageCount]);
   
+  // Check for duplicates by content to prevent doubled rendering
+  const uniqueMessages = chatMessages.reduce((acc: ChatMessageType[], current) => {
+    const isDuplicate = acc.find(item => 
+      item.id === current.id || 
+      (item.content === current.content && 
+       Math.abs(new Date(item.created_at).getTime() - new Date(current.created_at).getTime()) < 1000)
+    );
+    if (!isDuplicate) {
+      acc.push(current);
+    }
+    return acc;
+  }, []);
+  
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
         <AnimatePresence initial={false}>
-          {chatMessages.map((message, index) => {
+          {uniqueMessages.map((message, index) => {
             // Map 'error' role to 'assistant' for display purposes if needed
             const displayMessage = {
               ...message,

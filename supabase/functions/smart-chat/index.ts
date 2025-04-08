@@ -265,7 +265,7 @@ serve(async (req) => {
     }).join('\n\n');
 
     // 3. Prepare prompt with updated instructions
-    const prompt = `You are SOuLO, a personal mental well-being assistant designed to help users reflect on their emotions, understand patterns in their thoughts, and gain insight from their journaling practice and sometimes also give quantitative assessments, if asked to. 
+    const prompt = `You are SOuLO, a personal mental well-being assistant designed to help users reflect on their emotions, understand patterns in their thoughts, and gain insight from their journaling practice and sometimes also give quantitative assessments, if asked to. If you are responding to an existing conversation thread, don't provide repetitive information.
 
 Below are excerpts from the user's journal entries, along with dates:
 ${entriesWithDates}
