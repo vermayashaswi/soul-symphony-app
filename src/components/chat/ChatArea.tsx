@@ -29,7 +29,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           // Map 'error' role to 'assistant' for display purposes if needed
           const displayMessage = {
             ...message,
-            role: message.role === 'error' ? 'assistant' : message.role
+            // Use type assertion to allow for potential 'error' role which might come from elsewhere
+            role: (message.role as string) === 'error' ? 'assistant' : message.role
           };
           
           return (
