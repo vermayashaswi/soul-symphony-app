@@ -144,12 +144,13 @@ export default function SmartChatInterface() {
       return;
     }
     
-    // Create a proper message object
+    // Create a proper message object with required role property
     const userMessage: ChatMessageType = {
       id: `temp-${Date.now()}`,
       thread_id: threadId,
       content: message,
       sender: 'user',
+      role: 'user', // Explicitly set the role property
       created_at: new Date().toISOString()
     };
     
@@ -207,12 +208,13 @@ export default function SmartChatInterface() {
       if (savedResponse) {
         setChatHistory(prev => [...prev, savedResponse]);
       } else {
-        // Fallback if saving to DB fails
+        // Fallback if saving to DB fails - ensure it has the required role property
         const assistantMessage: ChatMessageType = {
           id: `temp-response-${Date.now()}`,
           thread_id: threadId,
           content: response.content,
           sender: 'assistant',
+          role: 'assistant', // Explicitly set the role property
           created_at: new Date().toISOString(),
           reference_entries: response.references,
           analysis_data: response.analysis,
@@ -224,13 +226,14 @@ export default function SmartChatInterface() {
     } catch (error: any) {
       console.error("Error sending message:", error);
       
-      // Create error message with proper type
+      // Create error message with proper type and required role property
       const errorMessage: ChatMessageType = {
         id: `error-${Date.now()}`,
         thread_id: threadId,
         content: "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : ""),
         sender: 'assistant',
+        role: 'assistant', // Explicitly set the role property
         created_at: new Date().toISOString()
       };
       

@@ -3,15 +3,7 @@ import React, { useRef, useEffect } from "react";
 import ChatMessage from "./ChatMessage";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
-
-export type ChatMessageType = {
-  role: 'user' | 'assistant' | 'error';
-  content: string;
-  references?: any[];
-  analysis?: any;
-  diagnostics?: any;
-  hasNumericResult?: boolean;
-};
+import { ChatMessage as ChatMessageType } from "@/services/chatPersistenceService";
 
 interface ChatAreaProps {
   chatMessages: ChatMessageType[];
@@ -34,7 +26,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
         {chatMessages.map((message, index) => {
-          // Map 'error' role to 'assistant' for display purposes
+          // Map 'error' role to 'assistant' for display purposes if needed
           const displayMessage = {
             ...message,
             role: message.role === 'error' ? 'assistant' as const : message.role

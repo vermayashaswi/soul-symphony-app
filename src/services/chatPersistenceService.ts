@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
@@ -21,7 +20,7 @@ export type ChatMessage = {
   reference_entries?: any[];
   analysis_data?: any;
   has_numeric_result?: boolean;
-  role?: 'user' | 'assistant'; // Added for compatibility with UI components
+  role: 'user' | 'assistant'; // Changed from optional to required
 };
 
 // Function to get all chat threads for a user
@@ -74,7 +73,7 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         content: messageData.content,
         created_at: messageData.created_at,
         sender: messageData.sender === 'user' ? 'user' : 'assistant',
-        role: messageData.sender === 'user' ? 'user' : 'assistant', // Add role for UI compatibility
+        role: messageData.sender === 'user' ? 'user' : 'assistant', // Always set role based on sender
         reference_entries: messageData.reference_entries ? 
           Array.isArray(messageData.reference_entries) ? 
             messageData.reference_entries : 
@@ -171,7 +170,7 @@ export const saveMessage = async (
       content: messageData.content,
       created_at: messageData.created_at,
       sender: messageData.sender === 'user' ? 'user' : 'assistant',
-      role: messageData.sender === 'user' ? 'user' : 'assistant', // Add role for UI compatibility
+      role: messageData.sender === 'user' ? 'user' : 'assistant', // Always set role based on sender
       reference_entries: messageData.reference_entries ? 
         Array.isArray(messageData.reference_entries) ? 
           messageData.reference_entries : 
