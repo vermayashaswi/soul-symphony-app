@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor } from 'lucide-react';
@@ -7,7 +8,6 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 import { useTheme } from '@/hooks/use-theme';
 import { setupJournalReminder, initializeCapacitorNotifications } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,7 @@ import { ColorPicker } from '@/components/settings/ColorPicker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { startOfDay, subDays, isWithinInterval } from 'date-fns';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -57,6 +58,7 @@ export default function Settings() {
   const [showFAQ, setShowFAQ] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [colorPickerValue, setColorPickerValue] = useState(customColor);
   
   const colorThemes = [
     { name: 'Default', color: 'bg-blue-500' },
@@ -155,20 +157,12 @@ export default function Settings() {
       window.location.href = '/';
     }
   };
-  
-  const getThemeStyle = () => {
-    const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
-    return { 
-      color: themeColor, 
-      borderColor: themeColor
-    };
-  };
-  
-  const getThemeBgStyle = () => {
-    const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
-    return { 
-      backgroundColor: `${themeColor}20` 
-    };
+
+  const applyCustomColor = () => {
+    setCustomColor(colorPickerValue);
+    setColorTheme('Custom');
+    toast.success('Custom color applied');
+    setShowColorPicker(false);
   };
 
   return (
@@ -193,7 +187,14 @@ export default function Settings() {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-              <ProfilePictureUpload />
+              <div className="flex flex-col items-center">
+                <Avatar className="h-24 w-24 mb-4">
+                  <AvatarImage src={user?.user_metadata?.avatar_url} />
+                  <AvatarFallback>
+                    {user?.email?.substring(0, 2).toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
               
               <div className="flex-1 space-y-4 text-center sm:text-left">
                 <div>
@@ -328,6 +329,7 @@ export default function Settings() {
                     size="sm" 
                     className="flex items-center gap-2"
                     onClick={() => {
+                      setColorPickerValue(customColor);
                       setShowColorPicker(true);
                     }}
                   >
@@ -471,9 +473,9 @@ export default function Settings() {
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Can I export my journal entries?</h3>
+                <h3 className="text-base font-semibold">Can I chat with my journal?</h3>
                 <p className="text-sm text-muted-foreground">
-                  Currently, we're working on an export feature. In the meantime, you can access all your entries through the Journal tab, where they're organized chronologically.
+                  Yes! One of SOuLO's unique features is the ability to chat with your journal. You can ask questions about your mood patterns, seek insights about your emotional trends, or get personalized reflections based on your journal entries.
                 </p>
               </div>
               
@@ -492,23 +494,23 @@ export default function Settings() {
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Can I use SOuLO offline?</h3>
+                <h3 className="text-base font-semibold">How do I customize the app's appearance?</h3>
                 <p className="text-sm text-muted-foreground">
-                  Some features of SOuLO require an internet connection, especially voice recording and AI analysis. However, you can view your past entries and create text entries offline. They'll sync once you're back online.
+                  In the Settings page, you can switch between light and dark mode, and choose from several color themes. You can even create your own custom color theme to personalize your experience.
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">How do I delete my account?</h3>
+                <h3 className="text-base font-semibold">How do I view my emotional insights?</h3>
                 <p className="text-sm text-muted-foreground">
-                  If you wish to delete your account, please contact our support team through the "Contact Support" button in the Settings page. We'll process your request and permanently delete all your data within 30 days.
+                  Navigate to the Insights tab to see visualizations of your emotional patterns over time. You can view your mood calendar, emotion distribution, and recurring themes from your journal entries.
                 </p>
               </div>
               
               <div className="space-y-2">
                 <h3 className="text-base font-semibold">Is SOuLO available on all devices?</h3>
                 <p className="text-sm text-muted-foreground">
-                  SOuLO is available as a web application that works on all modern browsers. We're currently developing native mobile applications for iOS and Android to provide an enhanced experience on mobile devices.
+                  SOuLO is available as a web application that works on all modern browsers. The responsive design ensures a great experience on both desktop and mobile devices.
                 </p>
               </div>
             </div>
@@ -531,7 +533,7 @@ export default function Settings() {
           </DialogHeader>
           <ScrollArea className="h-[60vh] pr-4">
             <div className="space-y-6 py-2">
-              <p className="text-sm text-muted-foreground">Last Updated: April 5, 2025</p>
+              <p className="text-sm text-muted-foreground">Last Updated: April 8, 2025</p>
               
               <div className="space-y-2">
                 <h3 className="text-base font-semibold">Introduction</h3>
@@ -586,53 +588,18 @@ export default function Settings() {
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Data Sharing</h3>
-                <p className="text-sm text-muted-foreground">
-                  We do not sell your personal information. We may share your information in the following limited circumstances:
-                </p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground ml-4 space-y-1">
-                  <li>With service providers who help us deliver our services</li>
-                  <li>When required by law or government authorities</li>
-                  <li>To protect our rights, property, or safety</li>
-                  <li>In connection with a business transaction (e.g., merger or acquisition)</li>
-                </ul>
-              </div>
-              
-              <div className="space-y-2">
                 <h3 className="text-base font-semibold">Your Choices and Rights</h3>
                 <p className="text-sm text-muted-foreground">
                   You have several rights regarding your personal information:
                 </p>
                 <ul className="list-disc list-inside text-sm text-muted-foreground ml-4 space-y-1">
-                  <li>Access and download your data</li>
+                  <li>Access and view your data</li>
                   <li>Correct inaccurate information</li>
                   <li>Delete your account and associated data</li>
                   <li>Object to certain data processing activities</li>
-                  <li>Opt out of marketing communications</li>
                 </ul>
                 <p className="text-sm text-muted-foreground mt-2">
                   To exercise these rights, please contact us using the information provided at the end of this policy.
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-base font-semibold">Cookies and Tracking Technologies</h3>
-                <p className="text-sm text-muted-foreground">
-                  We use cookies and similar technologies to improve your experience, understand usage patterns, and deliver personalized content. You can manage your cookie preferences through your browser settings.
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-base font-semibold">Children's Privacy</h3>
-                <p className="text-sm text-muted-foreground">
-                  Our service is not intended for individuals under the age of 13. We do not knowingly collect personal information from children. If we discover that we have collected personal information from a child, we will delete it promptly.
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-base font-semibold">Changes to This Policy</h3>
-                <p className="text-sm text-muted-foreground">
-                  We may update this Privacy Policy from time to time. We will notify you of any significant changes by posting the updated policy on our website or through the application.
                 </p>
               </div>
               
@@ -666,20 +633,16 @@ export default function Settings() {
           
           <div className="py-4">
             <ColorPicker
-              value={customColor}
+              value={colorPickerValue}
               onChange={(color) => {
-                setCustomColor(color);
-                setColorTheme('Custom');
+                setColorPickerValue(color);
               }}
             />
           </div>
           
           <div className="flex justify-end mt-2">
             <Button 
-              onClick={() => {
-                setShowColorPicker(false);
-                toast.success('Custom color applied');
-              }}
+              onClick={applyCustomColor}
               className="bg-theme-color hover:bg-theme-color/90"
             >
               Apply Color

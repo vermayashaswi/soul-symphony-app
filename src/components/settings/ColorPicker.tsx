@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { cn } from '@/lib/utils';
@@ -30,7 +31,7 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
     }
   }, [value]);
 
-  // Update color when HSL changes
+  // Update current preview color when HSL changes, but don't call onChange
   useEffect(() => {
     const hexColor = hslToHex(hue, saturation, lightness);
     setCurrentColor(hexColor);
@@ -38,23 +39,28 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
 
   const handleHueChange = (newHue: number[]) => {
     setHue(newHue[0]);
-    updateColor(newHue[0], saturation, lightness);
+    updateLocalColor(newHue[0], saturation, lightness);
   };
 
   const handleSaturationChange = (newSaturation: number[]) => {
     setSaturation(newSaturation[0]);
-    updateColor(hue, newSaturation[0], lightness);
+    updateLocalColor(hue, newSaturation[0], lightness);
   };
 
   const handleLightnessChange = (newLightness: number[]) => {
     setLightness(newLightness[0]);
-    updateColor(hue, saturation, newLightness[0]);
+    updateLocalColor(hue, saturation, newLightness[0]);
   };
 
-  const updateColor = (h: number, s: number, l: number) => {
+  // This updates the local preview color without calling the onChange prop
+  const updateLocalColor = (h: number, s: number, l: number) => {
     const hexColor = hslToHex(h, s, l);
     setCurrentColor(hexColor);
-    onChange(hexColor);
+  };
+  
+  // This function explicitly triggers the onChange callback
+  const applyColor = () => {
+    onChange(currentColor);
   };
 
   const handleSpectrumClick = (e: React.MouseEvent) => {
@@ -64,7 +70,7 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
       const width = rect.width;
       const newHue = Math.round((x / width) * 360);
       setHue(newHue);
-      updateColor(newHue, saturation, lightness);
+      updateLocalColor(newHue, saturation, lightness);
     }
   };
 

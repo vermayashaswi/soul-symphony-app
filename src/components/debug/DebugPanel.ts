@@ -1,5 +1,6 @@
 
-// Stub debug functions since debug mode was removed
+// This file has been emptied as part of the Debug Mode removal.
+// It's kept in place to prevent import errors, but all functionality has been removed.
 
 export const debugLogger = {
   setLastProfileError: (_: any) => {}
