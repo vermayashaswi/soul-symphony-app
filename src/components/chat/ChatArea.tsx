@@ -18,8 +18,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [prevMessageCount, setPrevMessageCount] = useState(0);
+  const [lastUserMessage, setLastUserMessage] = useState<ChatMessageType | null>(null);
   
   useEffect(() => {
+    // Find the last user message
+    if (chatMessages.length > 0) {
+      const lastMsg = [...chatMessages].reverse().find(msg => msg.role === 'user');
+      setLastUserMessage(lastMsg || null);
+    } else {
+      setLastUserMessage(null);
+    }
+
     // Only scroll to bottom if:
     // 1. New messages were added
     // 2. Loading state changed
@@ -43,11 +52,29 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     return acc;
   }, []);
   
+  // Filter out the last user message when loading to show it in the sticky header
+  const filteredMessages = isLoading && lastUserMessage 
+    ? uniqueMessages.filter(msg => msg.id !== lastUserMessage.id)
+    : uniqueMessages;
+  
   return (
     <div className="flex flex-col h-full">
+      {isLoading && lastUserMessage && (
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b pb-3 pt-2 px-4">
+          <div className="flex items-start gap-3">
+            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-xs font-medium text-primary-foreground">
+              You
+            </div>
+            <div className="bg-muted p-3 rounded-xl max-w-[75%] text-sm">
+              {lastUserMessage.content}
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
         <AnimatePresence initial={false}>
-          {uniqueMessages.map((message, index) => {
+          {filteredMessages.map((message, index) => {
             // Map 'error' role to 'assistant' for display purposes if needed
             const displayMessage = {
               ...message,
