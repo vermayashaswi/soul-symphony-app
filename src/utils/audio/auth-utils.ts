@@ -2,40 +2,29 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Verifies that the user is authenticated
+ * Verifies user authentication status
  */
-export const verifyUserAuthentication = async (): Promise<{
+export async function verifyUserAuthentication(): Promise<{
   isAuthenticated: boolean;
   userId?: string;
   error?: string;
-}> => {
+}> {
   try {
-    const { data: session, error } = await supabase.auth.getSession();
+    const { data: { user } } = await supabase.auth.getUser();
     
-    if (error) {
-      console.error('Authentication error:', error.message);
-      return {
-        isAuthenticated: false,
-        error: error.message
+    if (!user) {
+      return { 
+        isAuthenticated: false, 
+        error: 'You must be signed in to save journal entries.' 
       };
     }
     
-    if (!session.session) {
-      return {
-        isAuthenticated: false,
-        error: 'No active session'
-      };
-    }
-    
-    return {
-      isAuthenticated: true,
-      userId: session.session.user.id
-    };
+    return { isAuthenticated: true, userId: user.id };
   } catch (error: any) {
-    console.error('Error checking authentication:', error);
-    return {
-      isAuthenticated: false,
-      error: error.message
+    console.error('Auth verification error:', error);
+    return { 
+      isAuthenticated: false, 
+      error: `Authentication error: ${error.message || 'Unknown error'}`
     };
   }
-};
+}

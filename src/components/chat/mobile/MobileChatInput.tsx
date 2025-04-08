@@ -1,21 +1,25 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, MicOff, Loader2 } from "lucide-react";
+import { Send, Mic, MicOff, Loader2, Bug } from "lucide-react";
 import { motion } from "framer-motion";
-import { sendAudioForTranscription } from "@/utils/audio/transcription-service";
-import { toast } from "sonner";
+import { recordAudio } from "@/utils/audioRecorder";
+import { useChatDebug } from "@/components/chat/ChatDebugPanel";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
   isLoading: boolean;
   userId?: string;
+  onToggleDebug?: () => void;
+  debugModeActive?: boolean;
 }
 
 export default function MobileChatInput({
   onSendMessage,
   isLoading,
-  userId
+  userId,
+  onToggleDebug,
+  debugModeActive = false
 }: MobileChatInputProps) {
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -24,6 +28,7 @@ export default function MobileChatInput({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recordingRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const chatDebug = useChatDebug();
 
   useEffect(() => {
     if (isRecording) {
@@ -68,8 +73,10 @@ export default function MobileChatInput({
     const trimmedValue = inputValue.trim();
     if (trimmedValue) {
       try {
+        chatDebug.addEvent("User Message", `Preparing to send: "${trimmedValue.substring(0, 30)}${trimmedValue.length > 30 ? '...' : ''}"`);
         setIsSubmitting(true);
         
+        chatDebug.addEvent("Send Message", "Calling onSendMessage handler");
         onSendMessage(trimmedValue);
         
         setInputValue("");
@@ -77,8 +84,11 @@ export default function MobileChatInput({
           inputRef.current.style.height = 'auto';
           inputRef.current.focus();
         }
+        
+        chatDebug.addEvent("User Input", "Reset input field after sending");
       } catch (error) {
         console.error("Error sending message:", error);
+        chatDebug.addEvent("Send Error", error instanceof Error ? error.message : "Unknown error sending message");
       } finally {
         setIsSubmitting(false);
       }
@@ -86,84 +96,42 @@ export default function MobileChatInput({
   };
 
   const handleStartRecording = async () => {
-    if (!userId) {
-      toast.error("Please log in to use voice recording");
-      return;
-    }
-    
+    chatDebug.addEvent("Audio Recording", "Starting audio recording...");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-      
-      const mediaRecorder = new MediaRecorder(stream);
-      const audioChunks: BlobPart[] = [];
-      
-      mediaRecorder.addEventListener('dataavailable', (event) => {
-        audioChunks.push(event.data);
-      });
-      
-      mediaRecorder.addEventListener('stop', async () => {
-        try {
-          setIsSubmitting(true);
-          
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          
-          // Convert the blob to base64
-          const base64Audio = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(audioBlob);
-            reader.onloadend = () => {
-              const base64data = reader.result as string;
-              resolve(base64data);
-            };
-          });
-          
-          // Send for transcription
-          const result = await sendAudioForTranscription(
-            base64Audio.split(',')[1], // Remove the data URL prefix
-            userId,
-            true // Use direct transcription mode
-          );
-          
-          if (result.success && result.data?.transcription) {
-            onSendMessage(result.data.transcription, true);
-          } else {
-            toast.error("Failed to transcribe audio. Please try again.");
-          }
-        } catch (error) {
-          console.error("Error processing audio:", error);
-          toast.error("Error processing audio. Please try again.");
-        } finally {
-          setIsSubmitting(false);
-          setIsRecording(false);
-        }
-      });
-      
-      mediaRecorder.start();
-      recordingRef.current = mediaRecorder;
+      const recorder = await recordAudio();
+      recordingRef.current = recorder;
+      recorder.start();
       setIsRecording(true);
-      
+      chatDebug.addEvent("Audio Recording", "Recording started successfully");
     } catch (error) {
+      chatDebug.addEvent("Audio Recording", error instanceof Error ? error.message : "Could not access microphone");
       console.error("Error starting recording:", error);
-      toast.error("Could not access microphone. Please check permissions.");
+      alert("Could not access microphone. Please check permissions.");
     }
   };
 
   const handleStopRecording = async () => {
+    chatDebug.addEvent("Audio Recording", "Stopping audio recording...");
     if (!recordingRef.current) return;
     
     try {
-      recordingRef.current.stop();
-      const tracks = recordingRef.current.stream.getTracks();
-      tracks.forEach((track: MediaStreamTrack) => track.stop());
-    } catch (error) {
-      console.error("Error stopping recording:", error);
+      setIsSubmitting(true);
+      const audio = await recordingRef.current.stop();
       setIsRecording(false);
+      
+      // Get audio blob from the recorder
+      const audioBlob = await fetch(audio.audioUrl).then(r => r.blob());
+      
+      chatDebug.addEvent("Audio Recording", `Recording completed (${recordingTime}s)`);
+      
+      // For now, just send a placeholder message
+      onSendMessage("I sent an audio message", true);
+      
+      chatDebug.addEvent("Audio Processing", "Sending audio message placeholder");
+    } catch (error) {
+      chatDebug.addEvent("Audio Recording", error instanceof Error ? error.message : "Error stopping recording");
+      console.error("Error stopping recording:", error);
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -176,6 +144,19 @@ export default function MobileChatInput({
 
   return (
     <div className="p-3 bg-background border-t border-border flex items-end gap-2">
+      {onToggleDebug && (
+        <Button
+          type="button"
+          size="icon"
+          variant={debugModeActive ? "default" : "ghost"}
+          className="h-10 w-10 rounded-full"
+          onClick={onToggleDebug}
+          title="Toggle debug panel"
+        >
+          <Bug className="h-5 w-5" />
+        </Button>
+      )}
+      
       <div className="flex-1 relative">
         <textarea
           ref={inputRef}

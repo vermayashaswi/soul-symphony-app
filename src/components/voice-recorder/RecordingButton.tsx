@@ -13,7 +13,7 @@ interface RecordingButtonProps {
   onPermissionRequest: () => void;
   audioLevel?: number;
   showAnimation?: boolean;
-  audioBlob?: Blob | null;
+  audioBlob?: Blob | null; // Add this to track if we have a recording
 }
 
 export function RecordingButton({
@@ -39,7 +39,7 @@ export function RecordingButton({
     );
   }
   
-  // Dynamic glow effect based on audio level
+  // Dynamic glow effect based on audio level - keep this prominent
   const glowSize = isRecording ? Math.max(12, Math.min(60, audioLevel / 5 * 3)) : 0;
   
   // Get button color based on state

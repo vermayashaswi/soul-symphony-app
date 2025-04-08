@@ -1,9 +1,8 @@
-
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { clearAllToasts } from '@/services/notificationService';
 
 // Flag to track if an entry is being processed to prevent duplicate notifications
 let isEntryBeingProcessed = false;
@@ -21,8 +20,8 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
 }> {
   console.log('[AudioProcessing] Starting processing with blob:', audioBlob?.size, audioBlob?.type);
   
-  // Clear any existing toasts
-  toast.dismiss();
+  // Clear all toasts to ensure UI is clean before processing
+  clearAllToasts();
   
   // If there's already a processing operation in progress, wait briefly
   if (processingLock) {
@@ -89,14 +88,9 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     }
     
     // Launch the processing without awaiting it
-    toast.loading('Processing your journal entry...');
     processRecordingInBackground(audioBlob, userId, tempId)
-      .then(() => {
-        toast.success('Journal entry saved successfully!');
-      })
       .catch(err => {
         console.error('Background processing error:', err);
-        toast.error('Failed to process journal entry');
         isEntryBeingProcessed = false;
         processingLock = false;
         
@@ -285,14 +279,18 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
             if (text) {
               // Call the generate-themes function directly
               console.log("Calling generate-themes with text:", text.substring(0, 50) + "...");
-              await supabase.functions.invoke('generate-themes', {
+              const { error } = await supabase.functions.invoke('generate-themes', {
                 body: {
                   text: text,
                   entryId: result.data.entryId
                 }
               });
               
-              console.log("Successfully triggered theme extraction");
+              if (error) {
+                console.error("Error calling generate-themes:", error);
+              } else {
+                console.log("Successfully triggered theme extraction");
+              }
             } else {
               console.error("No text content found for theme extraction");
             }
@@ -338,7 +336,13 @@ export function resetProcessingState(): void {
     clearTimeout(processingTimeoutId);
     processingTimeoutId = null;
   }
+  
+  // Clear all toasts to ensure UI is clean
+  clearAllToasts();
 }
+
+// Variable to check if user has previous entries
+let hasPreviousEntries = false;
 
 /**
  * Ensures that a user profile exists for the given user ID
@@ -354,6 +358,16 @@ async function ensureUserProfileExists(userId: string | undefined): Promise<bool
       .select('id, onboarding_completed')
       .eq('id', userId)
       .single();
+      
+    // Check if user has existing journal entries
+    const { data: entries, error: entriesError } = await supabase
+      .from('Journal Entries')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1);
+      
+    hasPreviousEntries = !entriesError && entries && entries.length > 0;
+    console.log('User has previous entries:', hasPreviousEntries);
       
     // If profile doesn't exist, create one
     if (fetchError || !profile) {
