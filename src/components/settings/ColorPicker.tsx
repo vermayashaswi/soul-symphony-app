@@ -35,6 +35,7 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   useEffect(() => {
     const hexColor = hslToHex(hue, saturation, lightness);
     setCurrentColor(hexColor);
+    // Removed the onChange call here to prevent auto-apply
   }, [hue, saturation, lightness]);
 
   const handleHueChange = (newHue: number[]) => {
@@ -56,6 +57,7 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   const updateLocalColor = (h: number, s: number, l: number) => {
     const hexColor = hslToHex(h, s, l);
     setCurrentColor(hexColor);
+    // Removed the onChange call here to prevent auto-apply
   };
   
   // This function explicitly triggers the onChange callback
