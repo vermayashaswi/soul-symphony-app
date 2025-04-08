@@ -29,22 +29,53 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [showPlaceholder, setShowPlaceholder] = useState(true);
+  const [typingPlaceholder, setTypingPlaceholder] = useState("");
+  const [isTyping, setIsTyping] = useState(true);
+  const [typingIndex, setTypingIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const totalEntriesCount = entries.length;
 
-  // Set up the animation for the placeholder text
+  // Set up the typing animation for the placeholder text
   useEffect(() => {
-    const interval = setInterval(() => {
-      setShowPlaceholder(false);
-      setTimeout(() => {
-        setPlaceholderIndex((prevIndex) => (prevIndex + 1) % searchPrompts.length);
-        setShowPlaceholder(true);
-      }, 500); // Time for fade out before changing text
-    }, 3000); // Change text every 3 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+    if (isTyping) {
+      const currentWord = searchPrompts[placeholderIndex];
+      
+      if (typingIndex < currentWord.length) {
+        // Typing phase
+        const typingTimeout = setTimeout(() => {
+          setTypingPlaceholder(currentWord.substring(0, typingIndex + 1));
+          setTypingIndex(typingIndex + 1);
+        }, 100); // Speed of typing
+        
+        return () => clearTimeout(typingTimeout);
+      } else {
+        // Word is fully typed, pause before erasing
+        const pauseTimeout = setTimeout(() => {
+          setIsTyping(false);
+        }, 1500); // Pause with full word
+        
+        return () => clearTimeout(pauseTimeout);
+      }
+    } else {
+      // Erasing phase
+      if (typingIndex > 0) {
+        const erasingTimeout = setTimeout(() => {
+          setTypingPlaceholder(searchPrompts[placeholderIndex].substring(0, typingIndex - 1));
+          setTypingIndex(typingIndex - 1);
+        }, 60); // Speed of erasing (slightly faster than typing)
+        
+        return () => clearTimeout(erasingTimeout);
+      } else {
+        // Word is fully erased, move to next word
+        const nextWordTimeout = setTimeout(() => {
+          setPlaceholderIndex((prevIndex) => (prevIndex + 1) % searchPrompts.length);
+          setIsTyping(true);
+        }, 300); // Pause before starting next word
+        
+        return () => clearTimeout(nextWordTimeout);
+      }
+    }
+  }, [isTyping, typingIndex, placeholderIndex]);
 
   // Handle search functionality
   useEffect(() => {
@@ -128,7 +159,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
             <Input
               ref={inputRef}
               type="text"
-              placeholder={showPlaceholder ? `Search for ${searchPrompts[placeholderIndex]}...` : "Search journal entries..."}
+              placeholder={`Search for ${typingPlaceholder}${isTyping ? '|' : ''}`}
               value={searchQuery}
               onChange={handleSearchChange}
               className="w-full pl-9"
