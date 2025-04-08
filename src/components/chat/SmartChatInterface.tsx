@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
@@ -100,12 +101,12 @@ export default function SmartChatInterface() {
       }
       
       if (data && data.length > 0) {
-        const formattedMessages = data.map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
+        const formattedMessages: ChatMessage[] = data.map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant' as ChatMessageRole,
           content: msg.content,
           references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-          analysis: msg.analysis_data,
-          hasNumericResult: msg.has_numeric_result
+          analysis: msg.analysis_data || undefined,
+          hasNumericResult: msg.has_numeric_result || false
         }));
         
         setChatHistory(formattedMessages);
@@ -330,16 +331,12 @@ export default function SmartChatInterface() {
       
       <div className="chat-content flex-1 overflow-hidden">
         {chatHistory.length === 0 ? (
-          <EmptyChatState 
-            suggestions={suggestionQuestions} 
-            onSelectSuggestion={handleSendMessage} 
-            showSuggestions={showSuggestions}
-          />
+          <EmptyChatState />
         ) : (
           <ChatArea 
-            messages={chatHistory}
-            loading={loading}
-            loadingStage={processingStage}
+            chatMessages={chatHistory}
+            isLoading={loading}
+            processingStage={processingStage || undefined}
           />
         )}
       </div>
@@ -349,13 +346,16 @@ export default function SmartChatInterface() {
           <div className="flex-1">
             <ChatInput 
               onSendMessage={handleSendMessage} 
-              disabled={loading} 
-              className="w-full"
+              isLoading={loading} 
+              userId={user?.id}
             />
           </div>
           <VoiceRecordingButton 
-            onTranscription={handleSendMessage}
-            isDisabled={loading}
+            isLoading={loading}
+            isRecording={false}
+            recordingTime={0}
+            onStartRecording={() => {}}
+            onStopRecording={() => {}}
           />
         </div>
       </div>
