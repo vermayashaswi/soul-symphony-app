@@ -550,7 +550,7 @@ export default function MobileChatInterface({
                     >
                       <div className="flex items-start w-full">
                         <span className="flex-shrink-0 mt-0.5">{question.icon}</span>
-                        <span className="ml-1 flex-grow break-words">{question.text}</span>
+                        <span className="ml-1 flex-grow break-words whitespace-normal">{question.text}</span>
                       </div>
                     </Button>
                   ))}

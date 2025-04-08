@@ -23,7 +23,7 @@ const EmptyChatState: React.FC = () => {
       
       <div className="mt-6 text-sm text-muted-foreground/70">
         <p>Try questions like:</p>
-        <ul className="mt-1 space-y-1">
+        <ul className="mt-1 space-y-1 max-w-[280px] mx-auto">
           <li className="flex items-start">
             <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
             <span className="text-left break-words whitespace-normal">What were my top emotions last week?</span>
