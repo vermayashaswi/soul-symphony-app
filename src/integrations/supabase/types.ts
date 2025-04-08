@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       chat_messages: {
         Row: {
+          analysis_data: Json | null
           content: string
           created_at: string
           has_numeric_result: boolean | null
@@ -20,6 +21,7 @@ export type Database = {
           thread_id: string
         }
         Insert: {
+          analysis_data?: Json | null
           content: string
           created_at?: string
           has_numeric_result?: boolean | null
@@ -29,6 +31,7 @@ export type Database = {
           thread_id: string
         }
         Update: {
+          analysis_data?: Json | null
           content?: string
           created_at?: string
           has_numeric_result?: boolean | null

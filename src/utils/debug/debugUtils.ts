@@ -1,5 +1,25 @@
 
-import { LogLevel } from "./debugLogTypes";
+import { v4 as uuidv4 } from 'uuid';
+import { DebugLogEntry, LogLevel } from "./debugLogTypes";
+
+/**
+ * Creates a new debug log entry
+ */
+export const createLogEntry = (
+  category: string, 
+  message: string, 
+  level: LogLevel = 'info',
+  details?: any
+): DebugLogEntry => {
+  return {
+    id: uuidv4(),
+    timestamp: Date.now(),
+    category,
+    message,
+    level,
+    details
+  };
+};
 
 /**
  * Format a timestamp for display in the debug log
@@ -50,5 +70,20 @@ export const getLogLevelBgColor = (level: LogLevel): string => {
       return 'bg-red-50';
     default:
       return 'bg-gray-50';
+  }
+};
+
+/**
+ * Convert milliseconds to a readable duration
+ */
+export const formatDuration = (ms: number): string => {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  } else if (ms < 60000) {
+    return `${(ms / 1000).toFixed(1)}s`;
+  } else {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = ((ms % 60000) / 1000).toFixed(1);
+    return `${minutes}m ${seconds}s`;
   }
 };

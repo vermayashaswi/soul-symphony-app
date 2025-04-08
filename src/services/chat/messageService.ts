@@ -99,8 +99,15 @@ export const saveMessage = async (
       throw new Error(`Thread ${threadId} does not exist`);
     }
     
-    // Prepare the message data - only include analysis_data if it's provided
-    const messageData: Record<string, any> = {
+    // Define the message structure with explicit type to ensure compile-time type checking
+    const messageData: {
+      thread_id: string;
+      content: string;
+      sender: string;
+      reference_entries: any[] | null;
+      has_numeric_result: boolean;
+      analysis_data?: any;
+    } = {
       thread_id: threadId,
       content: content,
       sender: sender,
