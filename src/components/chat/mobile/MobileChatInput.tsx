@@ -73,10 +73,10 @@ export default function MobileChatInput({
     const trimmedValue = inputValue.trim();
     if (trimmedValue) {
       try {
-        chatDebug.addEvent("User Message", `Preparing to send: "${trimmedValue.substring(0, 30)}${trimmedValue.length > 30 ? '...' : ''}"`, "info");
+        chatDebug.addEvent("User Message", `Preparing to send: "${trimmedValue.substring(0, 30)}${trimmedValue.length > 30 ? '...' : ''}"`);
         setIsSubmitting(true);
         
-        chatDebug.addEvent("Send Message", "Calling onSendMessage handler", "info");
+        chatDebug.addEvent("Send Message", "Calling onSendMessage handler");
         onSendMessage(trimmedValue);
         
         setInputValue("");
@@ -85,10 +85,10 @@ export default function MobileChatInput({
           inputRef.current.focus();
         }
         
-        chatDebug.addEvent("User Input", "Reset input field after sending", "success");
+        chatDebug.addEvent("User Input", "Reset input field after sending");
       } catch (error) {
         console.error("Error sending message:", error);
-        chatDebug.addEvent("Send Error", error instanceof Error ? error.message : "Unknown error sending message", "error");
+        chatDebug.addEvent("Send Error", error instanceof Error ? error.message : "Unknown error sending message");
       } finally {
         setIsSubmitting(false);
       }
@@ -96,22 +96,22 @@ export default function MobileChatInput({
   };
 
   const handleStartRecording = async () => {
-    chatDebug.addEvent("Audio Recording", "Starting audio recording...", "info");
+    chatDebug.addEvent("Audio Recording", "Starting audio recording...");
     try {
       const recorder = await recordAudio();
       recordingRef.current = recorder;
       recorder.start();
       setIsRecording(true);
-      chatDebug.addEvent("Audio Recording", "Recording started successfully", "success");
+      chatDebug.addEvent("Audio Recording", "Recording started successfully");
     } catch (error) {
-      chatDebug.addEvent("Audio Recording", error instanceof Error ? error.message : "Could not access microphone", "error");
+      chatDebug.addEvent("Audio Recording", error instanceof Error ? error.message : "Could not access microphone");
       console.error("Error starting recording:", error);
       alert("Could not access microphone. Please check permissions.");
     }
   };
 
   const handleStopRecording = async () => {
-    chatDebug.addEvent("Audio Recording", "Stopping audio recording...", "info");
+    chatDebug.addEvent("Audio Recording", "Stopping audio recording...");
     if (!recordingRef.current) return;
     
     try {
@@ -122,14 +122,14 @@ export default function MobileChatInput({
       // Get audio blob from the recorder
       const audioBlob = await fetch(audio.audioUrl).then(r => r.blob());
       
-      chatDebug.addEvent("Audio Recording", `Recording completed (${recordingTime}s)`, "success");
+      chatDebug.addEvent("Audio Recording", `Recording completed (${recordingTime}s)`);
       
       // For now, just send a placeholder message
       onSendMessage("I sent an audio message", true);
       
-      chatDebug.addEvent("Audio Processing", "Sending audio message placeholder", "info");
+      chatDebug.addEvent("Audio Processing", "Sending audio message placeholder");
     } catch (error) {
-      chatDebug.addEvent("Audio Recording", error instanceof Error ? error.message : "Error stopping recording", "error");
+      chatDebug.addEvent("Audio Recording", error instanceof Error ? error.message : "Error stopping recording");
       console.error("Error stopping recording:", error);
     } finally {
       setIsSubmitting(false);

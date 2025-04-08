@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, MessageSquare, Trash2, ChevronRight, Pencil, Check } from "lucide-react";
@@ -45,7 +46,7 @@ export default function ChatThreadList({
     // Listen for thread title updates
     const handleThreadTitleUpdate = (event: CustomEvent) => {
       if (event.detail.threadId && event.detail.title) {
-        chatDebug?.addEvent("Thread Update", `Updating thread title: ${event.detail.threadId} -> ${event.detail.title}`, "info");
+        chatDebug.addEvent("Thread Update", `Updating thread title: ${event.detail.threadId} -> ${event.detail.title}`);
         setThreads(prev => prev.map(thread => 
           thread.id === event.detail.threadId 
             ? { ...thread, title: event.detail.title } 
@@ -72,18 +73,18 @@ export default function ChatThreadList({
     if (!userId) return;
     
     setLoading(true);
-    chatDebug?.addEvent("Thread List", `Fetching threads for user: ${userId}`, "info");
+    chatDebug.addEvent("Thread List", `Fetching threads for user: ${userId}`);
     try {
       console.log("Fetching threads for user:", userId);
       
       const threadList = await getUserChatThreads(userId);
       console.log(`Found ${threadList.length} threads`);
-      chatDebug?.addEvent("Thread List", `Found ${threadList.length} threads`, "success");
+      chatDebug.addEvent("Thread List", `Found ${threadList.length} threads`);
       
       setThreads(threadList);
     } catch (error) {
       console.error("Error loading threads:", error);
-      chatDebug?.addEvent("Thread List", `Error loading threads: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+      chatDebug.addEvent("Thread List", `Error loading threads: ${error instanceof Error ? error.message : "Unknown error"}`);
       toast({
         title: "Error",
         description: "Failed to load conversations",
@@ -96,18 +97,18 @@ export default function ChatThreadList({
 
   const handleNewThread = async () => {
     try {
-      chatDebug?.addEvent("Thread Creation", "Creating new thread", "info");
+      chatDebug.addEvent("Thread Creation", "Creating new thread");
       const newThreadId = await onStartNewThread();
       
       if (newThreadId) {
-        chatDebug?.addEvent("Thread Creation", `Created new thread: ${newThreadId}`, "success");
+        chatDebug.addEvent("Thread Creation", `Created new thread: ${newThreadId}`);
         console.log("Created new thread:", newThreadId);
         
         // Reload threads to include the new one
         await loadThreads();
       }
     } catch (error) {
-      chatDebug?.addEvent("Thread Creation", `Error creating new thread: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+      chatDebug.addEvent("Thread Creation", `Error creating new thread: ${error instanceof Error ? error.message : "Unknown error"}`);
       console.error("Error creating new thread:", error);
       toast({
         title: "Error",
@@ -121,7 +122,7 @@ export default function ChatThreadList({
     event.stopPropagation();
     
     try {
-      chatDebug?.addEvent("Thread Deletion", `Deleting thread: ${threadId}`, "info");
+      chatDebug.addEvent("Thread Deletion", `Deleting thread: ${threadId}`);
       console.log("Deleting thread:", threadId);
       
       const { error: messagesError } = await supabase
@@ -130,7 +131,7 @@ export default function ChatThreadList({
         .eq('thread_id', threadId);
         
       if (messagesError) {
-        chatDebug?.addEvent("Thread Deletion", `Error deleting messages: ${messagesError.message}`, "error");
+        chatDebug.addEvent("Thread Deletion", `Error deleting messages: ${messagesError.message}`);
         console.error("Error deleting messages:", messagesError);
         throw messagesError;
       }
@@ -141,17 +142,17 @@ export default function ChatThreadList({
         .eq('id', threadId);
         
       if (threadError) {
-        chatDebug?.addEvent("Thread Deletion", `Error deleting thread: ${threadError.message}`, "error");
+        chatDebug.addEvent("Thread Deletion", `Error deleting thread: ${threadError.message}`);
         console.error("Error deleting thread:", threadError);
         throw threadError;
       }
       
-      chatDebug?.addEvent("Thread Deletion", "Thread and messages deleted successfully", "success");
+      chatDebug.addEvent("Thread Deletion", "Thread and messages deleted successfully");
       setThreads(prev => prev.filter(thread => thread.id !== threadId));
       
       // If we're deleting the current thread, trigger a new thread creation
       if (threadId === currentThreadId) {
-        chatDebug?.addEvent("Thread Deletion", "Deleted current thread, creating new thread", "info");
+        chatDebug.addEvent("Thread Deletion", "Deleted current thread, creating new thread");
         console.log("Deleted current thread, creating new thread");
         await handleNewThread();
       }
@@ -161,7 +162,7 @@ export default function ChatThreadList({
         description: "Conversation deleted",
       });
     } catch (error) {
-      chatDebug?.addEvent("Thread Deletion", `Error deleting thread: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+      chatDebug.addEvent("Thread Deletion", `Error deleting thread: ${error instanceof Error ? error.message : "Unknown error"}`);
       console.error("Error deleting thread:", error);
       toast({
         title: "Error",
@@ -190,7 +191,7 @@ export default function ChatThreadList({
     }
     
     try {
-      chatDebug?.addEvent("Thread Edit", `Updating thread title: ${threadId} -> ${editTitle}`, "info");
+      chatDebug.addEvent("Thread Edit", `Updating thread title: ${threadId} -> ${editTitle}`);
       const success = await updateThreadTitle(threadId, editTitle);
       
       if (success) {
@@ -205,12 +206,12 @@ export default function ChatThreadList({
           description: "Thread title updated",
         });
         
-        chatDebug?.addEvent("Thread Edit", "Thread title updated successfully", "success");
+        chatDebug.addEvent("Thread Edit", "Thread title updated successfully");
       } else {
         throw new Error("Failed to update thread title");
       }
     } catch (error) {
-      chatDebug?.addEvent("Thread Edit", `Error updating thread title: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+      chatDebug.addEvent("Thread Edit", `Error updating thread title: ${error instanceof Error ? error.message : "Unknown error"}`);
       console.error("Error updating thread title:", error);
       toast({
         title: "Error",
