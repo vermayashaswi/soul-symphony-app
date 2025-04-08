@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
-import ChatMessage from "./ChatMessage";
+import ChatArea from "./ChatArea";
 import { Button } from "@/components/ui/button";
 import { processChatMessage } from "@/services/chatService";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import EmptyChatState from "./EmptyChatState";
-import ChatArea from "./ChatArea";
 import VoiceRecordingButton from "./VoiceRecordingButton";
 import { Trash, Bug } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,13 +20,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChatMessage as ChatMessageType, getUserChatThreads, getThreadMessages, saveMessage } from "@/services/chatPersistenceService";
-import ChatDebugPanel, { ChatDebugProvider, useChatDebug } from "./ChatDebugPanel";
+import { ChatMessage } from "@/services/chat";
+import { getThreadMessages, saveMessage } from "@/services/chat";
+import { useDebugLog } from "@/utils/debug/DebugContext";
+import DebugLogPanel from "@/components/debug/DebugLogPanel";
 
-type ChatMessageRole = 'user' | 'assistant' | 'error';
-
-const SmartChatInterfaceContent = () => {
-  const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
+const SmartChatInterface = () => {
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
@@ -39,14 +38,14 @@ const SmartChatInterfaceContent = () => {
   const { user } = useAuth();
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const loadedThreadRef = useRef<string | null>(null);
-  const chatDebug = useChatDebug();
+  const debugLog = useDebugLog();
 
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
         setCurrentThreadId(event.detail.threadId);
         loadThreadMessages(event.detail.threadId);
-        chatDebug.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
+        debugLog.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
       }
     };
     
@@ -56,10 +55,10 @@ const SmartChatInterfaceContent = () => {
     if (storedThreadId && user?.id) {
       setCurrentThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
-      chatDebug.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
+      debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
       setInitialLoading(false);
-      chatDebug.addEvent("Initialization", "No stored thread found, showing empty state", "info");
+      debugLog.addEvent("Initialization", "No stored thread found, showing empty state", "info");
     }
     
     return () => {
@@ -84,12 +83,12 @@ const SmartChatInterfaceContent = () => {
     }
     
     if (loadedThreadRef.current === threadId) {
-      chatDebug.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
+      debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
       return;
     }
     
     setInitialLoading(true);
-    chatDebug.addEvent("Thread Loading", `Loading messages for thread ${threadId}`, "info");
+    debugLog.addEvent("Thread Loading", `Loading messages for thread ${threadId}`, "info");
     
     try {
       const { data: threadData, error: threadError } = await supabase
@@ -100,7 +99,7 @@ const SmartChatInterfaceContent = () => {
         .single();
         
       if (threadError || !threadData) {
-        chatDebug.addEvent("Thread Loading", `Thread not found or doesn't belong to user: ${threadError?.message || "Unknown error"}`, "error");
+        debugLog.addEvent("Thread Loading", `Thread not found or doesn't belong to user: ${threadError?.message || "Unknown error"}`, "error");
         console.error("Thread not found or doesn't belong to user:", threadError);
         setChatHistory([]);
         setShowSuggestions(true);
@@ -108,24 +107,24 @@ const SmartChatInterfaceContent = () => {
         return;
       }
       
-      chatDebug.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "success");
+      debugLog.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "success");
       const messages = await getThreadMessages(threadId);
       
       if (messages && messages.length > 0) {
-        chatDebug.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
+        debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
         console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
         setChatHistory(messages);
         setShowSuggestions(false);
         loadedThreadRef.current = threadId;
       } else {
-        chatDebug.addEvent("Thread Loading", `No messages found for thread ${threadId}`, "info");
+        debugLog.addEvent("Thread Loading", `No messages found for thread ${threadId}`, "info");
         console.log(`No messages found for thread ${threadId}`);
         setChatHistory([]);
         setShowSuggestions(true);
       }
     } catch (error) {
       console.error("Error loading messages:", error);
-      chatDebug.addEvent("Thread Loading", `Error loading messages: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+      debugLog.addEvent("Thread Loading", `Error loading messages: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
       toast({
         title: "Error loading messages",
         description: "Could not load conversation history.",
@@ -146,7 +145,7 @@ const SmartChatInterfaceContent = () => {
         description: "Please sign in to use the chat feature.",
         variant: "destructive"
       });
-      chatDebug.addEvent("Authentication", "User not authenticated, message sending blocked", "error");
+      debugLog.addEvent("Authentication", "User not authenticated, message sending blocked", "error");
       return;
     }
 
@@ -158,11 +157,11 @@ const SmartChatInterfaceContent = () => {
         description: "Please select a conversation or start a new one.",
         variant: "destructive"
       });
-      chatDebug.addEvent("Thread Selection", "No thread selected for message sending", "error");
+      debugLog.addEvent("Thread Selection", "No thread selected for message sending", "error");
       return;
     }
     
-    const tempUserMessage: ChatMessageType = {
+    const tempUserMessage: ChatMessage = {
       id: `temp-${Date.now()}`,
       thread_id: threadId,
       content: message,
@@ -171,31 +170,31 @@ const SmartChatInterfaceContent = () => {
       created_at: new Date().toISOString()
     };
     
-    chatDebug.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
+    debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
     setChatHistory(prev => [...prev, tempUserMessage]);
     setLoading(true);
     setProcessingStage("Analyzing your question...");
     
     try {
-      let savedUserMessage: ChatMessageType | null = null;
+      let savedUserMessage: ChatMessage | null = null;
       try {
-        chatDebug.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
+        debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
         savedUserMessage = await saveMessage(threadId, message, 'user');
-        chatDebug.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
+        debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
         console.log("User message saved with ID:", savedUserMessage?.id);
         
         if (savedUserMessage) {
-          chatDebug.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
+          debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
           setChatHistory(prev => prev.map(msg => 
             msg.id === tempUserMessage.id ? savedUserMessage! : msg
           ));
         } else {
-          chatDebug.addEvent("Database", "Failed to save user message - null response", "error");
+          debugLog.addEvent("Database", "Failed to save user message - null response", "error");
           console.error("Failed to save user message - null response");
           throw new Error("Failed to save message");
         }
       } catch (saveError: any) {
-        chatDebug.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
+        debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
         console.error("Error saving user message:", saveError);
         toast({
           title: "Error saving message",
@@ -204,7 +203,7 @@ const SmartChatInterfaceContent = () => {
         });
       }
       
-      chatDebug.addEvent("Query Analysis", `Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
+      debugLog.addEvent("Query Analysis", `Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
       console.log("Performing comprehensive query analysis for:", message);
       setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
@@ -218,11 +217,11 @@ const SmartChatInterfaceContent = () => {
         emotion: queryTypes.emotion || 'none detected'
       };
       
-      chatDebug.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
+      debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
       console.log("Query analysis result:", queryTypes);
       
       setProcessingStage("Searching for insights...");
-      chatDebug.addEvent("AI Processing", "Sending query to AI for processing", "info");
+      debugLog.addEvent("AI Processing", "Sending query to AI for processing", "info");
       const response = await processChatMessage(
         message, 
         user.id, 
@@ -240,11 +239,11 @@ const SmartChatInterfaceContent = () => {
         errorState: response.role === 'error'
       };
       
-      chatDebug.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
+      debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
       console.log("Response received:", responseInfo);
       
       try {
-        chatDebug.addEvent("Database", "Saving assistant response to database", "info");
+        debugLog.addEvent("Database", "Saving assistant response to database", "info");
         const savedResponse = await saveMessage(
           threadId,
           response.content,
@@ -254,19 +253,19 @@ const SmartChatInterfaceContent = () => {
           response.hasNumericResult
         );
         
-        chatDebug.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
+        debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
         console.log("Assistant response saved with ID:", savedResponse?.id);
         
         if (savedResponse) {
-          chatDebug.addEvent("UI Update", "Adding assistant response to chat history", "info");
+          debugLog.addEvent("UI Update", "Adding assistant response to chat history", "info");
           setChatHistory(prev => [...prev, savedResponse]);
         } else {
           throw new Error("Failed to save assistant response");
         }
       } catch (saveError: any) {
-        chatDebug.addEvent("Database", `Error saving assistant response: ${saveError.message || "Unknown error"}`, "error");
+        debugLog.addEvent("Database", `Error saving assistant response: ${saveError.message || "Unknown error"}`, "error");
         console.error("Error saving assistant response:", saveError);
-        const assistantMessage: ChatMessageType = {
+        const assistantMessage: ChatMessage = {
           id: `temp-response-${Date.now()}`,
           thread_id: threadId,
           content: response.content,
@@ -278,7 +277,7 @@ const SmartChatInterfaceContent = () => {
           has_numeric_result: response.hasNumericResult
         };
         
-        chatDebug.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
+        debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
         setChatHistory(prev => [...prev, assistantMessage]);
         console.error("Failed to save assistant response to database, using temporary message");
         
@@ -289,14 +288,14 @@ const SmartChatInterfaceContent = () => {
         });
       }
     } catch (error: any) {
-      chatDebug.addEvent("Error", `Error in message handling: ${error?.message || "Unknown error"}`, "error");
+      debugLog.addEvent("Error", `Error in message handling: ${error?.message || "Unknown error"}`, "error");
       console.error("Error sending message:", error);
       
       const errorContent = "I'm having trouble processing your request. Please try again later. " + 
                (error?.message ? `Error: ${error.message}` : "");
       
       try {
-        chatDebug.addEvent("Error Handling", "Saving error message to database", "info");
+        debugLog.addEvent("Error Handling", "Saving error message to database", "info");
         const savedErrorMessage = await saveMessage(
           threadId,
           errorContent,
@@ -304,10 +303,10 @@ const SmartChatInterfaceContent = () => {
         );
         
         if (savedErrorMessage) {
-          chatDebug.addEvent("UI Update", "Adding error message to chat history", "warning");
+          debugLog.addEvent("UI Update", "Adding error message to chat history", "warning");
           setChatHistory(prev => [...prev, savedErrorMessage]);
         } else {
-          const errorMessage: ChatMessageType = {
+          const errorMessage: ChatMessage = {
             id: `error-${Date.now()}`,
             thread_id: threadId,
             content: errorContent,
@@ -316,17 +315,17 @@ const SmartChatInterfaceContent = () => {
             created_at: new Date().toISOString()
           };
           
-          chatDebug.addEvent("UI Update", "Adding fallback error message to chat history", "warning");
+          debugLog.addEvent("UI Update", "Adding fallback error message to chat history", "warning");
           setChatHistory(prev => [...prev, errorMessage]);
         }
         
-        chatDebug.addEvent("Error Handling", "Error message saved to database", "success");
+        debugLog.addEvent("Error Handling", "Error message saved to database", "success");
         console.log("Error message saved to database");
       } catch (e) {
-        chatDebug.addEvent("Error Handling", `Failed to save error message: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
+        debugLog.addEvent("Error Handling", `Failed to save error message: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
         console.error("Failed to save error message:", e);
         
-        const errorMessage: ChatMessageType = {
+        const errorMessage: ChatMessage = {
           id: `error-${Date.now()}`,
           thread_id: threadId,
           content: errorContent,
@@ -335,7 +334,7 @@ const SmartChatInterfaceContent = () => {
           created_at: new Date().toISOString()
         };
         
-        chatDebug.addEvent("UI Update", "Adding last-resort error message to chat history", "warning");
+        debugLog.addEvent("UI Update", "Adding last-resort error message to chat history", "warning");
         setChatHistory(prev => [...prev, errorMessage]);
       }
     } finally {
@@ -501,7 +500,7 @@ const SmartChatInterfaceContent = () => {
       </div>
       
       {showDebugPanel && (
-        <ChatDebugPanel onClose={() => setShowDebugPanel(false)} />
+        <DebugLogPanel onClose={() => setShowDebugPanel(false)} />
       )}
       
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -527,10 +526,6 @@ const SmartChatInterfaceContent = () => {
   );
 };
 
-export default function SmartChatInterface() {
-  return (
-    <ChatDebugProvider>
-      <SmartChatInterfaceContent />
-    </ChatDebugProvider>
-  );
+export default function SmartChatInterfaceWrapper() {
+  return <SmartChatInterface />;
 }

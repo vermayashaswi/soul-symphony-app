@@ -17,6 +17,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import { generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useToast } from "@/hooks/use-toast";
+import { DebugLogProvider } from "@/utils/debug/DebugContext";
 
 const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
 
@@ -342,5 +343,9 @@ export default function SmartChat() {
   
   const content = shouldRenderMobile ? mobileContent : desktopContent;
   
-  return mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content;
+  return (
+    <DebugLogProvider>
+      {mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content}
+    </DebugLogProvider>
+  );
 }
