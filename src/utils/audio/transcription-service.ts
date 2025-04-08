@@ -67,7 +67,7 @@ export async function sendAudioForTranscription(
       }
     });
 
-    // Handle response errors
+    // Handle response errors - using the correct properties from FunctionsResponse
     if (response.error) {
       console.error('Edge function error:', response.error);
       return {
