@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Brain, BarChart2, Search, Lightbulb, Trash } from "lucide-react";
+import { Menu, X, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage } from "@/services/chatService";
@@ -98,6 +98,7 @@ export default function MobileChatInterface({
   const [sheetOpen, setSheetOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const loadedThreadRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (propThreadId) {
@@ -145,6 +146,11 @@ export default function MobileChatInterface({
       return;
     }
     
+    // If we've already loaded this thread, don't reload it
+    if (loadedThreadRef.current === threadId) {
+      return;
+    }
+    
     setInitialLoading(true);
     
     try {
@@ -179,6 +185,8 @@ export default function MobileChatInterface({
         
         setMessages(uiMessages);
         setShowSuggestions(false);
+        // Mark this thread as loaded
+        loadedThreadRef.current = threadId;
       } else {
         console.log(`[Mobile] No messages found for thread ${threadId}`);
         setMessages([]);
@@ -257,6 +265,7 @@ export default function MobileChatInterface({
       isFirstMessage = !error && count === 0;
     }
     
+    // Add a temporary user message to the UI immediately
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setLoading(true);
     setProcessingStage("Analyzing your question...");
@@ -359,6 +368,7 @@ export default function MobileChatInterface({
       const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
+      // Add error message to UI
       setMessages(prev => [
         ...prev, 
         { 
@@ -396,6 +406,7 @@ export default function MobileChatInterface({
 
   const handleStartNewThread = async (): Promise<string | null> => {
     setSheetOpen(false);
+    loadedThreadRef.current = null;
     if (onCreateNewThread) {
       const newThreadId = await onCreateNewThread();
       return newThreadId;
@@ -436,6 +447,7 @@ export default function MobileChatInterface({
       
       setMessages([]);
       setShowSuggestions(true);
+      loadedThreadRef.current = null;
       
       if (onCreateNewThread) {
         const newThreadId = await onCreateNewThread();
@@ -511,22 +523,11 @@ export default function MobileChatInterface({
               onStartNewThread={handleStartNewThread}
               currentThreadId={currentThreadId}
               newChatButtonWidth="half"
+              showDeleteButtons={false}
             />
           </SheetContent>
         </Sheet>
         <h2 className="text-lg font-semibold flex-1 text-center">Roha</h2>
-        
-        {currentThreadId && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-muted-foreground hover:text-destructive" 
-            onClick={() => setShowDeleteDialog(true)}
-            title="Delete current conversation"
-          >
-            <Trash className="h-5 w-5" />
-          </Button>
-        )}
       </div>
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">

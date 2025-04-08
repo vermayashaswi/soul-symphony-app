@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
@@ -115,6 +116,12 @@ export const saveMessage = async (
     }
 
     console.log(`Saving ${sender} message to thread ${threadId}:`, content.substring(0, 50) + "...");
+    
+    // Check if threadId exists and is valid
+    if (!threadId || typeof threadId !== 'string') {
+      console.error("Invalid thread ID:", threadId);
+      throw new Error("Invalid thread ID");
+    }
     
     const { data, error } = await supabase
       .from('chat_messages')

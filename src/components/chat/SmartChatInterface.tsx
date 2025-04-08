@@ -37,6 +37,7 @@ export default function SmartChatInterface() {
   const { toast } = useToast();
   const { user } = useAuth();
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const loadedThreadRef = useRef<string | null>(null);
 
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -77,6 +78,11 @@ export default function SmartChatInterface() {
       return;
     }
     
+    // If we're already loaded this thread, don't reload it
+    if (loadedThreadRef.current === threadId) {
+      return;
+    }
+    
     setInitialLoading(true);
     
     try {
@@ -103,6 +109,8 @@ export default function SmartChatInterface() {
         console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
         setChatHistory(messages);
         setShowSuggestions(false);
+        // Mark this thread as loaded
+        loadedThreadRef.current = threadId;
       } else {
         console.log(`No messages found for thread ${threadId}`);
         setChatHistory([]);
@@ -144,7 +152,8 @@ export default function SmartChatInterface() {
       return;
     }
     
-    const userMessage: ChatMessageType = {
+    // Add a temporary user message to the UI immediately
+    const tempUserMessage: ChatMessageType = {
       id: `temp-${Date.now()}`,
       thread_id: threadId,
       content: message,
@@ -153,7 +162,7 @@ export default function SmartChatInterface() {
       created_at: new Date().toISOString()
     };
     
-    setChatHistory(prev => [...prev, userMessage]);
+    setChatHistory(prev => [...prev, tempUserMessage]);
     setLoading(true);
     setProcessingStage("Analyzing your question...");
     
@@ -161,6 +170,13 @@ export default function SmartChatInterface() {
       // Save user message to database
       const savedUserMessage = await saveMessage(threadId, message, 'user');
       console.log("User message saved:", savedUserMessage?.id);
+      
+      if (savedUserMessage) {
+        // Replace the temporary message with the saved one
+        setChatHistory(prev => prev.map(msg => 
+          msg.id === tempUserMessage.id ? savedUserMessage : msg
+        ));
+      }
       
       console.log("Performing comprehensive query analysis for:", message);
       setProcessingStage("Analyzing patterns in your journal...");
@@ -208,6 +224,7 @@ export default function SmartChatInterface() {
       console.log("Assistant response saved:", savedResponse?.id);
       
       if (savedResponse) {
+        // Add the saved assistant message to the chat history
         setChatHistory(prev => [...prev, savedResponse]);
       } else {
         // Fallback to using temporary message if database save fails
@@ -229,28 +246,48 @@ export default function SmartChatInterface() {
     } catch (error: any) {
       console.error("Error sending message:", error);
       
-      const errorMessage: ChatMessageType = {
-        id: `error-${Date.now()}`,
-        thread_id: threadId,
-        content: "I'm having trouble processing your request. Please try again later. " + 
-                 (error?.message ? `Error: ${error.message}` : ""),
-        sender: 'assistant',
-        role: 'assistant',
-        created_at: new Date().toISOString()
-      };
+      const errorContent = "I'm having trouble processing your request. Please try again later. " + 
+               (error?.message ? `Error: ${error.message}` : "");
       
-      setChatHistory(prev => [...prev, errorMessage]);
-      
-      // Ensure error message is saved to database
+      // Save error message to database
       try {
         const savedErrorMessage = await saveMessage(
           threadId,
-          errorMessage.content,
+          errorContent,
           'assistant'
         );
-        console.log("Error message saved to database:", savedErrorMessage?.id);
+        
+        if (savedErrorMessage) {
+          setChatHistory(prev => [...prev, savedErrorMessage]);
+        } else {
+          // Fallback error message if save fails
+          const errorMessage: ChatMessageType = {
+            id: `error-${Date.now()}`,
+            thread_id: threadId,
+            content: errorContent,
+            sender: 'assistant',
+            role: 'assistant',
+            created_at: new Date().toISOString()
+          };
+          
+          setChatHistory(prev => [...prev, errorMessage]);
+        }
+        
+        console.log("Error message saved to database");
       } catch (e) {
         console.error("Failed to save error message:", e);
+        
+        // Last resort error message
+        const errorMessage: ChatMessageType = {
+          id: `error-${Date.now()}`,
+          thread_id: threadId,
+          content: errorContent,
+          sender: 'assistant',
+          role: 'assistant',
+          created_at: new Date().toISOString()
+        };
+        
+        setChatHistory(prev => [...prev, errorMessage]);
       }
     } finally {
       setLoading(false);
@@ -291,6 +328,7 @@ export default function SmartChatInterface() {
       
       setChatHistory([]);
       setShowSuggestions(true);
+      loadedThreadRef.current = null;
       
       const { data } = await supabase
         .from('chat_threads')

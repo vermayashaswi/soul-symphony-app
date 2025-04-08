@@ -31,6 +31,8 @@ export default function SmartChat() {
   const { toast } = useToast();
   const previousThreadIdRef = useRef<string | null>(null);
   const titleGeneratedForThreads = useRef<Set<string>>(new Set());
+  const hasInitializedRef = useRef<boolean>(false);
+  const threadCheckInProgressRef = useRef<boolean>(false);
   
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -45,67 +47,78 @@ export default function SmartChat() {
     }
     
     const checkOrCreateThread = async () => {
-      if (!user?.id) return;
-
-      // Try to get the last active thread from localStorage first
-      const lastActiveThreadId = localStorage.getItem(THREAD_ID_STORAGE_KEY);
+      if (!user?.id || threadCheckInProgressRef.current || hasInitializedRef.current) return;
       
-      if (lastActiveThreadId) {
-        // Verify this thread exists and belongs to the user
+      threadCheckInProgressRef.current = true;
+      
+      try {
+        // Try to get the last active thread from localStorage first
+        const lastActiveThreadId = localStorage.getItem(THREAD_ID_STORAGE_KEY);
+        
+        if (lastActiveThreadId) {
+          // Verify this thread exists and belongs to the user
+          try {
+            const { data, error } = await supabase
+              .from('chat_threads')
+              .select('id')
+              .eq('id', lastActiveThreadId)
+              .eq('user_id', user.id)
+              .single();
+              
+            if (data && !error) {
+              console.log("Found stored thread ID:", lastActiveThreadId);
+              setCurrentThreadId(lastActiveThreadId);
+              previousThreadIdRef.current = lastActiveThreadId;
+              window.dispatchEvent(
+                new CustomEvent('threadSelected', { 
+                  detail: { threadId: lastActiveThreadId } 
+                })
+              );
+              hasInitializedRef.current = true;
+              return;
+            } else {
+              console.log("Stored thread ID not found or not valid:", lastActiveThreadId, error);
+              // Clear invalid thread ID from storage
+              localStorage.removeItem(THREAD_ID_STORAGE_KEY);
+            }
+          } catch (error) {
+            console.error("Error checking thread existence:", error);
+          }
+        }
+        
+        // If no saved thread ID or it doesn't exist, get the most recent thread
         try {
-          const { data, error } = await supabase
+          console.log("Looking for most recent thread");
+          const { data: threads, error } = await supabase
             .from('chat_threads')
-            .select('id')
-            .eq('id', lastActiveThreadId)
+            .select('*')
             .eq('user_id', user.id)
-            .single();
-            
-          if (data && !error) {
-            console.log("Found stored thread ID:", lastActiveThreadId);
-            setCurrentThreadId(lastActiveThreadId);
-            previousThreadIdRef.current = lastActiveThreadId;
+            .order('updated_at', { ascending: false })
+            .limit(1);
+
+          if (error) throw error;
+
+          if (threads && threads.length > 0) {
+            console.log("Found most recent thread:", threads[0].id);
+            setCurrentThreadId(threads[0].id);
+            previousThreadIdRef.current = threads[0].id;
+            localStorage.setItem(THREAD_ID_STORAGE_KEY, threads[0].id);
             window.dispatchEvent(
               new CustomEvent('threadSelected', { 
-                detail: { threadId: lastActiveThreadId } 
+                detail: { threadId: threads[0].id } 
               })
             );
-            return;
+            hasInitializedRef.current = true;
           } else {
-            console.log("Stored thread ID not found or not valid:", lastActiveThreadId, error);
+            console.log("No existing threads, creating new one");
+            await createNewThread();
+            hasInitializedRef.current = true;
           }
         } catch (error) {
-          console.error("Error checking thread existence:", error);
+          console.error("Error checking threads:", error);
         }
-      }
-      
-      // If no saved thread ID or it doesn't exist, get the most recent thread
-      try {
-        console.log("Looking for most recent thread");
-        const { data: threads, error } = await supabase
-          .from('chat_threads')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-          .limit(1);
-
-        if (error) throw error;
-
-        if (threads && threads.length > 0) {
-          console.log("Found most recent thread:", threads[0].id);
-          setCurrentThreadId(threads[0].id);
-          previousThreadIdRef.current = threads[0].id;
-          localStorage.setItem(THREAD_ID_STORAGE_KEY, threads[0].id);
-          window.dispatchEvent(
-            new CustomEvent('threadSelected', { 
-              detail: { threadId: threads[0].id } 
-            })
-          );
-        } else {
-          console.log("No existing threads, creating new one");
-          await createNewThread();
-        }
-      } catch (error) {
-        console.error("Error checking threads:", error);
+      } finally {
+        threadCheckInProgressRef.current = false;
       }
     };
 
@@ -137,7 +150,10 @@ export default function SmartChat() {
     window.addEventListener('closeChatSidebar', handleCloseSidebar);
     window.addEventListener('messageCreated' as any, handleMessageCreated);
     
-    checkOrCreateThread();
+    // Only run the check once when the component mounts or when user changes
+    if (user?.id && !hasInitializedRef.current && !threadCheckInProgressRef.current) {
+      checkOrCreateThread();
+    }
     
     return () => {
       window.removeEventListener('closeChatSidebar', handleCloseSidebar);
@@ -275,6 +291,7 @@ export default function SmartChat() {
             onSelectThread={handleSelectThread}
             onStartNewThread={createNewThread}
             currentThreadId={currentThreadId}
+            showDeleteButtons={false}
           />
         </div>
         
