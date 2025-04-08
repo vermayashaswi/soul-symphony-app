@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -24,7 +23,9 @@ import {
   subWeeks,
   parseISO,
   addYears,
-  subYears 
+  subYears,
+  addMonths,
+  subMonths
 } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CalendarDays, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -69,7 +70,7 @@ function getSentimentColor(sentiment: number): string {
 }
 
 const EmptyBox = () => (
-  <div className="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600">
+  <div className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600">
     <span className="sr-only">No data</span>
   </div>
 );
@@ -98,8 +99,13 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         toDate = endOfWeek(now, { weekStartsOn: 1 });
         break;
       case 'month':
-        fromDate = startOfMonth(now);
-        toDate = endOfMonth(now);
+        if (isSameMonth(currentMonth, now)) {
+          fromDate = startOfMonth(now);
+          toDate = endOfMonth(now);
+        } else {
+          fromDate = startOfMonth(currentMonth);
+          toDate = endOfMonth(currentMonth);
+        }
         break;
       case 'year':
         if (isSameYear(currentYear, now)) {
@@ -115,7 +121,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     }
     
     return sentimentData.filter(item => item.date >= fromDate && item.date <= toDate);
-  }, [sentimentData, timeRange, currentYear]);
+  }, [sentimentData, timeRange, currentYear, currentMonth]);
 
   const allSentimentData = React.useMemo(() => {
     return sentimentData;
@@ -296,6 +302,17 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     }
   };
 
+  const navigateToPreviousMonth = () => {
+    setCurrentMonth(prevMonth => subMonths(prevMonth, 1));
+  };
+
+  const navigateToNextMonth = () => {
+    const nextMonth = addMonths(currentMonth, 1);
+    if (nextMonth <= new Date()) {
+      setCurrentMonth(nextMonth);
+    }
+  };
+
   const navigateToPreviousYear = () => {
     setCurrentYear(prevYear => subYears(prevYear, 1));
   };
@@ -310,6 +327,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const isCurrentWeek = (date: Date) => {
     const currentWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
     return format(date, 'yyyy-MM-dd') === format(currentWeek, 'yyyy-MM-dd');
+  };
+
+  const isCurrentMonth = (date: Date) => {
+    const now = new Date();
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
   };
 
   const isCurrentYear = (date: Date) => {
@@ -389,7 +411,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 </div>
                 {daySentiment ? (
                   <div className={cn(
-                    "w-7 h-7 rounded-full", 
+                    "w-6 h-6 rounded-full", 
                     daySentiment.colorClass
                   )}/>
                 ) : (
@@ -408,99 +430,106 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       return renderYearView();
     }
     
-    // Month view
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
-    
     return (
       <div className="max-w-full overflow-visible pb-4">
-        <Calendar
-          mode="multiple"
-          month={currentMonth}
-          onMonthChange={setCurrentMonth}
-          selected={filteredData.map(d => d.date)}
-          className="rounded-xl w-full"
-          defaultMonth={currentMonth}
-          fromMonth={monthStart}
-          toMonth={monthEnd}
-          classNames={{
-            day_today: "bg-primary/5 text-primary font-medium",
-            day_selected: "!bg-transparent !text-foreground",
-            day_disabled: "text-muted-foreground opacity-50",
-            day_outside: "invisible", // Hide days outside current month
-            day_range_middle: "aria-selected:bg-transparent",
-            day_hidden: "invisible",
-            caption: "px-4 py-3 text-lg font-semibold",
-            month: "space-y-1",
-            months: "flex flex-col space-y-2",
-            table: isMobile ? "w-full border-collapse space-y-1 table-fixed" : "w-full border-collapse space-y-1",
-            head_row: "flex w-full justify-between",
-            head_cell: "text-muted-foreground text-xs font-medium w-9 sm:w-10 md:w-10 text-center",
-            row: "flex w-full justify-between",
-            cell: cn(
-              "relative p-0 text-center",
-              "focus-within:relative focus-within:z-20"
-            ),
-            day: cn(
-              "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-primary/10 transition-all duration-200"
-            ),
-            nav_button: "hover:bg-primary/10 p-1 rounded-full transition-all duration-200 h-8 w-8",
-            caption_label: "text-base font-medium",
-          }}
-          components={{
-            Day: (props: DayProps) => {
-              const { date } = props;
-              const formattedDate = format(date, 'yyyy-MM-dd');
-              const info = sentimentInfo.get(formattedDate);
-              
-              const isSelected = allSentimentData.some(
-                d => isSameDay(d.date, date)
-              );
-              
-              const isToday = isSameDay(date, new Date());
-              const isSameMonthValue = isSameMonth(date, currentMonth);
-              
-              // Only render days from the current month
-              if (!isSameMonthValue) {
-                return <div className="invisible" aria-hidden="true" />;
-              }
-              
-              return (
-                <div
-                  className={cn(
-                    "relative flex items-center justify-center hover:bg-primary/10 transition-all duration-200",
-                    isSelected && "font-medium",
-                    isToday && "font-bold ring-2 ring-primary rounded-full"
-                  )}
-                  {...props}
-                >
-                  <div className="flex flex-col items-center justify-center h-9 w-9 z-10">
-                    <span className="text-xs font-medium mb-0.5">
-                      {date.getDate()}
-                    </span>
-                    
-                    {info ? (
-                      <motion.div 
-                        className={cn(
-                          "w-6 h-6 rounded-full",
-                          info.colorClass
-                        )}
-                        initial={{ scale: 0.5 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.1, duration: 0.2 }}
-                      />
-                    ) : (
-                      <EmptyBox />
-                    )}
-                  </div>
+        <div className="flex justify-between items-center mb-4">
+          <button 
+            onClick={navigateToPreviousMonth}
+            className="p-1 rounded-full hover:bg-muted transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          
+          <div className="text-lg font-medium">
+            {format(currentMonth, 'MMMM yyyy')}
+            {isCurrentMonth(currentMonth) && (
+              <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                Current Month
+              </span>
+            )}
+          </div>
+          
+          <button 
+            onClick={navigateToNextMonth}
+            disabled={isCurrentMonth(currentMonth)}
+            className={cn(
+              "p-1 rounded-full transition-colors",
+              isCurrentMonth(currentMonth) 
+                ? "text-muted-foreground cursor-not-allowed" 
+                : "hover:bg-muted"
+            )}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-7 gap-0 text-center mb-2">
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+            <div key={day} className="text-xs font-medium text-muted-foreground">
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-7 gap-0">
+          {getDaysInMonth(currentMonth).map((day, index) => {
+            if (!day) {
+              return <div key={`empty-${index}`} className="aspect-square"></div>;
+            }
+            
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const daySentiment = sentimentInfo.get(dateKey);
+            const isToday = isSameDay(day, new Date());
+            
+            return (
+              <div 
+                key={dateKey}
+                className={cn(
+                  "aspect-square flex flex-col items-center justify-center p-1",
+                  isToday && "ring-2 ring-primary rounded-full"
+                )}
+              >
+                <div className="text-xs font-medium mb-1">
+                  {format(day, 'd')}
                 </div>
-              );
-            },
-          }}
-        />
+                {daySentiment ? (
+                  <div className={cn(
+                    "w-6 h-6 rounded-full", 
+                    daySentiment.colorClass
+                  )}/>
+                ) : (
+                  <EmptyBox />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
+
+  function getDaysInMonth(date: Date) {
+    const month = date.getMonth();
+    const year = date.getFullYear();
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const daysInMonth = lastDayOfMonth.getDate();
+    
+    const firstDayOfWeek = (firstDayOfMonth.getDay() + 6) % 7;
+    
+    const days: (Date | null)[] = Array(firstDayOfWeek).fill(null);
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(new Date(year, month, day));
+    }
+    
+    const totalCells = Math.ceil(days.length / 7) * 7;
+    while (days.length < totalCells) {
+      days.push(null);
+    }
+    
+    return days;
+  }
 
   const renderYearView = () => {
     const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
