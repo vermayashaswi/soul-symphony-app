@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
@@ -144,13 +143,12 @@ export default function SmartChatInterface() {
       return;
     }
     
-    // Create a proper message object with required role property
     const userMessage: ChatMessageType = {
       id: `temp-${Date.now()}`,
       thread_id: threadId,
       content: message,
       sender: 'user',
-      role: 'user', // Explicitly set the role property
+      role: 'user',
       created_at: new Date().toISOString()
     };
     
@@ -159,7 +157,6 @@ export default function SmartChatInterface() {
     setProcessingStage("Analyzing your question...");
     
     try {
-      // Save the user message to database
       await saveMessage(threadId, message, 'user');
       
       console.log("Performing comprehensive query analysis for:", message);
@@ -195,7 +192,6 @@ export default function SmartChatInterface() {
         errorState: response.role === 'error'
       });
       
-      // Save the assistant's response to database
       const savedResponse = await saveMessage(
         threadId,
         response.content,
@@ -208,13 +204,12 @@ export default function SmartChatInterface() {
       if (savedResponse) {
         setChatHistory(prev => [...prev, savedResponse]);
       } else {
-        // Fallback if saving to DB fails - ensure it has the required role property
         const assistantMessage: ChatMessageType = {
           id: `temp-response-${Date.now()}`,
           thread_id: threadId,
           content: response.content,
           sender: 'assistant',
-          role: 'assistant', // Explicitly set the role property
+          role: 'assistant',
           created_at: new Date().toISOString(),
           reference_entries: response.references,
           analysis_data: response.analysis,
@@ -226,20 +221,18 @@ export default function SmartChatInterface() {
     } catch (error: any) {
       console.error("Error sending message:", error);
       
-      // Create error message with proper type and required role property
       const errorMessage: ChatMessageType = {
         id: `error-${Date.now()}`,
         thread_id: threadId,
         content: "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : ""),
         sender: 'assistant',
-        role: 'assistant', // Explicitly set the role property
+        role: 'assistant',
         created_at: new Date().toISOString()
       };
       
       setChatHistory(prev => [...prev, errorMessage]);
       
-      // Try to save the error message to the database
       saveMessage(
         threadId,
         errorMessage.content,
