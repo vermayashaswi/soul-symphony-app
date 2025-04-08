@@ -1,6 +1,7 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import { DebugLogEntry, LogLevel } from "./debugLogTypes";
+
+// Keep these utility functions for internal use, but they no longer connect to UI
 
 /**
  * Creates a new debug log entry
@@ -33,7 +34,6 @@ export const formatLogTimestamp = (timestamp: number): string => {
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-    // Remove the problematic fractionalSecondDigits property
   }).format(date) + `.${date.getMilliseconds().toString().padStart(3, '0')}`;
 };
 

@@ -12,72 +12,39 @@ const DebugLogContext = createContext<DebugLogContextType>({
   toggleEnabled: () => {}
 });
 
-// Debug provider component
+// Debug provider component - now with UI components removed
 export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [logs, setLogs] = useState<DebugLogEntry[]>([]);
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   
-  // Local storage key for saving debug preferences
-  const STORAGE_KEY = 'debug_preferences';
-  
-  // Initialize from local storage
-  React.useEffect(() => {
-    const savedPreferences = localStorage.getItem(STORAGE_KEY);
-    if (savedPreferences) {
-      try {
-        const { enabled } = JSON.parse(savedPreferences);
-        setIsEnabled(enabled || false);
-      } catch (e) {
-        console.error("Error parsing debug preferences:", e);
-      }
-    }
-  }, []);
-
-  // Save preferences to local storage
-  const savePreferences = useCallback(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled: isEnabled }));
-    } catch (e) {
-      console.error("Error saving debug preferences:", e);
-    }
-  }, [isEnabled]);
-
-  // Add a new event log
+  // Add a new event log - now just logs to console in development
   const addEvent = useCallback((
     category: string, 
     message: string, 
     level: LogLevel = 'info',
     details?: any
   ) => {
-    if (!isEnabled) return;
-    
-    setLogs(prev => {
-      const newEntry = createLogEntry(category, message, level, details);
-      return [...prev, newEntry];
-    });
-  }, [isEnabled]);
-  
-  // Clear all logs
-  const clearLogs = useCallback(() => {
-    setLogs([]);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[${level.toUpperCase()}][${category}] ${message}`, details || '');
+    }
   }, []);
   
-  // Toggle debug mode
+  // Clear all logs - no-op in production
+  const clearLogs = useCallback(() => {
+    // No visible UI, so nothing to clear
+  }, []);
+  
+  // Toggle debug mode - no-op in production
   const toggleEnabled = useCallback(() => {
-    setIsEnabled(prev => {
-      const newState = !prev;
-      // Schedule saving the new state
-      setTimeout(() => savePreferences(), 0);
-      return newState;
-    });
-  }, [savePreferences]);
+    // Debug mode always disabled in production
+  }, []);
   
   // The context value
   const value = {
     logs,
     addEvent,
     clearLogs,
-    isEnabled,
+    isEnabled: false, // Always false in production
     toggleEnabled
   };
   

@@ -1,15 +1,19 @@
 
-// This file is now deprecated, we'll redirect to our new debug log panel
-import { useDebugLog } from "@/utils/debug/DebugContext";
-import DebugLogPanel from "@/components/debug/DebugLogPanel";
-
-// Create a provider for backward compatibility
+// This file is now deprecated, all debug functionality has been removed
 export const ChatDebugProvider = ({ children }: { children: React.ReactNode }) => {
   return children;
 };
 
-// Create a hook for backward compatibility
-export const useChatDebug = useDebugLog;
+// Create a no-op hook for backward compatibility
+export const useChatDebug = () => ({
+  logs: [],
+  addEvent: () => {},
+  clearLogs: () => {},
+  isEnabled: false,
+  toggleEnabled: () => {}
+});
 
-// Export the panel component for backward compatibility
-export default DebugLogPanel;
+// Export an empty component for backward compatibility
+export default function EmptyDebugPanel() {
+  return null;
+}
