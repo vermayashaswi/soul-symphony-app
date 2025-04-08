@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
@@ -87,6 +88,7 @@ export default function SmartChatInterface() {
           role: msg.sender === 'user' ? 'user' : 'assistant' as ChatMessageRole,
           content: msg.content,
           references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
+          // Fix: Safely check for analysis_data or use undefined
           analysis: msg.analysis_data || undefined,
           hasNumericResult: msg.has_numeric_result || false
         }));
