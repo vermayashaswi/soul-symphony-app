@@ -26,23 +26,23 @@ const EmptyChatState: React.FC = () => {
         <ul className="mt-1 space-y-1">
           <li className="flex items-start">
             <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
-            <span className="text-left">What were my top emotions last week?</span>
+            <span className="text-left break-words whitespace-normal">What were my top emotions last week?</span>
           </li>
           <li className="flex items-start">
             <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
-            <span className="text-left">What time of the day do I usually like journaling?</span>
+            <span className="text-left break-words whitespace-normal">What time of the day do I usually like journaling?</span>
           </li>
           <li className="flex items-start">
             <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
-            <span className="text-left">Am i am introvert? Do i like people in general?</span>
+            <span className="text-left break-words whitespace-normal">Am i am introvert? Do i like people in general?</span>
           </li>
           <li className="flex items-start">
             <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
-            <span className="text-left">What should i particularly do to help my mental health?</span>
+            <span className="text-left break-words whitespace-normal">What should i particularly do to help my mental health?</span>
           </li>
           <li className="flex items-start">
             <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
-            <span className="text-left">Rate my top 3 negative traits out of 100? What do i do to improve them?</span>
+            <span className="text-left break-words whitespace-normal">Rate my top 3 negative traits out of 100? What do i do to improve them?</span>
           </li>
         </ul>
       </div>
