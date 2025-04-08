@@ -1,9 +1,10 @@
+
 // This file contains the Supabase Edge Function for transcribing audio
 // and saving it as a journal entry
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.21.0';
-import { uuidv4 } from 'https://jspm.dev/uuid';
+import { v4 as uuidv4 } from 'https://esm.sh/uuid@9.0.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
