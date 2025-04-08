@@ -128,8 +128,8 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: mimeType });
     formData.append('file', blob, `audio.${detectedFileType}`);
     
-    // Use the latest Whisper model for highest accuracy
-    formData.append('model', 'whisper-large-v3');
+    // Update to use the latest available Whisper model
+    formData.append('model', 'whisper-1');
     formData.append('response_format', 'json');
     
     // Specify that we want high-fidelity transcription
@@ -137,7 +137,7 @@ serve(async (req) => {
       formData.append('language', 'en'); // Specify language to help with accuracy
     }
 
-    console.log("Sending to Whisper API for high-quality transcription using the latest model (whisper-large-v3)...");
+    console.log("Sending to Whisper API for high-quality transcription using the latest model (whisper-1)...");
     console.log("Using file type:", detectedFileType, "with MIME type:", mimeType);
     
     try {
