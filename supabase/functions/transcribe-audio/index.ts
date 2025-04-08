@@ -41,6 +41,21 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload');
     }
 
+    // Handle health check requests
+    if (payload.healthCheck === true) {
+      console.log('Health check request received');
+      return new Response(
+        JSON.stringify({ 
+          status: 'ok',
+          timestamp: new Date().toISOString(),
+          service: 'transcribe-audio'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     const { audio, userId, directTranscription, highQuality } = payload;
     
     if (!audio) {
