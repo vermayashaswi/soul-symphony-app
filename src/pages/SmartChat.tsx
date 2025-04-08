@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -343,7 +344,7 @@ export default function SmartChat() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-muted-foreground hover:text-destructive"
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20"
                 onClick={() => setShowDeleteDialog(true)}
                 aria-label="Delete conversation"
               >
@@ -367,7 +368,7 @@ export default function SmartChat() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteCurrentThread}
-              className="bg-red-500 hover:bg-red-600 text-white"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               Delete
             </AlertDialogAction>

@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, MessageSquare, Settings, Trash2, ChevronRight } from "lucide-react";
+import { PlusCircle, MessageSquare, Trash2, ChevronRight, Pencil, Check } from "lucide-react";
 import { getUserChatThreads } from "@/services/chatPersistenceService";
+import { updateThreadTitle } from "@/services/chat/threadService";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { truncateText } from "@/utils/textUtils";
 import { useChatDebug } from "@/components/chat/ChatDebugPanel";
+import { Input } from "@/components/ui/input";
 
 interface ChatThreadListProps {
   userId?: string;
@@ -27,6 +29,9 @@ export default function ChatThreadList({
 }: ChatThreadListProps) {
   const [threads, setThreads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const chatDebug = useChatDebug();
   
@@ -55,6 +60,13 @@ export default function ChatThreadList({
       window.removeEventListener('threadTitleUpdated' as any, handleThreadTitleUpdate);
     };
   }, [userId]);
+
+  // Focus the input when editing begins
+  useEffect(() => {
+    if (editingThreadId && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingThreadId]);
 
   const loadThreads = async () => {
     if (!userId) return;
@@ -159,6 +171,65 @@ export default function ChatThreadList({
     }
   };
 
+  const startEditingThread = (threadId: string, currentTitle: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setEditingThreadId(threadId);
+    setEditTitle(currentTitle);
+  };
+
+  const saveThreadTitle = async (threadId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    if (!editTitle.trim()) {
+      toast({
+        title: "Error",
+        description: "Title cannot be empty",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      chatDebug?.addEvent("Thread Edit", `Updating thread title: ${threadId} -> ${editTitle}`, "info");
+      const success = await updateThreadTitle(threadId, editTitle);
+      
+      if (success) {
+        setThreads(prev => prev.map(thread => 
+          thread.id === threadId 
+            ? { ...thread, title: editTitle } 
+            : thread
+        ));
+        
+        toast({
+          title: "Success",
+          description: "Thread title updated",
+        });
+        
+        chatDebug?.addEvent("Thread Edit", "Thread title updated successfully", "success");
+      } else {
+        throw new Error("Failed to update thread title");
+      }
+    } catch (error) {
+      chatDebug?.addEvent("Thread Edit", `Error updating thread title: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+      console.error("Error updating thread title:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update thread title",
+        variant: "destructive"
+      });
+    } finally {
+      setEditingThreadId(null);
+    }
+  };
+
+  const handleKeyDown = (threadId: string, e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      saveThreadTitle(threadId, e as unknown as React.MouseEvent);
+    } else if (e.key === 'Escape') {
+      setEditingThreadId(null);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="p-2 border-b">
@@ -221,23 +292,69 @@ export default function ChatThreadList({
               >
                 <div className="flex items-center flex-1 min-w-0">
                   <MessageSquare className="h-4 w-4 mr-2 flex-shrink-0" />
-                  <span className="truncate">{truncateText(thread.title, 24)}</span>
+                  {editingThreadId === thread.id ? (
+                    <div className="flex-1 pr-1" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        ref={editInputRef}
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(thread.id, e)}
+                        className={`h-7 py-0 px-2 text-sm ${
+                          currentThreadId === thread.id
+                            ? "bg-primary-foreground/10 text-primary-foreground border-primary-foreground/30"
+                            : "bg-background border-input"
+                        }`}
+                      />
+                    </div>
+                  ) : (
+                    <span className="truncate">{truncateText(thread.title, 24)}</span>
+                  )}
                 </div>
                 
-                {showDeleteButtons && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`h-7 w-7 opacity-50 hover:opacity-100 ${
-                      currentThreadId === thread.id
-                        ? "hover:bg-primary-foreground/20 text-primary-foreground"
-                        : "hover:bg-background/80 text-muted-foreground"
-                    }`}
-                    onClick={(e) => deleteThread(thread.id, e)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
+                <div className="flex items-center">
+                  {editingThreadId === thread.id ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-7 w-7 ${
+                        currentThreadId === thread.id
+                          ? "hover:bg-primary-foreground/20 text-primary-foreground"
+                          : "hover:bg-background/80 text-muted-foreground"
+                      }`}
+                      onClick={(e) => saveThreadTitle(thread.id, e)}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-7 w-7 opacity-50 hover:opacity-100 ${
+                        currentThreadId === thread.id
+                          ? "hover:bg-primary-foreground/20 text-primary-foreground"
+                          : "hover:bg-background/80 text-muted-foreground"
+                      }`}
+                      onClick={(e) => startEditingThread(thread.id, thread.title, e)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  
+                  {showDeleteButtons && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-7 w-7 opacity-50 hover:opacity-100 ${
+                        currentThreadId === thread.id
+                          ? "hover:bg-primary-foreground/20 text-primary-foreground"
+                          : "hover:bg-background/80 text-muted-foreground hover:text-destructive"
+                      }`}
+                      onClick={(e) => deleteThread(thread.id, e)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

@@ -574,7 +574,7 @@ const MobileChatInterfaceContent = ({
           <Button 
             variant="ghost" 
             size="icon" 
-            className="ml-1 h-8 w-8 text-muted-foreground hover:text-destructive"
+            className="ml-1 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20"
             onClick={() => setShowDeleteDialog(true)}
             aria-label="Delete conversation"
           >
@@ -670,7 +670,7 @@ const MobileChatInterfaceContent = ({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteCurrentThread}
-              className="bg-red-500 hover:bg-red-600 text-white"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               Delete
             </AlertDialogAction>
