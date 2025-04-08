@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -253,7 +254,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         {todaySentiment ? (
           <motion.div 
             className={cn(
-              "rounded-md w-28 h-28 flex items-center justify-center",
+              "rounded-full w-28 h-28 flex items-center justify-center",
               todaySentiment.colorClass
             )}
             initial={{ scale: 0 }}
@@ -262,7 +263,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           />
         ) : (
           <motion.div 
-            className="rounded-md w-28 h-28 border-4 border-gray-300 dark:border-gray-600"
+            className="rounded-full w-28 h-28 border-4 border-gray-300 dark:border-gray-600"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, type: "spring" }}
@@ -379,8 +380,8 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               <div 
                 key={dateKey}
                 className={cn(
-                  "aspect-square rounded-md flex flex-col items-center justify-center p-1",
-                  isToday && "ring-2 ring-theme hover:ring-theme"
+                  "aspect-square flex flex-col items-center justify-center p-1",
+                  isToday && "ring-2 ring-primary hover:ring-primary rounded-full"
                 )}
               >
                 <div className="text-xs font-medium mb-1">
@@ -388,7 +389,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                 </div>
                 {daySentiment ? (
                   <div className={cn(
-                    "w-7 h-7 rounded-md", 
+                    "w-7 h-7 rounded-full", 
                     daySentiment.colorClass
                   )}/>
                 ) : (
@@ -407,6 +408,10 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
       return renderYearView();
     }
     
+    // Month view
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    
     return (
       <div className="max-w-full overflow-visible pb-4">
         <Calendar
@@ -415,12 +420,14 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           onMonthChange={setCurrentMonth}
           selected={filteredData.map(d => d.date)}
           className="rounded-xl w-full"
-          defaultMonth={filteredData.length > 0 ? filteredData[0].date : undefined}
+          defaultMonth={currentMonth}
+          fromMonth={monthStart}
+          toMonth={monthEnd}
           classNames={{
             day_today: "bg-primary/5 text-primary font-medium",
             day_selected: "!bg-transparent !text-foreground",
             day_disabled: "text-muted-foreground opacity-50",
-            day_outside: "text-muted-foreground opacity-50",
+            day_outside: "invisible", // Hide days outside current month
             day_range_middle: "aria-selected:bg-transparent",
             day_hidden: "invisible",
             caption: "px-4 py-3 text-lg font-semibold",
@@ -453,12 +460,17 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
               const isToday = isSameDay(date, new Date());
               const isSameMonthValue = isSameMonth(date, currentMonth);
               
+              // Only render days from the current month
+              if (!isSameMonthValue) {
+                return <div className="invisible" aria-hidden="true" />;
+              }
+              
               return (
                 <div
                   className={cn(
-                    "relative flex items-center justify-center hover:bg-primary/10 rounded-md transition-all duration-200",
+                    "relative flex items-center justify-center hover:bg-primary/10 transition-all duration-200",
                     isSelected && "font-medium",
-                    isToday && "font-bold ring-2 ring-theme"
+                    isToday && "font-bold ring-2 ring-primary rounded-full"
                   )}
                   {...props}
                 >
@@ -470,16 +482,16 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
                     {info ? (
                       <motion.div 
                         className={cn(
-                          "w-6 h-6 rounded-md",
+                          "w-6 h-6 rounded-full",
                           info.colorClass
                         )}
                         initial={{ scale: 0.5 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.1, duration: 0.2 }}
                       />
-                    ) : isSameMonthValue ? (
+                    ) : (
                       <EmptyBox />
-                    ) : null}
+                    )}
                   </div>
                 </div>
               );
