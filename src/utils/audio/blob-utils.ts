@@ -1,82 +1,42 @@
 
 /**
- * Utility functions for working with audio blobs
+ * Converts a Blob to a base64 string
  */
-
-/**
- * Converts a Blob to base64 string
- */
-export function blobToBase64(blob: Blob): Promise<string> {
+export const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      // Ensure we have a valid result
-      if (typeof reader.result === 'string' && reader.result.length > 0) {
+      if (typeof reader.result === 'string') {
         resolve(reader.result);
       } else {
-        reject(new Error('Failed to convert audio to base64'));
+        reject(new Error('Failed to convert blob to base64'));
       }
     };
-    reader.onerror = () => reject(new Error('Error reading audio file'));
+    reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
-}
+};
 
 /**
- * Validates that an audio blob meets minimum requirements
+ * Validates audio blob before processing
  */
-export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; errorMessage?: string } {
-  if (!audioBlob) {
-    return { isValid: false, errorMessage: 'No recording to process.' };
+export const validateAudioBlob = (blob: Blob | null): { isValid: boolean; errorMessage?: string } => {
+  if (!blob) {
+    return { isValid: false, errorMessage: 'No audio recording found' };
   }
-  
-  // Minimum size check (increased to 1000 bytes for better validation)
-  if (audioBlob.size < 1000) {
-    return { isValid: false, errorMessage: 'Recording is too short. Please try again.' };
+
+  if (blob.size < 100) {
+    return { isValid: false, errorMessage: 'Audio recording is too small to process' };
   }
-  
-  // Check for supported MIME types
-  const supportedTypes = [
-    'audio/webm', 
-    'audio/mp4', 
-    'audio/ogg', 
-    'audio/wav', 
-    'audio/mpeg',
-    'audio/webm;codecs=opus'
-  ];
-  
-  // Use a fuzzy match to check for audio MIME type
-  const isAudioType = audioBlob.type.includes('audio/') || 
-                      supportedTypes.some(type => audioBlob.type.includes(type.split('/')[1]));
-  
-  if (!isAudioType) {
-    console.warn('Potentially unsupported audio format:', audioBlob.type);
-    // We'll continue anyway since browser implementations vary
-  }
-  
+
   return { isValid: true };
-}
+};
 
 /**
- * Fixes common issues with audio blob MIME types
+ * Normalizes audio blob to a consistent format for processing
  */
-export function normalizeAudioBlob(audioBlob: Blob): Blob {
-  // If the blob doesn't have a proper MIME type, try to assign one
-  if (!audioBlob.type.includes('audio/')) {
-    // Look at the size to make an educated guess
-    if (audioBlob.size > 1000000) {
-      // Larger files are likely WAV
-      return new Blob([audioBlob], { type: 'audio/wav' });
-    } else {
-      // Smaller files are likely Opus in WebM container
-      return new Blob([audioBlob], { type: 'audio/webm;codecs=opus' });
-    }
-  }
-  
-  // If audio blob is webm but doesn't specify codec, add it
-  if (audioBlob.type === 'audio/webm') {
-    return new Blob([audioBlob], { type: 'audio/webm;codecs=opus' });
-  }
-  
-  return audioBlob;
-}
+export const normalizeAudioBlob = (blob: Blob): Blob => {
+  // For now, just return the original blob
+  // In the future, this could convert between formats if needed
+  return blob;
+};

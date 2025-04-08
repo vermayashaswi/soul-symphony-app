@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
 import { toast } from 'sonner';
@@ -15,7 +16,7 @@ interface UseRecordRTCRecorderReturn {
   hasPermission: boolean | null;
   ripples: number[];
   startRecording: () => Promise<void>;
-  stopRecording: () => void;
+  stopRecording: () => Promise<void>;
   requestPermissions: () => Promise<void>;
   resetRecording: () => void;
 }
@@ -229,42 +230,50 @@ export function useRecordRTCRecorder({
     }
   };
 
-  const stopRecording = () => {
-    if (recorderRef.current && isRecording) {
-      console.log("Stopping recording...");
-      
-      recorderRef.current.stopRecording(() => {
-        console.log("Recording stopped, generating blob...");
-        const blob = recorderRef.current!.getBlob();
-        console.log("Recording blob created:", blob.type, blob.size, "bytes");
-        
-        setAudioBlob(blob);
-        setIsRecording(false);
-        
-        setRipples([]);
-        
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-        }
-        
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        
-        if (audioLevelTimerRef.current) {
-          clearInterval(audioLevelTimerRef.current);
-          audioLevelTimerRef.current = null;
-        }
-        
-        if (maxDurationTimerRef.current) {
-          clearTimeout(maxDurationTimerRef.current);
-          maxDurationTimerRef.current = null;
-        }
-        
-        toast.success('Recording saved!');
-      });
+  const stopRecording = async () => {
+    if (!recorderRef.current || !isRecording) {
+      return;
     }
+    
+    console.log("Stopping recording...");
+    
+    return new Promise<void>((resolve) => {
+      if (recorderRef.current) {
+        recorderRef.current.stopRecording(() => {
+          console.log("Recording stopped, generating blob...");
+          const blob = recorderRef.current!.getBlob();
+          console.log("Recording blob created:", blob.type, blob.size, "bytes");
+          
+          setAudioBlob(blob);
+          setIsRecording(false);
+          setRipples([]);
+          
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+          }
+          
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          
+          if (audioLevelTimerRef.current) {
+            clearInterval(audioLevelTimerRef.current);
+            audioLevelTimerRef.current = null;
+          }
+          
+          if (maxDurationTimerRef.current) {
+            clearTimeout(maxDurationTimerRef.current);
+            maxDurationTimerRef.current = null;
+          }
+          
+          toast.success('Recording saved!');
+          resolve();
+        });
+      } else {
+        resolve();
+      }
+    });
   };
   
   const requestPermissions = async () => {

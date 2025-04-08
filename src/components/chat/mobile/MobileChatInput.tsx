@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Mic, MicOff, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { recordAudio } from "@/utils/audioRecorder";
+import { sendAudioForTranscription } from "@/utils/audio/transcription-service";
+import { toast } from "sonner";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -85,14 +86,71 @@ export default function MobileChatInput({
   };
 
   const handleStartRecording = async () => {
+    if (!userId) {
+      toast.error("Please log in to use voice recording");
+      return;
+    }
+    
     try {
-      const recorder = await recordAudio();
-      recordingRef.current = recorder;
-      recorder.start();
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      
+      const mediaRecorder = new MediaRecorder(stream);
+      const audioChunks: BlobPart[] = [];
+      
+      mediaRecorder.addEventListener('dataavailable', (event) => {
+        audioChunks.push(event.data);
+      });
+      
+      mediaRecorder.addEventListener('stop', async () => {
+        try {
+          setIsSubmitting(true);
+          
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          
+          // Convert the blob to base64
+          const base64Audio = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = () => {
+              const base64data = reader.result as string;
+              resolve(base64data);
+            };
+          });
+          
+          // Send for transcription
+          const result = await sendAudioForTranscription(
+            base64Audio.split(',')[1], // Remove the data URL prefix
+            userId,
+            true // Use direct transcription mode
+          );
+          
+          if (result.success && result.data?.transcription) {
+            onSendMessage(result.data.transcription, true);
+          } else {
+            toast.error("Failed to transcribe audio. Please try again.");
+          }
+        } catch (error) {
+          console.error("Error processing audio:", error);
+          toast.error("Error processing audio. Please try again.");
+        } finally {
+          setIsSubmitting(false);
+          setIsRecording(false);
+        }
+      });
+      
+      mediaRecorder.start();
+      recordingRef.current = mediaRecorder;
       setIsRecording(true);
+      
     } catch (error) {
       console.error("Error starting recording:", error);
-      alert("Could not access microphone. Please check permissions.");
+      toast.error("Could not access microphone. Please check permissions.");
     }
   };
 
@@ -100,18 +158,12 @@ export default function MobileChatInput({
     if (!recordingRef.current) return;
     
     try {
-      setIsSubmitting(true);
-      const audio = await recordingRef.current.stop();
-      setIsRecording(false);
-      
-      // Get audio blob from the recorder
-      const audioBlob = await fetch(audio.audioUrl).then(r => r.blob());
-      
-      // For now, just send a placeholder message
-      onSendMessage("I sent an audio message", true);
+      recordingRef.current.stop();
+      const tracks = recordingRef.current.stream.getTracks();
+      tracks.forEach((track: MediaStreamTrack) => track.stop());
     } catch (error) {
       console.error("Error stopping recording:", error);
-    } finally {
+      setIsRecording(false);
       setIsSubmitting(false);
     }
   };
