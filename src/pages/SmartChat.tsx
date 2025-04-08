@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -60,6 +61,7 @@ export default function SmartChat() {
             .single();
             
           if (data && !error) {
+            console.log("Found stored thread ID:", lastActiveThreadId);
             setCurrentThreadId(lastActiveThreadId);
             previousThreadIdRef.current = lastActiveThreadId;
             window.dispatchEvent(
@@ -68,6 +70,8 @@ export default function SmartChat() {
               })
             );
             return;
+          } else {
+            console.log("Stored thread ID not found or not valid:", lastActiveThreadId, error);
           }
         } catch (error) {
           console.error("Error checking thread existence:", error);
@@ -76,6 +80,7 @@ export default function SmartChat() {
       
       // If no saved thread ID or it doesn't exist, get the most recent thread
       try {
+        console.log("Looking for most recent thread");
         const { data: threads, error } = await supabase
           .from('chat_threads')
           .select('*')
@@ -86,6 +91,7 @@ export default function SmartChat() {
         if (error) throw error;
 
         if (threads && threads.length > 0) {
+          console.log("Found most recent thread:", threads[0].id);
           setCurrentThreadId(threads[0].id);
           previousThreadIdRef.current = threads[0].id;
           localStorage.setItem(THREAD_ID_STORAGE_KEY, threads[0].id);
@@ -95,6 +101,7 @@ export default function SmartChat() {
             })
           );
         } else {
+          console.log("No existing threads, creating new one");
           await createNewThread();
         }
       } catch (error) {
@@ -186,6 +193,7 @@ export default function SmartChat() {
     if (!user?.id) return null;
     
     try {
+      console.log("Creating new thread");
       const newThreadId = uuidv4();
       const { error } = await supabase
         .from('chat_threads')
@@ -198,6 +206,8 @@ export default function SmartChat() {
         });
       
       if (error) throw error;
+      
+      console.log("Created new thread:", newThreadId);
       setCurrentThreadId(newThreadId);
       previousThreadIdRef.current = newThreadId;
       localStorage.setItem(THREAD_ID_STORAGE_KEY, newThreadId);
@@ -221,6 +231,7 @@ export default function SmartChat() {
   };
 
   const handleSelectThread = (threadId: string) => {
+    console.log("Thread selected:", threadId);
     setCurrentThreadId(threadId);
     localStorage.setItem(THREAD_ID_STORAGE_KEY, threadId);
     window.dispatchEvent(

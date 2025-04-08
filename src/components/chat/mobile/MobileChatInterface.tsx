@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
+import { ChatMessage as ChatMessageType, getThreadMessages } from "@/services/chatPersistenceService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,6 +64,7 @@ export default function MobileChatInterface({
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -100,8 +102,16 @@ export default function MobileChatInterface({
     if (propThreadId) {
       setCurrentThreadId(propThreadId);
       loadThreadMessages(propThreadId);
+    } else {
+      const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
+      if (storedThreadId && user?.id) {
+        setCurrentThreadId(storedThreadId);
+        loadThreadMessages(storedThreadId);
+      } else {
+        setInitialLoading(false);
+      }
     }
-  }, [propThreadId]);
+  }, [propThreadId, user?.id]);
 
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -129,62 +139,49 @@ export default function MobileChatInterface({
   };
 
   const loadThreadMessages = async (threadId: string) => {
-    if (!threadId || !user?.id) return;
+    if (!threadId || !user?.id) {
+      setInitialLoading(false);
+      return;
+    }
+    
+    setInitialLoading(true);
     
     try {
       console.log(`[Mobile] Loading messages for thread ${threadId}`);
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('thread_id', threadId)
-        .order('created_at', { ascending: true });
-        
-      if (error) {
-        console.error(`[Mobile] Error loading messages:`, error);
-        throw error;
-      }
       
-      console.log(`[Mobile] Loaded ${data?.length || 0} messages`);
-      
-      if (data && data.length > 0) {
-        const formattedMessages = data.map((msg: ChatMessageFromDB) => {
-          const uiMessage: UIChatMessage = {
-            role: msg.sender === 'user' ? 'user' : 'assistant',
-            content: msg.content
-          };
-          
-          if (msg.reference_entries) {
-            uiMessage.references = Array.isArray(msg.reference_entries) 
-              ? msg.reference_entries 
-              : typeof msg.reference_entries === 'object' 
-                ? [msg.reference_entries] 
-                : [];
-          }
-          
-          if (msg.analysis_data) {
-            uiMessage.analysis = msg.analysis_data;
-          }
-          
-          if (msg.has_numeric_result !== undefined) {
-            uiMessage.hasNumericResult = msg.has_numeric_result;
-          }
-          
-          return uiMessage;
-        });
+      const { data: threadData, error: threadError } = await supabase
+        .from('chat_threads')
+        .select('id')
+        .eq('id', threadId)
+        .eq('user_id', user.id)
+        .single();
         
-        console.log("[Mobile] Formatted messages:", formattedMessages.map(m => ({ 
-          role: m.role, 
-          content: m.content.substring(0, 20) + "...",
-          hasRefs: !!m.references 
-        })));
-        
-        setMessages(formattedMessages);
-        setShowSuggestions(false);
-        console.log("[Mobile] Set messages array with length:", formattedMessages.length);
-      } else {
+      if (threadError || !threadData) {
+        console.error(`[Mobile] Thread not found or doesn't belong to user:`, threadError);
         setMessages([]);
         setShowSuggestions(true);
-        console.log("[Mobile] No messages found, showing suggestions");
+        setInitialLoading(false);
+        return;
+      }
+      
+      const chatMessages = await getThreadMessages(threadId);
+      
+      if (chatMessages && chatMessages.length > 0) {
+        console.log(`[Mobile] Loaded ${chatMessages.length} messages for thread ${threadId}`);
+        
+        const uiMessages = chatMessages.map(msg => ({
+          role: msg.sender as 'user' | 'assistant',
+          content: msg.content,
+          references: msg.reference_entries,
+          hasNumericResult: msg.has_numeric_result
+        }));
+        
+        setMessages(uiMessages);
+        setShowSuggestions(false);
+      } else {
+        console.log(`[Mobile] No messages found for thread ${threadId}`);
+        setMessages([]);
+        setShowSuggestions(true);
       }
     } catch (error) {
       console.error("[Mobile] Error loading messages:", error);
@@ -193,6 +190,10 @@ export default function MobileChatInterface({
         description: "Could not load conversation history.",
         variant: "destructive"
       });
+      setMessages([]);
+      setShowSuggestions(true);
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -525,7 +526,12 @@ export default function MobileChatInterface({
       </div>
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
-        {messages.length === 0 ? (
+        {initialLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+            <span className="ml-2 text-muted-foreground">Loading conversation...</span>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex flex-col justify-start h-full mt-6 pt-4">
             <div className="text-center px-4">
               <h3 className="text-xl font-medium mb-2">How can I help you?</h3>

@@ -25,6 +25,7 @@ export type ChatMessage = {
 // Function to get all chat threads for a user
 export const getUserChatThreads = async (userId: string): Promise<ChatThread[]> => {
   try {
+    console.log("Fetching chat threads for user:", userId);
     const { data, error } = await supabase
       .from('chat_threads')
       .select('*')
@@ -36,6 +37,7 @@ export const getUserChatThreads = async (userId: string): Promise<ChatThread[]> 
       throw error;
     }
     
+    console.log(`Found ${data?.length || 0} chat threads`);
     return data || [];
   } catch (error) {
     console.error("Failed to get chat threads:", error);
@@ -46,6 +48,7 @@ export const getUserChatThreads = async (userId: string): Promise<ChatThread[]> 
 // Function to get messages for a specific thread
 export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]> => {
   try {
+    console.log("Fetching messages for thread:", threadId);
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
@@ -57,6 +60,8 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       throw error;
     }
     
+    console.log(`Found ${data?.length || 0} messages for thread ${threadId}`);
+    
     // Fixed: Ensure proper typing of sender as either 'user' or 'assistant'
     return (data || []).map(msg => {
       const typedMessage: ChatMessage = {
@@ -66,7 +71,8 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         created_at: msg.created_at,
         sender: msg.sender === 'user' ? 'user' : 'assistant',
         reference_entries: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-        has_numeric_result: msg.has_numeric_result || false
+        has_numeric_result: msg.has_numeric_result || false,
+        analysis_data: msg.analysis_data || undefined
       };
       
       return typedMessage;

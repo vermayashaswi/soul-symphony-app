@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
@@ -22,21 +21,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ChatMessage as ChatMessageType, getUserChatThreads, getThreadMessages } from "@/services/chatPersistenceService";
 
 type ChatMessageRole = 'user' | 'assistant' | 'error';
 
-type ChatMessage = {
-  role: ChatMessageRole;
-  content: string;
-  references?: any[];
-  analysis?: any;
-  diagnostics?: any;
-  hasNumericResult?: boolean;
-};
-
 export default function SmartChatInterface() {
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessageType[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -55,47 +47,63 @@ export default function SmartChatInterface() {
     
     window.addEventListener('threadSelected' as any, onThreadChange);
     
+    const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
+    if (storedThreadId && user?.id) {
+      setCurrentThreadId(storedThreadId);
+      loadThreadMessages(storedThreadId);
+    } else {
+      setInitialLoading(false);
+    }
+    
     return () => {
       window.removeEventListener('threadSelected' as any, onThreadChange);
     };
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     scrollToBottom();
   }, [chatHistory, loading]);
 
   const scrollToBottom = () => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const loadThreadMessages = async (threadId: string) => {
-    if (!threadId || !user?.id) return;
+    if (!threadId || !user?.id) {
+      setInitialLoading(false);
+      return;
+    }
+    
+    setInitialLoading(true);
     
     try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('thread_id', threadId)
-        .order('created_at', { ascending: true });
+      console.log(`Loading messages for thread ${threadId}`);
+      
+      const { data: threadData, error: threadError } = await supabase
+        .from('chat_threads')
+        .select('id')
+        .eq('id', threadId)
+        .eq('user_id', user.id)
+        .single();
         
-      if (error) {
-        console.error("Error loading messages:", error);
-        throw error;
+      if (threadError || !threadData) {
+        console.error("Thread not found or doesn't belong to user:", threadError);
+        setChatHistory([]);
+        setShowSuggestions(true);
+        setInitialLoading(false);
+        return;
       }
       
-      if (data && data.length > 0) {
-        const formattedMessages: ChatMessage[] = data.map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant' as ChatMessageRole,
-          content: msg.content,
-          references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-          // Handle analysis data - the database might not have this field yet
-          analysis: undefined, // We'll get this from elsewhere if needed
-          hasNumericResult: msg.has_numeric_result || false
-        }));
-        
-        setChatHistory(formattedMessages);
+      const messages = await getThreadMessages(threadId);
+      
+      if (messages && messages.length > 0) {
+        console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
+        setChatHistory(messages);
         setShowSuggestions(false);
       } else {
+        console.log(`No messages found for thread ${threadId}`);
         setChatHistory([]);
         setShowSuggestions(true);
       }
@@ -106,6 +114,10 @@ export default function SmartChatInterface() {
         description: "Could not load conversation history.",
         variant: "destructive"
       });
+      setChatHistory([]);
+      setShowSuggestions(true);
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -207,7 +219,6 @@ export default function SmartChatInterface() {
     }
 
     try {
-      // Delete all messages associated with the thread
       const { error: messagesError } = await supabase
         .from('chat_messages')
         .delete()
@@ -218,7 +229,6 @@ export default function SmartChatInterface() {
         throw messagesError;
       }
       
-      // Delete the thread itself
       const { error: threadError } = await supabase
         .from('chat_threads')
         .delete()
@@ -229,11 +239,9 @@ export default function SmartChatInterface() {
         throw threadError;
       }
       
-      // Clear current messages
       setChatHistory([]);
       setShowSuggestions(true);
       
-      // Try to find another thread
       const { data } = await supabase
         .from('chat_threads')
         .select('id')
@@ -245,14 +253,12 @@ export default function SmartChatInterface() {
         setCurrentThreadId(data[0].id);
         loadThreadMessages(data[0].id);
         
-        // Dispatch event to update sidebar
         window.dispatchEvent(
           new CustomEvent('threadSelected', { 
             detail: { threadId: data[0].id } 
           })
         );
       } else {
-        // Create a new thread if no other threads exist
         const { data: newThread, error } = await supabase
           .from('chat_threads')
           .insert({
@@ -267,7 +273,6 @@ export default function SmartChatInterface() {
         if (!error && newThread) {
           setCurrentThreadId(newThread.id);
           
-          // Dispatch event to update sidebar
           window.dispatchEvent(
             new CustomEvent('threadSelected', { 
               detail: { threadId: newThread.id } 
@@ -276,13 +281,11 @@ export default function SmartChatInterface() {
         }
       }
       
-      // Notify the user
       toast({
         title: "Success",
         description: "Conversation deleted successfully",
       });
       
-      // Close the dialog
       setShowDeleteDialog(false);
     } catch (error) {
       console.error("[Desktop] Error deleting thread:", error);
@@ -299,7 +302,6 @@ export default function SmartChatInterface() {
       <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
         <h2 className="text-xl font-semibold">Roha</h2>
         
-        {/* Add delete button */}
         {currentThreadId && (
           <Button 
             variant="ghost" 
@@ -314,7 +316,12 @@ export default function SmartChatInterface() {
       </div>
       
       <div className="chat-content flex-1 overflow-hidden">
-        {chatHistory.length === 0 ? (
+        {initialLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+            <span className="ml-2 text-muted-foreground">Loading conversation...</span>
+          </div>
+        ) : chatHistory.length === 0 ? (
           <EmptyChatState />
         ) : (
           <ChatArea 
@@ -344,7 +351,6 @@ export default function SmartChatInterface() {
         </div>
       </div>
       
-      {/* Delete confirmation dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
