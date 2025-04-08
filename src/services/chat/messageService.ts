@@ -99,15 +99,19 @@ export const saveMessage = async (
       throw new Error(`Thread ${threadId} does not exist`);
     }
     
-    // Prepare the message data
-    const messageData = {
+    // Prepare the message data - only include analysis_data if it's provided
+    const messageData: Record<string, any> = {
       thread_id: threadId,
       content: content,
       sender: sender,
       reference_entries: references || null,
-      has_numeric_result: hasNumericResult || false,
-      analysis_data: analysisData || null
+      has_numeric_result: hasNumericResult || false
     };
+    
+    // Only add analysis_data field if it was provided
+    if (analysisData !== undefined) {
+      messageData.analysis_data = analysisData;
+    }
     
     console.log("Inserting message with data:", JSON.stringify(messageData, null, 2));
     
@@ -185,10 +189,10 @@ export const saveMessage = async (
       has_numeric_result: data.has_numeric_result || false
     };
     
-    // Using conditional assignment for type safety
+    // Only add analysis_data if it exists in the response
     if (analysisData) {
       typedMessage.analysis_data = analysisData;
-    } else if ('analysis_data' in data && data.analysis_data) {
+    } else if (data.analysis_data) {
       typedMessage.analysis_data = data.analysis_data;
     }
     
