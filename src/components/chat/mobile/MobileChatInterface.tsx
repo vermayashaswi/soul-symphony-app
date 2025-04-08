@@ -1,8 +1,7 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
+import { Menu, X, Brain, BarChart2, Search, Lightbulb, Trash } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage } from "@/services/chatService";
@@ -14,6 +13,16 @@ import { supabase } from "@/integrations/supabase/client";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -57,6 +66,8 @@ export default function MobileChatInterface({
   const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
   const suggestionQuestions = [
     {
       text: "What were my top emotions last week?",
@@ -137,14 +148,11 @@ export default function MobileChatInterface({
       
       if (data && data.length > 0) {
         const formattedMessages = data.map((msg: ChatMessageFromDB) => {
-          // Create the base message structure
           const uiMessage: UIChatMessage = {
-            // Fix: Ensure sender field is correctly mapped to 'user' or 'assistant'
             role: msg.sender === 'user' ? 'user' : 'assistant',
             content: msg.content
           };
           
-          // Add optional fields if they exist
           if (msg.reference_entries) {
             uiMessage.references = Array.isArray(msg.reference_entries) 
               ? msg.reference_entries 
@@ -164,7 +172,6 @@ export default function MobileChatInterface({
           return uiMessage;
         });
         
-        // Log all messages for debugging purposes
         console.log("[Mobile] Formatted messages:", formattedMessages.map(m => ({ 
           role: m.role, 
           content: m.content.substring(0, 20) + "...",
@@ -391,6 +398,88 @@ export default function MobileChatInterface({
     return null;
   };
 
+  const handleDeleteCurrentThread = async () => {
+    if (!currentThreadId || !user?.id) {
+      toast({
+        title: "Error",
+        description: "No active conversation to delete",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error: messagesError } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('thread_id', currentThreadId);
+        
+      if (messagesError) {
+        console.error("[Mobile] Error deleting messages:", messagesError);
+        throw messagesError;
+      }
+      
+      const { error: threadError } = await supabase
+        .from('chat_threads')
+        .delete()
+        .eq('id', currentThreadId);
+        
+      if (threadError) {
+        console.error("[Mobile] Error deleting thread:", threadError);
+        throw threadError;
+      }
+      
+      setMessages([]);
+      setShowSuggestions(true);
+      
+      if (onCreateNewThread) {
+        const newThreadId = await onCreateNewThread();
+        if (newThreadId) {
+          setCurrentThreadId(newThreadId);
+        }
+      } else {
+        const { data } = await supabase
+          .from('chat_threads')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+          
+        if (data && data.length > 0) {
+          setCurrentThreadId(data[0].id);
+          loadThreadMessages(data[0].id);
+        } else {
+          const newThreadId = uuidv4();
+          await supabase
+            .from('chat_threads')
+            .insert({
+              id: newThreadId,
+              user_id: user.id,
+              title: "New Conversation",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+            
+          setCurrentThreadId(newThreadId);
+        }
+      }
+      
+      toast({
+        title: "Success",
+        description: "Conversation deleted successfully",
+      });
+      
+      setShowDeleteDialog(false);
+    } catch (error) {
+      console.error("[Mobile] Error deleting thread:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete conversation",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full" ref={containerRef}>
       <div className="mobile-chat-header flex items-center justify-between py-2 px-3 sticky top-0 z-10 bg-background border-b">
@@ -421,6 +510,18 @@ export default function MobileChatInterface({
           </SheetContent>
         </Sheet>
         <h2 className="text-lg font-semibold flex-1 text-center">Roha</h2>
+        
+        {currentThreadId && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-muted-foreground hover:text-destructive" 
+            onClick={() => setShowDeleteDialog(true)}
+            title="Delete current conversation"
+          >
+            <Trash className="h-5 w-5" />
+          </Button>
+        )}
       </div>
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
@@ -486,6 +587,26 @@ export default function MobileChatInterface({
           userId={userId || user?.id}
         />
       </div>
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this conversation and all its messages. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteCurrentThread}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
