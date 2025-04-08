@@ -9,7 +9,8 @@ export interface ChatDebugContextType {
 
 // Create context with default no-op values
 const ChatDebugContext = React.createContext<ChatDebugContextType>({
-  addEvent: () => {},
+  // Provide a no-op function that accepts the expected arguments
+  addEvent: (category: string, message: string, level?: string) => {},
   events: []
 });
 
@@ -17,7 +18,10 @@ const ChatDebugContext = React.createContext<ChatDebugContextType>({
 export const ChatDebugProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Just return children with the context providing no-op functions
   return (
-    <ChatDebugContext.Provider value={{ addEvent: () => {}, events: [] }}>
+    <ChatDebugContext.Provider value={{ 
+      addEvent: (category: string, message: string, level?: string) => {},
+      events: [] 
+    }}>
       {children}
     </ChatDebugContext.Provider>
   );
@@ -33,7 +37,7 @@ interface ChatDebugPanelProps {
   onClose?: () => void;
 }
 
-// Empty component that accepts onClose prop but doesn't use it
+// Empty component that accepts onClose prop
 const ChatDebugPanel: React.FC<ChatDebugPanelProps> = ({ onClose }) => {
   return null;
 };

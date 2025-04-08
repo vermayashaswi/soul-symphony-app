@@ -20,7 +20,7 @@ interface DebugContextType {
 
 export const DebugContext = React.createContext<DebugContextType>({
   events: [],
-  addEvent: () => {},
+  addEvent: (type: string, message: string, level?: 'info' | 'warning' | 'error' | 'success', details?: any) => {},
   clearEvents: () => {},
   exportEvents: () => {},
 });
@@ -33,7 +33,7 @@ export const DebugLogProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 export const useDebugLog = (): DebugContextType => {
   return {
     events: [],
-    addEvent: () => {},
+    addEvent: (type: string, message: string, level?: 'info' | 'warning' | 'error' | 'success', details?: any) => {},
     clearEvents: () => {},
     exportEvents: () => {},
   };
