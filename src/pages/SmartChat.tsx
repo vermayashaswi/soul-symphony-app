@@ -30,11 +30,6 @@ import {
 
 const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
 
-// Simple wrapper that just returns children
-const DebugLogProvider = ({ children }: { children: React.ReactNode }) => {
-  return <>{children}</>;
-};
-
 export default function SmartChat() {
   const isMobile = useIsMobile();
   const { user } = useAuth();
@@ -423,8 +418,8 @@ export default function SmartChat() {
   const content = shouldRenderMobile ? mobileContent : desktopContent;
   
   return (
-    <DebugLogProvider>
+    <>
       {mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content}
-    </DebugLogProvider>
+    </>
   );
 }
