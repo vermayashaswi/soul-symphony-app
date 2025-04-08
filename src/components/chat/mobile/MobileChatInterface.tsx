@@ -568,7 +568,7 @@ const MobileChatInterfaceContent = ({
             />
           </SheetContent>
         </Sheet>
-        <h2 className="text-lg font-semibold flex-1 text-center">Roha</h2>
+        <h2 className="text-lg font-semibold flex-1 text-center">Rūḥ</h2>
         
         {currentThreadId && messages.length > 0 && (
           <Button 

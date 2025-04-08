@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -436,7 +437,7 @@ const SmartChatInterface = () => {
   return (
     <div className="chat-interface flex flex-col h-full">
       <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
-        <h2 className="text-xl font-semibold">Roha</h2>
+        <h2 className="text-xl font-semibold">Rūḥ</h2>
         
         <div className="flex items-center gap-2">
           <Button
