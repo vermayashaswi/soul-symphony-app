@@ -21,7 +21,7 @@ const MaintenanceBanner = () => {
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="text-sm font-medium">
-            We're currently under maintenance. Be Right Back!
+            We're experiencing issues with the recording feature. Please check recording status for details.
           </AlertDescription>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>

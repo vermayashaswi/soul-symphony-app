@@ -41,7 +41,7 @@ const SupabaseStatusChecker = () => {
     try {
       // Just a ping to check if the function is accessible
       const { data: transcribeCheck, error: transcribeError } = await supabase.functions.invoke('transcribe-audio', {
-        body: { ping: true }
+        body: { healthCheck: true }
       });
       
       if (transcribeError) {
