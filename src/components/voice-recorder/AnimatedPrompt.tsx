@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from '@/hooks/use-theme';
 
 interface AnimatedPromptProps {
   show: boolean;
@@ -8,6 +9,7 @@ interface AnimatedPromptProps {
 
 export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const { theme } = useTheme();
   
   useEffect(() => {
     // Small delay to make sure the animation runs properly
@@ -30,7 +32,7 @@ export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
           transition={{ duration: 0.5, ease: "easeInOut" }}
         >
           <motion.span 
-            className="px-4 py-2 text-lg font-medium text-white dark:bg-theme-color/90 bg-theme-color/80 rounded-full shadow-md backdrop-blur-lg"
+            className={`px-4 py-2 text-lg font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
             animate={{ 
               scale: [1, 1.03, 1],
             }}
