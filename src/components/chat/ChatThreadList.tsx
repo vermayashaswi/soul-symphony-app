@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   PlusCircle, 
@@ -122,7 +121,6 @@ export default function ChatThreadList({
           description: "Conversation deleted"
         });
         
-        // If the currently selected thread was deleted, create a new one
         if (currentThreadId === threadToDelete) {
           onStartNewThread();
         }
