@@ -1,45 +1,15 @@
 
-import React from 'react';
+// This file is now deprecated, we'll redirect to our new debug log panel
+import { useDebugLog } from "@/utils/debug/DebugContext";
+import DebugLogPanel from "@/components/debug/DebugLogPanel";
 
-// Debug context type for proper typing
-export interface ChatDebugContextType {
-  addEvent: (category: string, message: string, level?: string) => void;
-  events: any[];
-}
-
-// Create context with default no-op values
-const ChatDebugContext = React.createContext<ChatDebugContextType>({
-  // Provide a no-op function that accepts the expected arguments
-  addEvent: (category: string, message: string, level?: string) => {},
-  events: []
-});
-
-// Debug provider that does nothing but provides the context shape
-export const ChatDebugProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Just return children with the context providing no-op functions
-  return (
-    <ChatDebugContext.Provider value={{ 
-      addEvent: (category: string, message: string, level?: string) => {},
-      events: [] 
-    }}>
-      {children}
-    </ChatDebugContext.Provider>
-  );
+// Create a provider for backward compatibility
+export const ChatDebugProvider = ({ children }: { children: React.ReactNode }) => {
+  return children;
 };
 
-// Hook to use the debug context
-export const useChatDebug = (): ChatDebugContextType => {
-  return React.useContext(ChatDebugContext);
-};
+// Create a hook for backward compatibility
+export const useChatDebug = useDebugLog;
 
-// This is a stub implementation that gets rendered only when requested
-interface ChatDebugPanelProps {
-  onClose?: () => void;
-}
-
-// Empty component that accepts onClose prop
-const ChatDebugPanel: React.FC<ChatDebugPanelProps> = ({ onClose }) => {
-  return null;
-};
-
-export default ChatDebugPanel;
+// Export the panel component for backward compatibility
+export default DebugLogPanel;

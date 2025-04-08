@@ -14,25 +14,32 @@ export interface LogEntry {
   stack?: string;
 }
 
-// Empty component that returns null
-export default function DebugPanel() {
-  return null;
+class DebugLogger {
+  private static instance: DebugLogger;
+  
+  private constructor() {}
+  
+  public static getInstance(): DebugLogger {
+    if (!DebugLogger.instance) {
+      DebugLogger.instance = new DebugLogger();
+    }
+    return DebugLogger.instance;
+  }
+  
+  public log(): void {}
+  public getLogs(): LogEntry[] { return []; }
+  public clearLogs(): void {}
+  public setEnabled(): void {}
+  public isEnabled(): boolean { return false; }
+  public subscribe(): () => void { return () => {}; }
+  public getFilteredLogs(): LogEntry[] { return []; }
+  public getErrorCount(): number { return 0; }
+  public getWarnCount(): number { return 0; }
+  public setLastProfileError(): void {}
+  public getLastProfileError(): string | null { return null; }
 }
 
-// No-op functions
-export const debugLogger = {
-  setLastProfileError: (_: any) => {},
-  log: (..._: any[]) => {},
-  getLogs: () => [],
-  clearLogs: () => {},
-  setEnabled: () => {},
-  isEnabled: () => false,
-  subscribe: () => () => {},
-  getFilteredLogs: () => [],
-  getErrorCount: () => 0,
-  getWarnCount: () => 0,
-  getLastProfileError: () => null
-};
+export const debugLogger = DebugLogger.getInstance();
 
 export const logInfo = () => {};
 export const logWarn = () => {};
@@ -44,3 +51,7 @@ export const logAuthError = () => {};
 export const logRender = () => {};
 export const logAPI = () => {};
 export const logAction = () => {};
+
+export default function DebugPanel() {
+  return null;
+}

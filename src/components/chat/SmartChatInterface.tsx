@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -8,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import EmptyChatState from "./EmptyChatState";
 import VoiceRecordingButton from "./VoiceRecordingButton";
-import { Trash } from "lucide-react";
+import { Trash, Bug } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   AlertDialog,
@@ -22,9 +23,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ChatMessage } from "@/services/chat";
 import { getThreadMessages, saveMessage } from "@/services/chat";
-
-// Keep track of ongoing message processing across navigation
-const ongoingProcessingMap = new Map();
+import { useDebugLog } from "@/utils/debug/DebugContext";
+import DebugLogPanel from "@/components/debug/DebugLogPanel";
 
 const SmartChatInterface = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -34,26 +34,19 @@ const SmartChatInterface = () => {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const loadedThreadRef = useRef<string | null>(null);
-  const isMountedRef = useRef<boolean>(true);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
+  const debugLog = useDebugLog();
 
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
         setCurrentThreadId(event.detail.threadId);
         loadThreadMessages(event.detail.threadId);
-        console.log(`Thread selected: ${event.detail.threadId}`);
+        debugLog.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
       }
     };
     
@@ -63,18 +56,10 @@ const SmartChatInterface = () => {
     if (storedThreadId && user?.id) {
       setCurrentThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
-      console.log(`Loading stored thread: ${storedThreadId}`);
+      debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
       setInitialLoading(false);
-      console.log("No stored thread found, showing empty state");
-    }
-    
-    // Check for ongoing processing
-    if (user?.id) {
-      const userProcessing = ongoingProcessingMap.get(user.id);
-      if (userProcessing && userProcessing.threadId) {
-        loadThreadMessages(userProcessing.threadId);
-      }
+      debugLog.addEvent("Initialization", "No stored thread found, showing empty state", "info");
     }
     
     return () => {
@@ -99,12 +84,12 @@ const SmartChatInterface = () => {
     }
     
     if (loadedThreadRef.current === threadId) {
-      console.log(`Thread ${threadId} already loaded, skipping`);
+      debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
       return;
     }
     
     setInitialLoading(true);
-    console.log(`Loading messages for thread ${threadId}`);
+    debugLog.addEvent("Thread Loading", `Loading messages for thread ${threadId}`, "info");
     
     try {
       const { data: threadData, error: threadError } = await supabase
@@ -115,6 +100,7 @@ const SmartChatInterface = () => {
         .single();
         
       if (threadError || !threadData) {
+        debugLog.addEvent("Thread Loading", `Thread not found or doesn't belong to user: ${threadError?.message || "Unknown error"}`, "error");
         console.error("Thread not found or doesn't belong to user:", threadError);
         setChatHistory([]);
         setShowSuggestions(true);
@@ -122,21 +108,24 @@ const SmartChatInterface = () => {
         return;
       }
       
-      console.log(`Thread ${threadId} found, fetching messages`);
+      debugLog.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "success");
       const messages = await getThreadMessages(threadId);
       
       if (messages && messages.length > 0) {
+        debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
         console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
         setChatHistory(messages);
         setShowSuggestions(false);
         loadedThreadRef.current = threadId;
       } else {
+        debugLog.addEvent("Thread Loading", `No messages found for thread ${threadId}`, "info");
         console.log(`No messages found for thread ${threadId}`);
         setChatHistory([]);
         setShowSuggestions(true);
       }
     } catch (error) {
       console.error("Error loading messages:", error);
+      debugLog.addEvent("Thread Loading", `Error loading messages: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
       toast({
         title: "Error loading messages",
         description: "Could not load conversation history.",
@@ -157,6 +146,7 @@ const SmartChatInterface = () => {
         description: "Please sign in to use the chat feature.",
         variant: "destructive"
       });
+      debugLog.addEvent("Authentication", "User not authenticated, message sending blocked", "error");
       return;
     }
 
@@ -168,6 +158,7 @@ const SmartChatInterface = () => {
         description: "Please select a conversation or start a new one.",
         variant: "destructive"
       });
+      debugLog.addEvent("Thread Selection", "No thread selected for message sending", "error");
       return;
     }
     
@@ -180,174 +171,142 @@ const SmartChatInterface = () => {
       created_at: new Date().toISOString()
     };
     
-    console.log(`Adding temporary message to UI: ${tempUserMessage.id}`);
+    debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
     setChatHistory(prev => [...prev, tempUserMessage]);
     setLoading(true);
     setProcessingStage("Analyzing your question...");
     
-    // Store the processing information so we can track it across navigations
-    const processingInfo = {
-      userId: user.id,
-      threadId: threadId,
-      messageId: tempUserMessage.id,
-      message: message,
-      timestamp: Date.now()
-    };
-    
-    ongoingProcessingMap.set(user.id, processingInfo);
-    
-    // Create the actual processing function that will run even if component unmounts
-    const processMessageInBackground = async () => {
+    try {
+      let savedUserMessage: ChatMessage | null = null;
       try {
-        let savedUserMessage: ChatMessage | null = null;
-        try {
-          console.log(`Saving user message to thread ${threadId}`);
-          savedUserMessage = await saveMessage(threadId, message, 'user');
-          console.log("User message saved with ID:", savedUserMessage?.id);
-          
-          if (savedUserMessage && isMountedRef.current) {
-            console.log(`Replacing temporary message with saved message: ${savedUserMessage.id}`);
-            setChatHistory(prev => prev.map(msg => 
-              msg.id === tempUserMessage.id ? savedUserMessage! : msg
-            ));
-          } else if (!savedUserMessage) {
-            console.error("Failed to save user message - null response");
-            throw new Error("Failed to save message");
-          }
-        } catch (saveError: any) {
-          console.error("Error saving user message:", saveError);
-          if (isMountedRef.current) {
-            toast({
-              title: "Error saving message",
-              description: saveError.message || "Could not save your message",
-              variant: "destructive"
-            });
-          }
+        debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
+        savedUserMessage = await saveMessage(threadId, message, 'user');
+        debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
+        console.log("User message saved with ID:", savedUserMessage?.id);
+        
+        if (savedUserMessage) {
+          debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
+          setChatHistory(prev => prev.map(msg => 
+            msg.id === tempUserMessage.id ? savedUserMessage! : msg
+          ));
+        } else {
+          debugLog.addEvent("Database", "Failed to save user message - null response", "error");
+          console.error("Failed to save user message - null response");
+          throw new Error("Failed to save message");
         }
-        
-        console.log(`Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`);
-        console.log("Performing comprehensive query analysis for:", message);
-        if (isMountedRef.current) {
-          setProcessingStage("Analyzing patterns in your journal...");
-        }
-        const queryTypes = analyzeQueryTypes(message);
-        
-        const analysisDetails = {
-          isEmotionFocused: queryTypes.isEmotionFocused,
-          isQuantitative: queryTypes.isQuantitative,
-          isWhyQuestion: queryTypes.isWhyQuestion,
-          isTemporalQuery: queryTypes.isTemporalQuery,
-          timeRange: queryTypes.timeRange.periodName,
-          emotion: queryTypes.emotion || 'none detected'
-        };
-        
-        console.log("Query analysis result:", queryTypes);
-        
-        if (isMountedRef.current) {
-          setProcessingStage("Searching for insights...");
-        }
-        console.log("Sending query to AI for processing");
-        const response = await processChatMessage(
-          message, 
-          user.id, 
-          queryTypes, 
+      } catch (saveError: any) {
+        debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
+        console.error("Error saving user message:", saveError);
+        toast({
+          title: "Error saving message",
+          description: saveError.message || "Could not save your message",
+          variant: "destructive"
+        });
+      }
+      
+      debugLog.addEvent("Query Analysis", `Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
+      console.log("Performing comprehensive query analysis for:", message);
+      setProcessingStage("Analyzing patterns in your journal...");
+      const queryTypes = analyzeQueryTypes(message);
+      
+      const analysisDetails = {
+        isEmotionFocused: queryTypes.isEmotionFocused,
+        isQuantitative: queryTypes.isQuantitative,
+        isWhyQuestion: queryTypes.isWhyQuestion,
+        isTemporalQuery: queryTypes.isTemporalQuery,
+        timeRange: queryTypes.timeRange.periodName,
+        emotion: queryTypes.emotion || 'none detected'
+      };
+      
+      debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
+      console.log("Query analysis result:", queryTypes);
+      
+      setProcessingStage("Searching for insights...");
+      debugLog.addEvent("AI Processing", "Sending query to AI for processing", "info");
+      const response = await processChatMessage(
+        message, 
+        user.id, 
+        queryTypes, 
+        threadId,
+        false
+      );
+      
+      const responseInfo = {
+        role: response.role,
+        hasReferences: !!response.references?.length,
+        refCount: response.references?.length || 0,
+        hasAnalysis: !!response.analysis,
+        hasNumericResult: response.hasNumericResult,
+        errorState: response.role === 'error'
+      };
+      
+      debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
+      console.log("Response received:", responseInfo);
+      
+      try {
+        debugLog.addEvent("Database", "Saving assistant response to database", "info");
+        const savedResponse = await saveMessage(
           threadId,
-          false
+          response.content,
+          'assistant',
+          response.references,
+          response.analysis,
+          response.hasNumericResult
         );
         
-        const responseInfo = {
-          role: response.role,
-          hasReferences: !!response.references?.length,
-          refCount: response.references?.length || 0,
-          hasAnalysis: !!response.analysis,
-          hasNumericResult: response.hasNumericResult,
-          errorState: response.role === 'error'
+        debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
+        console.log("Assistant response saved with ID:", savedResponse?.id);
+        
+        if (savedResponse) {
+          debugLog.addEvent("UI Update", "Adding assistant response to chat history", "info");
+          setChatHistory(prev => [...prev, savedResponse]);
+        } else {
+          throw new Error("Failed to save assistant response");
+        }
+      } catch (saveError: any) {
+        debugLog.addEvent("Database", `Error saving assistant response: ${saveError.message || "Unknown error"}`, "error");
+        console.error("Error saving assistant response:", saveError);
+        const assistantMessage: ChatMessage = {
+          id: `temp-response-${Date.now()}`,
+          thread_id: threadId,
+          content: response.content,
+          sender: 'assistant',
+          role: 'assistant',
+          created_at: new Date().toISOString(),
+          reference_entries: response.references,
+          analysis_data: response.analysis,
+          has_numeric_result: response.hasNumericResult
         };
         
-        console.log("Response received:", responseInfo);
+        debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
+        setChatHistory(prev => [...prev, assistantMessage]);
+        console.error("Failed to save assistant response to database, using temporary message");
         
-        try {
-          console.log("Saving assistant response to database");
-          const savedResponse = await saveMessage(
-            threadId,
-            response.content,
-            'assistant',
-            response.references,
-            response.analysis,
-            response.hasNumericResult
-          );
-          
-          console.log("Assistant response saved with ID:", savedResponse?.id);
-          
-          if (savedResponse && isMountedRef.current) {
-            console.log("Adding assistant response to chat history");
-            setChatHistory(prev => [...prev, savedResponse]);
-          } else if (!savedResponse) {
-            throw new Error("Failed to save assistant response");
-          }
-        } catch (saveError: any) {
-          console.error("Error saving assistant response:", saveError);
-          const assistantMessage: ChatMessage = {
-            id: `temp-response-${Date.now()}`,
-            thread_id: threadId,
-            content: response.content,
-            sender: 'assistant',
-            role: 'assistant',
-            created_at: new Date().toISOString(),
-            reference_entries: response.references,
-            analysis_data: response.analysis,
-            has_numeric_result: response.hasNumericResult
-          };
-          
-          console.log("Adding fallback temporary assistant response to chat history");
-          if (isMountedRef.current) {
-            setChatHistory(prev => [...prev, assistantMessage]);
-            console.error("Failed to save assistant response to database, using temporary message");
-            
-            toast({
-              title: "Warning",
-              description: "Response displayed but couldn't be saved to your conversation history",
-              variant: "default"
-            });
-          }
-        }
-      } catch (error: any) {
-        console.error("Error sending message:", error);
+        toast({
+          title: "Warning",
+          description: "Response displayed but couldn't be saved to your conversation history",
+          variant: "default"
+        });
+      }
+    } catch (error: any) {
+      debugLog.addEvent("Error", `Error in message handling: ${error?.message || "Unknown error"}`, "error");
+      console.error("Error sending message:", error);
+      
+      const errorContent = "I'm having trouble processing your request. Please try again later. " + 
+               (error?.message ? `Error: ${error.message}` : "");
+      
+      try {
+        debugLog.addEvent("Error Handling", "Saving error message to database", "info");
+        const savedErrorMessage = await saveMessage(
+          threadId,
+          errorContent,
+          'assistant'
+        );
         
-        const errorContent = "I'm having trouble processing your request. Please try again later. " + 
-                (error?.message ? `Error: ${error.message}` : "");
-        
-        try {
-          console.log("Saving error message to database");
-          const savedErrorMessage = await saveMessage(
-            threadId,
-            errorContent,
-            'assistant'
-          );
-          
-          if (savedErrorMessage && isMountedRef.current) {
-            console.log("Adding error message to chat history");
-            setChatHistory(prev => [...prev, savedErrorMessage]);
-          } else if (!savedErrorMessage) {
-            const errorMessage: ChatMessage = {
-              id: `error-${Date.now()}`,
-              thread_id: threadId,
-              content: errorContent,
-              sender: 'assistant',
-              role: 'assistant',
-              created_at: new Date().toISOString()
-            };
-            
-            if (isMountedRef.current) {
-              console.log("Adding fallback error message to chat history");
-              setChatHistory(prev => [...prev, errorMessage]);
-            }
-          }
-          
-          console.log("Error message saved to database");
-        } catch (e) {
-          console.error("Failed to save error message:", e);
-          
+        if (savedErrorMessage) {
+          debugLog.addEvent("UI Update", "Adding error message to chat history", "warning");
+          setChatHistory(prev => [...prev, savedErrorMessage]);
+        } else {
           const errorMessage: ChatMessage = {
             id: `error-${Date.now()}`,
             thread_id: threadId,
@@ -357,24 +316,32 @@ const SmartChatInterface = () => {
             created_at: new Date().toISOString()
           };
           
-          if (isMountedRef.current) {
-            console.log("Adding last-resort error message to chat history");
-            setChatHistory(prev => [...prev, errorMessage]);
-          }
+          debugLog.addEvent("UI Update", "Adding fallback error message to chat history", "warning");
+          setChatHistory(prev => [...prev, errorMessage]);
         }
-      } finally {
-        // Remove this processing task from the map
-        ongoingProcessingMap.delete(user.id);
         
-        if (isMountedRef.current) {
-          setLoading(false);
-          setProcessingStage(null);
-        }
+        debugLog.addEvent("Error Handling", "Error message saved to database", "success");
+        console.log("Error message saved to database");
+      } catch (e) {
+        debugLog.addEvent("Error Handling", `Failed to save error message: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
+        console.error("Failed to save error message:", e);
+        
+        const errorMessage: ChatMessage = {
+          id: `error-${Date.now()}`,
+          thread_id: threadId,
+          content: errorContent,
+          sender: 'assistant',
+          role: 'assistant',
+          created_at: new Date().toISOString()
+        };
+        
+        debugLog.addEvent("UI Update", "Adding last-resort error message to chat history", "warning");
+        setChatHistory(prev => [...prev, errorMessage]);
       }
-    };
-    
-    // Start processing in the background
-    processMessageInBackground();
+    } finally {
+      setLoading(false);
+      setProcessingStage(null);
+    }
   };
 
   const handleDeleteCurrentThread = async () => {
@@ -473,6 +440,16 @@ const SmartChatInterface = () => {
         <h2 className="text-xl font-semibold">Rūḥ</h2>
         
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-muted-foreground"
+            onClick={() => setShowDebugPanel(!showDebugPanel)}
+            title="Toggle debug panel"
+          >
+            <Bug className={`h-5 w-5 ${showDebugPanel ? 'text-primary' : ''}`} />
+          </Button>
+          
           {currentThreadId && (
             <Button 
               variant="ghost" 
@@ -522,6 +499,10 @@ const SmartChatInterface = () => {
           />
         </div>
       </div>
+      
+      {showDebugPanel && (
+        <DebugLogPanel onClose={() => setShowDebugPanel(false)} />
+      )}
       
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

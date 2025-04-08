@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -114,30 +115,11 @@ async function extract_themes(text: string) {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-  
+
   try {
-    // Parse the request body
-    const body = await req.json();
-    
-    // Handle health check requests
-    if (body.healthCheck === true) {
-      console.log('Health check request received');
-      return new Response(
-        JSON.stringify({ 
-          status: 'ok',
-          timestamp: new Date().toISOString(),
-          service: 'generate-themes'
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-    
     const { text, entryId } = await req.json();
     
     if (!text) {

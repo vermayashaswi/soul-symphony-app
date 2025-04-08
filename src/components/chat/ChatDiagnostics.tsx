@@ -36,6 +36,11 @@ interface ChatDiagnosticsProps {
   functionExecutions?: FunctionExecution[];
 }
 
-export default function ChatDiagnostics() {
+export default function ChatDiagnostics({
+  queryText,
+  isVisible,
+  ragSteps,
+  queryAnalysis
+}: ChatDiagnosticsProps) {
   return null;
 }
