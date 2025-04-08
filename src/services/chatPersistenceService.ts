@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
@@ -82,6 +81,7 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         has_numeric_result: messageData.has_numeric_result || false
       };
       
+      // Adding analysis_data if it exists in the response
       if (messageData.analysis_data) {
         typedMessage.analysis_data = messageData.analysis_data;
       } else if (messageData.reference_entries && typeof messageData.reference_entries === 'object') {

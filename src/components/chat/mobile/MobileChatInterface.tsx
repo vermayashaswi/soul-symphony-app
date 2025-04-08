@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -25,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import ChatDebugPanel, { ChatDebugProvider, useChatDebug } from "@/components/chat/ChatDebugPanel";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -55,14 +55,14 @@ interface MobileChatInterfaceProps {
   onSwipeRight?: () => void;
 }
 
-export default function MobileChatInterface({
+const MobileChatInterfaceContent = ({
   currentThreadId: propThreadId,
   onSelectThread,
   onCreateNewThread,
   userId,
   onSwipeLeft,
   onSwipeRight
-}: MobileChatInterfaceProps) {
+}: MobileChatInterfaceProps) => {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -70,6 +70,8 @@ export default function MobileChatInterface({
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const chatDebug = useChatDebug();
   
   const suggestionQuestions = [
     {
@@ -104,13 +106,16 @@ export default function MobileChatInterface({
     if (propThreadId) {
       setCurrentThreadId(propThreadId);
       loadThreadMessages(propThreadId);
+      chatDebug.addEvent("Thread Initialization", `Loading prop thread: ${propThreadId}`, "info");
     } else {
       const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
       if (storedThreadId && user?.id) {
         setCurrentThreadId(storedThreadId);
         loadThreadMessages(storedThreadId);
+        chatDebug.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
       } else {
         setInitialLoading(false);
+        chatDebug.addEvent("Thread Initialization", "No stored thread found", "info");
       }
     }
   }, [propThreadId, user?.id]);
@@ -120,6 +125,7 @@ export default function MobileChatInterface({
       if (event.detail.threadId) {
         setCurrentThreadId(event.detail.threadId);
         loadThreadMessages(event.detail.threadId);
+        chatDebug.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
       }
     };
     
@@ -146,12 +152,13 @@ export default function MobileChatInterface({
       return;
     }
     
-    // If we've already loaded this thread, don't reload it
     if (loadedThreadRef.current === threadId) {
+      chatDebug.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
       return;
     }
     
     setInitialLoading(true);
+    chatDebug.addEvent("Thread Loading", `[Mobile] Loading messages for thread ${threadId}`, "info");
     
     try {
       console.log(`[Mobile] Loading messages for thread ${threadId}`);
@@ -164,6 +171,7 @@ export default function MobileChatInterface({
         .single();
         
       if (threadError || !threadData) {
+        chatDebug.addEvent("Thread Loading", `[Mobile] Thread not found or doesn't belong to user: ${threadError?.message || "Unknown error"}`, "error");
         console.error(`[Mobile] Thread not found or doesn't belong to user:`, threadError);
         setMessages([]);
         setShowSuggestions(true);
@@ -171,9 +179,11 @@ export default function MobileChatInterface({
         return;
       }
       
+      chatDebug.addEvent("Thread Loading", `[Mobile] Thread ${threadId} found, fetching messages`, "success");
       const chatMessages = await getThreadMessages(threadId);
       
       if (chatMessages && chatMessages.length > 0) {
+        chatDebug.addEvent("Thread Loading", `[Mobile] Loaded ${chatMessages.length} messages for thread ${threadId}`, "success");
         console.log(`[Mobile] Loaded ${chatMessages.length} messages for thread ${threadId}`);
         
         const uiMessages = chatMessages.map(msg => ({
@@ -185,14 +195,15 @@ export default function MobileChatInterface({
         
         setMessages(uiMessages);
         setShowSuggestions(false);
-        // Mark this thread as loaded
         loadedThreadRef.current = threadId;
       } else {
+        chatDebug.addEvent("Thread Loading", `[Mobile] No messages found for thread ${threadId}`, "info");
         console.log(`[Mobile] No messages found for thread ${threadId}`);
         setMessages([]);
         setShowSuggestions(true);
       }
     } catch (error) {
+      chatDebug.addEvent("Thread Loading", `[Mobile] Error loading messages: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
       console.error("[Mobile] Error loading messages:", error);
       toast({
         title: "Error loading messages",
@@ -214,6 +225,7 @@ export default function MobileChatInterface({
         description: "Please sign in to use the chat feature.",
         variant: "destructive"
       });
+      chatDebug.addEvent("Authentication", "[Mobile] User not authenticated, message sending blocked", "error");
       return;
     }
 
@@ -222,14 +234,17 @@ export default function MobileChatInterface({
     
     if (!threadId) {
       try {
+        chatDebug.addEvent("Thread Creation", "[Mobile] Creating new thread for message", "info");
         if (onCreateNewThread) {
           const newThreadId = await onCreateNewThread();
           if (!newThreadId) {
             throw new Error("Failed to create new thread");
           }
           threadId = newThreadId;
+          chatDebug.addEvent("Thread Creation", `[Mobile] New thread created: ${newThreadId}`, "success");
         } else {
           const newThreadId = uuidv4();
+          chatDebug.addEvent("Thread Creation", `[Mobile] Creating new thread with ID: ${newThreadId}`, "info");
           const { error } = await supabase
             .from('chat_threads')
             .insert({
@@ -241,13 +256,16 @@ export default function MobileChatInterface({
             });
           
           if (error) {
+            chatDebug.addEvent("Thread Creation", `[Mobile] Error creating thread: ${error.message}`, "error");
             throw error;
           }
           
           threadId = newThreadId;
           setCurrentThreadId(newThreadId);
+          chatDebug.addEvent("Thread Creation", `[Mobile] New thread created: ${newThreadId}`, "success");
         }
       } catch (error: any) {
+        chatDebug.addEvent("Thread Creation", `[Mobile] Error creating thread: ${error.message || "Unknown error"}`, "error");
         console.error("[Mobile] Error creating thread:", error);
         toast({
           title: "Error",
@@ -257,22 +275,27 @@ export default function MobileChatInterface({
         return;
       }
     } else {
+      chatDebug.addEvent("Message Check", `[Mobile] Checking if first message in thread ${threadId}`, "info");
       const { count, error } = await supabase
         .from('chat_messages')
         .select('*', { count: 'exact', head: true })
         .eq('thread_id', threadId);
         
       isFirstMessage = !error && count === 0;
+      if (isFirstMessage) {
+        chatDebug.addEvent("Message Check", `[Mobile] This is the first message in thread ${threadId}`, "info");
+      }
     }
     
-    // Add a temporary user message to the UI immediately
+    chatDebug.addEvent("User Message", `[Mobile] Adding user message to UI: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setLoading(true);
     setProcessingStage("Analyzing your question...");
     
     try {
-      // Save user message using the shared saveMessage function
+      chatDebug.addEvent("Database", `[Mobile] Saving user message to thread ${threadId}`, "info");
       const savedUserMessage = await saveMessage(threadId, message, 'user');
+      chatDebug.addEvent("Database", `[Mobile] User message saved: ${savedUserMessage?.id}`, "success");
       console.log("[Mobile] User message saved:", savedUserMessage?.id);
       
       window.dispatchEvent(
@@ -285,6 +308,7 @@ export default function MobileChatInterface({
         })
       );
       
+      chatDebug.addEvent("Query Analysis", `[Mobile] Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
       setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
@@ -298,9 +322,11 @@ export default function MobileChatInterface({
         emotion: queryTypes.emotion || 'none detected'
       };
       
+      chatDebug.addEvent("Query Analysis", `[Mobile] Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
       console.log("[Mobile] Query analysis result:", queryTypes);
       
       setProcessingStage("Searching for insights...");
+      chatDebug.addEvent("AI Processing", "[Mobile] Sending query to AI for processing", "info");
       const response = await processChatMessage(
         message, 
         user.id, 
@@ -309,14 +335,17 @@ export default function MobileChatInterface({
         false
       );
       
-      console.log("[Mobile] Response received:", {
+      const responseInfo = {
         role: response.role,
         hasReferences: !!response.references?.length,
         refCount: response.references?.length || 0,
         hasAnalysis: !!response.analysis,
         hasNumericResult: response.hasNumericResult,
         errorState: response.role === 'error'
-      });
+      };
+      
+      chatDebug.addEvent("AI Processing", `[Mobile] Response received: ${JSON.stringify(responseInfo)}`, "success");
+      console.log("[Mobile] Response received:", responseInfo);
       
       const uiResponse: UIChatMessage = {
         role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
@@ -327,10 +356,11 @@ export default function MobileChatInterface({
       };
       
       if (response.role === 'error' || response.content.includes("issue retrieving")) {
+        chatDebug.addEvent("AI Processing", `[Mobile] Received error response: ${response.content.substring(0, 100)}...`, "error");
         console.error("[Mobile] Received error response:", response.content);
       }
       
-      // Save assistant response using the shared saveMessage function
+      chatDebug.addEvent("Database", "[Mobile] Saving assistant response to database", "info");
       const savedResponse = await saveMessage(
         threadId,
         response.content,
@@ -340,6 +370,7 @@ export default function MobileChatInterface({
         response.hasNumericResult || false
       );
       
+      chatDebug.addEvent("Database", `[Mobile] Assistant response saved: ${savedResponse?.id}`, "success");
       console.log("[Mobile] Assistant response saved:", savedResponse?.id);
       
       if (messages.length === 0) {
@@ -347,6 +378,7 @@ export default function MobileChatInterface({
           ? message.substring(0, 30) + "..." 
           : message;
           
+        chatDebug.addEvent("Thread Update", `[Mobile] Updating thread title to: ${truncatedTitle}`, "info");
         await supabase
           .from('chat_threads')
           .update({ 
@@ -356,19 +388,22 @@ export default function MobileChatInterface({
           .eq('id', threadId);
       }
       
+      chatDebug.addEvent("Thread Update", `[Mobile] Updating thread timestamp for ${threadId}`, "info");
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
       
+      chatDebug.addEvent("UI Update", "[Mobile] Adding assistant response to chat", "info");
       setMessages(prev => [...prev, uiResponse]);
     } catch (error: any) {
+      chatDebug.addEvent("Error", `[Mobile] Error in message handling: ${error?.message || "Unknown error"}`, "error");
       console.error("[Mobile] Error sending message:", error);
       
       const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
-      // Add error message to UI
+      chatDebug.addEvent("UI Update", "[Mobile] Adding error message to chat", "warning");
       setMessages(prev => [
         ...prev, 
         { 
@@ -377,15 +412,17 @@ export default function MobileChatInterface({
         }
       ]);
       
-      // Ensure error message is saved to database
       try {
+        chatDebug.addEvent("Database", "[Mobile] Saving error message to database", "info");
         const savedErrorMessage = await saveMessage(
           threadId,
           errorMessageContent,
           'assistant'
         );
+        chatDebug.addEvent("Database", `[Mobile] Error message saved to database: ${savedErrorMessage?.id}`, "success");
         console.log("[Mobile] Error message saved to database:", savedErrorMessage?.id);
       } catch (e) {
+        chatDebug.addEvent("Database", `[Mobile] Failed to save error message: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
         console.error("[Mobile] Failed to save error message:", e);
       }
     } finally {
@@ -497,6 +534,10 @@ export default function MobileChatInterface({
     }
   };
 
+  const toggleDebugPanel = () => {
+    setShowDebugPanel(!showDebugPanel);
+  };
+
   return (
     <div className="flex flex-col h-full" ref={containerRef}>
       <div className="mobile-chat-header flex items-center justify-between py-2 px-3 sticky top-0 z-10 bg-background border-b">
@@ -596,8 +637,14 @@ export default function MobileChatInterface({
           onSendMessage={handleSendMessage} 
           isLoading={loading}
           userId={userId || user?.id}
+          onToggleDebug={toggleDebugPanel}
+          debugModeActive={showDebugPanel}
         />
       </div>
+      
+      {showDebugPanel && (
+        <ChatDebugPanel onClose={() => setShowDebugPanel(false)} />
+      )}
       
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
@@ -619,5 +666,13 @@ export default function MobileChatInterface({
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+};
+
+export default function MobileChatInterface(props: MobileChatInterfaceProps) {
+  return (
+    <ChatDebugProvider>
+      <MobileChatInterfaceContent {...props} />
+    </ChatDebugProvider>
   );
 }
