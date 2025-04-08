@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor } from 'lucide-react';
@@ -8,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
-import { setupJournalReminder, initializeCapacitorNotifications, requestNotificationPermission } from '@/services/notificationService';
+import { setupJournalReminder, initializeCapacitorNotifications } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
@@ -130,23 +131,16 @@ export default function Settings() {
     calculateMaxStreak();
   }, [user, entries]);
 
-  const handleNotificationToggle = async (checked: boolean) => {
-    if (checked) {
-      const permissionGranted = await requestNotificationPermission();
-      
-      if (permissionGranted) {
-        setNotificationsEnabled(true);
-        await setupJournalReminder(true);
-        toast.success("Notifications enabled successfully");
-      } else {
-        setNotificationsEnabled(false);
-        toast.error("Please allow notifications in your device settings to enable this feature");
-      }
-    } else {
-      setNotificationsEnabled(false);
-      toast.info("Notifications disabled");
+  useEffect(() => {
+    if (notificationsEnabled) {
+      setupJournalReminder(true).then(() => {
+        if (typeof window !== 'undefined' && !('Notification' in window) || 
+            (window.Notification && window.Notification.permission !== 'granted')) {
+          initializeCapacitorNotifications();
+        }
+      });
     }
-  };
+  }, [notificationsEnabled]);
 
   const handleContactSupport = () => {
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
@@ -363,7 +357,9 @@ export default function Settings() {
               >
                 <Switch 
                   checked={notificationsEnabled}
-                  onCheckedChange={handleNotificationToggle}
+                  onCheckedChange={(checked) => {
+                    setNotificationsEnabled(checked);
+                  }}
                 />
               </SettingItem>
             </div>
@@ -625,9 +621,6 @@ export default function Settings() {
         open={showColorPicker} 
         onOpenChange={(open) => {
           setShowColorPicker(open);
-          if (!open) {
-            setColorPickerValue(customColor);
-          }
         }}
       >
         <DialogContent className="max-w-md">
