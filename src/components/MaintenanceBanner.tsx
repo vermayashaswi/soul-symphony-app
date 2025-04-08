@@ -27,12 +27,12 @@ const MaintenanceBanner = () => {
             <DialogTrigger asChild>
               <Button variant="ghost" size="sm" className="ml-2 text-xs h-6 px-2">
                 <Activity className="h-3 w-3 mr-1" />
-                Check Status
+                Check Recording Status
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>System Status</DialogTitle>
+                <DialogTitle>System Status & Recording Flow</DialogTitle>
               </DialogHeader>
               <SupabaseStatusChecker />
             </DialogContent>
