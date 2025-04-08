@@ -1,11 +1,10 @@
-
 import { useEffect, useState, useRef } from "react";
 import SmartChatInterface from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJournalEntries } from "@/hooks/use-journal-entries";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -18,6 +17,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useToast } from "@/hooks/use-toast";
 import { DebugLogProvider } from "@/utils/debug/DebugContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
 
@@ -28,6 +37,7 @@ export default function SmartChat() {
   const navigate = useNavigate();
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const previousThreadIdRef = useRef<string | null>(null);
@@ -53,11 +63,9 @@ export default function SmartChat() {
       threadCheckInProgressRef.current = true;
       
       try {
-        // Try to get the last active thread from localStorage first
         const lastActiveThreadId = localStorage.getItem(THREAD_ID_STORAGE_KEY);
         
         if (lastActiveThreadId) {
-          // Verify this thread exists and belongs to the user
           try {
             const { data, error } = await supabase
               .from('chat_threads')
@@ -79,7 +87,6 @@ export default function SmartChat() {
               return;
             } else {
               console.log("Stored thread ID not found or not valid:", lastActiveThreadId, error);
-              // Clear invalid thread ID from storage
               localStorage.removeItem(THREAD_ID_STORAGE_KEY);
             }
           } catch (error) {
@@ -87,7 +94,6 @@ export default function SmartChat() {
           }
         }
         
-        // If no saved thread ID or it doesn't exist, get the most recent thread
         try {
           console.log("Looking for most recent thread");
           const { data: threads, error } = await supabase
@@ -127,17 +133,12 @@ export default function SmartChat() {
       setShowSidebar(false);
     };
     
-    // Handle message creation events for title generation of first message only
     const handleMessageCreated = async (event: CustomEvent) => {
       if (event.detail?.threadId && event.detail?.isFirstMessage) {
-        // Wait a moment for the first message to be processed
         setTimeout(async () => {
           const title = await generateThreadTitle(event.detail.threadId, user?.id);
           if (title) {
-            // Mark this thread as having a generated title
             titleGeneratedForThreads.current.add(event.detail.threadId);
-            
-            // Dispatch event to update thread title in ChatThreadList
             window.dispatchEvent(
               new CustomEvent('threadTitleUpdated', { 
                 detail: { threadId: event.detail.threadId, title } 
@@ -151,7 +152,6 @@ export default function SmartChat() {
     window.addEventListener('closeChatSidebar', handleCloseSidebar);
     window.addEventListener('messageCreated' as any, handleMessageCreated);
     
-    // Only run the check once when the component mounts or when user changes
     if (user?.id && !hasInitializedRef.current && !threadCheckInProgressRef.current) {
       checkOrCreateThread();
     }
@@ -162,17 +162,13 @@ export default function SmartChat() {
     };
   }, [isMobile, mobileDemo, user]);
   
-  // Generate title ONLY when switching away from a thread and if it hasn't been generated before
   useEffect(() => {
-    // If we have a previous thread ID and it's different from the current one
     const generateTitleForPreviousThread = async () => {
       if (previousThreadIdRef.current && 
           previousThreadIdRef.current !== currentThreadId &&
           user?.id) {
         
-        // Only generate title if we haven't already done so for this thread
         if (!titleGeneratedForThreads.current.has(previousThreadIdRef.current)) {
-          // Check if the thread has messages
           const { data, error } = await supabase
             .from('chat_messages')
             .select('count')
@@ -183,10 +179,7 @@ export default function SmartChat() {
             const title = await generateThreadTitle(previousThreadIdRef.current, user?.id);
             
             if (title) {
-              // Mark this thread as having a generated title
               titleGeneratedForThreads.current.add(previousThreadIdRef.current);
-              
-              // Dispatch event to update thread title in ChatThreadList
               window.dispatchEvent(
                 new CustomEvent('threadTitleUpdated', { 
                   detail: { threadId: previousThreadIdRef.current, title } 
@@ -196,7 +189,6 @@ export default function SmartChat() {
           }
         }
         
-        // Update the previous thread ID
         previousThreadIdRef.current = currentThreadId;
       }
     };
@@ -258,6 +250,55 @@ export default function SmartChat() {
     );
   };
 
+  const handleDeleteCurrentThread = async () => {
+    if (!currentThreadId || !user?.id) {
+      toast({
+        title: "Error",
+        description: "No active conversation to delete",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error: messagesError } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('thread_id', currentThreadId);
+        
+      if (messagesError) {
+        console.error("Error deleting messages:", messagesError);
+        throw messagesError;
+      }
+      
+      const { error: threadError } = await supabase
+        .from('chat_threads')
+        .delete()
+        .eq('id', currentThreadId);
+        
+      if (threadError) {
+        console.error("Error deleting thread:", threadError);
+        throw threadError;
+      }
+      
+      await createNewThread();
+      
+      toast({
+        title: "Success",
+        description: "Conversation deleted successfully",
+      });
+      
+      setShowDeleteDialog(false);
+    } catch (error) {
+      console.error("Error deleting thread:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete conversation",
+        variant: "destructive"
+      });
+    }
+  };
+
   const desktopContent = (
     <>
       <Navbar />
@@ -296,10 +337,43 @@ export default function SmartChat() {
           />
         </div>
         
-        <div className="flex-1 p-4">
+        <div className="flex-1 p-4 relative">
+          {currentThreadId && (
+            <div className="absolute top-4 right-4 z-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                aria-label="Delete conversation"
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
           <SmartChatInterface />
         </div>
       </motion.div>
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this conversation and all its messages. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteCurrentThread}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 

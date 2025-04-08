@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Brain, BarChart2, Search, Lightbulb } from "lucide-react";
+import { Menu, X, Brain, BarChart2, Search, Lightbulb, Trash2 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage } from "@/services/chatService";
@@ -569,6 +569,18 @@ const MobileChatInterfaceContent = ({
           </SheetContent>
         </Sheet>
         <h2 className="text-lg font-semibold flex-1 text-center">Roha</h2>
+        
+        {currentThreadId && messages.length > 0 && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="ml-1 h-8 w-8 text-muted-foreground hover:text-destructive"
+            onClick={() => setShowDeleteDialog(true)}
+            aria-label="Delete conversation"
+          >
+            <Trash2 className="h-5 w-5" />
+          </Button>
+        )}
       </div>
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
