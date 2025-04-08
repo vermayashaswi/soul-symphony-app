@@ -21,6 +21,7 @@ export type ChatMessage = {
   reference_entries?: any[];
   analysis_data?: any;
   has_numeric_result?: boolean;
+  role?: 'user' | 'assistant'; // Added for compatibility with UI components
 };
 
 // Function to get all chat threads for a user
@@ -65,23 +66,28 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
     
     // Fixed: Ensure proper mapping of database fields to ChatMessage type
     return (data || []).map(msg => {
+      const messageData: any = msg;
+      
       const typedMessage: ChatMessage = {
-        id: msg.id,
-        thread_id: msg.thread_id,
-        content: msg.content,
-        created_at: msg.created_at,
-        sender: msg.sender === 'user' ? 'user' : 'assistant',
-        reference_entries: msg.reference_entries ? 
-          Array.isArray(msg.reference_entries) ? 
-            msg.reference_entries : 
+        id: messageData.id,
+        thread_id: messageData.thread_id,
+        content: messageData.content,
+        created_at: messageData.created_at,
+        sender: messageData.sender === 'user' ? 'user' : 'assistant',
+        role: messageData.sender === 'user' ? 'user' : 'assistant', // Add role for UI compatibility
+        reference_entries: messageData.reference_entries ? 
+          Array.isArray(messageData.reference_entries) ? 
+            messageData.reference_entries : 
             [] : 
           undefined,
-        has_numeric_result: msg.has_numeric_result || false
+        has_numeric_result: messageData.has_numeric_result || false
       };
       
       // Only add analysis_data if it exists in the database response
-      if (msg.reference_entries && typeof msg.reference_entries === 'object') {
-        const refObj = msg.reference_entries as Record<string, any>;
+      if (messageData.analysis_data) {
+        typedMessage.analysis_data = messageData.analysis_data;
+      } else if (messageData.reference_entries && typeof messageData.reference_entries === 'object') {
+        const refObj = messageData.reference_entries as Record<string, any>;
         if (refObj.analysis_data) {
           typedMessage.analysis_data = refObj.analysis_data;
         }
@@ -118,7 +124,8 @@ export const saveMessage = async (
         content,
         sender,
         reference_entries: references || null,
-        has_numeric_result: hasNumericResult || false
+        has_numeric_result: hasNumericResult || false,
+        analysis_data: analysisData || null // Store analysis data directly
       })
       .select()
       .single();
@@ -156,22 +163,27 @@ export const saveMessage = async (
       }
     }
     
+    const messageData: any = data;
+    
     const typedMessage: ChatMessage = {
-      id: data.id,
-      thread_id: data.thread_id,
-      content: data.content,
-      created_at: data.created_at,
-      sender: data.sender === 'user' ? 'user' : 'assistant',
-      reference_entries: data.reference_entries ? 
-        Array.isArray(data.reference_entries) ? 
-          data.reference_entries : 
+      id: messageData.id,
+      thread_id: messageData.thread_id,
+      content: messageData.content,
+      created_at: messageData.created_at,
+      sender: messageData.sender === 'user' ? 'user' : 'assistant',
+      role: messageData.sender === 'user' ? 'user' : 'assistant', // Add role for UI compatibility
+      reference_entries: messageData.reference_entries ? 
+        Array.isArray(messageData.reference_entries) ? 
+          messageData.reference_entries : 
           [] : 
         undefined,
-      has_numeric_result: data.has_numeric_result || false
+      has_numeric_result: messageData.has_numeric_result || false
     };
     
     if (analysisData) {
       typedMessage.analysis_data = analysisData;
+    } else if (messageData.analysis_data) {
+      typedMessage.analysis_data = messageData.analysis_data;
     }
     
     return typedMessage;

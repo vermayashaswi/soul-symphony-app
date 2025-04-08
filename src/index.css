@@ -30,6 +30,11 @@
     --primary-h: 217; /* For direct HSL usage */
     --primary-s: 91.2%; /* For direct HSL usage */
     --primary-l: 59.8%; /* For direct HSL usage */
+    /* New variables for thread action buttons */
+    --edit-btn-bg: 217 91.2% 95%; 
+    --edit-btn-text: 217 91.2% 40%;
+    --delete-btn-bg: 0 84.2% 95%;
+    --delete-btn-text: 0 84.2% 40%;
   }
  
   .dark {
@@ -56,6 +61,11 @@
     --primary-h: 217; /* For direct HSL usage */
     --primary-s: 91.2%; /* For direct HSL usage */
     --primary-l: 59.8%; /* For direct HSL usage */
+    /* Dark mode thread action buttons */
+    --edit-btn-bg: 217 91.2% 25%;
+    --edit-btn-text: 217 91.2% 80%;
+    --delete-btn-bg: 0 62.8% 20%;
+    --delete-btn-text: 0 62.8% 80%;
   }
 }
  
@@ -118,6 +128,23 @@
   .border-theme, .border-theme-color {
     border-color: var(--color-theme) !important;
   }
+  
+  /* Thread action button utilities */
+  .edit-button-bg {
+    background-color: hsl(var(--edit-btn-bg)) !important;
+  }
+  
+  .edit-button-text {
+    color: hsl(var(--edit-btn-text)) !important;
+  }
+  
+  .delete-button-bg {
+    background-color: hsl(var(--delete-btn-bg)) !important;
+  }
+  
+  .delete-button-text {
+    color: hsl(var(--delete-btn-text)) !important;
+  }
 }
 
 /* Add custom styles for scroll to top behavior */
@@ -148,6 +175,11 @@ html {
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --chart-bg: 240 10% 3.9%;
+    /* Dark mode thread action buttons */
+    --edit-btn-bg: 217 91.2% 25%;
+    --edit-btn-text: 217 91.2% 80%;
+    --delete-btn-bg: 0 62.8% 20%;
+    --delete-btn-text: 0 62.8% 80%;
   }
 }
 
@@ -165,4 +197,17 @@ html {
 .dark .recharts-tooltip-item-name,
 .dark .recharts-tooltip-item-value {
   color: hsl(var(--foreground)) !important;
+}
+
+/* Fix for TypeScript issue in SmartChatInterface */
+.chat-message-role-assistant {
+  /* Style for assistant chat messages */
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.chat-message-role-user {
+  /* Style for user chat messages */
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
 }

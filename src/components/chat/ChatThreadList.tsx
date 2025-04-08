@@ -260,7 +260,7 @@ export default function ChatThreadList({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center bg-background hover:bg-accent/50 rounded-md group relative overflow-hidden">
+                  <div className="flex items-center bg-background hover:bg-accent/50 rounded-md group relative overflow-hidden thread-item">
                     <Button
                       key={thread.id}
                       variant="ghost"
@@ -281,7 +281,7 @@ export default function ChatThreadList({
                       </div>
                     </Button>
                     
-                    <div className="flex items-center pr-1 chat-thread-buttons">
+                    <div className="thread-action-buttons flex items-center pr-1">
                       <Button
                         variant="ghost"
                         size="icon"
