@@ -1,4 +1,3 @@
-
 import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
 import { verifyUserAuthentication } from './audio/auth-utils';
 import { sendAudioForTranscription } from './audio/transcription-service';
@@ -175,7 +174,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
     }
     
     // 1. Convert blob to base64
-    const base64Audio = await blobToBase64(audioBlob);
+    const base64Audio = await blobToBase64(audioBlob!);
     
     // Validate base64 data
     if (!base64Audio || base64Audio.length < 100) {
@@ -216,7 +215,7 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
 
     console.log('User authentication verified:', authStatus.userId);
 
-    // 3. Check if the user profile exists, and create one if it doesn't
+    // 3. Check user profile
     if (authStatus.userId) {
       const profileExists = await ensureUserProfileExists(authStatus.userId);
       if (!profileExists) {
@@ -246,31 +245,33 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
       return;
     }
     
-    // 4. Process the full journal entry
+    // 4. Process the journal entry
     let result;
     let retries = 0;
-    const maxRetries = 3; // Increase retry count
+    const maxRetries = 3;
     
     while (retries <= maxRetries) {
       try {
         toast.loading('Processing your journal entry...', { id: 'processing-entry' });
         
         // Set directTranscription to false to get full journal entry processing
+        console.log(`Sending audio data to transcription service (attempt ${retries + 1})`);
         result = await sendAudioForTranscription(base64String, authStatus.userId, false);
         
         toast.dismiss('processing-entry');
         
         if (result.success) {
-          console.log('Transcription successful, breaking retry loop');
+          console.log('Transcription successful, result:', result);
           toast.success('Journal entry created successfully');
           break;
+        } else {
+          console.error('Transcription attempt failed:', result.error);
         }
         
         retries++;
         if (retries <= maxRetries) {
           console.log(`Transcription attempt ${retries} failed, retrying after delay...`);
           toast.error(`Processing failed (attempt ${retries}/${maxRetries}). Retrying...`);
-          // Increase delay between retries (exponential backoff)
           await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries)));
         } else {
           toast.error('Failed to process recording after multiple attempts');
@@ -297,12 +298,11 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
         processingTimeoutId = null;
       }
       
-      // Manually trigger theme extraction when we have a new entry
+      // Verify the entry was actually created by checking the database
       if (result.data?.entryId) {
         try {
-          console.log("Manually triggering theme extraction for entry:", result.data.entryId);
+          console.log("Verifying journal entry creation in database:", result.data.entryId);
           
-          // Get the entry text
           const { data: entryData, error: fetchError } = await supabase
             .from('Journal Entries')
             .select('id, "refined text", "transcription text"')
@@ -310,31 +310,17 @@ async function processRecordingInBackground(audioBlob: Blob | null, userId: stri
             .single();
             
           if (fetchError) {
-            console.error("Error fetching entry for theme extraction:", fetchError);
+            console.error("Error verifying entry creation:", fetchError);
+            toast.error("Entry may not have been saved properly");
           } else if (entryData) {
-            const text = entryData["refined text"] || entryData["transcription text"] || "";
-            
-            if (text) {
-              // Call the generate-themes function directly
-              console.log("Calling generate-themes with text:", text.substring(0, 50) + "...");
-              const { error } = await supabase.functions.invoke('generate-themes', {
-                body: {
-                  text: text,
-                  entryId: result.data.entryId
-                }
-              });
-              
-              if (error) {
-                console.error("Error calling generate-themes:", error);
-              } else {
-                console.log("Successfully triggered theme extraction");
-              }
-            } else {
-              console.error("No text content found for theme extraction");
-            }
+            console.log("Successfully verified journal entry in database:", entryData);
+            toast.success("Entry saved and verified in database");
+          } else {
+            console.error("Entry not found in database despite successful function call");
+            toast.error("Entry processing issue - not found in database");
           }
-        } catch (themeErr) {
-          console.error("Error manually triggering theme extraction:", themeErr);
+        } catch (verifyErr) {
+          console.error("Error checking entry in database:", verifyErr);
         }
       }
     } else {

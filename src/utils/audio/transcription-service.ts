@@ -78,10 +78,8 @@ export async function sendAudioForTranscription(
 
     // Log detailed response for debugging
     console.log('Edge function response:', JSON.stringify({
-      status: response.status,
-      statusText: response.statusText,
-      dataKeys: response.data ? Object.keys(response.data) : 'no data',
       hasData: !!response.data,
+      dataKeys: response.data ? Object.keys(response.data) : 'no data',
       successStatus: response.data?.success
     }));
 
