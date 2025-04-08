@@ -22,7 +22,8 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
     console.log(`Found ${data?.length || 0} messages for thread ${threadId}`);
     
     return (data || []).map(msg => {
-      const messageData: any = msg;
+      // Type assertion to avoid TypeScript errors
+      const messageData = msg as any;
       
       const typedMessage: ChatMessage = {
         id: messageData.id,
@@ -181,26 +182,28 @@ export const saveMessage = async (
     }
     
     // Format the message in the standard structure
+    // Use 'data as any' to avoid TypeScript type errors when accessing analysis_data
+    const dbData = data as any;
     const typedMessage: ChatMessage = {
-      id: data.id,
-      thread_id: data.thread_id,
-      content: data.content,
-      created_at: data.created_at,
-      sender: data.sender === 'user' ? 'user' : 'assistant',
-      role: data.sender === 'user' ? 'user' : 'assistant',
-      reference_entries: data.reference_entries ? 
-        Array.isArray(data.reference_entries) ? 
-          data.reference_entries : 
+      id: dbData.id,
+      thread_id: dbData.thread_id,
+      content: dbData.content,
+      created_at: dbData.created_at,
+      sender: dbData.sender === 'user' ? 'user' : 'assistant',
+      role: dbData.sender === 'user' ? 'user' : 'assistant',
+      reference_entries: dbData.reference_entries ? 
+        Array.isArray(dbData.reference_entries) ? 
+          dbData.reference_entries : 
           [] : 
         undefined,
-      has_numeric_result: data.has_numeric_result || false
+      has_numeric_result: dbData.has_numeric_result || false
     };
     
     // Only add analysis_data if it exists in the response
     if (analysisData) {
       typedMessage.analysis_data = analysisData;
-    } else if (data.analysis_data) {
-      typedMessage.analysis_data = data.analysis_data;
+    } else if (dbData.analysis_data) {
+      typedMessage.analysis_data = dbData.analysis_data;
     }
     
     return typedMessage;
