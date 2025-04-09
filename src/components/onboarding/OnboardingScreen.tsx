@@ -11,6 +11,25 @@ interface OnboardingScreenProps {
   onComplete?: () => void;
 }
 
+const createWavePath = (
+  width: number, 
+  height: number, 
+  amplitude: number, 
+  frequency: number, 
+  phase: number
+): string => {
+  let path = `M 0 ${height / 2}`;
+  const segments = 30;
+  
+  for (let i = 0; i <= segments; i++) {
+    const x = (i / segments) * width;
+    const y = (height / 2) + Math.sin(((i / segments) * Math.PI * 2 * frequency) + phase) * amplitude;
+    path += ` L ${x} ${y}`;
+  }
+  
+  return path;
+};
+
 const ONBOARDING_STEPS = [
   {
     title: "Welcome to SOuLO",
@@ -38,10 +57,78 @@ const ONBOARDING_STEPS = [
             />
           </div>
           
-          {/* Removed the Microphone Animation Above Logo */}
-          
           <div className="absolute inset-0 flex items-center justify-center z-10">
-            <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} />
+            <div className="absolute w-full h-16 flex items-center justify-center overflow-hidden">
+              <svg width="280" height="60" viewBox="0 0 280 60" className="absolute">
+                <motion.path
+                  d={createWavePath(280, 60, 12, 3, 0)}
+                  fill="none"
+                  stroke="var(--color-theme)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  initial={{ opacity: 0.4 }}
+                  animate={{ 
+                    opacity: [0.4, 0.7, 0.4],
+                    d: [
+                      createWavePath(280, 60, 12, 3, 0),
+                      createWavePath(280, 60, 12, 3, Math.PI),
+                      createWavePath(280, 60, 12, 3, Math.PI * 2)
+                    ]
+                  }}
+                  transition={{ 
+                    repeat: Infinity, 
+                    duration: 3,
+                    ease: "linear" 
+                  }}
+                />
+                
+                <motion.path
+                  d={createWavePath(280, 60, 8, 5, Math.PI / 4)}
+                  fill="none"
+                  stroke="var(--color-theme-light)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  initial={{ opacity: 0.3 }}
+                  animate={{ 
+                    opacity: [0.3, 0.6, 0.3],
+                    d: [
+                      createWavePath(280, 60, 8, 5, Math.PI / 4),
+                      createWavePath(280, 60, 8, 5, Math.PI + Math.PI / 4),
+                      createWavePath(280, 60, 8, 5, Math.PI * 2 + Math.PI / 4)
+                    ]
+                  }}
+                  transition={{ 
+                    repeat: Infinity, 
+                    duration: 4,
+                    ease: "linear" 
+                  }}
+                />
+                
+                <motion.path
+                  d={createWavePath(280, 60, 6, 4, Math.PI / 2)}
+                  fill="none"
+                  stroke="var(--color-theme-lighter)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  initial={{ opacity: 0.5 }}
+                  animate={{ 
+                    opacity: [0.5, 0.8, 0.5],
+                    d: [
+                      createWavePath(280, 60, 6, 4, Math.PI / 2),
+                      createWavePath(280, 60, 6, 4, Math.PI + Math.PI / 2),
+                      createWavePath(280, 60, 6, 4, Math.PI * 2 + Math.PI / 2)
+                    ]
+                  }}
+                  transition={{ 
+                    repeat: Infinity, 
+                    duration: 2.5,
+                    ease: "linear" 
+                  }}
+                />
+              </svg>
+            </div>
+            
+            <SouloLogo size="large" className="scale-[2.2] relative z-20" useColorTheme={true} animate={true} />
           </div>
           
           <motion.div 
