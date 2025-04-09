@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -156,8 +155,8 @@ export default function Auth() {
         className="max-w-md w-full glass-card p-8 rounded-xl relative z-10"
       >
         <div className="text-center mb-8">
-          <div className="h-16 w-16 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-2xl">S</span>
+          <div className="flex justify-center mb-4">
+            <SouloLogo size="large" className="text-4xl" useColorTheme={true} />
           </div>
           <h1 className="text-3xl font-bold mb-2">
             Welcome to <SouloLogo size="large" className="text-blue-600" />
