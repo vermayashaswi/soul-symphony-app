@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar } from 'lucide-react';
@@ -685,7 +684,6 @@ export default function Settings() {
           </DialogHeader>
           <ScrollArea className="h-[60vh] pr-4">
             <div className="space-y-6 py-2">
-              {/* FAQ items */}
               <div className="space-y-2">
                 <h3 className="text-base font-semibold">What is SOuLO?</h3>
                 <p className="text-sm text-muted-foreground">
@@ -777,7 +775,6 @@ export default function Settings() {
             <div className="space-y-6 py-2">
               <p className="text-sm text-muted-foreground">Last Updated: April 8, 2025</p>
               
-              {/* Privacy policy sections */}
               <div className="space-y-2">
                 <h3 className="text-base font-semibold">Introduction</h3>
                 <p className="text-sm text-muted-foreground">
@@ -820,8 +817,9 @@ export default function Settings() {
               <div className="space-y-2">
                 <h3 className="text-base font-semibold">Data Security</h3>
                 <p className="text-sm text-muted-foreground">
-                  We implement appropriate technical
+                  We implement appropriate technical measures to protect your personal information.
                 </p>
+              </div>
             </div>
           </ScrollArea>
         </DialogContent>
