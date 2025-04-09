@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, Heart } from "lucide-react";
 import SouloLogo from "@/components/SouloLogo";
-import SpeechDots from "@/components/SpeechDots";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -17,7 +16,7 @@ const ONBOARDING_STEPS = [
     title: "Welcome to SOuLO",
     subtitle: "",
     description: "Express your thoughts and feelings with voice notes - we'll do the rest.",
-    illustration: (
+    illustration: (props: {}) => (
       <div className="flex flex-col justify-center items-center my-2">
         <motion.div 
           className="relative w-64 h-64"
@@ -38,6 +37,43 @@ const ONBOARDING_STEPS = [
               }}
             />
           </div>
+          
+          {/* Microphone Animation Above Logo */}
+          <motion.div
+            className="absolute top-[-20%] left-1/2 transform -translate-x-1/2 z-20"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ 
+              opacity: 1, 
+              y: 0,
+              scale: [1, 1.1, 1],
+            }}
+            transition={{
+              scale: {
+                repeat: Infinity,
+                duration: 1.5,
+                ease: "easeInOut"
+              },
+              opacity: { duration: 0.5 }
+            }}
+          >
+            <div className="relative">
+              <motion.div
+                className="absolute -inset-4 rounded-full bg-theme-lighter opacity-40"
+                animate={{
+                  scale: [1, 1.5, 1],
+                  opacity: [0.4, 0.2, 0.4]
+                }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 2,
+                  ease: "easeInOut"
+                }}
+              />
+              <div className="bg-theme rounded-full p-3">
+                <Mic className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </motion.div>
           
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} />
@@ -75,6 +111,35 @@ const ONBOARDING_STEPS = [
             ))}
           </motion.div>
         </motion.div>
+        
+        <motion.h1 
+          className="text-2xl font-bold mb-3 mt-8 text-foreground"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          Welcome to SOuLO
+        </motion.h1>
+        
+        <motion.p 
+          className="text-muted-foreground mb-10 max-w-xs font-medium text-theme animate-pulse"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ 
+            opacity: 1, 
+            y: 0,
+            scale: [1, 1.05, 1]
+          }}
+          transition={{ 
+            delay: 0.4,
+            scale: {
+              repeat: Infinity,
+              duration: 2,
+              ease: "easeInOut"
+            }
+          }}
+        >
+          Express your thoughts and feelings with voice notes - we'll do the rest.
+        </motion.p>
       </div>
     ),
     buttonText: "Get Started"
@@ -83,7 +148,7 @@ const ONBOARDING_STEPS = [
     title: "Your Data is Private",
     subtitle: "Privacy first approach",
     description: "Your journal entries are securely stored and only accessible to you. We take your privacy seriously.",
-    illustration: (
+    illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <motion.div 
           className="relative w-64 h-64 flex items-center justify-center"
@@ -154,7 +219,7 @@ const ONBOARDING_STEPS = [
     title: "Voice Journaling",
     subtitle: "Speak your mind, we'll capture it",
     description: "Record your thoughts with voice notes that are automatically transcribed and analyzed for emotional patterns.",
-    illustration: (
+    illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 bg-theme-lighter rounded-full flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0 flex items-center justify-center">
@@ -203,7 +268,7 @@ const ONBOARDING_STEPS = [
     title: "AI Analysis",
     subtitle: "Meaningful insights, automatically",
     description: "Get insights into your emotional patterns and growth through advanced AI analysis.",
-    illustration: (
+    illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 bg-theme-lighter rounded-full flex flex-col items-center justify-center overflow-hidden p-4">
           <motion.div 
@@ -267,7 +332,7 @@ const ONBOARDING_STEPS = [
     title: "Chat with Your Journal",
     subtitle: "Discover insights through conversation",
     description: "Ask questions about your emotions, patterns, and growth through natural conversation with AI.",
-    illustration: (
+    illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 bg-theme-lighter rounded-xl flex items-center justify-center overflow-hidden p-4">
           <motion.div
@@ -317,7 +382,7 @@ const ONBOARDING_STEPS = [
     title: "Track Your Emotional Journey",
     subtitle: "Visualize your growth",
     description: "See your emotional patterns and growth over time with beautiful visualizations.",
-    illustration: (
+    illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 bg-theme-lighter rounded-full flex items-center justify-center overflow-hidden">
           <motion.div
@@ -409,7 +474,7 @@ const ONBOARDING_STEPS = [
     title: "Ready to Start Your Journey?",
     subtitle: "Express, reflect, and grow with SOuLO",
     description: "Create an account to begin your path to emotional wellness and self-discovery.",
-    illustration: (
+    illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <motion.div 
           className="relative w-64 h-64 rounded-xl flex items-center justify-center overflow-hidden bg-theme-lighter"
@@ -427,7 +492,7 @@ const ONBOARDING_STEPS = [
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
           >
-            <SouloLogo size="large" className="scale-[2.5]" useColorTheme={true} animate={true} utteringWords={true} />
+            <SouloLogo size="large" className="scale-[2.5]" useColorTheme={true} animate={true} />
           </motion.div>
           
           <motion.div
@@ -447,9 +512,7 @@ const ONBOARDING_STEPS = [
   }
 ];
 
-const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ 
-  onComplete 
-}) => {
+const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const navigate = useNavigate();
   const { setColorTheme } = useTheme();
@@ -487,6 +550,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
     }
   };
 
+  const CurrentIllustration = ONBOARDING_STEPS[currentStep].illustration;
   const currentStepData = ONBOARDING_STEPS[currentStep];
 
   return (
@@ -528,49 +592,11 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
             >
               {currentStep === 0 ? (
                 <>
-                  {currentStepData.illustration}
-                  
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.5 }}
-                    className="mb-4 mt-2"
-                  >
-                    <SpeechDots className="text-theme" />
-                  </motion.div>
-                  
-                  <motion.h1 
-                    className="text-2xl font-bold mb-3 text-foreground"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    {currentStepData.title}
-                  </motion.h1>
-                  
-                  <motion.p 
-                    className="text-muted-foreground mb-10 max-w-xs font-medium text-theme animate-pulse"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ 
-                      opacity: 1, 
-                      y: 0,
-                      scale: [1, 1.05, 1]
-                    }}
-                    transition={{ 
-                      delay: 0.4,
-                      scale: {
-                        repeat: Infinity,
-                        duration: 2,
-                        ease: "easeInOut"
-                      }
-                    }}
-                  >
-                    {currentStepData.description}
-                  </motion.p>
+                  <CurrentIllustration />
                 </>
               ) : (
                 <>
-                  {currentStepData.illustration}
+                  <CurrentIllustration />
                   
                   <motion.h1 
                     className="text-2xl font-bold mb-1 text-foreground"
