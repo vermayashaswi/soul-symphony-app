@@ -4,17 +4,20 @@ import ChatMessage from "./ChatMessage";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { ChatMessage as ChatMessageType } from "@/services/chatPersistenceService";
+import JournalEntryLoadingSkeleton from "../journal/JournalEntryLoadingSkeleton";
 
 interface ChatAreaProps {
   chatMessages: ChatMessageType[];
   isLoading: boolean;
   processingStage?: string;
+  threadId?: string | null;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
   chatMessages, 
   isLoading, 
-  processingStage 
+  processingStage,
+  threadId
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [prevMessageCount, setPrevMessageCount] = useState(0);
@@ -38,11 +41,32 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   
   // Store loading state in sessionStorage to persist across navigation
   useEffect(() => {
-    // Check for loading state on mount
+    // Check for loading state on mount and make sure it's for this thread
     const storedLoadingState = sessionStorage.getItem('chatLoadingState');
     const storedProcessingStage = sessionStorage.getItem('chatProcessingStage');
+    const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
+    const timestamp = sessionStorage.getItem('chatProcessingTimestamp');
     
-    if (storedLoadingState === 'true' && !isLoading) {
+    // Check if we should clear a stale loading state (older than 5 minutes)
+    if (storedLoadingState === 'true' && timestamp) {
+      const now = Date.now();
+      const then = parseInt(timestamp);
+      const fiveMinutesMs = 5 * 60 * 1000;
+      
+      if (now - then > fiveMinutesMs) {
+        // Clear stale loading state
+        sessionStorage.removeItem('chatLoadingState');
+        sessionStorage.removeItem('chatProcessingStage');
+        sessionStorage.removeItem('chatProcessingThreadId');
+        sessionStorage.removeItem('chatProcessingTimestamp');
+        setLocalIsLoading(false);
+        setLocalProcessingStage(null);
+        return;
+      }
+    }
+    
+    // Only restore loading state if it's for this thread
+    if (storedLoadingState === 'true' && !isLoading && threadId && storedThreadId === threadId) {
       setLocalIsLoading(true);
       if (storedProcessingStage) {
         setLocalProcessingStage(storedProcessingStage);
@@ -50,24 +74,44 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     }
     
     // Update storage when loading state changes
-    if (localIsLoading) {
+    if (localIsLoading && threadId) {
       sessionStorage.setItem('chatLoadingState', 'true');
+      sessionStorage.setItem('chatProcessingThreadId', threadId);
+      
+      if (!timestamp) {
+        sessionStorage.setItem('chatProcessingTimestamp', Date.now().toString());
+      }
+      
       if (localProcessingStage) {
         sessionStorage.setItem('chatProcessingStage', localProcessingStage);
       }
-    } else {
-      sessionStorage.removeItem('chatLoadingState');
-      sessionStorage.removeItem('chatProcessingStage');
+    } else if (!localIsLoading) {
+      const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
+      
+      // Only clear if this is the same thread that was loading
+      if (!threadId || storedThreadId === threadId) {
+        sessionStorage.removeItem('chatLoadingState');
+        sessionStorage.removeItem('chatProcessingStage');
+        sessionStorage.removeItem('chatProcessingThreadId');
+        sessionStorage.removeItem('chatProcessingTimestamp');
+      }
     }
     
     // Clean up storage when component unmounts if we're no longer loading
     return () => {
       if (!localIsLoading) {
-        sessionStorage.removeItem('chatLoadingState');
-        sessionStorage.removeItem('chatProcessingStage');
+        const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
+        
+        // Only clear if this is the same thread that was loading
+        if (!threadId || storedThreadId === threadId) {
+          sessionStorage.removeItem('chatLoadingState');
+          sessionStorage.removeItem('chatProcessingStage');
+          sessionStorage.removeItem('chatProcessingThreadId');
+          sessionStorage.removeItem('chatProcessingTimestamp');
+        }
       }
     };
-  }, [localIsLoading, localProcessingStage, isLoading]);
+  }, [localIsLoading, localProcessingStage, isLoading, threadId]);
   
   // Find the last user message
   useEffect(() => {
@@ -89,12 +133,24 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     
     // If we have a completed response, clear the loading state
     if (chatMessages.length > prevMessageCount && prevMessageCount > 0) {
-      setLocalIsLoading(false);
-      setLocalProcessingStage(null);
-      sessionStorage.removeItem('chatLoadingState');
-      sessionStorage.removeItem('chatProcessingStage');
+      const lastMessageIsAssistant = chatMessages[chatMessages.length - 1]?.role === 'assistant';
+      
+      if (lastMessageIsAssistant) {
+        setLocalIsLoading(false);
+        setLocalProcessingStage(null);
+        
+        const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
+        
+        // Only clear if this is the same thread that was loading
+        if (!threadId || storedThreadId === threadId) {
+          sessionStorage.removeItem('chatLoadingState');
+          sessionStorage.removeItem('chatProcessingStage');
+          sessionStorage.removeItem('chatProcessingThreadId');
+          sessionStorage.removeItem('chatProcessingTimestamp');
+        }
+      }
     }
-  }, [chatMessages, localIsLoading, prevMessageCount]);
+  }, [chatMessages, localIsLoading, prevMessageCount, threadId]);
   
   // Check for duplicates by content to prevent doubled rendering
   const uniqueMessages = chatMessages.reduce((acc: ChatMessageType[], current) => {
@@ -162,14 +218,18 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex items-center gap-3"
+              className="space-y-4"
             >
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                </div>
+                <div className="bg-muted/40 rounded-xl p-3 max-w-[75%] text-sm">
+                  {localProcessingStage || "Processing your request..."}
+                </div>
               </div>
-              <div className="bg-muted/40 rounded-xl p-3 max-w-[75%] text-sm">
-                {localProcessingStage || "Processing your request..."}
-              </div>
+              
+              <JournalEntryLoadingSkeleton count={1} />
             </motion.div>
           )}
         </AnimatePresence>
