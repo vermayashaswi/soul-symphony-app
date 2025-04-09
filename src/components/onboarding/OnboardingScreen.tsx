@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -15,14 +14,50 @@ interface OnboardingScreenProps {
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ 
   onComplete 
 }) => {
-  // Define onboardingSteps early to avoid the "used before declaration" error
+  const [currentStep, setCurrentStep] = useState(0);
+  const navigate = useNavigate();
+  const { setColorTheme } = useTheme();
+  
+  useEffect(() => {
+    setColorTheme('Calm');
+  }, [setColorTheme]);
+  
+  const handleNext = () => {
+    if (currentStep < onboardingSteps.length - 1) {
+      setCurrentStep(prev => prev + 1);
+    } else {
+      localStorage.setItem("onboardingComplete", "true");
+      
+      if (onComplete) {
+        onComplete();
+      } else {
+        navigate("/auth");
+      }
+    }
+  };
+  
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+  
+  const handleSkip = () => {
+    localStorage.setItem("onboardingComplete", "true");
+    if (onComplete) {
+      onComplete();
+    } else {
+      navigate("/auth");
+    }
+  };
+
   const onboardingSteps = [
     {
       title: "Welcome to SOuLO",
       subtitle: "",
       description: "Express your thoughts and feelings with voice notes - we'll do the rest.",
       illustration: (
-        <div className="flex flex-col justify-center items-center my-2">
+        <div className="flex justify-center items-center my-2">
           <motion.div 
             className="relative w-64 h-64"
             initial={{ opacity: 0, scale: 0.8 }}
@@ -43,45 +78,8 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               />
             </div>
             
-            {/* Microphone Animation Above Logo */}
-            <motion.div
-              className="absolute top-[-20%] left-1/2 transform -translate-x-1/2 z-20"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ 
-                opacity: 1, 
-                y: 0,
-                scale: [1, 1.1, 1],
-              }}
-              transition={{
-                scale: {
-                  repeat: Infinity,
-                  duration: 1.5,
-                  ease: "easeInOut"
-                },
-                opacity: { duration: 0.5 }
-              }}
-            >
-              <div className="relative">
-                <motion.div
-                  className="absolute -inset-4 rounded-full bg-theme-lighter opacity-40"
-                  animate={{
-                    scale: [1, 1.5, 1],
-                    opacity: [0.4, 0.2, 0.4]
-                  }}
-                  transition={{
-                    repeat: Infinity,
-                    duration: 2,
-                    ease: "easeInOut"
-                  }}
-                />
-                <div className="bg-theme rounded-full p-3">
-                  <Mic className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </motion.div>
-            
             <div className="absolute inset-0 flex items-center justify-center z-10">
-              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} />
+              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} utteringWords={true} />
             </div>
             
             <motion.div 
@@ -116,35 +114,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               ))}
             </motion.div>
           </motion.div>
-          
-          <motion.h1 
-            className="text-2xl font-bold mb-3 mt-8 text-foreground"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            {onboardingSteps[0].title}
-          </motion.h1>
-          
-          <motion.p 
-            className="text-muted-foreground mb-10 max-w-xs font-medium text-theme animate-pulse"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ 
-              opacity: 1, 
-              y: 0,
-              scale: [1, 1.05, 1]
-            }}
-            transition={{ 
-              delay: 0.4,
-              scale: {
-                repeat: Infinity,
-                duration: 2,
-                ease: "easeInOut"
-              }
-            }}
-          >
-            {onboardingSteps[0].description}
-          </motion.p>
         </div>
       ),
       buttonText: "Get Started"
@@ -497,7 +466,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
             >
-              <SouloLogo size="large" className="scale-[2.5]" useColorTheme={true} animate={true} />
+              <SouloLogo size="large" className="scale-[2.5]" useColorTheme={true} animate={true} utteringWords={true} />
             </motion.div>
             
             <motion.div
@@ -516,43 +485,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
       buttonText: "Get Started"
     }
   ];
-
-  const [currentStep, setCurrentStep] = useState(0);
-  const navigate = useNavigate();
-  const { setColorTheme } = useTheme();
-  
-  useEffect(() => {
-    setColorTheme('Calm');
-  }, [setColorTheme]);
-  
-  const handleNext = () => {
-    if (currentStep < onboardingSteps.length - 1) {
-      setCurrentStep(prev => prev + 1);
-    } else {
-      localStorage.setItem("onboardingComplete", "true");
-      
-      if (onComplete) {
-        onComplete();
-      } else {
-        navigate("/auth");
-      }
-    }
-  };
-  
-  const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
-    }
-  };
-  
-  const handleSkip = () => {
-    localStorage.setItem("onboardingComplete", "true");
-    if (onComplete) {
-      onComplete();
-    } else {
-      navigate("/auth");
-    }
-  };
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background">
@@ -594,6 +526,35 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               {currentStep === 0 ? (
                 <>
                   {onboardingSteps[0].illustration}
+                  
+                  <motion.h1 
+                    className="text-2xl font-bold mb-3 mt-2 text-foreground"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    {onboardingSteps[0].title}
+                  </motion.h1>
+                  
+                  <motion.p 
+                    className="text-muted-foreground mb-10 max-w-xs font-medium text-theme animate-pulse"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ 
+                      opacity: 1, 
+                      y: 0,
+                      scale: [1, 1.05, 1]
+                    }}
+                    transition={{ 
+                      delay: 0.4,
+                      scale: {
+                        repeat: Infinity,
+                        duration: 2,
+                        ease: "easeInOut"
+                      }
+                    }}
+                  >
+                    {onboardingSteps[0].description}
+                  </motion.p>
                 </>
               ) : (
                 <>

@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
-import { Mic } from 'lucide-react';
 
 export type LogoSize = "small" | "normal" | "large" | "medium";
 
@@ -27,7 +26,7 @@ const SouloLogo = ({
 }: SouloLogoProps) => {
   const { colorTheme } = useTheme();
   const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
-  const [micScale, setMicScale] = useState<number>(1);
+  const [utteranceState, setUtteranceState] = useState<number>(0);
   
   // Size classes for the smiley
   const sizeClasses = {
@@ -54,15 +53,15 @@ const SouloLogo = ({
     return () => clearInterval(animationInterval);
   }, [animate]);
   
-  // Microphone animation
+  // Utterance animation
   useEffect(() => {
     if (!utteringWords) return;
     
-    const micInterval = setInterval(() => {
-      setMicScale(prev => prev === 1 ? 1.2 : 1); // Simple pulse animation
-    }, 500); // Slower pulse for microphone
+    const utteranceInterval = setInterval(() => {
+      setUtteranceState(prev => (prev + 1) % 3); // Cycle through 3 states: 0, 1, 2
+    }, 300); // Faster animation for speech utterance
     
-    return () => clearInterval(micInterval);
+    return () => clearInterval(utteranceInterval);
   }, [utteringWords]);
   
   return (
@@ -78,6 +77,33 @@ const SouloLogo = ({
               {/* Eyes */}
               <span className="absolute top-[25%] left-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
               <span className="absolute top-[25%] right-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
+              
+              {/* Speech animation */}
+              {utteringWords && (
+                <>
+                  {/* Speech bubbles/utterances */}
+                  <div className="absolute -right-4 top-0 flex space-x-1">
+                    <span 
+                      className={cn(
+                        "block rounded-full bg-current transition-all duration-150",
+                        utteranceState === 0 ? "w-[6px] h-[6px] opacity-100" : "w-[3px] h-[3px] opacity-40"
+                      )}
+                    ></span>
+                    <span 
+                      className={cn(
+                        "block rounded-full bg-current transition-all duration-150",
+                        utteranceState === 1 ? "w-[6px] h-[6px] opacity-100" : "w-[3px] h-[3px] opacity-40"
+                      )}
+                    ></span>
+                    <span 
+                      className={cn(
+                        "block rounded-full bg-current transition-all duration-150",
+                        utteranceState === 2 ? "w-[6px] h-[6px] opacity-100" : "w-[3px] h-[3px] opacity-40"
+                      )}
+                    ></span>
+                  </div>
+                </>
+              )}
             </div>
           </span>
         </span>
