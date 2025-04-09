@@ -3,7 +3,6 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
-import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 
 const Home = () => {
   const { user } = useAuth();
@@ -98,10 +97,6 @@ const Home = () => {
           <p className="text-muted-foreground mt-2">
             Your personal wellness journey continues here
           </p>
-        </motion.div>
-        
-        <motion.div variants={itemVariants} className="space-y-4">
-          <InspirationalQuote />
         </motion.div>
       </motion.div>
     </div>
