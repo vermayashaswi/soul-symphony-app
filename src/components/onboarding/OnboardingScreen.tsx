@@ -86,39 +86,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} />
             </div>
             
-            {/* Waveform animation */}
-            <motion.div 
-              className="absolute inset-0 flex items-center justify-center z-5 pointer-events-none"
-              initial={{ opacity: 1 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              <svg 
-                width="200" 
-                height="80" 
-                viewBox="0 0 200 80" 
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-40"
-              >
-                {/* Audio waveform path with animation */}
-                <motion.path
-                  d="M0,40 C10,30 15,20 20,40 C25,60 30,70 35,40 C40,10 45,5 50,40 C55,75 60,80 65,40 C70,0 75,0 80,40 C85,80 90,80 95,40 C100,0 105,0 110,40 C115,80 120,80 125,40 C130,0 135,0 140,40 C145,80 150,80 155,40 C160,0 165,0 170,40 C175,80 180,80 185,40 C190,0 195,10 200,40"
-                  fill="none"
-                  stroke="var(--color-theme)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  initial={{ pathLength: 0, opacity: 0.7 }}
-                  animate={{ 
-                    pathLength: [0, 1, 0],
-                    opacity: [0.7, 1, 0.7]
-                  }}
-                  transition={{ 
-                    duration: 4, 
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                />
-              </svg>
-            </motion.div>
+            {/* Waveform animation - removed from here */}
             
             <motion.div 
               className="absolute inset-0 z-5"
@@ -591,50 +559,108 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               transition={{ duration: 0.3 }}
               className="absolute inset-0 flex flex-col justify-center items-center px-6 text-center"
             >
-              {onboardingSteps[currentStep].illustration}
-              
-              <motion.h1 
-                className="text-2xl font-bold mb-1 text-foreground"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                {onboardingSteps[currentStep].title}
-              </motion.h1>
-              
-              {onboardingSteps[currentStep].subtitle && (
-                <motion.h2
-                  className="text-lg text-theme mb-2"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  {onboardingSteps[currentStep].subtitle}
-                </motion.h2>
+              {/* We only modify step 0 (first page) */}
+              {currentStep === 0 ? (
+                <>
+                  {onboardingSteps[0].illustration}
+                  
+                  <motion.h1 
+                    className="text-2xl font-bold mb-3 mt-2 text-foreground"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    {onboardingSteps[0].title}
+                  </motion.h1>
+                  
+                  <motion.p 
+                    className="text-muted-foreground mb-10 max-w-xs font-medium text-theme animate-pulse"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ 
+                      opacity: 1, 
+                      y: 0,
+                      scale: [1, 1.05, 1]
+                    }}
+                    transition={{ 
+                      delay: 0.4,
+                      scale: {
+                        repeat: Infinity,
+                        duration: 2,
+                        ease: "easeInOut"
+                      }
+                    }}
+                  >
+                    {onboardingSteps[0].description}
+                  </motion.p>
+                  
+                  {/* Waveform animation - moved here, below the text */}
+                  <motion.div 
+                    className="w-full pointer-events-none px-2 mb-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <svg 
+                      width="100%" 
+                      height="80" 
+                      viewBox="0 0 400 80" 
+                      className="opacity-40"
+                    >
+                      {/* Audio waveform path with animation */}
+                      <motion.path
+                        d="M0,40 C10,30 15,20 20,40 C25,60 30,70 35,40 C40,10 45,5 50,40 C55,75 60,80 65,40 C70,0 75,0 80,40 C85,80 90,80 95,40 C100,0 105,0 110,40 C115,80 120,80 125,40 C130,0 135,0 140,40 C145,80 150,80 155,40 C160,0 165,0 170,40 C175,80 180,80 185,40 C190,0 195,10 200,40 C205,70 210,80 215,40 C220,0 225,0 230,40 C235,80 240,80 245,40 C250,0 255,0 260,40 C265,80 270,80 275,40 C280,0 285,0 290,40 C295,80 300,80 305,40 C310,0 315,0 320,40 C325,80 330,80 335,40 C340,0 345,0 350,40 C355,80 360,80 365,40 C370,0 375,10 380,40 C385,70 390,80 395,40 C400,0"
+                        fill="none"
+                        stroke="var(--color-theme)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        initial={{ pathLength: 0, opacity: 0.7 }}
+                        animate={{ 
+                          pathLength: [0, 1, 0],
+                          opacity: [0.7, 1, 0.7]
+                        }}
+                        transition={{ 
+                          duration: 4, 
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                      />
+                    </svg>
+                  </motion.div>
+                </>
+              ) : (
+                <>
+                  {onboardingSteps[currentStep].illustration}
+                  
+                  <motion.h1 
+                    className="text-2xl font-bold mb-1 text-foreground"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    {onboardingSteps[currentStep].title}
+                  </motion.h1>
+                  
+                  {onboardingSteps[currentStep].subtitle && (
+                    <motion.h2
+                      className="text-lg text-theme mb-2"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      {onboardingSteps[currentStep].subtitle}
+                    </motion.h2>
+                  )}
+                  
+                  <motion.p 
+                    className="text-muted-foreground mb-8 max-w-xs"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    {onboardingSteps[currentStep].description}
+                  </motion.p>
+                </>
               )}
-              
-              <motion.p 
-                className={cn(
-                  "text-muted-foreground mb-8 max-w-xs",
-                  currentStep === 0 && "font-medium text-theme animate-pulse"
-                )}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ 
-                  opacity: 1, 
-                  y: 0,
-                  scale: currentStep === 0 ? [1, 1.05, 1] : 1
-                }}
-                transition={{ 
-                  delay: 0.4,
-                  scale: {
-                    repeat: currentStep === 0 ? Infinity : 0,
-                    duration: 2,
-                    ease: "easeInOut"
-                  }
-                }}
-              >
-                {onboardingSteps[currentStep].description}
-              </motion.p>
             </motion.div>
           </AnimatePresence>
         </div>
