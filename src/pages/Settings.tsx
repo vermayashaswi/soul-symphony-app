@@ -224,7 +224,7 @@ export default function Settings() {
 
   const handleContactSupport = () => {
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
-    const mailtoLink = `mailto:verma.yashaswi@gmail.com?subject=${subject}`;
+    const mailtoLink = `mailto:support@soulo.online?subject=${subject}`;
     window.open(mailtoLink, '_blank');
   };
   
