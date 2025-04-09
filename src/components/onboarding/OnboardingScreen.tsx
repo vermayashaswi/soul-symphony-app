@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -828,7 +829,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                   {currentStepData.description && (
                     <p className="mb-8 text-muted-foreground max-w-xs">{currentStepData.description}</p>
                   )}
-                  {React.createElement(CurrentIllustration as any, { name, setName })}
+                  <CurrentIllustration name={name} setName={setName} />
                 </>
               ) : (
                 <>
