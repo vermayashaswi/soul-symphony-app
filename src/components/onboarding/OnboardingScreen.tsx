@@ -179,36 +179,71 @@ const ONBOARDING_STEPS = [
                 className="w-20 h-20 bg-theme-light rounded-full flex items-center justify-center mb-4"
               >
                 <motion.div className="relative w-10 h-10">
-                  {/* Lock animation - transitions from open to closed */}
+                  {/* Data stream animation */}
                   <motion.div
-                    initial={{ opacity: 1 }}
-                    animate={{ opacity: [1, 0] }}
-                    transition={{ 
-                      delay: 1.2,
-                      duration: 0.3,
-                      repeat: Infinity,
-                      repeatDelay: 3.7
+                    initial={{ opacity: 0 }}
+                    animate={{ 
+                      opacity: [0, 1, 1, 0],
                     }}
-                    className="absolute inset-0 flex justify-center items-center"
+                    transition={{ 
+                      times: [0, 0.2, 0.8, 1],
+                      duration: 2.5,
+                      repeat: Infinity,
+                      repeatDelay: 1.5
+                    }}
+                    className="absolute inset-0 flex justify-center items-center z-20"
                   >
                     <LockOpen className="w-10 h-10 text-theme" />
                   </motion.div>
                   
+                  {/* Closed lock that appears after data is inside */}
                   <motion.div
                     initial={{ opacity: 0 }}
-                    animate={{ opacity: [0, 1] }}
-                    transition={{ 
-                      delay: 1.5,
-                      duration: 0.3,
-                      repeat: Infinity,
-                      repeatDelay: 3.7
+                    animate={{ 
+                      opacity: [0, 0, 1, 1],
                     }}
-                    className="absolute inset-0 flex justify-center items-center"
+                    transition={{ 
+                      times: [0, 0.8, 0.9, 1],
+                      duration: 2.5,
+                      repeat: Infinity,
+                      repeatDelay: 1.5
+                    }}
+                    className="absolute inset-0 flex justify-center items-center z-10"
                   >
                     <Lock className="w-10 h-10 text-theme" />
                   </motion.div>
                   
-                  {/* Locking animation effect */}
+                  {/* Data stream particles animation */}
+                  <motion.div 
+                    className="absolute top-0 left-0 w-full h-full overflow-hidden"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    {[...Array(12)].map((_, i) => (
+                      <motion.div
+                        key={`data-particle-${i}`}
+                        className="absolute w-1.5 h-1.5 rounded-full bg-theme"
+                        style={{
+                          left: `${40 + (Math.random() * 20)}%`,
+                          top: i % 2 === 0 ? '-20%' : '-30%',
+                        }}
+                        initial={{ opacity: 0 }}
+                        animate={{ 
+                          y: [0, 55],
+                          opacity: [0, 1, 0],
+                        }}
+                        transition={{
+                          y: { duration: 1 },
+                          opacity: { duration: 1, times: [0, 0.3, 1] },
+                          delay: i * 0.1,
+                          repeat: Infinity,
+                          repeatDelay: 2
+                        }}
+                      />
+                    ))}
+                  </motion.div>
+                  
+                  {/* Locking effect circle animation */}
                   <motion.div 
                     className="absolute top-0 left-0 w-full h-full pointer-events-none"
                     animate={{ 
@@ -216,10 +251,10 @@ const ONBOARDING_STEPS = [
                       opacity: [0, 0.7, 0] 
                     }}
                     transition={{ 
-                      delay: 1.8,
                       duration: 0.8,
+                      delay: 2,
                       repeat: Infinity,
-                      repeatDelay: 3.2
+                      repeatDelay: 2.2
                     }}
                   >
                     <div className="w-full h-full rounded-full border-2 border-theme"></div>
