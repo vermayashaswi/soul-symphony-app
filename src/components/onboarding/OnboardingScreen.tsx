@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -783,6 +784,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   
   const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
   const isNameStep = currentStep === 6;
+  const isFirstStep = currentStep === 0;
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background">
@@ -851,7 +853,20 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         </div>
         
         <div className="pb-12 pt-4 px-6 relative z-10">
-          <div className="flex flex-col space-y-4">
+          <div className="flex justify-between items-center">
+            {currentStep > 0 ? (
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={handlePrevious}
+                className="bg-background hover:bg-muted h-10 w-10"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+            ) : (
+              <div className="w-10"></div> // Empty div to maintain layout
+            )}
+            
             <Button 
               size="lg" 
               onClick={handleNext} 
@@ -860,18 +875,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
               {currentStepData.buttonText}
               {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
             </Button>
-            
-            {currentStep > 0 && (
-              <Button 
-                variant="outline" 
-                size="lg" 
-                onClick={handlePrevious}
-                className="bg-background hover:bg-muted"
-              >
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            )}
           </div>
         </div>
       </div>
