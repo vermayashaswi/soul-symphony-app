@@ -80,7 +80,6 @@ export default function Settings() {
     { name: 'Focus', color: 'bg-emerald-400' },
   ];
 
-  // Time options for notifications
   const timeOptions: { label: string; value: NotificationTime }[] = [
     { label: 'Morning (8:00 AM)', value: 'morning' },
     { label: 'Afternoon (2:00 PM)', value: 'afternoon' },
@@ -88,7 +87,6 @@ export default function Settings() {
     { label: 'Night (10:00 PM)', value: 'night' },
   ];
 
-  // Frequency options for notifications
   const frequencyOptions: { label: string; value: NotificationFrequency }[] = [
     { label: 'Once a day', value: 'once' },
     { label: 'Twice a day', value: 'twice' },
