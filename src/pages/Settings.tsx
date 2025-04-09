@@ -929,7 +929,7 @@ export default function Settings() {
           </DialogHeader>
           <div className="py-4">
             <ColorPicker 
-              color={colorPickerValue} 
+              value={colorPickerValue} 
               onChange={setColorPickerValue} 
             />
           </div>
