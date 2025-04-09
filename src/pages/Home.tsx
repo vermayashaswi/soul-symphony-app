@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/use-theme';
+import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 
 const Home = () => {
   const { user } = useAuth();
@@ -133,7 +135,7 @@ const Home = () => {
         initial="hidden"
         animate="show"
       >
-        <motion.div variants={itemVariants} className="mb-12">
+        <motion.div variants={itemVariants} className="mb-8">
           <Card className="overflow-hidden rounded-xl max-w-md mx-auto">
             <div 
               className="h-64 w-full bg-cover bg-center" 
@@ -153,6 +155,10 @@ const Home = () => {
               </div>
             </div>
           </Card>
+        </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <InspirationalQuote />
         </motion.div>
       </motion.div>
     </div>

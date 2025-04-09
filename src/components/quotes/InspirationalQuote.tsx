@@ -8,6 +8,9 @@ import { toast } from 'sonner';
 
 export const InspirationalQuote: React.FC = () => {
   const [quote, setQuote] = useState<string>('');
+  const [author, setAuthor] = useState<string>('');
+  const [quotes, setQuotes] = useState<Array<{quote: string, author: string}>>([]);
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { ref, inView } = useInView({
@@ -15,7 +18,7 @@ export const InspirationalQuote: React.FC = () => {
     threshold: 0.1,
   });
 
-  const fetchNewQuote = async () => {
+  const fetchQuotes = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -23,22 +26,26 @@ export const InspirationalQuote: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('inspirational-quotes');
       
       if (error) {
-        console.error('Error fetching quote:', error);
-        setError('Could not load an inspirational quote');
-        toast.error('Could not load an inspirational quote');
+        console.error('Error fetching quotes:', error);
+        setError('Could not load inspirational quotes');
+        toast.error('Could not load inspirational quotes');
         return;
       }
       
-      if (data && data.quote) {
-        setQuote(data.quote);
+      if (data && data.quotes && Array.isArray(data.quotes)) {
+        setQuotes(data.quotes);
+        if (data.quotes.length > 0) {
+          setQuote(data.quotes[0].quote);
+          setAuthor(data.quotes[0].author || 'Unknown');
+        }
       } else if (data && data.error) {
         setError(data.error);
-        toast.error('Error loading quote');
+        toast.error('Error loading quotes');
       }
     } catch (err) {
-      console.error('Exception when fetching quote:', err);
-      setError('Failed to load an inspirational quote');
-      toast.error('Failed to load an inspirational quote');
+      console.error('Exception when fetching quotes:', err);
+      setError('Failed to load inspirational quotes');
+      toast.error('Failed to load inspirational quotes');
     } finally {
       setLoading(false);
     }
@@ -46,14 +53,24 @@ export const InspirationalQuote: React.FC = () => {
 
   useEffect(() => {
     if (inView) {
-      fetchNewQuote();
-      
-      // Set up interval to fetch a new quote every 60 seconds
-      const interval = setInterval(fetchNewQuote, 60 * 1000);
-      
-      return () => clearInterval(interval);
+      fetchQuotes();
     }
   }, [inView]);
+
+  useEffect(() => {
+    if (quotes.length > 0) {
+      const intervalId = setInterval(() => {
+        setCurrentQuoteIndex((prevIndex) => {
+          const newIndex = (prevIndex + 1) % quotes.length;
+          setQuote(quotes[newIndex].quote);
+          setAuthor(quotes[newIndex].author || 'Unknown');
+          return newIndex;
+        });
+      }, 5000); // Change quote every 5 seconds
+      
+      return () => clearInterval(intervalId);
+    }
+  }, [quotes]);
 
   return (
     <motion.div
@@ -67,7 +84,7 @@ export const InspirationalQuote: React.FC = () => {
         {loading ? (
           <motion.div
             key="loading"
-            className="flex flex-col items-center justify-center min-h-[200px]"
+            className="flex flex-col items-center justify-center min-h-[120px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -78,14 +95,14 @@ export const InspirationalQuote: React.FC = () => {
         ) : error ? (
           <motion.div
             key="error"
-            className="flex flex-col items-center justify-center min-h-[200px]"
+            className="flex flex-col items-center justify-center min-h-[120px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <p className="text-muted-foreground">{error}</p>
             <button 
-              onClick={fetchNewQuote}
+              onClick={fetchQuotes}
               className="mt-4 px-4 py-2 bg-theme/20 hover:bg-theme/30 text-foreground rounded-md transition-colors"
             >
               Try Again
@@ -93,26 +110,24 @@ export const InspirationalQuote: React.FC = () => {
           </motion.div>
         ) : (
           <motion.div
-            key="quote"
-            className="flex flex-col min-h-[200px] justify-center"
+            key={currentQuoteIndex}
+            className="flex flex-col min-h-[120px] justify-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
           >
             <div className="flex mb-4 justify-center">
               <Quote className="h-8 w-8 text-theme" />
             </div>
-            <p className="text-foreground text-center text-xl font-medium italic mb-6">
-              {quote}
+            <p className="text-foreground text-center text-xl font-medium italic mb-2">
+              "{quote}"
             </p>
-            <div className="flex justify-center">
-              <button 
-                onClick={fetchNewQuote}
-                className="px-4 py-2 bg-theme/20 hover:bg-theme/30 text-foreground rounded-md transition-colors"
-              >
-                New Quote
-              </button>
-            </div>
+            {author && (
+              <p className="text-muted-foreground text-center">
+                — {author}
+              </p>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
