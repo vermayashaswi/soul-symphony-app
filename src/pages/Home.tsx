@@ -1,13 +1,9 @@
+
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { useLocation } from '@/hooks/use-location';
-import { useWeather } from '@/hooks/use-weather';
-import { WeatherCard } from '@/components/weather/WeatherCard';
-import { LocationPermission } from '@/components/weather/LocationPermission';
-import { Loader2 } from 'lucide-react';
+import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 
 const Home = () => {
   const { user } = useAuth();
@@ -87,33 +83,6 @@ const Home = () => {
     return 'Friend';
   };
 
-  const { 
-    latitude, 
-    longitude, 
-    loading: locationLoading, 
-    error: locationError,
-    permissionState,
-    requestLocationPermission
-  } = useLocation();
-  
-  const weather = useWeather(latitude, longitude);
-
-  console.log('Location status:', { 
-    latitude, 
-    longitude, 
-    locationLoading, 
-    locationError,
-    permissionState 
-  });
-  
-  console.log('Weather status:', { 
-    temperature: weather.temperature,
-    condition: weather.condition,
-    location: weather.location,
-    loading: weather.loading,
-    error: weather.error
-  });
-
   return (
     <div className="min-h-screen pt-6 pb-20 px-4">
       <motion.div
@@ -132,25 +101,7 @@ const Home = () => {
         </motion.div>
         
         <motion.div variants={itemVariants} className="space-y-4">
-          {locationLoading ? (
-            <div className="bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl p-8 flex flex-col items-center justify-center h-96">
-              <Loader2 className="h-10 w-10 text-theme animate-spin mb-4" />
-              <p className="text-foreground">Determining your location...</p>
-            </div>
-          ) : weather.loading ? (
-            <div className="bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl p-8 flex flex-col items-center justify-center h-96">
-              <Loader2 className="h-10 w-10 text-theme animate-spin mb-4" />
-              <p className="text-foreground">Loading weather information...</p>
-            </div>
-          ) : permissionState !== 'granted' || locationError ? (
-            <LocationPermission 
-              onRequestPermission={requestLocationPermission} 
-              permissionState={permissionState}
-              error={locationError}
-            />
-          ) : (
-            <WeatherCard weather={weather} />
-          )}
+          <InspirationalQuote />
         </motion.div>
       </motion.div>
     </div>
