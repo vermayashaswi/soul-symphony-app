@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -49,9 +48,46 @@ const App = () => {
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     
+    // Remove Lovable badge if present
+    const removeLovableBadge = () => {
+      // Look for the badge in the DOM (it has several possible class names)
+      const badgeSelectors = [
+        '.lovable-badge',
+        '[data-lovable-badge]', 
+        '.powered-by-lovable'
+      ];
+      
+      badgeSelectors.forEach(selector => {
+        const badges = document.querySelectorAll(selector);
+        badges.forEach(badge => {
+          badge.remove();
+        });
+      });
+    };
+    
+    // Run once on mount
+    removeLovableBadge();
+    
+    // Also run after a small delay to catch any badges that might be added dynamically
+    setTimeout(removeLovableBadge, 1000);
+    
+    // Create a MutationObserver to detect if the badge gets added dynamically
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length) {
+          removeLovableBadge();
+        }
+      }
+    });
+    
+    // Start observing the body for changes
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    // Clean up observer on component unmount
     return () => {
       window.removeEventListener('error', handleGlobalError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      observer.disconnect();
     };
   }, []);
   
