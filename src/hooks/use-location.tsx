@@ -42,12 +42,19 @@ export const useLocation = () => {
             getCurrentPosition();
           }
         });
+
+        // If permission is already granted, get position immediately
+        if (permission.state === 'granted') {
+          getCurrentPosition();
+          return;
+        }
       }
 
       // Get current position
       const getCurrentPosition = () => {
         navigator.geolocation.getCurrentPosition(
           (position) => {
+            console.log('Location obtained:', position.coords.latitude, position.coords.longitude);
             setState(prev => ({
               ...prev,
               latitude: position.coords.latitude,
@@ -56,6 +63,9 @@ export const useLocation = () => {
               error: null,
               permissionState: 'granted',
             }));
+            
+            // Success notification
+            toast.success('Location obtained successfully');
           },
           (error) => {
             console.error('Error getting location:', error);
@@ -69,15 +79,33 @@ export const useLocation = () => {
                 loading: false,
                 permissionState: 'denied' 
               }));
+              toast.error('Location permission denied');
+            } else if (error.code === 2) {
+              errorMessage = 'Location not available';
+              setState(prev => ({ 
+                ...prev, 
+                error: errorMessage, 
+                loading: false 
+              }));
+              toast.error('Location not available');
+            } else if (error.code === 3) {
+              errorMessage = 'Location request timed out';
+              setState(prev => ({ 
+                ...prev, 
+                error: errorMessage, 
+                loading: false 
+              }));
+              toast.error('Location request timed out');
             } else {
               setState(prev => ({ 
                 ...prev, 
                 error: errorMessage, 
                 loading: false 
               }));
+              toast.error('Failed to get your location');
             }
           },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
         );
       };
       
@@ -90,6 +118,7 @@ export const useLocation = () => {
         error: error instanceof Error ? error.message : 'An unknown error occurred', 
         loading: false 
       }));
+      toast.error('Could not access location services');
     }
   }, []);
 

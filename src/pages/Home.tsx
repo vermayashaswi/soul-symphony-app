@@ -106,6 +106,21 @@ const Home = () => {
   
   const weather = useWeather(latitude, longitude);
 
+  console.log('Location status:', { 
+    latitude, 
+    longitude, 
+    locationLoading, 
+    locationError,
+    permissionState 
+  });
+  
+  console.log('Weather status:', { 
+    condition: weather.condition,
+    location: weather.location,
+    loading: weather.loading,
+    error: weather.error
+  });
+
   return (
     <div className="min-h-screen pt-6 pb-20 px-4">
       <motion.div
@@ -124,7 +139,12 @@ const Home = () => {
         </motion.div>
         
         <motion.div variants={itemVariants} className="space-y-4">
-          {locationLoading || weather.loading ? (
+          {locationLoading ? (
+            <div className="bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl p-8 flex flex-col items-center justify-center h-96">
+              <Loader2 className="h-10 w-10 text-theme animate-spin mb-4" />
+              <p className="text-muted-foreground">Determining your location...</p>
+            </div>
+          ) : weather.loading ? (
             <div className="bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl p-8 flex flex-col items-center justify-center h-96">
               <Loader2 className="h-10 w-10 text-theme animate-spin mb-4" />
               <p className="text-muted-foreground">Loading weather information...</p>

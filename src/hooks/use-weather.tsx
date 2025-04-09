@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
 export type WeatherData = {
   temperature: number;
@@ -42,6 +43,7 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
 
       try {
         setWeather(prev => ({ ...prev, loading: true, error: null }));
+        console.log('Fetching weather for:', latitude, longitude);
         
         // Fetch weather data from OpenWeatherMap API
         const response = await fetch(
@@ -49,10 +51,13 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
         );
 
         if (!response.ok) {
-          throw new Error('Weather data not available');
+          const errorText = await response.text();
+          console.error('Weather API error response:', errorText);
+          throw new Error(`Weather data not available: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
+        console.log('Weather API response:', data);
         
         // Map weather condition codes to our condition types
         const mapCondition = (weatherId: number): WeatherData['condition'] => {
@@ -81,6 +86,8 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
           loading: false,
           error: null
         });
+        
+        console.log('Weather data processed:', mapCondition(data.weather[0].id), data.name);
       } catch (error) {
         console.error('Error fetching weather:', error);
         setWeather(prev => ({
@@ -88,6 +95,7 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
           loading: false,
           error: error instanceof Error ? error.message : 'Failed to fetch weather data'
         }));
+        toast.error('Could not load weather information');
       }
     };
 
