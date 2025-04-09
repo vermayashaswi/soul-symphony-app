@@ -23,6 +23,7 @@ export const InspirationalQuote: React.FC = () => {
       setLoading(true);
       setError(null);
       
+      console.log('Fetching inspirational quotes from edge function');
       const { data, error } = await supabase.functions.invoke('inspirational-quotes');
       
       if (error) {
@@ -32,15 +33,23 @@ export const InspirationalQuote: React.FC = () => {
         return;
       }
       
+      console.log('Received response from inspirational-quotes edge function:', data);
+      
       if (data && data.quotes && Array.isArray(data.quotes)) {
+        console.log('Successfully parsed quotes:', data.quotes);
         setQuotes(data.quotes);
         if (data.quotes.length > 0) {
           setQuote(data.quotes[0].quote);
           setAuthor(data.quotes[0].author || 'Unknown');
         }
       } else if (data && data.error) {
+        console.error('Error from edge function:', data.error);
         setError(data.error);
         toast.error('Error loading quotes');
+      } else {
+        console.error('Unexpected response format:', data);
+        setError('Received invalid response format');
+        toast.error('Received invalid response format');
       }
     } catch (err) {
       console.error('Exception when fetching quotes:', err);
@@ -53,12 +62,14 @@ export const InspirationalQuote: React.FC = () => {
 
   useEffect(() => {
     if (inView) {
+      console.log('Quote component in view, fetching quotes');
       fetchQuotes();
     }
   }, [inView]);
 
   useEffect(() => {
     if (quotes.length > 0) {
+      console.log('Setting up quote rotation with', quotes.length, 'quotes');
       const intervalId = setInterval(() => {
         setCurrentQuoteIndex((prevIndex) => {
           const newIndex = (prevIndex + 1) % quotes.length;
@@ -72,10 +83,17 @@ export const InspirationalQuote: React.FC = () => {
     }
   }, [quotes]);
 
+  console.log('Rendering quote component with state:', { 
+    loading, 
+    error, 
+    quotesCount: quotes.length, 
+    currentQuote: quote.substring(0, 30) + '...' 
+  });
+
   return (
     <motion.div
       ref={ref}
-      className="p-6 bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl shadow-sm"
+      className="p-6 bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl shadow-sm mb-16"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}

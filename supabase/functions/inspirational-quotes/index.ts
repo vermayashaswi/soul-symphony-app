@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Generating inspirational quotes using OpenAI API key');
+    console.log('Generating inspirational quotes using OpenAI API');
     
     if (!openAIApiKey) {
       console.error('OPENAI_API_KEY environment variable is not set');
@@ -34,7 +34,7 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: 'You are an assistant that provides inspirational quotes with their authors. Respond with a JSON array of 5 inspirational quotes about mental health, emotional well-being, mindfulness, and personal growth. Each item should have "quote" and "author" fields. Make sure quotes are short (under 30 words) and attributed to the correct person. Return only valid JSON.' 
+            content: 'You are an assistant that provides inspirational quotes with their authors. Respond with a JSON array of 5 inspirational quotes about mental health, emotional well-being, mindfulness, and personal growth. Each item should have "quote" and "author" fields. Make sure quotes are short (under 30 words) and attributed to the correct person. Return only valid JSON with no markdown formatting.' 
           },
           { 
             role: 'user', 
@@ -55,23 +55,35 @@ serve(async (req) => {
     const data = await response.json();
     const content = data.choices[0].message.content.trim();
     
-    // Parse the JSON response from OpenAI
+    // Parse the JSON response from OpenAI, handling both direct JSON and markdown-wrapped JSON
     let quotes;
     try {
-      // Extract JSON from the response if it's wrapped in backticks
-      const jsonMatch = content.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/) || 
-                         content.match(/(\[[\s\S]*?\])/);
-      
-      if (jsonMatch && jsonMatch[1]) {
-        quotes = JSON.parse(jsonMatch[1]);
-      } else {
-        quotes = JSON.parse(content);
-      }
-      
-      console.log('Generated quotes:', quotes);
+      // First try to parse it directly as JSON
+      quotes = JSON.parse(content);
+      console.log('Parsed quotes directly:', quotes);
     } catch (error) {
-      console.error('Error parsing quotes JSON:', error, 'Content:', content);
-      throw new Error('Failed to parse quotes from OpenAI response');
+      console.error('Error directly parsing quotes, trying to extract JSON from markdown:', error);
+      try {
+        // Try to extract JSON from markdown code blocks
+        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || 
+                           content.match(/(\[[\s\S]*?\])/);
+        
+        if (jsonMatch && jsonMatch[1]) {
+          quotes = JSON.parse(jsonMatch[1].trim());
+          console.log('Extracted quotes from markdown:', quotes);
+        } else {
+          throw new Error('Could not find valid JSON in response');
+        }
+      } catch (extractError) {
+        console.error('Failed to extract JSON from response:', extractError);
+        throw new Error('Failed to parse quotes from OpenAI response');
+      }
+    }
+
+    // Validate that quotes is an array
+    if (!Array.isArray(quotes)) {
+      console.error('Quotes is not an array:', quotes);
+      throw new Error('OpenAI did not return a valid quotes array');
     }
 
     return new Response(JSON.stringify({ quotes }), {

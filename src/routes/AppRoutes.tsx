@@ -46,6 +46,7 @@ const AppRoutes = () => {
   const isOnboardingBypassedRoute = isAuthRoute || location.pathname.includes('debug') || location.pathname.includes('admin');
   
   useEffect(() => {
+    console.log("Setting up routes and checking authentication");
     const setCorrectViewport = () => {
       const metaViewport = document.querySelector('meta[name="viewport"]');
       const correctContent = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
@@ -77,7 +78,6 @@ const AppRoutes = () => {
     };
   }, []);
   
-  // If onboarding is still loading, show a loading spinner
   if (onboardingLoading) {
     return (
       <div className="flex items-center justify-center h-screen w-screen">
@@ -86,7 +86,6 @@ const AppRoutes = () => {
     );
   }
   
-  // Determine if we should show onboarding
   const shouldShowOnboarding = 
     !user && 
     !onboardingComplete && 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -21,6 +20,7 @@ const Home = () => {
   const formattedDate = format(today, 'EEE, MMM d');
   
   useEffect(() => {
+    console.log('Home component mounted');
     const fetchUserProfile = async () => {
       if (user) {
         try {
@@ -53,7 +53,6 @@ const Home = () => {
     };
     
     fetchUserProfile();
-    
     setBackgroundImage(getRandomBackgroundImage());
   }, [user]);
   
@@ -122,6 +121,8 @@ const Home = () => {
     show: { opacity: 1, y: 0 }
   };
 
+  console.log('Rendering Home page with background image:', backgroundImage);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="p-6 flex items-center justify-between">
@@ -158,6 +159,7 @@ const Home = () => {
         </motion.div>
 
         <motion.div variants={itemVariants}>
+          {console.log('Rendering InspirationalQuote component')}
           <InspirationalQuote />
         </motion.div>
       </motion.div>
