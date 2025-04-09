@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar } from 'lucide-react';
@@ -8,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
-import { setupJournalReminder, initializeCapacitorNotifications, scheduleNotification } from '@/services/notificationService';
+import { setupJournalReminder, initializeCapacitorNotifications } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
@@ -54,7 +55,6 @@ export default function Settings() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationFrequency, setNotificationFrequency] = useState("daily");
   const [notificationTime, setNotificationTime] = useState("evening");
-  const [showNotificationPreview, setShowNotificationPreview] = useState(false);
   const { user, signOut } = useAuth();
   const [maxStreak, setMaxStreak] = useState(0);
   const { entries } = useJournalEntries(user?.id, 0, !!user);
@@ -241,11 +241,6 @@ export default function Settings() {
     
     if (checked) {
       toast.success("Notifications enabled");
-      
-      // Schedule a test notification to show the user what they'll look like
-      setTimeout(() => {
-        setShowNotificationPreview(true);
-      }, 1500);
     } else {
       toast.info("Notifications disabled");
     }
@@ -268,16 +263,6 @@ export default function Settings() {
       case "weekly": return "Once a week";
       default: return "Every day";
     }
-  };
-  
-  const handleShowTestNotification = () => {
-    scheduleNotification(
-      "Journal Reminder",
-      "Time to reflect and capture your thoughts for today.",
-      0 // immediately
-    ).then(() => {
-      toast.success("Test notification sent");
-    });
   };
 
   return (
@@ -809,56 +794,7 @@ export default function Settings() {
           </div>
         </DialogContent>
       </Dialog>
-      
-      <Dialog 
-        open={showNotificationPreview} 
-        onOpenChange={setShowNotificationPreview}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-theme-color">Journal Reminder</DialogTitle>
-            <DialogDescription>
-              Your notifications will look like this
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-6">
-            <Card className="p-4 shadow-md border border-border">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-full bg-theme-color/10">
-                  <Bell className="h-5 w-5 text-theme-color" />
-                </div>
-                <div>
-                  <h3 className="font-medium mb-1">Journal Reminder</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Time to reflect and capture your thoughts for today.
-                  </p>
-                  <div className="flex items-center gap-2 mt-3">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8"
-                      onClick={() => setShowNotificationPreview(false)}
-                    >
-                      Later
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      className="h-8 bg-theme-color hover:bg-theme-color/90"
-                      onClick={() => {
-                        setShowNotificationPreview(false);
-                        navigate('/journal');
-                      }}
-                    >
-                      Open Journal
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
+
