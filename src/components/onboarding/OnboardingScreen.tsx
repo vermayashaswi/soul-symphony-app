@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +13,11 @@ import { toast } from "sonner";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
+}
+
+interface NameStepProps {
+  name: string;
+  setName: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const createWavePath = (
@@ -623,7 +629,7 @@ const ONBOARDING_STEPS = [
     title: "What Should We Call You?",
     subtitle: "Personalize your experience",
     description: "Your name helps us make your journey more personal.",
-    illustration: (props: { name: string; setName: (name: string) => void }) => (
+    illustration: (props: NameStepProps) => (
       <div className="flex flex-col justify-center items-center my-2 w-full">
         <motion.div 
           className="relative w-full max-w-xs bg-theme-lighter rounded-xl flex flex-col items-center justify-center overflow-hidden p-8"

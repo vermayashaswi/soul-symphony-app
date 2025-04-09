@@ -52,7 +52,10 @@ const Home = () => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ display_name: name })
+        .update({ 
+          display_name: name,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id);
       
       if (error) {

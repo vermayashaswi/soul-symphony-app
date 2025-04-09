@@ -38,7 +38,10 @@ export function useOnboarding() {
       // Save the name to the profile
       const { error } = await supabase
         .from('profiles')
-        .update({ display_name: name })
+        .update({ 
+          display_name: name,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', userId);
       
       if (error) {
