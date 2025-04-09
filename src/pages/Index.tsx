@@ -11,12 +11,14 @@ import SouloLogo from '@/components/SouloLogo';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { useOnboarding } from '@/hooks/use-onboarding';
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const isMobile = useIsMobile();
+  const { resetOnboarding } = useOnboarding();
   const [typingText, setTypingText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [showResponse, setShowResponse] = useState(false);
@@ -32,6 +34,11 @@ const Index = () => {
     } else {
       navigate(path);
     }
+  };
+
+  const handleStartOnboarding = () => {
+    resetOnboarding();
+    navigate('/onboarding');
   };
 
   const containerVariants = {
@@ -390,7 +397,7 @@ const Index = () => {
           
           {!user && (
             <motion.div 
-              className="mt-8"
+              className="mt-8 flex flex-col sm:flex-row gap-3 justify-center"
               variants={itemVariants}
             >
               <Button 
@@ -400,6 +407,16 @@ const Index = () => {
               >
                 Get Started
               </Button>
+              
+              {(isMobile || mobileDemo) && (
+                <Button 
+                  size={shouldRenderMobile ? "default" : "lg"} 
+                  variant="outline"
+                  onClick={handleStartOnboarding}
+                >
+                  View Onboarding
+                </Button>
+              )}
             </motion.div>
           )}
         </motion.div>

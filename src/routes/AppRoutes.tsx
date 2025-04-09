@@ -1,11 +1,14 @@
 
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/hooks/use-onboarding';
 import MobilePreviewFrame from '@/components/MobilePreviewFrame';
 import MobileNavbar from '@/components/mobile/MobileNavbar';
+import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import ProtectedRoute from './ProtectedRoute';
 
 // Pages
@@ -31,9 +34,15 @@ const MobilePreviewWrapper = ({ children }: { children: React.ReactNode }) => {
 
 const AppRoutes = () => {
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
+  const location = useLocation();
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldShowMobileNav = isMobile || mobileDemo;
+  
+  const isAuthRoute = location.pathname === '/auth';
+  const isOnboardingBypassedRoute = isAuthRoute || location.pathname.includes('debug') || location.pathname.includes('admin');
 
   useEffect(() => {
     const setCorrectViewport = () => {
@@ -66,6 +75,26 @@ const AppRoutes = () => {
       subscription.unsubscribe();
     };
   }, []);
+  
+  // If onboarding is still loading, show nothing or a loading spinner
+  if (onboardingLoading) {
+    return <div className="flex items-center justify-center h-screen w-screen">Loading...</div>;
+  }
+  
+  // Show onboarding for mobile users who aren't logged in and haven't completed onboarding
+  const shouldShowOnboarding = 
+    (isMobile || mobileDemo) && 
+    !user && 
+    !onboardingComplete && 
+    !isOnboardingBypassedRoute;
+  
+  if (shouldShowOnboarding) {
+    return (
+      <MobilePreviewWrapper>
+        <OnboardingScreen />
+      </MobilePreviewWrapper>
+    );
+  }
   
   return (
     <>
@@ -112,6 +141,11 @@ const AppRoutes = () => {
             </ProtectedRoute>
           </MobilePreviewWrapper>
         } />
+        <Route path="/onboarding" element={
+          <MobilePreviewWrapper>
+            <OnboardingScreen />
+          </MobilePreviewWrapper>
+        } />
         <Route path="*" element={
           <MobilePreviewWrapper>
             <NotFound />
@@ -119,7 +153,7 @@ const AppRoutes = () => {
         } />
       </Routes>
 
-      {shouldShowMobileNav && <MobileNavbar />}
+      {shouldShowMobileNav && !shouldShowOnboarding && <MobileNavbar />}
     </>
   );
 };
