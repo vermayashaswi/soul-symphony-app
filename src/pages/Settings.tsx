@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
-import { setupJournalReminder, initializeCapacitorNotifications } from '@/services/notificationService';
+import { setupJournalReminder, initializeCapacitorNotifications, scheduleNotification } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
@@ -21,6 +21,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { startOfDay, subDays, isWithinInterval } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -49,6 +52,9 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 export default function Settings() {
   const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationFrequency, setNotificationFrequency] = useState("daily");
+  const [notificationTime, setNotificationTime] = useState("evening");
+  const [showNotificationPreview, setShowNotificationPreview] = useState(false);
   const { user, signOut } = useAuth();
   const [maxStreak, setMaxStreak] = useState(0);
   const { entries } = useJournalEntries(user?.id, 0, !!user);
@@ -166,14 +172,14 @@ export default function Settings() {
 
   useEffect(() => {
     if (notificationsEnabled) {
-      setupJournalReminder(true).then(() => {
+      setupJournalReminder(true, notificationFrequency, notificationTime).then(() => {
         if (typeof window !== 'undefined' && !('Notification' in window) || 
             (window.Notification && window.Notification.permission !== 'granted')) {
           initializeCapacitorNotifications();
         }
       });
     }
-  }, [notificationsEnabled]);
+  }, [notificationsEnabled, notificationFrequency, notificationTime]);
 
   const handleContactSupport = () => {
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
@@ -228,6 +234,50 @@ export default function Settings() {
   const cancelNameEdit = () => {
     setDisplayName(originalDisplayName);
     setIsEditingName(false);
+  };
+  
+  const handleToggleNotifications = (checked: boolean) => {
+    setNotificationsEnabled(checked);
+    
+    if (checked) {
+      toast.success("Notifications enabled");
+      
+      // Schedule a test notification to show the user what they'll look like
+      setTimeout(() => {
+        setShowNotificationPreview(true);
+      }, 1500);
+    } else {
+      toast.info("Notifications disabled");
+    }
+  };
+  
+  const getNotificationTimeLabel = () => {
+    switch (notificationTime) {
+      case "morning": return "8:00 AM";
+      case "afternoon": return "2:00 PM";
+      case "evening": return "8:00 PM";
+      default: return "8:00 PM";
+    }
+  };
+  
+  const getNotificationFrequencyLabel = () => {
+    switch (notificationFrequency) {
+      case "daily": return "Every day";
+      case "weekdays": return "Weekdays only";
+      case "weekends": return "Weekends only";
+      case "weekly": return "Once a week";
+      default: return "Every day";
+    }
+  };
+  
+  const handleShowTestNotification = () => {
+    scheduleNotification(
+      "Journal Reminder",
+      "Time to reflect and capture your thoughts for today.",
+      0 // immediately
+    ).then(() => {
+      toast.success("Test notification sent");
+    });
   };
 
   return (
@@ -468,9 +518,7 @@ export default function Settings() {
               >
                 <Switch 
                   checked={notificationsEnabled}
-                  onCheckedChange={(checked) => {
-                    setNotificationsEnabled(checked);
-                  }}
+                  onCheckedChange={handleToggleNotifications}
                 />
               </SettingItem>
             </div>
@@ -758,6 +806,56 @@ export default function Settings() {
             >
               Apply Color
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog 
+        open={showNotificationPreview} 
+        onOpenChange={setShowNotificationPreview}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-theme-color">Journal Reminder</DialogTitle>
+            <DialogDescription>
+              Your notifications will look like this
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-6">
+            <Card className="p-4 shadow-md border border-border">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-full bg-theme-color/10">
+                  <Bell className="h-5 w-5 text-theme-color" />
+                </div>
+                <div>
+                  <h3 className="font-medium mb-1">Journal Reminder</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Time to reflect and capture your thoughts for today.
+                  </p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8"
+                      onClick={() => setShowNotificationPreview(false)}
+                    >
+                      Later
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      className="h-8 bg-theme-color hover:bg-theme-color/90"
+                      onClick={() => {
+                        setShowNotificationPreview(false);
+                        navigate('/journal');
+                      }}
+                    >
+                      Open Journal
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
           </div>
         </DialogContent>
       </Dialog>

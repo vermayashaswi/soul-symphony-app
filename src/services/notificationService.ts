@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 
 // Duration constants
@@ -259,15 +260,23 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 };
 
 // Schedule a notification (for reminders) - web only for now
-export const scheduleNotification = async (title: string, body: string, hours: number = 24): Promise<boolean> => {
+export const scheduleNotification = async (
+  title: string, 
+  body: string, 
+  hours: number = 24
+): Promise<boolean> => {
   try {
-    // For web testing - immediate notification
+    // For web testing - immediate notification if hours is 0, otherwise mock scheduling
     if (isBrowser() && 'Notification' in window && Notification.permission === 'granted') {
-      // This is just a mock for web - on real mobile we would use actual scheduling
-      new Notification(title, { body });
+      if (hours === 0) {
+        // Immediate notification
+        new Notification(title, { body });
+        console.log(`[NotificationService] Sent immediate notification: "${title}"`);
+      } else {
+        // This is just a mock for web - on real mobile we would use actual scheduling
+        console.log(`[NotificationService] Scheduled notification: "${title}" for ${hours} hours from now`);
+      }
       
-      // Log for debugging
-      console.log(`[NotificationService] Scheduled notification: "${title}" for ${hours} hours from now`);
       return true;
     }
     return false;
@@ -277,20 +286,82 @@ export const scheduleNotification = async (title: string, body: string, hours: n
   }
 };
 
-// Set up journal reminder
-export const setupJournalReminder = async (enabled: boolean): Promise<void> => {
+// Get time in hours for the notification based on time preference
+const getNotificationTimeHours = (timePreference: string): number => {
+  switch (timePreference) {
+    case 'morning': return 8; // 8:00 AM
+    case 'afternoon': return 14; // 2:00 PM
+    case 'evening': return 20; // 8:00 PM
+    default: return 20; // Default to 8:00 PM
+  }
+};
+
+// Check if notification should be sent today based on frequency
+const shouldSendNotificationToday = (frequency: string): boolean => {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  
+  switch (frequency) {
+    case 'daily':
+      return true;
+    case 'weekdays':
+      return dayOfWeek >= 1 && dayOfWeek <= 5; // Monday to Friday
+    case 'weekends':
+      return dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+    case 'weekly':
+      return dayOfWeek === 0; // Only on Sundays
+    default:
+      return true;
+  }
+};
+
+// Set up journal reminder with frequency and time preferences
+export const setupJournalReminder = async (
+  enabled: boolean,
+  frequency: string = 'daily',
+  timePreference: string = 'evening'
+): Promise<void> => {
   if (!enabled) return;
   
   try {
     const hasPermission = await requestNotificationPermission();
     
     if (hasPermission) {
-      await scheduleNotification(
-        "Journal Reminder",
-        "It's time to check in with yourself. Take a moment to record your thoughts.",
-        24 // Daily reminder
-      );
-      showToast("Journal reminders enabled", "success");
+      // Only schedule if we should send notification today based on frequency
+      if (shouldSendNotificationToday(frequency)) {
+        const timeHours = getNotificationTimeHours(timePreference);
+        
+        // Calculate hours until notification time
+        const now = new Date();
+        const notificationTime = new Date();
+        notificationTime.setHours(timeHours, 0, 0, 0); // Set to specified hour
+        
+        // If notification time has passed today, schedule for tomorrow
+        if (now > notificationTime) {
+          notificationTime.setDate(notificationTime.getDate() + 1);
+        }
+        
+        // Calculate hours difference
+        const hoursDiff = Math.round((notificationTime.getTime() - now.getTime()) / (1000 * 60 * 60));
+        
+        await scheduleNotification(
+          "Journal Reminder",
+          "It's time to check in with yourself. Take a moment to record your thoughts.",
+          hoursDiff
+        );
+        
+        console.log(`[NotificationService] Journal reminder scheduled for ${timeHours}:00 (${frequency})`);
+      } else {
+        console.log(`[NotificationService] No notification scheduled today based on frequency: ${frequency}`);
+      }
+      
+      // Save notification preferences to localStorage for persistence
+      if (isBrowser()) {
+        localStorage.setItem('notification_enabled', 'true');
+        localStorage.setItem('notification_frequency', frequency);
+        localStorage.setItem('notification_time', timePreference);
+      }
+      
     } else {
       showToast("Could not enable notifications. Please check your browser settings.", "error");
     }
