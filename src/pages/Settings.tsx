@@ -838,7 +838,7 @@ export default function Settings() {
                   <li>Objection to processing</li>
                 </ul>
                 <p className="text-sm text-muted-foreground mt-2">
-                  To exercise these rights, please contact us at privacy@soulo-app.com.
+                  To exercise these rights, please contact us at support@soulo.online.
                 </p>
               </div>
 
@@ -848,7 +848,7 @@ export default function Settings() {
                   If you have any questions or concerns about this Privacy Policy or our data practices, please contact us at:
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Email: privacy@soulo-app.com<br />
+                  Email: support@soulo.online<br />
                   Address: 123 Journal Street, San Francisco, CA 94105, USA
                 </p>
               </div>
