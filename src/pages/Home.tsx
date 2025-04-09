@@ -1,10 +1,67 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const Home = () => {
   const { user } = useAuth();
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user) {
+        try {
+          // First check if there's a name stored from onboarding
+          const localName = localStorage.getItem('user_display_name');
+          
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('display_name')
+            .eq('id', user.id)
+            .single();
+          
+          if (error && error.code !== 'PGRST116') {
+            console.error('Error fetching profile', error);
+            return;
+          }
+          
+          // If we have a stored name from onboarding and no display name in profile yet,
+          // update the profile with the stored name
+          if (localName && (!data || !data.display_name)) {
+            await updateDisplayName(localName);
+            setDisplayName(localName);
+            // Remove from localStorage to avoid overwriting future updates
+            localStorage.removeItem('user_display_name');
+          } else if (data && data.display_name) {
+            setDisplayName(data.display_name);
+          }
+        } catch (error) {
+          console.error('Error in profile fetching', error);
+        }
+      }
+    };
+    
+    fetchUserProfile();
+  }, [user]);
+  
+  const updateDisplayName = async (name: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ display_name: name })
+        .eq('id', user.id);
+      
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error updating display name', error);
+    }
+  };
   
   // Animation variants
   const containerVariants = {
@@ -22,6 +79,13 @@ const Home = () => {
     show: { opacity: 1, y: 0 }
   };
 
+  // Get the greeting name with priority: display name > email username > "Friend"
+  const getGreetingName = () => {
+    if (displayName) return displayName;
+    if (user?.email) return user.email.split('@')[0];
+    return 'Friend';
+  };
+
   return (
     <div className="min-h-screen pt-6 pb-20 px-4">
       <motion.div
@@ -32,7 +96,7 @@ const Home = () => {
       >
         <motion.div variants={itemVariants} className="mb-6">
           <h1 className="text-2xl font-bold text-theme">
-            Welcome, {user?.email?.split('@')[0] || 'Friend'}!
+            Welcome, {getGreetingName()}!
           </h1>
           <p className="text-muted-foreground mt-2">
             Your personal wellness journey continues here

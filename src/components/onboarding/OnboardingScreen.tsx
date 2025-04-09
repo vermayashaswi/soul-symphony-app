@@ -1,13 +1,14 @@
-
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User } from "lucide-react";
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { RecordingVisualizer } from "@/components/voice-recorder/RecordingVisualizer";
+import { toast } from "sonner";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -619,6 +620,62 @@ const ONBOARDING_STEPS = [
     buttonText: "Next"
   },
   {
+    title: "What Should We Call You?",
+    subtitle: "Personalize your experience",
+    description: "Your name helps us make your journey more personal.",
+    illustration: (props: { name: string; setName: (name: string) => void }) => (
+      <div className="flex flex-col justify-center items-center my-2 w-full">
+        <motion.div 
+          className="relative w-full max-w-xs bg-theme-lighter rounded-xl flex flex-col items-center justify-center overflow-hidden p-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.div
+            className="w-20 h-20 bg-theme/20 rounded-full flex items-center justify-center mb-6"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", delay: 0.3 }}
+          >
+            <User className="w-10 h-10 text-theme" />
+          </motion.div>
+          
+          <motion.div 
+            className="w-full space-y-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            <Input
+              placeholder="Enter your name"
+              value={props.name}
+              onChange={(e) => props.setName(e.target.value)}
+              className="bg-background/80 border-theme/20 focus:border-theme"
+              autoFocus
+            />
+            
+            <div className="text-sm text-muted-foreground text-center">
+              This is how SOuLO will address you
+            </div>
+          </motion.div>
+          
+          <motion.div 
+            className="absolute -z-10 inset-0 opacity-20"
+            animate={{ 
+              background: [
+                "radial-gradient(circle at 20% 20%, var(--color-theme-light) 0%, transparent 70%)",
+                "radial-gradient(circle at 80% 80%, var(--color-theme-light) 0%, transparent 70%)",
+                "radial-gradient(circle at 20% 20%, var(--color-theme-light) 0%, transparent 70%)"
+              ]
+            }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </motion.div>
+      </div>
+    ),
+    buttonText: "Continue"
+  },
+  {
     title: "Ready to Start Your Journey?",
     subtitle: "Express. Reflect. Grow.",
     description: "",
@@ -662,6 +719,7 @@ const ONBOARDING_STEPS = [
 
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const [name, setName] = useState('');
   const navigate = useNavigate();
   const { setColorTheme } = useTheme();
   
@@ -671,8 +729,17 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   
   const handleNext = () => {
     if (currentStep < ONBOARDING_STEPS.length - 1) {
+      if (currentStep === 6 && !name.trim()) {
+        toast.error("Please enter your name to continue");
+        return;
+      }
+      
       setCurrentStep(prev => prev + 1);
     } else {
+      if (name) {
+        localStorage.setItem("user_display_name", name.trim());
+      }
+      
       localStorage.setItem("onboardingComplete", "true");
       
       if (onComplete) {
@@ -690,6 +757,10 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   };
   
   const handleSkip = () => {
+    if (name) {
+      localStorage.setItem("user_display_name", name.trim());
+    }
+    
     localStorage.setItem("onboardingComplete", "true");
     if (onComplete) {
       onComplete();
@@ -701,8 +772,8 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const CurrentIllustration = ONBOARDING_STEPS[currentStep].illustration;
   const currentStepData = ONBOARDING_STEPS[currentStep];
   
-  // Gleaming animation for the final step subtitle
   const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
+  const isNameStep = currentStep === 6;
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background">
@@ -747,12 +818,14 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                 </>
               ) : (
                 <>
-                  {/* Illustration section - same vertical positioning */}
                   <div className="w-full flex-1 flex items-center justify-center py-4">
-                    <CurrentIllustration />
+                    {isNameStep ? (
+                      <CurrentIllustration name={name} setName={setName} />
+                    ) : (
+                      <CurrentIllustration />
+                    )}
                   </div>
                   
-                  {/* Consistent header section - all at same level */}
                   <div className="w-full mb-12">
                     <motion.h1 
                       className="text-2xl font-bold mb-1 text-foreground"

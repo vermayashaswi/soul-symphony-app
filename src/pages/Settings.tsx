@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -21,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { startOfDay, subDays, isWithinInterval } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -59,6 +59,11 @@ export default function Settings() {
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [colorPickerValue, setColorPickerValue] = useState(customColor);
+  
+  const [displayName, setDisplayName] = useState<string>('');
+  const [originalDisplayName, setOriginalDisplayName] = useState<string>('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   
   const colorThemes = [
     { name: 'Default', color: 'bg-blue-500' },
@@ -132,6 +137,34 @@ export default function Settings() {
   }, [user, entries]);
 
   useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user?.id) {
+        try {
+          setIsLoadingProfile(true);
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('display_name')
+            .eq('id', user.id)
+            .single();
+          
+          if (error && error.code !== 'PGRST116') {
+            console.error('Error fetching profile', error);
+          } else if (data) {
+            setDisplayName(data.display_name || '');
+            setOriginalDisplayName(data.display_name || '');
+          }
+        } catch (error) {
+          console.error('Error in profile fetching', error);
+        } finally {
+          setIsLoadingProfile(false);
+        }
+      }
+    };
+    
+    fetchUserProfile();
+  }, [user]);
+
+  useEffect(() => {
     if (notificationsEnabled) {
       setupJournalReminder(true).then(() => {
         if (typeof window !== 'undefined' && !('Notification' in window) || 
@@ -163,6 +196,38 @@ export default function Settings() {
     setColorTheme('Custom');
     toast.success('Custom color applied');
     setShowColorPicker(false);
+  };
+
+  const saveDisplayName = async () => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          display_name: displayName.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+      
+      if (error) {
+        toast.error('Failed to update display name');
+        console.error(error);
+        return;
+      }
+      
+      setOriginalDisplayName(displayName.trim());
+      toast.success('Display name updated successfully');
+      setIsEditingName(false);
+    } catch (error) {
+      console.error('Error updating display name', error);
+      toast.error('Something went wrong');
+    }
+  };
+
+  const cancelNameEdit = () => {
+    setDisplayName(originalDisplayName);
+    setIsEditingName(false);
   };
 
   return (
@@ -198,7 +263,53 @@ export default function Settings() {
               
               <div className="flex-1 space-y-4 text-center sm:text-left">
                 <div>
-                  <h3 className="text-xl font-semibold text-foreground">{user?.user_metadata?.full_name || 'User'}</h3>
+                  {isEditingName ? (
+                    <div className="flex flex-col space-y-2">
+                      <Input
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        placeholder="Enter your display name"
+                        className="max-w-xs"
+                        autoFocus
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={cancelNameEdit}
+                          className="flex items-center gap-1"
+                        >
+                          <X className="h-3 w-3" />
+                          Cancel
+                        </Button>
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={saveDisplayName}
+                          className="flex items-center gap-1 bg-theme hover:bg-theme/90"
+                          disabled={!displayName.trim() || displayName.trim() === originalDisplayName}
+                        >
+                          <Save className="h-3 w-3" />
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center sm:justify-start gap-2">
+                      <h3 className="text-xl font-semibold text-foreground">
+                        {isLoadingProfile ? "Loading..." : 
+                         originalDisplayName || user?.user_metadata?.full_name || 'User'}
+                      </h3>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        onClick={() => setIsEditingName(true)}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                   <p className="text-muted-foreground">{user?.email}</p>
                 </div>
                 
