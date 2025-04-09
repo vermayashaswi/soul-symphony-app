@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -50,8 +49,8 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
 
   const onboardingSteps = [
     {
-      title: "Welcome to SOULo",
-      subtitle: "Your personal AI companion for emotional wellness through voice journaling",
+      title: "Welcome to SOuLO",
+      subtitle: "",
       description: "Express your thoughts and feelings with voice notes - we'll do the rest.",
       illustration: (
         <div className="flex justify-center items-center my-2">
@@ -197,21 +196,21 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               <motion.div
                 className="relative w-28 h-28 rounded-full bg-theme-light flex items-center justify-center"
                 animate={{
-                  scale: [1, 1.05, 1],
+                  scale: [1, 1.2, 1],
                   boxShadow: [
                     "0 0 0 0 rgba(var(--color-theme), 0.7)",
-                    "0 0 0 15px rgba(var(--color-theme), 0)",
+                    "0 0 0 25px rgba(var(--color-theme), 0)",
                     "0 0 0 0 rgba(var(--color-theme), 0)"
                   ]
                 }}
                 transition={{
-                  duration: 2,
+                  duration: 1.5,
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
               >
                 <div className="w-20 h-20 rounded-full bg-theme flex items-center justify-center text-white">
-                  <Mic className="w-10 h-10" />
+                  <Mic className="w-10 h-10 animate-pulse" />
                 </div>
               </motion.div>
             </div>
@@ -331,7 +330,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
       description: "Ask questions about your emotions, patterns, and growth through natural conversation with AI.",
       illustration: (
         <div className="flex justify-center items-center my-2">
-          <div className="relative w-64 h-64 bg-theme-lighter rounded-full flex items-center justify-center overflow-hidden p-4">
+          <div className="relative w-64 h-64 bg-theme-lighter rounded-xl flex items-center justify-center overflow-hidden p-4">
             <motion.div
               className="absolute inset-0 bg-gradient-to-b from-transparent to-theme/10"
               animate={{ opacity: [0.3, 0.5, 0.3] }}
@@ -469,12 +468,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
     },
     {
       title: "Ready to Start Your Journey?",
-      subtitle: "Express, reflect, and grow with SOULo",
+      subtitle: "Express, reflect, and grow with SOuLO",
       description: "Create an account to begin your path to emotional wellness and self-discovery.",
       illustration: (
         <div className="flex justify-center items-center my-2">
           <motion.div 
-            className="relative w-64 h-64 rounded-full flex items-center justify-center overflow-hidden"
+            className="relative w-64 h-64 rounded-xl flex items-center justify-center overflow-hidden bg-theme-lighter"
             animate={{ 
               boxShadow: ["0 0 0 0px rgba(var(--color-theme), 0.2)", "0 0 0 20px rgba(var(--color-theme), 0)", "0 0 0 0px rgba(var(--color-theme), 0.2)"]
             }}
@@ -484,7 +483,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               ease: "easeInOut" 
             }}
           >
-            <div className="absolute inset-0 bg-theme-lighter rounded-full"></div>
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -574,10 +572,24 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               )}
               
               <motion.p 
-                className="text-muted-foreground mb-8 max-w-xs"
+                className={cn(
+                  "text-muted-foreground mb-8 max-w-xs",
+                  currentStep === 0 && "font-medium text-theme animate-pulse"
+                )}
                 initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
+                animate={{ 
+                  opacity: 1, 
+                  y: 0,
+                  scale: currentStep === 0 ? [1, 1.05, 1] : 1
+                }}
+                transition={{ 
+                  delay: 0.4,
+                  scale: {
+                    repeat: currentStep === 0 ? Infinity : 0,
+                    duration: 2,
+                    ease: "easeInOut"
+                  }
+                }}
               >
                 {onboardingSteps[currentStep].description}
               </motion.p>
