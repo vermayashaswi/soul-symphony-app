@@ -620,7 +620,7 @@ const ONBOARDING_STEPS = [
   },
   {
     title: "Ready to Start Your Journey?",
-    subtitle: "Express, reflect, and grow with SOuLO",
+    subtitle: "Express. Reflect. Grow.",
     description: "",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
@@ -700,6 +700,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
 
   const CurrentIllustration = ONBOARDING_STEPS[currentStep].illustration;
   const currentStepData = ONBOARDING_STEPS[currentStep];
+  
+  // Gleaming animation for the final step subtitle
+  const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background">
@@ -760,7 +763,36 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                       {currentStepData.title}
                     </motion.h1>
                     
-                    {currentStepData.subtitle && (
+                    {currentStepData.subtitle && isLastStep ? (
+                      <motion.h2
+                        className="text-lg mb-2 relative overflow-hidden"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                      >
+                        <span className="text-theme relative z-10">
+                          {currentStepData.subtitle}
+                        </span>
+                        <motion.div 
+                          className="absolute inset-0 bg-theme/20 z-0"
+                          initial={{ x: "-100%" }}
+                          animate={{ 
+                            x: ["-100%", "100%"],
+                            boxShadow: [
+                              "0px 0px 0px 0px rgba(var(--color-theme), 0.1)",
+                              "20px 0px 40px 10px rgba(var(--color-theme), 0.8)",
+                              "0px 0px 0px 0px rgba(var(--color-theme), 0.1)"
+                            ]
+                          }}
+                          transition={{ 
+                            repeat: Infinity, 
+                            duration: 3,
+                            ease: "easeInOut", 
+                            repeatDelay: 1
+                          }}
+                        />
+                      </motion.h2>
+                    ) : currentStepData.subtitle ? (
                       <motion.h2
                         className="text-lg text-theme mb-2"
                         initial={{ opacity: 0, y: 20 }}
@@ -769,7 +801,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                       >
                         {currentStepData.subtitle}
                       </motion.h2>
-                    )}
+                    ) : null}
                     
                     <motion.p 
                       className="text-muted-foreground max-w-xs mx-auto"
