@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -19,19 +18,16 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   const navigate = useNavigate();
   const { setColorTheme } = useTheme();
   
-  // Set the color theme to Calm (purple) when the component mounts
   useEffect(() => {
-    setColorTheme('Calm'); // Using 'Calm' instead of 'Purple' as it's a valid ColorTheme value
+    setColorTheme('Calm');
   }, [setColorTheme]);
   
   const handleNext = () => {
     if (currentStep < onboardingSteps.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
-      // Save that onboarding is complete
       localStorage.setItem("onboardingComplete", "true");
       
-      // Navigate to auth or call onComplete
       if (onComplete) {
         onComplete();
       } else {
@@ -85,8 +81,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
             <div className="absolute inset-0 flex items-center justify-center z-10">
               <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} />
             </div>
-            
-            {/* Waveform animation - removed from here */}
             
             <motion.div 
               className="absolute inset-0 z-5"
@@ -239,32 +233,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
             >
               <div className="w-full h-full rounded-full bg-theme"></div>
             </motion.div>
-            
-            <div className="absolute bottom-8 left-0 right-0 flex justify-center">
-              <motion.div
-                className="flex space-x-1"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                {[...Array(5)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="w-1 bg-theme rounded-full"
-                    style={{ height: 5 }}
-                    animate={{
-                      height: [5, 12 + Math.random() * 15, 5]
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Infinity,
-                      delay: i * 0.1,
-                      ease: "easeInOut"
-                    }}
-                  />
-                ))}
-              </motion.div>
-            </div>
           </div>
         </div>
       ),
@@ -351,7 +319,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               }}
             />
             
-            <div className="relative z-10 flex flex-col gap-3 w-48">
+            <div className="relative z-10 flex flex-col gap-3 w-48 mt-24">
               <motion.div 
                 className="self-start max-w-[80%] bg-muted p-3 rounded-2xl rounded-bl-none text-sm"
                 initial={{ x: -20, opacity: 0 }}
@@ -521,10 +489,8 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   return (
     <div className="flex flex-col h-[100dvh] bg-background">
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-background to-theme/5 pointer-events-none" />
         
-        {/* Progress dots */}
         <div className="absolute top-4 left-0 right-0 z-10 flex justify-center">
           <div className="flex space-x-2">
             {onboardingSteps.map((_, index) => (
@@ -541,14 +507,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
           </div>
         </div>
         
-        {/* Skip button */}
         <div className="absolute top-4 right-4 z-10">
           <Button variant="ghost" size="sm" onClick={handleSkip}>
             Skip
           </Button>
         </div>
 
-        {/* Onboarding content */}
         <div className="flex-1 relative pt-12">
           <AnimatePresence mode="wait">
             <motion.div
@@ -559,7 +523,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               transition={{ duration: 0.3 }}
               className="absolute inset-0 flex flex-col justify-center items-center px-6 text-center"
             >
-              {/* We only modify step 0 (first page) */}
               {currentStep === 0 ? (
                 <>
                   {onboardingSteps[0].illustration}
@@ -592,40 +555,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                   >
                     {onboardingSteps[0].description}
                   </motion.p>
-                  
-                  {/* Waveform animation - moved here, below the text */}
-                  <motion.div 
-                    className="w-full pointer-events-none px-2 mb-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.6 }}
-                  >
-                    <svg 
-                      width="100%" 
-                      height="80" 
-                      viewBox="0 0 400 80" 
-                      className="opacity-40"
-                    >
-                      {/* Audio waveform path with animation */}
-                      <motion.path
-                        d="M0,40 C10,30 15,20 20,40 C25,60 30,70 35,40 C40,10 45,5 50,40 C55,75 60,80 65,40 C70,0 75,0 80,40 C85,80 90,80 95,40 C100,0 105,0 110,40 C115,80 120,80 125,40 C130,0 135,0 140,40 C145,80 150,80 155,40 C160,0 165,0 170,40 C175,80 180,80 185,40 C190,0 195,10 200,40 C205,70 210,80 215,40 C220,0 225,0 230,40 C235,80 240,80 245,40 C250,0 255,0 260,40 C265,80 270,80 275,40 C280,0 285,0 290,40 C295,80 300,80 305,40 C310,0 315,0 320,40 C325,80 330,80 335,40 C340,0 345,0 350,40 C355,80 360,80 365,40 C370,0 375,10 380,40 C385,70 390,80 395,40 C400,0"
-                        fill="none"
-                        stroke="var(--color-theme)"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        initial={{ pathLength: 0, opacity: 0.7 }}
-                        animate={{ 
-                          pathLength: [0, 1, 0],
-                          opacity: [0.7, 1, 0.7]
-                        }}
-                        transition={{ 
-                          duration: 4, 
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
-                      />
-                    </svg>
-                  </motion.div>
                 </>
               ) : (
                 <>
@@ -665,7 +594,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
           </AnimatePresence>
         </div>
 
-        {/* Navigation buttons */}
         <div className="p-6 flex justify-between">
           <Button 
             variant="outline" 
