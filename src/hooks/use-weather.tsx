@@ -38,27 +38,35 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
     const fetchWeather = async () => {
       // Skip if location data isn't available
       if (latitude === null || longitude === null) {
+        console.log('Location data is null, skipping weather fetch');
         setWeather(prev => ({ ...prev, loading: false }));
         return;
       }
 
       try {
         setWeather(prev => ({ ...prev, loading: true, error: null }));
-        console.log('Fetching weather for:', latitude, longitude);
+        console.log('Fetching weather for coordinates:', latitude, longitude);
+        
+        // Construct API URL with proper formatting to avoid any potential issues
+        const apiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude.toFixed(6)}&lon=${longitude.toFixed(6)}&units=metric&appid=${WEATHER_API_KEY}`;
+        console.log('Weather API URL:', apiUrl);
         
         // Fetch weather data from OpenWeatherMap API
-        const response = await fetch(
-          `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${WEATHER_API_KEY}`
-        );
+        const response = await fetch(apiUrl);
 
         if (!response.ok) {
           const errorText = await response.text();
           console.error('Weather API error response:', errorText);
-          throw new Error(`Weather data not available: ${response.status} ${response.statusText}`);
+          throw new Error(`Weather API error: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
         console.log('Weather API response data:', data);
+        
+        if (!data || !data.main || !data.weather || !data.weather[0]) {
+          console.error('Incomplete weather data received:', data);
+          throw new Error('Incomplete weather data received from API');
+        }
         
         // Map weather condition codes to our condition types
         const mapCondition = (weatherId: number): WeatherData['condition'] => {
@@ -71,17 +79,23 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
           return 'unknown';
         };
 
+        const mainTemp = data.main.temp;
+        if (typeof mainTemp !== 'number') {
+          console.error('Invalid temperature data:', mainTemp);
+          throw new Error('Invalid temperature data received');
+        }
+
         const mappedCondition = mapCondition(data.weather[0].id);
         console.log('Mapped weather condition:', mappedCondition);
-        console.log('Temperature from API:', data.main.temp);
+        console.log('Temperature from API:', mainTemp);
 
         setWeather({
-          temperature: Math.round(data.main.temp),
+          temperature: Math.round(mainTemp),
           description: data.weather[0].description,
           condition: mappedCondition,
-          location: data.name,
-          humidity: data.main.humidity,
-          windSpeed: data.wind.speed,
+          location: data.name || 'Unknown location',
+          humidity: data.main.humidity || 0,
+          windSpeed: data.wind.speed || 0,
           date: new Date().toLocaleDateString('en-US', { 
             weekday: 'long', 
             year: 'numeric', 
@@ -92,19 +106,41 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
           error: null
         });
         
-        console.log('Weather data processed successfully');
+        console.log('Weather data processed successfully:', {
+          temperature: Math.round(mainTemp),
+          location: data.name,
+          condition: mappedCondition
+        });
+        
+        // Show success toast
+        toast.success('Weather information updated');
       } catch (error) {
         console.error('Error fetching weather:', error);
+        
+        // Set detailed error information
         setWeather(prev => ({
           ...prev,
           loading: false,
           error: error instanceof Error ? error.message : 'Failed to fetch weather data'
         }));
+        
+        // Show error toast with more specific message
         toast.error('Could not load weather information');
+        
+        // After 5 seconds, retry fetching weather data
+        setTimeout(() => {
+          console.log('Retrying weather fetch...');
+          setWeather(prev => ({ ...prev, loading: true, error: null }));
+        }, 5000);
       }
     };
 
     fetchWeather();
+    
+    // Set up polling to refresh weather data every 15 minutes
+    const interval = setInterval(fetchWeather, 15 * 60 * 1000);
+    
+    return () => clearInterval(interval);
   }, [latitude, longitude]);
 
   return weather;
