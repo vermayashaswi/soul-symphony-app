@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -19,14 +18,12 @@ const Home = () => {
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   
-  // Effect for fetching user profile and setting background image
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (user) {
         try {
           const localName = localStorage.getItem('user_display_name');
           
-          // Get profile data from Supabase
           const { data, error } = await supabase
             .from('profiles')
             .select('display_name, full_name')
@@ -38,7 +35,6 @@ const Home = () => {
             return;
           }
           
-          // Handle display name priority: local storage -> profile -> user metadata
           if (localName && (!data || !data.display_name)) {
             await updateDisplayName(localName);
             setDisplayName(localName);
@@ -56,7 +52,6 @@ const Home = () => {
     
     fetchUserProfile();
     
-    // Set a random background image on each login
     setBackgroundImage(getRandomBackgroundImage());
   }, [user]);
   
@@ -95,7 +90,6 @@ const Home = () => {
     navigate('/journal');
   };
 
-  // Collection of background images
   const getRandomBackgroundImage = () => {
     const images = [
       'https://images.unsplash.com/photo-1500673922987-e212871fec22',
@@ -108,23 +102,8 @@ const Home = () => {
       'https://images.unsplash.com/photo-1531604250646-2f0e818c4f06'
     ];
     
-    // Return a random image from the collection
     return images[Math.floor(Math.random() * images.length)];
   };
-
-  // This function is replaced by getRandomBackgroundImage
-  // const getBackgroundImage = () => {
-  //   const images = {
-  //     Default: '/placeholder.svg',
-  //     Calm: 'https://images.unsplash.com/photo-1500673922987-e212871fec22',
-  //     Soothing: 'https://images.unsplash.com/photo-1470813740244-df37b8c1edcb',
-  //     Energy: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
-  //     Focus: 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9',
-  //     Custom: 'https://images.unsplash.com/photo-1721322800607-8c38375eef04'
-  //   };
-    
-  //   return images[colorTheme as keyof typeof images] || images.Calm;
-  // };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -143,8 +122,9 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="p-6 flex items-center">
+      <div className="p-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold text-theme">{getJournalName()}</h1>
+        <p className="text-muted-foreground font-medium">{formattedDate}</p>
       </div>
 
       <motion.div
@@ -160,7 +140,6 @@ const Home = () => {
               style={{ backgroundImage: `url(${backgroundImage || '/placeholder.svg'})` }}
             />
             <div className="bg-gradient-to-b from-black/70 to-black/90 text-white p-6">
-              <p className="text-gray-300 text-center mb-3">{formattedDate}</p>
               <h2 className="text-2xl font-bold text-center mb-6">
                 Write about one good thing that happened yesterday.
               </h2>
