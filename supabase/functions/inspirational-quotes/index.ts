@@ -16,7 +16,12 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Generating an inspirational quote');
+    console.log('Generating an inspirational quote using OpenAI API key');
+    
+    if (!openAIApiKey) {
+      console.error('OPENAI_API_KEY environment variable is not set');
+      throw new Error('OpenAI API key is not configured');
+    }
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
