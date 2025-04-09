@@ -77,33 +77,6 @@ const SouloLogo = ({
               {/* Eyes */}
               <span className="absolute top-[25%] left-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
               <span className="absolute top-[25%] right-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
-              
-              {/* Speech animation */}
-              {utteringWords && (
-                <>
-                  {/* Speech bubbles/utterances */}
-                  <div className="absolute -right-4 top-0 flex space-x-1">
-                    <span 
-                      className={cn(
-                        "block rounded-full bg-current transition-all duration-150",
-                        utteranceState === 0 ? "w-[6px] h-[6px] opacity-100" : "w-[3px] h-[3px] opacity-40"
-                      )}
-                    ></span>
-                    <span 
-                      className={cn(
-                        "block rounded-full bg-current transition-all duration-150",
-                        utteranceState === 1 ? "w-[6px] h-[6px] opacity-100" : "w-[3px] h-[3px] opacity-40"
-                      )}
-                    ></span>
-                    <span 
-                      className={cn(
-                        "block rounded-full bg-current transition-all duration-150",
-                        utteranceState === 2 ? "w-[6px] h-[6px] opacity-100" : "w-[3px] h-[3px] opacity-40"
-                      )}
-                    ></span>
-                  </div>
-                </>
-              )}
             </div>
           </span>
         </span>
