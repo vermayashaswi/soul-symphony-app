@@ -58,7 +58,13 @@ const ONBOARDING_STEPS = [
             />
           </div>
           
-          <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="absolute inset-0 flex items-center justify-center z-10 mb-20">
+            <div className="relative z-20">
+              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} textClassName="font-bold" />
+            </div>
+          </div>
+          
+          <div className="absolute inset-0 flex items-center justify-center z-5 mt-20">
             <div className="absolute w-full h-16 flex items-center justify-center overflow-hidden">
               <RecordingVisualizer 
                 isRecording={false} 
@@ -66,10 +72,6 @@ const ONBOARDING_STEPS = [
                 ripples={[]} 
                 fullWidth={true} 
               />
-            </div>
-            
-            <div className="relative z-20">
-              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} textClassName="font-bold" />
             </div>
           </div>
           
