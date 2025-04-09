@@ -1,5 +1,5 @@
 
-import { Home, Book, BarChart2, MessageSquare, Settings } from 'lucide-react';
+import { Book, BarChart2, MessageSquare, Settings } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -16,14 +16,14 @@ const MobileNavbar = () => {
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
-  // Only show the navbar if the user is logged in or on the home page
-  if (!user && location.pathname !== '/') {
+  // Only show the navbar if the user is logged in
+  if (!user) {
     return null;
   }
 
   return (
     <motion.div 
-      className="fixed bottom-0 left-0 right-0 h-16 bg-background/90 backdrop-blur-sm border-t border-muted flex items-center justify-around z-50 px-1"
+      className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-muted flex items-center justify-around z-50 px-1"
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
@@ -41,18 +41,18 @@ const MobileNavbar = () => {
               {isActive && (
                 <motion.div
                   layoutId="nav-pill-mobile"
-                  className="absolute -inset-1 bg-theme/20 rounded-full"
+                  className="absolute -inset-1 bg-primary/20 rounded-full"
                   transition={{ type: "spring", duration: 0.6 }}
                 />
               )}
               <item.icon className={cn(
-                "relative h-5 w-5 transition-colors duration-200",
-                isActive ? "text-theme" : "text-muted-foreground"
+                "relative h-6 w-6 transition-colors duration-200",
+                isActive ? "text-primary" : "text-muted-foreground"
               )} />
             </div>
             <span className={cn(
               "text-xs mt-1 transition-colors duration-200",
-              isActive ? "text-theme font-medium" : "text-muted-foreground"
+              isActive ? "text-primary font-medium" : "text-muted-foreground"
             )}>
               {item.label}
             </span>
