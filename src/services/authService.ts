@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -33,6 +32,16 @@ export const getRedirectUrl = (): string => {
     return `${origin}/auth?pwa_mode=true`;
   }
   
+  // Use this variable to determine if we're in the production domain
+  const isProdDomain = window.location.hostname === 'soulo.online' || 
+                      window.location.hostname.endsWith('.soulo.online');
+  
+  // If we're in production, use the actual domain
+  if (isProdDomain) {
+    return `https://soulo.online/auth`;
+  }
+  
+  // Otherwise use the current origin (for local development)
   return `${origin}/auth`;
 };
 
