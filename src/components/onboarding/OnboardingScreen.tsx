@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -39,7 +38,15 @@ const createWavePath = (
   return path;
 };
 
-const ONBOARDING_STEPS = [
+interface StepIllustration {
+  title: string;
+  subtitle: string;
+  description: string;
+  illustration: React.FC<any>;
+  buttonText: string;
+}
+
+const ONBOARDING_STEPS: StepIllustration[] = [
   {
     title: "Welcome to SOuLO",
     subtitle: "",
@@ -186,7 +193,6 @@ const ONBOARDING_STEPS = [
                 className="w-20 h-20 bg-theme-light rounded-full flex items-center justify-center mb-4"
               >
                 <motion.div className="relative w-10 h-10">
-                  {/* Data stream animation */}
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ 
@@ -203,7 +209,6 @@ const ONBOARDING_STEPS = [
                     <LockOpen className="w-10 h-10 text-theme" />
                   </motion.div>
                   
-                  {/* Closed lock that appears after data is inside */}
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ 
@@ -220,7 +225,6 @@ const ONBOARDING_STEPS = [
                     <Lock className="w-10 h-10 text-theme" />
                   </motion.div>
                   
-                  {/* Data stream particles animation */}
                   <motion.div 
                     className="absolute top-0 left-0 w-full h-full overflow-hidden"
                     initial={{ opacity: 0 }}
@@ -250,7 +254,6 @@ const ONBOARDING_STEPS = [
                     ))}
                   </motion.div>
                   
-                  {/* Locking effect circle animation */}
                   <motion.div 
                     className="absolute top-0 left-0 w-full h-full pointer-events-none"
                     animate={{ 
