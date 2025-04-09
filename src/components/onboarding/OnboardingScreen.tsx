@@ -59,73 +59,33 @@ const ONBOARDING_STEPS = [
           
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <div className="absolute w-full h-16 flex items-center justify-center overflow-hidden">
-              <svg width="280" height="60" viewBox="0 0 280 60" className="absolute">
-                <motion.path
-                  d={createWavePath(280, 60, 12, 3, 0)}
-                  fill="none"
-                  stroke="var(--color-theme)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  initial={{ opacity: 0.4 }}
-                  animate={{ 
-                    opacity: [0.4, 0.7, 0.4],
-                    d: [
-                      createWavePath(280, 60, 12, 3, 0),
-                      createWavePath(280, 60, 12, 3, Math.PI),
-                      createWavePath(280, 60, 12, 3, Math.PI * 2)
-                    ]
-                  }}
-                  transition={{ 
-                    repeat: Infinity, 
-                    duration: 3,
-                    ease: "linear" 
-                  }}
-                />
-                
-                <motion.path
-                  d={createWavePath(280, 60, 8, 5, Math.PI / 4)}
-                  fill="none"
-                  stroke="var(--color-theme-light)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  initial={{ opacity: 0.3 }}
-                  animate={{ 
-                    opacity: [0.3, 0.6, 0.3],
-                    d: [
-                      createWavePath(280, 60, 8, 5, Math.PI / 4),
-                      createWavePath(280, 60, 8, 5, Math.PI + Math.PI / 4),
-                      createWavePath(280, 60, 8, 5, Math.PI * 2 + Math.PI / 4)
-                    ]
-                  }}
-                  transition={{ 
-                    repeat: Infinity, 
-                    duration: 4,
-                    ease: "linear" 
-                  }}
-                />
-                
-                <motion.path
-                  d={createWavePath(280, 60, 6, 4, Math.PI / 2)}
-                  fill="none"
-                  stroke="var(--color-theme-lighter)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  initial={{ opacity: 0.5 }}
-                  animate={{ 
-                    opacity: [0.5, 0.8, 0.5],
-                    d: [
-                      createWavePath(280, 60, 6, 4, Math.PI / 2),
-                      createWavePath(280, 60, 6, 4, Math.PI + Math.PI / 2),
-                      createWavePath(280, 60, 6, 4, Math.PI * 2 + Math.PI / 2)
-                    ]
-                  }}
-                  transition={{ 
-                    repeat: Infinity, 
-                    duration: 2.5,
-                    ease: "linear" 
-                  }}
-                />
-              </svg>
+              <div className="flex items-center h-16 space-x-0.5">
+                {Array.from({ length: 40 }).map((_, i) => {
+                  const baseHeight = Math.sin((i / 40) * Math.PI) * 30; 
+                  return (
+                    <motion.div
+                      key={i}
+                      className="w-1 rounded-full bg-theme"
+                      animate={{ 
+                        height: [
+                          baseHeight * 0.3, 
+                          baseHeight, 
+                          baseHeight * 0.7, 
+                          baseHeight * 0.5
+                        ],
+                        opacity: [0.2, 0.4, 0.3, 0.5]
+                      }}
+                      transition={{
+                        duration: 1.2,
+                        repeat: Infinity,
+                        repeatType: "reverse",
+                        ease: "easeInOut",
+                        delay: i * 0.02
+                      }}
+                    />
+                  );
+                })}
+              </div>
             </div>
             
             <SouloLogo size="large" className="scale-[2.2] relative z-20" useColorTheme={true} animate={true} />
