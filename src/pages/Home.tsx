@@ -25,6 +25,8 @@ const Home = () => {
         try {
           const localName = localStorage.getItem('user_display_name');
           
+          const userAvatarUrl = user.user_metadata?.avatar_url || null;
+          
           const { data, error } = await supabase
             .from('profiles')
             .select('display_name, avatar_url')
@@ -46,6 +48,8 @@ const Home = () => {
           
           if (data && data.avatar_url) {
             setAvatarUrl(data.avatar_url);
+          } else if (userAvatarUrl) {
+            setAvatarUrl(userAvatarUrl);
           }
         } catch (error) {
           console.error('Error in profile fetching', error);
