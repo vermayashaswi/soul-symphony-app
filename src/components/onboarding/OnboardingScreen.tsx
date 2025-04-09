@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -5,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, Heart } from "lucide-react";
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -15,6 +17,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const navigate = useNavigate();
+  const { setColorTheme } = useTheme();
+  
+  // Set the color theme to Calm (purple) when the component mounts
+  useEffect(() => {
+    setColorTheme('Calm'); // Using 'Calm' instead of 'Purple' as it's a valid ColorTheme value
+  }, [setColorTheme]);
   
   const handleNext = () => {
     if (currentStep < onboardingSteps.length - 1) {
@@ -77,6 +85,40 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
             <div className="absolute inset-0 flex items-center justify-center z-10">
               <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} />
             </div>
+            
+            {/* Waveform animation */}
+            <motion.div 
+              className="absolute inset-0 flex items-center justify-center z-5 pointer-events-none"
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              <svg 
+                width="200" 
+                height="80" 
+                viewBox="0 0 200 80" 
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-40"
+              >
+                {/* Audio waveform path with animation */}
+                <motion.path
+                  d="M0,40 C10,30 15,20 20,40 C25,60 30,70 35,40 C40,10 45,5 50,40 C55,75 60,80 65,40 C70,0 75,0 80,40 C85,80 90,80 95,40 C100,0 105,0 110,40 C115,80 120,80 125,40 C130,0 135,0 140,40 C145,80 150,80 155,40 C160,0 165,0 170,40 C175,80 180,80 185,40 C190,0 195,10 200,40"
+                  fill="none"
+                  stroke="var(--color-theme)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  initial={{ pathLength: 0, opacity: 0.7 }}
+                  animate={{ 
+                    pathLength: [0, 1, 0],
+                    opacity: [0.7, 1, 0.7]
+                  }}
+                  transition={{ 
+                    duration: 4, 
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                />
+              </svg>
+            </motion.div>
             
             <motion.div 
               className="absolute inset-0 z-5"
