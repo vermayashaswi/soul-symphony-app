@@ -19,7 +19,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   const { setColorTheme } = useTheme();
   
   useEffect(() => {
-    setColorTheme('Calm');
+    setColorTheme('Purple');
   }, [setColorTheme]);
   
   const handleNext = () => {
@@ -51,25 +51,25 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
     }
   };
 
-  // Create waveform animation for the logo
   const WaveformAnimation = () => {
     return (
-      <div className="absolute left-0 right-0 flex justify-center items-center h-8 pointer-events-none">
+      <div className="flex justify-center items-center space-x-1 h-10 mt-4">
         {[...Array(12)].map((_, i) => (
           <motion.div
             key={i}
-            className="w-1 mx-0.5 rounded-full bg-theme-color/60"
+            className="w-1 mx-0.5 rounded-full bg-theme-color"
+            initial={{ height: '4px' }}
             animate={{
               height: [
-                `${Math.random() * 8 + 4}px`,
-                `${Math.random() * 20 + 10}px`,
-                `${Math.random() * 8 + 4}px`
+                '4px',
+                `${Math.random() * 16 + 8}px`,
+                '4px'
               ]
             }}
             transition={{
               duration: 1.2,
               repeat: Infinity,
-              repeatType: "reverse",
+              repeatType: "mirror",
               delay: i * 0.1,
             }}
           />
@@ -90,9 +90,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               textClassName="font-bold tracking-wider"
               useColorTheme={true}
             />
-            <div className="mt-3">
-              <WaveformAnimation />
-            </div>
+            <WaveformAnimation />
           </div>
           <motion.p 
             className="mt-8 text-lg text-center max-w-xs text-theme-color font-medium"
