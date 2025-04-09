@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -9,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import EmptyChatState from "./EmptyChatState";
 import VoiceRecordingButton from "./VoiceRecordingButton";
-import { Trash, Bug } from "lucide-react";
+import { Trash } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   AlertDialog,
@@ -24,7 +23,6 @@ import {
 import { ChatMessage } from "@/services/chat";
 import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
-import DebugLogPanel from "@/components/debug/DebugLogPanel";
 
 const SmartChatInterface = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -440,16 +438,6 @@ const SmartChatInterface = () => {
         <h2 className="text-xl font-semibold">Rūḥ</h2>
         
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 text-muted-foreground"
-            onClick={() => setShowDebugPanel(!showDebugPanel)}
-            title="Toggle debug panel"
-          >
-            <Bug className={`h-5 w-5 ${showDebugPanel ? 'text-primary' : ''}`} />
-          </Button>
-          
           {currentThreadId && (
             <Button 
               variant="ghost" 
@@ -477,6 +465,7 @@ const SmartChatInterface = () => {
             chatMessages={chatHistory}
             isLoading={loading}
             processingStage={processingStage || undefined}
+            threadId={currentThreadId}
           />
         )}
       </div>
@@ -499,10 +488,6 @@ const SmartChatInterface = () => {
           />
         </div>
       </div>
-      
-      {showDebugPanel && (
-        <DebugLogPanel onClose={() => setShowDebugPanel(false)} />
-      )}
       
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

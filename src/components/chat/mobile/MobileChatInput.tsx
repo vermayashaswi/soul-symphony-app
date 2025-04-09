@@ -1,25 +1,20 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, MicOff, Loader2, Bug } from "lucide-react";
+import { Send, Mic, MicOff, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { recordAudio } from "@/utils/audioRecorder";
-import { useChatDebug } from "@/components/chat/ChatDebugPanel";
+import { useDebugLog } from "@/utils/debug/DebugContext";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
   isLoading: boolean;
   userId?: string;
-  onToggleDebug?: () => void;
-  debugModeActive?: boolean;
 }
 
 export default function MobileChatInput({
   onSendMessage,
   isLoading,
-  userId,
-  onToggleDebug,
-  debugModeActive = false
+  userId
 }: MobileChatInputProps) {
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -28,7 +23,7 @@ export default function MobileChatInput({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recordingRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const chatDebug = useChatDebug();
+  const chatDebug = useDebugLog();
 
   useEffect(() => {
     if (isRecording) {
@@ -119,12 +114,10 @@ export default function MobileChatInput({
       const audio = await recordingRef.current.stop();
       setIsRecording(false);
       
-      // Get audio blob from the recorder
       const audioBlob = await fetch(audio.audioUrl).then(r => r.blob());
       
       chatDebug.addEvent("Audio Recording", `Recording completed (${recordingTime}s)`, "success");
       
-      // For now, just send a placeholder message
       onSendMessage("I sent an audio message", true);
       
       chatDebug.addEvent("Audio Processing", "Sending audio message placeholder", "info");
@@ -144,19 +137,6 @@ export default function MobileChatInput({
 
   return (
     <div className="p-3 bg-background border-t border-border flex items-end gap-2">
-      {onToggleDebug && (
-        <Button
-          type="button"
-          size="icon"
-          variant={debugModeActive ? "default" : "ghost"}
-          className="h-10 w-10 rounded-full"
-          onClick={onToggleDebug}
-          title="Toggle debug panel"
-        >
-          <Bug className="h-5 w-5" />
-        </Button>
-      )}
-      
       <div className="flex-1 relative">
         <textarea
           ref={inputRef}
