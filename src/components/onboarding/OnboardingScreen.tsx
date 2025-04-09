@@ -220,6 +220,76 @@ const ONBOARDING_STEPS = [
         <div className="relative w-64 h-64 bg-theme-lighter rounded-full flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0 flex items-center justify-center">
             <motion.div
+              className="absolute w-[140px] h-[140px] rounded-full bg-theme/10"
+              animate={{
+                scale: [1, 1.15, 1],
+                opacity: [0.3, 0.2, 0.3]
+              }}
+              transition={{
+                duration: 2.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.1
+              }}
+            />
+            
+            <motion.div
+              className="absolute w-[120px] h-[120px] rounded-full bg-theme/20"
+              animate={{
+                scale: [1, 1.25, 1],
+                opacity: [0.4, 0.3, 0.4]
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.3
+              }}
+            />
+            
+            <motion.div
+              className="absolute w-[100px] h-[100px] rounded-full bg-theme/30"
+              animate={{
+                scale: [1, 1.35, 1],
+                opacity: [0.5, 0.4, 0.5]
+              }}
+              transition={{
+                duration: 3.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.5
+              }}
+            />
+            
+            <motion.div
+              className="absolute w-[80px] h-[80px] rounded-full bg-theme/40"
+              animate={{
+                scale: [1, 1.45, 1],
+                opacity: [0.6, 0.5, 0.6]
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.7
+              }}
+            />
+            
+            <motion.div
+              className="absolute w-[60px] h-[60px] rounded-full bg-theme/50"
+              animate={{
+                scale: [1, 1.55, 1],
+                opacity: [0.7, 0.6, 0.7]
+              }}
+              transition={{
+                duration: 4.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.9
+              }}
+            />
+            
+            <motion.div
               className="relative w-28 h-28 rounded-full bg-theme-light flex items-center justify-center"
               animate={{
                 scale: [1, 1.2, 1],
