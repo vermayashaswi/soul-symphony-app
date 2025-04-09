@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -743,36 +744,42 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                 </>
               ) : (
                 <>
-                  <CurrentIllustration />
+                  {/* Illustration section - same vertical positioning */}
+                  <div className="w-full flex-1 flex items-center justify-center py-4">
+                    <CurrentIllustration />
+                  </div>
                   
-                  <motion.h1 
-                    className="text-2xl font-bold mb-1 text-foreground"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    {currentStepData.title}
-                  </motion.h1>
-                  
-                  {currentStepData.subtitle && (
-                    <motion.h2
-                      className="text-lg text-theme mb-2"
+                  {/* Consistent header section - all at same level */}
+                  <div className="w-full mb-12">
+                    <motion.h1 
+                      className="text-2xl font-bold mb-1 text-foreground"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
+                      transition={{ delay: 0.2 }}
                     >
-                      {currentStepData.subtitle}
-                    </motion.h2>
-                  )}
-                  
-                  <motion.p 
-                    className="text-muted-foreground mb-8 max-w-xs"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    {currentStepData.description}
-                  </motion.p>
+                      {currentStepData.title}
+                    </motion.h1>
+                    
+                    {currentStepData.subtitle && (
+                      <motion.h2
+                        className="text-lg text-theme mb-2"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                      >
+                        {currentStepData.subtitle}
+                      </motion.h2>
+                    )}
+                    
+                    <motion.p 
+                      className="text-muted-foreground max-w-xs mx-auto"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                    >
+                      {currentStepData.description}
+                    </motion.p>
+                  </div>
                 </>
               )}
             </motion.div>
