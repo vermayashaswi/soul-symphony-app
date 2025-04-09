@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, Heart } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, Lock } from "lucide-react";
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
@@ -177,7 +178,52 @@ const ONBOARDING_STEPS = [
                 transition={{ type: "spring", delay: 0.5 }}
                 className="w-20 h-20 bg-theme-light rounded-full flex items-center justify-center mb-4"
               >
-                <Heart className="w-10 h-10 text-theme" />
+                <motion.div className="relative">
+                  {/* Lock body */}
+                  <motion.div 
+                    className="w-10 h-10 text-theme"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <Lock className="w-10 h-10" />
+                  </motion.div>
+                  
+                  {/* Lock shackle animation */}
+                  <motion.div 
+                    className="absolute top-0 left-0 w-full h-full flex justify-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.7 }}
+                  >
+                    <motion.div 
+                      className="w-10 h-10 text-theme"
+                      initial={{ rotate: -20, y: -5 }}
+                      animate={{ rotate: 0, y: 0 }}
+                      transition={{ 
+                        delay: 0.9, 
+                        duration: 0.5,
+                        repeat: Infinity,
+                        repeatDelay: 3,
+                        repeatType: "reverse"
+                      }}
+                    >
+                      <motion.div 
+                        className="w-4 h-4 bg-theme rounded-full absolute"
+                        style={{ top: "15%", left: "50%", marginLeft: "-8px" }}
+                        animate={{
+                          boxShadow: ["0 0 0 0 rgba(var(--color-theme), 0.7)", "0 0 0 10px rgba(var(--color-theme), 0)", "0 0 0 0 rgba(var(--color-theme), 0)"],
+                        }}
+                        transition={{
+                          delay: 1.4,
+                          duration: 1.5,
+                          repeat: Infinity,
+                          repeatDelay: 3
+                        }}
+                      />
+                    </motion.div>
+                  </motion.div>
+                </motion.div>
               </motion.div>
               
               <motion.div 
