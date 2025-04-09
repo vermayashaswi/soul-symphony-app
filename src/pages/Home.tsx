@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -139,27 +140,14 @@ const Home = () => {
         <motion.div variants={itemVariants} className="mb-8">
           <Card className="overflow-hidden rounded-xl max-w-md mx-auto">
             <div 
-              className="h-64 w-full bg-cover bg-center" 
+              className="h-64 w-full bg-cover bg-center cursor-pointer"
               style={{ backgroundImage: `url(${backgroundImage || '/placeholder.svg'})` }}
+              onClick={handleNavigateToJournal}
             />
-            <div className="bg-gradient-to-b from-black/70 to-black/90 text-white p-6">
-              <h2 className="text-2xl font-bold text-center mb-6">
-                Write about one good thing that happened yesterday.
-              </h2>
-              <div className="flex justify-center">
-                <Button 
-                  onClick={handleNavigateToJournal}
-                  className="rounded-full h-14 w-14 p-0 bg-rose-500 hover:bg-rose-600"
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </Button>
-              </div>
-            </div>
           </Card>
         </motion.div>
 
         <motion.div variants={itemVariants}>
-          {console.log('Rendering InspirationalQuote component')}
           <InspirationalQuote />
         </motion.div>
       </motion.div>
