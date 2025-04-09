@@ -234,21 +234,21 @@ export function EmotionChart({
 
   const handleLegendClick = (emotion: string) => {
     setVisibleEmotions(prev => {
+      if (prev.length > 1 && prev.includes(emotion)) {
+        return [emotion];
+      }
+      
       if (prev.length === 1 && prev.includes(emotion)) {
         return lineData.length > 0 
           ? Object.keys(lineData[0]).filter(key => key !== 'day')
           : [];
       }
       
-      if (prev.includes(emotion) && prev.length > 1) {
-        return [emotion];
-      }
-      
       if (!prev.includes(emotion)) {
-        return [emotion];
+        return [...prev, emotion];
       }
       
-      return [...prev, emotion];
+      return prev.filter(e => e !== emotion);
     });
   };
 
