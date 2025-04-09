@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, Heart 
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
+import RecordingVisualizer from "@/components/RecordingVisualizer";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -38,7 +39,7 @@ const ONBOARDING_STEPS = [
     illustration: (props: {}) => (
       <div className="flex flex-col justify-center items-center my-2">
         <motion.div 
-          className="relative w-64 h-64"
+          className="relative w-full h-64"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
@@ -59,32 +60,13 @@ const ONBOARDING_STEPS = [
           
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <div className="absolute w-full h-16 flex items-center justify-center overflow-hidden">
-              <div className="flex items-center h-16 space-x-0.5">
-                {Array.from({ length: 40 }).map((_, i) => {
-                  const baseHeight = Math.sin((i / 40) * Math.PI) * 30; 
-                  return (
-                    <motion.div
-                      key={i}
-                      className="w-1 rounded-full bg-theme"
-                      animate={{ 
-                        height: [
-                          baseHeight * 0.3, 
-                          baseHeight, 
-                          baseHeight * 0.7, 
-                          baseHeight * 0.5
-                        ],
-                        opacity: [0.2, 0.4, 0.3, 0.5]
-                      }}
-                      transition={{
-                        duration: 1.2,
-                        repeat: Infinity,
-                        repeatType: "reverse",
-                        ease: "easeInOut",
-                        delay: i * 0.02
-                      }}
-                    />
-                  );
-                })}
+              <div className="w-full px-4">
+                <RecordingVisualizer 
+                  isRecording={false} 
+                  audioLevel={0.5} 
+                  ripples={[]} 
+                  fullWidth={true} 
+                />
               </div>
             </div>
             

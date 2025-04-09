@@ -7,20 +7,22 @@ interface RecordingVisualizerProps {
   isRecording: boolean;
   audioLevel: number;
   ripples: number[];
+  fullWidth?: boolean;
 }
 
 export function RecordingVisualizer({ 
   isRecording, 
   audioLevel, 
-  ripples 
+  ripples,
+  fullWidth = false
 }: RecordingVisualizerProps) {
   // Create a simple visualization with oscillating bars
-  const maxBars = 40;
+  const maxBars = fullWidth ? 80 : 40; // Double the bars for full width
   const bars = Array.from({ length: maxBars });
   
   return (
-    <div className="w-full h-full flex items-center justify-center">
-      <div className="flex items-center h-16 space-x-0.5">
+    <div className={`w-full h-full flex items-center justify-center ${fullWidth ? 'px-0' : ''}`}>
+      <div className={`flex items-center h-16 space-x-0.5 ${fullWidth ? 'w-full justify-between' : ''}`}>
         {bars.map((_, i) => {
           // Calculate base height and randomize it slightly for natural look
           const baseHeight = Math.sin((i / maxBars) * Math.PI) * 100;
