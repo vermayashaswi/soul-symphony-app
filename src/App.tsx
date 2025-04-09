@@ -7,6 +7,7 @@ import { BrowserRouter } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
+import { TouchAnimation } from "./components/ui/touch-animation";
 import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
 import { useEffect } from 'react';
@@ -62,6 +63,10 @@ const App = () => {
             <AuthProvider>
               <div className="relative min-h-screen">
                 <div className="relative z-10">
+                  {/* Add the TouchAnimation component here */}
+                  <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
+                    <TouchAnimation />
+                  </div>
                   <Toaster />
                   <Sonner position="top-center" closeButton={false} />
                   <AnimatePresence mode="wait">
