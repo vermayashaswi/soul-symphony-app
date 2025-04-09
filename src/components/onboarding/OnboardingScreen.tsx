@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -482,7 +481,7 @@ const ONBOARDING_STEPS = [
     description: "Ask questions about your emotions, patterns, and growth through natural conversation with AI.",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
-        <div className="relative w-64 h-64 bg-theme-lighter rounded-xl flex items-center justify-center overflow-hidden p-4">
+        <div className="relative w-48 h-48 bg-theme-lighter rounded-xl flex items-center justify-center overflow-hidden p-4">
           <motion.div
             className="absolute inset-0 bg-gradient-to-b from-transparent to-theme/10"
             animate={{ opacity: [0.3, 0.5, 0.3] }}
@@ -493,9 +492,9 @@ const ONBOARDING_STEPS = [
             }}
           />
           
-          <div className="relative z-10 flex flex-col gap-3 w-48 mt-24">
+          <div className="relative z-10 flex flex-col gap-3 w-36 mt-18">
             <motion.div 
-              className="self-start max-w-[80%] bg-muted p-3 rounded-2xl rounded-bl-none text-sm"
+              className="self-start max-w-[80%] bg-muted p-2.5 rounded-2xl rounded-bl-none text-xs"
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
@@ -504,7 +503,7 @@ const ONBOARDING_STEPS = [
             </motion.div>
             
             <motion.div 
-              className="self-end max-w-[80%] bg-theme text-white p-3 rounded-2xl rounded-br-none text-sm"
+              className="self-end max-w-[80%] bg-theme text-white p-2.5 rounded-2xl rounded-br-none text-xs"
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.9 }}
@@ -513,12 +512,12 @@ const ONBOARDING_STEPS = [
             </motion.div>
             
             <motion.div
-              className="self-start flex items-center justify-center w-10 h-10 bg-muted rounded-full mt-2"
+              className="self-start flex items-center justify-center w-8 h-8 bg-muted rounded-full mt-1.5"
               initial={{ opacity: 0, scale: 0 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 1.5, type: "spring" }}
             >
-              <MessageSquare className="w-5 h-5 text-primary" />
+              <MessageSquare className="w-4 h-4 text-primary" />
             </motion.div>
           </div>
         </div>
