@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar } from 'lucide-react';
@@ -9,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
-import { setupJournalReminder, initializeCapacitorNotifications } from '@/services/notificationService';
+import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
@@ -25,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -53,8 +53,9 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 export default function Settings() {
   const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [notificationFrequency, setNotificationFrequency] = useState("daily");
-  const [notificationTime, setNotificationTime] = useState("evening");
+  const [notificationFrequency, setNotificationFrequency] = useState<NotificationFrequency>('once');
+  const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const { user, signOut } = useAuth();
   const [maxStreak, setMaxStreak] = useState(0);
   const { entries } = useJournalEntries(user?.id, 0, !!user);
@@ -77,6 +78,21 @@ export default function Settings() {
     { name: 'Soothing', color: 'bg-pink-200' },
     { name: 'Energy', color: 'bg-amber-400' },
     { name: 'Focus', color: 'bg-emerald-400' },
+  ];
+
+  // Time options for notifications
+  const timeOptions: { label: string; value: NotificationTime }[] = [
+    { label: 'Morning (8:00 AM)', value: 'morning' },
+    { label: 'Afternoon (2:00 PM)', value: 'afternoon' },
+    { label: 'Evening (7:00 PM)', value: 'evening' },
+    { label: 'Night (10:00 PM)', value: 'night' },
+  ];
+
+  // Frequency options for notifications
+  const frequencyOptions: { label: string; value: NotificationFrequency }[] = [
+    { label: 'Once a day', value: 'once' },
+    { label: 'Twice a day', value: 'twice' },
+    { label: 'Three times a day', value: 'thrice' },
   ];
 
   useEffect(() => {
@@ -170,16 +186,45 @@ export default function Settings() {
     fetchUserProfile();
   }, [user]);
 
+  // Load notification settings from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const enabled = localStorage.getItem('notification_enabled') === 'true';
+      const frequency = localStorage.getItem('notification_frequency') as NotificationFrequency;
+      const times = localStorage.getItem('notification_times');
+      
+      if (enabled) {
+        setNotificationsEnabled(true);
+      }
+      
+      if (frequency && ['once', 'twice', 'thrice'].includes(frequency)) {
+        setNotificationFrequency(frequency);
+      }
+      
+      if (times) {
+        try {
+          const parsedTimes = JSON.parse(times) as NotificationTime[];
+          if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
+            setNotificationTimes(parsedTimes);
+          }
+        } catch (e) {
+          console.error('Error parsing notification times from localStorage', e);
+        }
+      }
+    }
+  }, []);
+
+  // Apply notification settings when changed
   useEffect(() => {
     if (notificationsEnabled) {
-      setupJournalReminder(true, notificationFrequency, notificationTime).then(() => {
+      setupJournalReminder(true, notificationFrequency, notificationTimes).then(() => {
         if (typeof window !== 'undefined' && !('Notification' in window) || 
             (window.Notification && window.Notification.permission !== 'granted')) {
           initializeCapacitorNotifications();
         }
       });
     }
-  }, [notificationsEnabled, notificationFrequency, notificationTime]);
+  }, [notificationsEnabled, notificationFrequency, notificationTimes]);
 
   const handleContactSupport = () => {
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
@@ -240,29 +285,73 @@ export default function Settings() {
     setNotificationsEnabled(checked);
     
     if (checked) {
-      toast.success("Notifications enabled");
+      setShowNotificationSettings(true);
+      toast.success("Customize your notification settings");
     } else {
       toast.info("Notifications disabled");
+      // Clear notification settings from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('notification_enabled');
+        localStorage.removeItem('notification_frequency');
+        localStorage.removeItem('notification_times');
+      }
     }
   };
   
-  const getNotificationTimeLabel = () => {
-    switch (notificationTime) {
-      case "morning": return "8:00 AM";
-      case "afternoon": return "2:00 PM";
-      case "evening": return "8:00 PM";
-      default: return "8:00 PM";
-    }
+  const handleTimeChange = (time: NotificationTime) => {
+    setNotificationTimes(prev => {
+      // If already selected, remove it (toggle behavior)
+      if (prev.includes(time)) {
+        return prev.filter(t => t !== time);
+      }
+      // Otherwise add it
+      return [...prev, time];
+    });
   };
   
-  const getNotificationFrequencyLabel = () => {
-    switch (notificationFrequency) {
-      case "daily": return "Every day";
-      case "weekdays": return "Weekdays only";
-      case "weekends": return "Weekends only";
-      case "weekly": return "Once a week";
-      default: return "Every day";
+  const applyNotificationSettings = () => {
+    // Ensure we have at least one time selected
+    if (notificationTimes.length === 0) {
+      toast.error("Please select at least one time for notifications");
+      return;
     }
+    
+    // Make sure we don't have more time slots than frequency allows
+    let limitedTimes = [...notificationTimes];
+    const maxTimes = notificationFrequency === 'once' ? 1 : 
+                    notificationFrequency === 'twice' ? 2 : 3;
+    
+    if (limitedTimes.length > maxTimes) {
+      limitedTimes = limitedTimes.slice(0, maxTimes);
+      setNotificationTimes(limitedTimes);
+      toast.info(`Limited to ${maxTimes} time${maxTimes > 1 ? 's' : ''} based on frequency`);
+    }
+    
+    // Apply settings
+    setupJournalReminder(true, notificationFrequency, limitedTimes);
+    toast.success("Notification settings saved");
+    setShowNotificationSettings(false);
+  };
+  
+  const getNotificationSummary = () => {
+    if (!notificationsEnabled) return "Disabled";
+    
+    const frequencyText = {
+      'once': 'Once',
+      'twice': 'Twice',
+      'thrice': 'Three times'
+    }[notificationFrequency];
+    
+    const timeLabels = notificationTimes.map(time => {
+      return {
+        'morning': 'Morning',
+        'afternoon': 'Afternoon',
+        'evening': 'Evening',
+        'night': 'Night'
+      }[time];
+    });
+    
+    return `${frequencyText} daily: ${timeLabels.join(', ')}`;
   };
 
   return (
@@ -499,12 +588,23 @@ export default function Settings() {
               <SettingItem
                 icon={Bell}
                 title="Notifications"
-                description="Get reminders to journal and stay on track"
+                description={notificationsEnabled ? getNotificationSummary() : "Get reminders to journal and stay on track"}
               >
-                <Switch 
-                  checked={notificationsEnabled}
-                  onCheckedChange={handleToggleNotifications}
-                />
+                <div className="flex items-center gap-2">
+                  <Switch 
+                    checked={notificationsEnabled}
+                    onCheckedChange={handleToggleNotifications}
+                  />
+                  {notificationsEnabled && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setShowNotificationSettings(true)}
+                    >
+                      Customize
+                    </Button>
+                  )}
+                </div>
               </SettingItem>
             </div>
           </motion.div>
@@ -539,7 +639,7 @@ export default function Settings() {
                 variant="outline" 
                 size="lg" 
                 className="h-auto py-6 rounded-xl justify-start"
-                onClick={() => {
+                onClick={()={() => {
                   setShowPrivacyPolicy(true);
                 }}
               >
@@ -721,80 +821,4 @@ export default function Settings() {
               <div className="space-y-2">
                 <h3 className="text-base font-semibold">Data Security</h3>
                 <p className="text-sm text-muted-foreground">
-                  We implement appropriate technical and organizational measures to protect your personal information:
-                </p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground ml-4 space-y-1">
-                  <li>Encryption of sensitive data at rest and in transit</li>
-                  <li>Regular security assessments and audits</li>
-                  <li>Access controls and authentication mechanisms</li>
-                  <li>Regular backups to prevent data loss</li>
-                </ul>
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-base font-semibold">Your Choices and Rights</h3>
-                <p className="text-sm text-muted-foreground">
-                  You have several rights regarding your personal information:
-                </p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground ml-4 space-y-1">
-                  <li>Access and view your data</li>
-                  <li>Correct inaccurate information</li>
-                  <li>Delete your account and associated data</li>
-                  <li>Object to certain data processing activities</li>
-                </ul>
-                <p className="text-sm text-muted-foreground mt-2">
-                  To exercise these rights, please contact us using the information provided at the end of this policy.
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-base font-semibold">Contact Us</h3>
-                <p className="text-sm text-muted-foreground">
-                  If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us at:
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Email: verma.yashaswi@gmail.com
-                </p>
-              </div>
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog 
-        open={showColorPicker} 
-        onOpenChange={(open) => {
-          setShowColorPicker(open);
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-theme-color">Customize Your Color</DialogTitle>
-            <DialogDescription>
-              Select a custom color for your app theme
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-            <ColorPicker
-              value={colorPickerValue}
-              onChange={(color) => {
-                setColorPickerValue(color);
-              }}
-            />
-          </div>
-          
-          <div className="flex justify-end mt-2">
-            <Button 
-              onClick={applyCustomColor}
-              className="bg-theme-color hover:bg-theme-color/90"
-            >
-              Apply Color
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
+                  We implement appropriate technical

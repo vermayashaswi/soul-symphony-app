@@ -286,40 +286,37 @@ export const scheduleNotification = async (
   }
 };
 
-// Get time in hours for the notification based on time preference
-const getNotificationTimeHours = (timePreference: string): number => {
-  switch (timePreference) {
-    case 'morning': return 8; // 8:00 AM
-    case 'afternoon': return 14; // 2:00 PM
-    case 'evening': return 20; // 8:00 PM
-    default: return 20; // Default to 8:00 PM
-  }
+// New type definitions for notification frequency and time
+export type NotificationFrequency = 'once' | 'twice' | 'thrice';
+export type NotificationTime = 'morning' | 'afternoon' | 'evening' | 'night';
+
+// Get notification times based on selected time preferences
+const getNotificationTimeHours = (timePreferences: NotificationTime[]): number[] => {
+  const times: Record<NotificationTime, number> = {
+    'morning': 8,     // 8:00 AM
+    'afternoon': 14,  // 2:00 PM
+    'evening': 19,    // 7:00 PM
+    'night': 22       // 10:00 PM
+  };
+  
+  return timePreferences.map(time => times[time]);
 };
 
-// Check if notification should be sent today based on frequency
-const shouldSendNotificationToday = (frequency: string): boolean => {
-  const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  
+// Get notification days based on frequency
+const getNotificationDays = (frequency: NotificationFrequency): number => {
   switch (frequency) {
-    case 'daily':
-      return true;
-    case 'weekdays':
-      return dayOfWeek >= 1 && dayOfWeek <= 5; // Monday to Friday
-    case 'weekends':
-      return dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
-    case 'weekly':
-      return dayOfWeek === 0; // Only on Sundays
-    default:
-      return true;
+    case 'once': return 1;  // Once a day
+    case 'twice': return 2; // Twice a day
+    case 'thrice': return 3; // Three times a day
+    default: return 1;
   }
 };
 
 // Set up journal reminder with frequency and time preferences
 export const setupJournalReminder = async (
   enabled: boolean,
-  frequency: string = 'daily',
-  timePreference: string = 'evening'
+  frequency: NotificationFrequency = 'once',
+  timePreferences: NotificationTime[] = ['evening']
 ): Promise<void> => {
   if (!enabled) return;
   
@@ -327,14 +324,20 @@ export const setupJournalReminder = async (
     const hasPermission = await requestNotificationPermission();
     
     if (hasPermission) {
-      // Only schedule if we should send notification today based on frequency
-      if (shouldSendNotificationToday(frequency)) {
-        const timeHours = getNotificationTimeHours(timePreference);
-        
-        // Calculate hours until notification time
+      const timeHours = getNotificationTimeHours(timePreferences);
+      const notificationDays = getNotificationDays(frequency);
+      
+      // Limit the notifications per day based on frequency
+      const scheduledTimes = timeHours.slice(0, notificationDays);
+      
+      console.log(`[NotificationService] Setting up ${notificationDays} notifications per day at times:`, scheduledTimes);
+      
+      // Schedule notifications for each selected time
+      for (const hour of scheduledTimes) {
+        // Calculate hours until next notification time
         const now = new Date();
         const notificationTime = new Date();
-        notificationTime.setHours(timeHours, 0, 0, 0); // Set to specified hour
+        notificationTime.setHours(hour, 0, 0, 0);
         
         // If notification time has passed today, schedule for tomorrow
         if (now > notificationTime) {
@@ -350,16 +353,14 @@ export const setupJournalReminder = async (
           hoursDiff
         );
         
-        console.log(`[NotificationService] Journal reminder scheduled for ${timeHours}:00 (${frequency})`);
-      } else {
-        console.log(`[NotificationService] No notification scheduled today based on frequency: ${frequency}`);
+        console.log(`[NotificationService] Journal reminder scheduled for ${hour}:00`);
       }
       
       // Save notification preferences to localStorage for persistence
       if (isBrowser()) {
         localStorage.setItem('notification_enabled', 'true');
         localStorage.setItem('notification_frequency', frequency);
-        localStorage.setItem('notification_time', timePreference);
+        localStorage.setItem('notification_times', JSON.stringify(timePreferences));
       }
       
     } else {
