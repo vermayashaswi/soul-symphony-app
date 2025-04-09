@@ -30,7 +30,7 @@ export const useLocation = () => {
         throw new Error('Geolocation is not supported by your browser');
       }
       
-      // Define getCurrentPosition function first before using it
+      // Define getCurrentPosition function
       const getCurrentPosition = () => {
         navigator.geolocation.getCurrentPosition(
           (position) => {

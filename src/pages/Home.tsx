@@ -142,12 +142,12 @@ const Home = () => {
           {locationLoading ? (
             <div className="bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl p-8 flex flex-col items-center justify-center h-96">
               <Loader2 className="h-10 w-10 text-theme animate-spin mb-4" />
-              <p className="text-muted-foreground">Determining your location...</p>
+              <p className="text-foreground">Determining your location...</p>
             </div>
           ) : weather.loading ? (
             <div className="bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl p-8 flex flex-col items-center justify-center h-96">
               <Loader2 className="h-10 w-10 text-theme animate-spin mb-4" />
-              <p className="text-muted-foreground">Loading weather information...</p>
+              <p className="text-foreground">Loading weather information...</p>
             </div>
           ) : permissionState !== 'granted' || locationError ? (
             <LocationPermission 

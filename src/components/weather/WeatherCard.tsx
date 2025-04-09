@@ -40,7 +40,7 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className }) 
         <motion.div variants={itemVariants} className="mb-4">
           <div className="flex items-center">
             <MapPin className="h-5 w-5 text-theme mr-2" />
-            <h2 className="font-semibold text-lg">{weather.location}</h2>
+            <h2 className="font-semibold text-lg text-foreground">{weather.location}</h2>
           </div>
           <div className="flex items-center mt-1 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4 mr-1" />
@@ -53,7 +53,7 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className }) 
             <WeatherAnimation condition={weather.condition} />
           </div>
           
-          <h3 className="text-3xl font-bold text-center mb-1">{weather.temperature}°C</h3>
+          <h3 className="text-3xl font-bold text-center mb-1 text-foreground">{weather.temperature}°C</h3>
           <p className="text-muted-foreground capitalize mb-4">{weather.description}</p>
           
           <div className="grid grid-cols-2 gap-4 w-full">
@@ -63,7 +63,7 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className }) 
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Humidity</div>
-                <div className="font-medium">{weather.humidity}%</div>
+                <div className="font-medium text-foreground">{weather.humidity}%</div>
               </div>
             </motion.div>
             
@@ -73,7 +73,7 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, className }) 
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Wind</div>
-                <div className="font-medium">{weather.windSpeed} m/s</div>
+                <div className="font-medium text-foreground">{weather.windSpeed} m/s</div>
               </div>
             </motion.div>
           </div>

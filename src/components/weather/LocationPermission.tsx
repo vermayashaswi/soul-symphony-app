@@ -27,7 +27,7 @@ export const LocationPermission: React.FC<LocationPermissionProps> = ({
           <MapPin className="h-8 w-8 text-theme" />
         </div>
         
-        <h3 className="text-xl font-semibold mb-2">
+        <h3 className="text-xl font-semibold mb-2 text-foreground">
           {permissionState === 'denied' 
             ? 'Location Permission Denied' 
             : 'Enable Location Services'}
