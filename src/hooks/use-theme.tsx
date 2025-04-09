@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = 'light' | 'dark' | 'system';
@@ -30,6 +31,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   );
   
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
+    // Changed default from 'Calm' to 'Calm' (still purple but making it explicit)
     const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
     return (savedColorTheme as ColorTheme) || 'Calm';
   });
@@ -86,7 +88,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       case 'Default':
         return '#3b82f6';
       case 'Calm':
-        return '#8b5cf6';
+        return '#8b5cf6'; // Purple color
       case 'Soothing':
         return '#FFDEE2';
       case 'Energy':

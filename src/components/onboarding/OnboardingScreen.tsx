@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, Heart } from "lucide-react";
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -15,15 +16,18 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const navigate = useNavigate();
+  const { setColorTheme } = useTheme();
+  
+  useEffect(() => {
+    setColorTheme('Calm');
+  }, [setColorTheme]);
   
   const handleNext = () => {
     if (currentStep < onboardingSteps.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
-      // Save that onboarding is complete
       localStorage.setItem("onboardingComplete", "true");
       
-      // Navigate to auth or call onComplete
       if (onComplete) {
         onComplete();
       } else {
@@ -196,10 +200,10 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               <motion.div
                 className="relative w-28 h-28 rounded-full bg-theme-light flex items-center justify-center"
                 animate={{
-                  scale: [1, 1.2, 1],
+                  scale: [1, 1.3, 1],
                   boxShadow: [
                     "0 0 0 0 rgba(var(--color-theme), 0.7)",
-                    "0 0 0 25px rgba(var(--color-theme), 0)",
+                    "0 0 0 30px rgba(var(--color-theme), 0)",
                     "0 0 0 0 rgba(var(--color-theme), 0)"
                   ]
                 }}
@@ -511,10 +515,8 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   return (
     <div className="flex flex-col h-[100dvh] bg-background">
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-background to-theme/5 pointer-events-none" />
         
-        {/* Progress dots */}
         <div className="absolute top-4 left-0 right-0 z-10 flex justify-center">
           <div className="flex space-x-2">
             {onboardingSteps.map((_, index) => (
@@ -531,14 +533,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
           </div>
         </div>
         
-        {/* Skip button */}
         <div className="absolute top-4 right-4 z-10">
           <Button variant="ghost" size="sm" onClick={handleSkip}>
             Skip
           </Button>
         </div>
 
-        {/* Onboarding content */}
         <div className="flex-1 relative pt-12">
           <AnimatePresence mode="wait">
             <motion.div
@@ -597,7 +597,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
           </AnimatePresence>
         </div>
 
-        {/* Navigation buttons */}
         <div className="p-6 flex justify-between">
           <Button 
             variant="outline" 
