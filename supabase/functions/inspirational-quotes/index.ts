@@ -34,15 +34,15 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: 'You are an assistant that provides inspirational quotes with their authors. Respond with a JSON array of 5 inspirational quotes about mental health, emotional well-being, mindfulness, and personal growth. Each item should have "quote" and "author" fields. Make sure quotes are short (under 30 words) and attributed to the correct person. Return only valid JSON with no markdown formatting.' 
+            content: 'You are an assistant that provides inspirational quotes with their authors. Respond with a JSON array of 15 inspirational quotes about mental health, emotional well-being, mindfulness, and personal growth. Each item should have "quote" and "author" fields. Make sure quotes are short (under 30 words) and attributed to the correct person. Return only valid JSON with no markdown formatting.' 
           },
           { 
             role: 'user', 
-            content: 'Generate 5 inspirational quotes with authors.' 
+            content: 'Generate 15 inspirational quotes with authors.' 
           }
         ],
         temperature: 0.7,
-        max_tokens: 500,
+        max_tokens: 1500,
       }),
     });
 

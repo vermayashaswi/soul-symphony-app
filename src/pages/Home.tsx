@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -16,12 +15,16 @@ const Home = () => {
   const { colorTheme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
   const navigate = useNavigate();
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   
   useEffect(() => {
     console.log('Home component mounted');
+    
+    setRefreshKey(prev => prev + 1);
+    
     const fetchUserProfile = async () => {
       if (user) {
         try {
@@ -147,7 +150,7 @@ const Home = () => {
           </Card>
         </motion.div>
 
-        <motion.div variants={itemVariants}>
+        <motion.div variants={itemVariants} key={refreshKey}>
           <InspirationalQuote />
         </motion.div>
       </motion.div>

@@ -14,7 +14,7 @@ export const InspirationalQuote: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { ref, inView } = useInView({
-    triggerOnce: true,
+    triggerOnce: false, // Changed to false to refetch quotes when component comes back into view
     threshold: 0.1,
   });
 
@@ -37,10 +37,12 @@ export const InspirationalQuote: React.FC = () => {
       
       if (data && data.quotes && Array.isArray(data.quotes)) {
         console.log('Successfully parsed quotes:', data.quotes);
-        setQuotes(data.quotes);
-        if (data.quotes.length > 0) {
-          setQuote(data.quotes[0].quote);
-          setAuthor(data.quotes[0].author || 'Unknown');
+        // Shuffle the quotes for more randomness
+        const shuffledQuotes = [...data.quotes].sort(() => Math.random() - 0.5);
+        setQuotes(shuffledQuotes);
+        if (shuffledQuotes.length > 0) {
+          setQuote(shuffledQuotes[0].quote);
+          setAuthor(shuffledQuotes[0].author || 'Unknown');
         }
       } else if (data && data.error) {
         console.error('Error from edge function:', data.error);
@@ -60,13 +62,39 @@ export const InspirationalQuote: React.FC = () => {
     }
   };
 
+  // Effect to fetch quotes when component is in view or visibility changes
   useEffect(() => {
     if (inView) {
       console.log('Quote component in view, fetching quotes');
       fetchQuotes();
+      return () => {
+        // Reset state when component goes out of view
+        setCurrentQuoteIndex(0);
+      };
     }
   }, [inView]);
 
+  // Add effect to detect page visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && inView) {
+        console.log('Page became visible, fetching new quotes');
+        fetchQuotes();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Add event listener for page refocus
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, [inView]);
+
+  // Effect to rotate through quotes
   useEffect(() => {
     if (quotes.length > 0) {
       console.log('Setting up quote rotation with', quotes.length, 'quotes');
@@ -77,7 +105,7 @@ export const InspirationalQuote: React.FC = () => {
           setAuthor(quotes[newIndex].author || 'Unknown');
           return newIndex;
         });
-      }, 5000); // Change quote every 5 seconds
+      }, 4000); // Changed to 4 seconds per quote
       
       return () => clearInterval(intervalId);
     }
@@ -96,7 +124,7 @@ export const InspirationalQuote: React.FC = () => {
       className="p-6 bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl shadow-sm mb-16"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
+      transition={{ duration: 0.8 }} // Slower initial animation
     >
       <AnimatePresence mode="wait">
         {loading ? (
@@ -106,6 +134,7 @@ export const InspirationalQuote: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 1.2 }} // Slower loading animation
           >
             <Loader2 className="h-8 w-8 text-theme animate-spin mb-4" />
             <p className="text-muted-foreground">Finding inspiration for you...</p>
@@ -117,6 +146,7 @@ export const InspirationalQuote: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 1.2 }} // Slower error animation
           >
             <p className="text-muted-foreground">{error}</p>
             <button 
@@ -133,7 +163,7 @@ export const InspirationalQuote: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 1.2 }} // Slower transition between quotes
           >
             <div className="flex mb-4 justify-center">
               <Quote className="h-8 w-8 text-theme" />
