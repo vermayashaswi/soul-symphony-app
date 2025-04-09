@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +15,7 @@ interface OnboardingScreenProps {
   onComplete?: () => void;
 }
 
+// Define the props type for the name step illustration
 interface NameStepProps {
   name: string;
   setName: React.Dispatch<React.SetStateAction<string>>;
@@ -818,4 +820,61 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
               className="absolute inset-0 flex flex-col justify-center items-center px-6 text-center"
             >
               {currentStep === 0 ? (
+                <CurrentIllustration />
+              ) : isNameStep ? (
                 <>
+                  <h2 className="text-2xl font-bold mb-2 text-theme">{currentStepData.title}</h2>
+                  {currentStepData.subtitle && (
+                    <p className="text-sm text-theme-darker mb-3">{currentStepData.subtitle}</p>
+                  )}
+                  {currentStepData.description && (
+                    <p className="mb-8 text-muted-foreground max-w-xs">{currentStepData.description}</p>
+                  )}
+                  <CurrentIllustration name={name} setName={setName} />
+                </>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-bold mb-2 text-theme">{currentStepData.title}</h2>
+                  {currentStepData.subtitle && (
+                    <p className="text-sm text-theme-darker mb-3">{currentStepData.subtitle}</p>
+                  )}
+                  {currentStepData.description && (
+                    <p className="mb-8 text-muted-foreground max-w-xs">{currentStepData.description}</p>
+                  )}
+                  <CurrentIllustration />
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+        
+        <div className="pb-12 pt-4 px-6 relative z-10">
+          <div className="flex flex-col space-y-4">
+            <Button 
+              size="lg" 
+              onClick={handleNext} 
+              className="bg-theme hover:bg-theme-dark text-white"
+            >
+              {currentStepData.buttonText}
+              {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
+            </Button>
+            
+            {currentStep > 0 && (
+              <Button 
+                variant="outline" 
+                size="lg" 
+                onClick={handlePrevious}
+                className="bg-background hover:bg-muted"
+              >
+                <ChevronLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default OnboardingScreen;
