@@ -186,7 +186,6 @@ export default function Settings() {
     fetchUserProfile();
   }, [user]);
 
-  // Load notification settings from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const enabled = localStorage.getItem('notification_enabled') === 'true';
@@ -214,7 +213,6 @@ export default function Settings() {
     }
   }, []);
 
-  // Apply notification settings when changed
   useEffect(() => {
     if (notificationsEnabled) {
       setupJournalReminder(true, notificationFrequency, notificationTimes).then(() => {
@@ -639,7 +637,7 @@ export default function Settings() {
                 variant="outline" 
                 size="lg" 
                 className="h-auto py-6 rounded-xl justify-start"
-                onClick={()={() => {
+                onClick={() => {
                   setShowPrivacyPolicy(true);
                 }}
               >
@@ -822,3 +820,137 @@ export default function Settings() {
                 <h3 className="text-base font-semibold">Data Security</h3>
                 <p className="text-sm text-muted-foreground">
                   We implement appropriate technical
+                </p>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog
+        open={showNotificationSettings}
+        onOpenChange={(open) => {
+          setShowNotificationSettings(open);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Notification Settings</DialogTitle>
+            <DialogDescription>
+              Customize when you want to receive journal reminders
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div className="space-y-4">
+              <h3 className="font-medium text-sm">Frequency</h3>
+              <RadioGroup 
+                value={notificationFrequency} 
+                onValueChange={(value) => setNotificationFrequency(value as NotificationFrequency)}
+                className="flex flex-col space-y-2"
+              >
+                {frequencyOptions.map(option => (
+                  <div key={option.value} className="flex items-center space-x-2">
+                    <RadioGroupItem value={option.value} id={`frequency-${option.value}`} />
+                    <Label htmlFor={`frequency-${option.value}`} className="cursor-pointer">
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-medium text-sm">Time of Day</h3>
+                <p className="text-xs text-muted-foreground">
+                  {notificationFrequency === 'once' ? 'Select 1 time' : 
+                   notificationFrequency === 'twice' ? 'Select up to 2 times' : 
+                   'Select up to 3 times'}
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {timeOptions.map(option => (
+                  <div 
+                    key={option.value} 
+                    className={cn(
+                      "border rounded-md px-3 py-2 flex items-center space-x-2 cursor-pointer",
+                      notificationTimes.includes(option.value) 
+                        ? "border-primary bg-primary/10" 
+                        : "border-input"
+                    )}
+                    onClick={() => handleTimeChange(option.value)}
+                  >
+                    <Checkbox 
+                      checked={notificationTimes.includes(option.value)} 
+                      onCheckedChange={() => handleTimeChange(option.value)}
+                      id={`time-${option.value}`}
+                    />
+                    <Label 
+                      htmlFor={`time-${option.value}`} 
+                      className="flex-1 cursor-pointer text-sm"
+                    >
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowNotificationSettings(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={applyNotificationSettings}
+              disabled={notificationTimes.length === 0}
+            >
+              Apply Settings
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog
+        open={showColorPicker}
+        onOpenChange={(open) => {
+          if (!open) setShowColorPicker(false);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Custom Color</DialogTitle>
+            <DialogDescription>
+              Choose your own theme color
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <ColorPicker 
+              color={colorPickerValue} 
+              onChange={setColorPickerValue} 
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowColorPicker(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={applyCustomColor}
+              style={{ backgroundColor: colorPickerValue }}
+              className="text-white"
+            >
+              Apply Color
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
