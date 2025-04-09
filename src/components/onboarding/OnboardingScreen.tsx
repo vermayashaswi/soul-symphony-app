@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -14,43 +15,7 @@ interface OnboardingScreenProps {
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ 
   onComplete 
 }) => {
-  const [currentStep, setCurrentStep] = useState(0);
-  const navigate = useNavigate();
-  const { setColorTheme } = useTheme();
-  
-  useEffect(() => {
-    setColorTheme('Calm');
-  }, [setColorTheme]);
-  
-  const handleNext = () => {
-    if (currentStep < onboardingSteps.length - 1) {
-      setCurrentStep(prev => prev + 1);
-    } else {
-      localStorage.setItem("onboardingComplete", "true");
-      
-      if (onComplete) {
-        onComplete();
-      } else {
-        navigate("/auth");
-      }
-    }
-  };
-  
-  const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
-    }
-  };
-  
-  const handleSkip = () => {
-    localStorage.setItem("onboardingComplete", "true");
-    if (onComplete) {
-      onComplete();
-    } else {
-      navigate("/auth");
-    }
-  };
-
+  // Define onboardingSteps early to avoid the "used before declaration" error
   const onboardingSteps = [
     {
       title: "Welcome to SOuLO",
@@ -551,6 +516,43 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
       buttonText: "Get Started"
     }
   ];
+
+  const [currentStep, setCurrentStep] = useState(0);
+  const navigate = useNavigate();
+  const { setColorTheme } = useTheme();
+  
+  useEffect(() => {
+    setColorTheme('Calm');
+  }, [setColorTheme]);
+  
+  const handleNext = () => {
+    if (currentStep < onboardingSteps.length - 1) {
+      setCurrentStep(prev => prev + 1);
+    } else {
+      localStorage.setItem("onboardingComplete", "true");
+      
+      if (onComplete) {
+        onComplete();
+      } else {
+        navigate("/auth");
+      }
+    }
+  };
+  
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+  
+  const handleSkip = () => {
+    localStorage.setItem("onboardingComplete", "true");
+    if (onComplete) {
+      onComplete();
+    } else {
+      navigate("/auth");
+    }
+  };
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background">
