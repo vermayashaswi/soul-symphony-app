@@ -34,11 +34,13 @@ export const useLocation = () => {
       const getCurrentPosition = () => {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            console.log('Location obtained:', position.coords.latitude, position.coords.longitude);
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            console.log('Location obtained:', lat, lng);
             setState(prev => ({
               ...prev,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
+              latitude: lat,
+              longitude: lng,
               loading: false,
               error: null,
               permissionState: 'granted',
@@ -85,31 +87,38 @@ export const useLocation = () => {
               toast.error('Failed to get your location');
             }
           },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
       };
 
       // Check permission status if available
       if (navigator.permissions) {
-        const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-        setState(prev => ({ ...prev, permissionState: permission.state as PermissionState }));
-        
-        // Set up listener for permission changes
-        permission.addEventListener('change', () => {
+        try {
+          const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+          console.log('Geolocation permission state:', permission.state);
           setState(prev => ({ ...prev, permissionState: permission.state as PermissionState }));
+          
+          // Set up listener for permission changes
+          permission.addEventListener('change', () => {
+            console.log('Permission state changed to:', permission.state);
+            setState(prev => ({ ...prev, permissionState: permission.state as PermissionState }));
+            if (permission.state === 'granted') {
+              getCurrentPosition();
+            }
+          });
+
+          // If permission is already granted, get position immediately
           if (permission.state === 'granted') {
             getCurrentPosition();
+            return;
           }
-        });
-
-        // If permission is already granted, get position immediately
-        if (permission.state === 'granted') {
-          getCurrentPosition();
-          return;
+        } catch (permError) {
+          console.error('Error checking permission:', permError);
+          // Continue with direct geolocation request if permission API fails
         }
       }
       
-      // Get current position if permissions API not available
+      // Get current position if permissions API not available or failed
       getCurrentPosition();
       
     } catch (error) {
@@ -125,6 +134,7 @@ export const useLocation = () => {
 
   // Initial request on mount
   useEffect(() => {
+    console.log('Initializing location hook');
     requestLocationPermission();
   }, [requestLocationPermission]);
 

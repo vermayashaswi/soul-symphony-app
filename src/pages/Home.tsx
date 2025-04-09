@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -18,7 +17,6 @@ const Home = () => {
     const fetchUserProfile = async () => {
       if (user) {
         try {
-          // First check if there's a name stored from onboarding
           const localName = localStorage.getItem('user_display_name');
           
           const { data, error } = await supabase
@@ -32,12 +30,9 @@ const Home = () => {
             return;
           }
           
-          // If we have a stored name from onboarding and no display name in profile yet,
-          // update the profile with the stored name
           if (localName && (!data || !data.display_name)) {
             await updateDisplayName(localName);
             setDisplayName(localName);
-            // Remove from localStorage to avoid overwriting future updates
             localStorage.removeItem('user_display_name');
           } else if (data && data.display_name) {
             setDisplayName(data.display_name);
@@ -71,7 +66,6 @@ const Home = () => {
     }
   };
   
-  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -87,14 +81,12 @@ const Home = () => {
     show: { opacity: 1, y: 0 }
   };
 
-  // Get the greeting name with priority: display name > email username > "Friend"
   const getGreetingName = () => {
     if (displayName) return displayName;
     if (user?.email) return user.email.split('@')[0];
     return 'Friend';
   };
 
-  // Get location and weather data
   const { 
     latitude, 
     longitude, 
@@ -115,6 +107,7 @@ const Home = () => {
   });
   
   console.log('Weather status:', { 
+    temperature: weather.temperature,
     condition: weather.condition,
     location: weather.location,
     loading: weather.loading,

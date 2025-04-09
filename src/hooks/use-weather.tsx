@@ -36,6 +36,7 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
 
   useEffect(() => {
     const fetchWeather = async () => {
+      // Skip if location data isn't available
       if (latitude === null || longitude === null) {
         setWeather(prev => ({ ...prev, loading: false }));
         return;
@@ -57,7 +58,7 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
         }
 
         const data = await response.json();
-        console.log('Weather API response:', data);
+        console.log('Weather API response data:', data);
         
         // Map weather condition codes to our condition types
         const mapCondition = (weatherId: number): WeatherData['condition'] => {
@@ -70,10 +71,14 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
           return 'unknown';
         };
 
+        const mappedCondition = mapCondition(data.weather[0].id);
+        console.log('Mapped weather condition:', mappedCondition);
+        console.log('Temperature from API:', data.main.temp);
+
         setWeather({
           temperature: Math.round(data.main.temp),
           description: data.weather[0].description,
-          condition: mapCondition(data.weather[0].id),
+          condition: mappedCondition,
           location: data.name,
           humidity: data.main.humidity,
           windSpeed: data.wind.speed,
@@ -87,7 +92,7 @@ export const useWeather = (latitude: number | null, longitude: number | null) =>
           error: null
         });
         
-        console.log('Weather data processed:', mapCondition(data.weather[0].id), data.name);
+        console.log('Weather data processed successfully');
       } catch (error) {
         console.error('Error fetching weather:', error);
         setWeather(prev => ({
