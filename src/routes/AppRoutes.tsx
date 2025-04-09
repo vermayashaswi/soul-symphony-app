@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -89,7 +88,6 @@ const AppRoutes = () => {
   
   // Determine if we should show onboarding
   const shouldShowOnboarding = 
-    (isMobile || mobileDemo) && 
     !user && 
     !onboardingComplete && 
     !isOnboardingBypassedRoute &&

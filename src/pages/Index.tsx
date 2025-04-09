@@ -36,11 +36,6 @@ const Index = () => {
     }
   };
 
-  const handleStartOnboarding = () => {
-    resetOnboarding();
-    navigate('/onboarding');
-  };
-
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -407,16 +402,6 @@ const Index = () => {
               >
                 Get Started
               </Button>
-              
-              {(isMobile || mobileDemo) && (
-                <Button 
-                  size={shouldRenderMobile ? "default" : "lg"} 
-                  variant="outline"
-                  onClick={handleStartOnboarding}
-                >
-                  View Onboarding
-                </Button>
-              )}
             </motion.div>
           )}
         </motion.div>
