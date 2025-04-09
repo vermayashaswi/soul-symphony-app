@@ -42,6 +42,7 @@ const AppRoutes = () => {
   const shouldShowMobileNav = isMobile || mobileDemo;
   
   const isAuthRoute = location.pathname === '/auth';
+  const isOnboardingRoute = location.pathname === '/onboarding';
   const isOnboardingBypassedRoute = isAuthRoute || location.pathname.includes('debug') || location.pathname.includes('admin');
 
   useEffect(() => {
@@ -76,9 +77,13 @@ const AppRoutes = () => {
     };
   }, []);
   
-  // If onboarding is still loading, show nothing or a loading spinner
+  // If onboarding is still loading, show a loading spinner
   if (onboardingLoading) {
-    return <div className="flex items-center justify-center h-screen w-screen">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen w-screen">
+        <div className="animate-spin w-8 h-8 border-4 border-theme border-t-transparent rounded-full"></div>
+      </div>
+    );
   }
   
   // Show onboarding for mobile users who aren't logged in and haven't completed onboarding
@@ -86,7 +91,8 @@ const AppRoutes = () => {
     (isMobile || mobileDemo) && 
     !user && 
     !onboardingComplete && 
-    !isOnboardingBypassedRoute;
+    !isOnboardingBypassedRoute &&
+    !isOnboardingRoute;
   
   if (shouldShowOnboarding) {
     return (
@@ -153,7 +159,7 @@ const AppRoutes = () => {
         } />
       </Routes>
 
-      {shouldShowMobileNav && !shouldShowOnboarding && <MobileNavbar />}
+      {shouldShowMobileNav && !shouldShowOnboarding && !isOnboardingRoute && <MobileNavbar />}
     </>
   );
 };

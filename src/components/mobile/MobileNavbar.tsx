@@ -10,7 +10,6 @@ const MobileNavbar = () => {
   const { user } = useAuth();
   
   const navItems = [
-    { path: '/', label: 'Home', icon: Home },
     { path: '/journal', label: 'Journal', icon: Book },
     { path: '/insights', label: 'Insights', icon: BarChart2 },
     { path: '/smart-chat', label: 'Chat', icon: MessageSquare },
@@ -24,7 +23,7 @@ const MobileNavbar = () => {
 
   return (
     <motion.div 
-      className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t flex items-center justify-around z-50 px-1"
+      className="fixed bottom-0 left-0 right-0 h-16 bg-background/90 backdrop-blur-sm border-t border-muted flex items-center justify-around z-50 px-1"
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
@@ -36,22 +35,27 @@ const MobileNavbar = () => {
           <Link 
             key={item.path} 
             to={item.path}
-            className={cn(
-              "flex flex-col items-center justify-center w-full h-full pt-1",
-              isActive ? "text-primary" : "text-muted-foreground"
-            )}
+            className="flex flex-col items-center justify-center w-full h-full pt-1"
           >
             <div className="relative">
               {isActive && (
                 <motion.div
                   layoutId="nav-pill-mobile"
-                  className="absolute -inset-1 bg-primary/10 rounded-full"
+                  className="absolute -inset-1 bg-theme/20 rounded-full"
                   transition={{ type: "spring", duration: 0.6 }}
                 />
               )}
-              <item.icon className="relative h-5 w-5" />
+              <item.icon className={cn(
+                "relative h-5 w-5 transition-colors duration-200",
+                isActive ? "text-theme" : "text-muted-foreground"
+              )} />
             </div>
-            <span className="text-xs mt-1">{item.label}</span>
+            <span className={cn(
+              "text-xs mt-1 transition-colors duration-200",
+              isActive ? "text-theme font-medium" : "text-muted-foreground"
+            )}>
+              {item.label}
+            </span>
           </Link>
         );
       })}
