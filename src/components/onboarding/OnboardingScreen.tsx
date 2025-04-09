@@ -620,7 +620,7 @@ const ONBOARDING_STEPS = [
   {
     title: "Ready to Start Your Journey?",
     subtitle: "Express, reflect, and grow with SOuLO",
-    description: "Create an account to begin your path to emotional wellness and self-discovery.",
+    description: "",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <motion.div 
@@ -655,7 +655,7 @@ const ONBOARDING_STEPS = [
         </motion.div>
       </div>
     ),
-    buttonText: "Get Started"
+    buttonText: "Sign In"
   }
 ];
 
