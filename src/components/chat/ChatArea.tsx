@@ -19,9 +19,58 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const bottomRef = useRef<HTMLDivElement>(null);
   const [prevMessageCount, setPrevMessageCount] = useState(0);
   const [lastUserMessage, setLastUserMessage] = useState<ChatMessageType | null>(null);
+  const [localIsLoading, setLocalIsLoading] = useState(isLoading);
+  const [localProcessingStage, setLocalProcessingStage] = useState(processingStage);
   
+  // When loading changes externally, update local loading state
   useEffect(() => {
-    // Find the last user message
+    // If loading is starting, always update immediately
+    if (isLoading) {
+      setLocalIsLoading(true);
+      setLocalProcessingStage(processingStage);
+    } 
+    // If loading is ending, only update if we don't have an active processingStage stored
+    else if (!localProcessingStage || processingStage === null) {
+      setLocalIsLoading(false);
+      setLocalProcessingStage(null);
+    }
+  }, [isLoading, processingStage]);
+  
+  // Store loading state in sessionStorage to persist across navigation
+  useEffect(() => {
+    // Check for loading state on mount
+    const storedLoadingState = sessionStorage.getItem('chatLoadingState');
+    const storedProcessingStage = sessionStorage.getItem('chatProcessingStage');
+    
+    if (storedLoadingState === 'true' && !isLoading) {
+      setLocalIsLoading(true);
+      if (storedProcessingStage) {
+        setLocalProcessingStage(storedProcessingStage);
+      }
+    }
+    
+    // Update storage when loading state changes
+    if (localIsLoading) {
+      sessionStorage.setItem('chatLoadingState', 'true');
+      if (localProcessingStage) {
+        sessionStorage.setItem('chatProcessingStage', localProcessingStage);
+      }
+    } else {
+      sessionStorage.removeItem('chatLoadingState');
+      sessionStorage.removeItem('chatProcessingStage');
+    }
+    
+    // Clean up storage when component unmounts if we're no longer loading
+    return () => {
+      if (!localIsLoading) {
+        sessionStorage.removeItem('chatLoadingState');
+        sessionStorage.removeItem('chatProcessingStage');
+      }
+    };
+  }, [localIsLoading, localProcessingStage, isLoading]);
+  
+  // Find the last user message
+  useEffect(() => {
     if (chatMessages.length > 0) {
       const lastMsg = [...chatMessages].reverse().find(msg => msg.role === 'user');
       setLastUserMessage(lastMsg || null);
@@ -33,11 +82,19 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     // 1. New messages were added
     // 2. Loading state changed
     // 3. First render
-    if (chatMessages.length > prevMessageCount || isLoading !== undefined) {
+    if (chatMessages.length > prevMessageCount || localIsLoading !== undefined) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
       setPrevMessageCount(chatMessages.length);
     }
-  }, [chatMessages, isLoading, prevMessageCount]);
+    
+    // If we have a completed response, clear the loading state
+    if (chatMessages.length > prevMessageCount && prevMessageCount > 0) {
+      setLocalIsLoading(false);
+      setLocalProcessingStage(null);
+      sessionStorage.removeItem('chatLoadingState');
+      sessionStorage.removeItem('chatProcessingStage');
+    }
+  }, [chatMessages, localIsLoading, prevMessageCount]);
   
   // Check for duplicates by content to prevent doubled rendering
   const uniqueMessages = chatMessages.reduce((acc: ChatMessageType[], current) => {
@@ -53,13 +110,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   }, []);
   
   // Filter out the last user message when loading to show it in the sticky header
-  const filteredMessages = isLoading && lastUserMessage 
+  const filteredMessages = localIsLoading && lastUserMessage 
     ? uniqueMessages.filter(msg => msg.id !== lastUserMessage.id)
     : uniqueMessages;
   
   return (
     <div className="flex flex-col h-full">
-      {isLoading && lastUserMessage && (
+      {localIsLoading && lastUserMessage && (
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b pb-3 pt-2 px-4">
           <div className="flex items-start gap-3">
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-xs font-medium text-primary-foreground">
@@ -100,7 +157,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </AnimatePresence>
         
         <AnimatePresence>
-          {isLoading && (
+          {localIsLoading && (
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -111,7 +168,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 <Loader2 className="h-5 w-5 text-primary animate-spin" />
               </div>
               <div className="bg-muted/40 rounded-xl p-3 max-w-[75%] text-sm">
-                {processingStage || "Processing your request..."}
+                {localProcessingStage || "Processing your request..."}
               </div>
             </motion.div>
           )}

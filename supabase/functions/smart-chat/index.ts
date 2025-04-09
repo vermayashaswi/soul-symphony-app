@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -79,6 +78,23 @@ serve(async (req) => {
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
     console.log("Time range received:", timeRange);
+    
+    // Send an immediate response with processing status for long-running requests
+    if (reqBody.acknowledgeRequest) {
+      EdgeRuntime.waitUntil(async () => {
+        // This will run in the background after response is sent
+        console.log("Processing message in background task");
+        // Background processing would happen here
+      });
+      
+      return new Response(
+        JSON.stringify({ 
+          status: "processing",
+          message: "Your request is being processed"
+        }),
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
     
     // Fetch previous messages from this thread if a threadId is provided
     let conversationContext = [];
@@ -352,13 +368,19 @@ Now generate your thoughtful, emotionally intelligent response:`;
 
     // 5. Return response
     return new Response(
-      JSON.stringify({ data: responseContent }),
+      JSON.stringify({ 
+        data: responseContent,
+        processingComplete: true 
+      }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        processingComplete: true
+      }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },

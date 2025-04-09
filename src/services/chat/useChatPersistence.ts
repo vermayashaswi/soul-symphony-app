@@ -20,6 +20,20 @@ export const useChatPersistence = () => {
       description: message,
       variant: "destructive",
     });
+    
+    // Clear any loading states when an error occurs
+    sessionStorage.removeItem('chatLoadingState');
+    sessionStorage.removeItem('chatProcessingStage');
+  };
+  
+  const persistLoadingState = (stage: string) => {
+    sessionStorage.setItem('chatLoadingState', 'true');
+    sessionStorage.setItem('chatProcessingStage', stage);
+  };
+  
+  const clearLoadingState = () => {
+    sessionStorage.removeItem('chatLoadingState');
+    sessionStorage.removeItem('chatProcessingStage');
   };
   
   return {
@@ -34,7 +48,12 @@ export const useChatPersistence = () => {
     
     getThreadMessages: async (threadId: string) => {
       try {
-        return await getThreadMessages(threadId);
+        const messages = await getThreadMessages(threadId);
+        // If we have messages and the last one is from the assistant, we can clear any loading state
+        if (messages && messages.length > 0 && messages[messages.length - 1].sender === 'assistant') {
+          clearLoadingState();
+        }
+        return messages;
       } catch (error) {
         handleError("Failed to load conversation messages.");
         return [];
@@ -50,6 +69,14 @@ export const useChatPersistence = () => {
       hasNumericResult?: boolean
     ) => {
       try {
+        // If this is a user message, persist the loading state
+        if (sender === 'user') {
+          persistLoadingState("Analyzing your question...");
+        } else if (sender === 'assistant') {
+          // If this is an assistant response, clear the loading state
+          clearLoadingState();
+        }
+        
         return await saveMessage(threadId, content, sender, references, analysisData, hasNumericResult);
       } catch (error) {
         handleError("Failed to save your message. Please try again.");
@@ -73,6 +100,9 @@ export const useChatPersistence = () => {
         handleError("Failed to update conversation title.");
         return false;
       }
-    }
+    },
+    
+    persistLoadingState,
+    clearLoadingState
   };
 };
