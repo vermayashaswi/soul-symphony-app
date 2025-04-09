@@ -16,10 +16,12 @@ const Home = () => {
   const { colorTheme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const navigate = useNavigate();
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   
+  // Effect for fetching user profile and setting background image
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (user) {
@@ -64,6 +66,9 @@ const Home = () => {
     };
     
     fetchUserProfile();
+    
+    // Set a random background image on each login
+    setBackgroundImage(getRandomBackgroundImage());
   }, [user]);
   
   const updateDisplayName = async (name: string) => {
@@ -101,18 +106,36 @@ const Home = () => {
     navigate('/journal');
   };
 
-  const getBackgroundImage = () => {
-    const images = {
-      Default: '/placeholder.svg',
-      Calm: 'https://images.unsplash.com/photo-1500673922987-e212871fec22',
-      Soothing: 'https://images.unsplash.com/photo-1470813740244-df37b8c1edcb',
-      Energy: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
-      Focus: 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9',
-      Custom: 'https://images.unsplash.com/photo-1721322800607-8c38375eef04'
-    };
+  // Collection of background images
+  const getRandomBackgroundImage = () => {
+    const images = [
+      'https://images.unsplash.com/photo-1500673922987-e212871fec22',
+      'https://images.unsplash.com/photo-1470813740244-df37b8c1edcb',
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
+      'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9',
+      'https://images.unsplash.com/photo-1682686580391-615b1f28e5ee',
+      'https://images.unsplash.com/photo-1682685797208-c741d58c2eff',
+      'https://images.unsplash.com/photo-1613336026275-d6d473084e85',
+      'https://images.unsplash.com/photo-1531604250646-2f0e818c4f06'
+    ];
     
-    return images[colorTheme as keyof typeof images] || images.Calm;
+    // Return a random image from the collection
+    return images[Math.floor(Math.random() * images.length)];
   };
+
+  // This function is replaced by getRandomBackgroundImage
+  // const getBackgroundImage = () => {
+  //   const images = {
+  //     Default: '/placeholder.svg',
+  //     Calm: 'https://images.unsplash.com/photo-1500673922987-e212871fec22',
+  //     Soothing: 'https://images.unsplash.com/photo-1470813740244-df37b8c1edcb',
+  //     Energy: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
+  //     Focus: 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9',
+  //     Custom: 'https://images.unsplash.com/photo-1721322800607-8c38375eef04'
+  //   };
+    
+  //   return images[colorTheme as keyof typeof images] || images.Calm;
+  // };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -151,7 +174,7 @@ const Home = () => {
           <Card className="overflow-hidden rounded-xl max-w-md mx-auto">
             <div 
               className="h-64 w-full bg-cover bg-center" 
-              style={{ backgroundImage: `url(${getBackgroundImage()})` }}
+              style={{ backgroundImage: `url(${backgroundImage || '/placeholder.svg'})` }}
             />
             <div className="bg-gradient-to-b from-black/70 to-black/90 text-white p-6">
               <p className="text-gray-300 text-center mb-3">{formattedDate}</p>
