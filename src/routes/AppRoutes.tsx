@@ -19,6 +19,7 @@ import Insights from '@/pages/Insights';
 import SmartChat from '@/pages/SmartChat';
 import Settings from '@/pages/Settings';
 import NotFound from '@/pages/NotFound';
+import Home from '@/pages/Home';
 
 const ScrollToTop = () => {
   useScrollRestoration();
@@ -110,13 +111,22 @@ const AppRoutes = () => {
       <ScrollToTop />
       <Routes>
         <Route path="/" element={
-          <MobilePreviewWrapper>
-            <Index />
-          </MobilePreviewWrapper>
+          user ? <Navigate to="/home" replace /> : (
+            <MobilePreviewWrapper>
+              <Index />
+            </MobilePreviewWrapper>
+          )
         } />
         <Route path="/auth" element={
           <MobilePreviewWrapper>
             <Auth />
+          </MobilePreviewWrapper>
+        } />
+        <Route path="/home" element={
+          <MobilePreviewWrapper>
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
           </MobilePreviewWrapper>
         } />
         <Route path="/journal" element={

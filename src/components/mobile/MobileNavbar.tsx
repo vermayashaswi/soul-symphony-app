@@ -10,6 +10,7 @@ const MobileNavbar = () => {
   const { user } = useAuth();
   
   const navItems = [
+    { path: '/home', label: 'Home', icon: Home },
     { path: '/journal', label: 'Journal', icon: Book },
     { path: '/insights', label: 'Insights', icon: BarChart2 },
     { path: '/smart-chat', label: 'Chat', icon: MessageSquare },

@@ -56,9 +56,10 @@ export function Navbar() {
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
+    { path: '/home', label: 'Dashboard', icon: Home },
     { path: '/journal', label: 'Journal', icon: Home },
     { path: '/insights', label: 'Insights', icon: BarChart2 },
-    { path: '/smart-chat', label: 'AI Assistant', icon: MessageCircle }, // Using /smart-chat path for AI Assistant
+    { path: '/smart-chat', label: 'AI Assistant', icon: MessageCircle },
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
