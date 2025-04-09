@@ -533,9 +533,7 @@ const MobileChatInterfaceContent = ({
     }
   };
 
-  const toggleDebugPanel = () => {
-    setShowDebugPanel(!showDebugPanel);
-  };
+  
 
   return (
     <div className="flex flex-col h-full" ref={containerRef}>
