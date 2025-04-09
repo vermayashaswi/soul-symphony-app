@@ -31,12 +31,12 @@ export function Toaster() {
           >
             <div className="grid gap-1">
               {title && (
-                <ToastTitle className={isDarkMode ? "text-white" : "text-black"}>
+                <ToastTitle className={isDarkMode ? "text-white font-semibold" : "text-black font-semibold"}>
                   {title}
                 </ToastTitle>
               )}
               {description && (
-                <ToastDescription className={isDarkMode ? "text-white/90" : "text-black/90"}>
+                <ToastDescription className={isDarkMode ? "text-white/90 font-normal" : "text-black/90 font-normal"}>
                   {description}
                 </ToastDescription>
               )}
