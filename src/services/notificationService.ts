@@ -1,9 +1,9 @@
 import { toast } from "sonner";
 
 // Duration constants
-const STANDARD_DURATION = 5000; // 5 seconds for regular toasts (improved from 1 second)
-const ACTIVE_JOB_DURATION = 8000; // 8 seconds for active jobs
-const ERROR_DURATION = 6000; // 6 seconds for errors (increased from 3 seconds)
+const STANDARD_DURATION = 1000; // 1 second for regular toasts (updated from 5 seconds)
+const ACTIVE_JOB_DURATION = 8000; // 8 seconds for active jobs (unchanged)
+const ERROR_DURATION = 6000; // 6 seconds for errors (unchanged)
 
 // Check if we're in a browser environment
 const isBrowser = (): boolean => {
