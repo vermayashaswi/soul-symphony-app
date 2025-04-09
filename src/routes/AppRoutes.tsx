@@ -44,6 +44,7 @@ const AppRoutes = () => {
   const isAuthRoute = location.pathname === '/auth';
   const isOnboardingRoute = location.pathname === '/onboarding';
   const isOnboardingBypassedRoute = isAuthRoute || location.pathname.includes('debug') || location.pathname.includes('admin');
+  const isHomePage = location.pathname === '/';
 
   useEffect(() => {
     const setCorrectViewport = () => {
@@ -86,13 +87,15 @@ const AppRoutes = () => {
     );
   }
   
-  // Show onboarding for mobile users who aren't logged in and haven't completed onboarding
+  // Show onboarding only for new users who haven't completed it and aren't accessing special routes
+  // Also make sure we're on the home page to avoid showing onboarding after sign out
   const shouldShowOnboarding = 
     (isMobile || mobileDemo) && 
     !user && 
     !onboardingComplete && 
     !isOnboardingBypassedRoute &&
-    !isOnboardingRoute;
+    !isOnboardingRoute &&
+    isHomePage; // Only show onboarding on the home page
   
   if (shouldShowOnboarding) {
     return (

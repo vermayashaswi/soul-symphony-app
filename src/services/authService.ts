@@ -149,14 +149,14 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
     
-    // Redirect to home page if navigate function is provided
+    // Always redirect to home page if navigate function is provided
     if (navigate) {
       navigate('/');
     }
   } catch (error: any) {
     console.error('Error signing out:', error);
     
-    // Still navigate and clean up even if there's an error
+    // Still navigate to home page even if there's an error
     if (navigate) {
       navigate('/');
     }
