@@ -1,15 +1,20 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useLocation } from '@/hooks/use-location';
+import { useWeather } from '@/hooks/use-weather';
+import { WeatherCard } from '@/components/weather/WeatherCard';
+import { LocationPermission } from '@/components/weather/LocationPermission';
+import { Loader2 } from 'lucide-react';
 
 const Home = () => {
   const { user } = useAuth();
-  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [displayName, setDisplayName] = React.useState<string | null>(null);
   
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchUserProfile = async () => {
       if (user) {
         try {
@@ -89,6 +94,18 @@ const Home = () => {
     return 'Friend';
   };
 
+  // Get location and weather data
+  const { 
+    latitude, 
+    longitude, 
+    loading: locationLoading, 
+    error: locationError,
+    permissionState,
+    requestLocationPermission
+  } = useLocation();
+  
+  const weather = useWeather(latitude, longitude);
+
   return (
     <div className="min-h-screen pt-6 pb-20 px-4">
       <motion.div
@@ -106,34 +123,21 @@ const Home = () => {
           </p>
         </motion.div>
         
-        <motion.div 
-          variants={itemVariants}
-          className="bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl p-5 mb-6 shadow-sm"
-        >
-          <h2 className="font-semibold text-lg mb-3">Your Dashboard</h2>
-          <p className="text-sm text-muted-foreground">
-            Track your progress, revisit your journal entries, and discover new insights about yourself.
-          </p>
-        </motion.div>
-        
         <motion.div variants={itemVariants} className="space-y-4">
-          <div className="bg-card rounded-lg p-4 shadow-sm border border-border">
-            <h3 className="font-medium">Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <a href="/journal" className="bg-background hover:bg-accent transition-colors rounded-md p-3 text-center text-sm">
-                New Journal Entry
-              </a>
-              <a href="/smart-chat" className="bg-background hover:bg-accent transition-colors rounded-md p-3 text-center text-sm">
-                Chat with SOuLO
-              </a>
-              <a href="/insights" className="bg-background hover:bg-accent transition-colors rounded-md p-3 text-center text-sm">
-                View Insights
-              </a>
-              <a href="/settings" className="bg-background hover:bg-accent transition-colors rounded-md p-3 text-center text-sm">
-                Settings
-              </a>
+          {locationLoading || weather.loading ? (
+            <div className="bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl p-8 flex flex-col items-center justify-center h-96">
+              <Loader2 className="h-10 w-10 text-theme animate-spin mb-4" />
+              <p className="text-muted-foreground">Loading weather information...</p>
             </div>
-          </div>
+          ) : permissionState !== 'granted' || locationError ? (
+            <LocationPermission 
+              onRequestPermission={requestLocationPermission} 
+              permissionState={permissionState}
+              error={locationError}
+            />
+          ) : (
+            <WeatherCard weather={weather} />
+          )}
         </motion.div>
       </motion.div>
     </div>
