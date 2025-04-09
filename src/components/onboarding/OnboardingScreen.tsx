@@ -68,7 +68,7 @@ const ONBOARDING_STEPS = [
               />
             </div>
             
-            <div className="relative z-20 bg-background px-3 py-1 rounded-lg">
+            <div className="relative z-20">
               <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} textClassName="font-bold" />
             </div>
           </div>
