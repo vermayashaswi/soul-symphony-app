@@ -66,7 +66,7 @@ const SouloLogo = ({
   }, [utteringWords]);
   
   return (
-    <span className={cn("font-semibold inline-flex items-center", themeTextClass, textClassName, className)}>
+    <span className={cn("font-bold inline-flex items-center", themeTextClass, textClassName, className)}>
       <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>S</span>
       <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>O</span>
       <span className={cn("relative inline-block", sizeClasses[size], smileyClassName)}>

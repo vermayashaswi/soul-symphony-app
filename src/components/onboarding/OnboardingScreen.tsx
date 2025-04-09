@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, Heart 
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
-import RecordingVisualizer from "@/components/RecordingVisualizer";
+import { RecordingVisualizer } from "@/components/voice-recorder/RecordingVisualizer";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -70,7 +70,9 @@ const ONBOARDING_STEPS = [
               </div>
             </div>
             
-            <SouloLogo size="large" className="scale-[2.2] relative z-20" useColorTheme={true} animate={true} />
+            <div className="relative z-20 bg-background/95 px-3 py-1 rounded-lg">
+              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} textClassName="font-bold" />
+            </div>
           </div>
           
           <motion.div 
