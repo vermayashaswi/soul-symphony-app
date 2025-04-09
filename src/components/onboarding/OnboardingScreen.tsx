@@ -480,8 +480,8 @@ const ONBOARDING_STEPS = [
     subtitle: "Discover insights through conversation",
     description: "Ask questions about your emotions, patterns, and growth through natural conversation with AI.",
     illustration: (props: {}) => (
-      <div className="flex justify-center items-center my-2">
-        <div className="relative w-48 h-48 bg-theme-lighter rounded-xl flex items-center justify-center overflow-hidden p-4">
+      <div className="flex justify-center items-center my-2 w-full">
+        <div className="relative w-full max-w-xs bg-theme-lighter rounded-xl flex items-center justify-center overflow-hidden p-4">
           <motion.div
             className="absolute inset-0 bg-gradient-to-b from-transparent to-theme/10"
             animate={{ opacity: [0.3, 0.5, 0.3] }}
@@ -492,9 +492,9 @@ const ONBOARDING_STEPS = [
             }}
           />
           
-          <div className="relative z-10 flex flex-col gap-3 w-36 mt-18">
+          <div className="relative z-10 flex flex-col gap-3 w-full mt-4 mb-2">
             <motion.div 
-              className="self-start max-w-[80%] bg-muted p-2.5 rounded-2xl rounded-bl-none text-xs"
+              className="self-start max-w-[90%] bg-muted p-2.5 rounded-2xl rounded-bl-none text-sm"
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
@@ -503,7 +503,7 @@ const ONBOARDING_STEPS = [
             </motion.div>
             
             <motion.div 
-              className="self-end max-w-[80%] bg-theme text-white p-2.5 rounded-2xl rounded-br-none text-xs"
+              className="self-end max-w-[90%] bg-theme text-white p-2.5 rounded-2xl rounded-br-none text-sm"
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.9 }}
@@ -512,12 +512,12 @@ const ONBOARDING_STEPS = [
             </motion.div>
             
             <motion.div
-              className="self-start flex items-center justify-center w-8 h-8 bg-muted rounded-full mt-1.5"
+              className="self-start flex items-center justify-center w-10 h-10 bg-muted rounded-full mt-1.5"
               initial={{ opacity: 0, scale: 0 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 1.5, type: "spring" }}
             >
-              <MessageSquare className="w-4 h-4 text-primary" />
+              <MessageSquare className="w-5 h-5 text-primary" />
             </motion.div>
           </div>
         </div>
