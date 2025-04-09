@@ -15,16 +15,13 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(true);
   const [authUser, setAuthUser] = useState(null);
   
-  // Get the return path - prioritize query param, then location state, then localStorage, or default to / (home)
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  // Always redirect to home page after successful Google sign-in
   const from = '/';
 
   useEffect(() => {
-    // Check if the user is already authenticated
     const checkAuthState = async () => {
       try {
         const { data } = await supabase.auth.getSession();
@@ -40,7 +37,6 @@ export default function Auth() {
   }, []);
 
   useEffect(() => {
-    // Log the current origin/domain for debugging
     console.log('Current origin for Auth page:', window.location.origin);
     console.log('Redirect destination after auth:', from);
     
@@ -48,10 +44,8 @@ export default function Auth() {
       console.log('Auth page: User detected, redirecting to:', from);
       setRedirecting(true);
       
-      // Clear the stored redirect path after successful login
       localStorage.removeItem('authRedirectTo');
       
-      // Add a brief delay to ensure state changes have processed
       const timer = setTimeout(() => {
         navigate(from, { replace: true });
       }, 500);
@@ -62,7 +56,6 @@ export default function Auth() {
 
   useEffect(() => {
     const handleHashRedirect = async () => {
-      // Check if we're coming back from an OAuth redirect
       const hasHashParams = window.location.hash.includes('access_token') || 
                            window.location.hash.includes('error') ||
                            window.location.search.includes('error');
@@ -73,7 +66,6 @@ export default function Auth() {
           search: window.location.search 
         });
         
-        // Check for error in the URL
         if (window.location.hash.includes('error') || window.location.search.includes('error')) {
           console.error('Error detected in redirect URL');
           toast.error('Authentication failed. Please try again.');
@@ -81,7 +73,6 @@ export default function Auth() {
         }
         
         try {
-          // This will automatically exchange the auth code for a session
           const { data, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -90,7 +81,6 @@ export default function Auth() {
           } else if (data.session) {
             console.log('Successfully retrieved session after redirect:', data.session.user.email);
             setAuthUser(data.session.user);
-            // Session will be picked up by the other useEffect
           }
         } catch (e) {
           console.error('Exception during auth redirect handling:', e);
@@ -122,7 +112,6 @@ export default function Auth() {
     }
   };
   
-  // Helper function to get redirect URL
   const getRedirectUrl = (): string => {
     const origin = window.location.origin;
     const urlParams = new URLSearchParams(window.location.search);
@@ -155,9 +144,6 @@ export default function Auth() {
         className="max-w-md w-full glass-card p-8 rounded-xl relative z-10"
       >
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <SouloLogo size="large" className="text-4xl" useColorTheme={true} />
-          </div>
           <h1 className="text-3xl font-bold mb-2">
             Welcome to <SouloLogo size="large" className="text-blue-600" />
           </h1>

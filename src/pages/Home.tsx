@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -25,11 +26,10 @@ const Home = () => {
         try {
           const localName = localStorage.getItem('user_display_name');
           
-          const userAvatarUrl = user.user_metadata?.avatar_url || null;
-          
+          // Get profile data from Supabase
           const { data, error } = await supabase
             .from('profiles')
-            .select('display_name, avatar_url')
+            .select('display_name, avatar_url, full_name')
             .eq('id', user.id)
             .single();
           
@@ -38,18 +38,24 @@ const Home = () => {
             return;
           }
           
+          // Handle display name priority: local storage -> profile -> user metadata
           if (localName && (!data || !data.display_name)) {
             await updateDisplayName(localName);
             setDisplayName(localName);
             localStorage.removeItem('user_display_name');
           } else if (data && data.display_name) {
             setDisplayName(data.display_name);
+          } else if (data && data.full_name) {
+            setDisplayName(data.full_name);
           }
           
+          // Handle avatar URL priority: profile -> user metadata
           if (data && data.avatar_url) {
             setAvatarUrl(data.avatar_url);
-          } else if (userAvatarUrl) {
-            setAvatarUrl(userAvatarUrl);
+          } else if (user.user_metadata?.avatar_url) {
+            setAvatarUrl(user.user_metadata.avatar_url);
+          } else if (user.user_metadata?.picture) {
+            setAvatarUrl(user.user_metadata.picture);
           }
         } catch (error) {
           console.error('Error in profile fetching', error);
