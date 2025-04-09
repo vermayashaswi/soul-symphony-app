@@ -7,19 +7,38 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
+import { useTheme } from "@/hooks/use-theme"
 
 export function Toaster() {
   const { toasts } = useToast()
+  const { theme, systemTheme } = useTheme()
+  
+  // Determine if we're in dark mode
+  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
 
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
-          <Toast key={id} {...props} className="bg-background border-2 border-primary shadow-lg dark:bg-background/90 dark:border-primary dark:text-foreground">
+          <Toast 
+            key={id} 
+            {...props} 
+            className={
+              isDarkMode
+                ? "bg-slate-800 border border-slate-700 text-white shadow-lg"
+                : "bg-white border border-slate-200 text-black shadow-lg"
+            }
+          >
             <div className="grid gap-1">
-              {title && <ToastTitle className="text-foreground font-semibold dark:text-foreground">{title}</ToastTitle>}
+              {title && (
+                <ToastTitle className={isDarkMode ? "text-white" : "text-black"}>
+                  {title}
+                </ToastTitle>
+              )}
               {description && (
-                <ToastDescription className="text-foreground dark:text-foreground">{description}</ToastDescription>
+                <ToastDescription className={isDarkMode ? "text-white/90" : "text-black/90"}>
+                  {description}
+                </ToastDescription>
               )}
             </div>
             {action}
