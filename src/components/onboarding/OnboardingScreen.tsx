@@ -38,42 +38,7 @@ const ONBOARDING_STEPS = [
             />
           </div>
           
-          {/* Microphone Animation Above Logo */}
-          <motion.div
-            className="absolute top-[-20%] left-1/2 transform -translate-x-1/2 z-20"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ 
-              opacity: 1, 
-              y: 0,
-              scale: [1, 1.1, 1],
-            }}
-            transition={{
-              scale: {
-                repeat: Infinity,
-                duration: 1.5,
-                ease: "easeInOut"
-              },
-              opacity: { duration: 0.5 }
-            }}
-          >
-            <div className="relative">
-              <motion.div
-                className="absolute -inset-4 rounded-full bg-theme-lighter opacity-40"
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.4, 0.2, 0.4]
-                }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 2,
-                  ease: "easeInOut"
-                }}
-              />
-              <div className="bg-theme rounded-full p-3">
-                <Mic className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </motion.div>
+          {/* Removed the Microphone Animation Above Logo */}
           
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} />
