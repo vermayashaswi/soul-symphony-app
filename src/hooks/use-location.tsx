@@ -29,28 +29,8 @@ export const useLocation = () => {
       if (!navigator.geolocation) {
         throw new Error('Geolocation is not supported by your browser');
       }
-
-      // Check permission status if available
-      if (navigator.permissions) {
-        const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-        setState(prev => ({ ...prev, permissionState: permission.state as PermissionState }));
-        
-        // Set up listener for permission changes
-        permission.addEventListener('change', () => {
-          setState(prev => ({ ...prev, permissionState: permission.state as PermissionState }));
-          if (permission.state === 'granted') {
-            getCurrentPosition();
-          }
-        });
-
-        // If permission is already granted, get position immediately
-        if (permission.state === 'granted') {
-          getCurrentPosition();
-          return;
-        }
-      }
-
-      // Get current position
+      
+      // Define getCurrentPosition function first before using it
       const getCurrentPosition = () => {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -108,7 +88,28 @@ export const useLocation = () => {
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
         );
       };
+
+      // Check permission status if available
+      if (navigator.permissions) {
+        const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+        setState(prev => ({ ...prev, permissionState: permission.state as PermissionState }));
+        
+        // Set up listener for permission changes
+        permission.addEventListener('change', () => {
+          setState(prev => ({ ...prev, permissionState: permission.state as PermissionState }));
+          if (permission.state === 'granted') {
+            getCurrentPosition();
+          }
+        });
+
+        // If permission is already granted, get position immediately
+        if (permission.state === 'granted') {
+          getCurrentPosition();
+          return;
+        }
+      }
       
+      // Get current position if permissions API not available
       getCurrentPosition();
       
     } catch (error) {
