@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -19,6 +20,7 @@ import SmartChat from '@/pages/SmartChat';
 import Settings from '@/pages/Settings';
 import NotFound from '@/pages/NotFound';
 import Home from '@/pages/Home';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
 
 const ScrollToTop = () => {
   useScrollRestoration();
@@ -166,6 +168,12 @@ const AppRoutes = () => {
               <OnboardingScreen />
             </MobilePreviewWrapper>
           )
+        } />
+        {/* Add the new privacy policy route */}
+        <Route path="/privacy-policy" element={
+          <MobilePreviewWrapper>
+            <PrivacyPolicy />
+          </MobilePreviewWrapper>
         } />
         <Route path="*" element={
           <MobilePreviewWrapper>
