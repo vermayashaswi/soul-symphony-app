@@ -79,7 +79,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
             </div>
             
             <div className="absolute inset-0 flex items-center justify-center z-10">
-              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} />
+              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} utteringWords={true} />
             </div>
             
             <motion.div 
@@ -466,7 +466,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
             >
-              <SouloLogo size="large" className="scale-[2.5]" useColorTheme={true} animate={true} />
+              <SouloLogo size="large" className="scale-[2.5]" useColorTheme={true} animate={true} utteringWords={true} />
             </motion.div>
             
             <motion.div
