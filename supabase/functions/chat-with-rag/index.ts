@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -335,6 +334,8 @@ Example format (only to be used when you feel the need to) :
 - "On Mar 18 and Mar 20, you mentioned feeling drained after social interactions."
 - "Your entry on Apr 2 reflects a desire for deeper connection with others."
 - "Based on these entries, it seems you may lean toward introversion, but more context would help."
+
+**MAKE SURE YOUR RESPONES ARE STRUCTURED WITH BULLETS, POINTERS, BOLD HEADERS, and other boldened information that's important. Don't need lengthy paragraphs that are difficult to read. Use headers and sub headers wisely**
 
 Now generate your thoughtful, emotionally intelligent response:`;
 
