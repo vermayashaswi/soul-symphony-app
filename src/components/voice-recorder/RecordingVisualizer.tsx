@@ -21,7 +21,7 @@ export function RecordingVisualizer({
   const bars = Array.from({ length: maxBars });
   
   return (
-    <div className={`w-full h-full flex items-center justify-center ${fullWidth ? 'px-0' : ''}`}>
+    <div className={`w-full h-full flex items-center justify-center overflow-hidden ${fullWidth ? 'px-0 absolute inset-0' : ''}`}>
       <div className={`flex items-center h-16 space-x-0.5 ${fullWidth ? 'w-full justify-between' : ''}`}>
         {bars.map((_, i) => {
           // Calculate base height and randomize it slightly for natural look

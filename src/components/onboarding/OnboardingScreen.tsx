@@ -60,17 +60,15 @@ const ONBOARDING_STEPS = [
           
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <div className="absolute w-full h-16 flex items-center justify-center overflow-hidden">
-              <div className="w-full px-4">
-                <RecordingVisualizer 
-                  isRecording={false} 
-                  audioLevel={0.5} 
-                  ripples={[]} 
-                  fullWidth={true} 
-                />
-              </div>
+              <RecordingVisualizer 
+                isRecording={false} 
+                audioLevel={0.5} 
+                ripples={[]} 
+                fullWidth={true} 
+              />
             </div>
             
-            <div className="relative z-20 bg-background/95 px-3 py-1 rounded-lg">
+            <div className="relative z-20 bg-background px-3 py-1 rounded-lg">
               <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} textClassName="font-bold" />
             </div>
           </div>
