@@ -45,8 +45,7 @@ const AppRoutes = () => {
   const isAuthRoute = location.pathname === '/auth';
   const isOnboardingRoute = location.pathname === '/onboarding';
   const isOnboardingBypassedRoute = isAuthRoute || location.pathname.includes('debug') || location.pathname.includes('admin');
-  const isHomePage = location.pathname === '/';
-
+  
   useEffect(() => {
     const setCorrectViewport = () => {
       const metaViewport = document.querySelector('meta[name="viewport"]');
@@ -88,15 +87,13 @@ const AppRoutes = () => {
     );
   }
   
-  // Show onboarding only for new users who haven't completed it and aren't accessing special routes
-  // Also make sure we're on the home page to avoid showing onboarding after sign out
+  // Determine if we should show onboarding
   const shouldShowOnboarding = 
     (isMobile || mobileDemo) && 
     !user && 
     !onboardingComplete && 
     !isOnboardingBypassedRoute &&
-    !isOnboardingRoute &&
-    isHomePage; // Only show onboarding on the home page
+    !isOnboardingRoute;
   
   if (shouldShowOnboarding) {
     return (
@@ -112,15 +109,21 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={
           user ? <Navigate to="/home" replace /> : (
-            <MobilePreviewWrapper>
-              <Index />
-            </MobilePreviewWrapper>
+            shouldShowOnboarding ? (
+              <Navigate to="/onboarding" replace />
+            ) : (
+              <MobilePreviewWrapper>
+                <Index />
+              </MobilePreviewWrapper>
+            )
           )
         } />
         <Route path="/auth" element={
-          <MobilePreviewWrapper>
-            <Auth />
-          </MobilePreviewWrapper>
+          user ? <Navigate to="/home" replace /> : (
+            <MobilePreviewWrapper>
+              <Auth />
+            </MobilePreviewWrapper>
+          )
         } />
         <Route path="/home" element={
           <MobilePreviewWrapper>
@@ -161,9 +164,11 @@ const AppRoutes = () => {
           </MobilePreviewWrapper>
         } />
         <Route path="/onboarding" element={
-          <MobilePreviewWrapper>
-            <OnboardingScreen />
-          </MobilePreviewWrapper>
+          user ? <Navigate to="/home" replace /> : (
+            <MobilePreviewWrapper>
+              <OnboardingScreen />
+            </MobilePreviewWrapper>
+          )
         } />
         <Route path="*" element={
           <MobilePreviewWrapper>

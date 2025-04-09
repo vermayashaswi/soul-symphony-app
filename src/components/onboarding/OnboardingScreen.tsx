@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -15,7 +14,6 @@ interface OnboardingScreenProps {
   onComplete?: () => void;
 }
 
-// Define the props type for the name step illustration
 interface NameStepProps {
   name: string;
   setName: React.Dispatch<React.SetStateAction<string>>;
@@ -830,7 +828,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                   {currentStepData.description && (
                     <p className="mb-8 text-muted-foreground max-w-xs">{currentStepData.description}</p>
                   )}
-                  <CurrentIllustration name={name} setName={setName} />
+                  {React.createElement(CurrentIllustration as any, { name, setName })}
                 </>
               ) : (
                 <>
