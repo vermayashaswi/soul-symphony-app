@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import { Skeleton } from '@/components/ui/skeleton';
 import JournalSearch from './JournalSearch';
+import { getProcessingEntries } from '@/utils/audio-processing';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -31,12 +33,47 @@ export default function JournalEntriesList({
   const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [renderRetryCount, setRenderRetryCount] = useState(0);
-  const hasProcessingEntries = Array.isArray(processingEntries) && processingEntries.length > 0;
+  const [persistedProcessingEntries, setPersistedProcessingEntries] = useState<string[]>([]);
+  const hasProcessingEntries = Array.isArray(processingEntries) && processingEntries.length > 0 || persistedProcessingEntries.length > 0;
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
   const [renderError, setRenderError] = useState<Error | null>(null);
   const hasNoValidEntries = useRef(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
+
+  // Load processing entries from localStorage when component mounts or when user navigates back
+  useEffect(() => {
+    const loadPersistedProcessingEntries = () => {
+      const persistedEntries = getProcessingEntries();
+      setPersistedProcessingEntries(persistedEntries);
+    };
+    
+    // Load on mount
+    loadPersistedProcessingEntries();
+    
+    // Add an event listener to get updates when processing entries change
+    const handleProcessingEntriesChanged = (event: CustomEvent) => {
+      if (event.detail && Array.isArray(event.detail.entries)) {
+        setPersistedProcessingEntries(event.detail.entries);
+      }
+    };
+    
+    window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
+    
+    // Also reload on visibility change (user switches back to tab)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadPersistedProcessingEntries();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -153,9 +190,11 @@ export default function JournalEntriesList({
     setIsSearchActive(results.length !== localEntries.length);
   };
   
+  // Combine processing entries from props and localStorage
+  const allProcessingEntries = [...new Set([...processingEntries, ...persistedProcessingEntries])];
   const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !hasProcessingEntries;
   
-  const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !processingEntries.length;
+  const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !allProcessingEntries.length;
 
   if (hasNoValidEntries.current) {
     return (
@@ -209,7 +248,7 @@ export default function JournalEntriesList({
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Processing your new entry...</span>
                 </div>
-                <JournalEntryLoadingSkeleton count={processingEntries.length} />
+                <JournalEntryLoadingSkeleton count={allProcessingEntries.length} />
               </div>
             )}
             
@@ -248,7 +287,7 @@ export default function JournalEntriesList({
                       entry={entry} 
                       onDelete={handleEntryDelete} 
                       isNew={animatedEntryIds.includes(entry.id)}
-                      isProcessing={processingEntries.some(id => id.includes(String(entry.id)))}
+                      isProcessing={allProcessingEntries.some(id => id.includes(String(entry.id)))}
                     />
                   </motion.div>
                 </ErrorBoundary>
