@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
@@ -15,7 +14,6 @@ const Home = () => {
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const navigate = useNavigate();
   const today = new Date();
@@ -31,7 +29,7 @@ const Home = () => {
           // Get profile data from Supabase
           const { data, error } = await supabase
             .from('profiles')
-            .select('display_name, avatar_url, full_name')
+            .select('display_name, full_name')
             .eq('id', user.id)
             .single();
           
@@ -49,15 +47,6 @@ const Home = () => {
             setDisplayName(data.display_name);
           } else if (data && data.full_name) {
             setDisplayName(data.full_name);
-          }
-          
-          // Handle avatar URL priority: profile -> user metadata
-          if (data && data.avatar_url) {
-            setAvatarUrl(data.avatar_url);
-          } else if (user.user_metadata?.avatar_url) {
-            setAvatarUrl(user.user_metadata.avatar_url);
-          } else if (user.user_metadata?.picture) {
-            setAvatarUrl(user.user_metadata.picture);
           }
         } catch (error) {
           console.error('Error in profile fetching', error);
@@ -155,12 +144,6 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="p-6 flex items-center">
-        <Avatar className="h-14 w-14 mr-4 border-2 border-theme">
-          <AvatarImage src={avatarUrl || ''} alt={displayName || 'User'} />
-          <AvatarFallback className="bg-theme-light text-theme-darker text-lg font-semibold">
-            {displayName ? displayName.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase() || '?'}
-          </AvatarFallback>
-        </Avatar>
         <h1 className="text-3xl font-bold text-theme">{getJournalName()}</h1>
       </div>
 
