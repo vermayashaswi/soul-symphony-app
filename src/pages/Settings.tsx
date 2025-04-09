@@ -780,6 +780,9 @@ export default function Settings() {
                 <p className="text-sm text-muted-foreground">
                   Welcome to SOuLO ("we," "our," or "us"). We are committed to protecting your privacy and handling your data with transparency and care. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our journaling application.
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  This Privacy Policy is available at <a href="https://soulo-privacy.vercel.app" className="text-blue-500 hover:underline" target="_blank" rel="noopener noreferrer">https://soulo-privacy.vercel.app</a>
+                </p>
               </div>
               
               <div className="space-y-2">
@@ -817,7 +820,36 @@ export default function Settings() {
               <div className="space-y-2">
                 <h3 className="text-base font-semibold">Data Security</h3>
                 <p className="text-sm text-muted-foreground">
-                  We implement appropriate technical measures to protect your personal information.
+                  We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the Internet or electronic storage is 100% secure, and we cannot guarantee absolute security.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Your Rights</h3>
+                <p className="text-sm text-muted-foreground">
+                  Depending on your location, you may have rights regarding your personal information, including:
+                </p>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  <li>Access to your personal data</li>
+                  <li>Correction of inaccurate data</li>
+                  <li>Deletion of your data</li>
+                  <li>Restriction of processing</li>
+                  <li>Data portability</li>
+                  <li>Objection to processing</li>
+                </ul>
+                <p className="text-sm text-muted-foreground mt-2">
+                  To exercise these rights, please contact us at privacy@soulo-app.com.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">Contact Us</h3>
+                <p className="text-sm text-muted-foreground">
+                  If you have any questions or concerns about this Privacy Policy or our data practices, please contact us at:
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Email: privacy@soulo-app.com<br />
+                  Address: 123 Journal Street, San Francisco, CA 94105, USA
                 </p>
               </div>
             </div>

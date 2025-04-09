@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -235,9 +234,20 @@ export function EmotionChart({
 
   const handleLegendClick = (emotion: string) => {
     setVisibleEmotions(prev => {
-      if (prev.includes(emotion)) {
-        return prev.filter(e => e !== emotion);
+      if (prev.length === 1 && prev.includes(emotion)) {
+        return lineData.length > 0 
+          ? Object.keys(lineData[0]).filter(key => key !== 'day')
+          : [];
       }
+      
+      if (prev.includes(emotion) && prev.length > 1) {
+        return [emotion];
+      }
+      
+      if (!prev.includes(emotion)) {
+        return [emotion];
+      }
+      
       return [...prev, emotion];
     });
   };
@@ -321,7 +331,7 @@ export function EmotionChart({
                 className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200",
                   isSelected 
-                    ? "bg-secondary font-medium shadow-sm" 
+                    ? "bg-secondary font-medium shadow-sm border-2 border-primary" 
                     : "bg-secondary/30 hover:bg-secondary/50"
                 )}
                 onClick={() => handleLegendClick(emotion)}
@@ -334,7 +344,7 @@ export function EmotionChart({
                 ></div>
                 <span 
                   className={cn("text-sm", 
-                    isSelected ? "font-medium" : "text-muted-foreground"
+                    isSelected ? "font-bold" : "text-muted-foreground"
                   )}
                 >
                   {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
@@ -345,7 +355,7 @@ export function EmotionChart({
         </div>
         
         <div className="mt-4 text-center text-xs text-muted-foreground">
-          * Click on a legend item to toggle visibility
+          * Click on a legend item to focus on that emotion, click multiple to compare
         </div>
       </div>
     );
