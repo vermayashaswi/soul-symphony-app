@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -158,7 +157,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
   },
   {
     title: "Your Data is Private",
-    subtitle: "Privacy first approach",
+    subtitle: "",
     description: "Your journal entries are securely stored and only accessible to you. We take your privacy seriously.",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
@@ -306,7 +305,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
   },
   {
     title: "Voice Journaling",
-    subtitle: "Speak your mind, we'll capture it",
+    subtitle: "",
     description: "Record your thoughts with voice notes that are automatically transcribed and analyzed for emotional patterns.",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
@@ -425,7 +424,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
   },
   {
     title: "AI Analysis",
-    subtitle: "Meaningful insights, automatically",
+    subtitle: "",
     description: "Get insights into your emotional patterns and growth through advanced AI analysis.",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
@@ -489,7 +488,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
   },
   {
     title: "Chat with Your Journal",
-    subtitle: "Discover insights through conversation",
+    subtitle: "",
     description: "Ask questions about your emotions, patterns, and growth through natural conversation with AI.",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2 w-full">
@@ -539,7 +538,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
   },
   {
     title: "Track Your Emotional Journey",
-    subtitle: "Visualize your growth",
+    subtitle: "",
     description: "See your emotional patterns and growth over time with beautiful visualizations.",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
@@ -631,7 +630,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
   },
   {
     title: "What Should We Call You?",
-    subtitle: "Personalize your experience",
+    subtitle: "",
     description: "Your name helps us make your journey more personal.",
     illustration: (props: NameStepProps) => (
       <div className="flex flex-col justify-center items-center my-2 w-full">
@@ -687,7 +686,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
   },
   {
     title: "Ready to Start Your Journey?",
-    subtitle: "Express. Reflect. Grow.",
+    subtitle: "",
     description: "",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
@@ -828,9 +827,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
               ) : isNameStep ? (
                 <>
                   <h2 className="text-2xl font-bold mb-2 text-theme">{currentStepData.title}</h2>
-                  {currentStepData.subtitle && (
-                    <p className="text-sm text-theme-darker mb-3">{currentStepData.subtitle}</p>
-                  )}
                   {currentStepData.description && (
                     <p className="mb-8 text-muted-foreground max-w-xs">{currentStepData.description}</p>
                   )}
@@ -839,9 +835,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
               ) : (
                 <>
                   <h2 className="text-2xl font-bold mb-2 text-theme">{currentStepData.title}</h2>
-                  {currentStepData.subtitle && (
-                    <p className="text-sm text-theme-darker mb-3">{currentStepData.subtitle}</p>
-                  )}
                   {currentStepData.description && (
                     <p className="mb-8 text-muted-foreground max-w-xs">{currentStepData.description}</p>
                   )}
