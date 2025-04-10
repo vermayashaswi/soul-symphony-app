@@ -11,13 +11,12 @@ import {
   isAppRoute,
   AppRouteWrapper, 
   WebsiteRouteWrapper, 
-  RedirectRoute,
-  HomeRouteWrapper
+  RedirectRoute
 } from './RouteHelpers';
 import ViewportManager from './ViewportManager';
 import OnboardingCheck from './OnboardingCheck';
 import MobileNavigation from './MobileNavigation';
-import Index from '@/pages/Index';
+import HomePage from '@/pages/website/HomePage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import NotFound from '@/pages/NotFound';
 
@@ -55,14 +54,19 @@ const AppRoutes = () => {
         onboardingLoading={onboardingLoading}
       >
         <Routes>
-          {/* Special routes */}
+          {/* Home route - always shows website for web visitors */}
           <Route 
             path="/" 
             element={
-              <HomeRouteWrapper 
-                element={<Index />} 
-                onboardingElement={<OnboardingScreen />}
-              />
+              isNativeApp() ? (
+                user ? (
+                  <RedirectRoute to="/app/home" />
+                ) : (
+                  <RedirectRoute to="/app" />
+                )
+              ) : (
+                <WebsiteRouteWrapper><HomePage /></WebsiteRouteWrapper>
+              )
             } 
           />
           
@@ -100,7 +104,9 @@ const AppRoutes = () => {
           />
         </Routes>
         
-        <MobileNavigation onboardingComplete={onboardingComplete} />
+        {isAppRoute(location.pathname) && (
+          <MobileNavigation onboardingComplete={onboardingComplete} />
+        )}
       </OnboardingCheck>
     </>
   );

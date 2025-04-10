@@ -38,22 +38,6 @@ export const AppRouteWrapper: React.FC<AppRouteProps> = ({ element, requiresAuth
   const { user } = useAuth();
   const location = useLocation();
   
-  // If we're in a browser but the URL is /app/*, check if it's an authorized app view
-  if (!isNativeApp() && isAppRoute(location.pathname)) {
-    // For auth route, allow access even in browser
-    if (location.pathname === '/app/auth') {
-      return <MobilePreviewWrapper>{element}</MobilePreviewWrapper>;
-    }
-    
-    // For onboarding, allow access even in browser
-    if (location.pathname === '/app' || location.pathname === '/app/onboarding') {
-      return <MobilePreviewWrapper>{element}</MobilePreviewWrapper>;
-    }
-    
-    // For other app routes in browser, redirect to download
-    return <Navigate to="/app-download" replace />;
-  }
-  
   // For auth route, redirect to home if already logged in
   if (location.pathname === '/app/auth' && user) {
     return <Navigate to="/app/home" replace />;
@@ -83,26 +67,4 @@ interface RedirectRouteProps {
 
 export const RedirectRoute: React.FC<RedirectRouteProps> = ({ to }) => {
   return <Navigate to={to} replace />;
-};
-
-interface HomeRouteProps {
-  element: React.ReactNode;
-  onboardingElement: React.ReactNode;
-}
-
-export const HomeRouteWrapper: React.FC<HomeRouteProps> = ({ element, onboardingElement }) => {
-  const { user } = useAuth();
-  const location = useLocation();
-  
-  if (isNativeApp()) {
-    if (user) {
-      return <Navigate to="/app/home" replace />;
-    } else {
-      // In native app with no user, show app onboarding
-      return <Navigate to="/app" replace />;
-    }
-  } else {
-    // Website visitors see the landing page
-    return <MobilePreviewWrapper>{element}</MobilePreviewWrapper>;
-  }
 };

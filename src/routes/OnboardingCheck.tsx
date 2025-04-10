@@ -3,8 +3,6 @@ import React from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { isNativeApp, isAppRoute } from './RouteHelpers';
-import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import { MobilePreviewWrapper } from './RouteHelpers';
 
 interface OnboardingCheckProps {
   onboardingComplete: boolean | null;

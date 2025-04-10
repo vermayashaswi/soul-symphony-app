@@ -1,6 +1,5 @@
 
 import React from 'react';
-import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
 import Journal from '@/pages/Journal';
 import Insights from '@/pages/Insights';
@@ -28,11 +27,6 @@ export type RouteConfig = {
 
 // Website public routes (always accessible)
 export const websiteRoutes: RouteConfig[] = [
-  {
-    path: '/',
-    element: <HomePage />,
-    isWebsiteRoute: true,
-  },
   {
     path: '/blog',
     element: <BlogPage />,
@@ -111,11 +105,6 @@ export const appRoutes: RouteConfig[] = [
     element: <OnboardingScreen />,
   },
   // Legacy redirects
-  {
-    path: '/app/chat',
-    element: null,
-    redirectPath: '/app/smart-chat',
-  },
   {
     path: '/auth',
     element: null,
