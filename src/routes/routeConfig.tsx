@@ -11,10 +11,10 @@ import Home from '@/pages/Home';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import AppDownload from '@/pages/AppDownload';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import LandingPage from '@/pages/landing/LandingPage';
-import BlogPage from '@/pages/blog/BlogPage';
-import BlogPostPage from '@/pages/blog/BlogPostPage';
-import FAQPage from '@/pages/FAQPage';
+import FAQPage from '@/pages/website/FAQPage';
+import BlogPage from '@/pages/website/BlogPage';
+import BlogPostPage from '@/pages/website/BlogPostPage';
+import HomePage from '@/pages/website/HomePage';
 import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
 import AppDownloadPage from '@/pages/AppDownloadPage';
 
@@ -29,13 +29,8 @@ export type RouteConfig = {
 // Website public routes (always accessible)
 export const websiteRoutes: RouteConfig[] = [
   {
-    path: '/privacy-policy',
-    element: <PrivacyPolicyPage />,
-    isWebsiteRoute: true,
-  },
-  {
-    path: '/app-download',
-    element: <AppDownloadPage />,
+    path: '/',
+    element: <HomePage />,
     isWebsiteRoute: true,
   },
   {
@@ -51,6 +46,16 @@ export const websiteRoutes: RouteConfig[] = [
   {
     path: '/faq',
     element: <FAQPage />,
+    isWebsiteRoute: true,
+  },
+  {
+    path: '/privacy-policy',
+    element: <PrivacyPolicyPage />,
+    isWebsiteRoute: true,
+  },
+  {
+    path: '/app-download',
+    element: <AppDownloadPage />,
     isWebsiteRoute: true,
   },
   // Legacy routes from before website update
@@ -110,10 +115,6 @@ export const appRoutes: RouteConfig[] = [
 
 // Special routes
 export const specialRoutes: RouteConfig[] = [
-  {
-    path: '/',
-    element: <LandingPage />,
-  },
   {
     path: '*',
     element: <NotFound />,
