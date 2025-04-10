@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -29,11 +30,11 @@ export const getRedirectUrl = (): string => {
   if (isInStandaloneMode() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     console.log('Auth in standalone mode (PWA), using in-app auth flow');
     // Use a special auth flow that works better in PWA context
-    return `${origin}/auth?pwa_mode=true`;
+    return `${origin}/app/auth?pwa_mode=true`;
   }
   
   // Use the actual domain for any environment
-  return `${origin}/auth`;
+  return `${origin}/app/auth`;
 };
 
 /**

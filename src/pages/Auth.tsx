@@ -23,7 +23,7 @@ export default function Auth() {
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
   // Determine where to redirect after auth
-  const from = redirectParam || fromLocation || storedRedirect || '/app';
+  const from = redirectParam || fromLocation || storedRedirect || '/app/home';
 
   useEffect(() => {
     const checkAuthState = async () => {

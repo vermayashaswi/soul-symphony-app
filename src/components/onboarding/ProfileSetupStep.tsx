@@ -12,100 +12,81 @@ interface ProfileSetupStepProps {
 }
 
 const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({ onContinue }) => {
-  const [displayName, setDisplayName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, updateUserProfile } = useAuth();
   const { toast } = useToast();
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
-  };
+  const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || user?.user_metadata?.name || '');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!displayName.trim()) {
       toast({
-        title: "Name required",
-        description: "Please enter your name to continue.",
-        variant: "destructive"
+        title: 'Name Required',
+        description: 'Please enter your name to continue.',
+        variant: 'destructive',
       });
       return;
     }
-    
-    setIsSubmitting(true);
-    
+
+    setIsLoading(true);
+
     try {
-      // Store in localStorage first for quick access
+      // Store in local storage for immediate use
       localStorage.setItem('user_display_name', displayName);
       
-      // If user is logged in, update their profile as well
+      // Update the user profile if authenticated
       if (user) {
-        await updateUserProfile({ display_name: displayName });
+        await updateUserProfile({
+          full_name: displayName,
+          name: displayName
+        });
       }
       
-      onContinue();
-    } catch (error) {
-      console.error('Error saving profile:', error);
       toast({
-        title: "Error",
-        description: "There was a problem saving your profile. Please try again.",
-        variant: "destructive"
+        title: 'Profile Updated',
+        description: 'Your profile has been updated successfully.',
+      });
+      
+      onContinue();
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update your profile. Please try again.',
+        variant: 'destructive',
       });
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
   return (
     <motion.div
-      className="flex flex-col items-center justify-center h-full px-6 py-8"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="space-y-6"
     >
-      <motion.form 
-        className="w-full max-w-md space-y-6" 
-        onSubmit={handleSubmit}
-        variants={containerVariants}
-      >
-        <motion.div variants={itemVariants}>
-          <Label htmlFor="displayName" className="block text-sm font-medium mb-2">
-            What should we call you?
-          </Label>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="displayName">Your Name</Label>
           <Input
             id="displayName"
-            type="text"
-            placeholder="Your name"
+            placeholder="Enter your name"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full"
-            autoFocus
+            autoComplete="name"
           />
-        </motion.div>
+        </div>
         
-        <motion.div variants={itemVariants} className="mt-8">
-          <Button 
-            type="submit" 
-            disabled={isSubmitting} 
-            className="w-full"
-            size="lg"
-          >
-            {isSubmitting ? 'Saving...' : 'Continue'}
-          </Button>
-        </motion.div>
-      </motion.form>
+        <Button 
+          type="submit" 
+          className="w-full" 
+          disabled={isLoading}
+        >
+          {isLoading ? 'Saving...' : 'Continue'}
+        </Button>
+      </form>
     </motion.div>
   );
 };

@@ -19,6 +19,7 @@ import MobileNavigation from './MobileNavigation';
 import HomePage from '@/pages/website/HomePage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import NotFound from '@/pages/NotFound';
+import Auth from '@/pages/Auth';
 
 const ScrollToTop = () => {
   useScrollRestoration();
@@ -83,6 +84,18 @@ const AppRoutes = () => {
             element={
               <AppRouteWrapper element={<OnboardingScreen />} requiresAuth={false} />
             }
+          />
+          
+          {/* Auth route at /app/auth */}
+          <Route
+            path="/app/auth"
+            element={<Auth />}
+          />
+          
+          {/* Auth route at /auth (redirects to /app/auth) */}
+          <Route
+            path="/auth"
+            element={<RedirectRoute to="/app/auth" />}
           />
           
           {/* Website routes */}
