@@ -11,6 +11,12 @@ import Home from '@/pages/Home';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import AppDownload from '@/pages/AppDownload';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import LandingPage from '@/pages/landing/LandingPage';
+import BlogPage from '@/pages/blog/BlogPage';
+import BlogPostPage from '@/pages/blog/BlogPostPage';
+import FAQPage from '@/pages/FAQPage';
+import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
+import AppDownloadPage from '@/pages/AppDownloadPage';
 
 export type RouteConfig = {
   path: string;
@@ -24,11 +30,37 @@ export type RouteConfig = {
 export const websiteRoutes: RouteConfig[] = [
   {
     path: '/privacy-policy',
-    element: <PrivacyPolicy />,
+    element: <PrivacyPolicyPage />,
     isWebsiteRoute: true,
   },
   {
     path: '/app-download',
+    element: <AppDownloadPage />,
+    isWebsiteRoute: true,
+  },
+  {
+    path: '/blog',
+    element: <BlogPage />,
+    isWebsiteRoute: true,
+  },
+  {
+    path: '/blog/:slug',
+    element: <BlogPostPage />,
+    isWebsiteRoute: true,
+  },
+  {
+    path: '/faq',
+    element: <FAQPage />,
+    isWebsiteRoute: true,
+  },
+  // Legacy routes from before website update
+  {
+    path: '/privacy-policy-old',
+    element: <PrivacyPolicy />,
+    isWebsiteRoute: true,
+  },
+  {
+    path: '/app-download-old',
     element: <AppDownload />,
     isWebsiteRoute: true,
   },
@@ -80,7 +112,7 @@ export const appRoutes: RouteConfig[] = [
 export const specialRoutes: RouteConfig[] = [
   {
     path: '/',
-    element: <Index />,
+    element: <LandingPage />,
   },
   {
     path: '*',
