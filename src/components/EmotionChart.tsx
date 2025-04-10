@@ -291,7 +291,8 @@ export function EmotionChart({
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       dateRange = eachDayOfInterval({ start: monthStart, end: monthEnd });
     } else if (timeframe === 'year') {
-      dateRange = [];
+      const yearStart = new Date(now.getFullYear(), 0, 1);
+      const yearEnd = new Date(now.getFullYear(), 11, 31);
       for (let month = 0; month < 12; month++) {
         dateRange.push(new Date(now.getFullYear(), month, 1));
       }
