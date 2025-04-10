@@ -1,5 +1,6 @@
 
-import { toast } from "@/components/ui/use-toast";
+import { toast as shadcnToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 // Duration constants
 const STANDARD_DURATION = 1000; // 1 second for regular toasts (updated from 5 seconds)
@@ -75,7 +76,7 @@ export const showToast = (
   const toastVariant = type === "error" ? "destructive" : "default";
   
   // In the updated version, we'll use the standard toast function with the appropriate options
-  toastId = toast({
+  toastId = shadcnToast({
     title: type.charAt(0).toUpperCase() + type.slice(1),
     description: message,
     variant: toastVariant,
@@ -98,14 +99,66 @@ export const showToast = (
   return toastId;
 };
 
+// Get the dismiss function from the toast hook (for use in non-component contexts)
+// This is a helper to safely access the dismiss function
+const getDismissFunction = () => {
+  // In a real component, you would use: const { dismiss } = useToast()
+  // But since this is a service file, we need to work around this limitation
+  
+  // Try to access the dismiss function from the imported toast
+  // Note: This is a workaround and not ideal - in a real component you would use the useToast hook
+  return (toastId?: string) => {
+    // For component usage, prefer using the hook directly
+    console.log(`[NotificationService] Attempting to dismiss toast: ${toastId || 'all'}`);
+    
+    // Call the toast's dismiss method safely
+    try {
+      if (typeof shadcnToast === 'object' && shadcnToast !== null) {
+        // Try to access dismiss as a property
+        const dismissFn = (shadcnToast as any).dismiss;
+        if (typeof dismissFn === 'function') {
+          dismissFn(toastId);
+          return true;
+        }
+      }
+      
+      // Alternative: try to use the toast's return value
+      // Create a toast and use its dismiss function (hacky but could work)
+      const tempToast = shadcnToast({ description: "" });
+      if (tempToast && typeof tempToast.dismiss === 'function') {
+        if (toastId) {
+          // If we have a specific ID, we need additional DOM manipulation
+          // This is not ideal but necessary for this workaround
+          tempToast.dismiss();
+          
+          // For specific toast removal, we'd need DOM manipulation
+          if (isBrowser()) {
+            document.querySelectorAll('[data-sonner-toast]').forEach(toast => {
+              if (toast.getAttribute('data-id') === toastId) {
+                toast.parentNode?.removeChild(toast);
+              }
+            });
+          }
+        } else {
+          // Dismiss all
+          tempToast.dismiss();
+        }
+        return true;
+      }
+    } catch (e) {
+      console.error("[NotificationService] Error dismissing toast:", e);
+    }
+    
+    return false;
+  };
+};
+
 // Clear a specific toast
 export const clearToast = (toastId: string | number) => {
   if (toastId) {
     console.log(`[NotificationService] Clearing toast: ${toastId}`);
-    // Access dismiss via the global toast object
-    if (typeof toast.dismiss === 'function') {
-      toast.dismiss(toastId.toString());
-    }
+    // Use our dismiss function helper
+    getDismissFunction()(toastId.toString());
   }
 };
 
@@ -114,10 +167,8 @@ export const clearAllToasts = (): Promise<boolean> => {
   console.log('[NotificationService] Clearing all toasts');
   
   return new Promise((resolve) => {
-    // First use the standard dismiss method
-    if (typeof toast.dismiss === 'function') {
-      toast.dismiss();
-    }
+    // Use our dismiss function helper to dismiss all toasts
+    getDismissFunction()();
     
     // Clear all timeouts
     clearToastTimeouts();
@@ -178,10 +229,8 @@ export const clearAllToasts = (): Promise<boolean> => {
         }
       }
       
-      // Call toast.dismiss() one more time as a final measure
-      if (typeof toast.dismiss === 'function') {
-        toast.dismiss();
-      }
+      // Call dismiss one more time as a final measure
+      getDismissFunction()();
       resolve(true);
     }, 50);
   });
@@ -203,9 +252,7 @@ export const ensureAllToastsCleared = async (): Promise<boolean> => {
       console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after first cleanup`);
       
       // Second attempt with more aggressive DOM manipulation
-      if (typeof toast.dismiss === 'function') {
-        toast.dismiss();
-      }
+      getDismissFunction()();
       await new Promise(resolve => setTimeout(resolve, 50));
       
       try {
