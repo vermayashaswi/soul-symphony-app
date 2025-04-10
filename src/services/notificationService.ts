@@ -1,5 +1,4 @@
-
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 
 // Duration constants
 const STANDARD_DURATION = 1000; // 1 second for regular toasts (updated from 5 seconds)
@@ -9,6 +8,28 @@ const ERROR_DURATION = 6000; // 6 seconds for errors (unchanged)
 // Check if we're in a browser environment
 const isBrowser = (): boolean => {
   return typeof window !== 'undefined';
+};
+
+// Check if we're on a website page (vs an app page)
+const isWebsitePage = () => {
+  // Check if we're in the browser
+  if (!isBrowser()) return false;
+  
+  // Get the current pathname
+  const pathname = window.location.pathname;
+  
+  // Define website pages (as opposed to app pages)
+  const websitePatterns = [
+    /^\/$/, // Root/home
+    /^\/website/,
+    /^\/blog/,
+    /^\/faq/,
+    /^\/privacy-policy/,
+    /^\/terms/
+  ];
+  
+  // Check if current path matches any website patterns
+  return websitePatterns.some(pattern => pattern.test(pathname));
 };
 
 // Store active toast IDs to prevent duplicates and ensure cleanup
@@ -29,6 +50,12 @@ export const showToast = (
   type: "default" | "success" | "error" | "info" | "warning" = "default",
   isActiveJob = false
 ) => {
+  // Skip showing toasts on website pages
+  if (isWebsitePage()) {
+    console.log('[NotificationService] Toast suppressed on website page:', message);
+    return null;
+  }
+
   // Deduplicate identical messages that might be in flight
   const messageKey = `${type}-${message}`;
   if (activeToasts.has(messageKey)) {

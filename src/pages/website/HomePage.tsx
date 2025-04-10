@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail } from 'lucide-react';
@@ -159,7 +158,6 @@ const HomePage = () => {
               transition={{ duration: 0.8 }}
               className="w-full lg:w-1/2 text-center lg:text-left"
             >
-              {/* Removed logo as requested */}
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
                 Express. Reflect. <span className="text-primary">Grow.</span>
               </h1>
@@ -211,26 +209,57 @@ const HomePage = () => {
               transition={{ duration: 1, delay: 0.3 }}
               className="w-full lg:w-1/2"
             >
-              {/* Voice to Insights Animation */}
+              {/* Spiritual Robot Animation with Glowing Brain and Soul */}
               <div className="relative mx-auto max-w-md">
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
-                <div className="relative overflow-hidden shadow-2xl border border-white/50 rounded-xl">
-                  <video 
-                    autoPlay 
-                    loop 
-                    muted 
-                    playsInline
-                    className="w-full h-auto"
-                  >
-                    <source 
-                      src="https://static.vecteezy.com/system/resources/previews/023/610/147/mp4/smart-assistant-voice-control-interface-concept-audio-waves-and-digital-sound-visualization-free-video.mp4" 
-                      type="video/mp4" 
-                    />
-                    Your browser does not support the video tag.
-                  </video>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-lg">
-                      <p className="text-sm font-medium text-gray-800">Voice → AI → Insights</p>
+                <div className="relative overflow-hidden shadow-2xl border border-white/50 rounded-xl bg-black">
+                  {/* We're using Lottie animation for the robot */}
+                  <div className="w-full h-auto relative pt-[100%]">
+                    {/* Background glow effects */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-32 h-32 rounded-full bg-blue-500/30 animate-pulse blur-xl absolute"></div>
+                      <div className="w-24 h-24 rounded-full bg-purple-500/30 animate-pulse blur-xl absolute"></div>
+                    </div>
+                    
+                    {/* HTML/CSS animation fallback if no lottie available */}
+                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+                      <div className="relative w-60 h-60">
+                        {/* Robot head outline */}
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-48 rounded-3xl border-2 border-blue-400/80 bg-slate-900/50"></div>
+                        
+                        {/* Robot brain - pulsing glow */}
+                        <div className="absolute top-[25%] left-1/2 transform -translate-x-1/2 w-28 h-20 rounded-full">
+                          <div className="absolute inset-0 bg-blue-500/20 animate-pulse rounded-full blur-lg"></div>
+                          <div className="absolute inset-0 bg-blue-400/30 rounded-full"></div>
+                          <div className="absolute inset-2 bg-blue-300/30 rounded-full"></div>
+                          <div className="absolute inset-4 bg-blue-200/30 rounded-full animate-pulse"></div>
+                        </div>
+                        
+                        {/* Robot eyes */}
+                        <div className="absolute top-[42%] left-[35%] w-3 h-3 rounded-full bg-blue-400 shadow-lg shadow-blue-400/70 animate-pulse"></div>
+                        <div className="absolute top-[42%] left-[58%] w-3 h-3 rounded-full bg-blue-400 shadow-lg shadow-blue-400/70 animate-pulse"></div>
+                        
+                        {/* Soul energy - center glow */}
+                        <div className="absolute top-[60%] left-1/2 transform -translate-x-1/2 w-14 h-14">
+                          <div className="absolute inset-0 bg-purple-500/40 animate-pulse rounded-full blur-lg"></div>
+                          <div className="absolute inset-1 bg-purple-400/40 rounded-full animate-[pulse_3s_ease-in-out_infinite]"></div>
+                          <div className="absolute inset-3 bg-purple-300/30 rounded-full animate-[pulse_2s_ease-in-out_infinite]"></div>
+                          <div className="absolute inset-5 bg-white/90 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]"></div>
+                        </div>
+                        
+                        {/* Energy flowing lines */}
+                        <div className="absolute inset-0 opacity-80">
+                          <div className="absolute top-[45%] left-[20%] right-[20%] h-[1px] bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-[pulse_2s_ease-in-out_infinite]"></div>
+                          <div className="absolute top-[55%] left-[25%] right-[25%] h-[1px] bg-gradient-to-r from-transparent via-purple-400 to-transparent animate-[pulse_2.5s_ease-in-out_infinite]"></div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Animated text overlay */}
+                    <div className="absolute bottom-5 left-0 right-0 text-center text-white text-xs font-mono opacity-80">
+                      <div className="inline-block border border-blue-400/30 bg-black/50 px-2 py-1 rounded-md">
+                        <span className="animate-pulse">AI</span> × <span className="text-purple-300">Soul</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -591,140 +620,4 @@ const HomePage = () => {
                     </li>
                     <li className="flex items-start gap-3">
                       <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-gray-600">AI chat assistant</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-gray-600">Priority support</span>
-                    </li>
-                  </ul>
-                  <Button 
-                    className="w-full bg-primary hover:bg-primary/90 text-white"
-                  >
-                    Start Free Trial
-                  </Button>
-                </div>
-              </motion.div>
-            </div>
-          </div>
-        </div>
-      </section>
-      
-      {/* FAQs */}
-      <section className="py-16 md:py-24 bg-white">
-        <div className="container mx-auto px-4 max-w-4xl">
-          <div className="text-center mb-12">
-            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">FAQ</span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Everything you need to know about SOULo
-            </p>
-          </div>
-          
-          <div className="space-y-6">
-            {[
-              {
-                question: "How does voice journaling work?",
-                answer: "SOULo makes it easy to capture your thoughts by speaking. Just open the app, tap the record button, and speak freely. Our AI will transcribe your voice and analyze the content for emotional patterns and key themes."
-              },
-              {
-                question: "Is my data private and secure?",
-                answer: "Absolutely. Your privacy is our top priority. All your journal entries are end-to-end encrypted, and you have complete control over what you share. We do not sell or share your data with third parties."
-              },
-              {
-                question: "Can I use SOULo without internet connection?",
-                answer: "Yes, you can record your journal entries offline. They will be stored locally on your device and will sync with our servers when you reconnect to the internet."
-              },
-              {
-                question: "What languages does SOULo support?",
-                answer: "Currently, SOULo supports English, Spanish, French, German, and Japanese. We're continuously working to add more languages."
-              },
-              {
-                question: "Can I cancel my subscription anytime?",
-                answer: "Yes, you can cancel your subscription at any time. Your premium features will remain active until the end of your billing period."
-              }
-            ].map((faq, i) => (
-              <motion.div 
-                key={i} 
-                className="bg-gray-50 rounded-lg p-6"
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-              >
-                <h3 className="text-xl font-medium mb-3">{faq.question}</h3>
-                <p className="text-gray-600">{faq.answer}</p>
-              </motion.div>
-            ))}
-          </div>
-          
-          <div className="text-center mt-12">
-            <p className="text-gray-600 mb-4">Don't see your question here?</p>
-            <Button asChild>
-              <a href="/faq">View All FAQs</a>
-            </Button>
-          </div>
-        </div>
-      </section>
-      
-      {/* CTA Section */}
-      <section id="download-section" className="py-16 md:py-24 bg-gradient-to-br from-primary/10 to-purple-100">
-        <div className="container mx-auto px-4 text-center max-w-3xl">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Start Your Self-Discovery Journey?</h2>
-          <p className="text-xl text-gray-700 mb-8">
-            Join thousands of people who have transformed their self-reflection practice with SOULo.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Button 
-              size="lg" 
-              className="gap-2 bg-black text-white hover:bg-gray-800" 
-              onClick={openAppStore}
-            >
-              <Apple className="h-5 w-5" />
-              <span>App Store</span>
-            </Button>
-            <Button 
-              size="lg" 
-              className="gap-2 bg-primary hover:bg-primary/90" 
-              onClick={openPlayStore}
-            >
-              <Play className="h-5 w-5" />
-              <span>Google Play</span>
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              asChild
-            >
-              <a href="/app">Try Web App</a>
-            </Button>
-          </div>
-          
-          <div className="max-w-md mx-auto">
-            <h3 className="text-lg font-medium mb-4">Stay updated with our newsletter</h3>
-            <form onSubmit={handleEmailSubmit} className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="Your email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="flex-1"
-              />
-              <Button type="submit" className="gap-2">
-                Subscribe
-                <Mail className="h-4 w-4" />
-              </Button>
-            </form>
-          </div>
-        </div>
-      </section>
-      
-      {/* Footer */}
-      <Footer />
-    </div>
-  );
-};
-
-export default HomePage;
+                      <

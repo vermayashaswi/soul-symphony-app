@@ -27,7 +27,6 @@ const queryClient = new QueryClient({
 
 const App = () => {
   useEffect(() => {
-    // Add a global error listener to catch runtime errors
     const handleGlobalError = (event: ErrorEvent) => {
       console.error('Global error:', event.message, {
         filename: event.filename,
@@ -37,7 +36,6 @@ const App = () => {
       });
     };
     
-    // Add a global unhandled rejection listener
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       console.error('Unhandled promise rejection:', event.reason, {
         reason: event.reason,
@@ -48,9 +46,7 @@ const App = () => {
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     
-    // Remove Lovable badge if present
     const removeLovableBadge = () => {
-      // Look for the badge in the DOM (it has several possible class names)
       const badgeSelectors = [
         '.lovable-badge',
         '[data-lovable-badge]', 
@@ -65,13 +61,10 @@ const App = () => {
       });
     };
     
-    // Run once on mount
     removeLovableBadge();
     
-    // Also run after a small delay to catch any badges that might be added dynamically
     setTimeout(removeLovableBadge, 1000);
     
-    // Create a MutationObserver to detect if the badge gets added dynamically
     const observer = new MutationObserver(mutations => {
       for (const mutation of mutations) {
         if (mutation.type === 'childList' && mutation.addedNodes.length) {
@@ -80,10 +73,8 @@ const App = () => {
       }
     });
     
-    // Start observing the body for changes
     observer.observe(document.body, { childList: true, subtree: true });
     
-    // Clean up observer on component unmount
     return () => {
       window.removeEventListener('error', handleGlobalError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
@@ -99,7 +90,6 @@ const App = () => {
             <AuthProvider>
               <div className="relative min-h-screen">
                 <div className="relative z-10">
-                  {/* Add the TouchAnimation component here */}
                   <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
                     <TouchAnimation />
                   </div>
