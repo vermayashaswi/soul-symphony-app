@@ -21,6 +21,7 @@ import Settings from '@/pages/Settings';
 import NotFound from '@/pages/NotFound';
 import Home from '@/pages/Home';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import AppDownload from '@/pages/AppDownload';
 
 const ScrollToTop = () => {
   useScrollRestoration();
@@ -46,6 +47,24 @@ const AppRoutes = () => {
   const isAuthRoute = location.pathname === '/auth';
   const isOnboardingRoute = location.pathname === '/onboarding';
   const isOnboardingBypassedRoute = isAuthRoute || location.pathname.includes('debug') || location.pathname.includes('admin');
+  
+  // Check if this is a website route (public page that should always be accessible)
+  const isWebsiteRoute = [
+    '/privacy-policy',
+    '/app-download',
+    '/about',
+    '/blog',
+    '/contact',
+    '/terms',
+  ].includes(location.pathname);
+  
+  // Check if this is running in a native mobile app environment
+  const isNativeApp = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('nativeApp') === 'true' || 
+           window.location.href.includes('capacitor://') || 
+           window.location.href.includes('localhost');
+  };
   
   useEffect(() => {
     console.log("Setting up routes and checking authentication");
@@ -75,10 +94,16 @@ const AppRoutes = () => {
       console.log("Auth event outside React context:", event, session?.user?.email);
     });
     
+    // Redirect to download page if accessing app routes from a browser (non-native)
+    if (!isWebsiteRoute && !isNativeApp() && location.pathname !== '/') {
+      console.log("Browser trying to access app route, redirecting to download page");
+      window.location.href = '/app-download';
+    }
+    
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [location.pathname]);
   
   if (onboardingLoading) {
     return (
@@ -92,7 +117,8 @@ const AppRoutes = () => {
     !user && 
     !onboardingComplete && 
     !isOnboardingBypassedRoute &&
-    !isOnboardingRoute;
+    !isOnboardingRoute && 
+    isNativeApp(); // Only show onboarding in native app
   
   if (shouldShowOnboarding) {
     return (
@@ -107,74 +133,126 @@ const AppRoutes = () => {
       <ScrollToTop />
       <Routes>
         <Route path="/" element={
-          user ? <Navigate to="/home" replace /> : (
-            shouldShowOnboarding ? (
-              <Navigate to="/onboarding" replace />
-            ) : (
-              <MobilePreviewWrapper>
-                <Index />
-              </MobilePreviewWrapper>
+          isNativeApp() ? (
+            user ? <Navigate to="/home" replace /> : (
+              shouldShowOnboarding ? (
+                <Navigate to="/onboarding" replace />
+              ) : (
+                <MobilePreviewWrapper>
+                  <Index />
+                </MobilePreviewWrapper>
+              )
             )
-          )
-        } />
-        <Route path="/auth" element={
-          user ? <Navigate to="/home" replace /> : (
+          ) : (
+            // Website visitors see the landing page
             <MobilePreviewWrapper>
-              <Auth />
+              <Index />
             </MobilePreviewWrapper>
           )
         } />
-        <Route path="/home" element={
-          <MobilePreviewWrapper>
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          </MobilePreviewWrapper>
-        } />
-        <Route path="/journal" element={
-          <MobilePreviewWrapper>
-            <ProtectedRoute>
-              <Journal />
-            </ProtectedRoute>
-          </MobilePreviewWrapper>
-        } />
-        <Route path="/insights" element={
-          <MobilePreviewWrapper>
-            <ProtectedRoute>
-              <Insights />
-            </ProtectedRoute>
-          </MobilePreviewWrapper>
-        } />
-        <Route path="/chat" element={
-          <Navigate to="/smart-chat" replace />
-        } />
-        <Route path="/smart-chat" element={
-          <MobilePreviewWrapper>
-            <ProtectedRoute>
-              <SmartChat />
-            </ProtectedRoute>
-          </MobilePreviewWrapper>
-        } />
-        <Route path="/settings" element={
-          <MobilePreviewWrapper>
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          </MobilePreviewWrapper>
-        } />
-        <Route path="/onboarding" element={
-          user ? <Navigate to="/home" replace /> : (
-            <MobilePreviewWrapper>
-              <OnboardingScreen />
-            </MobilePreviewWrapper>
-          )
-        } />
-        {/* Add the new privacy policy route */}
+        
+        {/* Public website routes */}
         <Route path="/privacy-policy" element={
           <MobilePreviewWrapper>
             <PrivacyPolicy />
           </MobilePreviewWrapper>
         } />
+        
+        <Route path="/app-download" element={
+          <MobilePreviewWrapper>
+            <AppDownload />
+          </MobilePreviewWrapper>
+        } />
+        
+        {/* App-only routes - redirect to download page if not in native app */}
+        <Route path="/auth" element={
+          isNativeApp() ? (
+            user ? <Navigate to="/home" replace /> : (
+              <MobilePreviewWrapper>
+                <Auth />
+              </MobilePreviewWrapper>
+            )
+          ) : (
+            <Navigate to="/app-download" replace />
+          )
+        } />
+        
+        <Route path="/home" element={
+          isNativeApp() ? (
+            <MobilePreviewWrapper>
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            </MobilePreviewWrapper>
+          ) : (
+            <Navigate to="/app-download" replace />
+          )
+        } />
+        
+        <Route path="/journal" element={
+          isNativeApp() ? (
+            <MobilePreviewWrapper>
+              <ProtectedRoute>
+                <Journal />
+              </ProtectedRoute>
+            </MobilePreviewWrapper>
+          ) : (
+            <Navigate to="/app-download" replace />
+          )
+        } />
+        
+        <Route path="/insights" element={
+          isNativeApp() ? (
+            <MobilePreviewWrapper>
+              <ProtectedRoute>
+                <Insights />
+              </ProtectedRoute>
+            </MobilePreviewWrapper>
+          ) : (
+            <Navigate to="/app-download" replace />
+          )
+        } />
+        
+        <Route path="/chat" element={
+          <Navigate to="/smart-chat" replace />
+        } />
+        
+        <Route path="/smart-chat" element={
+          isNativeApp() ? (
+            <MobilePreviewWrapper>
+              <ProtectedRoute>
+                <SmartChat />
+              </ProtectedRoute>
+            </MobilePreviewWrapper>
+          ) : (
+            <Navigate to="/app-download" replace />
+          )
+        } />
+        
+        <Route path="/settings" element={
+          isNativeApp() ? (
+            <MobilePreviewWrapper>
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            </MobilePreviewWrapper>
+          ) : (
+            <Navigate to="/app-download" replace />
+          )
+        } />
+        
+        <Route path="/onboarding" element={
+          isNativeApp() ? (
+            user ? <Navigate to="/home" replace /> : (
+              <MobilePreviewWrapper>
+                <OnboardingScreen />
+              </MobilePreviewWrapper>
+            )
+          ) : (
+            <Navigate to="/app-download" replace />
+          )
+        } />
+        
         <Route path="*" element={
           <MobilePreviewWrapper>
             <NotFound />
@@ -182,7 +260,7 @@ const AppRoutes = () => {
         } />
       </Routes>
 
-      {shouldShowMobileNav && !shouldShowOnboarding && !isOnboardingRoute && <MobileNavbar />}
+      {shouldShowMobileNav && !shouldShowOnboarding && !isOnboardingRoute && isNativeApp() && <MobileNavbar />}
     </>
   );
 };
