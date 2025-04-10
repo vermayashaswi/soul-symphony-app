@@ -1,21 +1,21 @@
 
 import React from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { isNativeApp, isAppRoute } from './RouteHelpers';
 
 interface OnboardingCheckProps {
   onboardingComplete: boolean | null;
   onboardingLoading: boolean;
   children: React.ReactNode;
-  user: any | null; // Accept user as prop instead of using useAuth
 }
 
 const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ 
   onboardingComplete, 
   onboardingLoading, 
-  user,
   children 
 }) => {
+  const { user } = useAuth();
   const location = useLocation();
   
   const isAuthRoute = location.pathname === '/app/auth';
@@ -34,12 +34,6 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   
   // Only check onboarding for app routes
   if (isAppRoute(location.pathname)) {
-    // If user is at the root app path (/app) and logged in, redirect to home
-    if (location.pathname === '/app' && user) {
-      return <Navigate to="/app/home" replace />;
-    }
-    
-    // If not logged in, not at onboarding route, and not at a bypassed route, redirect to onboarding
     const shouldShowOnboarding = 
       !user && 
       !onboardingComplete && 

@@ -52,7 +52,6 @@ const AppRoutes = () => {
       <OnboardingCheck 
         onboardingComplete={onboardingComplete} 
         onboardingLoading={onboardingLoading}
-        user={user} // Pass user as a prop
       >
         <Routes>
           {/* Home route - always shows website for web visitors */}

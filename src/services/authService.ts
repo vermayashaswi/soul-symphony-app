@@ -1,72 +1,76 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
 
 /**
- * Gets the redirect URL for authentication that consistently works
+ * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
-  // Use window location origin to ensure we get the correct base URL
   const origin = window.location.origin;
+  const urlParams = new URLSearchParams(window.location.search);
+  const redirectTo = urlParams.get('redirectTo');
+  if (redirectTo) {
+    localStorage.setItem('authRedirectTo', redirectTo);
+  }
   
-  // Always return the /auth path for consistency
-  const redirectUrl = `${origin}/auth`;
-  console.log('Using auth redirect URL:', redirectUrl);
-  return redirectUrl;
+  // For iOS in standalone mode (PWA), we need to handle redirects differently
+  // Check for standalone mode in a type-safe way
+  const isInStandaloneMode = () => {
+    // Check for display-mode: standalone media query (PWA)
+    const standaloneCheck = window.matchMedia('(display-mode: standalone)').matches;
+    
+    // Check for navigator.standalone (iOS Safari)
+    // @ts-ignore - This is valid on iOS Safari but not in the TypeScript types
+    const iosSafariStandalone = window.navigator.standalone;
+    
+    return standaloneCheck || iosSafariStandalone;
+  };
+    
+  // For PWA on iOS, we want to avoid redirects that might break the app
+  if (isInStandaloneMode() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    console.log('Auth in standalone mode (PWA), using in-app auth flow');
+    // Use a special auth flow that works better in PWA context
+    return `${origin}/auth?pwa_mode=true`;
+  }
+  
+  // Use this variable to determine if we're in the production domain
+  const isProdDomain = window.location.hostname === 'soulo.online' || 
+                      window.location.hostname.endsWith('.soulo.online');
+  
+  // If we're in production, use the actual domain
+  if (isProdDomain) {
+    return `https://soulo.online/auth`;
+  }
+  
+  // Otherwise use the current origin (for local development)
+  return `${origin}/auth`;
 };
 
 /**
- * Sign in with Google with simplified and reliable approach
+ * Sign in with Google
  */
 export const signInWithGoogle = async (): Promise<void> => {
   try {
-    console.log('Initiating Google sign-in from:', window.location.href);
-    
-    // Record login attempt time for debugging
-    localStorage.setItem('loginAttemptTime', Date.now().toString());
-    
-    // Clear any existing auth data that might interfere
-    localStorage.removeItem('supabase.auth.error');
-    localStorage.removeItem('supabase.auth.token');
-    localStorage.removeItem('supabase.auth.refreshToken');
-    
-    // Get the redirect URL
     const redirectUrl = getRedirectUrl();
     console.log('Using redirect URL for Google auth:', redirectUrl);
-    
-    // Generate a nonce and timestamp to prevent caching
-    const nonce = Math.random().toString(36).substring(2, 15);
-    const timestamp = Date.now().toString();
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
-        queryParams: {
-          // Force prompt to select account to prevent automatic login with cached credentials
-          prompt: 'select_account',
-          // Add these to prevent caching issues
-          _t: timestamp,
-          nonce: nonce
-        },
       },
     });
 
     if (error) {
-      console.error('Error starting Google sign-in:', error);
-      toast.error(`Error starting Google sign-in: ${error.message}`);
       throw error;
     }
-    
-    console.log('Google sign-in flow initiated successfully');
   } catch (error: any) {
-    console.error('Failed to initiate Google sign-in:', error);
+    console.error('Error signing in with Google:', error);
     
     // Only show toast if we're in an app route
     const currentPath = window.location.pathname;
     if (isAppRoute(currentPath)) {
-      toast.error(`Google sign-in failed: ${error.message}`);
+      toast.error(`Error signing in with Google: ${error.message}`);
     }
     throw error;
   }
@@ -158,44 +162,35 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       console.log('No active session found, cleaning up local state only');
       // Clear any auth-related items from local storage
       localStorage.removeItem('authRedirectTo');
-      localStorage.removeItem('supabase.auth.error');
-      localStorage.removeItem('loginAttemptTime');
       
       // Redirect to onboarding page if navigate function is provided
       if (navigate) {
-        navigate('/app');
+        navigate('/onboarding');
       }
       return;
     }
     
     // If session exists, proceed with normal sign out
-    const { error } = await supabase.auth.signOut({
-      scope: 'global' // Ensure we're fully signing out of all sessions
-    });
-    
+    const { error } = await supabase.auth.signOut();
     if (error) {
       throw error;
     }
     
     // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
-    localStorage.removeItem('supabase.auth.error');
-    localStorage.removeItem('loginAttemptTime');
     
     // Always redirect to onboarding page if navigate function is provided
     if (navigate) {
-      navigate('/app');
+      navigate('/onboarding');
     }
   } catch (error: any) {
     console.error('Error signing out:', error);
     
     // Still navigate to onboarding page even if there's an error
     if (navigate) {
-      navigate('/app');
+      navigate('/onboarding');
     }
     localStorage.removeItem('authRedirectTo');
-    localStorage.removeItem('supabase.auth.error');
-    localStorage.removeItem('loginAttemptTime');
     
     // Show error toast but don't prevent logout flow
     toast.error(`Error while logging out: ${error.message}`);
@@ -251,38 +246,15 @@ export const getCurrentUser = async () => {
 export const handlePWAAuthCompletion = async () => {
   try {
     // Check if we have a hash in the URL that might contain auth params
-    if (window.location.hash || window.location.search.includes('error')) {
-      console.log('Detected hash/search params, attempting to process auth result');
-      
-      // If there's an error in the URL, log it
-      if (window.location.hash.includes('error') || window.location.search.includes('error')) {
-        console.error('Error detected in redirect URL');
-        
-        // Get error details
-        const urlParams = new URLSearchParams(window.location.search);
-        const errorDescription = urlParams.get('error_description');
-        
-        if (errorDescription) {
-          toast.error(`Authentication failed: ${errorDescription}`);
-        } else {
-          toast.error('Authentication failed. Please try again.');
-        }
-        
-        return null;
-      }
-      
-      // Clean up any stale auth errors
-      localStorage.removeItem('supabase.auth.error');
-      
+    if (window.location.hash) {
+      console.log('Detected hash params, attempting to process auth result');
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
-        console.error('Error getting session after redirect:', error);
-        toast.error('Authentication error. Please try again.');
-      } else if (data.session) {
-        console.log('Successfully retrieved session after redirect:', data.session.user.email);
-        return data.session;
+        throw error;
       }
+      
+      return data.session;
     }
     return null;
   } catch (error) {

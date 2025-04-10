@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -221,13 +222,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       await signOutService((path: string) => {
         console.log(`[AuthContext] Redirecting to ${path} after signout`);
-        window.location.href = '/app'; // Redirect to onboarding page 1
+        window.location.href = '/onboarding';
       });
     } catch (error: any) {
       console.error('[AuthContext] Error during sign out:', error);
       toast.error(`Error signing out: ${error.message}`);
       
-      window.location.href = '/app'; // Redirect to onboarding page 1 even on error
+      window.location.href = '/onboarding';
     }
   };
 
