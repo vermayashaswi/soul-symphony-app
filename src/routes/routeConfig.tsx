@@ -74,42 +74,87 @@ export const websiteRoutes: RouteConfig[] = [
 // App routes (protected in browser, accessible in native app)
 export const appRoutes: RouteConfig[] = [
   {
-    path: '/auth',
+    path: '/app',
+    element: <OnboardingScreen />,
+  },
+  {
+    path: '/app/auth',
     element: <Auth />,
   },
   {
-    path: '/home',
+    path: '/app/home',
     element: <Home />,
     requiresAuth: true,
   },
   {
-    path: '/journal',
+    path: '/app/journal',
     element: <Journal />,
     requiresAuth: true,
   },
   {
-    path: '/insights',
+    path: '/app/insights',
     element: <Insights />,
     requiresAuth: true,
   },
   {
-    path: '/smart-chat',
+    path: '/app/smart-chat',
     element: <SmartChat />,
     requiresAuth: true,
   },
   {
-    path: '/settings',
+    path: '/app/settings',
     element: <Settings />,
     requiresAuth: true,
   },
   {
-    path: '/onboarding',
+    path: '/app/onboarding',
     element: <OnboardingScreen />,
+  },
+  // Legacy redirects
+  {
+    path: '/app/chat',
+    element: null,
+    redirectPath: '/app/smart-chat',
+  },
+  {
+    path: '/auth',
+    element: null,
+    redirectPath: '/app/auth',
+  },
+  {
+    path: '/home',
+    element: null,
+    redirectPath: '/app/home',
+  },
+  {
+    path: '/journal',
+    element: null,
+    redirectPath: '/app/journal',
+  },
+  {
+    path: '/insights',
+    element: null,
+    redirectPath: '/app/insights',
+  },
+  {
+    path: '/smart-chat',
+    element: null,
+    redirectPath: '/app/smart-chat',
+  },
+  {
+    path: '/settings',
+    element: null,
+    redirectPath: '/app/settings',
+  },
+  {
+    path: '/onboarding',
+    element: null,
+    redirectPath: '/app/onboarding',
   },
   {
     path: '/chat',
     element: null,
-    redirectPath: '/smart-chat',
+    redirectPath: '/app/smart-chat',
   },
 ];
 

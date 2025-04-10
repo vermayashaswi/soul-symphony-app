@@ -13,6 +13,11 @@ export const isNativeApp = (): boolean => {
          window.location.href.includes('localhost');
 };
 
+// Check if the current route is an app route (starts with /app)
+export const isAppRoute = (path: string): boolean => {
+  return path.startsWith('/app');
+};
+
 interface RouteWrapperProps {
   children: React.ReactNode;
 }
@@ -33,14 +38,25 @@ export const AppRouteWrapper: React.FC<AppRouteProps> = ({ element, requiresAuth
   const { user } = useAuth();
   const location = useLocation();
   
-  // Redirect to app download page if not in native app
-  if (!isNativeApp()) {
+  // If we're in a browser but the URL is /app/*, check if it's an authorized app view
+  if (!isNativeApp() && isAppRoute(location.pathname)) {
+    // For auth route, allow access even in browser
+    if (location.pathname === '/app/auth') {
+      return <MobilePreviewWrapper>{element}</MobilePreviewWrapper>;
+    }
+    
+    // For onboarding, allow access even in browser
+    if (location.pathname === '/app' || location.pathname === '/app/onboarding') {
+      return <MobilePreviewWrapper>{element}</MobilePreviewWrapper>;
+    }
+    
+    // For other app routes in browser, redirect to download
     return <Navigate to="/app-download" replace />;
   }
   
   // For auth route, redirect to home if already logged in
-  if (location.pathname === '/auth' && user) {
-    return <Navigate to="/home" replace />;
+  if (location.pathname === '/app/auth' && user) {
+    return <Navigate to="/app/home" replace />;
   }
   
   // Wrap in protection if needed
@@ -76,12 +92,14 @@ interface HomeRouteProps {
 
 export const HomeRouteWrapper: React.FC<HomeRouteProps> = ({ element, onboardingElement }) => {
   const { user } = useAuth();
+  const location = useLocation();
   
   if (isNativeApp()) {
     if (user) {
-      return <Navigate to="/home" replace />;
+      return <Navigate to="/app/home" replace />;
     } else {
-      return <MobilePreviewWrapper>{element}</MobilePreviewWrapper>;
+      // In native app with no user, show app onboarding
+      return <Navigate to="/app" replace />;
     }
   } else {
     // Website visitors see the landing page

@@ -36,7 +36,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   
   useEffect(() => {
     if (!isLoading && !user) {
-      console.log("Protected route: No user, should redirect to /auth", {
+      console.log("Protected route: No user, should redirect to /app/auth", {
         path: location.pathname
       });
     }
@@ -52,7 +52,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   
   if (!user) {
     console.log("Redirecting to auth from protected route:", location.pathname);
-    return <Navigate to={`/auth?redirectTo=${location.pathname}`} replace />;
+    return <Navigate to={`/app/auth?redirectTo=${location.pathname}`} replace />;
   }
   
   return <>{children}</>;

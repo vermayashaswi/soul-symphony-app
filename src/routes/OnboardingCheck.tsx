@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { isNativeApp } from './RouteHelpers';
+import { isNativeApp, isAppRoute } from './RouteHelpers';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import { MobilePreviewWrapper } from './RouteHelpers';
 
@@ -20,8 +20,8 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   const { user } = useAuth();
   const location = useLocation();
   
-  const isAuthRoute = location.pathname === '/auth';
-  const isOnboardingRoute = location.pathname === '/onboarding';
+  const isAuthRoute = location.pathname === '/app/auth';
+  const isOnboardingRoute = location.pathname === '/app/onboarding' || location.pathname === '/app';
   const isOnboardingBypassedRoute = isAuthRoute || 
     location.pathname.includes('debug') || 
     location.pathname.includes('admin');
@@ -34,19 +34,17 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
     );
   }
   
-  const shouldShowOnboarding = 
-    !user && 
-    !onboardingComplete && 
-    !isOnboardingBypassedRoute &&
-    !isOnboardingRoute && 
-    isNativeApp();
-  
-  if (shouldShowOnboarding) {
-    return (
-      <MobilePreviewWrapper>
-        <OnboardingScreen />
-      </MobilePreviewWrapper>
-    );
+  // Only check onboarding for app routes
+  if (isAppRoute(location.pathname)) {
+    const shouldShowOnboarding = 
+      !user && 
+      !onboardingComplete && 
+      !isOnboardingBypassedRoute &&
+      !isOnboardingRoute;
+    
+    if (shouldShowOnboarding) {
+      return <Navigate to="/app" replace />;
+    }
   }
   
   return <>{children}</>;

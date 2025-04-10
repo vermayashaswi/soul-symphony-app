@@ -26,6 +26,9 @@ const Navbar = () => {
           <Button variant="ghost" asChild>
             <Link to="/faq">FAQ</Link>
           </Button>
+          <Button variant="primary" asChild>
+            <Link to="/app">Open App</Link>
+          </Button>
         </div>
       </div>
     </motion.nav>

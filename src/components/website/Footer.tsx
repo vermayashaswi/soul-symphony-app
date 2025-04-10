@@ -54,6 +54,9 @@ const Footer = () => {
             <Play className="h-5 w-5" />
             <span>Google Play</span>
           </Button>
+          <Button variant="outline" asChild>
+            <Link to="/app">Try Web App</Link>
+          </Button>
         </div>
         
         <p className="text-muted-foreground mb-8">

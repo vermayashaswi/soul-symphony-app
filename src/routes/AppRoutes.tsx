@@ -8,6 +8,7 @@ import { useOnboarding } from '@/hooks/use-onboarding';
 import { websiteRoutes, appRoutes, specialRoutes } from './routeConfig';
 import { 
   isNativeApp, 
+  isAppRoute,
   AppRouteWrapper, 
   WebsiteRouteWrapper, 
   RedirectRoute,
@@ -36,18 +37,10 @@ const AppRoutes = () => {
       console.log("Auth event outside React context:", event, session?.user?.email);
     });
     
-    // Redirect to download page if accessing app routes from a browser (non-native)
-    const isWebsiteRoute = websiteRoutes.some(route => route.path === location.pathname);
-    
-    if (!isWebsiteRoute && !isNativeApp() && location.pathname !== '/') {
-      console.log("Browser trying to access app route, redirecting to download page");
-      window.location.href = '/app-download';
-    }
-    
     return () => {
       subscription.unsubscribe();
     };
-  }, [location.pathname]);
+  }, []);
   
   // Find the NotFound route
   const notFoundRoute = specialRoutes.find(route => route.path === '*');
