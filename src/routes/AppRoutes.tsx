@@ -18,6 +18,7 @@ import OnboardingCheck from './OnboardingCheck';
 import MobileNavigation from './MobileNavigation';
 import Index from '@/pages/Index';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import NotFound from '@/pages/NotFound';
 
 const ScrollToTop = () => {
   useScrollRestoration();
@@ -47,6 +48,9 @@ const AppRoutes = () => {
       subscription.unsubscribe();
     };
   }, [location.pathname]);
+  
+  // Find the NotFound route
+  const notFoundRoute = specialRoutes.find(route => route.path === '*');
   
   return (
     <>
@@ -99,7 +103,7 @@ const AppRoutes = () => {
           {/* Catch all (404) */}
           <Route
             path="*"
-            element={<WebsiteRouteWrapper>{specialRoutes[1].element}</WebsiteRouteWrapper>}
+            element={<WebsiteRouteWrapper>{notFoundRoute ? notFoundRoute.element : <NotFound />}</WebsiteRouteWrapper>}
           />
         </Routes>
         
