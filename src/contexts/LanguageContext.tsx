@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // Define supported languages
@@ -458,4 +459,125 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     'testimonials.title': 'Что говорят наши пользователи',
     'testimonials.description': 'Присоединяйтесь к тысячам людей, которые изменили свою практику самоанализа с помощью SOuLO',
     'howItWorks.title': 'Как это работает',
-    'howItWorks.description': 'Начните свой путь самопознания в три простых шага
+    'howItWorks.description': 'Начните свой путь самопознания в три простых шага',
+    'howItWorks.step1.title': 'Запишите свои мысли',
+    'howItWorks.step1.description': 'Говорите свободно о своем дне, чувствах или любых мыслях, которые вы хотите записать. Писать не нужно!',
+    'howItWorks.step2.title': 'ИИ анализирует вашу запись',
+    'howItWorks.step2.description': 'Наш ИИ расшифровывает ваш голос и анализирует эмоциональные шаблоны и ключевые темы в вашей записи.',
+    'howItWorks.step3.title': 'Получите персонализированные выводы',
+    'howItWorks.step3.description': 'Обнаружите закономерности, отслеживайте эмоциональные тенденции со временем и получайте индивидуальные выводы для поддержки вашего роста.',
+    'onboarding.languageSelection.title': 'Выберите ваш язык',
+    'onboarding.languageSelection.description': 'Выберите предпочитаемый язык для работы с SOuLO',
+    'onboarding.continue': 'Продолжить',
+    'home.journal': 'Ваш дневник',
+    'home.today': 'Сегодня',
+  },
+  pt: {
+    'app.download': 'Baixar',
+    'app.tryWebApp': 'Experimentar App Web',
+    'nav.blog': 'Blog',
+    'nav.faq': 'Perguntas Frequentes',
+    'hero.title': 'Expressar. Refletir. Crescer.',
+    'hero.subtitle': 'Fazer um diário deve ser tão simples quanto falar. Use a voz e deixe o resto conosco.',
+    'app.appStore': 'App Store',
+    'app.googlePlay': 'Google Play',
+    'app.privacyFocused': 'Focado em privacidade',
+    'app.freeTrial': 'Teste gratuito de 14 dias',
+    'features.voiceJournaling.title': 'Diário por voz',
+    'features.voiceJournaling.description': 'Grave seus pensamentos com a voz e deixe o SOuLO transcrevê-los e analisá-los automaticamente.',
+    'features.aiAnalysis.title': 'Análise de IA',
+    'features.aiAnalysis.description': 'Obtenha insights sobre seus padrões e emoções através da análise avançada de IA.',
+    'features.emotionalTracking.title': 'Acompanhamento emocional',
+    'features.emotionalTracking.description': 'Visualize sua jornada emocional ao longo do tempo com gráficos interativos.',
+    'features.aiAssistant.title': 'Assistente de IA',
+    'features.aiAssistant.description': 'Converse com seu diário e obtenha insights personalizados das suas entradas passadas.',
+    'pricing.free': 'Gratuito',
+    'pricing.premium': 'Premium',
+    'pricing.monthly': 'Mensal',
+    'pricing.yearly': 'Anual',
+    'pricing.lifetime': 'Vitalício',
+    'pricing.getStarted': 'Começar',
+    'pricing.choosePremium': 'Escolher Premium',
+    'newsletter.title': 'Mantenha-se atualizado',
+    'newsletter.description': 'Inscreva-se em nossa newsletter para receber atualizações do produto, dicas de diário e conteúdo exclusivo.',
+    'newsletter.emailPlaceholder': 'Seu endereço de e-mail',
+    'newsletter.subscribe': 'Inscrever-se',
+    'privacy.title': 'Sua privacidade é nossa prioridade',
+    'privacy.description': 'No SOuLO, acreditamos que seus pensamentos e sentimentos pessoais devem permanecer privados. Construímos nossa plataforma com a privacidade em seu núcleo.',
+    'privacy.learnMore': 'Saiba mais sobre nossa privacidade',
+    'testimonials.title': 'O que nossos usuários dizem',
+    'testimonials.description': 'Junte-se a milhares de pessoas que transformaram sua prática de autorreflexão com o SOuLO',
+    'howItWorks.title': 'Como funciona',
+    'howItWorks.description': 'Comece sua jornada de autodescoberta em três passos simples',
+    'howItWorks.step1.title': 'Grave seus pensamentos',
+    'howItWorks.step1.description': 'Fale livremente sobre seu dia, sentimentos ou quaisquer pensamentos que deseje capturar. Não é necessário escrever!',
+    'howItWorks.step2.title': 'A IA analisa sua entrada',
+    'howItWorks.step2.description': 'Nossa IA transcreve sua voz e analisa os padrões emocionais e temas-chave em sua entrada.',
+    'howItWorks.step3.title': 'Obtenha insights personalizados',
+    'howItWorks.step3.description': 'Descubra padrões, acompanhe tendências emocionais ao longo do tempo e obtenha insights personalizados para apoiar seu crescimento.',
+    'onboarding.languageSelection.title': 'Escolha seu idioma',
+    'onboarding.languageSelection.description': 'Selecione seu idioma preferido para a experiência SOuLO',
+    'onboarding.continue': 'Continuar',
+    'home.journal': 'Seu diário',
+    'home.today': 'Hoje',
+  }
+};
+
+// Create the LanguageProvider component
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Try to get the saved language from localStorage, or use browser language, or default to English
+  const getSavedLanguage = (): LanguageCode => {
+    // First check if we have a saved language preference
+    const savedLanguage = localStorage.getItem('preferredLanguage');
+    if (savedLanguage && Object.keys(SUPPORTED_LANGUAGES).includes(savedLanguage)) {
+      return savedLanguage as LanguageCode;
+    }
+    
+    // Try to detect browser language
+    const browserLang = navigator.language.split('-')[0];
+    if (browserLang && Object.keys(SUPPORTED_LANGUAGES).includes(browserLang)) {
+      return browserLang as LanguageCode;
+    }
+    
+    // Default to English
+    return 'en';
+  };
+  
+  const [language, setLanguage] = useState<LanguageCode>(getSavedLanguage());
+  
+  // Save language preference to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('preferredLanguage', language);
+  }, [language]);
+  
+  // Translation function
+  const translate = (key: string, fallback?: string): string => {
+    // First try to get a translation in the current language
+    if (translations[language] && translations[language][key]) {
+      return translations[language][key];
+    }
+    
+    // If not found and not English, try English as fallback
+    if (language !== 'en' && translations.en && translations.en[key]) {
+      return translations.en[key];
+    }
+    
+    // Return fallback or key if all else fails
+    return fallback || key;
+  };
+  
+  return (
+    <LanguageContext.Provider value={{ language, setLanguage, translate }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+};
+
+// Hook for consuming the language context
+export const useLanguage = () => {
+  const context = useContext(LanguageContext);
+  if (context === undefined) {
+    throw new Error('useLanguage must be used within a LanguageProvider');
+  }
+  return context;
+};
