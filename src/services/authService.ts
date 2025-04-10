@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -9,6 +10,8 @@ export const getRedirectUrl = (): string => {
   const origin = window.location.origin;
   const urlParams = new URLSearchParams(window.location.search);
   const redirectTo = urlParams.get('redirectTo');
+  
+  // Store any redirect parameter for later use
   if (redirectTo) {
     localStorage.setItem('authRedirectTo', redirectTo);
   }
@@ -37,8 +40,9 @@ export const getRedirectUrl = (): string => {
   const isProdDomain = window.location.hostname === 'soulo.online' || 
                       window.location.hostname.endsWith('.soulo.online');
   
-  // If we're in production, use the full domain to ensure consistent redirects
+  // IMPORTANT: Always use HTTPS for production URLs to ensure secure auth
   if (isProdDomain) {
+    // Always use the full HTTPS URL for production to ensure consistent redirects
     console.log('Using production auth redirect URL: https://soulo.online/auth');
     return `https://soulo.online/auth`;
   }
@@ -53,24 +57,33 @@ export const getRedirectUrl = (): string => {
  */
 export const signInWithGoogle = async (): Promise<void> => {
   try {
+    // Record login attempt time for debugging
+    localStorage.setItem('loginAttemptTime', Date.now().toString());
+    
+    // Get the correct redirect URL based on environment
     const redirectUrl = getRedirectUrl();
     console.log('Using redirect URL for Google auth:', redirectUrl);
     
     // Clear any existing auth errors in localStorage that might be interfering
     localStorage.removeItem('supabase.auth.error');
     
+    // Generate a unique nonce to prevent caching issues
+    const nonce = Math.random().toString(36).substring(2, 15);
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
         queryParams: {
-          // Add timestamp to prevent caching issues
-          _t: Date.now().toString()
+          // Add timestamp and nonce to prevent caching issues
+          _t: Date.now().toString(),
+          nonce: nonce
         },
       },
     });
 
     if (error) {
+      console.error('Error in signInWithGoogle:', error);
       throw error;
     }
   } catch (error: any) {
@@ -172,6 +185,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       // Clear any auth-related items from local storage
       localStorage.removeItem('authRedirectTo');
       localStorage.removeItem('supabase.auth.error');
+      localStorage.removeItem('loginAttemptTime');
       
       // Redirect to onboarding page if navigate function is provided
       if (navigate) {
@@ -189,6 +203,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
     localStorage.removeItem('supabase.auth.error');
+    localStorage.removeItem('loginAttemptTime');
     
     // Always redirect to onboarding page if navigate function is provided
     if (navigate) {
@@ -203,6 +218,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     }
     localStorage.removeItem('authRedirectTo');
     localStorage.removeItem('supabase.auth.error');
+    localStorage.removeItem('loginAttemptTime');
     
     // Show error toast but don't prevent logout flow
     toast.error(`Error while logging out: ${error.message}`);
@@ -277,6 +293,9 @@ export const handlePWAAuthCompletion = async () => {
         
         return null;
       }
+      
+      // Clean up any stale auth errors
+      localStorage.removeItem('supabase.auth.error');
       
       const { data, error } = await supabase.auth.getSession();
       

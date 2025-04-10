@@ -17,6 +17,7 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState(null);
+  const [loginAttemptTime, setLoginAttemptTime] = useState<number | null>(null);
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -38,6 +39,7 @@ export default function Auth() {
   useEffect(() => {
     const checkAuthState = async () => {
       try {
+        console.log('Checking auth state on Auth page load');
         const { data, error } = await supabase.auth.getSession();
         if (error) {
           console.error('Error checking auth state:', error);
@@ -62,7 +64,10 @@ export default function Auth() {
       console.log('Auth page: User detected, redirecting to:', from);
       setRedirecting(true);
       
+      // Clean up any auth-related items from local storage
       localStorage.removeItem('authRedirectTo');
+      localStorage.removeItem('supabase.auth.error');
+      localStorage.removeItem('loginAttemptTime');
       
       const timer = setTimeout(() => {
         navigate(from, { replace: true });
@@ -74,6 +79,7 @@ export default function Auth() {
 
   useEffect(() => {
     const handleHashRedirect = async () => {
+      // Check for auth callback indicators in URL
       const hasHashParams = window.location.hash.includes('access_token') || 
                            window.location.hash.includes('error') ||
                            window.location.search.includes('error');
@@ -84,6 +90,7 @@ export default function Auth() {
           search: window.location.search 
         });
         
+        // Handle error case first
         if (window.location.hash.includes('error') || window.location.search.includes('error')) {
           const urlParams = new URLSearchParams(window.location.search);
           const errorDescription = urlParams.get('error_description');
@@ -96,6 +103,12 @@ export default function Auth() {
         }
         
         try {
+          console.log('Attempting to process successful auth redirect');
+          
+          // Clean any stale auth error that might be in localStorage
+          localStorage.removeItem('supabase.auth.error');
+          
+          // Get the session after the redirect
           const { data, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -103,14 +116,29 @@ export default function Auth() {
             setAuthError('Authentication error. Please try again.');
             toast.error('Authentication error. Please try again.');
           } else if (data.session) {
-            console.log('Successfully retrieved session after redirect:', data.session.user.email);
+            const loginTimestamp = localStorage.getItem('loginAttemptTime');
+            const loginTime = loginTimestamp ? parseInt(loginTimestamp, 10) : null;
+            const now = Date.now();
+            const loginDuration = loginTime ? now - loginTime : null;
+            
+            console.log('Successfully retrieved session after redirect:', {
+              user: data.session.user.email,
+              timeTaken: loginDuration ? `${loginDuration}ms` : 'unknown'
+            });
+            
             setAuthUser(data.session.user);
+            localStorage.removeItem('loginAttemptTime');
+          } else {
+            console.warn('No session found after redirect despite hash params');
+            setAuthError('Unable to complete sign-in. Please try again.');
           }
         } catch (e) {
           console.error('Exception during auth redirect handling:', e);
           setAuthError('Unexpected error during authentication');
           toast.error('Unexpected error during authentication');
         }
+      } else {
+        console.log('No auth redirect detected in URL');
       }
     };
     
@@ -118,30 +146,40 @@ export default function Auth() {
   }, []);
 
   const handleSignIn = async () => {
-    console.log('Initiating Google sign-in from', window.location.origin);
     setAuthError(null);
+    setLoginAttemptTime(Date.now());
+    localStorage.setItem('loginAttemptTime', Date.now().toString());
+    
+    console.log('Initiating Google sign-in from', window.location.origin);
     
     try {
       const redirectUrl = getRedirectUrl();
       console.log('Using redirect URL:', redirectUrl);
       
-      // Clear any existing auth errors
+      // Clear any existing auth errors or stale session data
       localStorage.removeItem('supabase.auth.error');
+      
+      // Add a unique nonce to prevent caching issues
+      const nonce = Math.random().toString(36).substring(2, 15);
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
           queryParams: {
-            // Add timestamp to prevent caching issues
-            _t: Date.now().toString()
+            // Add timestamp and nonce to prevent caching issues
+            _t: Date.now().toString(),
+            nonce: nonce
           },
         },
       });
       
       if (error) {
+        console.error('Failed to initiate Google sign-in:', error);
         throw error;
       }
+      
+      console.log('Google OAuth flow initiated successfully');
     } catch (error) {
       console.error('Failed to initiate Google sign-in:', error);
       setAuthError('Failed to initiate sign-in process. Please try again.');
