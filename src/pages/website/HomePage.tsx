@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail } from 'lucide-react';
@@ -620,4 +621,55 @@ const HomePage = () => {
                     </li>
                     <li className="flex items-start gap-3">
                       <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <
+                      <span className="text-gray-600">AI-powered insights</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-gray-600">Smart chat with your journal</span>
+                    </li>
+                  </ul>
+                  <Button 
+                    className="w-full"
+                  >
+                    Choose Premium
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      {/* Newsletter Section */}
+      <section className="py-16 md:py-24 bg-gradient-to-br from-primary/10 to-purple-100">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-2xl mx-auto">
+            <span className="px-3 py-1 rounded-full bg-white text-primary text-sm font-medium mb-4 inline-block">Newsletter</span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Stay Updated</h2>
+            <p className="text-gray-600 mb-8">
+              Subscribe to our newsletter for product updates, journaling tips, and exclusive content.
+            </p>
+            
+            <form onSubmit={handleEmailSubmit} className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
+              <Input
+                type="email"
+                placeholder="Your email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="bg-white"
+              />
+              <Button type="submit">
+                Subscribe
+              </Button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <Footer />
+    </div>
+  );
+};
+
+export default HomePage;
