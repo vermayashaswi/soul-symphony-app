@@ -19,6 +19,7 @@ import MobileNavigation from './MobileNavigation';
 import HomePage from '@/pages/website/HomePage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import NotFound from '@/pages/NotFound';
+import Navbar from '@/components/website/Navbar'; // Import the website Navbar component
 
 const ScrollToTop = () => {
   useScrollRestoration();
@@ -44,10 +45,16 @@ const AppRoutes = () => {
   // Find the NotFound route
   const notFoundRoute = specialRoutes.find(route => route.path === '*');
   
+  // Determine if we should show the website navbar
+  const shouldShowWebsiteNavbar = !isNativeApp() && !isAppRoute(location.pathname);
+  
   return (
     <>
       <ViewportManager />
       <ScrollToTop />
+      
+      {/* Render website navbar when not in app routes and not in native app */}
+      {shouldShowWebsiteNavbar && <Navbar />}
       
       <OnboardingCheck 
         onboardingComplete={onboardingComplete} 
