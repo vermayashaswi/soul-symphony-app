@@ -91,7 +91,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
     
     return data.map(item => ({
       date: new Date(item.date),
-      sentiment: parseFloat(item.sentiment || 0)
+      sentiment: parseFloat(String(item.sentiment || 0))
     }));
   };
 
@@ -201,7 +201,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           sentiment: data ? data.total / data.count : null
         } as ChartDataPointWithDate;
       }).filter(item => item.sentiment !== null);
-    } 
+    }
     
     if (timeRange === 'week') {
       const startOfWeekDate = startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -214,7 +214,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
           sentiment: dailySentiment.get(dateStr) || null
         } as ChartDataPointWithDate;
       });
-    } 
+    }
     
     if (timeRange === 'month') {
       const startOfMonthDate = startOfMonth(new Date());
