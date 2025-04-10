@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, MessageSquare, Trash2, ChevronRight, Pencil, Check } from "lucide-react";
+import { PlusCircle, MessageSquare, Trash2, X, Pencil, Check } from "lucide-react";
 import { getUserChatThreads } from "@/services/chatPersistenceService";
 import { updateThreadTitle } from "@/services/chat/threadService";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,7 +42,6 @@ export default function ChatThreadList({
       setLoading(false);
     }
     
-    // Listen for thread title updates
     const handleThreadTitleUpdate = (event: CustomEvent) => {
       if (event.detail.threadId && event.detail.title) {
         chatDebug?.addEvent("Thread Update", `Updating thread title: ${event.detail.threadId} -> ${event.detail.title}`, "info");
@@ -61,7 +60,6 @@ export default function ChatThreadList({
     };
   }, [userId]);
 
-  // Focus the input when editing begins
   useEffect(() => {
     if (editingThreadId && editInputRef.current) {
       editInputRef.current.focus();
@@ -103,7 +101,6 @@ export default function ChatThreadList({
         chatDebug?.addEvent("Thread Creation", `Created new thread: ${newThreadId}`, "success");
         console.log("Created new thread:", newThreadId);
         
-        // Reload threads to include the new one
         await loadThreads();
       }
     } catch (error) {
@@ -149,7 +146,6 @@ export default function ChatThreadList({
       chatDebug?.addEvent("Thread Deletion", "Thread and messages deleted successfully", "success");
       setThreads(prev => prev.filter(thread => thread.id !== threadId));
       
-      // If we're deleting the current thread, trigger a new thread creation
       if (threadId === currentThreadId) {
         chatDebug?.addEvent("Thread Deletion", "Deleted current thread, creating new thread", "info");
         console.log("Deleted current thread, creating new thread");
@@ -232,18 +228,20 @@ export default function ChatThreadList({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-2 border-b">
+      <div className="p-2 border-b flex items-center justify-between">
         {newChatButtonWidth === "full" ? (
-          <Button
-            variant="default"
-            className="w-full justify-start"
-            onClick={handleNewThread}
-          >
-            <PlusCircle className="h-4 w-4 mr-2" />
-            New Chat
-          </Button>
+          <>
+            <Button
+              variant="default"
+              className="w-full justify-start"
+              onClick={handleNewThread}
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              New Chat
+            </Button>
+          </>
         ) : (
-          <div className="flex gap-2">
+          <>
             <Button
               variant="default"
               className="flex-1 justify-center"
@@ -258,9 +256,9 @@ export default function ChatThreadList({
               className="h-9 w-9"
               onClick={() => window.dispatchEvent(new CustomEvent('closeChatSidebar'))}
             >
-              <ChevronRight className="h-4 w-4" />
+              <X className="h-4 w-4" />
             </Button>
-          </div>
+          </>
         )}
       </div>
       

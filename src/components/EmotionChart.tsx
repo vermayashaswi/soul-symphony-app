@@ -234,21 +234,21 @@ export function EmotionChart({
 
   const handleLegendClick = (emotion: string) => {
     setVisibleEmotions(prev => {
-      if (prev.length > 1 && prev.includes(emotion)) {
-        return [emotion];
-      }
-      
-      if (prev.length === 1 && prev.includes(emotion)) {
-        return lineData.length > 0 
-          ? Object.keys(lineData[0]).filter(key => key !== 'day')
-          : [];
-      }
-      
-      if (!prev.includes(emotion)) {
+      if (prev.includes(emotion)) {
+        // If clicking on an already selected emotion
+        if (prev.length > 1) {
+          // If more than one emotion is selected, deselect the clicked one
+          return prev.filter(e => e !== emotion);
+        } else {
+          // If only one emotion is selected, show all emotions
+          return lineData.length > 0 
+            ? Object.keys(lineData[0]).filter(key => key !== 'day')
+            : [];
+        }
+      } else {
+        // If clicking on an unselected emotion, add it to selection
         return [...prev, emotion];
       }
-      
-      return prev.filter(e => e !== emotion);
     });
   };
 

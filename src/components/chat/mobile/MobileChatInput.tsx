@@ -75,7 +75,7 @@ export default function MobileChatInput({
           onChange={handleInputChange}
           onKeyDown={handleKeyPress}
           placeholder="Type your message..."
-          className="w-full border rounded-lg py-2 px-3 pr-10 focus:outline-none focus:ring-1 focus:ring-primary resize-none min-h-[40px] max-h-[120px] bg-background"
+          className="w-full border rounded-lg py-2 px-3 pr-10 focus:outline-none focus:ring-1 focus:ring-primary resize-none min-h-[32px] max-h-[120px] bg-background"
           disabled={isLoading || isSubmitting}
         />
       </div>

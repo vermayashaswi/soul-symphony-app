@@ -85,6 +85,16 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [currentYear, setCurrentYear] = useState<Date>(new Date());
   
+  const getSentimentData = () => {
+    const data = sentimentData || [];
+    if (data.length === 0) return [];
+    
+    return data.map(item => ({
+      date: new Date(item.date),
+      sentiment: parseFloat(item.sentiment || 0)
+    }));
+  };
+
   const filteredData = React.useMemo(() => {
     const now = new Date();
     let fromDate: Date;
@@ -120,11 +130,11 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         fromDate = subDays(now, 30);
     }
     
-    return sentimentData.filter(item => item.date >= fromDate && item.date <= toDate);
+    return getSentimentData().filter(item => item.date >= fromDate && item.date <= toDate);
   }, [sentimentData, timeRange, currentYear, currentMonth]);
 
   const allSentimentData = React.useMemo(() => {
-    return sentimentData;
+    return getSentimentData();
   }, [sentimentData]);
 
   const dailySentiment = React.useMemo(() => {
@@ -138,7 +148,7 @@ export default function SentimentCalendar({ sentimentData, timeRange }: Sentimen
         sentimentMap.set(dateKey, { total: 0, count: 0 });
       }
       const current = sentimentMap.get(dateKey)!;
-      current.total += item.sentiment;
+      current.total += item.sentiment || 0;
       current.count += 1;
     });
     

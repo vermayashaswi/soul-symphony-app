@@ -38,7 +38,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Type your message..."
-            className="min-h-[40px] md:min-h-[40px] text-sm md:text-base resize-none rounded-full pl-4 pr-16 py-2 shadow-sm border-muted bg-background"
+            className="min-h-[32px] md:min-h-[32px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-16 py-1 shadow-sm border-muted bg-background"
             disabled={isLoading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -53,10 +53,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
           <Button 
             type="submit" 
             size={isMobile ? "sm" : "default"}
-            className="rounded-full h-10 w-10 p-0 bg-primary text-primary-foreground"
+            className="rounded-full h-8 w-8 p-0 bg-primary text-primary-foreground"
             disabled={isLoading}
           >
-            <Send className="h-5 w-5" />
+            <Send className="h-4 w-4" />
           </Button>
         </div>
       </form>
