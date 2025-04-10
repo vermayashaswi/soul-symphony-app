@@ -5,7 +5,6 @@ import { ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { OptimizedImage } from '@/utils/imageUtils';
 
 const blogPosts = [
   {
@@ -63,7 +62,7 @@ const BlogPreview = () => {
               <Link to={`/blog/${post.id}`}>
                 <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
                   <div className="relative h-48 overflow-hidden">
-                    <OptimizedImage 
+                    <img 
                       src={post.image} 
                       alt={post.title} 
                       className="object-cover w-full h-full transform hover:scale-105 transition-transform duration-500"

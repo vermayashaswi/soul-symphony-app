@@ -8,27 +8,27 @@ import { Card, CardContent } from '@/components/ui/card';
 const features = [
   {
     title: "Voice Journaling",
-    description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically.",
+    description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
     icon: Mic,
-    image: "https://cdn.dribbble.com/users/1210339/screenshots/4663953/media/8b7cef39e44cd120b7f647b584eaa5ca.gif",
+    image: "/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png",
   },
   {
     title: "AI Analysis",
     description: "Gain insights into your patterns and emotions through advanced AI analysis.",
     icon: Brain,
-    image: "https://cdn.dribbble.com/users/1723105/screenshots/5694740/media/ee962b0c153fac1e3902ba6a93d72333.gif",
+    image: "/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png",
   },
   {
     title: "Emotional Tracking",
     description: "Visualize your emotional journey over time with interactive charts.",
     icon: LineChart,
-    image: "https://cdn.dribbble.com/users/1369921/screenshots/16411291/media/d57f6aafac4bd54f92c34b4c5048a9b9.png",
+    image: "/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png",
   },
   {
     title: "AI Assistant",
     description: "Chat with your journal and get personalized insights from your past entries.",
     icon: MessageSquare,
-    image: "https://cdn.dribbble.com/users/257123/screenshots/15291004/media/9f5df559c3c4d6ea739af7a6e4275103.png",
+    image: "/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png",
   }
 ];
 
@@ -50,7 +50,7 @@ const AppFeatureCarousel = () => {
           <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
             App Features
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOuLO's Features</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOULo's Features</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
           </p>

@@ -14,7 +14,6 @@ import Testimonials from './components/Testimonials';
 import BlogPreview from './components/BlogPreview';
 import PrivacySection from './components/PrivacySection';
 import Footer from './components/Footer';
-import { OptimizedImage } from '@/utils/imageUtils';
 
 const LandingPage = () => {
   const containerVariants = {
@@ -41,7 +40,7 @@ const LandingPage = () => {
     {
       icon: Mic,
       title: "Voice Journaling",
-      description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically."
+      description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically."
     },
     {
       icon: Brain,
@@ -83,14 +82,14 @@ const LandingPage = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <motion.div className="w-full md:w-1/2 text-center md:text-left" variants={itemVariants}>
               <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
-                Introducing SOuLO
+                Introducing SOULo
               </span>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
                 Express. Reflect.{" "}
                 <span className="text-primary">Grow.</span>
               </h1>
               <p className="text-xl md:text-2xl mb-8 text-muted-foreground">
-                Discover yourself through voice journaling and AI-powered insights with SOuLO.
+                Discover yourself through voice journaling and AI-powered insights with SOULo.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                 <Button size="lg" className="group">
@@ -111,10 +110,9 @@ const LandingPage = () => {
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
                 <div className="relative bg-card backdrop-blur-sm border border-primary/10 rounded-2xl p-6 shadow-xl overflow-hidden">
                   <div className="absolute -right-20 -top-20 w-40 h-40 bg-primary/10 rounded-full blur-3xl"></div>
-                  {/* Replace app screenshot with spiritual robot animation */}
                   <img 
-                    src="https://media3.giphy.com/media/JpYdtQifMv3SAsnf6t/giphy.gif" 
-                    alt="Spiritual robot with glowing brain and soul" 
+                    src="/lovable-uploads/586c1ed2-eaed-4063-a18d-500e7085909d.png" 
+                    alt="SOULo App Screenshot" 
                     className="w-full rounded-lg shadow-lg relative z-10"
                   />
                 </div>
