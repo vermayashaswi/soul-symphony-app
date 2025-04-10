@@ -11,6 +11,8 @@ import Navbar from '@/components/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
 import HeroSection from '@/components/landing/HeroSection';
 import FeaturesGrid from '@/components/landing/FeaturesGrid';
+import { useLanguage } from '@/contexts/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -18,6 +20,7 @@ const Index = () => {
   const { colorTheme } = useTheme();
   const isMobile = useIsMobile();
   const { resetOnboarding } = useOnboarding();
+  const { translate } = useLanguage();
 
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -59,6 +62,11 @@ const Index = () => {
         animate="visible"
         variants={containerVariants}
       >
+        {/* Add Language Selector */}
+        <div className="flex justify-end mb-4">
+          <LanguageSelector />
+        </div>
+        
         <HeroSection user={user} />
         <FeaturesGrid />
       </motion.main>

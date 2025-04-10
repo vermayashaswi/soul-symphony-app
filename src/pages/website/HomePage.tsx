@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -25,12 +24,14 @@ import SouloLogo from '@/components/SouloLogo';
 import Footer from '@/components/website/Footer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const HomePage = () => {
   const isMobile = useIsMobile();
   const [email, setEmail] = useState('');
   const [activeFeature, setActiveFeature] = useState(0);
   const [pricingMode, setPricingMode] = useState('monthly');
+  const { translate } = useLanguage();
   
   const openAppStore = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -70,27 +71,25 @@ const HomePage = () => {
     alert('Thanks for subscribing!');
   };
 
-  // Updated features with correct icons that match the descriptions better
   const features = [
     {
-      title: "Voice Journaling",
-      description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically.",
+      title: translate('features.voiceJournaling.title', "Voice Journaling"),
+      description: translate('features.voiceJournaling.description', "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically."),
       icon: AudioWaveform,
-      // We'll create custom illustrations for these features in the component
     },
     {
-      title: "AI Analysis",
-      description: "Gain insights into your patterns and emotions through advanced AI analysis.",
+      title: translate('features.aiAnalysis.title', "AI Analysis"),
+      description: translate('features.aiAnalysis.description', "Gain insights into your patterns and emotions through advanced AI analysis."),
       icon: Sparkles,
     },
     {
-      title: "Emotional Tracking",
-      description: "Visualize your emotional journey over time with interactive charts.",
+      title: translate('features.emotionalTracking.title', "Emotional Tracking"),
+      description: translate('features.emotionalTracking.description', "Visualize your emotional journey over time with interactive charts."),
       icon: BarChart3,
     },
     {
-      title: "AI Assistant",
-      description: "Chat with your journal and get personalized insights from your past entries.",
+      title: translate('features.aiAssistant.title', "AI Assistant"),
+      description: translate('features.aiAssistant.description', "Chat with your journal and get personalized insights from your past entries."),
       icon: MessagesSquare,
     }
   ];
@@ -154,7 +153,6 @@ const HomePage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Custom feature illustrations component
   const FeatureIllustration = ({ type }) => {
     if (type === "Voice Journaling") {
       return (
@@ -277,10 +275,10 @@ const HomePage = () => {
               className="w-full lg:w-1/2 text-center lg:text-left"
             >
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
-                Express. Reflect. <span className="text-primary">Grow.</span>
+                {translate('hero.title', 'Express. Reflect. Grow.')}
               </h1>
               <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-2xl mx-auto lg:mx-0">
-                Journaling should be as simple as talking. Use voice and leave the rest to us.
+                {translate('hero.subtitle', 'Journaling should be as simple as talking. Use voice and leave the rest to us.')}
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
@@ -290,7 +288,7 @@ const HomePage = () => {
                   onClick={openAppStore}
                 >
                   <Apple className="h-5 w-5" />
-                  <span>App Store</span>
+                  <span>{translate('app.appStore', 'App Store')}</span>
                 </Button>
                 <Button 
                   size="lg" 
@@ -298,25 +296,25 @@ const HomePage = () => {
                   onClick={openPlayStore}
                 >
                   <Play className="h-5 w-5" />
-                  <span>Google Play</span>
+                  <span>{translate('app.googlePlay', 'Google Play')}</span>
                 </Button>
                 <Button 
                   size="lg" 
                   variant="outline" 
                   asChild
                 >
-                  <a href="/app">Try Web App</a>
+                  <a href="/app">{translate('app.tryWebApp', 'Try Web App')}</a>
                 </Button>
               </div>
               
               <div className="flex items-center justify-center lg:justify-start gap-8 text-sm text-gray-500">
                 <div className="flex items-center gap-1">
                   <Shield className="h-4 w-4 text-primary" />
-                  <span>Privacy-Focused</span>
+                  <span>{translate('app.privacyFocused', 'Privacy-Focused')}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Check className="h-4 w-4 text-primary" />
-                  <span>14-Day Free Trial</span>
+                  <span>{translate('app.freeTrial', '14-Day Free Trial')}</span>
                 </div>
               </div>
             </motion.div>
@@ -327,25 +325,19 @@ const HomePage = () => {
               transition={{ duration: 1, delay: 0.3 }}
               className="w-full lg:w-1/2"
             >
-              {/* Spiritual Robot Animation with Glowing Brain and Soul */}
               <div className="relative mx-auto max-w-md">
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
                 <div className="relative overflow-hidden shadow-2xl border border-white/50 rounded-xl bg-black">
-                  {/* We're using Lottie animation for the robot */}
                   <div className="w-full h-auto relative pt-[100%]">
-                    {/* Background glow effects */}
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="w-32 h-32 rounded-full bg-blue-500/30 animate-pulse blur-xl absolute"></div>
                       <div className="w-24 h-24 rounded-full bg-purple-500/30 animate-pulse blur-xl absolute"></div>
                     </div>
                     
-                    {/* HTML/CSS animation fallback if no lottie available */}
                     <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
                       <div className="relative w-60 h-60">
-                        {/* Robot head outline */}
                         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-48 rounded-3xl border-2 border-blue-400/80 bg-slate-900/50"></div>
                         
-                        {/* Robot brain - pulsing glow */}
                         <div className="absolute top-[25%] left-1/2 transform -translate-x-1/2 w-28 h-20 rounded-full">
                           <div className="absolute inset-0 bg-blue-500/20 animate-pulse rounded-full blur-lg"></div>
                           <div className="absolute inset-0 bg-blue-400/30 rounded-full"></div>
@@ -353,11 +345,9 @@ const HomePage = () => {
                           <div className="absolute inset-4 bg-blue-200/30 rounded-full animate-pulse"></div>
                         </div>
                         
-                        {/* Robot eyes */}
                         <div className="absolute top-[42%] left-[35%] w-3 h-3 rounded-full bg-blue-400 shadow-lg shadow-blue-400/70 animate-pulse"></div>
                         <div className="absolute top-[42%] left-[58%] w-3 h-3 rounded-full bg-blue-400 shadow-lg shadow-blue-400/70 animate-pulse"></div>
                         
-                        {/* Soul energy - center glow */}
                         <div className="absolute top-[60%] left-1/2 transform -translate-x-1/2 w-14 h-14">
                           <div className="absolute inset-0 bg-purple-500/40 animate-pulse rounded-full blur-lg"></div>
                           <div className="absolute inset-1 bg-purple-400/40 rounded-full animate-[pulse_3s_ease-in-out_infinite]"></div>
@@ -365,7 +355,6 @@ const HomePage = () => {
                           <div className="absolute inset-5 bg-white/90 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]"></div>
                         </div>
                         
-                        {/* Energy flowing lines */}
                         <div className="absolute inset-0 opacity-80">
                           <div className="absolute top-[45%] left-[20%] right-[20%] h-[1px] bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-[pulse_2s_ease-in-out_infinite]"></div>
                           <div className="absolute top-[55%] left-[25%] right-[25%] h-[1px] bg-gradient-to-r from-transparent via-purple-400 to-transparent animate-[pulse_2.5s_ease-in-out_infinite]"></div>
@@ -373,7 +362,6 @@ const HomePage = () => {
                       </div>
                     </div>
                     
-                    {/* Animated text overlay */}
                     <div className="absolute bottom-5 left-0 right-0 text-center text-white text-xs font-mono opacity-80">
                       <div className="inline-block border border-blue-400/30 bg-black/50 px-2 py-1 rounded-md">
                         <span className="animate-pulse">AI</span> × <span className="text-purple-300">Soul</span>

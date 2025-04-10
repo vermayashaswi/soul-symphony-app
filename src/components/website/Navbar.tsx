@@ -4,8 +4,12 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import SouloLogo from '@/components/SouloLogo';
 import { Button } from '@/components/ui/button';
+import LanguageSelector from '@/components/LanguageSelector';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const Navbar = () => {
+  const { translate } = useLanguage();
+  
   const scrollToDownloadSection = () => {
     const downloadSection = document.getElementById('download-section');
     if (downloadSection) {
@@ -27,18 +31,19 @@ const Navbar = () => {
         </Link>
         
         <div className="flex items-center gap-4">
+          <LanguageSelector variant="minimal" />
           <Button variant="ghost" asChild>
-            <Link to="/blog">Blog</Link>
+            <Link to="/blog">{translate('nav.blog', 'Blog')}</Link>
           </Button>
           <Button variant="ghost" asChild>
-            <Link to="/faq">FAQ</Link>
+            <Link to="/faq">{translate('nav.faq', 'FAQ')}</Link>
           </Button>
           <Button 
             variant="default" 
             className="bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={scrollToDownloadSection}
           >
-            Download
+            {translate('app.download', 'Download')}
           </Button>
         </div>
       </div>

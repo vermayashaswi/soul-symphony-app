@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -9,6 +10,8 @@ import { ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/use-theme';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
+import { useLanguage } from '@/contexts/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 const Home = () => {
   const { user } = useAuth();
@@ -17,6 +20,8 @@ const Home = () => {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const navigate = useNavigate();
+  const { translate } = useLanguage();
+  
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   
@@ -131,7 +136,10 @@ const Home = () => {
     <div className="min-h-screen bg-background text-foreground">
       <div className="p-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold text-theme">{getJournalName()}</h1>
-        <p className="text-muted-foreground font-medium">{formattedDate}</p>
+        <div className="flex items-center gap-4">
+          <LanguageSelector variant="minimal" />
+          <p className="text-muted-foreground font-medium">{formattedDate}</p>
+        </div>
       </div>
 
       <motion.div

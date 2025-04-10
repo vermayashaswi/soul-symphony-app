@@ -1,111 +1,22 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
-import { AuthProvider } from "./contexts/AuthContext";
-import { ThemeProvider } from "./hooks/use-theme";
-import { TouchAnimation } from "./components/ui/touch-animation";
-import AppRoutes from "./routes/AppRoutes";
-import "./styles/mobile.css";
-import { useEffect } from 'react';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      meta: {
-        onError: (error: unknown) => {
-          console.error('Query error:', error);
-        }
-      }
-    },
-  },
-});
+import { BrowserRouter as Router } from 'react-router-dom';
+import { ThemeProvider } from '@/hooks/use-theme';
+import { LanguageProvider } from '@/contexts/LanguageContext';
+import AppRoutes from '@/routes/AppRoutes';
+import { Toaster } from '@/components/ui/toaster';
+import '@/App.css';
 
-const App = () => {
-  useEffect(() => {
-    const handleGlobalError = (event: ErrorEvent) => {
-      console.error('Global error:', event.message, {
-        filename: event.filename,
-        lineno: event.lineno,
-        colno: event.colno,
-        stack: event.error?.stack
-      });
-    };
-    
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled promise rejection:', event.reason, {
-        reason: event.reason,
-        stack: event.reason?.stack
-      });
-    };
-    
-    window.addEventListener('error', handleGlobalError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-    
-    const removeLovableBadge = () => {
-      const badgeSelectors = [
-        '.lovable-badge',
-        '[data-lovable-badge]', 
-        '.powered-by-lovable'
-      ];
-      
-      badgeSelectors.forEach(selector => {
-        const badges = document.querySelectorAll(selector);
-        badges.forEach(badge => {
-          badge.remove();
-        });
-      });
-    };
-    
-    removeLovableBadge();
-    
-    setTimeout(removeLovableBadge, 1000);
-    
-    const observer = new MutationObserver(mutations => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList' && mutation.addedNodes.length) {
-          removeLovableBadge();
-        }
-      }
-    });
-    
-    observer.observe(document.body, { childList: true, subtree: true });
-    
-    return () => {
-      window.removeEventListener('error', handleGlobalError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-      observer.disconnect();
-    };
-  }, []);
-  
+function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <ThemeProvider>
-            <AuthProvider>
-              <div className="relative min-h-screen">
-                <div className="relative z-10">
-                  <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
-                    <TouchAnimation />
-                  </div>
-                  <Toaster />
-                  <Sonner position="top-center" closeButton={false} />
-                  <AnimatePresence mode="wait">
-                    <AppRoutes />
-                  </AnimatePresence>
-                </div>
-              </div>
-            </AuthProvider>
-          </ThemeProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <Router>
+          <AppRoutes />
+          <Toaster />
+        </Router>
+      </ThemeProvider>
+    </LanguageProvider>
   );
-};
+}
 
 export default App;
