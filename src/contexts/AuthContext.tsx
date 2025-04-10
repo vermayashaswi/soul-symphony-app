@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +14,8 @@ import {
   refreshSession as refreshSessionService
 } from '@/services/authService';
 import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } from '@/components/debug/DebugPanel';
+import { isAppRoute } from '@/routes/RouteHelpers';
+import { useLocation } from 'react-router-dom';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -30,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
   const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const location = useLocation();
 
   useEffect(() => {
     const checkMobile = () => {
@@ -356,9 +360,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         setIsLoading(false);
 
+        // Only show sign-in notification for app routes, not website routes
         if (event === 'SIGNED_IN') {
           logInfo('User signed in successfully', 'AuthContext');
-          toast.success('Signed in successfully');
+          if (isAppRoute(location.pathname)) {
+            toast.success('Signed in successfully');
+          }
         } else if (event === 'SIGNED_OUT') {
           logInfo('User signed out', 'AuthContext');
           setProfileExistsStatus(null);
@@ -370,7 +377,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAutoRetryTimeoutId(null);
           }
           
-          toast.info('Signed out');
+          // Only show sign-out notification for app routes
+          if (isAppRoute(location.pathname)) {
+            toast.info('Signed out');
+          }
         }
       }
     );
@@ -411,7 +421,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearTimeout(autoRetryTimeoutId);
       }
     };
-  }, [isMobileDevice]);
+  }, [isMobileDevice, location.pathname]);
 
   const value = {
     session,
