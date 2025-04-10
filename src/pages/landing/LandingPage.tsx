@@ -2,10 +2,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Shield, MessageSquare, Brain, LineChart, Mic } from 'lucide-react';
+import { ArrowRight, Shield, MessageSquare, Brain, LineChart, Mic, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import SouloLogo from '@/components/SouloLogo';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 // Components
 import Navbar from '@/components/Navbar';
@@ -18,8 +16,6 @@ import PrivacySection from './components/PrivacySection';
 import Footer from './components/Footer';
 
 const LandingPage = () => {
-  const isMobile = useIsMobile();
-
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -63,6 +59,13 @@ const LandingPage = () => {
     }
   ];
 
+  const scrollToFeatures = () => {
+    const featuresSection = document.getElementById('features');
+    if (featuresSection) {
+      featuresSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <ParticleBackground />
@@ -70,7 +73,7 @@ const LandingPage = () => {
       
       {/* Hero Section */}
       <motion.section
-        className="relative pt-20 pb-12 md:pt-32 md:pb-24 overflow-hidden px-4"
+        className="relative pt-20 pb-16 md:pt-32 md:pb-24 overflow-hidden px-4"
         initial="hidden"
         animate="visible"
         variants={containerVariants}
@@ -78,8 +81,12 @@ const LandingPage = () => {
         <div className="container mx-auto max-w-6xl relative z-10">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <motion.div className="w-full md:w-1/2 text-center md:text-left" variants={itemVariants}>
+              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
+                Introducing SOULo
+              </span>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
-                Express. Reflect. Grow.
+                Express. Reflect.{" "}
+                <span className="text-primary">Grow.</span>
               </h1>
               <p className="text-xl md:text-2xl mb-8 text-muted-foreground">
                 Discover yourself through voice journaling and AI-powered insights with SOULo.
@@ -101,21 +108,33 @@ const LandingPage = () => {
             >
               <div className="relative w-full max-w-sm">
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
-                <div className="relative bg-card backdrop-blur-sm border border-primary/10 rounded-2xl p-6 shadow-xl">
+                <div className="relative bg-card backdrop-blur-sm border border-primary/10 rounded-2xl p-6 shadow-xl overflow-hidden">
+                  <div className="absolute -right-20 -top-20 w-40 h-40 bg-primary/10 rounded-full blur-3xl"></div>
                   <img 
                     src="/lovable-uploads/586c1ed2-eaed-4063-a18d-500e7085909d.png" 
                     alt="SOULo App Screenshot" 
-                    className="w-full rounded-lg shadow-lg"
+                    className="w-full rounded-lg shadow-lg relative z-10"
                   />
                 </div>
               </div>
             </motion.div>
           </div>
+          
+          <motion.div 
+            className="absolute bottom-10 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center gap-2 cursor-pointer"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.5, duration: 0.5 }}
+            onClick={scrollToFeatures}
+          >
+            <span className="text-sm text-muted-foreground">Discover More</span>
+            <ChevronDown className="animate-bounce" />
+          </motion.div>
         </div>
       </motion.section>
       
       {/* Main Tagline */}
-      <section className="py-12 md:py-20 bg-primary/5 backdrop-blur-sm">
+      <section className="py-12 md:py-16 bg-primary/5 backdrop-blur-sm">
         <div className="container mx-auto text-center">
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-medium max-w-4xl mx-auto">
             Keep a journal and capture your day without writing down a single word!
@@ -124,9 +143,16 @@ const LandingPage = () => {
       </section>
       
       {/* Features Grid */}
-      <section className="py-16 md:py-24">
+      <section id="features" className="py-16 md:py-24">
         <div className="container mx-auto max-w-6xl px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">How SOULo Works</h2>
+          <div className="text-center mb-12">
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Features</span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">How SOULo Works</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
+            </p>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {features.map((feature, index) => (
               <motion.div 
@@ -151,11 +177,11 @@ const LandingPage = () => {
       {/* Feature Showcase */}
       <FeatureShowcase />
       
-      {/* App Download Section */}
-      <AppDownloadSection />
-      
       {/* Privacy Section */}
       <PrivacySection />
+      
+      {/* App Download Section */}
+      <AppDownloadSection />
       
       {/* Blog Preview */}
       <BlogPreview />

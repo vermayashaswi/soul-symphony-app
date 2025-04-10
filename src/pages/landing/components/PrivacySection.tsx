@@ -26,8 +26,18 @@ const PrivacySection = () => {
 
   return (
     <section className="py-16 md:py-24 bg-primary/5 relative overflow-hidden">
-      <div className="container mx-auto max-w-6xl px-4">
+      {/* Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-30 pointer-events-none">
+        <div className="absolute -top-20 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-40 -left-20 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 right-40 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
+      </div>
+      
+      <div className="container mx-auto max-w-6xl px-4 relative z-10">
         <div className="text-center mb-12">
+          <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
+            Privacy First
+          </span>
           <motion.h2 
             className="text-3xl md:text-4xl font-bold mb-4"
             initial={{ opacity: 0, y: 20 }}
@@ -52,7 +62,7 @@ const PrivacySection = () => {
           {privacyFeatures.map((feature, index) => (
             <motion.div 
               key={index}
-              className="bg-card border border-primary/10 rounded-xl p-6 shadow-sm"
+              className="bg-card border border-primary/10 rounded-xl p-6 shadow-sm hover:shadow-md transition-all hover:-translate-y-1"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -74,11 +84,14 @@ const PrivacySection = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.5 }}
         >
-          <p className="mb-4 text-muted-foreground">
+          <p className="mb-6 text-muted-foreground max-w-3xl mx-auto">
             The most important thing is that only SOULo app is able to read your entries. We don't send your data to our servers, so we don't have access to your entries. Your privacy is our priority.
           </p>
-          <Button variant="outline" asChild>
-            <Link to="/privacy-policy">Read Our Privacy Policy</Link>
+          <Button variant="outline" asChild className="group">
+            <Link to="/privacy-policy">
+              Read Our Privacy Policy
+              <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
           </Button>
         </motion.div>
       </div>

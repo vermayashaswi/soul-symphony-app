@@ -73,9 +73,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
     hover: { 
       scale: 1.05,
       transition: { 
-        duration: 0.2,
-        yoyo: Infinity,
-        repeatDelay: 0.5
+        duration: 0.2
       }
     }
   };
@@ -86,20 +84,26 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
       animate="animate"
       whileHover="hover"
       variants={cardVariants}
+      className="h-full"
     >
-      <Card className="h-full border-primary/20 overflow-hidden dark:bg-card/75 bg-card/60 backdrop-blur-sm">
-        <CardHeader className="pb-0 pt-4 flex flex-row items-center justify-center gap-2">
-          <motion.div 
-            variants={iconVariants}
-            className="bg-primary/10 rounded-full p-2"
-          >
-            <Icon className="h-6 w-6 text-primary" />
-          </motion.div>
-          <CardTitle>{title}</CardTitle>
+      <Card className="h-full border-primary/20 overflow-hidden dark:bg-card/75 bg-card/60 backdrop-blur-sm hover:border-primary/40 transition-colors">
+        <CardHeader className="pb-0 pt-4">
+          <div className="flex flex-row items-center gap-3 mb-2">
+            <motion.div 
+              variants={iconVariants}
+              className="bg-primary/10 rounded-full p-2 flex-shrink-0"
+            >
+              <Icon className="h-6 w-6 text-primary" />
+            </motion.div>
+            <CardTitle>{title}</CardTitle>
+          </div>
+          <CardDescription className="text-base">{description}</CardDescription>
         </CardHeader>
-        <CardDescription className="text-center px-4 mt-2">{description}</CardDescription>
-        <CardContent className="flex justify-center py-3">
-          <FeatureVisual type={visualType} />
+        <CardContent className="flex justify-center py-3 relative">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-card/30 rounded-md z-0"></div>
+          <div className="relative z-10 w-full">
+            <FeatureVisual type={visualType} />
+          </div>
         </CardContent>
         <CardFooter className="pt-0">
           <motion.div
