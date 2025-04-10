@@ -19,7 +19,6 @@ import MobileNavigation from './MobileNavigation';
 import HomePage from '@/pages/website/HomePage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import NotFound from '@/pages/NotFound';
-import Auth from '@/pages/Auth';
 
 const ScrollToTop = () => {
   useScrollRestoration();
@@ -45,13 +44,6 @@ const AppRoutes = () => {
   // Find the NotFound route
   const notFoundRoute = specialRoutes.find(route => route.path === '*');
   
-  // Debug logs for routing logic
-  useEffect(() => {
-    console.log("Current path:", location.pathname);
-    console.log("User authenticated:", !!user);
-    console.log("Onboarding complete:", onboardingComplete);
-  }, [location.pathname, user, onboardingComplete]);
-  
   return (
     <>
       <ViewportManager />
@@ -76,26 +68,6 @@ const AppRoutes = () => {
                 <WebsiteRouteWrapper><HomePage /></WebsiteRouteWrapper>
               )
             } 
-          />
-          
-          {/* Explicit route for /app to ensure onboarding is shown */}
-          <Route
-            path="/app"
-            element={
-              <AppRouteWrapper element={<OnboardingScreen />} requiresAuth={false} />
-            }
-          />
-          
-          {/* Auth route at /app/auth */}
-          <Route
-            path="/app/auth"
-            element={<Auth />}
-          />
-          
-          {/* Auth route at /auth (redirects to /app/auth) */}
-          <Route
-            path="/auth"
-            element={<RedirectRoute to="/app/auth" />}
           />
           
           {/* Website routes */}

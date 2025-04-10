@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -15,23 +16,13 @@ import {
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
-import { Sparkles, CalendarX } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
-import {
-  TooltipProvider,
-  Tooltip as UITooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { addDays, format, eachDayOfInterval, isAfter, isBefore, isSameDay, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 
 type EmotionData = {
   day: string;
-  dayFormatted: string;
-  rawDate: string;
-  noEntry?: boolean;
-  [key: string]: number | string | boolean | undefined;
+  [key: string]: number | string;
 };
 
 type ChartType = 'line' | 'bubble';
@@ -90,70 +81,6 @@ const getEmotionColor = (emotion: string, index: number): string => {
   return fallbackColors[index % fallbackColors.length];
 };
 
-const CustomDot = (props: any) => {
-  const { cx, cy, stroke, fill, dataKey, payload, value, noEntry } = props;
-
-  if (payload.noEntry) {
-    return (
-      <circle 
-        cx={cx} 
-        cy={cy} 
-        r={5} 
-        fill="#EF4444" 
-        stroke="none" 
-      />
-    );
-  }
-  
-  return (
-    <circle 
-      cx={cx} 
-      cy={cy} 
-      r={4} 
-      fill={fill || stroke} 
-      stroke="#fff" 
-      strokeWidth={2} 
-    />
-  );
-};
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    if (payload[0].payload.noEntry) {
-      return (
-        <div className="bg-background border border-border/50 shadow-lg rounded-lg p-2 text-sm flex items-center gap-2">
-          <CalendarX size={16} className="text-red-500" />
-          <span>No Entry</span>
-          <span className="text-xs text-muted-foreground ml-1">
-            {payload[0].payload.dayFormatted}
-          </span>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="bg-background border border-border/50 shadow-lg rounded-lg p-2">
-        <p className="font-medium mb-1">{payload[0].payload.dayFormatted}</p>
-        {payload.map((entry: any, index: number) => (
-          <div 
-            key={`tooltip-${index}`} 
-            className="flex items-center gap-2 py-0.5"
-          >
-            <div 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: entry.stroke }}
-            ></div>
-            <span className="capitalize">{entry.dataKey}: </span>
-            <span className="font-mono font-medium">{Number(entry.value).toFixed(2)}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  return null;
-};
-
 export function EmotionChart({ 
   className, 
   timeframe = 'week',
@@ -183,7 +110,9 @@ export function EmotionChart({
       if (dataPoints.length > 0) {
         const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
         if (totalScore > 0) {
+          // Average the emotion score
           emotionScores[emotion] = totalScore / dataPoints.length;
+          // Ensure we cap at 1.0
           if (emotionScores[emotion] > 1.0) {
             emotionScores[emotion] = 1.0;
           }
@@ -191,6 +120,7 @@ export function EmotionChart({
       }
     });
     
+    // Filter out any emotions with zero score
     const filteredEmotions = Object.fromEntries(
       Object.entries(emotionScores).filter(([_, value]) => value > 0)
     );
@@ -223,7 +153,7 @@ export function EmotionChart({
       
       setSelectedEmotionInfo({
         name: emotion,
-        percentage: Math.round(percentage * 10) / 10
+        percentage: Math.round(percentage * 10) / 10 // Round to 1 decimal place
       });
       
       setTimeout(() => {
@@ -239,26 +169,33 @@ export function EmotionChart({
     
     const emotionTotals: Record<string, number> = {};
     
+    // This will track date -> emotion -> {total, count} for proper averaging
     const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
     
+    // Process emotion data points
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       let totalValue = 0;
       
       dataPoints.forEach(point => {
+        // Initialize date entry if it doesn't exist
         if (!dateMap.has(point.date)) {
           dateMap.set(point.date, new Map());
         }
         
+        // Get the map for the current date
         const dateEntry = dateMap.get(point.date)!;
         
+        // Initialize emotion entry for this date if it doesn't exist
         if (!dateEntry.has(emotion)) {
           dateEntry.set(emotion, { total: 0, count: 0 });
         }
         
+        // Update totals and counts
         const emotionEntry = dateEntry.get(emotion)!;
         emotionEntry.total += point.value;
         emotionEntry.count += 1;
         
+        // Track total value for sorting top emotions
         totalValue += point.value;
       });
       
@@ -267,58 +204,29 @@ export function EmotionChart({
       }
     });
     
+    // Get top emotions for display
     const topEmotions = Object.entries(emotionTotals)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
+    // Initialize visible emotions to show all emotions by default
     if (visibleEmotions.length === 0 && chartType === 'line') {
       setVisibleEmotions(topEmotions);
     }
     
-    const now = new Date();
-    
-    let dateRange: Date[] = [];
-    
-    if (timeframe === 'week') {
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-      dateRange = eachDayOfInterval({ start: weekStart, end: weekEnd });
-    } else if (timeframe === 'today') {
-      dateRange = [now];
-    } else if (timeframe === 'month') {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      dateRange = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    } else if (timeframe === 'year') {
-      const yearStart = new Date(now.getFullYear(), 0, 1);
-      const yearEnd = new Date(now.getFullYear(), 11, 31);
-      for (let month = 0; month < 12; month++) {
-        dateRange.push(new Date(now.getFullYear(), month, 1));
-      }
-    }
-    
-    const existingDates = new Set<string>(Array.from(dateMap.keys()));
-    
-    const mergedData: EmotionData[] = dateRange.map(date => {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const dayFormatted = format(date, 'MMM d, yyyy');
-      const day = format(date, 'MMM d');
-      const hasData = existingDates.has(dateStr);
-      
-      const dataPoint: EmotionData = { 
-        day,
-        dayFormatted,
-        rawDate: dateStr,
-        noEntry: !hasData
-      };
-      
-      if (hasData) {
-        const emotions = dateMap.get(dateStr)!;
+    // Convert map data to array format for the chart
+    const result = Array.from(dateMap.entries())
+      .map(([date, emotions]) => {
+        const dataPoint: EmotionData = { 
+          day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+        };
         
+        // Set values for top emotions in this data point
         topEmotions.forEach(emotion => {
           const emotionData = emotions.get(emotion);
           if (emotionData && emotionData.count > 0) {
+            // Calculate average and ensure it's at most 1.0
             let avgValue = emotionData.total / emotionData.count;
             if (avgValue > 1.0) avgValue = 1.0;
             dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
@@ -326,21 +234,17 @@ export function EmotionChart({
             dataPoint[emotion] = 0;
           }
         });
-      } else {
-        topEmotions.forEach(emotion => {
-          dataPoint[emotion] = 0;
-        });
-      }
-      
-      return dataPoint;
-    }).sort((a, b) => {
-      const dateA = parseISO(a.rawDate);
-      const dateB = parseISO(b.rawDate);
-      return dateA.getTime() - dateB.getTime();
-    });
+        
+        return dataPoint;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.day);
+        const dateB = new Date(b.day);
+        return dateA.getTime() - dateB.getTime();
+      });
     
-    return mergedData;
-  }, [aggregatedData, visibleEmotions, chartType, timeframe]);
+    return result;
+  }, [aggregatedData, visibleEmotions, chartType]);
 
   const EmotionLineLabel = (props: any) => {
     const { x, y, stroke, value, index, data, dataKey } = props;
@@ -367,14 +271,18 @@ export function EmotionChart({
   const handleLegendClick = (emotion: string) => {
     setVisibleEmotions(prev => {
       if (prev.includes(emotion)) {
+        // If clicking on an already selected emotion
         if (prev.length > 1) {
+          // If more than one emotion is selected, deselect the clicked one
           return prev.filter(e => e !== emotion);
         } else {
+          // If only one emotion is selected, show all emotions
           return lineData.length > 0 
-            ? Object.keys(lineData[0]).filter(key => !['day', 'dayFormatted', 'rawDate', 'noEntry'].includes(key))
+            ? Object.keys(lineData[0]).filter(key => key !== 'day')
             : [];
         }
       } else {
+        // If clicking on an unselected emotion, add it to selection
         return [...prev, emotion];
       }
     });
@@ -389,7 +297,7 @@ export function EmotionChart({
       );
     }
     
-    const allEmotions = Object.keys(lineData[0]).filter(key => !['day', 'dayFormatted', 'rawDate', 'noEntry'].includes(key));
+    const allEmotions = Object.keys(lineData[0]).filter(key => key !== 'day');
     
     if (allEmotions.length === 0) {
       return (
@@ -423,7 +331,16 @@ export function EmotionChart({
               tickFormatter={(value) => value.toFixed(1)}
               width={isMobile ? 25 : 40}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip 
+              contentStyle={{ 
+                backgroundColor: theme === 'dark' ? 'hsl(var(--card))' : 'rgba(255, 255, 255, 0.8)', 
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
+                border: 'none',
+                color: theme === 'dark' ? 'hsl(var(--card-foreground))' : 'inherit'
+              }}
+              formatter={(value: any) => [parseFloat(value).toFixed(1), '']}
+            />
             {allEmotions.map((emotion, index) => (
               <Line
                 key={emotion}
@@ -431,12 +348,11 @@ export function EmotionChart({
                 dataKey={emotion}
                 stroke={getEmotionColor(emotion, index)}
                 strokeWidth={2}
-                dot={<CustomDot />}
+                dot={{ r: isMobile ? 3 : 4 }}
                 activeDot={{ r: isMobile ? 5 : 6 }}
                 name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
                 label={isMobile ? null : <EmotionLineLabel />}
                 hide={!visibleEmotions.includes(emotion)}
-                connectNulls={false}
               />
             ))}
           </LineChart>
@@ -474,14 +390,8 @@ export function EmotionChart({
           })}
         </div>
         
-        <div className="flex items-center justify-center gap-4 mt-4 bg-secondary/30 rounded-md py-2 px-4">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <span className="text-xs text-muted-foreground">No Entry</span>
-          </div>
-          <div className="text-xs text-muted-foreground">
-            * Click on a legend item to focus on specific emotions
-          </div>
+        <div className="mt-4 text-center text-xs text-muted-foreground">
+          * Click on a legend item to focus on that emotion, click multiple to compare
         </div>
       </div>
     );

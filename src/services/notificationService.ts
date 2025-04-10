@@ -1,6 +1,5 @@
-import { toast as shadcnToast } from "@/components/ui/use-toast";
-import { Toast } from "@/components/ui/toast";
-import { useToast } from "@/hooks/use-toast";
+
+import { toast } from "sonner";
 
 // Duration constants
 const STANDARD_DURATION = 1000; // 1 second for regular toasts (updated from 5 seconds)
@@ -10,28 +9,6 @@ const ERROR_DURATION = 6000; // 6 seconds for errors (unchanged)
 // Check if we're in a browser environment
 const isBrowser = (): boolean => {
   return typeof window !== 'undefined';
-};
-
-// Check if we're on a website page (vs an app page)
-const isWebsitePage = () => {
-  // Check if we're in the browser
-  if (!isBrowser()) return false;
-  
-  // Get the current pathname
-  const pathname = window.location.pathname;
-  
-  // Define website pages (as opposed to app pages)
-  const websitePatterns = [
-    /^\/$/, // Root/home
-    /^\/website/,
-    /^\/blog/,
-    /^\/faq/,
-    /^\/privacy-policy/,
-    /^\/terms/
-  ];
-  
-  // Check if current path matches any website patterns
-  return websitePatterns.some(pattern => pattern.test(pathname));
 };
 
 // Store active toast IDs to prevent duplicates and ensure cleanup
@@ -52,12 +29,6 @@ export const showToast = (
   type: "default" | "success" | "error" | "info" | "warning" = "default",
   isActiveJob = false
 ) => {
-  // Skip showing toasts on website pages
-  if (isWebsitePage()) {
-    console.log('[NotificationService] Toast suppressed on website page:', message);
-    return null;
-  }
-
   // Deduplicate identical messages that might be in flight
   const messageKey = `${type}-${message}`;
   if (activeToasts.has(messageKey)) {
@@ -71,18 +42,72 @@ export const showToast = (
   console.log(`[NotificationService] Showing toast: ${message} (${type})`);
   
   let toastId;
-  
-  // Map our type values to shadcn toast variants
-  // Default to 'default' variant, use 'destructive' for errors
-  const toastVariant: "default" | "destructive" = type === "error" ? "destructive" : "default";
-  
-  // In the updated version, we'll use the standard toast function with the appropriate options
-  toastId = shadcnToast({
-    title: type.charAt(0).toUpperCase() + type.slice(1),
-    description: message,
-    variant: toastVariant,
-    duration: duration
-  });
+  switch (type) {
+    case "success":
+      toastId = toast.success(message, { 
+        duration, 
+        id: messageKey,
+        onDismiss: () => {
+          activeToasts.delete(messageKey);
+          if (toastTimeouts.has(messageKey)) {
+            clearTimeout(toastTimeouts.get(messageKey)!);
+            toastTimeouts.delete(messageKey);
+          }
+        }
+      });
+      break;
+    case "error":
+      toastId = toast.error(message, { 
+        duration, 
+        id: messageKey,
+        onDismiss: () => {
+          activeToasts.delete(messageKey);
+          if (toastTimeouts.has(messageKey)) {
+            clearTimeout(toastTimeouts.get(messageKey)!);
+            toastTimeouts.delete(messageKey);
+          }
+        }
+      });
+      break;
+    case "info":
+      toastId = toast.info(message, { 
+        duration, 
+        id: messageKey,
+        onDismiss: () => {
+          activeToasts.delete(messageKey);
+          if (toastTimeouts.has(messageKey)) {
+            clearTimeout(toastTimeouts.get(messageKey)!);
+            toastTimeouts.delete(messageKey);
+          }
+        }
+      });
+      break;
+    case "warning":
+      toastId = toast.warning(message, { 
+        duration, 
+        id: messageKey,
+        onDismiss: () => {
+          activeToasts.delete(messageKey);
+          if (toastTimeouts.has(messageKey)) {
+            clearTimeout(toastTimeouts.get(messageKey)!);
+            toastTimeouts.delete(messageKey);
+          }
+        }
+      });
+      break;
+    default:
+      toastId = toast(message, { 
+        duration, 
+        id: messageKey,
+        onDismiss: () => {
+          activeToasts.delete(messageKey);
+          if (toastTimeouts.has(messageKey)) {
+            clearTimeout(toastTimeouts.get(messageKey)!);
+            toastTimeouts.delete(messageKey);
+          }
+        }
+      });
+  }
   
   activeToasts.add(messageKey);
   
@@ -100,51 +125,11 @@ export const showToast = (
   return toastId;
 };
 
-// This is a helper function to safely handle toast dismissal
-// It works around the issue where toast.dismiss isn't directly accessible
-const dismissToast = (toastId?: string) => {
-  console.log(`[NotificationService] Attempting to dismiss toast: ${toastId || 'all'}`);
-  
-  try {
-    // Create a temporary toast and use its dismiss method
-    const tempToast = shadcnToast({ 
-      description: "",
-      duration: 1 // Very short duration
-    });
-    
-    // If we have the dismiss method on the toast object, use it
-    if (tempToast) {
-      if (toastId) {
-        // Clean up DOM manually for specific toasts
-        if (isBrowser()) {
-          document.querySelectorAll('[data-sonner-toast]').forEach(toast => {
-            if (toast.getAttribute('data-id') === toastId) {
-              toast.remove();
-            }
-          });
-        }
-      } else {
-        // For dismissing all toasts, we use the manual approach
-        if (isBrowser()) {
-          document.querySelectorAll('[data-sonner-toast]').forEach(toast => {
-            toast.remove();
-          });
-        }
-      }
-      return true;
-    }
-  } catch (e) {
-    console.error("[NotificationService] Error dismissing toast:", e);
-  }
-  
-  return false;
-};
-
 // Clear a specific toast
 export const clearToast = (toastId: string | number) => {
   if (toastId) {
     console.log(`[NotificationService] Clearing toast: ${toastId}`);
-    dismissToast(toastId.toString());
+    toast.dismiss(toastId);
   }
 };
 
@@ -153,8 +138,8 @@ export const clearAllToasts = (): Promise<boolean> => {
   console.log('[NotificationService] Clearing all toasts');
   
   return new Promise((resolve) => {
-    // Dismiss all toasts
-    dismissToast();
+    // First use the standard dismiss method
+    toast.dismiss();
     
     // Clear all timeouts
     clearToastTimeouts();
@@ -215,8 +200,8 @@ export const clearAllToasts = (): Promise<boolean> => {
         }
       }
       
-      // Call dismiss one more time as a final measure
-      dismissToast();
+      // Call toast.dismiss() one more time as a final measure
+      toast.dismiss();
       resolve(true);
     }, 50);
   });
@@ -238,7 +223,7 @@ export const ensureAllToastsCleared = async (): Promise<boolean> => {
       console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after first cleanup`);
       
       // Second attempt with more aggressive DOM manipulation
-      dismissToast();
+      toast.dismiss();
       await new Promise(resolve => setTimeout(resolve, 50));
       
       try {

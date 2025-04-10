@@ -71,7 +71,7 @@ const Footer = () => {
         </div>
         
         <p className="text-xs text-muted-foreground mt-8">
-          &copy; {new Date().getFullYear()} SOuLO. All rights reserved.
+          &copy; {new Date().getFullYear()} SOULo. All rights reserved.
         </p>
       </div>
     </footer>

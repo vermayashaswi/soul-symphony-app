@@ -1,21 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Apple, 
-  Play, 
-  Shield, 
-  Brain, 
-  Mic, 
-  MessageSquare, 
-  LineChart, 
-  ArrowRight, 
-  Check, 
-  Mail,
-  AudioWaveform,
-  Sparkles,
-  BarChart3,
-  MessagesSquare
-} from 'lucide-react';
+import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,14 +10,12 @@ import SouloLogo from '@/components/SouloLogo';
 import Footer from '@/components/website/Footer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
-import { useLanguage } from '@/contexts/LanguageContext';
 
 const HomePage = () => {
   const isMobile = useIsMobile();
   const [email, setEmail] = useState('');
   const [activeFeature, setActiveFeature] = useState(0);
   const [pricingMode, setPricingMode] = useState('monthly');
-  const { translate } = useLanguage();
   
   const openAppStore = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -67,36 +51,40 @@ const HomePage = () => {
     console.log('Email submitted:', email);
     // Clear the input
     setEmail('');
-    // Show success message
+    // Show success message (you'd typically use a toast here)
     alert('Thanks for subscribing!');
   };
 
   const features = [
     {
-      title: translate('features.voiceJournaling.title', "Voice Journaling"),
-      description: translate('features.voiceJournaling.description', "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically."),
-      icon: AudioWaveform,
+      title: "Voice Journaling",
+      description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
+      icon: Mic,
+      image: "/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png",
     },
     {
-      title: translate('features.aiAnalysis.title', "AI Analysis"),
-      description: translate('features.aiAnalysis.description', "Gain insights into your patterns and emotions through advanced AI analysis."),
-      icon: Sparkles,
+      title: "AI Analysis",
+      description: "Gain insights into your patterns and emotions through advanced AI analysis.",
+      icon: Brain,
+      image: "/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png",
     },
     {
-      title: translate('features.emotionalTracking.title', "Emotional Tracking"),
-      description: translate('features.emotionalTracking.description', "Visualize your emotional journey over time with interactive charts."),
-      icon: BarChart3,
+      title: "Emotional Tracking",
+      description: "Visualize your emotional journey over time with interactive charts.",
+      icon: LineChart,
+      image: "/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png",
     },
     {
-      title: translate('features.aiAssistant.title', "AI Assistant"),
-      description: translate('features.aiAssistant.description', "Chat with your journal and get personalized insights from your past entries."),
-      icon: MessagesSquare,
+      title: "AI Assistant",
+      description: "Chat with your journal and get personalized insights from your past entries.",
+      icon: MessageSquare,
+      image: "/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png",
     }
   ];
 
   const testimonials = [
     {
-      text: "SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
+      text: "SOULo has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
       author: "Sarah K., Designer",
       avatar: "/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png"
     },
@@ -106,7 +94,7 @@ const HomePage = () => {
       avatar: "/lovable-uploads/5b18686b-4a3c-4341-a072-479db470ac1d.png"
     },
     {
-      text: "The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes.",
+      text: "The emotional insights I get from SOULo have helped me understand my patterns and make positive changes.",
       author: "Jamie L., Therapist",
       avatar: "/lovable-uploads/cb710491-93f0-42be-a596-f64d80d9800e.png"
     }
@@ -153,109 +141,6 @@ const HomePage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const FeatureIllustration = ({ type }) => {
-    if (type === "Voice Journaling") {
-      return (
-        <div className="relative h-64 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg overflow-hidden flex items-center justify-center">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-24 h-24 rounded-full bg-blue-400/30 animate-pulse blur-xl absolute"></div>
-          </div>
-          <div className="relative z-10 flex flex-col items-center">
-            <AudioWaveform size={48} className="text-primary mb-4" />
-            <div className="flex gap-1 items-center">
-              <div className="h-10 w-1 bg-blue-500 animate-[pulse_1s_ease-in-out_infinite] rounded-full"></div>
-              <div className="h-16 w-1 bg-blue-500 animate-[pulse_0.7s_ease-in-out_infinite] rounded-full"></div>
-              <div className="h-12 w-1 bg-blue-500 animate-[pulse_0.8s_ease-in-out_infinite] rounded-full"></div>
-              <div className="h-20 w-1 bg-blue-500 animate-[pulse_0.6s_ease-in-out_infinite] rounded-full"></div>
-              <div className="h-14 w-1 bg-blue-500 animate-[pulse_0.9s_ease-in-out_infinite] rounded-full"></div>
-              <div className="h-10 w-1 bg-blue-500 animate-[pulse_1s_ease-in-out_infinite] rounded-full"></div>
-              <div className="h-8 w-1 bg-blue-500 animate-[pulse_0.7s_ease-in-out_infinite] rounded-full"></div>
-            </div>
-            <div className="mt-4 p-2 bg-white/80 backdrop-blur-sm rounded-md border border-blue-100">
-              <p className="text-sm text-blue-800">Voice → Text Conversion</p>
-            </div>
-          </div>
-        </div>
-      );
-    } else if (type === "AI Analysis") {
-      return (
-        <div className="relative h-64 bg-gradient-to-br from-purple-50 to-pink-100 rounded-lg overflow-hidden flex items-center justify-center">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-24 h-24 rounded-full bg-purple-400/30 animate-pulse blur-xl absolute"></div>
-          </div>
-          <div className="relative z-10 flex flex-col items-center">
-            <div className="relative mb-3">
-              <Brain size={48} className="text-purple-600" />
-              <Sparkles size={20} className="text-yellow-500 absolute -top-2 -right-2" />
-            </div>
-            <div className="flex flex-wrap justify-center gap-2 max-w-xs">
-              {['Joy', 'Growth', 'Stress', 'Family', 'Health'].map((tag, i) => (
-                <span 
-                  key={tag} 
-                  className="px-2 py-1 bg-white/80 rounded-full text-xs border border-purple-200 text-purple-700"
-                  style={{ 
-                    animationDelay: `${i * 0.1}s`, 
-                    animation: 'pulse 2s infinite' 
-                  }}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <div className="mt-4 p-2 bg-white/80 backdrop-blur-sm rounded-md border border-purple-100">
-              <p className="text-sm text-purple-800">Pattern Recognition</p>
-            </div>
-          </div>
-        </div>
-      );
-    } else if (type === "Emotional Tracking") {
-      return (
-        <div className="relative h-64 bg-gradient-to-br from-green-50 to-teal-100 rounded-lg overflow-hidden flex items-center justify-center">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-24 h-24 rounded-full bg-teal-400/30 animate-pulse blur-xl absolute"></div>
-          </div>
-          <div className="relative z-10 flex flex-col items-center">
-            <BarChart3 size={48} className="text-teal-600 mb-4" />
-            <div className="w-64 h-24 bg-white/80 backdrop-blur-sm rounded-lg p-2 flex items-end">
-              <div className="w-8 h-10 bg-teal-300 rounded-t-md mx-1"></div>
-              <div className="w-8 h-16 bg-teal-400 rounded-t-md mx-1"></div>
-              <div className="w-8 h-8 bg-teal-300 rounded-t-md mx-1"></div>
-              <div className="w-8 h-14 bg-teal-500 rounded-t-md mx-1"></div>
-              <div className="w-8 h-20 bg-teal-600 rounded-t-md mx-1"></div>
-              <div className="w-8 h-12 bg-teal-400 rounded-t-md mx-1"></div>
-            </div>
-            <div className="mt-4 p-2 bg-white/80 backdrop-blur-sm rounded-md border border-teal-100">
-              <p className="text-sm text-teal-800">Emotion Trend Analysis</p>
-            </div>
-          </div>
-        </div>
-      );
-    } else if (type === "AI Assistant") {
-      return (
-        <div className="relative h-64 bg-gradient-to-br from-amber-50 to-orange-100 rounded-lg overflow-hidden flex items-center justify-center">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-24 h-24 rounded-full bg-amber-400/30 animate-pulse blur-xl absolute"></div>
-          </div>
-          <div className="relative z-10 flex flex-col items-center">
-            <MessagesSquare size={48} className="text-amber-600 mb-4" />
-            <div className="flex flex-col gap-2">
-              <div className="bg-white/80 backdrop-blur-sm p-2 rounded-lg text-left text-sm">
-                <p className="text-gray-800">How have I been feeling lately?</p>
-              </div>
-              <div className="bg-amber-500/90 backdrop-blur-sm p-2 rounded-lg text-white text-left text-sm">
-                <p>Based on your entries, you've been feeling more positive this week!</p>
-              </div>
-            </div>
-            <div className="mt-4 p-2 bg-white/80 backdrop-blur-sm rounded-md border border-amber-100">
-              <p className="text-sm text-amber-800">Personalized Insights</p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -274,11 +159,12 @@ const HomePage = () => {
               transition={{ duration: 0.8 }}
               className="w-full lg:w-1/2 text-center lg:text-left"
             >
+              {/* Removed logo as requested */}
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
-                {translate('hero.title', 'Express. Reflect. Grow.')}
+                Express. Reflect. <span className="text-primary">Grow.</span>
               </h1>
               <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-2xl mx-auto lg:mx-0">
-                {translate('hero.subtitle', 'Journaling should be as simple as talking. Use voice and leave the rest to us.')}
+                Journaling should be as simple as talking. Use voice and leave the rest to us.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
@@ -288,7 +174,7 @@ const HomePage = () => {
                   onClick={openAppStore}
                 >
                   <Apple className="h-5 w-5" />
-                  <span>{translate('app.appStore', 'App Store')}</span>
+                  <span>App Store</span>
                 </Button>
                 <Button 
                   size="lg" 
@@ -296,25 +182,25 @@ const HomePage = () => {
                   onClick={openPlayStore}
                 >
                   <Play className="h-5 w-5" />
-                  <span>{translate('app.googlePlay', 'Google Play')}</span>
+                  <span>Google Play</span>
                 </Button>
                 <Button 
                   size="lg" 
                   variant="outline" 
                   asChild
                 >
-                  <a href="/app">{translate('app.tryWebApp', 'Try Web App')}</a>
+                  <a href="/app">Try Web App</a>
                 </Button>
               </div>
               
               <div className="flex items-center justify-center lg:justify-start gap-8 text-sm text-gray-500">
                 <div className="flex items-center gap-1">
                   <Shield className="h-4 w-4 text-primary" />
-                  <span>{translate('app.privacyFocused', 'Privacy-Focused')}</span>
+                  <span>Privacy-Focused</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Check className="h-4 w-4 text-primary" />
-                  <span>{translate('app.freeTrial', '14-Day Free Trial')}</span>
+                  <span>14-Day Free Trial</span>
                 </div>
               </div>
             </motion.div>
@@ -325,47 +211,26 @@ const HomePage = () => {
               transition={{ duration: 1, delay: 0.3 }}
               className="w-full lg:w-1/2"
             >
+              {/* Voice to Insights Animation */}
               <div className="relative mx-auto max-w-md">
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
-                <div className="relative overflow-hidden shadow-2xl border border-white/50 rounded-xl bg-black">
-                  <div className="w-full h-auto relative pt-[100%]">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-32 h-32 rounded-full bg-blue-500/30 animate-pulse blur-xl absolute"></div>
-                      <div className="w-24 h-24 rounded-full bg-purple-500/30 animate-pulse blur-xl absolute"></div>
-                    </div>
-                    
-                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-                      <div className="relative w-60 h-60">
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-48 rounded-3xl border-2 border-blue-400/80 bg-slate-900/50"></div>
-                        
-                        <div className="absolute top-[25%] left-1/2 transform -translate-x-1/2 w-28 h-20 rounded-full">
-                          <div className="absolute inset-0 bg-blue-500/20 animate-pulse rounded-full blur-lg"></div>
-                          <div className="absolute inset-0 bg-blue-400/30 rounded-full"></div>
-                          <div className="absolute inset-2 bg-blue-300/30 rounded-full"></div>
-                          <div className="absolute inset-4 bg-blue-200/30 rounded-full animate-pulse"></div>
-                        </div>
-                        
-                        <div className="absolute top-[42%] left-[35%] w-3 h-3 rounded-full bg-blue-400 shadow-lg shadow-blue-400/70 animate-pulse"></div>
-                        <div className="absolute top-[42%] left-[58%] w-3 h-3 rounded-full bg-blue-400 shadow-lg shadow-blue-400/70 animate-pulse"></div>
-                        
-                        <div className="absolute top-[60%] left-1/2 transform -translate-x-1/2 w-14 h-14">
-                          <div className="absolute inset-0 bg-purple-500/40 animate-pulse rounded-full blur-lg"></div>
-                          <div className="absolute inset-1 bg-purple-400/40 rounded-full animate-[pulse_3s_ease-in-out_infinite]"></div>
-                          <div className="absolute inset-3 bg-purple-300/30 rounded-full animate-[pulse_2s_ease-in-out_infinite]"></div>
-                          <div className="absolute inset-5 bg-white/90 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]"></div>
-                        </div>
-                        
-                        <div className="absolute inset-0 opacity-80">
-                          <div className="absolute top-[45%] left-[20%] right-[20%] h-[1px] bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-[pulse_2s_ease-in-out_infinite]"></div>
-                          <div className="absolute top-[55%] left-[25%] right-[25%] h-[1px] bg-gradient-to-r from-transparent via-purple-400 to-transparent animate-[pulse_2.5s_ease-in-out_infinite]"></div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="absolute bottom-5 left-0 right-0 text-center text-white text-xs font-mono opacity-80">
-                      <div className="inline-block border border-blue-400/30 bg-black/50 px-2 py-1 rounded-md">
-                        <span className="animate-pulse">AI</span> × <span className="text-purple-300">Soul</span>
-                      </div>
+                <div className="relative overflow-hidden shadow-2xl border border-white/50 rounded-xl">
+                  <video 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline
+                    className="w-full h-auto"
+                  >
+                    <source 
+                      src="https://static.vecteezy.com/system/resources/previews/023/610/147/mp4/smart-assistant-voice-control-interface-concept-audio-waves-and-digital-sound-visualization-free-video.mp4" 
+                      type="video/mp4" 
+                    />
+                    Your browser does not support the video tag.
+                  </video>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-lg">
+                      <p className="text-sm font-medium text-gray-800">Voice → AI → Insights</p>
                     </div>
                   </div>
                 </div>
@@ -382,7 +247,7 @@ const HomePage = () => {
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
               App Features
             </span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOuLO's Features</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOULo's Features</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
             </p>
@@ -410,7 +275,11 @@ const HomePage = () => {
                     className="w-full md:w-1/2 p-4"
                   >
                     <div className="overflow-hidden border-primary/10 shadow-lg bg-white rounded-xl">
-                      <FeatureIllustration type={features[activeFeature].title} />
+                      <img 
+                        src={features[activeFeature].image} 
+                        alt={features[activeFeature].title} 
+                        className="w-full h-auto"
+                      />
                     </div>
                   </motion.div>
                   
@@ -454,7 +323,7 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* How It Works Section with Icon-based Process Steps */}
+      {/* How It Works Section */}
       <section className="py-16 md:py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -471,19 +340,19 @@ const HomePage = () => {
                 step: "1",
                 title: "Record Your Thoughts",
                 description: "Speak freely about your day, feelings, or any thoughts you want to capture. No writing required!",
-                icon: <Mic size={64} className="text-primary"/>
+                image: "https://cdn.dribbble.com/users/1210339/screenshots/4663953/media/8b7cef39e44cd120b7f647b584eaa5ca.gif"
               },
               {
                 step: "2",
                 title: "AI Analyzes Your Entry",
                 description: "Our AI transcribes your voice and analyzes the emotional patterns and key themes in your entry.",
-                icon: <Brain size={64} className="text-primary"/>
+                image: "https://cdn.dribbble.com/users/1068771/screenshots/14225432/media/0da8c461ba3522a6b0a0c272dd5d3b80.jpg"
               },
               {
                 step: "3",
                 title: "Gain Personalized Insights",
                 description: "Discover patterns, track emotional trends over time, and get personalized insights to support your growth.",
-                icon: <Sparkles size={64} className="text-primary"/>
+                image: "https://cdn.dribbble.com/users/1369921/screenshots/16411291/media/d57f6aafac4bd54f92c34b4c5048a9b9.png"
               }
             ].map((item, i) => (
               <motion.div 
@@ -502,8 +371,8 @@ const HomePage = () => {
                 </div>
                 <h3 className="text-xl font-bold mb-3">{item.title}</h3>
                 <p className="text-muted-foreground mb-6">{item.description}</p>
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-8 rounded-lg border border-gray-200 shadow-sm">
-                  {item.icon}
+                <div className="relative w-full max-w-xs mx-auto rounded-lg overflow-hidden shadow-md">
+                  <img src={item.image} alt={item.title} className="w-full h-auto" />
                 </div>
               </motion.div>
             ))}
@@ -525,7 +394,7 @@ const HomePage = () => {
                 <Shield className="h-12 w-12 text-primary mb-6" />
                 <h2 className="text-3xl font-bold mb-4">Your Privacy is Our Priority</h2>
                 <p className="text-lg text-gray-600 mb-6">
-                  At SOuLO, we believe that your personal thoughts and feelings should remain private. 
+                  At SOULo, we believe that your personal thoughts and feelings should remain private. 
                   We've built our platform with privacy at its core.
                 </p>
                 <ul className="space-y-3 mb-8">
@@ -574,12 +443,28 @@ const HomePage = () => {
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Testimonials</span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Join thousands of people who have transformed their self-reflection practice with SOuLO
+              Join thousands of people who have transformed their self-reflection practice with SOULo
             </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {testimonials.map((testimonial, i) => (
+            {[
+              {
+                text: "SOULo has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
+                author: "Sarah K., Designer",
+                avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
+              },
+              {
+                text: "As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible.",
+                author: "Michael T., Engineer",
+                avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
+              },
+              {
+                text: "The emotional insights I get from SOULo have helped me understand my patterns and make positive changes.",
+                author: "Jamie L., Therapist",
+                avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
+              }
+            ].map((testimonial, i) => (
               <motion.div 
                 key={i} 
                 className="bg-white p-6 rounded-xl shadow-md border border-gray-100"
@@ -706,17 +591,17 @@ const HomePage = () => {
                     </li>
                     <li className="flex items-start gap-3">
                       <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-gray-600">AI-powered insights</span>
+                      <span className="text-gray-600">AI chat assistant</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-gray-600">Smart chat with your journal</span>
+                      <span className="text-gray-600">Priority support</span>
                     </li>
                   </ul>
                   <Button 
-                    className="w-full"
+                    className="w-full bg-primary hover:bg-primary/90 text-white"
                   >
-                    Choose Premium
+                    Start Free Trial
                   </Button>
                 </div>
               </motion.div>
@@ -725,33 +610,118 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* Newsletter Section */}
-      <section className="py-16 md:py-24 bg-gradient-to-br from-primary/10 to-purple-100">
-        <div className="container mx-auto px-4">
-          <div className="text-center max-w-2xl mx-auto">
-            <span className="px-3 py-1 rounded-full bg-white text-primary text-sm font-medium mb-4 inline-block">Newsletter</span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Stay Updated</h2>
-            <p className="text-gray-600 mb-8">
-              Subscribe to our newsletter for product updates, journaling tips, and exclusive content.
+      {/* FAQs */}
+      <section className="py-16 md:py-24 bg-white">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <div className="text-center mb-12">
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">FAQ</span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Everything you need to know about SOULo
             </p>
-            
-            <form onSubmit={handleEmailSubmit} className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
+          </div>
+          
+          <div className="space-y-6">
+            {[
+              {
+                question: "How does voice journaling work?",
+                answer: "SOULo makes it easy to capture your thoughts by speaking. Just open the app, tap the record button, and speak freely. Our AI will transcribe your voice and analyze the content for emotional patterns and key themes."
+              },
+              {
+                question: "Is my data private and secure?",
+                answer: "Absolutely. Your privacy is our top priority. All your journal entries are end-to-end encrypted, and you have complete control over what you share. We do not sell or share your data with third parties."
+              },
+              {
+                question: "Can I use SOULo without internet connection?",
+                answer: "Yes, you can record your journal entries offline. They will be stored locally on your device and will sync with our servers when you reconnect to the internet."
+              },
+              {
+                question: "What languages does SOULo support?",
+                answer: "Currently, SOULo supports English, Spanish, French, German, and Japanese. We're continuously working to add more languages."
+              },
+              {
+                question: "Can I cancel my subscription anytime?",
+                answer: "Yes, you can cancel your subscription at any time. Your premium features will remain active until the end of your billing period."
+              }
+            ].map((faq, i) => (
+              <motion.div 
+                key={i} 
+                className="bg-gray-50 rounded-lg p-6"
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+              >
+                <h3 className="text-xl font-medium mb-3">{faq.question}</h3>
+                <p className="text-gray-600">{faq.answer}</p>
+              </motion.div>
+            ))}
+          </div>
+          
+          <div className="text-center mt-12">
+            <p className="text-gray-600 mb-4">Don't see your question here?</p>
+            <Button asChild>
+              <a href="/faq">View All FAQs</a>
+            </Button>
+          </div>
+        </div>
+      </section>
+      
+      {/* CTA Section */}
+      <section id="download-section" className="py-16 md:py-24 bg-gradient-to-br from-primary/10 to-purple-100">
+        <div className="container mx-auto px-4 text-center max-w-3xl">
+          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Start Your Self-Discovery Journey?</h2>
+          <p className="text-xl text-gray-700 mb-8">
+            Join thousands of people who have transformed their self-reflection practice with SOULo.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+            <Button 
+              size="lg" 
+              className="gap-2 bg-black text-white hover:bg-gray-800" 
+              onClick={openAppStore}
+            >
+              <Apple className="h-5 w-5" />
+              <span>App Store</span>
+            </Button>
+            <Button 
+              size="lg" 
+              className="gap-2 bg-primary hover:bg-primary/90" 
+              onClick={openPlayStore}
+            >
+              <Play className="h-5 w-5" />
+              <span>Google Play</span>
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              asChild
+            >
+              <a href="/app">Try Web App</a>
+            </Button>
+          </div>
+          
+          <div className="max-w-md mx-auto">
+            <h3 className="text-lg font-medium mb-4">Stay updated with our newsletter</h3>
+            <form onSubmit={handleEmailSubmit} className="flex gap-2">
               <Input
                 type="email"
                 placeholder="Your email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="bg-white"
+                className="flex-1"
               />
-              <Button type="submit">
+              <Button type="submit" className="gap-2">
                 Subscribe
+                <Mail className="h-4 w-4" />
               </Button>
             </form>
           </div>
         </div>
       </section>
-
+      
+      {/* Footer */}
       <Footer />
     </div>
   );

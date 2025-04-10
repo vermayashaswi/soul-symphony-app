@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -30,11 +29,20 @@ export const getRedirectUrl = (): string => {
   if (isInStandaloneMode() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     console.log('Auth in standalone mode (PWA), using in-app auth flow');
     // Use a special auth flow that works better in PWA context
-    return `${origin}/app/auth?pwa_mode=true`;
+    return `${origin}/auth?pwa_mode=true`;
   }
   
-  // Use the actual domain for any environment
-  return `${origin}/app/auth`;
+  // Use this variable to determine if we're in the production domain
+  const isProdDomain = window.location.hostname === 'soulo.online' || 
+                      window.location.hostname.endsWith('.soulo.online');
+  
+  // If we're in production, use the actual domain
+  if (isProdDomain) {
+    return `https://soulo.online/auth`;
+  }
+  
+  // Otherwise use the current origin (for local development)
+  return `${origin}/auth`;
 };
 
 /**
@@ -49,10 +57,6 @@ export const signInWithGoogle = async (): Promise<void> => {
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
       },
     });
 
@@ -137,11 +141,10 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       console.log('No active session found, cleaning up local state only');
       // Clear any auth-related items from local storage
       localStorage.removeItem('authRedirectTo');
-      localStorage.removeItem('onboardingComplete');
       
-      // Redirect to auth page if navigate function is provided
+      // Redirect to onboarding page if navigate function is provided
       if (navigate) {
-        navigate('/auth');
+        navigate('/onboarding');
       }
       return;
     }
@@ -154,21 +157,19 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     
     // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
-    localStorage.removeItem('onboardingComplete');
     
-    // Always redirect to auth page if navigate function is provided
+    // Always redirect to onboarding page if navigate function is provided
     if (navigate) {
-      navigate('/auth');
+      navigate('/onboarding');
     }
   } catch (error: any) {
     console.error('Error signing out:', error);
     
-    // Still navigate to auth page even if there's an error
+    // Still navigate to onboarding page even if there's an error
     if (navigate) {
-      navigate('/auth');
+      navigate('/onboarding');
     }
     localStorage.removeItem('authRedirectTo');
-    localStorage.removeItem('onboardingComplete');
     
     // Show error toast but don't prevent logout flow
     toast.error(`Error while logging out: ${error.message}`);
