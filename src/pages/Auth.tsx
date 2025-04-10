@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -6,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
+import { signInWithGoogle } from '@/services/authService';
 
 export default function Auth() {
   const location = useLocation();
@@ -13,116 +15,72 @@ export default function Auth() {
   const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [authUser, setAuthUser] = useState(null);
+  const { user, isLoading: authLoading } = useAuth();
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  const from = '/';
+  // Determine where to redirect after auth
+  const redirectTo = redirectParam || fromLocation || storedRedirect || '/app/home';
 
   useEffect(() => {
-    const checkAuthState = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        setAuthUser(data.session?.user || null);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error checking auth state:', error);
-        setIsLoading(false);
+    // Check if we're coming back from OAuth with hash parameters
+    const hasHashParams = window.location.hash.includes('access_token') || 
+                          window.location.hash.includes('error') ||
+                          window.location.search.includes('error');
+                          
+    if (hasHashParams) {
+      console.log('Auth: Detected hash params in URL, processing auth result', {
+        hash: window.location.hash,
+        search: window.location.search
+      });
+      
+      // Show error toast if error in URL
+      if (window.location.hash.includes('error') || window.location.search.includes('error')) {
+        console.error('Auth: Error detected in redirect URL');
+        toast.error('Authentication failed. Please try again.');
       }
-    };
+    }
     
-    checkAuthState();
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    console.log('Current origin for Auth page:', window.location.origin);
-    console.log('Redirect destination after auth:', from);
+    console.log('Auth: Current session state:', { user: !!user, authLoading, redirectTo });
     
-    if (authUser && !redirecting) {
-      console.log('Auth page: User detected, redirecting to:', from);
+    // If user is logged in and page has finished initial loading, redirect
+    if (user && !authLoading && !redirecting) {
+      console.log('Auth: User authenticated, redirecting to:', redirectTo);
       setRedirecting(true);
       
+      // Clean up stored redirect
       localStorage.removeItem('authRedirectTo');
       
+      // Add small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
-        navigate(from, { replace: true });
+        navigate(redirectTo, { replace: true });
       }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [authUser, navigate, redirecting, from]);
-
-  useEffect(() => {
-    const handleHashRedirect = async () => {
-      const hasHashParams = window.location.hash.includes('access_token') || 
-                           window.location.hash.includes('error') ||
-                           window.location.search.includes('error');
-                           
-      if (hasHashParams) {
-        console.log('Detected auth redirect with hash/search params:', { 
-          hash: window.location.hash,
-          search: window.location.search 
-        });
-        
-        if (window.location.hash.includes('error') || window.location.search.includes('error')) {
-          console.error('Error detected in redirect URL');
-          toast.error('Authentication failed. Please try again.');
-          return;
-        }
-        
-        try {
-          const { data, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            console.error('Error getting session after redirect:', error);
-            toast.error('Authentication error. Please try again.');
-          } else if (data.session) {
-            console.log('Successfully retrieved session after redirect:', data.session.user.email);
-            setAuthUser(data.session.user);
-          }
-        } catch (e) {
-          console.error('Exception during auth redirect handling:', e);
-          toast.error('Unexpected error during authentication');
-        }
-      }
-    };
-    
-    handleHashRedirect();
-  }, []);
+  }, [user, authLoading, navigate, redirecting, redirectTo]);
 
   const handleSignIn = async () => {
-    console.log('Initiating Google sign-in from', window.location.origin);
     try {
-      const redirectUrl = getRedirectUrl();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-        },
-      });
-      
-      if (error) {
-        throw error;
-      }
+      setIsLoading(true);
+      console.log('Auth: Initiating Google sign-in');
+      await signInWithGoogle();
+      // The page will be redirected by Supabase, so no need to do anything else here
     } catch (error) {
-      console.error('Failed to initiate Google sign-in:', error);
-      toast.error('Failed to initiate sign-in process. Please try again.');
+      console.error('Auth: Failed to initiate Google sign-in:', error);
+      toast.error('Failed to initiate sign-in. Please try again.');
+      setIsLoading(false);
     }
-  };
-  
-  const getRedirectUrl = (): string => {
-    const origin = window.location.origin;
-    const urlParams = new URLSearchParams(window.location.search);
-    const redirectTo = urlParams.get('redirectTo');
-    if (redirectTo) {
-      localStorage.setItem('authRedirectTo', redirectTo);
-    }
-    return `${origin}/auth`;
   };
 
-  if (isLoading) {
+  // If still checking auth state, show loading
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -130,9 +88,10 @@ export default function Auth() {
     );
   }
 
-  if (authUser) {
-    console.log('Auth page: User exists in render, redirecting to', from);
-    return <Navigate to={from} replace />;
+  // If already logged in, redirect to target page
+  if (user) {
+    console.log('Auth: User already logged in, redirecting to:', redirectTo);
+    return <Navigate to={redirectTo} replace />;
   }
 
   return (
@@ -157,15 +116,20 @@ export default function Auth() {
             size="lg" 
             className="w-full flex items-center justify-center gap-2"
             onClick={handleSignIn}
+            disabled={isLoading}
           >
-            <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-              <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
-                <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
-                <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
-                <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"/>
-                <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
-              </g>
-            </svg>
+            {isLoading ? (
+              <span className="animate-spin h-5 w-5 border-t-2 border-white rounded-full mr-2" />
+            ) : (
+              <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+                <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
+                  <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
+                  <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
+                  <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"/>
+                  <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
+                </g>
+              </svg>
+            )}
             Sign in with Google
           </Button>
           

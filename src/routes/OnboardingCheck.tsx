@@ -3,6 +3,7 @@ import React from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
 import { User } from '@supabase/supabase-js';
 import { isNativeApp, isAppRoute } from './RouteHelpers';
+import { debugAuthState } from '@/services/authService';
 
 interface OnboardingCheckProps {
   onboardingComplete: boolean | null;
@@ -18,6 +19,19 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   children 
 }) => {
   const location = useLocation();
+  
+  // Log debug information
+  React.useEffect(() => {
+    console.log("OnboardingCheck rendering with:", {
+      onboardingComplete,
+      onboardingLoading,
+      hasUser: !!user,
+      pathname: location.pathname
+    });
+    
+    // Debug auth state
+    debugAuthState().catch(console.error);
+  }, [onboardingComplete, onboardingLoading, user, location.pathname]);
   
   const isAuthRoute = location.pathname === '/app/auth';
   const isOnboardingRoute = location.pathname === '/app/onboarding' || location.pathname === '/app';
@@ -42,6 +56,12 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
       !isOnboardingRoute;
     
     if (shouldShowOnboarding) {
+      console.log("Redirecting to onboarding from:", location.pathname, {
+        hasUser: !!user,
+        onboardingComplete,
+        isOnboardingBypassedRoute,
+        isOnboardingRoute
+      });
       return <Navigate to="/app" replace />;
     }
   }

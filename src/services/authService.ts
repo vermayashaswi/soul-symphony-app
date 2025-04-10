@@ -37,12 +37,14 @@ export const getRedirectUrl = (): string => {
   const isProdDomain = window.location.hostname === 'soulo.online' || 
                       window.location.hostname.endsWith('.soulo.online');
   
-  // If we're in production, use the actual domain
+  // If we're in production domain, use the absolute URL
   if (isProdDomain) {
+    console.log('Auth on production domain, using soulo.online/auth as redirect');
     return `https://soulo.online/auth`;
   }
   
   // Otherwise use the current origin (for local development)
+  console.log('Auth on non-production domain, using current origin as redirect:', origin);
   return `${origin}/auth`;
 };
 
@@ -58,6 +60,10 @@ export const signInWithGoogle = async (): Promise<void> => {
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     });
 
@@ -154,6 +160,8 @@ export const resetPassword = async (email: string): Promise<void> => {
  */
 export const signOut = async (navigate?: (path: string) => void): Promise<void> => {
   try {
+    console.log('Attempting to sign out user');
+    
     // Check if there's a session before trying to sign out
     const { data: sessionData } = await supabase.auth.getSession();
     
@@ -165,7 +173,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       
       // Redirect to onboarding page if navigate function is provided
       if (navigate) {
-        navigate('/onboarding');
+        navigate('/app');
       }
       return;
     }
@@ -181,14 +189,14 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     
     // Always redirect to onboarding page if navigate function is provided
     if (navigate) {
-      navigate('/onboarding');
+      navigate('/app');
     }
   } catch (error: any) {
     console.error('Error signing out:', error);
     
     // Still navigate to onboarding page even if there's an error
     if (navigate) {
-      navigate('/onboarding');
+      navigate('/app');
     }
     localStorage.removeItem('authRedirectTo');
     
@@ -260,5 +268,28 @@ export const handlePWAAuthCompletion = async () => {
   } catch (error) {
     console.error('Error handling PWA auth completion:', error);
     return null;
+  }
+};
+
+/**
+ * Debug the current authentication state
+ */
+export const debugAuthState = async (): Promise<{session: any, user: any}> => {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: userData } = await supabase.auth.getUser();
+    
+    console.log('Current auth state:', {
+      session: sessionData.session,
+      user: userData.user
+    });
+    
+    return {
+      session: sessionData.session,
+      user: userData.user
+    };
+  } catch (error) {
+    console.error('Error debugging auth state:', error);
+    return { session: null, user: null };
   }
 };

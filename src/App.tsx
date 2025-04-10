@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,6 +8,7 @@ import { AnimatePresence } from "framer-motion";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import { TouchAnimation } from "./components/ui/touch-animation";
+import { supabase } from "./integrations/supabase/client";
 import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
 import { useEffect } from 'react';
@@ -44,6 +46,22 @@ const App = () => {
         stack: event.reason?.stack
       });
     };
+    
+    // Set up Supabase auth debugging
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed in App.tsx:', event, {
+        user: session?.user?.email || 'No user',
+        expires_at: session?.expires_at
+      });
+    });
+    
+    // Debug the current session on app load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial auth session in App.tsx:', {
+        user: session?.user?.email || 'No user',
+        expires_at: session?.expires_at
+      });
+    });
     
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
@@ -87,6 +105,7 @@ const App = () => {
     return () => {
       window.removeEventListener('error', handleGlobalError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      subscription.unsubscribe();
       observer.disconnect();
     };
   }, []);
