@@ -276,30 +276,30 @@ export function EmotionChart({
       setVisibleEmotions(topEmotions);
     }
     
-    const allDates: Date[] = [];
     const now = new Date();
+    
+    let dateRange: Date[] = [];
     
     if (timeframe === 'week') {
       const weekStart = startOfWeek(now, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-      allDates = eachDayOfInterval({ start: weekStart, end: weekEnd });
+      dateRange = eachDayOfInterval({ start: weekStart, end: weekEnd });
     } else if (timeframe === 'today') {
-      allDates = [now];
+      dateRange = [now];
     } else if (timeframe === 'month') {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      allDates = eachDayOfInterval({ start: monthStart, end: monthEnd });
+      dateRange = eachDayOfInterval({ start: monthStart, end: monthEnd });
     } else if (timeframe === 'year') {
-      const yearStart = new Date(now.getFullYear(), 0, 1);
-      const yearEnd = new Date(now.getFullYear(), 11, 31);
+      dateRange = [];
       for (let month = 0; month < 12; month++) {
-        allDates.push(new Date(now.getFullYear(), month, 1));
+        dateRange.push(new Date(now.getFullYear(), month, 1));
       }
     }
     
     const existingDates = new Set<string>(Array.from(dateMap.keys()));
     
-    const mergedData: EmotionData[] = allDates.map(date => {
+    const mergedData: EmotionData[] = dateRange.map(date => {
       const dateStr = format(date, 'yyyy-MM-dd');
       const dayFormatted = format(date, 'MMM d, yyyy');
       const day = format(date, 'MMM d');
