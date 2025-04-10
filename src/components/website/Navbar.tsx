@@ -26,7 +26,7 @@ const Navbar = () => {
           <Button variant="ghost" asChild>
             <Link to="/faq">FAQ</Link>
           </Button>
-          <Button variant="primary" asChild>
+          <Button variant="default" asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
             <Link to="/app">Open App</Link>
           </Button>
         </div>
