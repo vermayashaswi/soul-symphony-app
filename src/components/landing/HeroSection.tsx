@@ -34,15 +34,26 @@ const HeroSection: React.FC<HeroSectionProps> = ({ user }) => {
       className="text-center mb-4" 
       variants={itemVariants}
     >
-      <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-3 flex items-center justify-center`}>
-        <span className="text-foreground dark:text-white">
-          Welcome to
-        </span> 
-        <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} animate={true} />
-      </h1>
-      <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse mt-4 mb-8`}>
-        Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
-      </p>
+      <div className="flex flex-col items-center justify-center">
+        <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-3 flex items-center justify-center`}>
+          <span className="text-foreground dark:text-white">
+            Welcome to
+          </span> 
+          <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} animate={true} />
+        </h1>
+        
+        <div className="w-full max-w-md mx-auto my-8">
+          <img 
+            src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExcHkzb2ptOGU3MWYxYXNoZmFsZ3YwZngybHpkZTNuNnl3ZXVyb2lqZyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7ZeqYkLtTSQHoXAs/giphy.gif" 
+            alt="Spiritual robot with glowing brain and soul" 
+            className="w-full h-auto rounded-lg shadow-lg mx-auto"
+          />
+        </div>
+        
+        <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse mt-4 mb-8`}>
+          Express. Reflect. <span className="font-bold">Grow.</span>
+        </p>
+      </div>
       
       {!user && (
         <motion.div 

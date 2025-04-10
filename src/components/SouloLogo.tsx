@@ -82,7 +82,7 @@ const SouloLogo = ({
           </span>
         </span>
       </span>
-      <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>L</span>
+      <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300 lowercase"}>l</span>
       <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>O</span>
     </span>
   );

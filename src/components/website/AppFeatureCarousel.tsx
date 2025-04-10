@@ -4,32 +4,31 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { OptimizedImage } from '@/utils/imageUtils';
 
 const features = [
   {
     title: "Voice Journaling",
-    description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
+    description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically.",
     icon: Mic,
-    image: "features.voiceJournaling",
+    image: "https://cdn.dribbble.com/users/1210339/screenshots/4663953/media/8b7cef39e44cd120b7f647b584eaa5ca.gif",
   },
   {
     title: "AI Analysis",
     description: "Gain insights into your patterns and emotions through advanced AI analysis.",
     icon: Brain,
-    image: "features.aiAnalysis",
+    image: "https://cdn.dribbble.com/users/1723105/screenshots/5694740/media/ee962b0c153fac1e3902ba6a93d72333.gif",
   },
   {
     title: "Emotional Tracking",
     description: "Visualize your emotional journey over time with interactive charts.",
     icon: LineChart,
-    image: "features.emotionalTracking",
+    image: "https://cdn.dribbble.com/users/1369921/screenshots/16411291/media/d57f6aafac4bd54f92c34b4c5048a9b9.png",
   },
   {
     title: "AI Assistant",
     description: "Chat with your journal and get personalized insights from your past entries.",
     icon: MessageSquare,
-    image: "features.aiAssistant",
+    image: "https://cdn.dribbble.com/users/257123/screenshots/15291004/media/9f5df559c3c4d6ea739af7a6e4275103.png",
   }
 ];
 
@@ -51,7 +50,7 @@ const AppFeatureCarousel = () => {
           <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
             App Features
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOULo's Features</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOuLO's Features</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
           </p>
@@ -80,7 +79,7 @@ const AppFeatureCarousel = () => {
                 >
                   <Card className="overflow-hidden border-primary/10 shadow-lg bg-white">
                     <CardContent className="p-0">
-                      <OptimizedImage 
+                      <img 
                         src={features[activeFeature].image} 
                         alt={features[activeFeature].title} 
                         className="w-full h-auto"

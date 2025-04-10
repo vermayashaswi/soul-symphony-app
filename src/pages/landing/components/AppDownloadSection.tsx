@@ -7,7 +7,7 @@ import { OptimizedImage } from '@/utils/imageUtils';
 
 const AppDownloadSection = () => {
   return (
-    <section className="py-16 md:py-24 bg-background relative overflow-hidden">
+    <section className="py-16 md:py-24 bg-background relative overflow-hidden" id="download-section">
       <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
       <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
       
@@ -21,10 +21,10 @@ const AppDownloadSection = () => {
             transition={{ duration: 0.5 }}
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Download and Start Using SOULo Today!
+              Download and Start Using SOuLO Today!
             </h2>
             <p className="text-muted-foreground mb-8">
-              It's free to download and easy to use. Begin your journey of self-discovery with SOULo - your personal companion for emotional wellness.
+              It's free to download and easy to use. Begin your journey of self-discovery with SOuLO - your personal companion for emotional wellness.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
@@ -66,7 +66,7 @@ const AppDownloadSection = () => {
               <div className="relative bg-card backdrop-blur-sm border border-primary/10 rounded-2xl p-6 shadow-xl">
                 <OptimizedImage 
                   src="appScreenshot" 
-                  alt="SOULo App Screenshot" 
+                  alt="SOuLO App Screenshot" 
                   className="w-full max-w-xs rounded-lg shadow-lg"
                 />
               </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail } from 'lucide-react';
@@ -47,11 +46,8 @@ const HomePage = () => {
   
   const handleEmailSubmit = (e) => {
     e.preventDefault();
-    // Handle newsletter signup
     console.log('Email submitted:', email);
-    // Clear the input
     setEmail('');
-    // Show success message (you'd typically use a toast here)
     alert('Thanks for subscribing!');
   };
 
@@ -133,13 +129,33 @@ const HomePage = () => {
   };
 
   useEffect(() => {
-    // Auto-rotate features every 5 seconds
     const interval = setInterval(() => {
       nextFeature();
     }, 5000);
     
     return () => clearInterval(interval);
   }, []);
+
+  const processSteps = [
+    {
+      step: "1",
+      title: "Record Your Thoughts",
+      description: "Speak freely about your day, feelings, or any thoughts you want to capture. No writing required!",
+      icon: Mic
+    },
+    {
+      step: "2",
+      title: "AI Analyzes Your Entry",
+      description: "Our AI transcribes your voice and analyzes the emotional patterns and key themes in your entry.",
+      icon: Brain
+    },
+    {
+      step: "3",
+      title: "Gain Personalized Insights",
+      description: "Discover patterns, track emotional trends over time, and get personalized insights to support your growth.",
+      icon: LineChart
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-white">
@@ -159,7 +175,6 @@ const HomePage = () => {
               transition={{ duration: 0.8 }}
               className="w-full lg:w-1/2 text-center lg:text-left"
             >
-              {/* Removed logo as requested */}
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
                 Express. Reflect. <span className="text-primary">Grow.</span>
               </h1>
@@ -211,23 +226,14 @@ const HomePage = () => {
               transition={{ duration: 1, delay: 0.3 }}
               className="w-full lg:w-1/2"
             >
-              {/* Voice to Insights Animation */}
               <div className="relative mx-auto max-w-md">
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
                 <div className="relative overflow-hidden shadow-2xl border border-white/50 rounded-xl">
-                  <video 
-                    autoPlay 
-                    loop 
-                    muted 
-                    playsInline
+                  <img 
+                    src="https://media.giphy.com/media/l0HlEMf3CdWiETeGk/giphy.gif" 
+                    alt="Spiritual robot with glowing brain and soul"
                     className="w-full h-auto"
-                  >
-                    <source 
-                      src="https://static.vecteezy.com/system/resources/previews/023/610/147/mp4/smart-assistant-voice-control-interface-concept-audio-waves-and-digital-sound-visualization-free-video.mp4" 
-                      type="video/mp4" 
-                    />
-                    Your browser does not support the video tag.
-                  </video>
+                  />
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-lg">
                       <p className="text-sm font-medium text-gray-800">Voice → AI → Insights</p>
@@ -328,33 +334,14 @@ const HomePage = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Process</span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">How SOuLO Works</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Start your self-discovery journey in three simple steps
             </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {[
-              {
-                step: "1",
-                title: "Record Your Thoughts",
-                description: "Speak freely about your day, feelings, or any thoughts you want to capture. No writing required!",
-                image: "https://cdn.dribbble.com/users/1210339/screenshots/4663953/media/8b7cef39e44cd120b7f647b584eaa5ca.gif"
-              },
-              {
-                step: "2",
-                title: "AI Analyzes Your Entry",
-                description: "Our AI transcribes your voice and analyzes the emotional patterns and key themes in your entry.",
-                image: "https://cdn.dribbble.com/users/1068771/screenshots/14225432/media/0da8c461ba3522a6b0a0c272dd5d3b80.jpg"
-              },
-              {
-                step: "3",
-                title: "Gain Personalized Insights",
-                description: "Discover patterns, track emotional trends over time, and get personalized insights to support your growth.",
-                image: "https://cdn.dribbble.com/users/1369921/screenshots/16411291/media/d57f6aafac4bd54f92c34b4c5048a9b9.png"
-              }
-            ].map((item, i) => (
+            {processSteps.map((item, i) => (
               <motion.div 
                 key={i}
                 className="flex flex-col items-center text-center"
@@ -365,15 +352,12 @@ const HomePage = () => {
               >
                 <div className="relative mb-6">
                   <div className="absolute -inset-1 bg-primary/20 rounded-full blur-lg"></div>
-                  <div className="bg-white w-16 h-16 rounded-full border-2 border-primary flex items-center justify-center text-2xl font-bold text-primary relative">
-                    {item.step}
+                  <div className="bg-white w-16 h-16 rounded-full border-2 border-primary flex items-center justify-center relative">
+                    <item.icon className="h-8 w-8 text-primary" />
                   </div>
                 </div>
                 <h3 className="text-xl font-bold mb-3">{item.title}</h3>
                 <p className="text-muted-foreground mb-6">{item.description}</p>
-                <div className="relative w-full max-w-xs mx-auto rounded-lg overflow-hidden shadow-md">
-                  <img src={item.image} alt={item.title} className="w-full h-auto" />
-                </div>
               </motion.div>
             ))}
           </div>
