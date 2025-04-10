@@ -4,31 +4,32 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { OptimizedImage } from '@/utils/imageUtils';
 
 const features = [
   {
     title: "Voice Journaling",
     description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
     icon: Mic,
-    image: "/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png",
+    image: "features.voiceJournaling",
   },
   {
     title: "AI Analysis",
     description: "Gain insights into your patterns and emotions through advanced AI analysis.",
     icon: Brain,
-    image: "/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png",
+    image: "features.aiAnalysis",
   },
   {
     title: "Emotional Tracking",
     description: "Visualize your emotional journey over time with interactive charts.",
     icon: LineChart,
-    image: "/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png",
+    image: "features.emotionalTracking",
   },
   {
     title: "AI Assistant",
     description: "Chat with your journal and get personalized insights from your past entries.",
     icon: MessageSquare,
-    image: "/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png",
+    image: "features.aiAssistant",
   }
 ];
 
@@ -79,7 +80,7 @@ const AppFeatureCarousel = () => {
                 >
                   <Card className="overflow-hidden border-primary/10 shadow-lg bg-white">
                     <CardContent className="p-0">
-                      <img 
+                      <OptimizedImage 
                         src={features[activeFeature].image} 
                         alt={features[activeFeature].title} 
                         className="w-full h-auto"

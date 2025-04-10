@@ -3,6 +3,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Apple, PlayIcon } from 'lucide-react';
+import { OptimizedImage } from '@/utils/imageUtils';
 
 const AppDownloadSection = () => {
   return (
@@ -63,8 +64,8 @@ const AppDownloadSection = () => {
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
               <div className="relative bg-card backdrop-blur-sm border border-primary/10 rounded-2xl p-6 shadow-xl">
-                <img 
-                  src="/lovable-uploads/586c1ed2-eaed-4063-a18d-500e7085909d.png" 
+                <OptimizedImage 
+                  src="appScreenshot" 
                   alt="SOULo App Screenshot" 
                   className="w-full max-w-xs rounded-lg shadow-lg"
                 />
