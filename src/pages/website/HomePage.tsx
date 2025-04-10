@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Navbar from '@/components/website/Navbar';
 import SouloLogo from '@/components/SouloLogo';
-import AppFeatureCarousel from '@/components/website/AppFeatureCarousel';
 import Footer from '@/components/website/Footer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -15,6 +14,8 @@ import { cn } from '@/lib/utils';
 const HomePage = () => {
   const isMobile = useIsMobile();
   const [email, setEmail] = useState('');
+  const [activeFeature, setActiveFeature] = useState(0);
+  const [pricingMode, setPricingMode] = useState('monthly');
   
   const openAppStore = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -56,24 +57,28 @@ const HomePage = () => {
 
   const features = [
     {
-      icon: Mic,
       title: "Voice Journaling",
-      description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically."
+      description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
+      icon: Mic,
+      image: "/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png",
     },
     {
-      icon: Brain,
       title: "AI Analysis",
-      description: "Gain insights into your patterns and emotions through advanced AI analysis."
+      description: "Gain insights into your patterns and emotions through advanced AI analysis.",
+      icon: Brain,
+      image: "/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png",
     },
     {
-      icon: LineChart,
       title: "Emotional Tracking",
-      description: "Visualize your emotional journey over time with interactive charts."
+      description: "Visualize your emotional journey over time with interactive charts.",
+      icon: LineChart,
+      image: "/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png",
     },
     {
-      icon: MessageSquare,
       title: "AI Assistant",
-      description: "Chat with your journal and get personalized insights from your past entries."
+      description: "Chat with your journal and get personalized insights from your past entries.",
+      icon: MessageSquare,
+      image: "/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png",
     }
   ];
 
@@ -95,52 +100,46 @@ const HomePage = () => {
     }
   ];
 
-  const pricingPlans = [
-    {
-      name: "Free",
-      price: "$0",
-      period: "forever",
-      description: "Great for getting started with voice journaling",
-      features: [
-        "5 voice entries per month",
-        "Basic emotion tracking",
-        "7-day insight history",
-        "Web app access"
-      ],
-      cta: "Get Started",
-      popular: false
-    },
-    {
-      name: "Premium",
-      price: "$9.99",
-      period: "per month",
-      description: "Perfect for daily journaling and deeper insights",
-      features: [
-        "Unlimited voice entries",
-        "Advanced emotion analytics",
-        "Unlimited history",
-        "AI chat assistant",
-        "Priority support"
-      ],
-      cta: "Start Free Trial",
-      popular: true
-    },
-    {
-      name: "Family",
-      price: "$19.99",
-      period: "per month",
-      description: "Share the journey with your loved ones",
-      features: [
-        "Everything in Premium",
-        "Up to 5 user accounts",
-        "Shared insights (optional)",
-        "Family trends",
-        "Premium support"
-      ],
-      cta: "Start Free Trial",
-      popular: false
+  const getPricingDetails = (plan) => {
+    if (pricingMode === 'monthly') {
+      return { 
+        usd: "$5",
+        inr: "₹99",
+        period: "per month"
+      };
+    } else if (pricingMode === 'yearly') {
+      return { 
+        usd: "$48", // $5 * 12 - 20% discount = $48
+        inr: "₹950", // ₹99 * 12 - 20% discount ~ ₹950
+        period: "per year",
+        discount: "Save 20%"
+      };
+    } else if (pricingMode === 'lifetime') {
+      return { 
+        usd: "$200",
+        inr: "₹2,000",
+        period: "one-time payment",
+        discount: "Best value"
+      };
     }
-  ];
+  };
+
+  const nextFeature = () => {
+    setActiveFeature((prev) => (prev + 1) % features.length);
+  };
+
+  const prevFeature = () => {
+    setActiveFeature((prev) => (prev - 1 + features.length) % features.length);
+  };
+
+  useEffect(() => {
+    // Auto-rotate features every 5 seconds
+    const interval = setInterval(() => {
+      nextFeature();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="min-h-screen bg-white">
@@ -160,12 +159,12 @@ const HomePage = () => {
               transition={{ duration: 0.8 }}
               className="w-full lg:w-1/2 text-center lg:text-left"
             >
-              <SouloLogo size="large" useColorTheme={true} className="mx-auto lg:mx-0 mb-4" />
+              {/* Removed logo as requested */}
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
                 Express. Reflect. <span className="text-primary">Grow.</span>
               </h1>
               <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-2xl mx-auto lg:mx-0">
-                Keep a journal and capture your day without writing down a single word!
+                Journaling should be as simple as talking. Use voice and leave the rest to us.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
@@ -212,14 +211,28 @@ const HomePage = () => {
               transition={{ duration: 1, delay: 0.3 }}
               className="w-full lg:w-1/2"
             >
+              {/* Voice to Insights Animation */}
               <div className="relative mx-auto max-w-md">
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
-                <div className="relative bg-white rounded-xl overflow-hidden shadow-2xl border border-white/50">
-                  <img 
-                    src="/lovable-uploads/586c1ed2-eaed-4063-a18d-500e7085909d.png" 
-                    alt="SOULo App Screenshot" 
+                <div className="relative overflow-hidden shadow-2xl border border-white/50 rounded-xl">
+                  <video 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline
                     className="w-full h-auto"
-                  />
+                  >
+                    <source 
+                      src="https://static.vecteezy.com/system/resources/previews/023/610/147/mp4/smart-assistant-voice-control-interface-concept-audio-waves-and-digital-sound-visualization-free-video.mp4" 
+                      type="video/mp4" 
+                    />
+                    Your browser does not support the video tag.
+                  </video>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-lg">
+                      <p className="text-sm font-medium text-gray-800">Voice → AI → Insights</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -227,53 +240,88 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* Social Proof */}
-      <section className="py-10 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 opacity-70">
-            <p className="text-lg font-medium text-gray-500">Trusted by teams at:</p>
-            <img src="https://via.placeholder.com/120x40" alt="Company 1" className="h-8" />
-            <img src="https://via.placeholder.com/120x40" alt="Company 2" className="h-8" />
-            <img src="https://via.placeholder.com/120x40" alt="Company 3" className="h-8" />
-            <img src="https://via.placeholder.com/120x40" alt="Company 4" className="h-8" />
-          </div>
-        </div>
-      </section>
-      
-      {/* Features Grid */}
+      {/* App Features Carousel */}
       <section className="py-16 md:py-24 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Features</span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">How SOULo Works</h2>
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
+              App Features
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOULo's Features</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, index) => (
-              <motion.div 
-                key={index}
-                className="bg-white border border-primary/10 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
+          <div className="relative max-w-5xl mx-auto">
+            <div className="flex items-center">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="absolute left-0 z-10 rounded-full"
+                onClick={prevFeature}
               >
-                <div className="bg-primary/10 rounded-full w-12 h-12 flex items-center justify-center mb-4">
-                  <feature.icon className="h-6 w-6 text-primary" />
+                <ArrowRight className="h-6 w-6 rotate-180" />
+              </Button>
+              
+              <div className="w-full overflow-hidden py-8">
+                <div className="flex flex-col md:flex-row items-center gap-8">
+                  <motion.div 
+                    key={activeFeature}
+                    initial={{ opacity: 0, x: 100 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -100 }}
+                    transition={{ duration: 0.5 }}
+                    className="w-full md:w-1/2 p-4"
+                  >
+                    <div className="overflow-hidden border-primary/10 shadow-lg bg-white rounded-xl">
+                      <img 
+                        src={features[activeFeature].image} 
+                        alt={features[activeFeature].title} 
+                        className="w-full h-auto"
+                      />
+                    </div>
+                  </motion.div>
+                  
+                  <motion.div 
+                    key={`text-${activeFeature}`}
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -50 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="w-full md:w-1/2 p-4 text-center md:text-left"
+                  >
+                    <div className="bg-primary/10 rounded-full w-16 h-16 flex items-center justify-center mb-6 mx-auto md:mx-0">
+                      {React.createElement(features[activeFeature].icon, { className: "h-8 w-8 text-primary" })}
+                    </div>
+                    <h3 className="text-2xl md:text-3xl font-bold mb-4">{features[activeFeature].title}</h3>
+                    <p className="text-muted-foreground text-lg">{features[activeFeature].description}</p>
+                  </motion.div>
                 </div>
-                <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
-              </motion.div>
-            ))}
+              </div>
+              
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="absolute right-0 z-10 rounded-full"
+                onClick={nextFeature}
+              >
+                <ArrowRight className="h-6 w-6" />
+              </Button>
+            </div>
+            
+            <div className="flex justify-center gap-2 mt-8">
+              {features.map((_, index) => (
+                <button
+                  key={index}
+                  className={`w-3 h-3 rounded-full ${index === activeFeature ? 'bg-primary' : 'bg-gray-300'}`}
+                  onClick={() => setActiveFeature(index)}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </section>
-      
-      {/* App Features Carousel */}
-      <AppFeatureCarousel />
       
       {/* How It Works Section */}
       <section className="py-16 md:py-24 bg-white">
@@ -292,19 +340,19 @@ const HomePage = () => {
                 step: "1",
                 title: "Record Your Thoughts",
                 description: "Speak freely about your day, feelings, or any thoughts you want to capture. No writing required!",
-                image: "/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png"
+                image: "https://cdn.dribbble.com/users/1210339/screenshots/4663953/media/8b7cef39e44cd120b7f647b584eaa5ca.gif"
               },
               {
                 step: "2",
                 title: "AI Analyzes Your Entry",
                 description: "Our AI transcribes your voice and analyzes the emotional patterns and key themes in your entry.",
-                image: "/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png"
+                image: "https://cdn.dribbble.com/users/1068771/screenshots/14225432/media/0da8c461ba3522a6b0a0c272dd5d3b80.jpg"
               },
               {
                 step: "3",
                 title: "Gain Personalized Insights",
                 description: "Discover patterns, track emotional trends over time, and get personalized insights to support your growth.",
-                image: "/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png"
+                image: "https://cdn.dribbble.com/users/1369921/screenshots/16411291/media/d57f6aafac4bd54f92c34b4c5048a9b9.png"
               }
             ].map((item, i) => (
               <motion.div 
@@ -379,7 +427,7 @@ const HomePage = () => {
               viewport={{ once: true }}
             >
               <img 
-                src="/lovable-uploads/32abc730-009c-4901-912c-a16e7c2c1ec6.png" 
+                src="https://img.freepik.com/free-vector/gdpr-concept-illustration_114360-1028.jpg" 
                 alt="Privacy-focused design" 
                 className="w-full h-auto rounded-xl shadow-lg"
               />
@@ -400,7 +448,23 @@ const HomePage = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {testimonials.map((testimonial, i) => (
+            {[
+              {
+                text: "SOULo has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
+                author: "Sarah K., Designer",
+                avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
+              },
+              {
+                text: "As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible.",
+                author: "Michael T., Engineer",
+                avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
+              },
+              {
+                text: "The emotional insights I get from SOULo have helped me understand my patterns and make positive changes.",
+                author: "Jamie L., Therapist",
+                avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
+              }
+            ].map((testimonial, i) => (
               <motion.div 
                 key={i} 
                 className="bg-white p-6 rounded-xl shadow-md border border-gray-100"
@@ -412,7 +476,7 @@ const HomePage = () => {
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-12 h-12 rounded-full overflow-hidden">
                     <img 
-                      src={testimonial.avatar || "https://via.placeholder.com/48"} 
+                      src={testimonial.avatar} 
                       alt={testimonial.author} 
                       className="w-full h-full object-cover"
                     />
@@ -441,64 +505,106 @@ const HomePage = () => {
           
           <div className="mt-8">
             <Tabs defaultValue="monthly" className="w-full max-w-md mx-auto mb-12">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="monthly">Monthly</TabsTrigger>
-                <TabsTrigger value="yearly">Yearly (Save 20%)</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="monthly" onClick={() => setPricingMode('monthly')}>Monthly</TabsTrigger>
+                <TabsTrigger value="yearly" onClick={() => setPricingMode('yearly')}>Yearly (Save 20%)</TabsTrigger>
+                <TabsTrigger value="lifetime" onClick={() => setPricingMode('lifetime')}>Lifetime</TabsTrigger>
               </TabsList>
-              <TabsContent value="monthly">
-                {/* Monthly pricing will be shown by default */}
-              </TabsContent>
-              <TabsContent value="yearly">
-                {/* Yearly pricing would be shown here */}
-              </TabsContent>
             </Tabs>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-              {pricingPlans.map((plan, i) => (
-                <motion.div 
-                  key={i}
-                  className={cn(
-                    "bg-white rounded-xl overflow-hidden shadow-lg border", 
-                    plan.popular ? "border-primary relative" : "border-gray-100"
-                  )}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                >
-                  {plan.popular && (
-                    <div className="bg-primary text-white text-center py-1 text-sm font-medium">
-                      Most Popular
-                    </div>
-                  )}
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-                    <p className="text-muted-foreground mb-6">{plan.description}</p>
-                    <div className="mb-6">
-                      <span className="text-4xl font-bold">{plan.price}</span>
-                      <span className="text-gray-500">/{plan.period}</span>
-                    </div>
-                    <ul className="space-y-3 mb-8">
-                      {plan.features.map((feature, j) => (
-                        <li key={j} className="flex items-start gap-3">
-                          <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                          <span className="text-gray-600">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button 
-                      className={cn(
-                        "w-full", 
-                        plan.popular 
-                          ? "bg-primary hover:bg-primary/90 text-white" 
-                          : "bg-white border-2 border-primary text-primary hover:bg-primary/5"
-                      )}
-                    >
-                      {plan.cta}
-                    </Button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              {/* Free Plan */}
+              <motion.div 
+                className="bg-white rounded-xl overflow-hidden shadow-lg border border-gray-100"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+              >
+                <div className="p-6">
+                  <h3 className="text-xl font-bold mb-2">Free</h3>
+                  <p className="text-muted-foreground mb-6">Great for getting started with voice journaling</p>
+                  <div className="mb-6">
+                    <span className="text-4xl font-bold">$0</span>
+                    <span className="text-gray-500">/forever</span>
                   </div>
-                </motion.div>
-              ))}
+                  <ul className="space-y-3 mb-8">
+                    <li className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-gray-600">Unlimited entries per week</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-gray-600">Basic emotion tracking</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-gray-600">Web app access</span>
+                    </li>
+                    <li className="flex items-start gap-3 opacity-50">
+                      <Check className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" />
+                      <span className="text-gray-400">No access to insights (Premium only)</span>
+                    </li>
+                    <li className="flex items-start gap-3 opacity-50">
+                      <Check className="h-5 w-5 text-gray-400 shrink-0 mt-0.5" />
+                      <span className="text-gray-400">No AI chatbot (Premium only)</span>
+                    </li>
+                  </ul>
+                  <Button 
+                    className="w-full bg-white border-2 border-primary text-primary hover:bg-primary/5"
+                  >
+                    Get Started
+                  </Button>
+                </div>
+              </motion.div>
+              
+              {/* Premium Plan */}
+              <motion.div 
+                className="bg-white rounded-xl overflow-hidden shadow-lg border border-primary relative"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 }}
+              >
+                <div className="bg-primary text-white text-center py-1 text-sm font-medium">
+                  {pricingMode === 'yearly' ? 'Save 20%' : pricingMode === 'lifetime' ? 'Best Value' : 'Most Popular'}
+                </div>
+                <div className="p-6">
+                  <h3 className="text-xl font-bold mb-2">Premium</h3>
+                  <p className="text-muted-foreground mb-6">Perfect for daily journaling and deeper insights</p>
+                  <div className="mb-6">
+                    <span className="text-4xl font-bold">{getPricingDetails('premium').usd}</span>
+                    <span className="text-gray-500">/{getPricingDetails('premium').period}</span>
+                    <div className="text-sm text-primary mt-1">Also available in INR: {getPricingDetails('premium').inr}</div>
+                  </div>
+                  <ul className="space-y-3 mb-8">
+                    <li className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-gray-600">Unlimited entries per week</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-gray-600">Advanced emotion analytics</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-gray-600">Unlimited history</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-gray-600">AI chat assistant</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-gray-600">Priority support</span>
+                    </li>
+                  </ul>
+                  <Button 
+                    className="w-full bg-primary hover:bg-primary/90 text-white"
+                  >
+                    Start Free Trial
+                  </Button>
+                </div>
+              </motion.div>
             </div>
           </div>
         </div>
@@ -562,7 +668,7 @@ const HomePage = () => {
       </section>
       
       {/* CTA Section */}
-      <section className="py-16 md:py-24 bg-gradient-to-br from-primary/10 to-purple-100">
+      <section id="download-section" className="py-16 md:py-24 bg-gradient-to-br from-primary/10 to-purple-100">
         <div className="container mx-auto px-4 text-center max-w-3xl">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Start Your Self-Discovery Journey?</h2>
           <p className="text-xl text-gray-700 mb-8">
