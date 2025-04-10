@@ -22,8 +22,8 @@ export default function Auth() {
   const redirectParam = searchParams.get('redirectTo');
   const from = '/app/home';
 
-  // Check for error params in URL
   useEffect(() => {
+    // Check for error params in URL
     const errorParam = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
     
@@ -37,11 +37,14 @@ export default function Auth() {
     const checkAuthState = async () => {
       try {
         console.log('Checking auth state on Auth page load');
+        // Check if there's already an active session
         const { data, error } = await supabase.auth.getSession();
+        
         if (error) {
           console.error('Error checking auth state:', error);
           setAuthError('Failed to check authentication state');
         }
+        
         setAuthUser(data.session?.user || null);
         setIsLoading(false);
       } catch (error) {
@@ -54,9 +57,6 @@ export default function Auth() {
   }, []);
 
   useEffect(() => {
-    console.log('Current origin for Auth page:', window.location.origin);
-    console.log('Redirect destination after auth:', from);
-    
     if (authUser && !redirecting) {
       console.log('Auth page: User detected, redirecting to:', from);
       setRedirecting(true);
@@ -66,6 +66,7 @@ export default function Auth() {
       localStorage.removeItem('supabase.auth.error');
       localStorage.removeItem('loginAttemptTime');
       
+      // Small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
         navigate(from, { replace: true });
       }, 500);
@@ -75,14 +76,14 @@ export default function Auth() {
   }, [authUser, navigate, redirecting, from]);
 
   useEffect(() => {
-    const handleHashRedirect = async () => {
+    const handleAuthRedirect = async () => {
       // Check for auth callback indicators in URL
-      const hasHashParams = window.location.hash.includes('access_token') || 
-                           window.location.hash.includes('error') ||
-                           window.location.search.includes('error');
-                           
-      if (hasHashParams) {
-        console.log('Detected auth redirect with hash/search params:', { 
+      const hasAuthParams = window.location.hash.includes('access_token') || 
+                          window.location.hash.includes('error') ||
+                          window.location.search.includes('error');
+                          
+      if (hasAuthParams) {
+        console.log('Detected auth redirect with params:', { 
           hash: window.location.hash,
           search: window.location.search 
         });
@@ -96,11 +97,12 @@ export default function Auth() {
           console.error('Error detected in redirect URL:', errorMessage);
           setAuthError(errorMessage);
           toast.error(errorMessage);
+          setIsLoading(false);
           return;
         }
         
         try {
-          console.log('Attempting to process successful auth redirect');
+          console.log('Processing successful auth redirect');
           
           // Clean any stale auth error that might be in localStorage
           localStorage.removeItem('supabase.auth.error');
@@ -112,15 +114,10 @@ export default function Auth() {
             console.error('Error getting session after redirect:', error);
             setAuthError('Authentication error. Please try again.');
             toast.error('Authentication error. Please try again.');
+            setIsLoading(false);
           } else if (data.session) {
-            const loginTimestamp = localStorage.getItem('loginAttemptTime');
-            const loginTime = loginTimestamp ? parseInt(loginTimestamp, 10) : null;
-            const now = Date.now();
-            const loginDuration = loginTime ? now - loginTime : null;
-            
             console.log('Successfully retrieved session after redirect:', {
-              user: data.session.user.email,
-              timeTaken: loginDuration ? `${loginDuration}ms` : 'unknown'
+              user: data.session.user.email
             });
             
             setAuthUser(data.session.user);
@@ -128,43 +125,45 @@ export default function Auth() {
           } else {
             console.warn('No session found after redirect despite hash params');
             setAuthError('Unable to complete sign-in. Please try again.');
+            setIsLoading(false);
           }
         } catch (e) {
           console.error('Exception during auth redirect handling:', e);
           setAuthError('Unexpected error during authentication');
           toast.error('Unexpected error during authentication');
+          setIsLoading(false);
         }
       } else {
         console.log('No auth redirect detected in URL');
+        setIsLoading(false);
       }
     };
     
-    handleHashRedirect();
+    handleAuthRedirect();
   }, []);
 
   const handleSignIn = async () => {
     setAuthError(null);
+    setIsLoading(true);
     
     // Set login attempt time for timing metrics
     const currentTime = Date.now();
     setLoginAttemptTime(currentTime);
     localStorage.setItem('loginAttemptTime', currentTime.toString());
     
-    console.log('Initiating Google sign-in from', window.location.origin);
+    console.log('Initiating Google sign-in from', window.location.href);
     
     try {
-      // Clear any existing auth errors or stale session data before signing in
+      // Clear any existing auth errors or stale session data
       localStorage.removeItem('supabase.auth.error');
-      localStorage.removeItem('supabase.auth.refreshToken');
-      localStorage.removeItem('supabase.auth.token');
-      
-      // Force using the explicit redirect URL
-      const redirectUrl = getRedirectUrl();
-      console.log('Using redirect URL:', redirectUrl);
       
       // Generate unique values to prevent caching issues
       const timestamp = Date.now();
       const nonce = Math.random().toString(36).substring(2, 15);
+      
+      // Get the redirect URL
+      const redirectUrl = getRedirectUrl();
+      console.log('Using redirect URL:', redirectUrl);
       
       // Initiate Google sign-in with explicit options
       const { error } = await supabase.auth.signInWithOAuth({
@@ -172,16 +171,20 @@ export default function Auth() {
         options: {
           redirectTo: redirectUrl,
           queryParams: {
+            // Force prompt selection to avoid automatic login
+            prompt: 'select_account',
             // Add these to prevent caching issues
             _t: timestamp.toString(),
-            nonce: nonce,
-            prompt: 'select_account'
+            nonce: nonce
           },
         },
       });
       
       if (error) {
         console.error('Failed to initiate Google sign-in:', error);
+        setAuthError(`Failed to initiate sign-in: ${error.message}`);
+        toast.error(`Failed to initiate sign-in: ${error.message}`);
+        setIsLoading(false);
         throw error;
       }
       
@@ -220,7 +223,7 @@ export default function Auth() {
             Welcome to <SouloLogo size="large" className="text-blue-600" />
           </h1>
           <p className="text-muted-foreground">
-            Sign in to start your journaling journey and track your emotional wellbeing
+            Sign in to start your journaling journey
           </p>
         </div>
         
@@ -235,6 +238,7 @@ export default function Auth() {
             size="lg" 
             className="w-full flex items-center justify-center gap-2"
             onClick={handleSignIn}
+            disabled={isLoading}
           >
             <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
               <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">

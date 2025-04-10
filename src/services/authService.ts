@@ -1,69 +1,72 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
 
 /**
- * Gets the redirect URL for authentication
+ * Gets the redirect URL for authentication that consistently works
  */
 export const getRedirectUrl = (): string => {
-  // Use this variable to determine if we're in the production domain
-  const isProdDomain = window.location.hostname === 'soulo.online' || 
-                       window.location.hostname.endsWith('.soulo.online');
-  
-  // IMPORTANT: Always use HTTPS for production URLs to ensure secure auth
-  if (isProdDomain) {
-    // Always use the full HTTPS URL for production
-    console.log('Using production auth redirect URL: https://soulo.online/auth');
-    return `https://soulo.online/auth`;
-  }
-  
-  // Otherwise use the current origin (for local development)
+  // Use window location origin to ensure we get the correct base URL
   const origin = window.location.origin;
-  console.log('Using development auth redirect URL:', `${origin}/auth`);
-  return `${origin}/auth`;
+  
+  // Always return the /auth path for consistency
+  const redirectUrl = `${origin}/auth`;
+  console.log('Using auth redirect URL:', redirectUrl);
+  return redirectUrl;
 };
 
 /**
- * Sign in with Google
+ * Sign in with Google with simplified and reliable approach
  */
 export const signInWithGoogle = async (): Promise<void> => {
   try {
+    console.log('Initiating Google sign-in from:', window.location.href);
+    
     // Record login attempt time for debugging
     localStorage.setItem('loginAttemptTime', Date.now().toString());
     
-    // Get the correct redirect URL based on environment
+    // Clear any existing auth data that might interfere
+    localStorage.removeItem('supabase.auth.error');
+    localStorage.removeItem('supabase.auth.token');
+    localStorage.removeItem('supabase.auth.refreshToken');
+    
+    // Get the redirect URL
     const redirectUrl = getRedirectUrl();
     console.log('Using redirect URL for Google auth:', redirectUrl);
     
-    // Clear any existing auth errors in localStorage that might be interfering
-    localStorage.removeItem('supabase.auth.error');
-    
-    // Generate a unique nonce to prevent caching issues
+    // Generate a nonce and timestamp to prevent caching
     const nonce = Math.random().toString(36).substring(2, 15);
+    const timestamp = Date.now().toString();
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
         queryParams: {
-          // Add timestamp and nonce to prevent caching issues
-          _t: Date.now().toString(),
+          // Force prompt to select account to prevent automatic login with cached credentials
+          prompt: 'select_account',
+          // Add these to prevent caching issues
+          _t: timestamp,
           nonce: nonce
         },
       },
     });
 
     if (error) {
-      console.error('Error in signInWithGoogle:', error);
+      console.error('Error starting Google sign-in:', error);
+      toast.error(`Error starting Google sign-in: ${error.message}`);
       throw error;
     }
+    
+    console.log('Google sign-in flow initiated successfully');
   } catch (error: any) {
-    console.error('Error signing in with Google:', error);
+    console.error('Failed to initiate Google sign-in:', error);
     
     // Only show toast if we're in an app route
     const currentPath = window.location.pathname;
     if (isAppRoute(currentPath)) {
-      toast.error(`Error signing in with Google: ${error.message}`);
+      toast.error(`Google sign-in failed: ${error.message}`);
     }
     throw error;
   }
