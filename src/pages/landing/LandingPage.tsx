@@ -15,6 +15,9 @@ import BlogPreview from './components/BlogPreview';
 import PrivacySection from './components/PrivacySection';
 import Footer from './components/Footer';
 import { OptimizedImage } from '@/utils/imageUtils';
+import SpiritualRobotAnimation from '@/components/website/SpiritualRobotAnimation';
+import LanguageSelector from '@/components/website/LanguageSelector';
+import ProcessSteps from '@/components/website/ProcessSteps';
 
 const LandingPage = () => {
   const containerVariants = {
@@ -41,7 +44,7 @@ const LandingPage = () => {
     {
       icon: Mic,
       title: "Voice Journaling",
-      description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically."
+      description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically."
     },
     {
       icon: Brain,
@@ -70,7 +73,12 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <ParticleBackground />
-      <Navbar />
+      <header className="relative z-20">
+        <Navbar />
+        <div className="container mx-auto px-4 flex justify-end pt-4">
+          <LanguageSelector />
+        </div>
+      </header>
       
       {/* Hero Section */}
       <motion.section
@@ -83,14 +91,14 @@ const LandingPage = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <motion.div className="w-full md:w-1/2 text-center md:text-left" variants={itemVariants}>
               <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
-                Introducing SOULo
+                Introducing SOuLO
               </span>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
                 Express. Reflect.{" "}
                 <span className="text-primary">Grow.</span>
               </h1>
               <p className="text-xl md:text-2xl mb-8 text-muted-foreground">
-                Discover yourself through voice journaling and AI-powered insights with SOULo.
+                Discover yourself through voice journaling and AI-powered insights with SOuLO.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                 <Button size="lg" className="group">
@@ -107,17 +115,7 @@ const LandingPage = () => {
               className="w-full md:w-1/2 flex justify-center md:justify-end"
               variants={itemVariants}
             >
-              <div className="relative w-full max-w-sm">
-                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
-                <div className="relative bg-card backdrop-blur-sm border border-primary/10 rounded-2xl p-6 shadow-xl overflow-hidden">
-                  <div className="absolute -right-20 -top-20 w-40 h-40 bg-primary/10 rounded-full blur-3xl"></div>
-                  <OptimizedImage 
-                    src="appScreenshot" 
-                    alt="SOULo App Screenshot" 
-                    className="w-full rounded-lg shadow-lg relative z-10"
-                  />
-                </div>
-              </div>
+              <SpiritualRobotAnimation className="w-full max-w-sm h-96" />
             </motion.div>
           </div>
           
@@ -148,7 +146,7 @@ const LandingPage = () => {
         <div className="container mx-auto max-w-6xl px-4">
           <div className="text-center mb-12">
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Features</span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">How SOULo Works</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">How SOuLO Works</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
             </p>
@@ -177,6 +175,9 @@ const LandingPage = () => {
       
       {/* Feature Showcase */}
       <FeatureShowcase />
+      
+      {/* Process Steps Section */}
+      <ProcessSteps />
       
       {/* Privacy Section */}
       <PrivacySection />

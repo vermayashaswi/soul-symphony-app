@@ -9,7 +9,7 @@ import { OptimizedImage } from '@/utils/imageUtils';
 const features = [
   {
     title: "Voice Journaling",
-    description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
+    description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically.",
     icon: Mic,
     image: "features.voiceJournaling",
   },
@@ -51,7 +51,7 @@ const AppFeatureCarousel = () => {
           <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
             App Features
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOULo's Features</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOuLO's Features</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
           </p>
