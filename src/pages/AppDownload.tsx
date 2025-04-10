@@ -4,13 +4,12 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
-import { AppleIcon, AndroidIcon } from 'lucide-react';
 import SouloLogo from '@/components/SouloLogo';
 import ParticleBackground from '@/components/ParticleBackground';
 import Navbar from '@/components/Navbar';
 
 // Create custom icons for app stores
-const AppleIcon = () => (
+const AppleStoreIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 20.94c1.5 0 2.75-.67 3.95-1.34 1.24-.67 2.23-1.76 2.73-3.02.32-.85.47-1.76.47-2.75 0-1.27-.47-2.44-1.28-3.32-.97-1.08-2.34-1.69-3.72-1.69-.53 0-1.13.15-1.76.44-.53.25-.97.49-1.32.73-.34-.23-.79-.48-1.32-.73-.62-.3-1.23-.45-1.77-.45-1.38 0-2.76.6-3.72 1.69-.82.88-1.29 2.05-1.29 3.32 0 .99.15 1.9.47 2.75.5 1.26 1.49 2.35 2.73 3.02 1.2.67 2.45 1.34 3.95 1.34z" />
     <path d="M12 8.62c.16-.59.3-1.21.47-1.84.34-1.26 1.87-2.1 2.8-2.36 0 0-.74 2.72-2.3 2.72-1.13 0-1.28.88-.97 1.48z" />
@@ -18,7 +17,7 @@ const AppleIcon = () => (
   </svg>
 );
 
-const AndroidIcon = () => (
+const GooglePlayIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M7.5 4.27c-.93.93-1.5 2.2-1.5 3.6v8.26c0 1.4.58 2.68 1.5 3.6" />
     <path d="M16.5 4.27c.93.93 1.5 2.2 1.5 3.6v8.26c0 1.4-.58 2.68-1.5 3.6" />
@@ -120,7 +119,7 @@ const AppDownload = () => {
               className="w-full h-16 text-lg border-2 hover:bg-primary/10"
               onClick={() => window.open('https://apps.apple.com/app/soulo-journal', '_blank')}
             >
-              <AppleIcon />
+              <AppleStoreIcon />
               <div className="flex flex-col items-start ml-2 text-left">
                 <span className="text-xs">Download on the</span>
                 <span className="font-semibold">App Store</span>
@@ -135,7 +134,7 @@ const AppDownload = () => {
               className="w-full h-16 text-lg border-2 hover:bg-primary/10"
               onClick={() => window.open('https://play.google.com/store/apps/details?id=app.soulo.journal', '_blank')}
             >
-              <AndroidIcon />
+              <GooglePlayIcon />
               <div className="flex flex-col items-start ml-2 text-left">
                 <span className="text-xs">Get it on</span>
                 <span className="font-semibold">Google Play</span>
