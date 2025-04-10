@@ -52,6 +52,7 @@ const AppRoutes = () => {
       <OnboardingCheck 
         onboardingComplete={onboardingComplete} 
         onboardingLoading={onboardingLoading}
+        user={user}
       >
         <Routes>
           {/* Home route - always shows website for web visitors */}

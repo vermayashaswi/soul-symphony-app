@@ -113,7 +113,9 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
             });
             
             if (count > 0) {
-              entry.sentiment = (totalSentiment / count).toFixed(2);
+              let avgSentiment = totalSentiment / count;
+              if (avgSentiment > 1.0) avgSentiment = 1.0;
+              entry.sentiment = avgSentiment.toFixed(2);
             }
           } catch (e) {
             console.error('Error processing emotions for sentiment:', e);
@@ -380,6 +382,8 @@ const calculateJournalActivity = (entries: any[], timeRange: TimeRange): Journal
 const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmotionData => {
   const emotionData: AggregatedEmotionData = {};
   
+  const emotionCounts = new Map<string, Map<string, number>>();
+  
   entries.forEach(entry => {
     const dateStr = format(new Date(entry.created_at), 'yyyy-MM-dd');
     
@@ -393,6 +397,15 @@ const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmo
           if (!emotionData[emotion]) {
             emotionData[emotion] = [];
           }
+          
+          if (!emotionCounts.has(dateStr)) {
+            emotionCounts.set(dateStr, new Map());
+          }
+          const dateEmotionCounts = emotionCounts.get(dateStr)!;
+          if (!dateEmotionCounts.has(emotion)) {
+            dateEmotionCounts.set(emotion, 0);
+          }
+          dateEmotionCounts.set(emotion, dateEmotionCounts.get(emotion)! + 1);
           
           const existingPoint = emotionData[emotion].find(point => point.date === dateStr);
           
@@ -410,6 +423,19 @@ const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmo
         console.error('Error parsing emotions:', e);
       }
     }
+  });
+  
+  Object.entries(emotionData).forEach(([emotion, dataPoints]) => {
+    dataPoints.forEach(point => {
+      const dateEmotionCounts = emotionCounts.get(point.date);
+      if (dateEmotionCounts && dateEmotionCounts.has(emotion)) {
+        const count = dateEmotionCounts.get(emotion)!;
+        if (count > 1) {
+          point.value = point.value / count;
+          if (point.value > 1.0) point.value = 1.0;
+        }
+      }
+    });
   });
   
   return emotionData;
