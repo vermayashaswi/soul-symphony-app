@@ -14,86 +14,75 @@ const imageCache: Record<string, string> = {
   'appScreenshot': 'data:image/webp;base64,UklGRlwQAABXRUJQVlA4IFAQAACQUgCdASqAAMAAPm0uk0WkIqGhK9n9QLASCWwAy5doG/l/4b+a/0/0z/Af0D/Jf439gf2r/q/8X/dP/L/xnwA/lP9u/4P/C/cD/hf+F/1v+C+wL/hf4d/vP+r/8//IfYQ/uf///X/7J+3Pv/8Afs3/If//+2P2oP//+j/1v+1Prr7E/+f/wv///3H3TPYX/v/9h///+zfrj+zf9V9Bj9u/5D///7k+037bfyv/y/8n+A/kv+m/+v/I/zP/a/3/+Uf9P/Of5D/+f7v///2//5v///9f/3X+k////ef83+5fuIP9n///7x+9/1TH5r/JP8J/mP+L/mv9p/pf8p/nP+d/wv+R/xP/F/3X+df0X+d/w//K/4r/Sf/8/1H//P9z/v/+D/x//Y/z3/z/wD/qv+L/nf9//xP/C/7H/A/+X/j/+5/+n/B/v/8Af5b/m/83/h////7l+6n////cP3S////eX7g+wV5G+hVHpJzP91gDaX/pQRQx5jKnJDWjuSm6Ky7fXbNNOy/GNQzEbXRVTR7RtCPbJm3uOoqfMQZLMlT37QcPQG0XtBUlPzZn6H1LdZQcpksDNhQB5zZk1x3tpf82gIeXVsXKFy16A4FgXyLcyDrZRYPp33G8zHPYzkIwvdGvXTGZFt3lKMV30Jx7MVBczxaxSbLzLGOr3gqjygbE0UrHaLw5IWxGCgpWy+O9PNNp5UQ3kxRlOx0rg/WJT9nHk13fPL1RcSrwLFvzpKKCY6QEBJ+u1hJpAiKDTxdmZ78MWyGwUQSzLxBs/BQyR+lM6IUgFzKm5Np8nh7O4Qc5jrSvv6SyvY5BTGBF6NF43dARXA4flP8tFHAGMAojA0nDmJvUW4yzZJJiI2yT2IiXNOYxCfwn5iOAKSsJhptbqQqAhEwWc9CIvdYGIqoIdYzrFz3V6P/LiO5pTCn2GmP5/LfDSKDHDXjJnxXPYIZ4FhPCLDTvpXLWODvl3oVTjqnj2q+YfRfzJ0+vNTL1LbEXiXDHEU+cPyWr7lNdDwQ1LZXr32dYVGKAZyUCOxPpPGYOcGK6CnKg5V6BjqHLb55EwzKBKbDWxQAA/v35qCVPZRjqJ1GznqLBHCCgdvMeOhm5UiMv2fvctdRvbQPxL7PcS2EYrlzdjc/aSRJGnTrC1B/MX8SebQb54TDR0bZPOQMFgHFIgJ+Cp6Sz+Tq0Rz1cyCGbw3VjEWQr6Gy0vZ0Uo83e+VrdV8kzkk9AkpFvz1I/g0eCfTAiPuIXZWcAQr83oYZO11Dji5oSPUMQmA1bvajh9gG+I5f71TlmFj3iH3tZXmAGGN01NwCa0JcuAoXt3/QGXEb0VraPQRHrtpX9hAOlIvTdSucAD35LsHjBjlkjD3l+oj0wYEWr8h1GjdDgIwMVzWOPqCGizBEBgf/w1rucmBshFUbcWgxRR0x+37NrPp5q7dF0AzuB9Kgv9NKj9qqHuW8Bt/ljCTL8p40k8vWXucnYRy+t0yW9LDRo7RJsMSBExFGlO9vd2W0fpICGKmZsquxMvRO85zjOy8N+L9U/4YnpjMkgCe3qFZt5VULUiZE64DTQVyZQkfzlZnbYVBBWCCugCZR8Y5MCqKm6dajxoOIIvcGFQcImZ0jRMKSaWtS+JBgM0JJ99XrDa+bx1a3Gv7bUXeS57Eg2wfmOKpq2N9RBkgdkDFdQE7TlV2JzUc6dCLLZgDYWUHw77uPcFg0rQ3sBEJtS/sLM9DW5XIKP5oVLQOy8KDfU/Dz4r6Aa5jOUHEXqf7ksG6P8Pjj/i0T3H1FGK9xhfGhK5vbWyPpFVepFTU25YZk14RQODrfHV4x/EwlD0PscTHiNX7/7+6gKXgaSDp+7E0a6ZGnJK/ZtZIxORWzBDnUdrdTpKJTr2h7XQ4OglrSlU19RD3Jm+T0GHzkvCkf4aaFZO9Wt1pWsQEzfPz2Hq8PICGmxNAk0Oe/Gyl3Qb0eAPd/mA7vAjgimVnRVN6rjapgMAiP3v+4nD6YrTrW9ZVtlRKM7DfSVPOLyU6wOTYIeD/S2lJdL22uXroDqRMU13iMaqqPOOCYQ1aEKICZPg9W1gy8NnA+uJOi6hPsWJw5JV82dDlcwv1OTLqrM25SdCgbilwTJpDfLBFscJpuIdTgx79gG7Ruk3v5J5Tct99yYGQc/CUl/bh/3Fc5o6QFqLGcIXqyF/HmEeL+cXaS7l9Ygl75Dc8VsYsufYVR5MtZy+X1j36KDsXc+3x0HsNH65bYPAXF3JXBOuCCXpIwlIyf4IH/v9J8xUfTxjjR9N6yKP3uoJ78pjZTGaKNHnUMXlHnA94y8q0z6nqX7xDmwx4pjCLCQdVnNXU3OIlIGmNx8XC/XhXSYeXH3mQw6t8R9TxTb1nIIy+YlDXiBb+Z9qfGY2s+vj5NglhwfT5cQJkPHvDlrg6/0eAIMj3Ck0PG+k9q0+Fmi0znqt3NaMZlGF/53vAqLVtxsSlH7GfVfDBXfS9/5XdKlhOVZsqcNrFcVm1xZgecvjCR9fDYt8JbUY6LX62eXdFLlw4pRt2VH0qEPPNRbfhWX1oOi7BQRSj8Ao0DY8aU5UKvXHC0Vr3+D5xdxXJR7llfLaMvZ5u8L+gNRqQAePy+5cCljO3vGk2x4OE5YEsrwnujzTT/X0/rF6xjdKXRr3eIFaJB/4bJyb+RHQiLhA7sY38QLvcsjKCJQkbKbppyqcKFwLrJ71BU3RQa9AxzBJ40LsGUH5AFTBJ50x1fD74m8dj2HUKc3XzQsyVozdlnZDsiBkQxI2bKh7iAh4sjjmMJpQVeolIUbC42W5KJFwmXwIJLzG++LjK+sDGOXn/y1IkO/4EXDuSjSLzCcPgd+RJtUHcqHHlWZ99aaXjwx2dDYwkVHEMEZqilkMLhzJ71GY/7nJrVeaQiHAM/y3fEcdXqDavxSSIUaJCxkYvzpVFNSGGQ4bXLwVVqcDKcG8fmyYB2SH7V2k4LQvj5N3oVhPzYWCWCipO2YpAKDYuVbD2rVYPVLYm80AKu8sNNYdMpEJFnBCvk6fEF/gdbf1o7u5M0jm0Rb1yO9bCXmzuIhT+wEGu2e1fC7IuLaY9YULNPMJdyeZ7v3L6o1zsjmWfJ/T3+oumBojj69c+D8YHLK8ZDrsCMOCzI0/jvadZcWjNfBx0hQnRSBJ7pQzqkCIKYXgZf4bZeLUBTeMfOHnVMLVgf+jGQQJKxKZMgSC7W0lkzwYjsRvb8HwP7v6j7O+0AAAm2xFw6p8WP31c5gLKJ4jXPAJSSYQZ2RBo2Ysi90/PJPF9+69jZaipqI9zaqIRnC2Nl0Qz8rZPx9qr4zq3iKRtF9RDI3BLCpOw9oYyAVdtMfNW/tKRTZUu5FNRCmOa8ZJDT+a7ksEsbbMJmJQsBWj0eXvkrKfHqEu1hnxvAG7a/rw7Jz0kYQTdSP9n0FmKLpT3kxavKBQgJKDZITQ3m4nFTZnptFXGzKU9r2IMJoOqk4dD1DvLKLrFYTfOeF0AjTf2tKaXLgQFUGE7FJeXNpOH2PBgG0O5UYkMKdmLt9ujEfqqzWrKNk1Jl2RQ5m+QqwbxAeZNTMkPw74V5I+y9Nm4zW2UFj0vw+yT2fK16xnkJTtpYoWqz2XNhWI/Q+7nRlK8RsaXrJfgqaWBXyOlRsAf1TFmFCbZFjNlPYN/Xt4GJhQ5XSwiBx8JpCmmsMm1zKtM2oVRXv6lbUvG1FDhGZrz8Sxn94ufepQME7KDRCJLpj2Uy7oT49qwkEE/4nscgxC2Xg3VxEHPHPo5Bd2RyDYEojCCDNFvQeUiI/Xq5zDkpHs62XRYnYVxfkRoHiUXI4IW9gADKZMZGwU9MH0ZcHD79TYU/oAz1+XXi0pTOCbWHMB7FG3bXfUNxhQYjwXO1HMXrOSNa+3Pve7QALv0O/MpGytlnYONsjV1s3e/09sJkMEwgSI4bWXpNMLlOqZFWS/M4QfRv7+z7YuqD9RpOcxMQgDkTgnz9I7JMqdjTBZ3cxtIEKZ81W4FaGqf+AUCwSLT4p/mPKhp+aBPTN7LRSd7ZTuxdgR0/2A1PgPwDx7QzjzrXwZs0fTTzxb/gu7S5kBJdl8KDkhhw1C+p4+qDMUJTN38t/BuXQkPDgHyHDZcPODzpvTfj1hIKiSaMSvmQ6T10jElsTm4Og0Iov9Tl38LoNZxAXzqQKs9lfxWuLVXCIoq+1+hESQi4L86nPg2pP40cP/KX7MZA8YQzPYILsqKTrXhFXvL0SJ1IvFzFKyTQ+CnEuIm7h0Iiikd1PNR4FgfZHsC0HNEPLGtCxbkKUdgG5JFYzn86dlv9MZCzNGfGWGKF1M9Hy9dFY8Tse7Fj3jG6Oz2ZI6Dz0UGHlxMzYI/T6pQFTlSHpTFNbwPEH6bJiYvUGHrvKOHnHYwOl/UQmxIE7UVo/78kFP/kABLw/FY2I/cQJvt/ZS+cLpnuIXsgpqM6ww4Z8cWimMpIFdm8CY+ZAh0EZc7bNH5HpH6FuAxoxhqBxg40TbXwv48ySxMgcMYooxnQPkuqhyrbqQz8ZdiFxr7n/ypsCk4+NPQP1xyE2IjEavVFdHmYxoRn9KgXK4B3GGDl9RqHhkNv4ZYWJwS7FxxXSH9fvRUF1Wbzd9tTOUwB+4g9M1wq0yyEcARPvCOtFdPHjmzSIBjC0W8D81NTtUNJ5ZIwV9iXCEGupnNfH4ybO0FRnpBUKuInvgvP6yjYN0ZxX4TnOzaLjUCg3mczLfG5rrYD+jxs8E/FmZZPJl0MWgkQAqHRkW2+/fwYBX81AJbw1sX0AXnMgj49vhYN8VVZR42nO+RCFGZ8Xmtie7u9BM0JY41zBfNuEmICk4sB2pmnLYBBv0t/qQGkwZRnDlWWu0Zm8U9RMMCS+esCJi+tDQo6b3/sSb1VbAwfnHkOMXzpRnKaZWmm1vU+ZXF5Q3HpfQzzZJ0kpJzN9EWbWQCzVmA6K6EWFpTsYcKHn6I40e+3HXRj8g+Vky6pOzYv0+yYK8srvUFJX3sI/+MFX5Rnw8DkM6qzGS53aaACCzNHpADFnUXfzDKpjgCVKEd4RY+JvfMbNuIb9XARrxCDJdYeZWJZUWoN3FG9mZ5k0Fn8Wl0E/TYJTRnZS3QRlkTyGBt97eSdE9mVwGGQkHsq4fRNBPwjhIU/GKIX5UDyS8f3fACwNc0lWuEGLPYBRyBLpTW8O2/bV3e9/+K4rPJSs2y7aK8MrQqoztbxzh2RGGqVKEhEQxqMWMSlqCU0AjHWI+hPEBBKjVZQ8FzMpMzrDgBVOHCxo3L84p3lYwx3xoQJUfFYe03vD5X5yLF/cWLiYLaC6MBZIqQwQhVkYkAqGrp87Z+YPHljfF2JVAjVpq5MvEClDtQGnYoxCcb/5UYtCWP6Rq9RWI64xEMy3Vm0ICNYe3w8OGkWqVpZiZ7hchj8xfg40C0l7rEe1rUv26ZswG0lULxr+RBRHYzP3LCUD5KMmLU/JBwNgbdTvUf4pwYAofMVsLLwwC5+mYm/m5FmtdyANn+OM5a8TpzgRw8ePIhaPf8IEklWI94Y+DXMzU5/7e4Z0Y0O/gVmXXH5xkAMKQEEcO3w12qN1Ml6C9oLfPZg6nETJtxaAD/38Zo+NyPi94w9PZj/FPWXF2QJfZBYTz95xspsMaJpO3RzMqm/l5/5MNGYLs/KD7BLRRQrIiOyXj7ljD9NKCx7/EAAAAAA==',
 };
 
-// Function to determine if the image exists in the cache
-export const getOptimizedImage = (src: string): string => {
-  // If src is already a data URL, return it as is
-  if (src?.startsWith('data:')) {
-    return src;
+/**
+ * Utility function to convert an image to base64
+ * @param {string} url - The URL of the image to convert
+ * @returns {Promise<string>} - A promise that resolves to the base64 encoded image
+ */
+export const imageToBase64 = async (url: string): Promise<string> => {
+  try {
+    // For images that are already in base64 format
+    if (url.startsWith('data:')) {
+      return url;
+    }
+    
+    // For images from our server, fetch and convert
+    const response = await fetch(url);
+    const blob = await response.blob();
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Error converting image to base64:', error);
+    return url; // Return original URL if conversion fails
   }
-  
-  // Check if we have a pre-compressed version in the cache
-  if (imageCache[src]) {
-    return imageCache[src];
-  }
-  
-  // If no cached version, return the original src
-  return src;
 };
 
-// Component to render optimized images
+/**
+ * Component that displays an image with base64 optimization
+ */
 export const OptimizedImage: React.FC<{
   src: string;
   alt: string;
   className?: string;
-  width?: number;
-  height?: number;
-  priority?: boolean;
-  loading?: 'lazy' | 'eager';
+  width?: number | string;
+  height?: number | string;
+  placeholder?: boolean;
 }> = ({ 
   src, 
   alt, 
-  className, 
-  width, 
+  className,
+  width,
   height,
-  priority = false,
-  loading = 'lazy'
+  placeholder = true
 }) => {
-  const [imageSrc, setImageSrc] = useState<string>(getOptimizedImage(src));
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [imageSrc, setImageSrc] = useState<string>(
+    // Check if we have a pre-compressed version
+    imageCache[src as keyof typeof imageCache] || 
+    (placeholder ? '/placeholder.svg' : src)
+  );
   
   useEffect(() => {
-    // Update image source when src prop changes
-    setImageSrc(getOptimizedImage(src));
-    setIsLoading(true);
-    setError(false);
+    // If not already using a pre-compressed version, try to convert
+    if (!imageCache[src as keyof typeof imageCache]) {
+      imageToBase64(src)
+        .then(base64 => setImageSrc(base64))
+        .catch(() => setImageSrc(src));
+    }
   }, [src]);
-
+  
   return (
-    <div className={cn("relative overflow-hidden", className)}>
-      {isLoading && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-200 animate-pulse">
-          <span className="sr-only">Loading...</span>
-        </div>
-      )}
-      
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-          <span className="text-gray-500">Failed to load image</span>
-        </div>
-      )}
-      
-      <img
-        src={imageSrc}
-        alt={alt}
-        className={cn(
-          "transition-opacity duration-300",
-          isLoading ? "opacity-0" : "opacity-100",
-          className
-        )}
-        width={width}
-        height={height}
-        loading={priority ? 'eager' : loading}
-        onLoad={() => setIsLoading(false)}
-        onError={() => {
-          setError(true);
-          setIsLoading(false);
-          // If the optimized version fails, fall back to original
-          if (imageSrc !== src) {
-            setImageSrc(src);
-          }
-        }}
-      />
-    </div>
+    <img 
+      src={imageSrc} 
+      alt={alt} 
+      className={className}
+      width={width}
+      height={height}
+      loading="lazy"
+    />
   );
 };
