@@ -20,9 +20,6 @@ export default function Auth() {
   const [loginAttemptTime, setLoginAttemptTime] = useState<number | null>(null);
   
   const redirectParam = searchParams.get('redirectTo');
-  const fromLocation = location.state?.from?.pathname;
-  const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
-  
   const from = '/app/home';
 
   // Check for error params in URL
@@ -147,29 +144,38 @@ export default function Auth() {
 
   const handleSignIn = async () => {
     setAuthError(null);
-    setLoginAttemptTime(Date.now());
-    localStorage.setItem('loginAttemptTime', Date.now().toString());
+    
+    // Set login attempt time for timing metrics
+    const currentTime = Date.now();
+    setLoginAttemptTime(currentTime);
+    localStorage.setItem('loginAttemptTime', currentTime.toString());
     
     console.log('Initiating Google sign-in from', window.location.origin);
     
     try {
+      // Clear any existing auth errors or stale session data before signing in
+      localStorage.removeItem('supabase.auth.error');
+      localStorage.removeItem('supabase.auth.refreshToken');
+      localStorage.removeItem('supabase.auth.token');
+      
+      // Force using the explicit redirect URL
       const redirectUrl = getRedirectUrl();
       console.log('Using redirect URL:', redirectUrl);
       
-      // Clear any existing auth errors or stale session data
-      localStorage.removeItem('supabase.auth.error');
-      
-      // Add a unique nonce to prevent caching issues
+      // Generate unique values to prevent caching issues
+      const timestamp = Date.now();
       const nonce = Math.random().toString(36).substring(2, 15);
       
+      // Initiate Google sign-in with explicit options
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
           queryParams: {
-            // Add timestamp and nonce to prevent caching issues
-            _t: Date.now().toString(),
-            nonce: nonce
+            // Add these to prevent caching issues
+            _t: timestamp.toString(),
+            nonce: nonce,
+            prompt: 'select_account'
           },
         },
       });
@@ -179,11 +185,12 @@ export default function Auth() {
         throw error;
       }
       
-      console.log('Google OAuth flow initiated successfully');
-    } catch (error) {
+      console.log('Google OAuth flow initiated successfully at:', timestamp);
+    } catch (error: any) {
       console.error('Failed to initiate Google sign-in:', error);
       setAuthError('Failed to initiate sign-in process. Please try again.');
       toast.error('Failed to initiate sign-in process. Please try again.');
+      setIsLoading(false);
     }
   };
 

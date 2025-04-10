@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -7,47 +6,19 @@ import { isAppRoute } from '@/routes/RouteHelpers';
  * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
-  const origin = window.location.origin;
-  const urlParams = new URLSearchParams(window.location.search);
-  const redirectTo = urlParams.get('redirectTo');
-  
-  // Store any redirect parameter for later use
-  if (redirectTo) {
-    localStorage.setItem('authRedirectTo', redirectTo);
-  }
-  
-  // For iOS in standalone mode (PWA), we need to handle redirects differently
-  // Check for standalone mode in a type-safe way
-  const isInStandaloneMode = () => {
-    // Check for display-mode: standalone media query (PWA)
-    const standaloneCheck = window.matchMedia('(display-mode: standalone)').matches;
-    
-    // Check for navigator.standalone (iOS Safari)
-    // @ts-ignore - This is valid on iOS Safari but not in the TypeScript types
-    const iosSafariStandalone = window.navigator.standalone;
-    
-    return standaloneCheck || iosSafariStandalone;
-  };
-    
-  // For PWA on iOS, we want to avoid redirects that might break the app
-  if (isInStandaloneMode() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-    console.log('Auth in standalone mode (PWA), using in-app auth flow');
-    // Use a special auth flow that works better in PWA context
-    return `${origin}/auth?pwa_mode=true`;
-  }
-  
   // Use this variable to determine if we're in the production domain
   const isProdDomain = window.location.hostname === 'soulo.online' || 
-                      window.location.hostname.endsWith('.soulo.online');
+                       window.location.hostname.endsWith('.soulo.online');
   
   // IMPORTANT: Always use HTTPS for production URLs to ensure secure auth
   if (isProdDomain) {
-    // Always use the full HTTPS URL for production to ensure consistent redirects
+    // Always use the full HTTPS URL for production
     console.log('Using production auth redirect URL: https://soulo.online/auth');
     return `https://soulo.online/auth`;
   }
   
   // Otherwise use the current origin (for local development)
+  const origin = window.location.origin;
   console.log('Using development auth redirect URL:', `${origin}/auth`);
   return `${origin}/auth`;
 };
@@ -195,7 +166,10 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     }
     
     // If session exists, proceed with normal sign out
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({
+      scope: 'global' // Ensure we're fully signing out of all sessions
+    });
+    
     if (error) {
       throw error;
     }
