@@ -44,6 +44,13 @@ const AppRoutes = () => {
   // Find the NotFound route
   const notFoundRoute = specialRoutes.find(route => route.path === '*');
   
+  // Debug logs for routing logic
+  useEffect(() => {
+    console.log("Current path:", location.pathname);
+    console.log("User authenticated:", !!user);
+    console.log("Onboarding complete:", onboardingComplete);
+  }, [location.pathname, user, onboardingComplete]);
+  
   return (
     <>
       <ViewportManager />
@@ -68,6 +75,14 @@ const AppRoutes = () => {
                 <WebsiteRouteWrapper><HomePage /></WebsiteRouteWrapper>
               )
             } 
+          />
+          
+          {/* Explicit route for /app to ensure onboarding is shown */}
+          <Route
+            path="/app"
+            element={
+              <AppRouteWrapper element={<OnboardingScreen />} requiresAuth={false} />
+            }
           />
           
           {/* Website routes */}

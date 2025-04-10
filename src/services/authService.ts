@@ -32,16 +32,7 @@ export const getRedirectUrl = (): string => {
     return `${origin}/auth?pwa_mode=true`;
   }
   
-  // Use this variable to determine if we're in the production domain
-  const isProdDomain = window.location.hostname === 'soulo.online' || 
-                      window.location.hostname.endsWith('.soulo.online');
-  
-  // If we're in production, use the actual domain
-  if (isProdDomain) {
-    return `https://soulo.online/auth`;
-  }
-  
-  // Otherwise use the current origin (for local development)
+  // Use the actual domain for any environment
   return `${origin}/auth`;
 };
 
@@ -57,6 +48,10 @@ export const signInWithGoogle = async (): Promise<void> => {
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
       },
     });
 
@@ -141,10 +136,11 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       console.log('No active session found, cleaning up local state only');
       // Clear any auth-related items from local storage
       localStorage.removeItem('authRedirectTo');
+      localStorage.removeItem('onboardingComplete');
       
-      // Redirect to onboarding page if navigate function is provided
+      // Redirect to auth page if navigate function is provided
       if (navigate) {
-        navigate('/onboarding');
+        navigate('/auth');
       }
       return;
     }
@@ -157,19 +153,21 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     
     // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
+    localStorage.removeItem('onboardingComplete');
     
-    // Always redirect to onboarding page if navigate function is provided
+    // Always redirect to auth page if navigate function is provided
     if (navigate) {
-      navigate('/onboarding');
+      navigate('/auth');
     }
   } catch (error: any) {
     console.error('Error signing out:', error);
     
-    // Still navigate to onboarding page even if there's an error
+    // Still navigate to auth page even if there's an error
     if (navigate) {
-      navigate('/onboarding');
+      navigate('/auth');
     }
     localStorage.removeItem('authRedirectTo');
+    localStorage.removeItem('onboardingComplete');
     
     // Show error toast but don't prevent logout flow
     toast.error(`Error while logging out: ${error.message}`);

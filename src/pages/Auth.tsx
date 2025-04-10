@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -6,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
+import { signInWithGoogle } from '@/services/authService';
 
 export default function Auth() {
   const location = useLocation();
@@ -14,17 +16,20 @@ export default function Auth() {
   const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [authUser, setAuthUser] = useState(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  const from = '/';
+  // Determine where to redirect after auth
+  const from = redirectParam || fromLocation || storedRedirect || '/app';
 
   useEffect(() => {
     const checkAuthState = async () => {
       try {
         const { data } = await supabase.auth.getSession();
+        console.log("Auth page: Initial auth check:", !!data.session);
         setAuthUser(data.session?.user || null);
         setIsLoading(false);
       } catch (error) {
@@ -94,32 +99,15 @@ export default function Auth() {
 
   const handleSignIn = async () => {
     console.log('Initiating Google sign-in from', window.location.origin);
+    setIsSigningIn(true);
+    
     try {
-      const redirectUrl = getRedirectUrl();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-        },
-      });
-      
-      if (error) {
-        throw error;
-      }
+      await signInWithGoogle();
     } catch (error) {
       console.error('Failed to initiate Google sign-in:', error);
       toast.error('Failed to initiate sign-in process. Please try again.');
+      setIsSigningIn(false);
     }
-  };
-  
-  const getRedirectUrl = (): string => {
-    const origin = window.location.origin;
-    const urlParams = new URLSearchParams(window.location.search);
-    const redirectTo = urlParams.get('redirectTo');
-    if (redirectTo) {
-      localStorage.setItem('authRedirectTo', redirectTo);
-    }
-    return `${origin}/auth`;
   };
 
   if (isLoading) {
@@ -157,6 +145,7 @@ export default function Auth() {
             size="lg" 
             className="w-full flex items-center justify-center gap-2"
             onClick={handleSignIn}
+            disabled={isSigningIn}
           >
             <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
               <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
@@ -166,7 +155,7 @@ export default function Auth() {
                 <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
               </g>
             </svg>
-            Sign in with Google
+            {isSigningIn ? 'Signing in...' : 'Sign in with Google'}
           </Button>
           
           <div className="text-center text-sm text-muted-foreground">
