@@ -1,12 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, ShieldCheck, UserPlus, Globe } from 'lucide-react';
+import { CheckCircle, ShieldCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import LanguageSelectionStep from '@/components/onboarding/LanguageSelectionStep';
 import ProfileSetupStep from '@/components/onboarding/ProfileSetupStep';
 import WelcomeScreen from '@/components/onboarding/WelcomeScreen';
 import { Button } from '@/components/ui/button';
@@ -40,20 +39,13 @@ const OnboardingScreen: React.FC = () => {
     },
     {
       id: 1,
-      title: 'Language',
-      description: 'Choose your preferred language',
-      icon: Globe,
-      component: LanguageSelectionStep,
-    },
-    {
-      id: 2,
       title: 'Profile',
       description: 'Create your profile',
       icon: ShieldCheck,
       component: ProfileSetupStep,
     },
     {
-      id: 3,
+      id: 2,
       title: 'Complete',
       description: 'You\'re all set!',
       icon: CheckCircle,
@@ -173,8 +165,6 @@ const OnboardingScreen: React.FC = () => {
 
             <motion.div variants={itemVariants} className="w-full">
               {currentStep.id === 1 ? (
-                <LanguageSelectionStep onContinue={() => handleContinue(stepIndex)} />
-              ) : currentStep.id === 2 ? (
                 <ProfileSetupStep onContinue={() => handleContinue(stepIndex)} />
               ) : currentStep.id === 0 ? (
                 <WelcomeScreen onContinue={() => handleContinue(stepIndex)} />

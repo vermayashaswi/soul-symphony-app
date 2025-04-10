@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,6 +59,21 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
     }
     
     // If user is authenticated but hasn't completed onboarding, redirect to onboarding
+    // If route is /app specifically, show onboarding regardless
+    if (location.pathname === '/app') {
+      // If user is authenticated but hasn't completed onboarding
+      if (user && !onboardingComplete) {
+        // Show onboarding at /app
+        return <>{children}</>;
+      }
+      
+      // If user is authenticated and has completed onboarding, redirect to home
+      if (user && onboardingComplete) {
+        return <Navigate to="/app/home" replace />;
+      }
+    }
+    
+    // For other app routes
     const shouldShowOnboarding = 
       user && 
       !onboardingComplete && 
