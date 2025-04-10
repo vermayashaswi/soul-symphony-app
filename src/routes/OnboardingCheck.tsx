@@ -34,6 +34,12 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   
   // Only check onboarding for app routes
   if (isAppRoute(location.pathname)) {
+    // If user is at the root app path (/app) and logged in, redirect to home
+    if (location.pathname === '/app' && user) {
+      return <Navigate to="/app/home" replace />;
+    }
+    
+    // If not logged in, not at onboarding route, and not at a bypassed route, redirect to onboarding
     const shouldShowOnboarding = 
       !user && 
       !onboardingComplete && 

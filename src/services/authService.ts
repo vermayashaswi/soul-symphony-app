@@ -165,7 +165,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       
       // Redirect to onboarding page if navigate function is provided
       if (navigate) {
-        navigate('/onboarding');
+        navigate('/app');
       }
       return;
     }
@@ -181,14 +181,14 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     
     // Always redirect to onboarding page if navigate function is provided
     if (navigate) {
-      navigate('/onboarding');
+      navigate('/app');
     }
   } catch (error: any) {
     console.error('Error signing out:', error);
     
     // Still navigate to onboarding page even if there's an error
     if (navigate) {
-      navigate('/onboarding');
+      navigate('/app');
     }
     localStorage.removeItem('authRedirectTo');
     
