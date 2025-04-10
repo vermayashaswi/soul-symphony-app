@@ -23,7 +23,7 @@ const Navbar = () => {
       <div className="container mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <SouloLogo size="normal" useColorTheme={true} />
-          {/* Removed SOULo text as requested */}
+          {/* Removed SOUlo text as requested */}
         </Link>
         
         <div className="flex items-center gap-4">

@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 
 // Duration constants
@@ -69,72 +70,16 @@ export const showToast = (
   console.log(`[NotificationService] Showing toast: ${message} (${type})`);
   
   let toastId;
-  switch (type) {
-    case "success":
-      toastId = toast.success(message, { 
-        duration, 
-        id: messageKey,
-        onDismiss: () => {
-          activeToasts.delete(messageKey);
-          if (toastTimeouts.has(messageKey)) {
-            clearTimeout(toastTimeouts.get(messageKey)!);
-            toastTimeouts.delete(messageKey);
-          }
-        }
-      });
-      break;
-    case "error":
-      toastId = toast.error(message, { 
-        duration, 
-        id: messageKey,
-        onDismiss: () => {
-          activeToasts.delete(messageKey);
-          if (toastTimeouts.has(messageKey)) {
-            clearTimeout(toastTimeouts.get(messageKey)!);
-            toastTimeouts.delete(messageKey);
-          }
-        }
-      });
-      break;
-    case "info":
-      toastId = toast.info(message, { 
-        duration, 
-        id: messageKey,
-        onDismiss: () => {
-          activeToasts.delete(messageKey);
-          if (toastTimeouts.has(messageKey)) {
-            clearTimeout(toastTimeouts.get(messageKey)!);
-            toastTimeouts.delete(messageKey);
-          }
-        }
-      });
-      break;
-    case "warning":
-      toastId = toast.warning(message, { 
-        duration, 
-        id: messageKey,
-        onDismiss: () => {
-          activeToasts.delete(messageKey);
-          if (toastTimeouts.has(messageKey)) {
-            clearTimeout(toastTimeouts.get(messageKey)!);
-            toastTimeouts.delete(messageKey);
-          }
-        }
-      });
-      break;
-    default:
-      toastId = toast(message, { 
-        duration, 
-        id: messageKey,
-        onDismiss: () => {
-          activeToasts.delete(messageKey);
-          if (toastTimeouts.has(messageKey)) {
-            clearTimeout(toastTimeouts.get(messageKey)!);
-            toastTimeouts.delete(messageKey);
-          }
-        }
-      });
-  }
+  
+  // In the updated version, we'll use the standard toast function with the appropriate options
+  toastId = toast({
+    title: type.charAt(0).toUpperCase() + type.slice(1),
+    description: message,
+    variant: type === "default" ? "default" : 
+             type === "success" ? "success" :
+             type === "error" ? "destructive" : "default",
+    duration: duration
+  });
   
   activeToasts.add(messageKey);
   
@@ -156,7 +101,7 @@ export const showToast = (
 export const clearToast = (toastId: string | number) => {
   if (toastId) {
     console.log(`[NotificationService] Clearing toast: ${toastId}`);
-    toast.dismiss(toastId);
+    toast.dismiss(toastId.toString());
   }
 };
 

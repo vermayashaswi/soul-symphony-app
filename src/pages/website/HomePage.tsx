@@ -1,7 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail } from 'lucide-react';
+import { 
+  Apple, 
+  Play, 
+  Shield, 
+  Brain, 
+  Mic, 
+  MessageSquare, 
+  LineChart, 
+  ArrowRight, 
+  Check, 
+  Mail,
+  AudioWaveform,
+  Sparkles,
+  BarChart3,
+  MessagesSquare
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -51,40 +66,38 @@ const HomePage = () => {
     console.log('Email submitted:', email);
     // Clear the input
     setEmail('');
-    // Show success message (you'd typically use a toast here)
+    // Show success message
     alert('Thanks for subscribing!');
   };
 
+  // Updated features with correct icons that match the descriptions better
   const features = [
     {
       title: "Voice Journaling",
-      description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
-      icon: Mic,
-      image: "/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png",
+      description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically.",
+      icon: AudioWaveform,
+      // We'll create custom illustrations for these features in the component
     },
     {
       title: "AI Analysis",
       description: "Gain insights into your patterns and emotions through advanced AI analysis.",
-      icon: Brain,
-      image: "/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png",
+      icon: Sparkles,
     },
     {
       title: "Emotional Tracking",
       description: "Visualize your emotional journey over time with interactive charts.",
-      icon: LineChart,
-      image: "/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png",
+      icon: BarChart3,
     },
     {
       title: "AI Assistant",
       description: "Chat with your journal and get personalized insights from your past entries.",
-      icon: MessageSquare,
-      image: "/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png",
+      icon: MessagesSquare,
     }
   ];
 
   const testimonials = [
     {
-      text: "SOULo has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
+      text: "SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
       author: "Sarah K., Designer",
       avatar: "/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png"
     },
@@ -94,7 +107,7 @@ const HomePage = () => {
       avatar: "/lovable-uploads/5b18686b-4a3c-4341-a072-479db470ac1d.png"
     },
     {
-      text: "The emotional insights I get from SOULo have helped me understand my patterns and make positive changes.",
+      text: "The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes.",
       author: "Jamie L., Therapist",
       avatar: "/lovable-uploads/cb710491-93f0-42be-a596-f64d80d9800e.png"
     }
@@ -140,6 +153,110 @@ const HomePage = () => {
     
     return () => clearInterval(interval);
   }, []);
+
+  // Custom feature illustrations component
+  const FeatureIllustration = ({ type }) => {
+    if (type === "Voice Journaling") {
+      return (
+        <div className="relative h-64 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg overflow-hidden flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full bg-blue-400/30 animate-pulse blur-xl absolute"></div>
+          </div>
+          <div className="relative z-10 flex flex-col items-center">
+            <AudioWaveform size={48} className="text-primary mb-4" />
+            <div className="flex gap-1 items-center">
+              <div className="h-10 w-1 bg-blue-500 animate-[pulse_1s_ease-in-out_infinite] rounded-full"></div>
+              <div className="h-16 w-1 bg-blue-500 animate-[pulse_0.7s_ease-in-out_infinite] rounded-full"></div>
+              <div className="h-12 w-1 bg-blue-500 animate-[pulse_0.8s_ease-in-out_infinite] rounded-full"></div>
+              <div className="h-20 w-1 bg-blue-500 animate-[pulse_0.6s_ease-in-out_infinite] rounded-full"></div>
+              <div className="h-14 w-1 bg-blue-500 animate-[pulse_0.9s_ease-in-out_infinite] rounded-full"></div>
+              <div className="h-10 w-1 bg-blue-500 animate-[pulse_1s_ease-in-out_infinite] rounded-full"></div>
+              <div className="h-8 w-1 bg-blue-500 animate-[pulse_0.7s_ease-in-out_infinite] rounded-full"></div>
+            </div>
+            <div className="mt-4 p-2 bg-white/80 backdrop-blur-sm rounded-md border border-blue-100">
+              <p className="text-sm text-blue-800">Voice → Text Conversion</p>
+            </div>
+          </div>
+        </div>
+      );
+    } else if (type === "AI Analysis") {
+      return (
+        <div className="relative h-64 bg-gradient-to-br from-purple-50 to-pink-100 rounded-lg overflow-hidden flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full bg-purple-400/30 animate-pulse blur-xl absolute"></div>
+          </div>
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="relative mb-3">
+              <Brain size={48} className="text-purple-600" />
+              <Sparkles size={20} className="text-yellow-500 absolute -top-2 -right-2" />
+            </div>
+            <div className="flex flex-wrap justify-center gap-2 max-w-xs">
+              {['Joy', 'Growth', 'Stress', 'Family', 'Health'].map((tag, i) => (
+                <span 
+                  key={tag} 
+                  className="px-2 py-1 bg-white/80 rounded-full text-xs border border-purple-200 text-purple-700"
+                  style={{ 
+                    animationDelay: `${i * 0.1}s`, 
+                    animation: 'pulse 2s infinite' 
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+            <div className="mt-4 p-2 bg-white/80 backdrop-blur-sm rounded-md border border-purple-100">
+              <p className="text-sm text-purple-800">Pattern Recognition</p>
+            </div>
+          </div>
+        </div>
+      );
+    } else if (type === "Emotional Tracking") {
+      return (
+        <div className="relative h-64 bg-gradient-to-br from-green-50 to-teal-100 rounded-lg overflow-hidden flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full bg-teal-400/30 animate-pulse blur-xl absolute"></div>
+          </div>
+          <div className="relative z-10 flex flex-col items-center">
+            <BarChart3 size={48} className="text-teal-600 mb-4" />
+            <div className="w-64 h-24 bg-white/80 backdrop-blur-sm rounded-lg p-2 flex items-end">
+              <div className="w-8 h-10 bg-teal-300 rounded-t-md mx-1"></div>
+              <div className="w-8 h-16 bg-teal-400 rounded-t-md mx-1"></div>
+              <div className="w-8 h-8 bg-teal-300 rounded-t-md mx-1"></div>
+              <div className="w-8 h-14 bg-teal-500 rounded-t-md mx-1"></div>
+              <div className="w-8 h-20 bg-teal-600 rounded-t-md mx-1"></div>
+              <div className="w-8 h-12 bg-teal-400 rounded-t-md mx-1"></div>
+            </div>
+            <div className="mt-4 p-2 bg-white/80 backdrop-blur-sm rounded-md border border-teal-100">
+              <p className="text-sm text-teal-800">Emotion Trend Analysis</p>
+            </div>
+          </div>
+        </div>
+      );
+    } else if (type === "AI Assistant") {
+      return (
+        <div className="relative h-64 bg-gradient-to-br from-amber-50 to-orange-100 rounded-lg overflow-hidden flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full bg-amber-400/30 animate-pulse blur-xl absolute"></div>
+          </div>
+          <div className="relative z-10 flex flex-col items-center">
+            <MessagesSquare size={48} className="text-amber-600 mb-4" />
+            <div className="flex flex-col gap-2">
+              <div className="bg-white/80 backdrop-blur-sm p-2 rounded-lg text-left text-sm">
+                <p className="text-gray-800">How have I been feeling lately?</p>
+              </div>
+              <div className="bg-amber-500/90 backdrop-blur-sm p-2 rounded-lg text-white text-left text-sm">
+                <p>Based on your entries, you've been feeling more positive this week!</p>
+              </div>
+            </div>
+            <div className="mt-4 p-2 bg-white/80 backdrop-blur-sm rounded-md border border-amber-100">
+              <p className="text-sm text-amber-800">Personalized Insights</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -277,7 +394,7 @@ const HomePage = () => {
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
               App Features
             </span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOULo's Features</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOuLO's Features</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
             </p>
@@ -305,11 +422,7 @@ const HomePage = () => {
                     className="w-full md:w-1/2 p-4"
                   >
                     <div className="overflow-hidden border-primary/10 shadow-lg bg-white rounded-xl">
-                      <img 
-                        src={features[activeFeature].image} 
-                        alt={features[activeFeature].title} 
-                        className="w-full h-auto"
-                      />
+                      <FeatureIllustration type={features[activeFeature].title} />
                     </div>
                   </motion.div>
                   
@@ -353,7 +466,7 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* How It Works Section */}
+      {/* How It Works Section with Icon-based Process Steps */}
       <section className="py-16 md:py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -370,19 +483,19 @@ const HomePage = () => {
                 step: "1",
                 title: "Record Your Thoughts",
                 description: "Speak freely about your day, feelings, or any thoughts you want to capture. No writing required!",
-                image: "https://cdn.dribbble.com/users/1210339/screenshots/4663953/media/8b7cef39e44cd120b7f647b584eaa5ca.gif"
+                icon: <Mic size={64} className="text-primary"/>
               },
               {
                 step: "2",
                 title: "AI Analyzes Your Entry",
                 description: "Our AI transcribes your voice and analyzes the emotional patterns and key themes in your entry.",
-                image: "https://cdn.dribbble.com/users/1068771/screenshots/14225432/media/0da8c461ba3522a6b0a0c272dd5d3b80.jpg"
+                icon: <Brain size={64} className="text-primary"/>
               },
               {
                 step: "3",
                 title: "Gain Personalized Insights",
                 description: "Discover patterns, track emotional trends over time, and get personalized insights to support your growth.",
-                image: "https://cdn.dribbble.com/users/1369921/screenshots/16411291/media/d57f6aafac4bd54f92c34b4c5048a9b9.png"
+                icon: <Sparkles size={64} className="text-primary"/>
               }
             ].map((item, i) => (
               <motion.div 
@@ -401,8 +514,8 @@ const HomePage = () => {
                 </div>
                 <h3 className="text-xl font-bold mb-3">{item.title}</h3>
                 <p className="text-muted-foreground mb-6">{item.description}</p>
-                <div className="relative w-full max-w-xs mx-auto rounded-lg overflow-hidden shadow-md">
-                  <img src={item.image} alt={item.title} className="w-full h-auto" />
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-8 rounded-lg border border-gray-200 shadow-sm">
+                  {item.icon}
                 </div>
               </motion.div>
             ))}
@@ -424,7 +537,7 @@ const HomePage = () => {
                 <Shield className="h-12 w-12 text-primary mb-6" />
                 <h2 className="text-3xl font-bold mb-4">Your Privacy is Our Priority</h2>
                 <p className="text-lg text-gray-600 mb-6">
-                  At SOULo, we believe that your personal thoughts and feelings should remain private. 
+                  At SOuLO, we believe that your personal thoughts and feelings should remain private. 
                   We've built our platform with privacy at its core.
                 </p>
                 <ul className="space-y-3 mb-8">
@@ -473,28 +586,12 @@ const HomePage = () => {
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Testimonials</span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Join thousands of people who have transformed their self-reflection practice with SOULo
+              Join thousands of people who have transformed their self-reflection practice with SOuLO
             </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {[
-              {
-                text: "SOULo has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
-                author: "Sarah K., Designer",
-                avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
-              },
-              {
-                text: "As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible.",
-                author: "Michael T., Engineer",
-                avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
-              },
-              {
-                text: "The emotional insights I get from SOULo have helped me understand my patterns and make positive changes.",
-                author: "Jamie L., Therapist",
-                avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
-              }
-            ].map((testimonial, i) => (
+            {testimonials.map((testimonial, i) => (
               <motion.div 
                 key={i} 
                 className="bg-white p-6 rounded-xl shadow-md border border-gray-100"
