@@ -1,21 +1,21 @@
 
 import React from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { isNativeApp, isAppRoute } from './RouteHelpers';
 
 interface OnboardingCheckProps {
   onboardingComplete: boolean | null;
   onboardingLoading: boolean;
   children: React.ReactNode;
+  user: any | null; // Accept user as prop instead of using useAuth
 }
 
 const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ 
   onboardingComplete, 
   onboardingLoading, 
+  user,
   children 
 }) => {
-  const { user } = useAuth();
   const location = useLocation();
   
   const isAuthRoute = location.pathname === '/app/auth';
