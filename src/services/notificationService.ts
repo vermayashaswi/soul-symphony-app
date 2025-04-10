@@ -71,13 +71,14 @@ export const showToast = (
   
   let toastId;
   
+  // Map our type values to shadcn toast variants
+  const toastVariant = type === "error" ? "destructive" : "default";
+  
   // In the updated version, we'll use the standard toast function with the appropriate options
   toastId = toast({
     title: type.charAt(0).toUpperCase() + type.slice(1),
     description: message,
-    variant: type === "default" ? "default" : 
-             type === "success" ? "success" :
-             type === "error" ? "destructive" : "default",
+    variant: toastVariant,
     duration: duration
   });
   
@@ -101,7 +102,10 @@ export const showToast = (
 export const clearToast = (toastId: string | number) => {
   if (toastId) {
     console.log(`[NotificationService] Clearing toast: ${toastId}`);
-    toast.dismiss(toastId.toString());
+    // Access dismiss via the global toast object
+    if (typeof toast.dismiss === 'function') {
+      toast.dismiss(toastId.toString());
+    }
   }
 };
 
@@ -111,7 +115,9 @@ export const clearAllToasts = (): Promise<boolean> => {
   
   return new Promise((resolve) => {
     // First use the standard dismiss method
-    toast.dismiss();
+    if (typeof toast.dismiss === 'function') {
+      toast.dismiss();
+    }
     
     // Clear all timeouts
     clearToastTimeouts();
@@ -173,7 +179,9 @@ export const clearAllToasts = (): Promise<boolean> => {
       }
       
       // Call toast.dismiss() one more time as a final measure
-      toast.dismiss();
+      if (typeof toast.dismiss === 'function') {
+        toast.dismiss();
+      }
       resolve(true);
     }, 50);
   });
@@ -195,7 +203,9 @@ export const ensureAllToastsCleared = async (): Promise<boolean> => {
       console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after first cleanup`);
       
       // Second attempt with more aggressive DOM manipulation
-      toast.dismiss();
+      if (typeof toast.dismiss === 'function') {
+        toast.dismiss();
+      }
       await new Promise(resolve => setTimeout(resolve, 50));
       
       try {
