@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { isAppRoute } from '@/routes/RouteHelpers';
 
 /**
  * Gets the redirect URL for authentication
@@ -66,12 +65,7 @@ export const signInWithGoogle = async (): Promise<void> => {
     }
   } catch (error: any) {
     console.error('Error signing in with Google:', error);
-    
-    // Only show toast if we're in an app route
-    const currentPath = window.location.pathname;
-    if (isAppRoute(currentPath)) {
-      toast.error(`Error signing in with Google: ${error.message}`);
-    }
+    toast.error(`Error signing in with Google: ${error.message}`);
     throw error;
   }
 };
@@ -91,12 +85,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     }
   } catch (error: any) {
     console.error('Error signing in with email:', error);
-    
-    // Only show toast if we're in an app route
-    const currentPath = window.location.pathname;
-    if (isAppRoute(currentPath)) {
-      toast.error(`Error signing in with email: ${error.message}`);
-    }
+    toast.error(`Error signing in with email: ${error.message}`);
     throw error;
   }
 };
@@ -116,12 +105,7 @@ export const signUp = async (email: string, password: string): Promise<void> => 
     }
   } catch (error: any) {
     console.error('Error signing up:', error);
-    
-    // Only show toast if we're in an app route
-    const currentPath = window.location.pathname;
-    if (isAppRoute(currentPath)) {
-      toast.error(`Error signing up: ${error.message}`);
-    }
+    toast.error(`Error signing up: ${error.message}`);
     throw error;
   }
 };
@@ -138,12 +122,7 @@ export const resetPassword = async (email: string): Promise<void> => {
     }
   } catch (error: any) {
     console.error('Error resetting password:', error);
-    
-    // Only show toast if we're in an app route
-    const currentPath = window.location.pathname;
-    if (isAppRoute(currentPath)) {
-      toast.error(`Error resetting password: ${error.message}`);
-    }
+    toast.error(`Error resetting password: ${error.message}`);
     throw error;
   }
 };

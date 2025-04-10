@@ -1,22 +1,21 @@
 
 import React from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
-import { User } from '@supabase/supabase-js';
+import { useAuth } from '@/contexts/AuthContext';
 import { isNativeApp, isAppRoute } from './RouteHelpers';
 
 interface OnboardingCheckProps {
   onboardingComplete: boolean | null;
   onboardingLoading: boolean;
-  user: User | null;
   children: React.ReactNode;
 }
 
 const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ 
   onboardingComplete, 
   onboardingLoading, 
-  user,
   children 
 }) => {
+  const { user } = useAuth();
   const location = useLocation();
   
   const isAuthRoute = location.pathname === '/app/auth';
