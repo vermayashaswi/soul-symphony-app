@@ -37,12 +37,14 @@ export const getRedirectUrl = (): string => {
   const isProdDomain = window.location.hostname === 'soulo.online' || 
                       window.location.hostname.endsWith('.soulo.online');
   
-  // If we're in production, use the actual domain
+  // If we're in production, use the full domain to ensure consistent redirects
   if (isProdDomain) {
+    console.log('Using production auth redirect URL: https://soulo.online/auth');
     return `https://soulo.online/auth`;
   }
   
   // Otherwise use the current origin (for local development)
+  console.log('Using development auth redirect URL:', `${origin}/auth`);
   return `${origin}/auth`;
 };
 
@@ -54,10 +56,17 @@ export const signInWithGoogle = async (): Promise<void> => {
     const redirectUrl = getRedirectUrl();
     console.log('Using redirect URL for Google auth:', redirectUrl);
     
+    // Clear any existing auth errors in localStorage that might be interfering
+    localStorage.removeItem('supabase.auth.error');
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
+        queryParams: {
+          // Add timestamp to prevent caching issues
+          _t: Date.now().toString()
+        },
       },
     });
 
@@ -162,6 +171,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       console.log('No active session found, cleaning up local state only');
       // Clear any auth-related items from local storage
       localStorage.removeItem('authRedirectTo');
+      localStorage.removeItem('supabase.auth.error');
       
       // Redirect to onboarding page if navigate function is provided
       if (navigate) {
@@ -178,6 +188,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     
     // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
+    localStorage.removeItem('supabase.auth.error');
     
     // Always redirect to onboarding page if navigate function is provided
     if (navigate) {
@@ -191,6 +202,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       navigate('/app');
     }
     localStorage.removeItem('authRedirectTo');
+    localStorage.removeItem('supabase.auth.error');
     
     // Show error toast but don't prevent logout flow
     toast.error(`Error while logging out: ${error.message}`);
@@ -246,15 +258,35 @@ export const getCurrentUser = async () => {
 export const handlePWAAuthCompletion = async () => {
   try {
     // Check if we have a hash in the URL that might contain auth params
-    if (window.location.hash) {
-      console.log('Detected hash params, attempting to process auth result');
+    if (window.location.hash || window.location.search.includes('error')) {
+      console.log('Detected hash/search params, attempting to process auth result');
+      
+      // If there's an error in the URL, log it
+      if (window.location.hash.includes('error') || window.location.search.includes('error')) {
+        console.error('Error detected in redirect URL');
+        
+        // Get error details
+        const urlParams = new URLSearchParams(window.location.search);
+        const errorDescription = urlParams.get('error_description');
+        
+        if (errorDescription) {
+          toast.error(`Authentication failed: ${errorDescription}`);
+        } else {
+          toast.error('Authentication failed. Please try again.');
+        }
+        
+        return null;
+      }
+      
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
-        throw error;
+        console.error('Error getting session after redirect:', error);
+        toast.error('Authentication error. Please try again.');
+      } else if (data.session) {
+        console.log('Successfully retrieved session after redirect:', data.session.user.email);
+        return data.session;
       }
-      
-      return data.session;
     }
     return null;
   } catch (error) {

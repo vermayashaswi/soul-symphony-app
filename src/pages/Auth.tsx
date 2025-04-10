@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -6,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
+import { getRedirectUrl } from '@/services/authService';
 
 export default function Auth() {
   const location = useLocation();
@@ -13,22 +15,38 @@ export default function Auth() {
   const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState(null);
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  const from = '/';
+  const from = '/app/home';
+
+  // Check for error params in URL
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
+    
+    if (errorParam) {
+      setAuthError(errorDescription || 'Authentication failed. Please try again.');
+      console.error('Auth error from URL params:', errorParam, errorDescription);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const checkAuthState = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error checking auth state:', error);
+          setAuthError('Failed to check authentication state');
+        }
         setAuthUser(data.session?.user || null);
         setIsLoading(false);
       } catch (error) {
-        console.error('Error checking auth state:', error);
+        console.error('Exception checking auth state:', error);
         setIsLoading(false);
       }
     };
@@ -67,8 +85,13 @@ export default function Auth() {
         });
         
         if (window.location.hash.includes('error') || window.location.search.includes('error')) {
-          console.error('Error detected in redirect URL');
-          toast.error('Authentication failed. Please try again.');
+          const urlParams = new URLSearchParams(window.location.search);
+          const errorDescription = urlParams.get('error_description');
+          
+          const errorMessage = errorDescription || 'Authentication failed. Please try again.';
+          console.error('Error detected in redirect URL:', errorMessage);
+          setAuthError(errorMessage);
+          toast.error(errorMessage);
           return;
         }
         
@@ -77,6 +100,7 @@ export default function Auth() {
           
           if (error) {
             console.error('Error getting session after redirect:', error);
+            setAuthError('Authentication error. Please try again.');
             toast.error('Authentication error. Please try again.');
           } else if (data.session) {
             console.log('Successfully retrieved session after redirect:', data.session.user.email);
@@ -84,6 +108,7 @@ export default function Auth() {
           }
         } catch (e) {
           console.error('Exception during auth redirect handling:', e);
+          setAuthError('Unexpected error during authentication');
           toast.error('Unexpected error during authentication');
         }
       }
@@ -94,12 +119,23 @@ export default function Auth() {
 
   const handleSignIn = async () => {
     console.log('Initiating Google sign-in from', window.location.origin);
+    setAuthError(null);
+    
     try {
       const redirectUrl = getRedirectUrl();
+      console.log('Using redirect URL:', redirectUrl);
+      
+      // Clear any existing auth errors
+      localStorage.removeItem('supabase.auth.error');
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
+          queryParams: {
+            // Add timestamp to prevent caching issues
+            _t: Date.now().toString()
+          },
         },
       });
       
@@ -108,18 +144,9 @@ export default function Auth() {
       }
     } catch (error) {
       console.error('Failed to initiate Google sign-in:', error);
+      setAuthError('Failed to initiate sign-in process. Please try again.');
       toast.error('Failed to initiate sign-in process. Please try again.');
     }
-  };
-  
-  const getRedirectUrl = (): string => {
-    const origin = window.location.origin;
-    const urlParams = new URLSearchParams(window.location.search);
-    const redirectTo = urlParams.get('redirectTo');
-    if (redirectTo) {
-      localStorage.setItem('authRedirectTo', redirectTo);
-    }
-    return `${origin}/auth`;
   };
 
   if (isLoading) {
@@ -151,6 +178,12 @@ export default function Auth() {
             Sign in to start your journaling journey and track your emotional wellbeing
           </p>
         </div>
+        
+        {authError && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
+            {authError}
+          </div>
+        )}
         
         <div className="space-y-4">
           <Button 
