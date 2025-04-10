@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -109,7 +110,12 @@ export function EmotionChart({
       if (dataPoints.length > 0) {
         const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
         if (totalScore > 0) {
-          emotionScores[emotion] = totalScore;
+          // Average the emotion score
+          emotionScores[emotion] = totalScore / dataPoints.length;
+          // Ensure we cap at 1.0
+          if (emotionScores[emotion] > 1.0) {
+            emotionScores[emotion] = 1.0;
+          }
         }
       }
     });
@@ -162,24 +168,43 @@ export function EmotionChart({
     }
     
     const emotionTotals: Record<string, number> = {};
-    const dateMap: Map<string, Record<string, number>> = new Map();
     
+    // This will track date -> emotion -> {total, count} for proper averaging
+    const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
+    
+    // Process emotion data points
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
-      // Only include emotions with positive values
-      const totalValue = dataPoints.reduce((sum, point) => sum + point.value, 0);
+      let totalValue = 0;
+      
+      dataPoints.forEach(point => {
+        // Initialize date entry if it doesn't exist
+        if (!dateMap.has(point.date)) {
+          dateMap.set(point.date, new Map());
+        }
+        
+        // Get the map for the current date
+        const dateEntry = dateMap.get(point.date)!;
+        
+        // Initialize emotion entry for this date if it doesn't exist
+        if (!dateEntry.has(emotion)) {
+          dateEntry.set(emotion, { total: 0, count: 0 });
+        }
+        
+        // Update totals and counts
+        const emotionEntry = dateEntry.get(emotion)!;
+        emotionEntry.total += point.value;
+        emotionEntry.count += 1;
+        
+        // Track total value for sorting top emotions
+        totalValue += point.value;
+      });
+      
       if (totalValue > 0) {
         emotionTotals[emotion] = totalValue;
-        
-        dataPoints.forEach(point => {
-          if (!dateMap.has(point.date)) {
-            dateMap.set(point.date, {});
-          }
-          const dateEntry = dateMap.get(point.date)!;
-          dateEntry[emotion] = point.value;
-        });
       }
     });
     
+    // Get top emotions for display
     const topEmotions = Object.entries(emotionTotals)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
@@ -190,15 +215,24 @@ export function EmotionChart({
       setVisibleEmotions(topEmotions);
     }
     
-    return Array.from(dateMap.entries())
+    // Convert map data to array format for the chart
+    const result = Array.from(dateMap.entries())
       .map(([date, emotions]) => {
         const dataPoint: EmotionData = { 
           day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
         };
         
+        // Set values for top emotions in this data point
         topEmotions.forEach(emotion => {
-          const value = emotions[emotion] || 0;
-          dataPoint[emotion] = parseFloat(value.toFixed(1));
+          const emotionData = emotions.get(emotion);
+          if (emotionData && emotionData.count > 0) {
+            // Calculate average and ensure it's at most 1.0
+            let avgValue = emotionData.total / emotionData.count;
+            if (avgValue > 1.0) avgValue = 1.0;
+            dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
+          } else {
+            dataPoint[emotion] = 0;
+          }
         });
         
         return dataPoint;
@@ -208,6 +242,8 @@ export function EmotionChart({
         const dateB = new Date(b.day);
         return dateA.getTime() - dateB.getTime();
       });
+    
+    return result;
   }, [aggregatedData, visibleEmotions, chartType]);
 
   const EmotionLineLabel = (props: any) => {
