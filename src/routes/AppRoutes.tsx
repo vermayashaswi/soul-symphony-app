@@ -48,6 +48,11 @@ const AppRoutes = () => {
   // Determine if we should show the website navbar
   const shouldShowWebsiteNavbar = !isNativeApp() && !isAppRoute(location.pathname);
   
+  console.log("Current path:", location.pathname);
+  console.log("Should show website navbar:", shouldShowWebsiteNavbar);
+  console.log("Is native app:", isNativeApp());
+  console.log("Is app route:", isAppRoute(location.pathname));
+  
   return (
     <>
       <ViewportManager />

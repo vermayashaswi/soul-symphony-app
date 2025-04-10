@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,14 +7,18 @@ import MobilePreviewFrame from '@/components/MobilePreviewFrame';
 // Check if this is running in a native mobile app environment
 export const isNativeApp = (): boolean => {
   const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('nativeApp') === 'true' || 
+  const isNative = urlParams.get('nativeApp') === 'true' || 
          window.location.href.includes('capacitor://') || 
          window.location.href.includes('localhost');
+  console.log("isNativeApp check:", isNative, window.location.href);
+  return isNative;
 };
 
 // Check if the current route is an app route (starts with /app)
 export const isAppRoute = (path: string): boolean => {
-  return path.startsWith('/app');
+  const isApp = path.startsWith('/app');
+  console.log("isAppRoute check for path", path, ":", isApp);
+  return isApp;
 };
 
 interface RouteWrapperProps {

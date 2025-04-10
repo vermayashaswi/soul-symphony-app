@@ -6,10 +6,14 @@ import SouloLogo from '@/components/SouloLogo';
 import { Button } from '@/components/ui/button';
 
 const Navbar = () => {
+  console.log("Website Navbar rendering"); // Debug log
+
   const scrollToDownloadSection = () => {
     const downloadSection = document.getElementById('download-section');
     if (downloadSection) {
       downloadSection.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      console.log("Download section not found");
     }
   };
 
