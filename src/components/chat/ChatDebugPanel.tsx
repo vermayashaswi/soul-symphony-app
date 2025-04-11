@@ -9,8 +9,8 @@ export const ChatDebugProvider = ({ children }: { children: React.ReactNode }) =
 // Create a null hook for backward compatibility that supports both addLog and addEvent
 export const useChatDebug = () => ({
   logs: [],
-  addLog: () => {},
-  addEvent: () => {}, // Added this for compatibility
+  addLog: (category?: string, message?: string, level?: string, details?: any) => {},
+  addEvent: (category?: string, message?: string, level?: string, details?: any) => {}, // Added with parameters
   clearLogs: () => {},
   isEnabled: false,
   toggleEnabled: () => {}
