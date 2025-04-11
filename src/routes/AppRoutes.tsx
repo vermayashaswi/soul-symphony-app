@@ -30,6 +30,16 @@ const AppRoutes = () => {
   const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
   const location = useLocation();
   
+  // Log current route for debugging
+  useEffect(() => {
+    console.log('AppRoutes rendering, path:', location.pathname, {
+      user: !!user,
+      onboardingComplete,
+      isAppRoute: isAppRoute(location.pathname),
+      isNativeApp: isNativeApp()
+    });
+  }, [location.pathname, user, onboardingComplete]);
+  
   // Find the NotFound route
   const notFoundRoute = specialRoutes.find(route => route.path === '*');
   

@@ -1,8 +1,7 @@
 
 import React, { useEffect } from 'react';
-import { Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import Navbar from '@/components/Navbar'; // Import the Navbar component
 
 export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
@@ -20,7 +19,6 @@ export const WebsiteRouteWrapper = ({ element }: { element: React.ReactNode }) =
   );
 };
 
-// Modified AppRouteWrapper to remove the Navbar component
 export const AppRouteWrapper = ({ 
   element, 
   requiresAuth = true,
@@ -32,16 +30,35 @@ export const AppRouteWrapper = ({
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  console.log('AppRouteWrapper rendering:', location.pathname, { 
+    requiresAuth, 
+    userExists: !!user 
+  });
   
   useEffect(() => {
     if (requiresAuth && !user) {
-      navigate('/auth');
+      console.log('Protected route accessed without auth, redirecting to /app/auth');
+      navigate('/app/auth', { 
+        state: { from: location },
+        replace: true
+      });
     }
-  }, [user, navigate, requiresAuth]);
+  }, [user, navigate, requiresAuth, location]);
+
+  // If this is a protected route and user is not authenticated,
+  // render nothing while the redirect happens
+  if (requiresAuth && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen app-route">
-      {/* Navbar has been removed from here */}
       <div className="min-h-screen">
         {element}
       </div>
@@ -50,5 +67,6 @@ export const AppRouteWrapper = ({
 };
 
 export const RedirectRoute = ({ to }: { to: string }) => {
+  console.log('RedirectRoute: Redirecting to', to);
   return <Navigate to={to} replace />;
 };

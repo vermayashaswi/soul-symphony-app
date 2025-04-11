@@ -1,3 +1,4 @@
+
 import React from 'react';
 import Auth from '@/pages/Auth';
 import Journal from '@/pages/Journal';
@@ -69,14 +70,17 @@ export const appRoutes: RouteConfig[] = [
   {
     path: '/app',
     element: <OnboardingScreen />,
+    requiresAuth: false, // Important: This should not require auth
   },
   {
     path: '/app/onboarding',
     element: <OnboardingScreen />,
+    requiresAuth: false, // Important: This should not require auth
   },
   {
     path: '/app/auth',
     element: <Auth />,
+    requiresAuth: false, // Important: This should not require auth
   },
   {
     path: '/app/home',

@@ -18,6 +18,7 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   children 
 }) => {
   const location = useLocation();
+  console.log('OnboardingCheck rendering at path:', location.pathname, {user: !!user, onboardingComplete});
   
   const isAuthRoute = location.pathname === '/app/auth' || location.pathname === '/auth';
   const isOnboardingRoute = location.pathname === '/app/onboarding';
@@ -33,27 +34,32 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
       </div>
     );
   }
-  
-  // Only check onboarding for app routes
-  if (isAppRoute(location.pathname)) {
-    // If user is not logged in and tries to access /app, redirect to onboarding
-    if (!user && isRootAppRoute) {
+
+  // Special handling for the root /app route
+  if (isRootAppRoute) {
+    console.log('Root app route detected, user:', !!user);
+    // If user is logged in, redirect to home
+    if (user) {
+      console.log('User is logged in, redirecting to /app/home');
+      return <Navigate to="/app/home" replace />;
+    } else {
+      // If user is not logged in, redirect to onboarding
+      console.log('User not logged in, redirecting to /app/onboarding');
       return <Navigate to="/app/onboarding" replace />;
     }
-    
-    // If user is logged in and tries to access /app, redirect to home
-    if (user && isRootAppRoute) {
-      return <Navigate to="/app/home" replace />;
-    }
-    
-    // For other app routes, check if user should be redirected to onboarding
+  }
+  
+  // For other app routes, check if user should be redirected to onboarding
+  if (isAppRoute(location.pathname)) {
     const shouldShowOnboarding = 
       !user && 
       !onboardingComplete && 
       !isOnboardingBypassedRoute &&
       !isOnboardingRoute;
     
+    // If user is not logged in and it's a protected route (not onboarding or auth)
     if (shouldShowOnboarding) {
+      console.log('Redirecting to onboarding from:', location.pathname);
       return <Navigate to="/app/onboarding" replace />;
     }
   }

@@ -24,6 +24,14 @@ export default function Auth() {
   // Determine where to redirect after auth
   const redirectTo = redirectParam || fromLocation || storedRedirect || '/app/home';
 
+  console.log('Auth page mounted', { 
+    redirectTo, 
+    redirectParam, 
+    fromLocation,
+    storedRedirect,
+    hasUser: !!user
+  });
+
   useEffect(() => {
     setIsLoading(false);
   }, []);
@@ -31,6 +39,7 @@ export default function Auth() {
   useEffect(() => {
     // If user is logged in and page has finished initial loading, redirect
     if (user && !authLoading && !redirecting) {
+      console.log('User is logged in, redirecting to:', redirectTo);
       setRedirecting(true);
       
       // Clean up stored redirect
@@ -49,10 +58,12 @@ export default function Auth() {
     try {
       setIsLoading(true);
       setAuthError(null);
+      console.log('Initiating Google sign-in');
       
       await signInWithGoogle();
       // The page will be redirected by Supabase, so no need to do anything else here
     } catch (error: any) {
+      console.error('Sign-in error:', error.message);
       setAuthError(error.message);
       toast.error('Failed to initiate sign-in. Please try again.');
       setIsLoading(false);
@@ -70,6 +81,7 @@ export default function Auth() {
 
   // If already logged in, redirect to target page
   if (user) {
+    console.log('User already logged in, redirecting to:', redirectTo);
     return <Navigate to={redirectTo} replace />;
   }
 
