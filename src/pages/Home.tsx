@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -127,14 +125,13 @@ const Home = () => {
           animate="show"
         >
           <motion.div variants={itemVariants} className="mb-8">
-            <Card className="overflow-hidden rounded-xl max-w-md mx-auto backdrop-blur-sm bg-background/60">
-              <div 
-                className="h-64 w-full cursor-pointer relative"
-                onClick={handleNavigateToJournal}
-              >
-                {/* Removed the nested EnergyAnimation component here */}
-              </div>
-            </Card>
+            <Button 
+              onClick={handleNavigateToJournal}
+              className="w-full py-6 text-lg flex items-center justify-between relative z-10"
+            >
+              Start Journaling
+              <ChevronRight />
+            </Button>
           </motion.div>
 
           <motion.div variants={itemVariants} key={refreshKey} className="relative z-20">

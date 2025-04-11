@@ -14,7 +14,7 @@ export const InspirationalQuote: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { ref, inView } = useInView({
-    triggerOnce: false, // Changed to false to refetch quotes when component comes back into view
+    triggerOnce: false,
     threshold: 0.1,
   });
 
@@ -121,10 +121,10 @@ export const InspirationalQuote: React.FC = () => {
   return (
     <motion.div
       ref={ref}
-      className="p-6 bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl shadow-sm mb-16 relative z-20 backdrop-blur-sm"
+      className="p-6 bg-transparent backdrop-blur-sm mb-16 relative z-20"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8 }} // Slower initial animation
+      transition={{ duration: 0.8 }}
     >
       <AnimatePresence mode="wait">
         {loading ? (
@@ -134,7 +134,7 @@ export const InspirationalQuote: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.2 }} // Slower loading animation
+            transition={{ duration: 1.2 }}
           >
             <Loader2 className="h-8 w-8 text-theme animate-spin mb-4" />
             <p className="text-muted-foreground">Finding inspiration for you...</p>
@@ -146,7 +146,7 @@ export const InspirationalQuote: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.2 }} // Slower error animation
+            transition={{ duration: 1.2 }}
           >
             <p className="text-muted-foreground">{error}</p>
             <button 
@@ -163,7 +163,7 @@ export const InspirationalQuote: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.2 }} // Slower transition between quotes
+            transition={{ duration: 1.2 }}
           >
             <div className="flex mb-4 justify-center">
               <Quote className="h-8 w-8 text-theme" />
