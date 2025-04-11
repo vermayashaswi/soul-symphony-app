@@ -6,10 +6,12 @@ import { useTranslation } from 'react-i18next';
 import SouloLogo from '@/components/SouloLogo';
 import { Button } from '@/components/ui/button';
 import LanguageSelector from '@/components/LanguageSelector';
+import { useTheme } from '@/hooks/use-theme';
 
 const Navbar = () => {
   console.log("Website Navbar rendering"); // Debug log
   const { t } = useTranslation();
+  const { colorTheme, customColor } = useTheme();
 
   const scrollToDownloadSection = () => {
     const downloadSection = document.getElementById('download-section');
@@ -27,7 +29,7 @@ const Navbar = () => {
 
   return (
     <motion.nav 
-      className="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-md shadow-sm py-4 px-4 md:px-8"
+      className="fixed top-0 w-full z-50 bg-theme backdrop-blur-md shadow-sm py-4 px-4 md:px-8"
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
@@ -39,18 +41,18 @@ const Navbar = () => {
         </Link>
         
         <div className="flex items-center gap-4">
-          <Button variant="ghost" className="text-black hover:text-black" asChild>
+          <Button variant="ghost" className="text-white hover:text-white" asChild>
             <Link to="/">{t('navbar.home')}</Link>
           </Button>
-          <Button variant="ghost" className="text-black hover:text-black" asChild>
+          <Button variant="ghost" className="text-white hover:text-white" asChild>
             <Link to="/blog">{t('navbar.blog')}</Link>
           </Button>
-          <Button variant="ghost" className="text-black hover:text-black" asChild>
+          <Button variant="ghost" className="text-white hover:text-white" asChild>
             <Link to="/faq">{t('navbar.faq')}</Link>
           </Button>
           <Button 
             variant="default" 
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="bg-white text-theme hover:bg-white/90"
             onClick={scrollToDownloadSection}
           >
             {t('navbar.download')}
