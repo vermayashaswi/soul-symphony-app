@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar } from 'lucide-react';
-import Navbar from '@/components/Navbar';
+// Remove Navbar import
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
@@ -352,7 +353,7 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen pb-20">
-      <Navbar />
+      {/* Navbar removed from here */}
       
       <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
         <div className="mb-6">
