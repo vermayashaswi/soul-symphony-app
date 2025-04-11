@@ -583,7 +583,7 @@ const HomePage = () => {
                             ))}
                           </div>
                         ) : (
-                          <div className="relative max-w-xs mx-auto">
+                          <div className="relative w-[60%] max-w-[200px] mx-auto">
                             <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-3xl blur-xl"></div>
                             <div className="relative">
                               <div className="bg-white w-full aspect-[9/19] mx-auto rounded-[24px] overflow-hidden border-[4.8px] border-gray-800 shadow-xl relative">
