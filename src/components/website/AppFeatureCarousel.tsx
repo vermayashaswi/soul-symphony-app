@@ -10,25 +10,25 @@ const features = [
     title: "Voice Journaling",
     description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
     icon: Mic,
-    image: "/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png", // Voice journal image
+    image: "https://images.unsplash.com/photo-1589254065878-42c9da997008?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Person speaking into microphone
   },
   {
     title: "AI Analysis",
     description: "Gain insights into your patterns and emotions through advanced AI analysis.",
     icon: Brain,
-    image: "/lovable-uploads/5b18686b-4a3c-4341-a072-479db470ac1d.png", // AI analysis visualization
+    image: "https://images.unsplash.com/photo-1581092583537-20d51b4b4f1b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Digital brain/neural network visualization
   },
   {
     title: "Emotional Tracking",
     description: "Visualize your emotional journey over time with interactive charts.",
     icon: LineChart,
-    image: "/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png", // Emotional tracking charts
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Colorful emotion/mood charts
   },
   {
     title: "AI Assistant",
     description: "Chat with your journal and get personalized insights from your past entries.",
     icon: MessageSquare,
-    image: "/lovable-uploads/241062d6-3971-492c-aaeb-a110d1256c7a.png", // AI chat interface
+    image: "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // AI chat interface with personal insights
   }
 ];
 
