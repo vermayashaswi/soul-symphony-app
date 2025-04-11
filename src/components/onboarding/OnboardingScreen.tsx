@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -61,9 +60,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-0 flex items-center justify-center">
             <motion.div 
-              className="w-full h-full rounded-full bg-theme-dark dark:bg-theme-dark flex items-center justify-center overflow-hidden"
+              className="w-full h-full flex items-center justify-center overflow-hidden"
               animate={{ 
                 boxShadow: ["0 0 0 0px rgba(var(--color-theme), 0.2)", "0 0 0 20px rgba(var(--color-theme), 0)", "0 0 0 0px rgba(var(--color-theme), 0.2)"]
               }}
@@ -169,18 +168,6 @@ const ONBOARDING_STEPS: StepIllustration[] = [
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
-          <motion.div
-            className="absolute w-56 h-56 bg-theme-dark dark:bg-theme-dark rounded-full opacity-20"
-            animate={{
-              scale: [1, 1.1, 1],
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-          
           <motion.div 
             className="relative z-10 bg-white/90 dark:bg-gray-800/90 rounded-xl p-5 shadow-lg border border-theme-light"
             initial={{ y: 20, opacity: 0 }}
@@ -312,11 +299,11 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 flex items-center justify-center overflow-hidden">
-          {/* Concentric circles that pulse with the mic button */}
-          {[60, 80, 100, 120].map((size, index) => (
+          {/* Multiple concentric circles with theme colors that pulse with the mic button */}
+          {[45, 60, 80, 100].map((size, index) => (
             <motion.div
               key={`circle-${index}`}
-              className="absolute rounded-full bg-theme/20 dark:bg-theme/20"
+              className={`absolute rounded-full ${index % 2 === 0 ? 'bg-theme/30 dark:bg-theme/30' : 'bg-theme-light/30 dark:bg-theme-light/30'}`}
               style={{ width: size, height: size }}
               animate={{
                 scale: [1, 1.2, 1],
@@ -363,18 +350,6 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 flex flex-col items-center justify-center overflow-hidden p-4">
-          <motion.div 
-            className="absolute inset-0 bg-theme opacity-5 dark:bg-theme dark:opacity-10 rounded-full"
-            animate={{
-              scale: [1, 1.1, 1]
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-          
           <motion.div
             className="relative z-10 mb-3"
             initial={{ scale: 0 }}
@@ -625,7 +600,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <motion.div 
-          className="relative w-64 h-64 rounded-xl flex items-center justify-center overflow-hidden bg-theme-dark dark:bg-theme-dark"
+          className="relative w-64 h-64 rounded-xl flex items-center justify-center overflow-hidden"
           animate={{ 
             boxShadow: ["0 0 0 0px rgba(var(--color-theme), 0.2)", "0 0 0 20px rgba(var(--color-theme), 0)", "0 0 0 0px rgba(var(--color-theme), 0.2)"]
           }}
@@ -713,7 +688,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     }
   };
 
-  // Add swipe gesture handling
   useSwipeGesture(contentRef, {
     onSwipeLeft: () => {
       if (currentStep < ONBOARDING_STEPS.length - 1) {
