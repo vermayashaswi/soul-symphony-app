@@ -48,7 +48,7 @@ const FeatureShowcase = () => {
               <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
               <div className="relative p-2 bg-card rounded-2xl shadow-xl border border-primary/10">
                 <img 
-                  src="/lovable-uploads/feature-voice.png" 
+                  src="https://images.unsplash.com/photo-1589254065878-42c9da997008?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" 
                   alt="Voice Journaling"
                   className="w-full rounded-xl"
                 />
