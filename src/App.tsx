@@ -30,6 +30,8 @@ const queryClient = new QueryClient({
 
 const App = () => {
   useEffect(() => {
+    console.log('App mounted, path:', window.location.pathname);
+    
     // Add a global error listener to catch runtime errors
     const handleGlobalError = (event: ErrorEvent) => {
       console.error('Global error:', event.message);
@@ -42,6 +44,8 @@ const App = () => {
     
     // Set up Supabase auth basic listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      
       if (event === 'SIGNED_IN' && session?.user) {
         // Create user session when signed in
         const userId = session.user.id;
@@ -69,6 +73,7 @@ const App = () => {
                          window.location.hash.includes('error');
     
     if (hasAuthParams) {
+      console.log('Detected auth callback parameters, handling...');
       // Process auth callback using the correct method
       handleAuthCallback().catch(err => {
         console.error('Error handling auth callback at app startup:', err);

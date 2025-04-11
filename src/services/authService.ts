@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -86,6 +87,7 @@ async function createUserSession(userId: string) {
 export const signInWithGoogle = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
+    console.log('Using redirect URL:', redirectUrl);
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -105,6 +107,7 @@ export const signInWithGoogle = async (): Promise<void> => {
     
     // If we have a URL, manually redirect to it (as a backup)
     if (data?.url) {
+      console.log('Redirecting to OAuth URL:', data.url);
       setTimeout(() => {
         window.location.href = data.url;
       }, 100);
@@ -304,15 +307,19 @@ export const handleAuthCallback = async () => {
                          window.location.hash.includes('error') ||
                          window.location.search.includes('error');
     
+    console.log('Checking for auth callback params:', hasHashParams);
+    
     if (hasHashParams) {
       // Get the session
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
+        console.error('Error in auth callback session check:', error);
         return null;
       } 
       
       if (data.session?.user) {
+        console.log('User authenticated in callback handler');
         // Create a user session record
         await createUserSession(data.session.user.id);
         
