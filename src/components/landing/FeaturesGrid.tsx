@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -7,34 +7,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import FeatureCard from './FeatureCard';
-import { useTranslation } from 'react-i18next';
 import { useDebugLog } from '@/utils/debug/DebugContext';
 
 const FeaturesGrid: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { t } = useTranslation();
   const { addEvent } = useDebugLog();
   
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
-
-  // Log translation status for debugging
-  useEffect(() => {
-    addEvent('i18n', 'FeaturesGrid translation check', 'info', {
-      feature1: t('features.voiceJournaling'),
-      feature1Translated: t('features.voiceJournaling') !== 'features.voiceJournaling',
-      feature2: t('features.aiAnalysis'),
-      feature2Translated: t('features.aiAnalysis') !== 'features.aiAnalysis',
-      feature3: t('features.progressTracking'),
-      feature3Translated: t('features.progressTracking') !== 'features.progressTracking',
-      feature4: t('features.journalChat'),
-      feature4Translated: t('features.journalChat') !== 'features.journalChat',
-    });
-  }, [t, addEvent]);
 
   const navigateToFeature = (path: string) => {
     if (!user && path !== '/') {
@@ -66,34 +50,34 @@ const FeaturesGrid: React.FC = () => {
 
   const features = [
     {
-      title: t('features.voiceJournaling'),
-      description: t('features.voiceJournalingDesc'),
+      title: "Voice Journaling",
+      description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
       icon: Mic,
-      cta: t('features.startJournaling'),
+      cta: "Start Journaling",
       ctaAction: () => navigateToFeature('/journal'),
       visualType: 'voice' as const
     },
     {
-      title: t('features.aiAnalysis'),
-      description: t('features.aiAnalysisDesc'),
+      title: "AI Analysis",
+      description: "Gain insights into your patterns and emotions through advanced AI analysis.",
       icon: Brain,
-      cta: t('features.seeInsights'),
+      cta: "See Insights",
       ctaAction: () => navigateToFeature('/insights'),
       visualType: 'ai' as const
     },
     {
-      title: t('features.progressTracking'),
-      description: t('features.progressTrackingDesc'),
+      title: "Progress Tracking",
+      description: "Visualize your emotional journey over time with interactive charts.",
       icon: LineChart,
-      cta: t('features.viewProgress'),
+      cta: "View Progress",
       ctaAction: () => navigateToFeature('/insights'),
       visualType: 'chart' as const
     },
     {
-      title: t('features.journalChat'),
-      description: t('features.journalChatDesc'),
+      title: "Journal Chat",
+      description: "Chat with your journal and get personalized insights from your past entries.",
       icon: MessageSquare,
-      cta: t('features.startChatting'),
+      cta: "Start Chatting",
       ctaAction: () => navigateToFeature('/smart-chat'),
       visualType: 'chat' as const
     }
@@ -105,7 +89,6 @@ const FeaturesGrid: React.FC = () => {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      data-i18n-section="features-grid"
     >
       {features.map((feature, index) => (
         <motion.div key={feature.title} variants={itemVariants}>
