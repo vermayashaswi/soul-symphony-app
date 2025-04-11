@@ -21,9 +21,9 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ className }) => {
       </div>
       
       {/* User provided image with reduced opacity */}
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-64 opacity-50 z-0">
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-50 z-0">
         <img 
-          src="/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png" 
+          src="/lovable-uploads/fbca5601-f42c-41b3-94af-779d961a1d06.png" 
           alt="Energy silhouette" 
           className="w-full h-full object-contain"
         />
