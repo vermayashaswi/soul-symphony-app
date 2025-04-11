@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -21,7 +22,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 type EmotionData = {
   day: string;
-  [key: string]: number | string;
+  [key: string]: number | string | null;
 };
 
 type ChartType = 'line' | 'bubble';
@@ -167,6 +168,7 @@ export function EmotionChart({
     
     const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
     
+    // Process emotion data points
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       let totalValue = 0;
       
@@ -202,12 +204,14 @@ export function EmotionChart({
       setVisibleEmotions(topEmotions);
     }
     
+    // Convert map data to array format for the chart, but don't include null values
     const result = Array.from(dateMap.entries())
       .map(([date, emotions]) => {
         const dataPoint: EmotionData = { 
           day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
         };
         
+        // Only include emotions that have values for this day
         topEmotions.forEach(emotion => {
           const emotionData = emotions.get(emotion);
           if (emotionData && emotionData.count > 0) {
@@ -215,7 +219,8 @@ export function EmotionChart({
             if (avgValue > 1.0) avgValue = 1.0;
             dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
           } else {
-            dataPoint[emotion] = 0;
+            // Set to null instead of 0 to create a gap in the line
+            dataPoint[emotion] = null;
           }
         });
         
@@ -254,9 +259,10 @@ export function EmotionChart({
 
   const handleLegendClick = (emotion: string) => {
     setVisibleEmotions(prev => {
-      if (prev.length === lineData.length > 0 
+      // If all emotions are currently visible, select only the clicked one
+      if (prev.length === (lineData.length > 0 
           ? Object.keys(lineData[0]).filter(key => key !== 'day').length 
-          : 0) {
+          : 0)) {
         return [emotion];
       } 
       
@@ -273,22 +279,9 @@ export function EmotionChart({
   };
 
   const CustomDot = (props: any) => {
-    const { cx, cy, stroke, strokeWidth, r, value, dataKey } = props;
+    const { cx, cy, stroke, strokeWidth, r, value } = props;
     
-    if (value === 0) {
-      return (
-        <g>
-          <circle 
-            cx={cx} 
-            cy={cy} 
-            r={r + 1} 
-            fill="transparent" 
-            stroke="#000" 
-            strokeWidth={1.5} 
-          />
-        </g>
-      );
-    }
+    if (value === null) return null;
     
     return (
       <circle 
@@ -311,7 +304,9 @@ export function EmotionChart({
       );
     }
     
-    const allEmotions = Object.keys(lineData[0]).filter(key => key !== 'day');
+    const allEmotions = Object.keys(lineData[0])
+      .filter(key => key !== 'day')
+      .filter(key => lineData.some(point => point[key] !== null));
     
     if (allEmotions.length === 0) {
       return (
@@ -333,6 +328,7 @@ export function EmotionChart({
           <LineChart
             data={lineData}
             margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
+            connectNulls={true}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
             <XAxis 
@@ -359,7 +355,7 @@ export function EmotionChart({
                 border: 'none',
                 color: theme === 'dark' ? 'hsl(var(--card-foreground))' : 'inherit'
               }}
-              formatter={(value: any) => [parseFloat(value).toFixed(1), '']}
+              formatter={(value: any) => value !== null ? [parseFloat(value).toFixed(1), ''] : ['No data', '']}
             />
             {allEmotions.map((emotion, index) => (
               <Line
@@ -373,6 +369,7 @@ export function EmotionChart({
                 name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
                 label={isMobile ? null : <EmotionLineLabel />}
                 hide={!visibleEmotions.includes(emotion)}
+                connectNulls={true}
               />
             ))}
           </LineChart>
@@ -411,10 +408,6 @@ export function EmotionChart({
         </div>
         
         <div className="flex justify-center flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <CircleDot className="h-4 w-4 stroke-black dark:stroke-white" strokeWidth={1.5} />
-            <span>Emotion has no score</span>
-          </div>
           <span>* Click on a legend item to focus on that emotion</span>
         </div>
       </div>
