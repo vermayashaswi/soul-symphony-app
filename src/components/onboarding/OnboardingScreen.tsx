@@ -90,38 +90,6 @@ const ONBOARDING_STEPS: StepIllustration[] = [
               />
             </div>
           </div>
-          
-          <motion.div 
-            className="absolute inset-0 z-5"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            {[...Array(5)].map((_, i) => (
-              <motion.div
-                key={`particle-${i}`}
-                className="absolute rounded-full bg-theme-dark dark:bg-theme-dark"
-                style={{
-                  width: Math.random() * 30 + 10,
-                  height: Math.random() * 30 + 10,
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 100}%`,
-                }}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ 
-                  scale: [0, 1, 0],
-                  opacity: [0, 0.7, 0],
-                  x: [0, Math.random() * 100 - 50],
-                  y: [0, Math.random() * -100],
-                }}
-                transition={{
-                  duration: Math.random() * 3 + 2,
-                  repeat: Infinity,
-                  delay: Math.random() * 2,
-                }}
-              />
-            ))}
-          </motion.div>
         </motion.div>
         
         <motion.h1 
@@ -615,7 +583,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
           >
-            <SouloLogo size="large" className="scale-[2.5]" useColorTheme={true} animate={true} />
+            <SouloLogo size="large" className="scale-[2.5]" useColorTheme={false} animate={true} textClassName="font-bold text-white" />
           </motion.div>
           
           <motion.div
