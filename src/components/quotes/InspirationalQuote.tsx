@@ -121,7 +121,7 @@ export const InspirationalQuote: React.FC = () => {
   return (
     <motion.div
       ref={ref}
-      className="p-6 bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl shadow-sm mb-16"
+      className="p-6 bg-gradient-to-br from-theme/10 to-theme/5 rounded-xl shadow-sm mb-16 relative z-20 backdrop-blur-sm"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }} // Slower initial animation

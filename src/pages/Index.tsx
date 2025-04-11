@@ -8,9 +8,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import Navbar from '@/components/Navbar';
-import ParticleBackground from '@/components/ParticleBackground';
 import HeroSection from '@/components/landing/HeroSection';
 import FeaturesGrid from '@/components/landing/FeaturesGrid';
+import EnergyAnimation from '@/components/EnergyAnimation';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -45,8 +45,10 @@ const Index = () => {
   }, [shouldRenderMobile]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <ParticleBackground />
+    <div className="flex flex-col min-h-screen bg-background relative">
+      {/* Full-width and height animation with bottom navbar offset */}
+      <EnergyAnimation fullScreen={true} bottomNavOffset={shouldRenderMobile} />
+      
       <Navbar />
       
       <motion.main

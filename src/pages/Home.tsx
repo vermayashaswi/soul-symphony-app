@@ -111,7 +111,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
-      <EnergyAnimation fullScreen={true} />
+      <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
       
       <div className="relative z-10">
         <div className="p-6 flex items-center justify-between">
@@ -131,12 +131,14 @@ const Home = () => {
                 className="h-64 w-full cursor-pointer relative"
                 onClick={handleNavigateToJournal}
               >
-                <EnergyAnimation />
+                <div className="absolute inset-0">
+                  <EnergyAnimation />
+                </div>
               </div>
             </Card>
           </motion.div>
 
-          <motion.div variants={itemVariants} key={refreshKey}>
+          <motion.div variants={itemVariants} key={refreshKey} className="relative z-20">
             <InspirationalQuote />
           </motion.div>
         </motion.div>

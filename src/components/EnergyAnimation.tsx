@@ -5,15 +5,23 @@ import { motion } from 'framer-motion';
 interface EnergyAnimationProps {
   className?: string;
   fullScreen?: boolean;
+  bottomNavOffset?: boolean;
 }
 
-const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ className, fullScreen = false }) => {
+const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ 
+  className, 
+  fullScreen = false,
+  bottomNavOffset = false
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
   return (
     <div 
       ref={containerRef}
-      className={`relative ${fullScreen ? 'fixed inset-0 z-0' : 'w-full h-full'} overflow-hidden ${className}`}
+      className={`absolute ${fullScreen ? 'fixed inset-0' : 'w-full h-full'} 
+                 ${bottomNavOffset ? 'bottom-16' : 'bottom-0'} 
+                 left-0 right-0 top-0 overflow-hidden opacity-70 z-0 ${className}`}
+      style={{ pointerEvents: 'none' }} // Ensure the animation doesn't interfere with user interactions
     >
       {/* Glowing center with enhanced blur */}
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
@@ -35,10 +43,10 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ className, fullScreen
             background: "radial-gradient(circle, rgba(139,92,246,0.6) 0%, rgba(124,58,237,0.4) 50%, rgba(14,165,233,0.2) 100%)" 
           }}
           animate={{ 
-            width: 800, 
-            height: 800, 
-            x: -400, 
-            y: -400, 
+            width: 1000, 
+            height: 1000, 
+            x: -500, 
+            y: -500, 
             opacity: 0,
             background: "radial-gradient(circle, rgba(139,92,246,0.2) 0%, rgba(124,58,237,0.1) 50%, rgba(14,165,233,0.05) 100%)" 
           }}
@@ -70,10 +78,10 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ className, fullScreen
             background: "radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(186,230,253,0.5) 50%, rgba(125,211,252,0.3) 100%)" 
           }}
           animate={{ 
-            width: 500, 
-            height: 500, 
-            x: -250, 
-            y: -250, 
+            width: 700, 
+            height: 700, 
+            x: -350, 
+            y: -350, 
             opacity: 0,
             background: "radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(186,230,253,0.1) 50%, rgba(125,211,252,0.05) 100%)" 
           }}
@@ -88,7 +96,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ className, fullScreen
       ))}
       
       {/* Ultra-small particles with random paths for added fluidity */}
-      {[...Array(30)].map((_, index) => (
+      {[...Array(40)].map((_, index) => (
         <motion.div
           key={`particle-${index}`}
           className="absolute top-1/2 left-1/2 rounded-full bg-white/80"
@@ -100,8 +108,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ className, fullScreen
             opacity: 0.9
           }}
           animate={{ 
-            x: -1.5 + (Math.random() * 600 - 300),
-            y: -1.5 + (Math.random() * 600 - 300),
+            x: -1.5 + (Math.random() * 800 - 400),
+            y: -1.5 + (Math.random() * 800 - 400),
             opacity: 0
           }}
           transition={{ 
