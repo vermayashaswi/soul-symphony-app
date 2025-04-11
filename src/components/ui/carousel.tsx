@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
@@ -17,6 +18,7 @@ type CarouselProps = {
   plugins?: CarouselPlugin
   orientation?: "horizontal" | "vertical"
   setApi?: (api: CarouselApi) => void
+  setActiveItem?: (index: number) => void
 }
 
 type CarouselContextProps = {
@@ -26,6 +28,8 @@ type CarouselContextProps = {
   scrollNext: () => void
   canScrollPrev: boolean
   canScrollNext: boolean
+  activeIndex: number
+  setActiveItem?: (index: number) => void
 } & CarouselProps
 
 const CarouselContext = React.createContext<CarouselContextProps | null>(null)
@@ -52,6 +56,7 @@ const Carousel = React.forwardRef<
       plugins,
       className,
       children,
+      setActiveItem,
       ...props
     },
     ref
@@ -65,15 +70,22 @@ const Carousel = React.forwardRef<
     )
     const [canScrollPrev, setCanScrollPrev] = React.useState(false)
     const [canScrollNext, setCanScrollNext] = React.useState(false)
+    const [activeIndex, setActiveIndex] = React.useState(0)
 
     const onSelect = React.useCallback((api: CarouselApi) => {
       if (!api) {
         return
       }
 
+      const currentIndex = api.selectedScrollSnap()
+      setActiveIndex(currentIndex)
+      if (setActiveItem) {
+        setActiveItem(currentIndex)
+      }
+
       setCanScrollPrev(api.canScrollPrev())
       setCanScrollNext(api.canScrollNext())
-    }, [])
+    }, [setActiveItem])
 
     const scrollPrev = React.useCallback(() => {
       api?.scrollPrev()
@@ -130,6 +142,8 @@ const Carousel = React.forwardRef<
           scrollNext,
           canScrollPrev,
           canScrollNext,
+          activeIndex,
+          setActiveItem
         }}
       >
         <div
@@ -204,10 +218,7 @@ const CarouselPrevious = React.forwardRef<
       variant={variant}
       size={size}
       className={cn(
-        "absolute  h-8 w-8 rounded-full",
-        orientation === "horizontal"
-          ? "-left-12 top-1/2 -translate-y-1/2"
-          : "-top-12 left-1/2 -translate-x-1/2 rotate-90",
+        "h-8 w-8 rounded-full",
         className
       )}
       disabled={!canScrollPrev}
@@ -233,10 +244,7 @@ const CarouselNext = React.forwardRef<
       variant={variant}
       size={size}
       className={cn(
-        "absolute h-8 w-8 rounded-full",
-        orientation === "horizontal"
-          ? "-right-12 top-1/2 -translate-y-1/2"
-          : "-bottom-12 left-1/2 -translate-x-1/2 rotate-90",
+        "h-8 w-8 rounded-full",
         className
       )}
       disabled={!canScrollNext}
@@ -250,6 +258,32 @@ const CarouselNext = React.forwardRef<
 })
 CarouselNext.displayName = "CarouselNext"
 
+const CarouselDots = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & { count: number }
+>(({ className, count, ...props }, ref) => {
+  const { activeIndex, api } = useCarousel()
+
+  return (
+    <div
+      ref={ref}
+      className={cn("flex gap-2 justify-center", className)}
+      {...props}
+    >
+      {Array.from({ length: count }).map((_, index) => (
+        <button
+          key={index}
+          className={`w-3 h-3 rounded-full ${
+            index === activeIndex ? "bg-primary" : "bg-gray-300"
+          }`}
+          onClick={() => api?.scrollTo(index)}
+        />
+      ))}
+    </div>
+  )
+})
+CarouselDots.displayName = "CarouselDots"
+
 export {
   type CarouselApi,
   Carousel,
@@ -257,4 +291,5 @@ export {
   CarouselItem,
   CarouselPrevious,
   CarouselNext,
+  CarouselDots,
 }

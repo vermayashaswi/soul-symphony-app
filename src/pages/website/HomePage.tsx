@@ -4,6 +4,13 @@ import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import Navbar from '@/components/website/Navbar';
 import SouloLogo from '@/components/SouloLogo';
 import Footer from '@/components/website/Footer';
@@ -246,6 +253,7 @@ const HomePage = () => {
   const [email, setEmail] = useState('');
   const [activeFeature, setActiveFeature] = useState(0);
   const [pricingMode, setPricingMode] = useState('monthly');
+  const [activeProcessStep, setActiveProcessStep] = useState(0);
   
   const openAppStore = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -327,6 +335,37 @@ const HomePage = () => {
     }
   ];
 
+  const processSteps = [
+    {
+      step: "1",
+      title: "Record Your Thoughts",
+      description: "Speak freely in any language about your day, feelings, or thoughts you want to capture. SOULo works even in noisy environments and understands multiple languages. No writing required - just talk naturally!",
+      image: "/lovable-uploads/eb66a92e-1044-4a85-9380-4790da9cf683.png",
+      icon: Mic
+    },
+    {
+      step: "2",
+      title: "AI Analyzes Your Entry",
+      description: "Our AI transcribes your voice and analyzes the emotional patterns and key themes in your entry.",
+      image: "https://images.unsplash.com/photo-1581092583537-20d51b4b4f1b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+      icon: Brain
+    },
+    {
+      step: "3",
+      title: "Gain Personalized Insights",
+      description: "Discover patterns, track emotional trends over time, and get personalized insights to support your growth.",
+      image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+      icon: LineChart
+    },
+    {
+      step: "4",
+      title: "Chat with Your Journal",
+      description: "Have a conversation with your journal to gain deeper insights about your thoughts, emotions, and patterns over time.",
+      image: "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+      icon: MessageSquare
+    }
+  ];
+
   const getPricingDetails = (plan) => {
     if (pricingMode === 'monthly') {
       return { 
@@ -357,6 +396,14 @@ const HomePage = () => {
 
   const prevFeature = () => {
     setActiveFeature((prev) => (prev - 1 + features.length) % features.length);
+  };
+
+  const nextProcessStep = () => {
+    setActiveProcessStep((prev) => (prev + 1) % processSteps.length);
+  };
+
+  const prevProcessStep = () => {
+    setActiveProcessStep((prev) => (prev - 1 + processSteps.length) % processSteps.length);
   };
 
   useEffect(() => {
@@ -522,53 +569,67 @@ const HomePage = () => {
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Process</span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Start your self-discovery journey in three simple steps
+              Start your self-discovery journey in four simple steps
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {[
-              {
-                step: "1",
-                title: "Record Your Thoughts",
-                description: "Speak freely about your day, feelings, or any thoughts you want to capture. No writing required!",
-                image: "https://cdn.dribbble.com/users/1210339/screenshots/4663953/media/8b7cef39e44cd120b7f647b584eaa5ca.gif"
-              },
-              {
-                step: "2",
-                title: "AI Analyzes Your Entry",
-                description: "Our AI transcribes your voice and analyzes the emotional patterns and key themes in your entry.",
-                image: "https://cdn.dribbble.com/users/1068771/screenshots/14225432/media/0da8c461ba3522a6b0a0c272dd5d3b80.jpg"
-              },
-              {
-                step: "3",
-                title: "Gain Personalized Insights",
-                description: "Discover patterns, track emotional trends over time, and get personalized insights to support your growth.",
-                image: "https://cdn.dribbble.com/users/1369921/screenshots/16411291/media/d57f6aafac4bd54f92c34b4c5048a9b9.png"
-              }
-            ].map((item, i) => (
-              <motion.div 
-                key={i}
-                className="flex flex-col items-center text-center"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.2 }}
-              >
-                <div className="relative mb-6">
-                  <div className="absolute -inset-1 bg-primary/20 rounded-full blur-lg"></div>
-                  <div className="bg-white w-16 h-16 rounded-full border-2 border-primary flex items-center justify-center text-2xl font-bold text-primary relative">
-                    {item.step}
+          <Carousel 
+            className="w-full max-w-5xl mx-auto"
+            setActiveItem={setActiveProcessStep}
+          >
+            <CarouselContent>
+              {processSteps.map((item, i) => (
+                <CarouselItem key={i} className="md:basis-full">
+                  <div className="p-1">
+                    <div className="flex flex-col md:flex-row items-center gap-8 p-4">
+                      <div className="w-full md:w-1/2 text-center md:text-left order-2 md:order-1">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center">
+                            <span className="text-2xl font-bold text-primary">{item.step}</span>
+                          </div>
+                          <h3 className="text-2xl font-bold">{item.title}</h3>
+                        </div>
+                        <p className="text-muted-foreground mb-6">{item.description}</p>
+                        <div className="bg-primary/10 rounded-full w-12 h-12 flex items-center justify-center mb-4 mx-auto md:mx-0">
+                          {React.createElement(item.icon, { className: "h-6 w-6 text-primary" })}
+                        </div>
+                      </div>
+                      
+                      <div className="w-full md:w-1/2 order-1 md:order-2">
+                        <div className="relative max-w-xs mx-auto">
+                          <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-3xl blur-xl"></div>
+                          <div className="relative">
+                            <div className="bg-white w-64 h-[500px] mx-auto rounded-[40px] overflow-hidden border-8 border-gray-800 shadow-xl relative">
+                              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-black rounded-b-xl z-10"></div>
+                              <img 
+                                src={item.image} 
+                                alt={item.title} 
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <h3 className="text-xl font-bold mb-3">{item.title}</h3>
-                <p className="text-muted-foreground mb-6">{item.description}</p>
-                <div className="relative w-full max-w-xs mx-auto rounded-lg overflow-hidden shadow-md">
-                  <img src={item.image} alt={item.title} className="w-full h-auto" />
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            
+            <div className="flex justify-center gap-4 mt-8">
+              <CarouselPrevious className="relative -left-0 top-0 translate-y-0 mx-2" />
+              <div className="flex gap-2">
+                {processSteps.map((_, index) => (
+                  <button
+                    key={index}
+                    className={`w-3 h-3 rounded-full ${index === activeProcessStep ? 'bg-primary' : 'bg-gray-300'}`}
+                    onClick={() => setActiveProcessStep(index)}
+                  />
+                ))}
+              </div>
+              <CarouselNext className="relative -right-0 top-0 translate-y-0 mx-2" />
+            </div>
+          </Carousel>
         </div>
       </section>
       
