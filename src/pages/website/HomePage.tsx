@@ -339,28 +339,48 @@ const HomePage = () => {
     {
       step: "1",
       title: "Record Your Thoughts",
-      description: "Speak freely in any language about your day, feelings, or thoughts you want to capture. SOuLO works even in noisy environments and understands multiple languages. No writing required - just talk naturally!",
+      description: [
+        "Speak freely in any language about your day, feelings, or thoughts",
+        "Works even in noisy environments and understands multiple languages",
+        "No writing required - just talk naturally as you would to a friend",
+        "Automatic transcription saves your spoken words into text format"
+      ],
       image: "/lovable-uploads/eb66a92e-1044-4a85-9380-4790da9cf683.png",
       icon: Mic
     },
     {
       step: "2",
       title: "AI Analyzes Your Entry",
-      description: "Our AI transcribes your voice and analyzes the emotional patterns and key themes in your entry.",
-      image: "https://images.unsplash.com/photo-1581092583537-20d51b4b4f1b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+      description: [
+        "Our AI transcribes your voice and analyzes emotional patterns and themes",
+        "Automatically recognizes key entities like people, places, and things",
+        "Creates searchable tags to help you easily filter and find past entries",
+        "Identifies recurring themes and patterns in your journaling"
+      ],
+      image: "/lovable-uploads/185c449b-b8f9-435d-b91b-3638651c0d06.png",
       icon: Brain
     },
     {
       step: "3",
       title: "Gain Personalized Insights",
-      description: "Discover patterns, track emotional trends over time, and get personalized insights to support your growth.",
+      description: [
+        "Discover patterns in your emotions and behaviors over time",
+        "Track emotional trends with interactive visualizations",
+        "Get personalized recommendations based on your journal entries",
+        "Identify correlations between activities and your mood"
+      ],
       image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
       icon: LineChart
     },
     {
       step: "4",
       title: "Chat with Your Journal",
-      description: "Have a conversation with your journal to gain deeper insights about your thoughts, emotions, and patterns over time.",
+      description: [
+        "Have a conversation with your journal to explore your thoughts",
+        "Ask questions about your past entries and get insightful responses",
+        "Receive personalized guidance based on your journaling history",
+        "Uncover deeper connections across your entire journal"
+      ],
       image: "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
       icon: MessageSquare
     }
@@ -589,7 +609,11 @@ const HomePage = () => {
                           </div>
                           <h3 className="text-2xl font-bold">{item.title}</h3>
                         </div>
-                        <p className="text-muted-foreground mb-6">{item.description}</p>
+                        <ul className="text-muted-foreground mb-6 space-y-2 list-disc pl-5">
+                          {item.description.map((point, index) => (
+                            <li key={index} className="text-left">{point}</li>
+                          ))}
+                        </ul>
                         <div className="bg-primary/10 rounded-full w-12 h-12 flex items-center justify-center mb-4 mx-auto md:mx-0">
                           {React.createElement(item.icon, { className: "h-6 w-6 text-primary" })}
                         </div>
@@ -599,8 +623,8 @@ const HomePage = () => {
                         <div className="relative max-w-xs mx-auto">
                           <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-3xl blur-xl"></div>
                           <div className="relative">
-                            <div className="bg-white w-64 h-[500px] mx-auto rounded-[40px] overflow-hidden border-8 border-gray-800 shadow-xl relative">
-                              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-black rounded-b-xl z-10"></div>
+                            <div className="bg-white w-[38.4px] h-[300px] mx-auto rounded-[24px] overflow-hidden border-[4.8px] border-gray-800 shadow-xl relative">
+                              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-[19.2px] h-[3.6px] bg-black rounded-b-xl z-10"></div>
                               <img 
                                 src={item.image} 
                                 alt={item.title} 
