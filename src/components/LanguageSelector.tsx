@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { useDebugLog } from '@/utils/debug/DebugContext';
+import { toast } from 'sonner';
 
 // Language options
 const languageOptions = [
@@ -40,9 +41,10 @@ const languageOptions = [
 const LanguageSelector = () => {
   const { i18n } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [currentLang, setCurrentLang] = useState(i18n.language);
+  const [currentLang, setCurrentLang] = useState('');
   const { addEvent } = useDebugLog();
 
+  // Initialize language state from i18n
   useEffect(() => {
     // Log component mount
     addEvent('i18n', 'LanguageSelector mounted', 'info', {
@@ -50,17 +52,11 @@ const LanguageSelector = () => {
       localStorage: localStorage.getItem('i18nextLng')
     });
     
-    // Ensure language is applied from localStorage on component mount
-    const savedLang = localStorage.getItem('i18nextLng');
-    if (savedLang && savedLang !== i18n.language) {
-      addEvent('i18n', 'Applying saved language from localStorage', 'info', {
-        savedLang,
-        currentLang: i18n.language
-      });
-      
-      i18n.changeLanguage(savedLang);
-      setCurrentLang(savedLang);
-    }
+    // Set the initial language state from i18n
+    setCurrentLang(i18n.language);
+    
+    // Ensure document language matches i18n language
+    document.documentElement.lang = i18n.language;
     
     // Return cleanup function
     return () => {
@@ -71,29 +67,47 @@ const LanguageSelector = () => {
   const currentLanguage = languageOptions.find(lang => lang.code === currentLang) || languageOptions[0];
 
   const changeLanguage = (code: string) => {
+    if (code === currentLang) {
+      setOpen(false);
+      return; // Don't reload if the language is the same
+    }
+    
     addEvent('i18n', 'Language change requested', 'info', {
       from: currentLang,
       to: code,
       timestamp: new Date().toISOString()
     });
     
-    // Update language in i18next
-    i18n.changeLanguage(code);
-    
-    // Update component state
-    setCurrentLang(code);
-    setOpen(false);
-    
-    // Save language preference
-    localStorage.setItem('i18nextLng', code);
-    
-    addEvent('i18n', 'About to reload page for language change', 'info', {
-      newLang: code,
-      localStorage: localStorage.getItem('i18nextLng')
-    });
-    
-    // Force reload to ensure all components update with the new language
-    window.location.reload();
+    try {
+      // Update document lang attribute immediately
+      document.documentElement.lang = code;
+      
+      // Update language in i18next
+      i18n.changeLanguage(code);
+      
+      // Update component state
+      setCurrentLang(code);
+      setOpen(false);
+      
+      // Save language preference
+      localStorage.setItem('i18nextLng', code);
+      
+      addEvent('i18n', 'Language changed successfully', 'success', {
+        newLang: code,
+        localStorage: localStorage.getItem('i18nextLng'),
+        documentLang: document.documentElement.lang
+      });
+      
+      // Show a toast notification
+      toast.success(`Language changed to ${languageOptions.find(lang => lang.code === code)?.name || code}`);
+      
+      // Force reload only if absolutely necessary (usually not needed)
+      // window.location.reload();
+    } catch (error) {
+      console.error('Error changing language:', error);
+      addEvent('i18n', 'Error changing language', 'error', { error, code });
+      toast.error('Failed to change language');
+    }
   };
 
   return (

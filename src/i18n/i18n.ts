@@ -107,6 +107,14 @@ const debugI18n = (message: string, args?: any) => {
   }
 };
 
+// Apply HTML lang attribute after language detection
+const applyHtmlLang = (detected: string) => {
+  const lang = detected || 'en';
+  document.documentElement.lang = lang;
+  debugI18n(`Applied language to HTML: ${lang}`);
+  return lang;
+};
+
 // Initialize i18next
 i18n
   // Detect user language
@@ -125,22 +133,27 @@ i18n
     detection: detectionOptions,
     react: {
       useSuspense: false, // This prevents issues with suspense during language loading
-      bindI18n: 'languageChanged' // Re-render components when language changes
+      bindI18n: 'languageChanged loaded' // Re-render components when language changes or loads
     }
   });
 
+// Get initial language from localStorage or navigator
+const initialLang = localStorage.getItem('i18nextLng') || navigator.language.split('-')[0];
+applyHtmlLang(initialLang);
+
 // Add all language change listeners to help debug
 i18n.on('initialized', (options) => {
+  const currentLang = i18n.language;
   debugI18n('i18next initialized', {
     languages: options.supportedLngs,
     fallbackLng: options.fallbackLng,
-    lng: i18n.language,
+    lng: currentLang,
     detectionOrder: options.detection?.order,
     localStorage: localStorage.getItem('i18nextLng')
   });
   
   // Set the html lang attribute
-  document.documentElement.lang = i18n.language;
+  applyHtmlLang(currentLang);
 });
 
 i18n.on('loaded', (loaded) => {
@@ -149,14 +162,16 @@ i18n.on('loaded', (loaded) => {
 
 i18n.on('languageChanged', (lng) => {
   debugI18n(`Language changed to: ${lng}`, {
-    previousLng: i18n.language,
+    previousLng: document.documentElement.lang,
     newLng: lng,
-    localStorage: localStorage.getItem('i18nextLng'),
-    documentLang: document.documentElement.lang
+    localStorage: localStorage.getItem('i18nextLng')
   });
   
   // Update the html lang attribute when language changes
-  document.documentElement.lang = lng;
+  applyHtmlLang(lng);
+  
+  // Force update any listeners
+  document.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: lng } }));
 });
 
 i18n.on('failedLoading', (lng, ns, msg) => {
