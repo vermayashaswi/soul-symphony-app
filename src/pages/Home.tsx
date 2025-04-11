@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -9,12 +10,12 @@ import { ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/use-theme';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
+import EnergyAnimation from '@/components/EnergyAnimation';
 
 const Home = () => {
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const navigate = useNavigate();
   const today = new Date();
@@ -57,7 +58,6 @@ const Home = () => {
     };
     
     fetchUserProfile();
-    setBackgroundImage(getRandomBackgroundImage());
   }, [user]);
   
   const updateDisplayName = async (name: string) => {
@@ -95,21 +95,6 @@ const Home = () => {
     navigate('/journal');
   };
 
-  const getRandomBackgroundImage = () => {
-    const images = [
-      'https://images.unsplash.com/photo-1500673922987-e212871fec22',
-      'https://images.unsplash.com/photo-1470813740244-df37b8c1edcb',
-      'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
-      'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9',
-      'https://images.unsplash.com/photo-1682686580391-615b1f28e5ee',
-      'https://images.unsplash.com/photo-1682685797208-c741d58c2eff',
-      'https://images.unsplash.com/photo-1613336026275-d6d473084e85',
-      'https://images.unsplash.com/photo-1531604250646-2f0e818c4f06'
-    ];
-    
-    return images[Math.floor(Math.random() * images.length)];
-  };
-
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -124,8 +109,6 @@ const Home = () => {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0 }
   };
-
-  console.log('Rendering Home page with background image:', backgroundImage);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -143,10 +126,11 @@ const Home = () => {
         <motion.div variants={itemVariants} className="mb-8">
           <Card className="overflow-hidden rounded-xl max-w-md mx-auto">
             <div 
-              className="h-64 w-full bg-cover bg-center cursor-pointer"
-              style={{ backgroundImage: `url(${backgroundImage || '/placeholder.svg'})` }}
+              className="h-64 w-full cursor-pointer relative"
               onClick={handleNavigateToJournal}
-            />
+            >
+              <EnergyAnimation />
+            </div>
           </Card>
         </motion.div>
 
