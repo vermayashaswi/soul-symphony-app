@@ -240,12 +240,12 @@
     right: 0;
     background-color: hsl(var(--background));
     z-index: 50;
-    padding-bottom: env(safe-area-inset-bottom, 16px);
+    padding-bottom: env(safe-area-inset-bottom, 10px);
   }
   
   /* Add space at the bottom of the chat content to prevent messages from being hidden behind the input */
   .mobile-chat-content {
-    padding-bottom: 80px !important;
+    padding-bottom: 30px !important;
   }
   
   /* Ensure empty chat state is properly visible */
@@ -481,13 +481,13 @@
   
   /* UPDATED: Chat area scrolling adjustments */
   .mobile-chat-area {
-    padding-bottom: 70px !important; /* Reduced to minimum needed space */
+    padding-bottom: 30px !important; /* UPDATED: Changed from 70px to 30px as requested */
     margin-bottom: env(safe-area-inset-bottom, 10px);
   }
   
   /* NEW: Added specific chat input spacing when keyboard is closed */
   .p-2.bg-background.border-t.flex.items-center.gap-2:not(.input-keyboard-active) {
-    margin-bottom: 56px; /* Only space for the navbar */
+    margin-bottom: 25px; /* UPDATED: Changed from 56px to 25px as requested */
   }
   
   /* NEW: Add bottom area protection for chat content */

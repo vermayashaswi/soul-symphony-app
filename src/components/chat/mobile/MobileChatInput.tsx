@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -61,25 +60,18 @@ export default function MobileChatInput({
     }
   };
 
-  // Track keyboard visibility
   useEffect(() => {
     const handleVisualViewportResize = () => {
       if (window.visualViewport) {
         const isKeyboard = window.visualViewport.height < window.innerHeight * 0.8;
         setIsKeyboardVisible(isKeyboard);
         
-        // Dispatch custom event to notify other components
         const eventName = isKeyboard ? 'keyboardOpen' : 'keyboardClose';
         window.dispatchEvent(new Event(eventName));
         
-        // If keyboard is visible, ensure input is visible
         if (isKeyboard && inputRef.current) {
-          // Delay scrolling to ensure UI has updated
           setTimeout(() => {
-            // Scroll to make input visible
             inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            
-            // Also scroll the page to ensure the input is visible
             window.scrollTo({
               top: document.body.scrollHeight,
               behavior: 'smooth'
@@ -89,10 +81,8 @@ export default function MobileChatInput({
       }
     };
 
-    // Initial check
     handleVisualViewportResize();
     
-    // Set up listeners
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleVisualViewportResize);
       window.addEventListener('resize', handleVisualViewportResize);
@@ -106,20 +96,16 @@ export default function MobileChatInput({
     };
   }, []);
 
-  // Handle focus events
   useEffect(() => {
     const handleFocus = () => {
-      // Scroll to the input field when it receives focus
       setTimeout(() => {
         window.scrollTo({
           top: document.body.scrollHeight,
           behavior: 'smooth'
         });
         
-        // Set keyboard visible state to ensure proper positioning
         setIsKeyboardVisible(true);
         
-        // Dispatch custom event
         window.dispatchEvent(new Event('keyboardOpen'));
       }, 300);
     };
@@ -143,7 +129,7 @@ export default function MobileChatInput({
       }`}
       style={{
         paddingBottom: isKeyboardVisible ? '10px' : 'env(safe-area-inset-bottom, 10px)',
-        marginBottom: !isKeyboardVisible ? '56px' : '0' // Space just for the nav bar
+        marginBottom: !isKeyboardVisible ? '25px' : '0'
       }}
     >
       <div className="flex-1 relative">
