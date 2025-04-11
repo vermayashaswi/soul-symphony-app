@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Auth from '@/pages/Auth';
 import Journal from '@/pages/Journal';
@@ -72,6 +71,10 @@ export const appRoutes: RouteConfig[] = [
     element: <OnboardingScreen />,
   },
   {
+    path: '/app/onboarding',
+    element: <OnboardingScreen />,
+  },
+  {
     path: '/app/auth',
     element: <Auth />,
   },
@@ -99,10 +102,6 @@ export const appRoutes: RouteConfig[] = [
     path: '/app/settings',
     element: <Settings />,
     requiresAuth: true,
-  },
-  {
-    path: '/app/onboarding',
-    element: <OnboardingScreen />,
   },
   // Legacy redirects
   {

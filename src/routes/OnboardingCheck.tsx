@@ -20,7 +20,8 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   const location = useLocation();
   
   const isAuthRoute = location.pathname === '/app/auth' || location.pathname === '/auth';
-  const isOnboardingRoute = location.pathname === '/app/onboarding' || location.pathname === '/app';
+  const isOnboardingRoute = location.pathname === '/app/onboarding';
+  const isRootAppRoute = location.pathname === '/app';
   const isOnboardingBypassedRoute = isAuthRoute || 
     location.pathname.includes('debug') || 
     location.pathname.includes('admin');
@@ -35,6 +36,17 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   
   // Only check onboarding for app routes
   if (isAppRoute(location.pathname)) {
+    // If user is not logged in and tries to access /app, redirect to onboarding
+    if (!user && isRootAppRoute) {
+      return <Navigate to="/app/onboarding" replace />;
+    }
+    
+    // If user is logged in and tries to access /app, redirect to home
+    if (user && isRootAppRoute) {
+      return <Navigate to="/app/home" replace />;
+    }
+    
+    // For other app routes, check if user should be redirected to onboarding
     const shouldShowOnboarding = 
       !user && 
       !onboardingComplete && 
@@ -42,7 +54,7 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
       !isOnboardingRoute;
     
     if (shouldShowOnboarding) {
-      return <Navigate to="/app" replace />;
+      return <Navigate to="/app/onboarding" replace />;
     }
   }
   
