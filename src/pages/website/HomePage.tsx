@@ -398,12 +398,12 @@ const HomePage = () => {
       step: "4",
       title: "Chat with Your Journal",
       description: [
-        "Have a conversation with your journal to explore your thoughts",
+        "Have a conversation with \"Rūḥ\", an emotionally intelligent AI assistant",
         "Ask questions about your past entries and get insightful responses",
-        "Receive personalized guidance based on your journaling history",
-        "Uncover deeper connections across your entire journal"
+        "Receive personalized guidance specific to your own journal entries",
+        "Get contextual advice on mental health and emotional wellbeing"
       ],
-      image: "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+      image: "/lovable-uploads/1c377509-f91d-4c41-9289-dc867a89a90e.png",
       icon: MessageSquare
     }
   ];
