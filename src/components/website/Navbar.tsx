@@ -2,15 +2,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
 import SouloLogo from '@/components/SouloLogo';
 import { Button } from '@/components/ui/button';
-import LanguageSelector from '@/components/LanguageSelector';
 import { useTheme } from '@/hooks/use-theme';
 
 const Navbar = () => {
   console.log("Website Navbar rendering"); // Debug log
-  const { t } = useTranslation();
   const { colorTheme, customColor } = useTheme();
 
   const scrollToDownloadSection = () => {
@@ -42,22 +39,21 @@ const Navbar = () => {
         
         <div className="flex items-center gap-4">
           <Button variant="ghost" className="text-white hover:text-white" asChild>
-            <Link to="/">{t('navbar.home')}</Link>
+            <Link to="/">Home</Link>
           </Button>
           <Button variant="ghost" className="text-white hover:text-white" asChild>
-            <Link to="/blog">{t('navbar.blog')}</Link>
+            <Link to="/blog">Blog</Link>
           </Button>
           <Button variant="ghost" className="text-white hover:text-white" asChild>
-            <Link to="/faq">{t('navbar.faq')}</Link>
+            <Link to="/faq">FAQ</Link>
           </Button>
           <Button 
             variant="default" 
             className="bg-white text-theme hover:bg-white/90"
             onClick={scrollToDownloadSection}
           >
-            {t('navbar.download')}
+            Download
           </Button>
-          <LanguageSelector />
         </div>
       </div>
     </motion.nav>

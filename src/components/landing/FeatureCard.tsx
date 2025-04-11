@@ -28,17 +28,15 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
     <motion.div 
       className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden h-full flex flex-col"
       whileHover={{ y: -5, transition: { duration: 0.2 } }}
-      data-i18n-component="feature-card"
-      data-feature-type={visualType}
     >
       <div className="flex items-start mb-4">
         <div className="bg-primary/10 rounded-full w-12 h-12 flex items-center justify-center mr-4">
           <Icon className="h-6 w-6 text-primary" />
         </div>
-        <h3 className="text-xl font-bold" data-i18n-key={`features.${visualType}Title`}>{title}</h3>
+        <h3 className="text-xl font-bold">{title}</h3>
       </div>
       
-      <p className="text-muted-foreground mb-6" data-i18n-key={`features.${visualType}Desc`}>{description}</p>
+      <p className="text-muted-foreground mb-6">{description}</p>
       
       <div className="mt-auto flex flex-col space-y-4">
         <FeatureVisual type={visualType} />
@@ -46,7 +44,6 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
         <Button 
           onClick={ctaAction} 
           className="w-full mt-4"
-          data-i18n-key={`features.${visualType}CTA`}
         >
           {cta}
         </Button>
