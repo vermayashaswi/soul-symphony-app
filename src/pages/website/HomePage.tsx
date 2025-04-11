@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail } from 'lucide-react';
@@ -211,7 +210,7 @@ const HomePage = () => {
               transition={{ duration: 1, delay: 0.3 }}
               className="w-full lg:w-1/2"
             >
-              {/* Voice to Insights Animation */}
+              {/* Voice to Insights Animation - Replaced static image with animation */}
               <div className="relative mx-auto max-w-md">
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
                 <div className="relative overflow-hidden shadow-2xl border border-white/50 rounded-xl">
