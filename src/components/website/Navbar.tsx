@@ -39,13 +39,13 @@ const Navbar = () => {
         </Link>
         
         <div className="flex items-center gap-4">
-          <Button variant="ghost" asChild>
+          <Button variant="ghost" className="text-black hover:text-black" asChild>
             <Link to="/">{t('navbar.home')}</Link>
           </Button>
-          <Button variant="ghost" asChild>
+          <Button variant="ghost" className="text-black hover:text-black" asChild>
             <Link to="/blog">{t('navbar.blog')}</Link>
           </Button>
-          <Button variant="ghost" asChild>
+          <Button variant="ghost" className="text-black hover:text-black" asChild>
             <Link to="/faq">{t('navbar.faq')}</Link>
           </Button>
           <Button 

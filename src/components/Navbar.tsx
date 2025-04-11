@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -111,13 +110,13 @@ export function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
-          <Button variant="ghost" asChild>
+          <Button variant="ghost" className="text-black hover:text-black" asChild>
             <Link to="/blog">{t('navbar.blog')}</Link>
           </Button>
-          <Button variant="ghost" asChild>
+          <Button variant="ghost" className="text-black hover:text-black" asChild>
             <Link to="/faq">{t('navbar.faq')}</Link>
           </Button>
-          <Button variant="ghost" asChild>
+          <Button variant="ghost" className="text-black hover:text-black" asChild>
             <Link to="/app">{t('navbar.openApp')}</Link>
           </Button>
           
@@ -149,7 +148,7 @@ export function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button variant="ghost" asChild>
+            <Button variant="ghost" className="text-black hover:text-black" asChild>
               <Link to="/app/auth">
                 <LogIn className="mr-2 h-4 w-4" />
                 {t('navbar.signIn')}
@@ -166,7 +165,7 @@ export function Navbar() {
           
           <button 
             onClick={() => setIsOpen(!isOpen)}
-            className="p-2"
+            className="p-2 text-black"
             aria-label={isOpen ? "Close menu" : "Open menu"}
           >
             {isOpen ? (
@@ -189,16 +188,16 @@ export function Navbar() {
           className="md:hidden overflow-hidden"
         >
           <div className="py-4 flex flex-col gap-2">
-            <Button variant="ghost" asChild>
+            <Button variant="ghost" className="text-black hover:text-black" asChild>
               <Link to="/" onClick={closeMenu}>{t('navbar.home')}</Link>
             </Button>
-            <Button variant="ghost" asChild>
+            <Button variant="ghost" className="text-black hover:text-black" asChild>
               <Link to="/blog" onClick={closeMenu}>{t('navbar.blog')}</Link>
             </Button>
-            <Button variant="ghost" asChild>
+            <Button variant="ghost" className="text-black hover:text-black" asChild>
               <Link to="/faq" onClick={closeMenu}>{t('navbar.faq')}</Link>
             </Button>
-            <Button variant="ghost" asChild>
+            <Button variant="ghost" className="text-black hover:text-black" asChild>
               <Link to="/app" onClick={closeMenu}>{t('navbar.openApp')}</Link>
             </Button>
           </div>
