@@ -470,6 +470,46 @@
     padding: 8px 10px;
     transition: transform 0.2s ease-out;
   }
+  
+  /* NEW: Input visibility improvements */
+  .mobile-chat-interface .input-container {
+    position: relative;
+    padding-bottom: env(safe-area-inset-bottom, 10px);
+    z-index: 1000;
+    background-color: hsl(var(--background));
+  }
+  
+  /* NEW: Chat area scrolling adjustments */
+  .mobile-chat-area {
+    padding-bottom: 100px !important;
+    margin-bottom: env(safe-area-inset-bottom, 20px);
+  }
+  
+  /* NEW: Ensure input is visible during keyboard interaction */
+  .input-keyboard-active {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px;
+    background-color: hsl(var(--background));
+    border-top: 1px solid hsl(var(--border));
+    z-index: 9999;
+    transform: translateY(0);
+    transition: transform 0.2s ease-out;
+  }
+  
+  /* NEW: Adjust screen space when keyboard is visible */
+  body.keyboard-open {
+    height: calc(100% - var(--keyboard-height, 0px));
+    overflow: hidden;
+  }
+  
+  /* NEW: Better focus management */
+  input:focus, textarea:focus {
+    position: relative;
+    z-index: 1001;
+  }
 }
 
 /* Dark mode support for sticky elements */

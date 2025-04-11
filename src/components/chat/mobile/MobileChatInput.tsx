@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDebugLog } from "@/utils/debug/DebugContext";
+import { Input } from "@/components/ui/input";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -18,21 +19,15 @@ export default function MobileChatInput({
 }: MobileChatInputProps) {
   const [inputValue, setInputValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const chatDebug = useDebugLog();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
-    adjustTextareaHeight(e.target);
   };
 
-  const adjustTextareaHeight = (textarea: HTMLTextAreaElement) => {
-    textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 36)}px`;
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
       e.preventDefault();
       handleSendMessage();
@@ -53,7 +48,6 @@ export default function MobileChatInput({
         
         setInputValue("");
         if (inputRef.current) {
-          inputRef.current.style.height = 'auto';
           inputRef.current.focus();
         }
         
@@ -69,35 +63,82 @@ export default function MobileChatInput({
 
   // Track keyboard visibility
   useEffect(() => {
-    const handleResize = () => {
-      // Simple heuristic for detecting keyboard on mobile
-      const visualViewport = window.visualViewport;
-      if (visualViewport) {
-        const isKeyboard = visualViewport.height < window.innerHeight * 0.8;
-        setIsKeyboardOpen(isKeyboard);
+    const handleVisualViewportResize = () => {
+      if (window.visualViewport) {
+        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.8;
+        setIsKeyboardVisible(isKeyboard);
+        
+        // If keyboard is visible, scroll to the input
+        if (isKeyboard && inputRef.current) {
+          // Delay scrolling to ensure UI has updated
+          setTimeout(() => {
+            window.scrollTo({
+              top: document.body.scrollHeight,
+              behavior: 'smooth'
+            });
+            inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 100);
+        }
       }
     };
 
-    // Use VisualViewport API if available
+    // Initial check
+    handleVisualViewportResize();
+    
+    // Set up listeners
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleResize);
-      return () => window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+      window.addEventListener('resize', handleVisualViewportResize);
     }
     
-    return undefined;
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
+        window.removeEventListener('resize', handleVisualViewportResize);
+      }
+    };
+  }, []);
+
+  // Handle focus events
+  useEffect(() => {
+    const handleFocus = () => {
+      // Scroll to the input field when it receives focus
+      setTimeout(() => {
+        window.scrollTo({
+          top: document.body.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 300);
+    };
+
+    const inputElement = inputRef.current;
+    if (inputElement) {
+      inputElement.addEventListener('focus', handleFocus);
+    }
+
+    return () => {
+      if (inputElement) {
+        inputElement.removeEventListener('focus', handleFocus);
+      }
+    };
   }, []);
 
   return (
-    <div className={`p-2 bg-background border-t border-border flex items-center gap-2 ${isKeyboardOpen ? 'keyboard-visible' : ''}`}>
+    <div 
+      className={`p-2 bg-background border-t border-border flex items-center gap-2 ${isKeyboardVisible ? 'fixed bottom-0 left-0 right-0 z-50' : ''}`}
+      style={{
+        paddingBottom: isKeyboardVisible ? '10px' : 'env(safe-area-inset-bottom, 10px)'
+      }}
+    >
       <div className="flex-1 relative">
-        <textarea
+        <Input
           ref={inputRef}
+          type="text"
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyPress}
-          onFocus={() => setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100)}
           placeholder="Type your message..."
-          className="w-full border rounded-lg py-1 px-3 pr-10 focus:outline-none focus:ring-1 focus:ring-primary resize-none min-h-[24px] max-h-[36px] bg-background overflow-hidden"
+          className="w-full pr-10 focus:outline-none focus:ring-1 focus:ring-primary bg-background"
           disabled={isLoading || isSubmitting}
         />
       </div>
