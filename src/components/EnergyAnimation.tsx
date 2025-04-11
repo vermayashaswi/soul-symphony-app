@@ -20,19 +20,13 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ className }) => {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-white blur-md opacity-90"></div>
       </div>
       
-      {/* Human silhouette */}
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-64 opacity-30 z-0">
-        <svg 
-          viewBox="0 0 100 160" 
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full"
-          fill="rgba(255,255,255,0.5)"
-        >
-          <path d="M50,20 C60,20 65,15 65,10 C65,5 60,0 50,0 C40,0 35,5 35,10 C35,15 40,20 50,20 Z" />
-          <path d="M40,25 L60,25 L65,60 L55,60 L60,120 L55,160 L45,160 L50,120 L40,60 L35,60 Z" />
-          <path d="M65,60 L75,110 L80,110 L70,60 Z" />
-          <path d="M35,60 L25,110 L20,110 L30,60 Z" />
-        </svg>
+      {/* User provided image with reduced opacity */}
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-64 opacity-50 z-0">
+        <img 
+          src="/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png" 
+          alt="Energy silhouette" 
+          className="w-full h-full object-contain"
+        />
       </div>
       
       {/* Radiating pulses */}
