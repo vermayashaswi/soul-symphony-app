@@ -1,73 +1,53 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import ProtectedRoute from './ProtectedRoute';
-import MobilePreviewFrame from '@/components/MobilePreviewFrame';
 
-// Check if this is running in a native mobile app environment
 export const isNativeApp = (): boolean => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const isNative = urlParams.get('nativeApp') === 'true' || 
-         window.location.href.includes('capacitor://') || 
-         window.location.href.includes('localhost');
-  console.log("isNativeApp check:", isNative, window.location.href);
-  return isNative;
+  return /native/i.test(window.navigator.userAgent);
 };
 
-// Check if the current route is an app route (starts with /app)
-export const isAppRoute = (path: string): boolean => {
-  const isApp = path.startsWith('/app');
-  console.log("isAppRoute check for path", path, ":", isApp);
-  return isApp;
+export const isAppRoute = (pathname: string): boolean => {
+  return pathname.startsWith('/app');
 };
 
-interface RouteWrapperProps {
-  children: React.ReactNode;
-}
-
-export const MobilePreviewWrapper: React.FC<RouteWrapperProps> = ({ children }) => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  
-  return mobileDemo ? <MobilePreviewFrame>{children}</MobilePreviewFrame> : <>{children}</>;
+export const WebsiteRouteWrapper = ({ element }: { element: React.ReactNode }) => {
+  return (
+    <div className="website-route">
+      {element}
+    </div>
+  );
 };
 
-interface AppRouteProps {
-  element: React.ReactNode;
-  requiresAuth?: boolean;
-}
-
-export const AppRouteWrapper: React.FC<AppRouteProps> = ({ element, requiresAuth }) => {
+// This is the update to the AppRouteWrapper component
+export const AppRouteWrapper = ({ 
+  element, 
+  requiresAuth = true,
+  hideNavbar = false 
+}: { 
+  element: React.ReactNode, 
+  requiresAuth?: boolean,
+  hideNavbar?: boolean 
+}) => {
   const { user } = useAuth();
-  const location = useLocation();
+  const navigate = useNavigate();
   
-  // For auth route, redirect to home if already logged in
-  if (location.pathname === '/app/auth' && user) {
-    return <Navigate to="/app/home" replace />;
-  }
-  
-  // Wrap in protection if needed
-  if (requiresAuth) {
-    return (
-      <MobilePreviewWrapper>
-        <ProtectedRoute>
-          {element}
-        </ProtectedRoute>
-      </MobilePreviewWrapper>
-    );
-  }
-  
-  return <MobilePreviewWrapper>{element}</MobilePreviewWrapper>;
+  useEffect(() => {
+    if (requiresAuth && !user) {
+      navigate('/auth');
+    }
+  }, [user, navigate, requiresAuth]);
+
+  return (
+    <div className="min-h-screen app-route">
+      {!hideNavbar && <Navbar />}
+      <div className="pt-16 min-h-screen">
+        {element}
+      </div>
+    </div>
+  );
 };
 
-export const WebsiteRouteWrapper: React.FC<RouteWrapperProps> = ({ children }) => {
-  return <MobilePreviewWrapper>{children}</MobilePreviewWrapper>;
-};
-
-interface RedirectRouteProps {
-  to: string;
-}
-
-export const RedirectRoute: React.FC<RedirectRouteProps> = ({ to }) => {
+export const RedirectRoute = ({ to }: { to: string }) => {
   return <Navigate to={to} replace />;
 };
+

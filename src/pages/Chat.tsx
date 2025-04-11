@@ -42,6 +42,23 @@ const Chat = () => {
     }
   }, [user, toast]);
 
+  // Add CSS override to hide duplicate close button in chat sidebar
+  useEffect(() => {
+    // Create a style element to inject CSS
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .chat-sidebar-close-duplicate {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    // Clean up on unmount
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
     <div className="w-full h-full flex flex-col">
       <SmartChatInterface />

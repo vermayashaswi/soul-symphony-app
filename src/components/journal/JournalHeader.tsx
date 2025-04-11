@@ -1,16 +1,12 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useIsMobile } from '@/hooks/use-mobile';
 import SouloLogo from '@/components/SouloLogo';
 import { cn } from '@/lib/utils';
-import { useTheme } from '@/hooks/use-theme';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useTranslation } from 'react-i18next';
 
 const JournalHeader = () => {
-  const { user } = useAuth();
   const isMobile = useIsMobile();
   const { t } = useTranslation();
   const urlParams = new URLSearchParams(window.location.search);
@@ -23,26 +19,15 @@ const JournalHeader = () => {
       shouldAdjustForMobile ? "mt-0" : "mt-1 md:mt-2"
     )}>
       <div className="container mx-auto px-4 max-w-5xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-1">
-          <div className="w-full">
-            <motion.h1 
-              className="text-2xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2 flex-wrap text-theme-color"
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500 shrink-0" />
-              <span className="inline-block">{t('journal.header.your')} <SouloLogo className="inline-flex" useColorTheme={true} /> {t('journal.header.journal')}</span>
-            </motion.h1>
-            <motion.p 
-              className="text-muted-foreground mt-0.5 text-sm sm:text-base"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              {t('journal.header.subtitle')}
-            </motion.p>
-          </div>
+        <div className="flex justify-center md:justify-start">
+          <motion.h1 
+            className="text-2xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            {t('journal.header.your')} <SouloLogo className="inline-flex" useColorTheme={true} /> {t('journal.header.journal')}
+          </motion.h1>
         </div>
       </div>
     </div>
