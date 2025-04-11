@@ -23,17 +23,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
                  left-0 right-0 top-0 overflow-hidden opacity-70 z-0 ${className}`}
       style={{ pointerEvents: 'none' }} // Ensure the animation doesn't interfere with user interactions
     >
-      {/* Buddha image at center */}
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 w-24 h-24 flex items-center justify-center">
-        <img 
-          src="/buddha-meditation.png" 
-          alt="Buddha Meditation" 
-          className="w-full h-full object-contain opacity-90"
-        />
-      </div>
-      
       {/* Glowing center with enhanced blur */}
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-5">
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
         <div className="w-32 h-32 rounded-full bg-cyan-300 blur-3xl opacity-70"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-white blur-md opacity-80"></div>
       </div>

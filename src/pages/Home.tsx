@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -131,9 +132,7 @@ const Home = () => {
                 className="h-64 w-full cursor-pointer relative"
                 onClick={handleNavigateToJournal}
               >
-                <div className="absolute inset-0">
-                  <EnergyAnimation />
-                </div>
+                {/* Removed the nested EnergyAnimation component here */}
               </div>
             </Card>
           </motion.div>
