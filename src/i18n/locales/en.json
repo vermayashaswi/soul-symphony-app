@@ -1,4 +1,3 @@
-
 {
   "navbar": {
     "home": "Home",
@@ -78,6 +77,12 @@
       "title": "Ready to start your journey?",
       "description": "Download SOULo today and transform how you journal.",
       "buttonText": "Get Started"
+    }
+  },
+  "journal": {
+    "header": {
+      "your": "Your",
+      "journal": "Journal"
     }
   }
 }
