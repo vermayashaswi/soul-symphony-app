@@ -10,6 +10,237 @@ import Footer from '@/components/website/Footer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
+const PhoneVoiceAnimation = () => {
+  const [animationStage, setAnimationStage] = useState(0);
+  const [waveform, setWaveform] = useState<number[]>([]);
+  const [insights, setInsights] = useState<string[]>([]);
+  const maxStages = 3;
+
+  useEffect(() => {
+    const generateWaveform = () => {
+      const newWaveform = Array.from({ length: 30 }, () => 
+        Math.random() * 0.8 + 0.2
+      );
+      setWaveform(newWaveform);
+    };
+
+    const interval = setInterval(() => {
+      setAnimationStage((prev) => (prev + 1) % maxStages);
+      
+      if (animationStage === 0) {
+        generateWaveform();
+        setInsights([]);
+      } else if (animationStage === 1) {
+        setInsights([]);
+      } else if (animationStage === 2) {
+        setInsights([
+          "Feeling optimistic about new project",
+          "Stress levels decreasing compared to last week",
+          "Sleep pattern improving"
+        ]);
+      }
+    }, 3000);
+
+    generateWaveform();
+
+    return () => clearInterval(interval);
+  }, [animationStage]);
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      <div className="relative w-64 h-[500px] bg-gray-900 rounded-[40px] overflow-hidden border-8 border-gray-800 shadow-xl">
+        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-black rounded-b-xl z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800 flex flex-col">
+          <div className="h-14 bg-gradient-to-r from-primary/80 to-purple-600/80 flex items-center justify-center">
+            <SouloLogo size="small" useColorTheme={true} />
+          </div>
+          <div className="flex-1 p-4 flex flex-col">
+            {animationStage === 0 && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col items-center justify-center"
+              >
+                <div className="text-white text-center mb-6">
+                  <p className="text-sm mb-2">Recording your journal...</p>
+                </div>
+                <div className="w-full h-24 flex items-center justify-center gap-1 mb-8">
+                  {waveform.map((height, index) => (
+                    <motion.div
+                      key={index}
+                      className="w-1.5 bg-primary rounded-full"
+                      initial={{ height: 4 }}
+                      animate={{ 
+                        height: `${height * 80}px`,
+                        opacity: height
+                      }}
+                      transition={{
+                        duration: 0.2,
+                        repeat: Infinity,
+                        repeatType: "reverse",
+                        delay: index * 0.02
+                      }}
+                    />
+                  ))}
+                </div>
+                <motion.div 
+                  className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center mb-4"
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    repeatType: "reverse"
+                  }}
+                >
+                  <Mic className="h-8 w-8 text-white" />
+                </motion.div>
+              </motion.div>
+            )}
+            {animationStage === 1 && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col items-center justify-center"
+              >
+                <div className="text-white text-center mb-8">
+                  <p className="text-sm mb-2">Processing your entry...</p>
+                </div>
+                <motion.div 
+                  className="w-20 h-20 rounded-full bg-purple-600/30 flex items-center justify-center"
+                  animate={{ 
+                    scale: [1, 1.2, 1],
+                    rotate: [0, 360],
+                    borderRadius: ["50%", "40%", "50%"]
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  <Brain className="h-10 w-10 text-purple-400" />
+                </motion.div>
+                <div className="mt-8 flex gap-2">
+                  <motion.div 
+                    className="w-3 h-3 rounded-full bg-primary"
+                    animate={{ scale: [1, 1.5, 1] }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      repeatType: "loop",
+                      delay: 0
+                    }}
+                  />
+                  <motion.div 
+                    className="w-3 h-3 rounded-full bg-primary"
+                    animate={{ scale: [1, 1.5, 1] }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      repeatType: "loop",
+                      delay: 0.3
+                    }}
+                  />
+                  <motion.div 
+                    className="w-3 h-3 rounded-full bg-primary"
+                    animate={{ scale: [1, 1.5, 1] }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      repeatType: "loop",
+                      delay: 0.6
+                    }}
+                  />
+                </div>
+              </motion.div>
+            )}
+            {animationStage === 2 && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col"
+              >
+                <h3 className="text-white text-center mb-4 text-sm">Your Journal Insights</h3>
+                <div className="space-y-3">
+                  {insights.map((insight, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.3 }}
+                      className="bg-gray-800/80 p-3 rounded-lg border border-gray-700"
+                    >
+                      <div className="flex gap-2">
+                        <div className="min-w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                          <LineChart className="h-3 w-3 text-primary" />
+                        </div>
+                        <p className="text-white text-xs">{insight}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+                <motion.div 
+                  className="mt-auto mb-4 w-full bg-primary/20 p-3 rounded-lg flex items-center justify-between"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.2 }}
+                >
+                  <p className="text-primary text-xs">View full analysis</p>
+                  <ArrowRight className="h-4 w-4 text-primary" />
+                </motion.div>
+              </motion.div>
+            )}
+          </div>
+          <div className="h-16 border-t border-gray-800 flex justify-around items-center px-4">
+            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center">
+              <Mic className="h-5 w-5 text-white" />
+            </div>
+            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center">
+              <LineChart className="h-5 w-5 text-white" />
+            </div>
+            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center">
+              <MessageSquare className="h-5 w-5 text-white" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-primary/20 filter blur-3xl -z-10"></div>
+      <div className="absolute top-1/3 left-1/3 w-40 h-40 rounded-full bg-purple-500/20 filter blur-2xl -z-10"></div>
+      {animationStage === 2 && (
+        <>
+          {Array.from({ length: 8 }).map((_, index) => (
+            <motion.div
+              key={index}
+              className="absolute w-2 h-2 rounded-full bg-primary/60"
+              initial={{ 
+                top: "60%", 
+                left: "50%", 
+                scale: 0,
+                opacity: 0.8 
+              }}
+              animate={{ 
+                top: `${30 + Math.random() * 30}%`,
+                left: `${30 + Math.random() * 40}%`,
+                scale: Math.random() * 0.5 + 0.5,
+                opacity: 0
+              }}
+              transition={{
+                duration: 2 + Math.random() * 2,
+                repeat: Infinity,
+                repeatType: "loop",
+                delay: index * 0.3
+              }}
+            />
+          ))}
+        </>
+      )}
+    </div>
+  );
+};
+
 const HomePage = () => {
   const isMobile = useIsMobile();
   const [email, setEmail] = useState('');
@@ -202,43 +433,10 @@ const HomePage = () => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 1, delay: 0.3 }}
-              className="w-full lg:w-1/2"
+              className="w-full lg:w-1/2 flex items-center justify-center"
             >
-              <div className="relative mx-auto max-w-md">
-                <div className="absolute -inset-4 bg-gradient-to-r from-primary/50 to-purple-500/50 rounded-2xl blur-xl opacity-80"></div>
-                <div className="relative overflow-hidden rounded-xl shadow-2xl border-2 border-white/80">
-                  <img 
-                    src="/lovable-uploads/241062d6-3971-492c-aaeb-a110d1256c7a.png" 
-                    alt="Voice to insights animation"
-                    className="w-full h-auto rounded-xl bg-white"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-full h-full bg-gradient-to-r from-blue-600/20 to-purple-600/20 backdrop-blur-sm flex items-center justify-center">
-                      <div className="text-center p-6 relative z-10">
-                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/90 shadow-lg flex items-center justify-center animate-pulse">
-                          <Mic className="h-10 w-10 text-primary" />
-                        </div>
-                        <div className="flex items-center justify-center gap-3 mb-4">
-                          <div className="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
-                          <div className="w-3 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.2s" }}></div>
-                          <div className="w-3 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.4s" }}></div>
-                          <div className="w-3 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.6s" }}></div>
-                          <div className="w-3 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.8s" }}></div>
-                        </div>
-                        <div className="w-20 h-20 mx-auto mt-4 rounded-full bg-white/90 shadow-lg flex items-center justify-center animate-pulse" style={{ animationDelay: "1s" }}>
-                          <Brain className="h-10 w-10 text-purple-500" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                  <div className="absolute top-1/4 right-1/4 w-24 h-24 rounded-full bg-primary/40 blur-xl animate-pulse"></div>
-                  <div className="absolute bottom-1/3 left-1/3 w-20 h-20 rounded-full bg-purple-500/40 blur-xl animate-pulse" style={{animationDelay: "1s"}}></div>
-                  <div className="absolute top-1/2 right-1/3 w-16 h-16 rounded-full bg-blue-500/40 blur-xl animate-pulse" style={{animationDelay: "0.5s"}}></div>
-                  <div className="absolute bottom-1/4 right-1/2 w-12 h-12 rounded-full bg-indigo-500/40 blur-xl animate-pulse" style={{animationDelay: "1.5s"}}></div>
-                </div>
+              <div className="relative max-w-md w-full h-[500px]">
+                <PhoneVoiceAnimation />
               </div>
             </motion.div>
           </div>
@@ -385,6 +583,15 @@ const HomePage = () => {
       
       <section className="py-16 md:py-24 bg-gray-50">
         <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Privacy</span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Your Privacy is Our Priority</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              At SOULo, we believe that your personal thoughts and feelings should remain private. 
+              We've built our platform with privacy at its core.
+            </p>
+          </div>
+          
           <div className="flex flex-col md:flex-row items-center gap-12">
             <motion.div 
               className="w-full md:w-1/2"
