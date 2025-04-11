@@ -1,6 +1,8 @@
+
 import React, { useEffect } from 'react';
 import { Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import Navbar from '@/components/Navbar'; // Import the Navbar component
 
 export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
@@ -50,4 +52,3 @@ export const AppRouteWrapper = ({
 export const RedirectRoute = ({ to }: { to: string }) => {
   return <Navigate to={to} replace />;
 };
-

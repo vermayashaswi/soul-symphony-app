@@ -67,7 +67,7 @@ const AppRoutes = () => {
                   <RedirectRoute to="/app" />
                 )
               ) : (
-                <WebsiteRouteWrapper><HomePage /></WebsiteRouteWrapper>
+                <WebsiteRouteWrapper element={<HomePage />} />
               )
             } 
           />
@@ -77,7 +77,7 @@ const AppRoutes = () => {
             <Route
               key={route.path}
               path={route.path}
-              element={<WebsiteRouteWrapper>{route.element}</WebsiteRouteWrapper>}
+              element={<WebsiteRouteWrapper element={route.element} />}
             />
           ))}
           
@@ -103,7 +103,7 @@ const AppRoutes = () => {
           {/* Catch all (404) */}
           <Route
             path="*"
-            element={<WebsiteRouteWrapper>{notFoundRoute ? notFoundRoute.element : <NotFound />}</WebsiteRouteWrapper>}
+            element={<WebsiteRouteWrapper element={notFoundRoute ? notFoundRoute.element : <NotFound />} />}
           />
         </Routes>
         
