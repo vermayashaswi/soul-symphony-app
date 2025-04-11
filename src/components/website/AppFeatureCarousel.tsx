@@ -16,7 +16,7 @@ const features = [
     title: "AI Analysis",
     description: "Gain insights into your patterns and emotions through advanced AI analysis.",
     icon: Brain,
-    image: "https://images.unsplash.com/photo-1581092583537-20d51b4b4f1b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Digital brain/neural network visualization
+    image: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Better AI visualization image with shorter height
   },
   {
     title: "Emotional Tracking",
