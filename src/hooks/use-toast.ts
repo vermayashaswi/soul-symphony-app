@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import type {
@@ -54,7 +55,8 @@ interface State {
 }
 
 // Global toasts state
-let memoryState: State = { toasts: [] }
+const INITIAL_STATE: State = { toasts: [] }
+let memoryState: State = INITIAL_STATE
 
 // Global listeners for state updates
 const listeners: Array<(state: State) => void> = []
@@ -196,7 +198,7 @@ function useToast() {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, [])
 
   // Cleanup function to remove all toasts when unmounting
   React.useEffect(() => {

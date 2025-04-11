@@ -1,4 +1,3 @@
 
-import { useToast, toast } from "@/hooks/use-toast";
-
-export { useToast, toast };
+// Directly re-export from the source file to avoid circular imports
+export { useToast, toast } from "@/hooks/use-toast";
