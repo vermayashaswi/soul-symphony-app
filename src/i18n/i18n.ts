@@ -93,6 +93,20 @@ const resources = {
   }
 };
 
+// Language detection options
+const detectionOptions = {
+  order: ['localStorage', 'navigator'],
+  lookupLocalStorage: 'i18nextLng',
+  caches: ['localStorage']
+};
+
+// Debug function for all i18n operations
+const debugI18n = (message: string, args?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[i18n] ${message}`, args);
+  }
+};
+
 // Initialize i18next
 i18n
   // Detect user language
@@ -103,23 +117,54 @@ i18n
   .init({
     resources,
     fallbackLng: 'en',
-    debug: process.env.NODE_ENV === 'development',
+    debug: true, // Enable debug for all environments to help troubleshoot
+    supportedLngs: Object.keys(resources), // Explicitly set supported languages
     interpolation: {
       escapeValue: false // React already safes from XSS
     },
-    detection: {
-      order: ['localStorage', 'navigator'],
-      lookupLocalStorage: 'i18nextLng',
-      caches: ['localStorage']
-    },
+    detection: detectionOptions,
     react: {
-      useSuspense: false // This prevents issues with suspense during language loading
+      useSuspense: false, // This prevents issues with suspense during language loading
+      bindI18n: 'languageChanged' // Re-render components when language changes
     }
   });
 
-// Add a language change listener to help debug
+// Add all language change listeners to help debug
+i18n.on('initialized', (options) => {
+  debugI18n('i18next initialized', {
+    languages: options.supportedLngs,
+    fallbackLng: options.fallbackLng,
+    lng: i18n.language,
+    detectionOrder: options.detection?.order,
+    localStorage: localStorage.getItem('i18nextLng')
+  });
+  
+  // Set the html lang attribute
+  document.documentElement.lang = i18n.language;
+});
+
+i18n.on('loaded', (loaded) => {
+  debugI18n('i18next resources loaded', { loaded });
+});
+
 i18n.on('languageChanged', (lng) => {
-  console.log(`Language changed to: ${lng}`);
+  debugI18n(`Language changed to: ${lng}`, {
+    previousLng: i18n.language,
+    newLng: lng,
+    localStorage: localStorage.getItem('i18nextLng'),
+    documentLang: document.documentElement.lang
+  });
+  
+  // Update the html lang attribute when language changes
+  document.documentElement.lang = lng;
+});
+
+i18n.on('failedLoading', (lng, ns, msg) => {
+  console.error(`[i18n] Failed loading language: ${lng}, namespace: ${ns}`, msg);
+});
+
+i18n.on('missingKey', (lngs, namespace, key, res) => {
+  console.warn(`[i18n] Missing translation key: ${key} in namespace: ${namespace} for languages: ${lngs.join(', ')}`);
 });
 
 export default i18n;

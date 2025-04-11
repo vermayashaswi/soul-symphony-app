@@ -16,6 +16,8 @@ import { handleAuthCallback } from "./services/authService";
 import { DebugLogProvider } from "./utils/debug/DebugContext";
 import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n/i18n';
+import LanguageDebugPanel from "./components/debug/LanguageDebugPanel";
+import DebugLogPanel from "./components/debug/DebugLogPanel";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -144,6 +146,10 @@ const App = () => {
                       <AnimatePresence mode="wait">
                         <AppRoutes />
                       </AnimatePresence>
+                      
+                      {/* Debug panels */}
+                      <LanguageDebugPanel />
+                      <DebugLogPanel />
                     </div>
                   </div>
                 </DebugLogProvider>

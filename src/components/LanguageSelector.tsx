@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { useDebugLog } from '@/utils/debug/DebugContext';
 
 // Language options
 const languageOptions = [
@@ -40,24 +41,56 @@ const LanguageSelector = () => {
   const { i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [currentLang, setCurrentLang] = useState(i18n.language);
+  const { addEvent } = useDebugLog();
 
   useEffect(() => {
+    // Log component mount
+    addEvent('i18n', 'LanguageSelector mounted', 'info', {
+      initialLanguage: i18n.language,
+      localStorage: localStorage.getItem('i18nextLng')
+    });
+    
     // Ensure language is applied from localStorage on component mount
     const savedLang = localStorage.getItem('i18nextLng');
     if (savedLang && savedLang !== i18n.language) {
+      addEvent('i18n', 'Applying saved language from localStorage', 'info', {
+        savedLang,
+        currentLang: i18n.language
+      });
+      
       i18n.changeLanguage(savedLang);
       setCurrentLang(savedLang);
     }
-  }, [i18n]);
+    
+    // Return cleanup function
+    return () => {
+      addEvent('i18n', 'LanguageSelector unmounted', 'info');
+    };
+  }, [i18n, addEvent]);
 
   const currentLanguage = languageOptions.find(lang => lang.code === currentLang) || languageOptions[0];
 
   const changeLanguage = (code: string) => {
+    addEvent('i18n', 'Language change requested', 'info', {
+      from: currentLang,
+      to: code,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Update language in i18next
     i18n.changeLanguage(code);
+    
+    // Update component state
     setCurrentLang(code);
     setOpen(false);
+    
     // Save language preference
     localStorage.setItem('i18nextLng', code);
+    
+    addEvent('i18n', 'About to reload page for language change', 'info', {
+      newLang: code,
+      localStorage: localStorage.getItem('i18nextLng')
+    });
     
     // Force reload to ensure all components update with the new language
     window.location.reload();
