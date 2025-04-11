@@ -47,5 +47,37 @@
     "privacy": "Politique de Confidentialité",
     "terms": "Conditions d'Utilisation"
   },
-  "mainTagline": "Tenez un journal et capturez votre journée sans écrire un seul mot!"
+  "mainTagline": "Tenez un journal et capturez votre journée sans écrire un seul mot!",
+  "homepage": {
+    "expressReflectGrow": "Exprimer. Réfléchir. Grandir.",
+    "appFeatures": "Fonctionnalités de l'App",
+    "process": {
+      "title": "Processus: Comment Ça Marche",
+      "step1Title": "Enregistrer",
+      "step1Description": "Exprimez vos pensées à voix haute - pas besoin de taper",
+      "step2Title": "Analyser",
+      "step2Description": "L'IA traite vos entrées pour identifier les tendances et les insights",
+      "step3Title": "Réfléchir",
+      "step3Description": "Consultez des insights personnalisés et suivez votre parcours émotionnel"
+    },
+    "privacy": {
+      "title": "Votre Confidentialité Est Notre Priorité",
+      "description": "Nous utilisons un cryptage de pointe pour garantir que vos entrées de journal restent totalement privées et sécurisées.",
+      "featuresList": [
+        "Cryptage de bout en bout",
+        "Options de stockage local",
+        "Aucun partage avec des tiers",
+        "Contrôle total sur vos données"
+      ]
+    },
+    "testimonials": {
+      "title": "Ce Que Disent Nos Utilisateurs",
+      "subtitle": "Rejoignez des milliers de personnes qui transforment leur parcours de bien-être mental."
+    },
+    "cta": {
+      "title": "Prêt à commencer votre voyage?",
+      "description": "Téléchargez SOULo aujourd'hui et transformez votre façon de tenir un journal.",
+      "buttonText": "Commencer"
+    }
+  }
 }

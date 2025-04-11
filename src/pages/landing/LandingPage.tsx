@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 // Components
-import Navbar from '@/components/Navbar';
+import Navbar from '@/components/website/Navbar';
 import ParticleBackground from '@/components/ParticleBackground';
 import FeatureShowcase from './components/FeatureShowcase';
 import AppDownloadSection from './components/AppDownloadSection';
@@ -136,8 +136,11 @@ const LandingPage = () => {
       <section className="py-12 md:py-16 bg-primary/5 backdrop-blur-sm">
         <div className="container mx-auto text-center">
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-medium max-w-4xl mx-auto">
-            {t('mainTagline')}
+            {t('homepage.expressReflectGrow')}
           </h2>
+          <p className="mt-4 text-lg text-muted-foreground max-w-3xl mx-auto">
+            {t('mainTagline')}
+          </p>
         </div>
       </section>
       
@@ -146,7 +149,7 @@ const LandingPage = () => {
         <div className="container mx-auto max-w-6xl px-4">
           <div className="text-center mb-12">
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
-              {t('features.title')}
+              {t('homepage.appFeatures')}
             </span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('features.title')}</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -175,20 +178,145 @@ const LandingPage = () => {
         </div>
       </section>
       
-      {/* Feature Showcase */}
-      <FeatureShowcase />
+      {/* Process: How It Works */}
+      <section className="py-16 md:py-24 bg-primary/5">
+        <div className="container mx-auto max-w-6xl px-4">
+          <div className="text-center mb-16">
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
+              {t('homepage.process.title')}
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">{t('features.title')}</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <motion.div 
+              className="flex flex-col items-center text-center"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 }}
+            >
+              <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                <Mic className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2">{t('homepage.process.step1Title')}</h3>
+              <p className="text-muted-foreground">{t('homepage.process.step1Description')}</p>
+            </motion.div>
+            
+            <motion.div 
+              className="flex flex-col items-center text-center"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                <Brain className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2">{t('homepage.process.step2Title')}</h3>
+              <p className="text-muted-foreground">{t('homepage.process.step2Description')}</p>
+            </motion.div>
+            
+            <motion.div 
+              className="flex flex-col items-center text-center"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                <LineChart className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2">{t('homepage.process.step3Title')}</h3>
+              <p className="text-muted-foreground">{t('homepage.process.step3Description')}</p>
+            </motion.div>
+          </div>
+        </div>
+      </section>
       
       {/* Privacy Section */}
-      <PrivacySection />
+      <section className="py-16 md:py-24">
+        <div className="container mx-auto max-w-6xl px-4">
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <motion.div 
+              className="w-full md:w-1/2"
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+            >
+              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
+                {t('homepage.privacy.title')}
+              </span>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('homepage.privacy.title')}</h2>
+              <p className="text-muted-foreground mb-6">
+                {t('homepage.privacy.description')}
+              </p>
+              
+              <ul className="space-y-3">
+                {[0, 1, 2, 3].map((index) => (
+                  <li key={index} className="flex items-start">
+                    <Shield className="h-5 w-5 text-primary mr-2 mt-0.5" />
+                    <span>{t(`homepage.privacy.featuresList.${index}`)}</span>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+            
+            <motion.div 
+              className="w-full md:w-1/2"
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
+                <div className="relative bg-card border border-primary/10 rounded-2xl p-6 shadow-xl">
+                  <img 
+                    src="/lovable-uploads/security-illustration.svg" 
+                    alt="Privacy and Security" 
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
       
-      {/* App Download Section */}
-      <AppDownloadSection />
+      {/* Testimonials Section */}
+      <section className="py-16 md:py-24 bg-primary/5">
+        <div className="container mx-auto max-w-6xl px-4">
+          <div className="text-center mb-12">
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
+              {t('homepage.testimonials.title')}
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('homepage.testimonials.title')}</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              {t('homepage.testimonials.subtitle')}
+            </p>
+          </div>
+          
+          <Testimonials />
+        </div>
+      </section>
       
-      {/* Blog Preview */}
-      <BlogPreview />
-      
-      {/* Testimonials/Future Users Section */}
-      <Testimonials />
+      {/* CTA Section */}
+      <section className="py-16 md:py-24">
+        <div className="container mx-auto max-w-6xl px-4">
+          <div className="bg-primary/10 rounded-3xl p-8 md:p-12 text-center">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('homepage.cta.title')}</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto mb-8">
+              {t('homepage.cta.description')}
+            </p>
+            <Button size="lg" className="group">
+              {t('homepage.cta.buttonText')}
+              <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </div>
+        </div>
+      </section>
       
       {/* Footer */}
       <Footer />

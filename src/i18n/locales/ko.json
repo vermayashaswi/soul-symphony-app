@@ -47,5 +47,37 @@
     "privacy": "개인정보 처리방침",
     "terms": "서비스 약관"
   },
-  "mainTagline": "단어 하나 쓰지 않고 일기를 작성하고 하루를 기록하세요!"
+  "mainTagline": "단어 하나 쓰지 않고 일기를 작성하고 하루를 기록하세요!",
+  "homepage": {
+    "expressReflectGrow": "표현. 성찰. 성장.",
+    "appFeatures": "앱 기능",
+    "process": {
+      "title": "과정: 작동 방식",
+      "step1Title": "기록",
+      "step1Description": "생각을 소리내어 말하기 - 타이핑 필요 없음",
+      "step2Title": "분석",
+      "step2Description": "AI가 패턴과 통찰력을 식별하기 위해 항목을 처리합니다",
+      "step3Title": "성찰",
+      "step3Description": "개인화된 통찰력을 검토하고 감정 여정을 추적하세요"
+    },
+    "privacy": {
+      "title": "귀하의 개인정보 보호가 우리의 최우선 과제입니다",
+      "description": "최첨단 암호화를 사용하여 일기 항목이 완전히 비공개로 안전하게 유지되도록 보장합니다.",
+      "featuresList": [
+        "종단간 암호화",
+        "로컬 저장 옵션",
+        "제3자와 공유하지 않음",
+        "데이터에 대한 완전한 제어"
+      ]
+    },
+    "testimonials": {
+      "title": "사용자들의 의견",
+      "subtitle": "정신 건강 여정을 변화시키고 있는 수천 명의 사람들과 함께하세요."
+    },
+    "cta": {
+      "title": "여정을 시작할 준비가 되셨나요?",
+      "description": "오늘 SOULo를 다운로드하고 일기 작성 방식을 변화시키세요.",
+      "buttonText": "시작하기"
+    }
+  }
 }

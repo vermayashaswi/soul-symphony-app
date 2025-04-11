@@ -47,5 +47,37 @@
     "privacy": "プライバシーポリシー",
     "terms": "利用規約"
   },
-  "mainTagline": "一言も書かずに日記をつけて一日を記録しましょう！"
+  "mainTagline": "一言も書かずに日記をつけて一日を記録しましょう！",
+  "homepage": {
+    "expressReflectGrow": "表現。熟考。成長。",
+    "appFeatures": "アプリの特徴",
+    "process": {
+      "title": "プロセス：仕組み",
+      "step1Title": "記録",
+      "step1Description": "考えを声に出して話す - タイピング不要",
+      "step2Title": "分析",
+      "step2Description": "AIがあなたの記録を処理してパターンと洞察を識別します",
+      "step3Title": "熟考",
+      "step3Description": "パーソナライズされた洞察を確認し、感情の旅を追跡します"
+    },
+    "privacy": {
+      "title": "あなたのプライバシーが私たちの優先事項です",
+      "description": "最先端の暗号化技術を使用して、あなたの日記エントリーが完全にプライベートで安全であることを保証します。",
+      "featuresList": [
+        "エンドツーエンドの暗号化",
+        "ローカルストレージオプション",
+        "第三者との共有なし",
+        "データに対する完全な制御"
+      ]
+    },
+    "testimonials": {
+      "title": "ユーザーの声",
+      "subtitle": "メンタルウェルネスの旅を変革している数千人の人々に参加しましょう。"
+    },
+    "cta": {
+      "title": "旅を始める準備はできていますか？",
+      "description": "今日SOULoをダウンロードして、日記のつけ方を変革しましょう。",
+      "buttonText": "始める"
+    }
+  }
 }

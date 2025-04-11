@@ -47,5 +47,37 @@
     "privacy": "隐私政策",
     "terms": "服务条款"
   },
-  "mainTagline": "记录日记并捕捉您的一天，无需写下一个字！"
+  "mainTagline": "记录日记并捕捉您的一天，无需写下一个字！",
+  "homepage": {
+    "expressReflectGrow": "表达。反思。成长。",
+    "appFeatures": "应用特点",
+    "process": {
+      "title": "流程：它是如何工作的",
+      "step1Title": "记录",
+      "step1Description": "大声说出您的想法 - 无需打字",
+      "step2Title": "分析",
+      "step2Description": "AI处理您的条目以识别模式和见解",
+      "step3Title": "反思",
+      "step3Description": "查看个性化的见解并跟踪您的情感旅程"
+    },
+    "privacy": {
+      "title": "您的隐私是我们的首要任务",
+      "description": "我们使用最先进的加密技术确保您的日记条目完全私密和安全。",
+      "featuresList": [
+        "端到端加密",
+        "本地存储选项",
+        "不与第三方分享",
+        "完全控制您的数据"
+      ]
+    },
+    "testimonials": {
+      "title": "用户们怎么说",
+      "subtitle": "加入数千名正在改变他们心理健康旅程的人。"
+    },
+    "cta": {
+      "title": "准备开始您的旅程？",
+      "description": "今天下载SOULo，改变您记日记的方式。",
+      "buttonText": "开始使用"
+    }
+  }
 }

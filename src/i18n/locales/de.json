@@ -47,5 +47,37 @@
     "privacy": "Datenschutzrichtlinie",
     "terms": "Nutzungsbedingungen"
   },
-  "mainTagline": "Führen Sie ein Tagebuch und halten Sie Ihren Tag fest, ohne ein einziges Wort aufzuschreiben!"
+  "mainTagline": "Führen Sie ein Tagebuch und halten Sie Ihren Tag fest, ohne ein einziges Wort aufzuschreiben!",
+  "homepage": {
+    "expressReflectGrow": "Ausdrücken. Reflektieren. Wachsen.",
+    "appFeatures": "App-Funktionen",
+    "process": {
+      "title": "Prozess: So Funktioniert Es",
+      "step1Title": "Aufnehmen",
+      "step1Description": "Sprechen Sie Ihre Gedanken laut aus - kein Tippen erforderlich",
+      "step2Title": "Analysieren",
+      "step2Description": "KI verarbeitet Ihre Einträge, um Muster und Erkenntnisse zu identifizieren",
+      "step3Title": "Reflektieren",
+      "step3Description": "Überprüfen Sie personalisierte Einblicke und verfolgen Sie Ihre emotionale Reise"
+    },
+    "privacy": {
+      "title": "Ihre Privatsphäre Ist Unsere Priorität",
+      "description": "Wir verwenden modernste Verschlüsselung, um sicherzustellen, dass Ihre Tagebucheinträge vollständig privat und sicher bleiben.",
+      "featuresList": [
+        "Ende-zu-Ende-Verschlüsselung",
+        "Lokale Speicheroptionen",
+        "Keine Weitergabe an Dritte",
+        "Volle Kontrolle über Ihre Daten"
+      ]
+    },
+    "testimonials": {
+      "title": "Was Unsere Nutzer Sagen",
+      "subtitle": "Schließen Sie sich Tausenden von Menschen an, die ihre mentale Wellness-Reise transformieren."
+    },
+    "cta": {
+      "title": "Bereit, Ihre Reise zu beginnen?",
+      "description": "Laden Sie SOULo heute herunter und verändern Sie, wie Sie Tagebuch führen.",
+      "buttonText": "Loslegen"
+    }
+  }
 }

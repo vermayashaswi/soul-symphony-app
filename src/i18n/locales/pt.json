@@ -47,5 +47,37 @@
     "privacy": "Política de Privacidade",
     "terms": "Termos de Serviço"
   },
-  "mainTagline": "Mantenha um diário e capture seu dia sem escrever uma única palavra!"
+  "mainTagline": "Mantenha um diário e capture seu dia sem escrever uma única palavra!",
+  "homepage": {
+    "expressReflectGrow": "Expressar. Refletir. Crescer.",
+    "appFeatures": "Recursos do Aplicativo",
+    "process": {
+      "title": "Processo: Como Funciona",
+      "step1Title": "Gravar",
+      "step1Description": "Fale seus pensamentos em voz alta - sem necessidade de digitar",
+      "step2Title": "Analisar",
+      "step2Description": "A IA processa suas entradas para identificar padrões e insights",
+      "step3Title": "Refletir",
+      "step3Description": "Revise insights personalizados e acompanhe sua jornada emocional"
+    },
+    "privacy": {
+      "title": "Sua Privacidade É Nossa Prioridade",
+      "description": "Usamos criptografia de ponta para garantir que suas entradas de diário permaneçam completamente privadas e seguras.",
+      "featuresList": [
+        "Criptografia de ponta a ponta",
+        "Opções de armazenamento local",
+        "Sem compartilhamento com terceiros",
+        "Controle total sobre seus dados"
+      ]
+    },
+    "testimonials": {
+      "title": "O Que Nossos Usuários Dizem",
+      "subtitle": "Junte-se a milhares de pessoas que estão transformando sua jornada de bem-estar mental."
+    },
+    "cta": {
+      "title": "Pronto para começar sua jornada?",
+      "description": "Baixe o SOULo hoje e transforme como você mantém um diário.",
+      "buttonText": "Começar"
+    }
+  }
 }
