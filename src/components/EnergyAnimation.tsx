@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { useTheme } from '@/hooks/use-theme';
 
 interface EnergyAnimationProps {
   className?: string;
@@ -14,6 +15,71 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   bottomNavOffset = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { colorTheme, customColor } = useTheme();
+  
+  // Determine the base color to use based on the user's selected theme
+  const getThemeColors = () => {
+    switch(colorTheme) {
+      case 'Calm':
+        return {
+          main: 'rgba(139,92,246,0.6)',
+          secondary: 'rgba(124,58,237,0.4)',
+          tertiary: 'rgba(109,40,217,0.2)',
+          pulse: 'rgba(139,92,246,0.8)',
+          light: 'rgba(186,230,253,0.5)'
+        };
+      case 'Energy':
+        return {
+          main: 'rgba(245,158,11,0.6)',
+          secondary: 'rgba(234,88,12,0.4)',
+          tertiary: 'rgba(194,65,12,0.2)',
+          pulse: 'rgba(245,158,11,0.8)',
+          light: 'rgba(254,240,138,0.5)'
+        };
+      case 'Soothing':
+        return {
+          main: 'rgba(255,222,226,0.6)',
+          secondary: 'rgba(248,180,184,0.4)',
+          tertiary: 'rgba(244,114,182,0.2)',
+          pulse: 'rgba(244,114,182,0.8)',
+          light: 'rgba(253,242,248,0.5)'
+        };
+      case 'Focus':
+        return {
+          main: 'rgba(16,185,129,0.6)',
+          secondary: 'rgba(5,150,105,0.4)',
+          tertiary: 'rgba(6,95,70,0.2)',
+          pulse: 'rgba(16,185,129,0.8)',
+          light: 'rgba(209,250,229,0.5)'
+        };
+      case 'Custom':
+        // For custom color, we need to convert hex to rgba
+        const hexToRgba = (hex: string, alpha: number): string => {
+          const r = parseInt(hex.slice(1, 3), 16);
+          const g = parseInt(hex.slice(3, 5), 16);
+          const b = parseInt(hex.slice(5, 7), 16);
+          return `rgba(${r},${g},${b},${alpha})`;
+        };
+        
+        return {
+          main: hexToRgba(customColor, 0.6),
+          secondary: hexToRgba(customColor, 0.4),
+          tertiary: hexToRgba(customColor, 0.2),
+          pulse: hexToRgba(customColor, 0.8),
+          light: 'rgba(255,255,255,0.5)' // Default light for custom
+        };
+      default: // Default case - including the 'Default' theme which is blue
+        return {
+          main: 'rgba(59,130,246,0.6)',
+          secondary: 'rgba(37,99,235,0.4)',
+          tertiary: 'rgba(29,78,216,0.2)',
+          pulse: 'rgba(59,130,246,0.8)',
+          light: 'rgba(219,234,254,0.5)'
+        };
+    }
+  };
+  
+  const colors = getThemeColors();
   
   return (
     <div 
@@ -25,7 +91,10 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
     >
       {/* Glowing center with enhanced blur */}
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
-        <div className="w-32 h-32 rounded-full bg-cyan-300 blur-3xl opacity-70"></div>
+        <div 
+          className="w-32 h-32 rounded-full blur-3xl opacity-70"
+          style={{ backgroundColor: colors.pulse }}
+        ></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-white blur-md opacity-80"></div>
       </div>
       
@@ -39,16 +108,17 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
             height: 40, 
             x: -20, 
             y: -20, 
-            opacity: 0.8, 
-            background: "radial-gradient(circle, rgba(139,92,246,0.6) 0%, rgba(124,58,237,0.4) 50%, rgba(14,165,233,0.2) 100%)" 
+            opacity: 0.8
           }}
           animate={{ 
             width: 1000, 
             height: 1000, 
             x: -500, 
             y: -500, 
-            opacity: 0,
-            background: "radial-gradient(circle, rgba(139,92,246,0.2) 0%, rgba(124,58,237,0.1) 50%, rgba(14,165,233,0.05) 100%)" 
+            opacity: 0
+          }}
+          style={{
+            background: `radial-gradient(circle, ${colors.main} 0%, ${colors.secondary} 50%, ${colors.tertiary} 100%)`
           }}
           transition={{ 
             repeat: Infinity, 
@@ -61,8 +131,18 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       ))}
       
       {/* Enhanced background gradients with wider coverage */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 via-violet-800/10 to-blue-900/10"></div>
-      <div className="absolute inset-0 bg-gradient-to-tr from-indigo-900/10 via-purple-800/10 to-cyan-900/10"></div>
+      <div 
+        className="absolute inset-0"
+        style={{ 
+          background: `linear-gradient(to bottom right, ${colors.main}10, ${colors.secondary}10, ${colors.tertiary}10)`
+        }}
+      ></div>
+      <div 
+        className="absolute inset-0"
+        style={{ 
+          background: `linear-gradient(to top right, ${colors.secondary}10, ${colors.main}10, ${colors.tertiary}10)`
+        }}
+      ></div>
       
       {/* Additional smaller, faster pulses with improved timing */}
       {[...Array(24)].map((_, index) => (
@@ -74,16 +154,17 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
             height: 20, 
             x: -10, 
             y: -10, 
-            opacity: 0.7, 
-            background: "radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(186,230,253,0.5) 50%, rgba(125,211,252,0.3) 100%)" 
+            opacity: 0.7
           }}
           animate={{ 
             width: 700, 
             height: 700, 
             x: -350, 
             y: -350, 
-            opacity: 0,
-            background: "radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(186,230,253,0.1) 50%, rgba(125,211,252,0.05) 100%)" 
+            opacity: 0
+          }}
+          style={{
+            background: `radial-gradient(circle, rgba(255,255,255,0.8) 0%, ${colors.light} 50%, ${colors.tertiary} 100%)`
           }}
           transition={{ 
             repeat: Infinity, 
