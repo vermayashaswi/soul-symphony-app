@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import MobilePreviewFrame from "@/components/MobilePreviewFrame";
-import Navbar from "@/components/Navbar";
 import ChatThreadList from "@/components/chat/ChatThreadList";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
@@ -301,16 +300,15 @@ export default function SmartChat() {
 
   const desktopContent = (
     <>
-      <Navbar />
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="smart-chat-container w-full h-[calc(100vh-4rem)] flex pt-16"
+        className="smart-chat-container w-full h-[calc(100vh)] flex"
         ref={chatContainerRef}
       >
         {!hasEnoughEntries && !loading && (
-          <Alert className="absolute z-10 top-20 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800">
+          <Alert className="absolute z-10 top-4 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>No journal entries found</AlertTitle>
             <AlertDescription className="mt-2">

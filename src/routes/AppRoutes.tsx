@@ -25,8 +25,8 @@ const ScrollToTop = () => {
   return null;
 };
 
-// Pages where we should not show the app navbar
-const hideNavbarOnPages = ['/insights', '/settings'];
+// Pages where we should not show the app navbar - no longer needed since we're removing navbar from all app pages
+// const hideNavbarOnPages = ['/insights', '/settings'];
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -38,9 +38,6 @@ const AppRoutes = () => {
   
   // Determine if we should show the website navbar
   const shouldShowWebsiteNavbar = !isNativeApp() && !isAppRoute(location.pathname);
-  
-  // Check if we should hide the app navbar on the current page
-  const shouldHideAppNavbar = hideNavbarOnPages.includes(location.pathname);
   
   return (
     <>
@@ -93,7 +90,7 @@ const AppRoutes = () => {
                   <AppRouteWrapper 
                     element={route.element} 
                     requiresAuth={route.requiresAuth}
-                    hideNavbar={shouldHideAppNavbar}
+                    // No longer passing hideNavbar since navbar is removed from all app pages
                   />
                 )
               }

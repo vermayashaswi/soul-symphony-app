@@ -1,8 +1,8 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import Navbar from '@/components/Navbar';
 import EmotionChart from '@/components/EmotionChart';
 import SentimentCalendar from '@/components/insights/SentimentCalendar';
 import { Button } from '@/components/ui/button';
@@ -108,7 +108,7 @@ export default function Insights() {
 
   return (
     <div className="min-h-screen pb-20">
-      <Navbar />
+      {/* Navbar removed from here */}
       
       {isSticky && (
         <div className="fixed top-0 left-0 right-0 z-40 py-3 px-4 bg-background border-b shadow-sm flex justify-center">
@@ -120,7 +120,7 @@ export default function Insights() {
       
       <div className={cn(
         "max-w-5xl mx-auto px-4 pt-4 md:pt-8",
-        isMobile ? "mt-2" : "mt-16"
+        isMobile ? "mt-2" : "mt-4"
       )}>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div>

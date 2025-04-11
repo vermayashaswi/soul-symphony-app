@@ -20,7 +20,7 @@ export const WebsiteRouteWrapper = ({ element }: { element: React.ReactNode }) =
   );
 };
 
-// This is the update to the AppRouteWrapper component
+// Modified AppRouteWrapper to remove the Navbar component
 export const AppRouteWrapper = ({ 
   element, 
   requiresAuth = true,
@@ -41,8 +41,8 @@ export const AppRouteWrapper = ({
 
   return (
     <div className="min-h-screen app-route">
-      {!hideNavbar && <Navbar />}
-      <div className="pt-16 min-h-screen">
+      {/* Navbar has been removed from here */}
+      <div className="min-h-screen">
         {element}
       </div>
     </div>
