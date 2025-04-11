@@ -470,80 +470,53 @@
     transition: transform 0.2s ease-out;
   }
   
-  /* NEW: Input visibility improvements */
+  /* UPDATED: Input visibility improvements with better spacing from nav bar */
   .mobile-chat-interface .input-container {
     position: relative;
-    padding-bottom: env(safe-area-inset-bottom, 10px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 10px) + 60px); /* Added more padding to ensure visibility above nav */
     z-index: 1000;
     background-color: hsl(var(--background));
+    margin-bottom: 56px; /* Space for bottom nav bar */
   }
   
-  /* NEW: Chat area scrolling adjustments */
+  /* UPDATED: Chat area scrolling adjustments to prevent content being hidden */
   .mobile-chat-area {
-    padding-bottom: 100px !important;
+    padding-bottom: calc(100px + 56px) !important; /* Added height of nav bar */
     margin-bottom: env(safe-area-inset-bottom, 20px);
   }
   
-  /* NEW: Ensure input is visible during keyboard interaction */
+  /* NEW: Ensure input is visible with margin above nav bar */
   .input-keyboard-active {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 8px;
+    padding: 12px;
     background-color: hsl(var(--background));
     border-top: 1px solid hsl(var(--border));
     z-index: 9999;
     transform: translateY(0);
     transition: transform 0.2s ease-out;
+    margin-bottom: 0; /* Reset margin when keyboard is open */
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1); /* Add shadow for better visibility */
   }
   
-  /* NEW: Adjust screen space when keyboard is visible */
-  body.keyboard-open {
-    height: calc(100% - var(--keyboard-height, 0px));
-    overflow: hidden;
+  /* NEW: Added specific chat input spacing when keyboard is closed */
+  .p-2.bg-background.border-t.flex.items-center.gap-2:not(.input-keyboard-active) {
+    margin-bottom: 56px; /* Add space above the navbar */
   }
   
-  /* NEW: Better focus management */
-  input:focus, textarea:focus {
-    position: relative;
-    z-index: 1001;
+  /* NEW: Add bottom area protection for chat content */
+  .mobile-chat-interface .chat-content-container {
+    padding-bottom: calc(56px + 60px); /* Navigation height plus extra space */
   }
   
-  /* NEW: Ensure fixed positioning works correctly */
-  .fixed-visible-bottom {
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 9999 !important;
-    background-color: hsl(var(--background)) !important;
-    border-top: 1px solid hsl(var(--border)) !important;
-    padding: 8px !important;
-  }
-  
-  /* NEW: Prevent overflow hidden on chat container */
-  .mobile-chat-interface {
-    overflow: visible !important;
-  }
-  
-  /* NEW: Increase z-index for input when keyboard is open */
-  .mobile-chat-interface .p-2.bg-background.border-t.fixed {
-    z-index: 9999 !important;
-  }
-  
-  /* NEW: Hide navigation bar when keyboard is active */
-  body:has(input:focus) .fixed.bottom-0.left-0.right-0.h-16.bg-background\/90,
-  body:has(textarea:focus) .fixed.bottom-0.left-0.right-0.h-16.bg-background\/90,
-  body:has(.input-keyboard-active) .fixed.bottom-0.left-0.right-0.h-16.bg-background\/90 {
-    display: none !important;
-  }
-  
-  /* NEW: Adjust spacing for when navbar is hidden */
-  body:has(input:focus) .smart-chat-container,
-  body:has(textarea:focus) .smart-chat-container,
-  body:has(.input-keyboard-active) .smart-chat-container {
-    padding-bottom: 0 !important;
+  /* NEW: Improve visibility of fixed elements at the bottom */
+  .fixed-bottom-element {
+    margin-bottom: 56px !important; /* Space for bottom nav */
+    background-color: hsl(var(--background));
+    z-index: 40;
+    border-top: 1px solid hsl(var(--border));
   }
 }
 
