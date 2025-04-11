@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -11,7 +10,8 @@ export const getRedirectUrl = (): string => {
     origin: window.location.origin,
     hostname: window.location.hostname,
     pathname: window.location.pathname,
-    search: window.location.search
+    search: window.location.search,
+    href: window.location.href
   });
 
   // This is a production environment fix specifically for soulo.online
@@ -19,7 +19,9 @@ export const getRedirectUrl = (): string => {
   if (window.location.hostname === 'soulo.online' || 
       window.location.hostname.endsWith('.soulo.online')) {
     console.log('Auth on production domain (soulo.online), using hardcoded redirect URL');
-    return 'https://soulo.online/auth';
+    // Check if we're on a specific path like /app/auth
+    const pathMatch = window.location.pathname.match(/\/app\/auth/);
+    return pathMatch ? 'https://soulo.online/app/auth' : 'https://soulo.online/auth';
   }
   
   const origin = window.location.origin;
@@ -53,12 +55,19 @@ export const getRedirectUrl = (): string => {
   if (isInStandaloneMode() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     console.log('Auth in standalone mode (PWA), using in-app auth flow');
     // Use a special auth flow that works better in PWA context
-    return `${origin}/auth?pwa_mode=true`;
+    const pathname = window.location.pathname;
+    // Check if we're on app auth page
+    const isAppAuth = pathname.includes('/app/auth');
+    return `${origin}${isAppAuth ? '/app/auth' : '/auth'}?pwa_mode=true`;
   }
   
   // Otherwise use the current origin for local development
   console.log('Auth on non-production domain, using current origin as redirect:', origin);
-  return `${origin}/auth`;
+  // Use the current path to determine if we're in /auth or /app/auth
+  const pathname = window.location.pathname;
+  // Check if we're on app auth page
+  const isAppAuth = pathname.includes('/app/auth');
+  return `${origin}${isAppAuth ? '/app/auth' : '/auth'}`;
 };
 
 /**
@@ -82,8 +91,18 @@ export const signInWithGoogle = async (): Promise<void> => {
         hostname: window.location.hostname,
         pathname: window.location.pathname,
         search: window.location.search,
-        hash: window.location.hash
+        hash: window.location.hash,
+        href: window.location.href
       },
+      timestamp: new Date().toISOString()
+    });
+    
+    // Test current session state before attempting sign in
+    const { data: sessionData } = await supabase.auth.getSession();
+    console.log('Current session state before sign in:', {
+      hasSession: !!sessionData.session,
+      user: sessionData.session?.user?.email || 'No user',
+      provider: sessionData.session?.user?.app_metadata?.provider || 'None',
       timestamp: new Date().toISOString()
     });
     
@@ -114,6 +133,14 @@ export const signInWithGoogle = async (): Promise<void> => {
       url: data?.url,
       timestamp: new Date().toISOString()
     });
+    
+    // If we have a URL, manually redirect to it (as a backup)
+    if (data?.url) {
+      console.log('Manually redirecting to:', data.url);
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 100);
+    }
   } catch (error: any) {
     console.error('Error signing in with Google:', {
       message: error.message,
@@ -350,10 +377,36 @@ export const debugAuthState = async (): Promise<{session: any, user: any}> => {
       user_metadata: userData.user.user_metadata,
     } : null;
     
+    // Check for any active OAuth flows
+    const oauthInProgress = document.cookie.includes('supabase-auth-token') || 
+                           localStorage.getItem('supabase.auth.token') !== null;
+    
+    // Get all cookies to help debug
+    const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split('=');
+      acc[key] = value;
+      return acc;
+    }, {});
+    
+    // Get all local storage keys related to Supabase auth
+    const authLocalStorage = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('supabase') || key.includes('auth'))) {
+        try {
+          authLocalStorage[key] = localStorage.getItem(key);
+        } catch (e) {
+          authLocalStorage[key] = '[Error reading value]';
+        }
+      }
+    }
+    
     console.log('Current auth state:', {
       session: detailedSessionInfo,
       user: detailedUserInfo,
-      cookies: document.cookie ? 'Present' : 'None',
+      oauthInProgress,
+      cookies: cookies,
+      authLocalStorage,
       localStorage: {
         authRedirectTo: localStorage.getItem('authRedirectTo') || 'Not set'
       },
@@ -362,7 +415,8 @@ export const debugAuthState = async (): Promise<{session: any, user: any}> => {
         hostname: window.location.hostname,
         pathname: window.location.pathname,
         search: window.location.search,
-        hash: window.location.hash
+        hash: window.location.hash,
+        href: window.location.href
       }
     });
     

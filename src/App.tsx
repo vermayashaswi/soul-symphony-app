@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -55,7 +56,8 @@ const App = () => {
         expires_at: session?.expires_at,
         pathname: window.location.pathname,
         search: window.location.search,
-        hash: window.location.hash
+        hash: window.location.hash,
+        href: window.location.href
       });
     });
     
@@ -68,7 +70,8 @@ const App = () => {
       console.log('Auth callback parameters detected at app startup:', {
         pathname: window.location.pathname,
         hash: window.location.hash,
-        search: window.location.search
+        search: window.location.search,
+        href: window.location.href
       });
       
       // Process auth callback using the correct method
@@ -78,8 +81,11 @@ const App = () => {
         } else if (data.session) {
           console.log('Successfully processed auth callback at app startup:', {
             user: data.session.user.email,
-            expires: data.session.expires_at
+            expires: data.session.expires_at,
+            provider: data.session.user.app_metadata?.provider
           });
+        } else {
+          console.warn('No session found after processing auth callback');
         }
       });
     }
@@ -91,8 +97,23 @@ const App = () => {
         expires_at: session?.expires_at,
         pathname: window.location.pathname,
         search: window.location.search,
-        hash: window.location.hash
+        hash: window.location.hash,
+        href: window.location.href
       });
+      
+      // Check local storage for auth tokens
+      const localStorageAuthItems = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('auth'))) {
+          try {
+            localStorageAuthItems[key] = localStorage.getItem(key);
+          } catch (e) {
+            localStorageAuthItems[key] = '[Error reading value]';
+          }
+        }
+      }
+      console.log('Local storage auth items:', localStorageAuthItems);
     });
     
     window.addEventListener('error', handleGlobalError);

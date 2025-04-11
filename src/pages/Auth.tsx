@@ -20,7 +20,7 @@ export default function Auth() {
   const { user, isLoading: authLoading } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
-  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(true); // Set debug to open by default
   const { addEvent, isEnabled, toggleEnabled } = useDebugLog();
   
   const redirectParam = searchParams.get('redirectTo');
@@ -32,6 +32,11 @@ export default function Auth() {
 
   // Enhanced debug logging
   useEffect(() => {
+    // Enable debug mode by default
+    if (!isEnabled) {
+      toggleEnabled();
+    }
+    
     const debugData = {
       pathname: location.pathname,
       search: location.search,
@@ -49,6 +54,32 @@ export default function Auth() {
     setDebugInfo(prev => ({...prev, initialMount: debugData}));
     console.log('Auth: Component mounted', debugData);
     addEvent('auth', 'Auth component mounted', 'info', debugData);
+
+    // Add additional debugging info for the URL and navigation timing
+    const navTiming = window.performance && window.performance.timing ? {
+      navigationStart: window.performance.timing.navigationStart,
+      redirectStart: window.performance.timing.redirectStart,
+      redirectEnd: window.performance.timing.redirectEnd,
+      fetchStart: window.performance.timing.fetchStart,
+      domainLookupStart: window.performance.timing.domainLookupStart,
+      domainLookupEnd: window.performance.timing.domainLookupEnd,
+      connectStart: window.performance.timing.connectStart,
+      connectEnd: window.performance.timing.connectEnd,
+      secureConnectionStart: window.performance.timing.secureConnectionStart,
+      requestStart: window.performance.timing.requestStart,
+      responseStart: window.performance.timing.responseStart,
+      responseEnd: window.performance.timing.responseEnd,
+      domLoading: window.performance.timing.domLoading,
+      domInteractive: window.performance.timing.domInteractive,
+      domContentLoadedEventStart: window.performance.timing.domContentLoadedEventStart,
+      domContentLoadedEventEnd: window.performance.timing.domContentLoadedEventEnd,
+      domComplete: window.performance.timing.domComplete,
+      loadEventStart: window.performance.timing.loadEventStart,
+      loadEventEnd: window.performance.timing.loadEventEnd
+    } : 'Navigation Timing API not available';
+    
+    setDebugInfo(prev => ({...prev, navigationTiming: navTiming}));
+    addEvent('auth', 'Navigation timing info', 'info', navTiming);
 
     // Debug auth state on component mount
     debugAuthState().then(({ session, user }) => {
@@ -224,7 +255,8 @@ export default function Auth() {
         timestamp: new Date().toISOString(),
         hasSession: !!state.session,
         hasUser: !!state.user,
-        sessionExpiry: state.session?.expires_at ? new Date(state.session.expires_at * 1000).toISOString() : null
+        sessionExpiry: state.session?.expires_at ? new Date(state.session.expires_at * 1000).toISOString() : null,
+        signInMethodData: state.session?.user?.app_metadata
       }
     }));
     addEvent('auth', 'Forced debug state check', 'info', state);
@@ -251,6 +283,37 @@ export default function Auth() {
     }));
     
     addEvent('auth', 'Local storage checked', 'info', { localStorage: localStorageItems });
+    
+    // Check cookies
+    const cookieData = document.cookie ? document.cookie.split(';').reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split('=');
+      acc[key] = value;
+      return acc;
+    }, {}) : {};
+    
+    setDebugInfo(prev => ({
+      ...prev,
+      cookies: {
+        items: cookieData,
+        timestamp: new Date().toISOString()
+      }
+    }));
+    
+    addEvent('auth', 'Cookies checked', 'info', { cookies: cookieData });
+    
+    // Check network connectivity
+    const connectionData = {
+      online: navigator.onLine,
+      effectiveType: (navigator as any).connection ? (navigator as any).connection.effectiveType : 'unknown',
+      timestamp: new Date().toISOString()
+    };
+    
+    setDebugInfo(prev => ({
+      ...prev,
+      networkConnection: connectionData
+    }));
+    
+    addEvent('auth', 'Network connection checked', 'info', connectionData);
     
     // Also enable debug mode
     if (!isEnabled) {
