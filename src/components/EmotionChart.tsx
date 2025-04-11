@@ -198,8 +198,10 @@ export function EmotionChart({
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
-    if (visibleEmotions.length === 0 && chartType === 'line') {
-      setVisibleEmotions(topEmotions);
+    const mostDominantEmotion = topEmotions[0] || '';
+    
+    if (chartType === 'line' && visibleEmotions.length === 0 && mostDominantEmotion) {
+      setVisibleEmotions([mostDominantEmotion]);
     }
     
     const result = Array.from(dateMap.entries())
@@ -230,6 +232,37 @@ export function EmotionChart({
     return result;
   }, [aggregatedData, visibleEmotions, chartType]);
 
+  const dominantEmotion = useMemo(() => {
+    if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
+      return '';
+    }
+    
+    const emotionTotals: Record<string, number> = {};
+    
+    Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
+      let totalValue = 0;
+      
+      dataPoints.forEach(point => {
+        totalValue += point.value;
+      });
+      
+      if (totalValue > 0) {
+        emotionTotals[emotion] = totalValue;
+      }
+    });
+    
+    const sortedEmotions = Object.entries(emotionTotals)
+      .sort((a, b) => b[1] - a[1]);
+      
+    return sortedEmotions.length > 0 ? sortedEmotions[0][0] : '';
+  }, [aggregatedData]);
+  
+  useEffect(() => {
+    if (dominantEmotion && chartType === 'line' && visibleEmotions.length === 0) {
+      setVisibleEmotions([dominantEmotion]);
+    }
+  }, [dominantEmotion, chartType, visibleEmotions.length]);
+
   const EmotionLineLabel = (props: any) => {
     const { x, y, stroke, value, index, data, dataKey } = props;
     
@@ -254,19 +287,14 @@ export function EmotionChart({
 
   const handleLegendClick = (emotion: string) => {
     setVisibleEmotions(prev => {
-      if (prev.length === (lineData.length > 0 
-          ? Object.keys(lineData[0]).filter(key => key !== 'day').length 
-          : 0)) {
-        return [emotion];
-      } 
+      if (prev.length === 1 && prev[0] === emotion) {
+        return prev;
+      }
       
       if (prev.includes(emotion)) {
-        if (prev.length === 1) {
-          return [];
-        } else {
-          return prev.filter(e => e !== emotion);
-        }
-      } else {
+        return prev.filter(e => e !== emotion);
+      } 
+      else {
         return [...prev, emotion];
       }
     });
@@ -309,12 +337,6 @@ export function EmotionChart({
         </div>
       );
     }
-    
-    useEffect(() => {
-      if (visibleEmotions.length === 0 && allEmotions.length > 0) {
-        setVisibleEmotions(allEmotions);
-      }
-    }, [allEmotions, visibleEmotions.length]);
     
     return (
       <div className="flex flex-col h-full">
@@ -410,7 +432,7 @@ export function EmotionChart({
   return (
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Emotions</h3>
+        <h3 className="text-xl font-semibold">Top Emotions</h3>
         <div className="flex gap-2">
           {chartTypes.map((type) => (
             <button
