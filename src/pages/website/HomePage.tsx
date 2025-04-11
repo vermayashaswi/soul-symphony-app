@@ -12,6 +12,7 @@ import {
   CarouselPrevious,
   CarouselDots,
 } from "@/components/ui/carousel";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 import Navbar from '@/components/website/Navbar';
 import SouloLogo from '@/components/SouloLogo';
 import Footer from '@/components/website/Footer';
@@ -664,7 +665,7 @@ const HomePage = () => {
                           <div className="relative max-w-xs mx-auto">
                             <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-3xl blur-xl"></div>
                             <div className="relative">
-                              <div className="bg-white w-full h-[397px] mx-auto rounded-[24px] overflow-hidden border-[4.8px] border-gray-800 shadow-xl relative">
+                              <div className="bg-white w-full aspect-[9/19] mx-auto rounded-[24px] overflow-hidden border-[4.8px] border-gray-800 shadow-xl relative">
                                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-[30%] h-[1.5%] bg-black rounded-b-xl z-10"></div>
                                 <img 
                                   src={item.image} 
