@@ -121,25 +121,25 @@ export const InspirationalQuote: React.FC = () => {
   return (
     <motion.div
       ref={ref}
-      className="p-6 bg-transparent backdrop-blur-sm mb-16 relative z-20"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      className="fixed inset-0 w-full h-full flex items-end justify-center z-20 pointer-events-none"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ duration: 0.8 }}
     >
       <AnimatePresence mode="wait">
         {error ? (
           <motion.div
             key="error"
-            className="flex flex-col items-center justify-center min-h-[120px]"
+            className="flex flex-col items-center justify-center mb-28 w-full px-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 1.2 }}
           >
-            <p className="text-muted-foreground">{error}</p>
+            <p className="text-muted-foreground opacity-100">{error}</p>
             <button 
               onClick={fetchQuotes}
-              className="mt-4 px-4 py-2 bg-theme/20 hover:bg-theme/30 text-foreground rounded-md transition-colors"
+              className="mt-4 px-4 py-2 bg-theme/20 hover:bg-theme/30 text-foreground rounded-md transition-colors opacity-100 pointer-events-auto"
             >
               Try Again
             </button>
@@ -147,7 +147,7 @@ export const InspirationalQuote: React.FC = () => {
         ) : (
           <motion.div
             key={currentQuoteIndex}
-            className="flex flex-col min-h-[120px] justify-center"
+            className="flex flex-col justify-end w-full px-6 mb-28"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -156,13 +156,13 @@ export const InspirationalQuote: React.FC = () => {
             {!loading && quotes.length > 0 && (
               <>
                 <div className="flex mb-4 justify-center">
-                  <Quote className="h-8 w-8 text-theme" />
+                  <Quote className="h-8 w-8 text-theme opacity-100" />
                 </div>
-                <p className="text-foreground text-center text-xl font-medium italic mb-2">
+                <p className="text-foreground text-center text-xl font-medium italic mb-2 opacity-100">
                   "{quote}"
                 </p>
                 {author && (
-                  <p className="text-muted-foreground text-center">
+                  <p className="text-muted-foreground text-center opacity-100">
                     — {author}
                   </p>
                 )}

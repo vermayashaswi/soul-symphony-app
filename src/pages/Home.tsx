@@ -129,20 +129,13 @@ const Home = () => {
           <p className="text-muted-foreground font-medium">{formattedDate}</p>
         </div>
 
-        <div className="flex-1 flex flex-col justify-between">
-          <div>
-            {/* Content can be added here in the future */}
-          </div>
-          
-          <motion.div 
-            variants={itemVariants} 
-            key={refreshKey} 
-            className="relative z-20 mt-auto mb-2"
-          >
-            <InspirationalQuote />
-          </motion.div>
+        <div className="flex-1">
+          {/* Content can be added here in the future */}
         </div>
       </div>
+      
+      {/* InspirationalQuote is now positioned absolutely and covers the full screen */}
+      <InspirationalQuote />
     </div>
   );
 };
