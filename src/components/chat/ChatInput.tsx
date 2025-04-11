@@ -32,13 +32,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className="w-full">
-      <form onSubmit={handleSubmit} className="relative flex items-end w-full">
+      <form onSubmit={handleSubmit} className="relative flex items-center w-full">
         <div className="flex items-center w-full relative">
           <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Type your message..."
-            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-16 py-1 shadow-sm border-muted bg-background overflow-hidden"
+            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-background overflow-hidden"
             disabled={isLoading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -49,14 +49,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
           />
         </div>
         
-        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center">
           <Button 
             type="submit" 
             size={isMobile ? "sm" : "default"}
-            className="rounded-full h-8 w-8 p-0 bg-primary text-primary-foreground"
+            className="rounded-full h-7 w-7 p-0 bg-primary text-primary-foreground"
             disabled={isLoading}
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-3 w-3" />
           </Button>
         </div>
       </form>

@@ -18,6 +18,7 @@ export default function MobileChatInput({
 }: MobileChatInputProps) {
   const [inputValue, setInputValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatDebug = useDebugLog();
 
@@ -66,32 +67,53 @@ export default function MobileChatInput({
     }
   };
 
+  // Track keyboard visibility
+  useEffect(() => {
+    const handleResize = () => {
+      // Simple heuristic for detecting keyboard on mobile
+      const visualViewport = window.visualViewport;
+      if (visualViewport) {
+        const isKeyboard = visualViewport.height < window.innerHeight * 0.8;
+        setIsKeyboardOpen(isKeyboard);
+      }
+    };
+
+    // Use VisualViewport API if available
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      return () => window.visualViewport?.removeEventListener('resize', handleResize);
+    }
+    
+    return undefined;
+  }, []);
+
   return (
-    <div className="p-3 bg-background border-t border-border flex items-end gap-2">
+    <div className={`p-2 bg-background border-t border-border flex items-center gap-2 ${isKeyboardOpen ? 'keyboard-visible' : ''}`}>
       <div className="flex-1 relative">
         <textarea
           ref={inputRef}
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyPress}
+          onFocus={() => setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100)}
           placeholder="Type your message..."
-          className="w-full border rounded-lg py-2 px-3 pr-10 focus:outline-none focus:ring-1 focus:ring-primary resize-none min-h-[24px] max-h-[36px] bg-background overflow-hidden"
+          className="w-full border rounded-lg py-1 px-3 pr-10 focus:outline-none focus:ring-1 focus:ring-primary resize-none min-h-[24px] max-h-[36px] bg-background overflow-hidden"
           disabled={isLoading || isSubmitting}
         />
       </div>
       
-      <div className="flex-shrink-0">
+      <div className="flex-shrink-0 flex items-center">
         <Button
           type="button"
           size="icon"
-          className="h-10 w-10 rounded-full"
+          className="h-8 w-8 rounded-full flex items-center justify-center"
           onClick={handleSendMessage}
           disabled={isLoading || isSubmitting || !inputValue.trim()}
         >
           {isSubmitting || isLoading ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <Send className="h-5 w-5" />
+            <Send className="h-4 w-4" />
           )}
         </Button>
       </div>

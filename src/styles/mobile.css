@@ -457,6 +457,19 @@
     -webkit-touch-callout: none !important;
     -webkit-tap-highlight-color: transparent !important;
   }
+  
+  /* Chat input keyboard adjustments */
+  .keyboard-visible {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background-color: hsl(var(--background));
+    border-top: 1px solid hsl(var(--border));
+    padding: 8px 10px;
+    transition: transform 0.2s ease-out;
+  }
 }
 
 /* Dark mode support for sticky elements */
