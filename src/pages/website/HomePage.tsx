@@ -583,21 +583,15 @@ const HomePage = () => {
             </p>
           </div>
           
-          <div className="flex flex-col md:flex-row items-center gap-12">
+          <div className="flex flex-col md:flex-row items-center gap-12 justify-center">
             <motion.div 
-              className="w-full md:w-1/2"
+              className="w-full md:w-[35%]"
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
             >
-              <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
-                <Shield className="h-12 w-12 text-primary mb-6" />
-                <h2 className="text-3xl font-bold mb-4">Your Privacy is Our Priority</h2>
-                <p className="text-lg text-gray-600 mb-6">
-                  At SOULo, we believe that your personal thoughts and feelings should remain private. 
-                  We've built our platform with privacy at its core.
-                </p>
-                <ul className="space-y-3 mb-8">
+              <div className="bg-black text-white p-6 rounded-xl shadow-lg">
+                <ul className="space-y-3">
                   {[
                     "End-to-end encryption for all your journal entries",
                     "Your data never leaves your personal space",
@@ -607,27 +601,29 @@ const HomePage = () => {
                   ].map((item, i) => (
                     <li key={i} className="flex items-start gap-3">
                       <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-gray-600">{item}</span>
+                      <span className="text-gray-300">{item}</span>
                     </li>
                   ))}
                 </ul>
-                <Button variant="outline" asChild className="gap-2">
-                  <a href="/privacy-policy">
-                    Learn More About Our Privacy
-                    <ArrowRight className="h-4 w-4" />
-                  </a>
-                </Button>
+                <div className="mt-6">
+                  <Button variant="outline" asChild className="gap-2 bg-transparent text-white border-white hover:bg-white/10">
+                    <a href="/privacy-policy">
+                      Learn More About Our Privacy
+                      <ArrowRight className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </div>
               </div>
             </motion.div>
             
             <motion.div 
-              className="w-full md:w-1/2"
+              className="w-full md:w-[35%]"
               initial={{ opacity: 0, x: 20 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
             >
               <img 
-                src="https://img.freepik.com/free-vector/gdpr-concept-illustration_114360-1028.jpg" 
+                src="/lovable-uploads/2ca17c6f-5994-4559-a86c-7dcac6672b6c.png" 
                 alt="Privacy-focused design" 
                 className="w-full h-auto rounded-xl shadow-lg"
               />
@@ -807,7 +803,7 @@ const HomePage = () => {
       </section>
       
       <section className="py-16 md:py-24 bg-white">
-        <div className="container mx-auto px-4 max-w-4xl">
+        <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">FAQ</span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
