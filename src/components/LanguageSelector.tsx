@@ -23,7 +23,17 @@ const languageOptions = [
   { code: 'ar', name: 'العربية' },
   { code: 'hi', name: 'हिन्दी' },
   { code: 'it', name: 'Italiano' },
-  { code: 'ko', name: '한국어' }
+  { code: 'ko', name: '한국어' },
+  // Indian languages
+  { code: 'bn', name: 'বাংলা' },        // Bengali
+  { code: 'ta', name: 'தமிழ்' },        // Tamil
+  { code: 'te', name: 'తెలుగు' },       // Telugu
+  { code: 'mr', name: 'मराठी' },        // Marathi
+  { code: 'gu', name: 'ગુજરાતી' },      // Gujarati
+  { code: 'kn', name: 'ಕನ್ನಡ' },        // Kannada
+  { code: 'ml', name: 'മലയാളം' },      // Malayalam
+  { code: 'pa', name: 'ਪੰਜਾਬੀ' },       // Punjabi
+  { code: 'or', name: 'ଓଡ଼ିଆ' }         // Odia
 ];
 
 const LanguageSelector: React.FC = () => {

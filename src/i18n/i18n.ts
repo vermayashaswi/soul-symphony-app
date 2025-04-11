@@ -16,6 +16,15 @@ import arTranslation from './locales/ar.json';
 import hiTranslation from './locales/hi.json';
 import itTranslation from './locales/it.json';
 import koTranslation from './locales/ko.json';
+import bnTranslation from './locales/bn.json';
+import taTranslation from './locales/ta.json';
+import teTranslation from './locales/te.json';
+import mrTranslation from './locales/mr.json';
+import guTranslation from './locales/gu.json';
+import knTranslation from './locales/kn.json';
+import mlTranslation from './locales/ml.json';
+import paTranslation from './locales/pa.json';
+import orTranslation from './locales/or.json';
 
 // Resources for i18next
 const resources = {
@@ -54,6 +63,33 @@ const resources = {
   },
   ko: {
     translation: koTranslation
+  },
+  bn: {
+    translation: bnTranslation
+  },
+  ta: {
+    translation: taTranslation
+  },
+  te: {
+    translation: teTranslation
+  },
+  mr: {
+    translation: mrTranslation
+  },
+  gu: {
+    translation: guTranslation
+  },
+  kn: {
+    translation: knTranslation
+  },
+  ml: {
+    translation: mlTranslation
+  },
+  pa: {
+    translation: paTranslation
+  },
+  or: {
+    translation: orTranslation
   }
 };
 
