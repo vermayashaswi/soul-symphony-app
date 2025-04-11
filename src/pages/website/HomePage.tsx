@@ -388,7 +388,7 @@ const HomePage = () => {
         "Identify patterns in your mood with color-coded visual guides"
       ],
       images: [
-        "/lovable-uploads/d916a877-0a67-459e-8e73-cc0fa3615a88.png",
+        "/lovable-uploads/3eeb2da1-ba02-4cd6-b5f7-100f72896921.png",
         "/lovable-uploads/1b346540-75b4-4095-8860-2446c46aea4c.png"
       ],
       icon: Calendar,
