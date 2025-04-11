@@ -7,6 +7,7 @@ import { DebugLogContextType, DebugLogEntry, LogLevel } from './debugLogTypes';
 const DebugLogContext = createContext<DebugLogContextType>({
   logs: [],
   addEvent: () => {},
+  addLog: () => {}, // Added for backwards compatibility 
   clearLogs: () => {},
   isEnabled: false,
   toggleEnabled: () => {}
@@ -42,7 +43,7 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [isEnabled]);
 
-  // Add a new event log
+  // Add a new event log (primary method name)
   const addEvent = useCallback((
     category: string, 
     message: string, 
@@ -56,6 +57,16 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
       return [...prev, newEntry];
     });
   }, [isEnabled]);
+  
+  // Add for backward compatibility
+  const addLog = useCallback((
+    category: string, 
+    message: string, 
+    level: LogLevel = 'info',
+    details?: any
+  ) => {
+    addEvent(category, message, level, details);
+  }, [addEvent]);
   
   // Clear all logs
   const clearLogs = useCallback(() => {
@@ -76,6 +87,7 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
   const value = {
     logs,
     addEvent,
+    addLog, // Added for backwards compatibility
     clearLogs,
     isEnabled,
     toggleEnabled

@@ -13,6 +13,7 @@ import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
 import { useEffect } from 'react';
 import { handleAuthCallback } from "./services/authService";
+import { DebugLogProvider } from "./utils/debug/DebugContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -128,19 +129,21 @@ const App = () => {
         <BrowserRouter>
           <ThemeProvider>
             <AuthProvider>
-              <div className="relative min-h-screen">
-                <div className="relative z-10">
-                  {/* Add the TouchAnimation component here */}
-                  <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
-                    <TouchAnimation />
+              <DebugLogProvider>
+                <div className="relative min-h-screen">
+                  <div className="relative z-10">
+                    {/* Add the TouchAnimation component here */}
+                    <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
+                      <TouchAnimation />
+                    </div>
+                    <Toaster />
+                    <Sonner position="top-center" closeButton={false} />
+                    <AnimatePresence mode="wait">
+                      <AppRoutes />
+                    </AnimatePresence>
                   </div>
-                  <Toaster />
-                  <Sonner position="top-center" closeButton={false} />
-                  <AnimatePresence mode="wait">
-                    <AppRoutes />
-                  </AnimatePresence>
                 </div>
-              </div>
+              </DebugLogProvider>
             </AuthProvider>
           </ThemeProvider>
         </BrowserRouter>
