@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
-import { Loader2, Quote } from 'lucide-react';
+import { Quote } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -127,19 +127,7 @@ export const InspirationalQuote: React.FC = () => {
       transition={{ duration: 0.8 }}
     >
       <AnimatePresence mode="wait">
-        {loading ? (
-          <motion.div
-            key="loading"
-            className="flex flex-col items-center justify-center min-h-[120px]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.2 }}
-          >
-            <Loader2 className="h-8 w-8 text-theme animate-spin mb-4" />
-            <p className="text-muted-foreground">Finding inspiration for you...</p>
-          </motion.div>
-        ) : error ? (
+        {error ? (
           <motion.div
             key="error"
             className="flex flex-col items-center justify-center min-h-[120px]"
@@ -165,16 +153,20 @@ export const InspirationalQuote: React.FC = () => {
             exit={{ opacity: 0 }}
             transition={{ duration: 1.2 }}
           >
-            <div className="flex mb-4 justify-center">
-              <Quote className="h-8 w-8 text-theme" />
-            </div>
-            <p className="text-foreground text-center text-xl font-medium italic mb-2">
-              "{quote}"
-            </p>
-            {author && (
-              <p className="text-muted-foreground text-center">
-                — {author}
-              </p>
+            {!loading && quotes.length > 0 && (
+              <>
+                <div className="flex mb-4 justify-center">
+                  <Quote className="h-8 w-8 text-theme" />
+                </div>
+                <p className="text-foreground text-center text-xl font-medium italic mb-2">
+                  "{quote}"
+                </p>
+                {author && (
+                  <p className="text-muted-foreground text-center">
+                    — {author}
+                  </p>
+                )}
+              </>
             )}
           </motion.div>
         )}

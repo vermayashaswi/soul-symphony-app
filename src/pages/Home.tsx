@@ -107,13 +107,13 @@ const Home = () => {
     <div className="min-h-screen bg-background text-foreground relative">
       <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
       
-      <div className="relative z-10">
+      <div className="relative z-10 flex flex-col h-[calc(100vh-80px)]">
         <div className="p-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-theme">{getJournalName()}</h1>
           <p className="text-muted-foreground font-medium">{formattedDate}</p>
         </div>
 
-        <div className="flex-1 flex flex-col justify-between" style={{ minHeight: 'calc(100vh - 160px)' }}>
+        <div className="flex-1 flex flex-col justify-between">
           <div>
             {/* Content can be added here in the future */}
           </div>
@@ -121,7 +121,7 @@ const Home = () => {
           <motion.div 
             variants={itemVariants} 
             key={refreshKey} 
-            className="relative z-20 mb-20"
+            className="relative z-20 mt-auto mb-2"
           >
             <InspirationalQuote />
           </motion.div>
