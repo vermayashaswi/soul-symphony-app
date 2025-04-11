@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -168,7 +167,6 @@ export function EmotionChart({
     
     const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
     
-    // Process emotion data points
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       let totalValue = 0;
       
@@ -204,14 +202,12 @@ export function EmotionChart({
       setVisibleEmotions(topEmotions);
     }
     
-    // Convert map data to array format for the chart, but don't include null values
     const result = Array.from(dateMap.entries())
       .map(([date, emotions]) => {
         const dataPoint: EmotionData = { 
           day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
         };
         
-        // Only include emotions that have values for this day
         topEmotions.forEach(emotion => {
           const emotionData = emotions.get(emotion);
           if (emotionData && emotionData.count > 0) {
@@ -219,7 +215,6 @@ export function EmotionChart({
             if (avgValue > 1.0) avgValue = 1.0;
             dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
           } else {
-            // Set to null instead of 0 to create a gap in the line
             dataPoint[emotion] = null;
           }
         });
@@ -259,7 +254,6 @@ export function EmotionChart({
 
   const handleLegendClick = (emotion: string) => {
     setVisibleEmotions(prev => {
-      // If all emotions are currently visible, select only the clicked one
       if (prev.length === (lineData.length > 0 
           ? Object.keys(lineData[0]).filter(key => key !== 'day').length 
           : 0)) {
@@ -328,7 +322,6 @@ export function EmotionChart({
           <LineChart
             data={lineData}
             margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
-            connectNulls={true}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
             <XAxis 
