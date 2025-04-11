@@ -105,7 +105,7 @@ export const InspirationalQuote: React.FC = () => {
           setAuthor(quotes[newIndex].author || 'Unknown');
           return newIndex;
         });
-      }, 4000); // Changed to 4 seconds per quote
+      }, 7000); // Changed from 4 seconds to 7 seconds per quote
       
       return () => clearInterval(intervalId);
     }
