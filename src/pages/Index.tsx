@@ -70,9 +70,10 @@ const Index = () => {
     // Listen for language changes - store the unsubscribe function
     const unsubscribe = i18n.on('languageChanged', handleLanguageChange);
     
+    // Handle cleanup properly by using the unsubscribe function if available
     return () => {
-      // Fixed: Only call unsubscribe if it's a function
-      if (typeof unsubscribe === 'function') {
+      // Check if unsubscribe exists and is a function before calling it
+      if (unsubscribe && typeof unsubscribe === 'function') {
         unsubscribe();
       }
     };
