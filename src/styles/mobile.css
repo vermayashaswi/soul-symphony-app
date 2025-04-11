@@ -470,45 +470,29 @@
     transition: transform 0.2s ease-out;
   }
   
-  /* UPDATED: Input visibility improvements with better spacing from nav bar (reduced by 75%) */
+  /* UPDATED: Input visibility improvements with better spacing from nav bar */
   .mobile-chat-interface .input-container {
     position: relative;
-    padding-bottom: calc(env(safe-area-inset-bottom, 10px) + 15px); /* Reduced by 75% from original 60px */
+    padding-bottom: 0px; /* Completely removed padding bottom */
     z-index: 1000;
     background-color: hsl(var(--background));
-    margin-bottom: 56px; /* Space for bottom nav bar */
+    margin-bottom: 56px; /* Space for bottom nav bar only */
   }
   
-  /* UPDATED: Chat area scrolling adjustments to prevent content being hidden (reduced by 75%) */
+  /* UPDATED: Chat area scrolling adjustments */
   .mobile-chat-area {
-    padding-bottom: calc(100px + 14px) !important; /* Reduced by 75% from additional 56px */
-    margin-bottom: env(safe-area-inset-bottom, 20px);
-  }
-  
-  /* NEW: Ensure input is visible with margin above nav bar */
-  .input-keyboard-active {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 12px;
-    background-color: hsl(var(--background));
-    border-top: 1px solid hsl(var(--border));
-    z-index: 9999;
-    transform: translateY(0);
-    transition: transform 0.2s ease-out;
-    margin-bottom: 0; /* Reset margin when keyboard is open */
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1); /* Add shadow for better visibility */
+    padding-bottom: 70px !important; /* Reduced to minimum needed space */
+    margin-bottom: env(safe-area-inset-bottom, 10px);
   }
   
   /* NEW: Added specific chat input spacing when keyboard is closed */
   .p-2.bg-background.border-t.flex.items-center.gap-2:not(.input-keyboard-active) {
-    margin-bottom: 56px; /* Add space above the navbar */
+    margin-bottom: 56px; /* Only space for the navbar */
   }
   
-  /* NEW: Add bottom area protection for chat content (reduced by 75%) */
+  /* NEW: Add bottom area protection for chat content */
   .mobile-chat-interface .chat-content-container {
-    padding-bottom: calc(56px + 15px); /* Reduced by 75% from additional 60px */
+    padding-bottom: 56px; /* Only space for the navbar */
   }
   
   /* NEW: Improve visibility of fixed elements at the bottom */

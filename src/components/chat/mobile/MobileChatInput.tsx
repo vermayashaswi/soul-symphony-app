@@ -142,8 +142,8 @@ export default function MobileChatInput({
         isKeyboardVisible ? 'fixed bottom-0 left-0 right-0 z-[9999] input-keyboard-active' : ''
       }`}
       style={{
-        paddingBottom: isKeyboardVisible ? '10px' : 'env(safe-area-inset-bottom, 16px)',
-        marginBottom: !isKeyboardVisible ? '56px' : '0' // Add margin to ensure space above the nav bar
+        paddingBottom: isKeyboardVisible ? '10px' : 'env(safe-area-inset-bottom, 10px)',
+        marginBottom: !isKeyboardVisible ? '56px' : '0' // Space just for the nav bar
       }}
     >
       <div className="flex-1 relative">
