@@ -59,6 +59,7 @@ const Index = () => {
     // Run once on mount and whenever language changes
     applyI18nAttributes();
     
+    // Fixed: Don't use the return value of i18n.on in a conditional statement
     const handleLanguageChange = () => {
       addEvent('i18n', 'Language changed in Index page', 'info', {
         to: i18n.language
@@ -66,11 +67,14 @@ const Index = () => {
       applyI18nAttributes();
     };
     
-    // Listen for language changes
+    // Listen for language changes - store the unsubscribe function
     const unsubscribe = i18n.on('languageChanged', handleLanguageChange);
     
     return () => {
-      if (unsubscribe) unsubscribe();
+      // Fixed: Only call unsubscribe if it's a function
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     };
   }, [t, i18n, addEvent]);
 
