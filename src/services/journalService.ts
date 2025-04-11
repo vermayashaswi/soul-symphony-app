@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
@@ -79,7 +80,7 @@ export const fetchJournalEntries = async (
     
     const { data, error, status } = await supabase
       .from('Journal Entries')
-      .select('*')
+      .select('*, recognized_languages')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -103,7 +104,8 @@ export const fetchJournalEntries = async (
       console.log('[JournalService] First entry sample:', {
         id: data[0].id,
         text: data[0]["refined text"],
-        created: data[0].created_at
+        created: data[0].created_at,
+        languages: data[0].recognized_languages
       });
     } else {
       console.log('[JournalService] No entries found for this user');
@@ -121,7 +123,8 @@ export const fetchJournalEntries = async (
         type: entity.type,
         name: entity.name,
         text: entity.text
-      })) : undefined
+      })) : undefined,
+      recognizedLanguages: item.recognized_languages
     }));
     
     return typedEntries;
