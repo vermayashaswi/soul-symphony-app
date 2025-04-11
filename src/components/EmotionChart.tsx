@@ -440,12 +440,6 @@ export function EmotionChart({
                   preventOverlap={true}
                   onEmotionClick={handleEmotionClick}
                 />
-                {selectedEmotionInfo && (
-                  <div className="absolute top-3 left-3 bg-background/90 border border-border rounded-lg px-3 py-2 shadow-md flex items-center gap-2 animate-fade-in z-10">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">{selectedEmotionInfo.name}: {selectedEmotionInfo.percentage.toFixed(1)}%</span>
-                  </div>
-                )}
                 <div className="absolute bottom-3 right-3 text-xs text-muted-foreground bg-background/70 px-2 py-1 rounded-md">
                   Tip: Tap bubbles to see percentages
                 </div>
