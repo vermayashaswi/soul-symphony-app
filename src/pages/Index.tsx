@@ -22,7 +22,7 @@ const Index = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
-  const shouldRenderMobile = isMobile || mobileDemo;
+  const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
   const containerVariants = {
     hidden: { opacity: 0 },

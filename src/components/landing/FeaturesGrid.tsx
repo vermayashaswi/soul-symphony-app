@@ -16,7 +16,7 @@ const FeaturesGrid: React.FC = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
-  const shouldRenderMobile = isMobile || mobileDemo;
+  const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
   const navigateToFeature = (path: string) => {
     if (!user && path !== '/') {

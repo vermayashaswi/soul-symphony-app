@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -30,7 +29,7 @@ export function Navbar() {
   // Check for mobile view after all hooks have been called
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  const shouldHideNavbar = isMobile || mobileDemo;
+  const shouldHideNavbar = isMobile.isMobile || mobileDemo;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -176,7 +175,7 @@ export function Navbar() {
         </div>
       </div>
 
-      {isMobile && (
+      {isMobile.isMobile && (
         <motion.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ 

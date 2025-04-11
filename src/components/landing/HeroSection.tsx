@@ -19,7 +19,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ user }) => {
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
-  const shouldRenderMobile = isMobile || mobileDemo;
+  const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
