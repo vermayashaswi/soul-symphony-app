@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail } from 'lucide-react';
@@ -210,41 +209,30 @@ const HomePage = () => {
               transition={{ duration: 1, delay: 0.3 }}
               className="w-full lg:w-1/2"
             >
-              {/* Voice to Insights Animation - Improved with clearer animation */}
+              {/* Rich Voice Animation - High-quality visual with no text overlay */}
               <div className="relative mx-auto max-w-md">
-                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
-                <div className="relative overflow-hidden shadow-2xl border border-white/50 rounded-xl">
+                <div className="absolute -inset-4 bg-gradient-to-r from-primary/30 to-purple-500/30 rounded-2xl blur-xl opacity-70"></div>
+                <div className="relative overflow-hidden rounded-xl shadow-2xl border border-white/50 shadow-primary/20">
                   <video 
                     autoPlay 
                     loop 
                     muted 
                     playsInline
-                    className="w-full h-auto"
-                    style={{ maxHeight: "400px" }}
+                    className="w-full h-auto rounded-xl"
                   >
                     <source 
-                      src="https://cdn.pixabay.com/vimeo/802619079/voice-170750.mp4?width=640&hash=d6c1a6583d73c7ed16d0c8f3c37db89fce1ab731" 
+                      src="https://cdn.dribbble.com/users/1057205/screenshots/5426452/media/e78a22cb5a6e7f4a0ca35635d6551a22.mp4" 
                       type="video/mp4" 
-                    />
-                    <source 
-                      src="https://cdn.pixabay.com/vimeo/802619079/voice-170750.webm?width=640&hash=bd4c9c7553fe4be290531a075c99c3f5e5e9a72d" 
-                      type="video/webm" 
                     />
                     Your browser does not support the video tag.
                   </video>
-                  
-                  <div className="absolute bottom-4 left-4 right-4 bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-lg text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <Mic className="h-5 w-5 text-primary animate-pulse" />
-                      <span className="text-sm font-medium text-gray-800">Voice</span>
-                      <ArrowRight className="h-4 w-4" />
-                      <Brain className="h-5 w-5 text-primary" />
-                      <span className="text-sm font-medium text-gray-800">AI</span>
-                      <ArrowRight className="h-4 w-4" />
-                      <LineChart className="h-5 w-5 text-primary" />
-                      <span className="text-sm font-medium text-gray-800">Insights</span>
-                    </div>
-                  </div>
+                </div>
+                
+                {/* Floating particles effect */}
+                <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                  <div className="absolute top-1/4 right-1/4 w-20 h-20 rounded-full bg-primary/10 blur-xl animate-pulse"></div>
+                  <div className="absolute bottom-1/3 left-1/3 w-16 h-16 rounded-full bg-purple-500/10 blur-xl animate-pulse" style={{animationDelay: "1s"}}></div>
+                  <div className="absolute top-1/2 right-1/3 w-12 h-12 rounded-full bg-blue-500/10 blur-xl animate-pulse" style={{animationDelay: "0.5s"}}></div>
                 </div>
               </div>
             </motion.div>
