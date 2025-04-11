@@ -6,6 +6,14 @@ import { isAppRoute } from '@/routes/RouteHelpers';
  * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
+  // This is a production environment fix specifically for soulo.online
+  // Force the correct URL for production environment
+  if (window.location.hostname === 'soulo.online' || 
+      window.location.hostname.endsWith('.soulo.online')) {
+    console.log('Auth on production domain (soulo.online), using hardcoded redirect URL');
+    return 'https://soulo.online/auth';
+  }
+  
   const origin = window.location.origin;
   const urlParams = new URLSearchParams(window.location.search);
   const redirectTo = urlParams.get('redirectTo');
@@ -33,17 +41,7 @@ export const getRedirectUrl = (): string => {
     return `${origin}/auth?pwa_mode=true`;
   }
   
-  // Use this variable to determine if we're in the production domain
-  const isProdDomain = window.location.hostname === 'soulo.online' || 
-                      window.location.hostname.endsWith('.soulo.online');
-  
-  // If we're in production domain, use the absolute URL
-  if (isProdDomain) {
-    console.log('Auth on production domain, using soulo.online/auth as redirect');
-    return `https://soulo.online/auth`;
-  }
-  
-  // Otherwise use the current origin (for local development)
+  // Otherwise use the current origin for local development
   console.log('Auth on non-production domain, using current origin as redirect:', origin);
   return `${origin}/auth`;
 };
@@ -61,6 +59,7 @@ export const signInWithGoogle = async (): Promise<void> => {
       options: {
         redirectTo: redirectUrl,
         queryParams: {
+          // Force refresh of Google access tokens
           access_type: 'offline',
           prompt: 'consent',
         },
@@ -280,8 +279,18 @@ export const debugAuthState = async (): Promise<{session: any, user: any}> => {
     const { data: userData } = await supabase.auth.getUser();
     
     console.log('Current auth state:', {
-      session: sessionData.session,
-      user: userData.user
+      session: sessionData.session ? {
+        user: sessionData.session.user.email,
+        expires_at: sessionData.session.expires_at,
+        access_token_length: sessionData.session.access_token.length,
+        refresh_token_present: !!sessionData.session.refresh_token,
+      } : null,
+      user: userData.user ? {
+        email: userData.user.email,
+        id: userData.user.id,
+        app_metadata: userData.user.app_metadata,
+        provider: userData.user.app_metadata?.provider,
+      } : null
     });
     
     return {

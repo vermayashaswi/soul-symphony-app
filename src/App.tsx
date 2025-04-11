@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -47,19 +46,50 @@ const App = () => {
       });
     };
     
-    // Set up Supabase auth debugging
+    // Set up Supabase auth debugging - this is outside React context
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state changed in App.tsx:', event, {
         user: session?.user?.email || 'No user',
-        expires_at: session?.expires_at
+        expires_at: session?.expires_at,
+        pathname: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash
       });
     });
+    
+    // Check for auth callback hash/query parameters on page load
+    const hasAuthParams = window.location.hash.includes('access_token') || 
+                         window.location.search.includes('error') || 
+                         window.location.hash.includes('error');
+    
+    if (hasAuthParams) {
+      console.log('Auth callback parameters detected at app startup:', {
+        pathname: window.location.pathname,
+        hash: window.location.hash,
+        search: window.location.search
+      });
+      
+      // Process auth callback - this should trigger the onAuthStateChange event
+      supabase.auth.getSessionFromUrl().then(({ data, error }) => {
+        if (error) {
+          console.error('Error handling auth callback at app startup:', error);
+        } else if (data.session) {
+          console.log('Successfully processed auth callback at app startup:', {
+            user: data.session.user.email,
+            expires: data.session.expires_at
+          });
+        }
+      });
+    }
     
     // Debug the current session on app load
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('Initial auth session in App.tsx:', {
         user: session?.user?.email || 'No user',
-        expires_at: session?.expires_at
+        expires_at: session?.expires_at,
+        pathname: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash
       });
     });
     

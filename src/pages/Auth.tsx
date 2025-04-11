@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
-import { signInWithGoogle } from '@/services/authService';
+import { signInWithGoogle, debugAuthState } from '@/services/authService';
 
 export default function Auth() {
   const location = useLocation();
@@ -16,6 +16,7 @@ export default function Auth() {
   const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const { user, isLoading: authLoading } = useAuth();
+  const [authError, setAuthError] = useState<string | null>(null);
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -23,6 +24,26 @@ export default function Auth() {
   
   // Determine where to redirect after auth
   const redirectTo = redirectParam || fromLocation || storedRedirect || '/app/home';
+
+  // Enhanced debug logging
+  useEffect(() => {
+    console.log('Auth: Component mounted', {
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+      redirectTo,
+      hasUser: !!user,
+    });
+
+    // Debug auth state on component mount
+    debugAuthState().then(({ session, user }) => {
+      console.log('Auth: Initial auth state', { 
+        hasSession: !!session, 
+        hasUser: !!user,
+        userEmail: user?.email
+      });
+    });
+  }, []);
 
   useEffect(() => {
     // Check if we're coming back from OAuth with hash parameters
@@ -36,18 +57,39 @@ export default function Auth() {
         search: window.location.search
       });
       
+      // Process the hash - this should trigger the auth state change listener
+      supabase.auth.getSessionFromUrl().then(({ data, error }) => {
+        if (error) {
+          console.error('Auth: Error getting session from URL', error);
+          setAuthError(error.message);
+          toast.error(`Authentication failed: ${error.message}`);
+        } else if (data.session) {
+          console.log('Auth: Successfully got session from URL', {
+            user: data.session.user.email,
+            expires: data.session.expires_at
+          });
+        }
+        setIsLoading(false);
+      });
+      
       // Show error toast if error in URL
       if (window.location.hash.includes('error') || window.location.search.includes('error')) {
         console.error('Auth: Error detected in redirect URL');
         toast.error('Authentication failed. Please try again.');
+        setAuthError('Error detected in redirect URL');
       }
+    } else {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    console.log('Auth: Current session state:', { user: !!user, authLoading, redirectTo });
+    console.log('Auth: Current session state:', { 
+      user: !!user, 
+      authLoading, 
+      redirectTo,
+      authError
+    });
     
     // If user is logged in and page has finished initial loading, redirect
     if (user && !authLoading && !redirecting) {
@@ -69,11 +111,13 @@ export default function Auth() {
   const handleSignIn = async () => {
     try {
       setIsLoading(true);
+      setAuthError(null);
       console.log('Auth: Initiating Google sign-in');
       await signInWithGoogle();
       // The page will be redirected by Supabase, so no need to do anything else here
-    } catch (error) {
+    } catch (error: any) {
       console.error('Auth: Failed to initiate Google sign-in:', error);
+      setAuthError(error.message);
       toast.error('Failed to initiate sign-in. Please try again.');
       setIsLoading(false);
     }
@@ -110,6 +154,12 @@ export default function Auth() {
             Sign in to start your journaling journey and track your emotional wellbeing
           </p>
         </div>
+        
+        {authError && (
+          <div className="mb-4 p-2 border border-red-500 bg-red-50 text-red-600 rounded">
+            <p className="text-sm">Error: {authError}</p>
+          </div>
+        )}
         
         <div className="space-y-4">
           <Button 
