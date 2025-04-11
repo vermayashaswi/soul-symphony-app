@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -110,9 +109,7 @@ export function EmotionChart({
       if (dataPoints.length > 0) {
         const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
         if (totalScore > 0) {
-          // Average the emotion score
           emotionScores[emotion] = totalScore / dataPoints.length;
-          // Ensure we cap at 1.0
           if (emotionScores[emotion] > 1.0) {
             emotionScores[emotion] = 1.0;
           }
@@ -120,7 +117,6 @@ export function EmotionChart({
       }
     });
     
-    // Filter out any emotions with zero score
     const filteredEmotions = Object.fromEntries(
       Object.entries(emotionScores).filter(([_, value]) => value > 0)
     );
@@ -153,7 +149,7 @@ export function EmotionChart({
       
       setSelectedEmotionInfo({
         name: emotion,
-        percentage: Math.round(percentage * 10) / 10 // Round to 1 decimal place
+        percentage: Math.round(percentage * 10) / 10
       });
       
       setTimeout(() => {
@@ -169,33 +165,26 @@ export function EmotionChart({
     
     const emotionTotals: Record<string, number> = {};
     
-    // This will track date -> emotion -> {total, count} for proper averaging
     const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
     
-    // Process emotion data points
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       let totalValue = 0;
       
       dataPoints.forEach(point => {
-        // Initialize date entry if it doesn't exist
         if (!dateMap.has(point.date)) {
           dateMap.set(point.date, new Map());
         }
         
-        // Get the map for the current date
         const dateEntry = dateMap.get(point.date)!;
         
-        // Initialize emotion entry for this date if it doesn't exist
         if (!dateEntry.has(emotion)) {
           dateEntry.set(emotion, { total: 0, count: 0 });
         }
         
-        // Update totals and counts
         const emotionEntry = dateEntry.get(emotion)!;
         emotionEntry.total += point.value;
         emotionEntry.count += 1;
         
-        // Track total value for sorting top emotions
         totalValue += point.value;
       });
       
@@ -204,29 +193,24 @@ export function EmotionChart({
       }
     });
     
-    // Get top emotions for display
     const topEmotions = Object.entries(emotionTotals)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
-    // Initialize visible emotions to show all emotions by default
     if (visibleEmotions.length === 0 && chartType === 'line') {
       setVisibleEmotions(topEmotions);
     }
     
-    // Convert map data to array format for the chart
     const result = Array.from(dateMap.entries())
       .map(([date, emotions]) => {
         const dataPoint: EmotionData = { 
           day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
         };
         
-        // Set values for top emotions in this data point
         topEmotions.forEach(emotion => {
           const emotionData = emotions.get(emotion);
           if (emotionData && emotionData.count > 0) {
-            // Calculate average and ensure it's at most 1.0
             let avgValue = emotionData.total / emotionData.count;
             if (avgValue > 1.0) avgValue = 1.0;
             dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
@@ -270,25 +254,24 @@ export function EmotionChart({
 
   const handleLegendClick = (emotion: string) => {
     setVisibleEmotions(prev => {
+      if (prev.length === lineData.length > 0 
+          ? Object.keys(lineData[0]).filter(key => key !== 'day').length 
+          : 0) {
+        return [emotion];
+      } 
+      
       if (prev.includes(emotion)) {
-        // If clicking on an already selected emotion
-        if (prev.length > 1) {
-          // If more than one emotion is selected, deselect the clicked one
-          return prev.filter(e => e !== emotion);
+        if (prev.length === 1) {
+          return [];
         } else {
-          // If only one emotion is selected, show all emotions
-          return lineData.length > 0 
-            ? Object.keys(lineData[0]).filter(key => key !== 'day')
-            : [];
+          return prev.filter(e => e !== emotion);
         }
       } else {
-        // If clicking on an unselected emotion, add it to selection
         return [...prev, emotion];
       }
     });
   };
 
-  // Custom dot renderer to show zero-value emotions with black circle
   const CustomDot = (props: any) => {
     const { cx, cy, stroke, strokeWidth, r, value, dataKey } = props;
     
@@ -337,6 +320,12 @@ export function EmotionChart({
         </div>
       );
     }
+    
+    useEffect(() => {
+      if (visibleEmotions.length === 0 && allEmotions.length > 0) {
+        setVisibleEmotions(allEmotions);
+      }
+    }, [allEmotions, visibleEmotions.length]);
     
     return (
       <div className="flex flex-col h-full">
