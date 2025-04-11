@@ -68,16 +68,19 @@ export default function MobileChatInput({
         const isKeyboard = window.visualViewport.height < window.innerHeight * 0.8;
         setIsKeyboardVisible(isKeyboard);
         
-        // If keyboard is visible, scroll to the input
+        // If keyboard is visible, ensure input is visible
         if (isKeyboard && inputRef.current) {
           // Delay scrolling to ensure UI has updated
           setTimeout(() => {
+            // Scroll to make input visible
+            inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            
+            // Also scroll the page to ensure the input is visible
             window.scrollTo({
               top: document.body.scrollHeight,
               behavior: 'smooth'
             });
-            inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 100);
+          }, 300);
         }
       }
     };
@@ -108,6 +111,9 @@ export default function MobileChatInput({
           top: document.body.scrollHeight,
           behavior: 'smooth'
         });
+        
+        // Set keyboard visible state to ensure proper positioning
+        setIsKeyboardVisible(true);
       }, 300);
     };
 
@@ -125,7 +131,9 @@ export default function MobileChatInput({
 
   return (
     <div 
-      className={`p-2 bg-background border-t border-border flex items-center gap-2 ${isKeyboardVisible ? 'fixed bottom-0 left-0 right-0 z-50' : ''}`}
+      className={`p-2 bg-background border-t border-border flex items-center gap-2 ${
+        isKeyboardVisible ? 'fixed bottom-0 left-0 right-0 z-[9999] input-keyboard-active' : ''
+      }`}
       style={{
         paddingBottom: isKeyboardVisible ? '10px' : 'env(safe-area-inset-bottom, 10px)'
       }}

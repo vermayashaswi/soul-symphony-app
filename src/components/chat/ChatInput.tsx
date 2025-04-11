@@ -3,9 +3,8 @@ import React, { useState, useRef } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -61,6 +60,18 @@ const ChatInput: React.FC<ChatInputProps> = ({
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSubmit(e);
+              }
+            }}
+            onFocus={() => {
+              // Only for mobile, ensure the textarea is visible when focused
+              if (isMobile) {
+                setTimeout(() => {
+                  window.scrollTo({
+                    top: document.body.scrollHeight,
+                    behavior: 'smooth'
+                  });
+                  textareaRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }, 300);
               }
             }}
           />
