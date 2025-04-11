@@ -15,7 +15,7 @@ const PrivacySection = () => {
   ];
 
   return (
-    <section className="py-16 md:py-24">
+    <section className="py-16 md:py-24" data-i18n-section="privacy-section">
       <div className="container mx-auto max-w-6xl px-4">
         <div className="flex flex-col md:flex-row items-center gap-8">
           <motion.div 
@@ -25,11 +25,11 @@ const PrivacySection = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block" data-i18n-key="homepage.privacy.title">
               {t('homepage.privacy.title')}
             </span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('homepage.privacy.title')}</h2>
-            <p className="text-muted-foreground mb-6">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4" data-i18n-key="homepage.privacy.title">{t('homepage.privacy.title')}</h2>
+            <p className="text-muted-foreground mb-6" data-i18n-key="homepage.privacy.description">
               {t('homepage.privacy.description')}
             </p>
             
@@ -37,7 +37,7 @@ const PrivacySection = () => {
               {privacyFeatures.map((feature, index) => (
                 <li key={index} className="flex items-start">
                   <Shield className="h-5 w-5 text-primary mr-2 mt-0.5" />
-                  <span>{feature}</span>
+                  <span data-i18n-key={`homepage.privacy.featuresList.${index}`}>{feature}</span>
                 </li>
               ))}
             </ul>

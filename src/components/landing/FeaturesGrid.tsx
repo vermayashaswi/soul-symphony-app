@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -7,16 +7,34 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import FeatureCard from './FeatureCard';
+import { useTranslation } from 'react-i18next';
+import { useDebugLog } from '@/utils/debug/DebugContext';
 
 const FeaturesGrid: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const { t } = useTranslation();
+  const { addEvent } = useDebugLog();
   
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
+
+  // Log translation status for debugging
+  useEffect(() => {
+    addEvent('i18n', 'FeaturesGrid translation check', 'info', {
+      feature1: t('features.voiceJournaling'),
+      feature1Translated: t('features.voiceJournaling') !== 'features.voiceJournaling',
+      feature2: t('features.aiAnalysis'),
+      feature2Translated: t('features.aiAnalysis') !== 'features.aiAnalysis',
+      feature3: t('features.progressTracking'),
+      feature3Translated: t('features.progressTracking') !== 'features.progressTracking',
+      feature4: t('features.journalChat'),
+      feature4Translated: t('features.journalChat') !== 'features.journalChat',
+    });
+  }, [t, addEvent]);
 
   const navigateToFeature = (path: string) => {
     if (!user && path !== '/') {
@@ -48,34 +66,34 @@ const FeaturesGrid: React.FC = () => {
 
   const features = [
     {
-      title: "Record Your Thoughts",
-      description: "Capture your daily reflections with voice recordings that are automatically transcribed and analyzed.",
+      title: t('features.voiceJournaling'),
+      description: t('features.voiceJournalingDesc'),
       icon: Mic,
-      cta: "Start Journaling",
+      cta: t('features.startJournaling'),
       ctaAction: () => navigateToFeature('/journal'),
       visualType: 'voice' as const
     },
     {
-      title: "AI Analysis",
-      description: "Get insights into your emotional patterns and themes through advanced AI analysis of your journal entries.",
+      title: t('features.aiAnalysis'),
+      description: t('features.aiAnalysisDesc'),
       icon: Brain,
-      cta: "See Insights",
+      cta: t('features.seeInsights'),
       ctaAction: () => navigateToFeature('/insights'),
       visualType: 'ai' as const
     },
     {
-      title: "Track Your Journey",
-      description: "Visualize your emotional progress over time with interactive charts and trend analysis.",
+      title: t('features.progressTracking'),
+      description: t('features.progressTrackingDesc'),
       icon: LineChart,
-      cta: "View Progress",
+      cta: t('features.viewProgress'),
       ctaAction: () => navigateToFeature('/insights'),
       visualType: 'chart' as const
     },
     {
-      title: "Chat With Your Journal",
-      description: "Ask questions and get personalized insights based on your past journal entries with AI-powered chat.",
+      title: t('features.journalChat'),
+      description: t('features.journalChatDesc'),
       icon: MessageSquare,
-      cta: "Start Chatting",
+      cta: t('features.startChatting'),
       ctaAction: () => navigateToFeature('/smart-chat'),
       visualType: 'chat' as const
     }
@@ -87,8 +105,9 @@ const FeaturesGrid: React.FC = () => {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
+      data-i18n-section="features-grid"
     >
-      {features.map((feature) => (
+      {features.map((feature, index) => (
         <motion.div key={feature.title} variants={itemVariants}>
           <FeatureCard 
             title={feature.title}

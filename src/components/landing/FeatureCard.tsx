@@ -2,9 +2,10 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { LucideIcon } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import FeatureVisual from './FeatureVisual';
+
+type VisualType = 'voice' | 'ai' | 'chart' | 'chat';
 
 interface FeatureCardProps {
   title: string;
@@ -12,7 +13,7 @@ interface FeatureCardProps {
   icon: LucideIcon;
   cta: string;
   ctaAction: () => void;
-  visualType: 'voice' | 'ai' | 'chart' | 'chat';
+  visualType: VisualType;
 }
 
 const FeatureCard: React.FC<FeatureCardProps> = ({
@@ -23,102 +24,33 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
   ctaAction,
   visualType
 }) => {
-  const cardVariants = {
-    initial: { 
-      y: 20, 
-      opacity: 0 
-    },
-    hover: { 
-      y: -5,
-      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-      transition: { 
-        y: { type: "spring", stiffness: 300, damping: 15 },
-        boxShadow: { duration: 0.2 }
-      }
-    },
-    animate: { 
-      y: 0, 
-      opacity: 1,
-      transition: { 
-        duration: 0.5
-      }
-    }
-  };
-
-  const iconVariants = {
-    initial: { 
-      scale: 0.8, 
-      opacity: 0 
-    },
-    animate: { 
-      scale: 1, 
-      opacity: 1,
-      transition: { 
-        duration: 0.5,
-        delay: 0.2
-      }
-    },
-    hover: {
-      scale: 1.1,
-      rotate: [0, 5, 0, -5, 0],
-      transition: { 
-        duration: 0.5,
-        repeat: 0
-      }
-    }
-  };
-
-  const buttonVariants = {
-    initial: { scale: 1 },
-    hover: { 
-      scale: 1.05,
-      transition: { 
-        duration: 0.2
-      }
-    }
-  };
-
   return (
-    <motion.div
-      initial="initial"
-      animate="animate"
-      whileHover="hover"
-      variants={cardVariants}
-      className="h-full"
+    <motion.div 
+      className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden h-full flex flex-col"
+      whileHover={{ y: -5, transition: { duration: 0.2 } }}
+      data-i18n-component="feature-card"
+      data-feature-type={visualType}
     >
-      <Card className="h-full border-primary/20 overflow-hidden dark:bg-card/75 bg-card/60 backdrop-blur-sm hover:border-primary/40 transition-colors">
-        <CardHeader className="pb-0 pt-4">
-          <div className="flex flex-row items-center gap-3 mb-2">
-            <motion.div 
-              variants={iconVariants}
-              className="bg-primary/10 rounded-full p-2 flex-shrink-0"
-            >
-              <Icon className="h-6 w-6 text-primary" />
-            </motion.div>
-            <CardTitle>{title}</CardTitle>
-          </div>
-          <CardDescription className="text-base">{description}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center py-3 relative">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-card/30 rounded-md z-0"></div>
-          <div className="relative z-10 w-full">
-            <FeatureVisual type={visualType} />
-          </div>
-        </CardContent>
-        <CardFooter className="pt-0">
-          <motion.div
-            className="w-full"
-            variants={buttonVariants}
-          >
-            <Button 
-              className="w-full" 
-              onClick={ctaAction}
-            >
-              {cta}
-            </Button>
-          </motion.div>
-        </CardFooter>
-      </Card>
+      <div className="flex items-start mb-4">
+        <div className="bg-primary/10 rounded-full w-12 h-12 flex items-center justify-center mr-4">
+          <Icon className="h-6 w-6 text-primary" />
+        </div>
+        <h3 className="text-xl font-bold" data-i18n-key={`features.${visualType}Title`}>{title}</h3>
+      </div>
+      
+      <p className="text-muted-foreground mb-6" data-i18n-key={`features.${visualType}Desc`}>{description}</p>
+      
+      <div className="mt-auto flex flex-col space-y-4">
+        <FeatureVisual type={visualType} />
+        
+        <Button 
+          onClick={ctaAction} 
+          className="w-full mt-4"
+          data-i18n-key={`features.${visualType}CTA`}
+        >
+          {cta}
+        </Button>
+      </div>
     </motion.div>
   );
 };

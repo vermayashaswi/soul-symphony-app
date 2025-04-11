@@ -8,6 +8,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { useDebugLog } from '@/utils/debug/DebugContext';
 import Navbar from '@/components/Navbar';
 import HeroSection from '@/components/landing/HeroSection';
 import FeaturesGrid from '@/components/landing/FeaturesGrid';
@@ -15,11 +16,12 @@ import EnergyAnimation from '@/components/EnergyAnimation';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const isMobile = useIsMobile();
   const { resetOnboarding } = useOnboarding();
+  const { addEvent } = useDebugLog();
 
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -36,6 +38,41 @@ const Index = () => {
       }
     }
   };
+
+  // Log translation status for the Index page
+  useEffect(() => {
+    addEvent('i18n', 'Index page translation check', 'info', {
+      mainTagline: t('mainTagline'),
+      mainTaglineTranslated: t('mainTagline') !== 'mainTagline',
+      currentLanguage: i18n.language
+    });
+    
+    // Apply data-i18n attributes to help with debugging
+    const applyI18nAttributes = () => {
+      document.querySelectorAll('h1, h2, h3, p, button, a').forEach((el, index) => {
+        if (!el.hasAttribute('data-i18n-key') && !el.hasAttribute('data-i18n-section')) {
+          el.setAttribute('data-i18n-auto', `element-${index}`);
+        }
+      });
+    };
+    
+    // Run once on mount and whenever language changes
+    applyI18nAttributes();
+    
+    const handleLanguageChange = () => {
+      addEvent('i18n', 'Language changed in Index page', 'info', {
+        to: i18n.language
+      });
+      applyI18nAttributes();
+    };
+    
+    // Listen for language changes
+    const unsubscribe = i18n.on('languageChanged', handleLanguageChange);
+    
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [t, i18n, addEvent]);
 
   useEffect(() => {
     if (shouldRenderMobile) {
@@ -62,12 +99,13 @@ const Index = () => {
         initial="hidden"
         animate="visible"
         variants={containerVariants}
+        data-i18n-section="index-page"
       >
         <HeroSection user={user} />
         
         {/* Main Tagline with translation */}
         <div className="text-center my-12">
-          <h2 className="text-2xl md:text-3xl font-medium">{t('mainTagline')}</h2>
+          <h2 className="text-2xl md:text-3xl font-medium" data-i18n-key="mainTagline">{t('mainTagline')}</h2>
         </div>
         
         <FeaturesGrid />

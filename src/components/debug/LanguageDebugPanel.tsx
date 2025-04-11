@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bug, X, ChevronDown, ChevronRight, Check, AlertCircle } from 'lucide-react';
@@ -35,7 +34,19 @@ const LanguageDebugPanel = () => {
       { key: 'hero.welcome', element: 'Hero Welcome' },
       { key: 'hero.tagline', element: 'Hero Tagline' },
       { key: 'hero.getStarted', element: 'Get Started Button' },
-      { key: 'features.title', element: 'Features Title' }
+      { key: 'features.title', element: 'Features Title' },
+      // Home page specific elements
+      { key: 'features.voiceJournaling', element: 'Voice Journaling Feature' },
+      { key: 'features.aiAnalysis', element: 'AI Analysis Feature' },
+      { key: 'features.progressTracking', element: 'Progress Tracking Feature' },
+      { key: 'features.journalChat', element: 'Journal Chat Feature' },
+      { key: 'homepage.expressReflectGrow', element: 'Homepage Tagline' },
+      { key: 'navbar.home', element: 'Navbar Home' },
+      { key: 'navbar.blog', element: 'Navbar Blog' },
+      { key: 'navbar.faq', element: 'Navbar FAQ' },
+      { key: 'navbar.download', element: 'Download Button' },
+      { key: 'footer.rights', element: 'Footer Rights' },
+      { key: 'footer.contact', element: 'Footer Contact' }
     ];
 
     const checks = keysToCheck.map(item => {
@@ -56,6 +67,42 @@ const LanguageDebugPanel = () => {
       currentLanguage: i18n.language,
       pageUrl: window.location.pathname
     });
+    
+    // Add visual indicators to translated elements on the page
+    setTimeout(() => {
+      const elementsWithTranslation = document.querySelectorAll('[data-i18n-key]');
+      elementsWithTranslation.forEach(el => {
+        const key = el.getAttribute('data-i18n-key');
+        const isTranslated = key ? t(key) !== key : false;
+        
+        // Add a subtle indicator of translation status
+        if (el instanceof HTMLElement) {
+          el.style.position = 'relative';
+          
+          // Remove existing indicator if any
+          const existingIndicator = el.querySelector('.translation-indicator');
+          if (existingIndicator) {
+            existingIndicator.remove();
+          }
+          
+          // Create new indicator
+          const indicator = document.createElement('span');
+          indicator.className = 'translation-indicator';
+          indicator.style.position = 'absolute';
+          indicator.style.top = '0';
+          indicator.style.right = '0';
+          indicator.style.width = '8px';
+          indicator.style.height = '8px';
+          indicator.style.borderRadius = '50%';
+          indicator.style.backgroundColor = isTranslated ? '#4ade80' : '#ef4444';
+          indicator.style.zIndex = '999';
+          indicator.style.opacity = '0.7';
+          indicator.title = isTranslated ? 'Translated' : 'Not translated';
+          
+          el.appendChild(indicator);
+        }
+      });
+    }, 200);
   };
 
   // Listen for language changes
