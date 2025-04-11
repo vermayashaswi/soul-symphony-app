@@ -71,7 +71,7 @@ const Footer = () => {
               </li>
               <li>
                 <div className="mt-4">
-                  <LanguageSelector inverted={true} />
+                  <LanguageSelector />
                 </div>
               </li>
             </ul>
