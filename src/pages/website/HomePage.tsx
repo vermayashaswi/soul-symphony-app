@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail } from 'lucide-react';
+import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +10,7 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  CarouselDots,
 } from "@/components/ui/carousel";
 import Navbar from '@/components/website/Navbar';
 import SouloLogo from '@/components/SouloLogo';
@@ -361,16 +362,37 @@ const HomePage = () => {
       icon: Brain
     },
     {
-      step: "3",
-      title: "Gain Personalized Insights",
+      step: "3a",
+      title: "Analyze Your Emotional Patterns",
       description: [
-        "Discover patterns in your emotions and behaviors over time",
-        "Track emotional trends with interactive visualizations",
-        "Get personalized recommendations based on your journal entries",
-        "Identify correlations between activities and your mood"
+        "Filter insights using customizable time ranges (day, week, month, year)",
+        "See your dominant moods and what emotions appear most in your entries",
+        "Track your biggest emotional changes and their intensity over time",
+        "View your journaling activity stats and streaks"
       ],
-      image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
-      icon: LineChart
+      images: [
+        "/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png",
+        "/lovable-uploads/86f40c9c-bea5-4d03-9eb3-7336786f1bbb.png", 
+        "/lovable-uploads/71907497-c7a1-4288-9799-bbd229b480ad.png"
+      ],
+      icon: LineChart,
+      multiplePhones: true
+    },
+    {
+      step: "3b",
+      title: "Visualize Your Emotional Journey",
+      description: [
+        "See graphical representations of emotion score movements over time",
+        "Explore emotional bubbles that define your personality and their intensities",
+        "View your overall sentiment changes in interactive calendar format",
+        "Identify patterns in your mood with color-coded visual guides"
+      ],
+      images: [
+        "/lovable-uploads/d916a877-0a67-459e-8e73-cc0fa3615a88.png",
+        "/lovable-uploads/1b346540-75b4-4095-8860-2446c46aea4c.png"
+      ],
+      icon: Calendar,
+      multiplePhones: true
     },
     {
       step: "4",
@@ -589,7 +611,7 @@ const HomePage = () => {
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Process</span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Start your self-discovery journey in four simple steps
+              Start your self-discovery journey with these simple steps
             </p>
           </div>
           
@@ -620,19 +642,39 @@ const HomePage = () => {
                       </div>
                       
                       <div className="w-full md:w-1/2 order-1 md:order-2">
-                        <div className="relative max-w-xs mx-auto">
-                          <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-3xl blur-xl"></div>
-                          <div className="relative">
-                            <div className="bg-white w-[38.4px] h-[300px] mx-auto rounded-[24px] overflow-hidden border-[4.8px] border-gray-800 shadow-xl relative">
-                              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-[19.2px] h-[3.6px] bg-black rounded-b-xl z-10"></div>
-                              <img 
-                                src={item.image} 
-                                alt={item.title} 
-                                className="w-full h-full object-cover"
-                              />
+                        {item.multiplePhones ? (
+                          <div className="flex flex-wrap justify-center gap-2">
+                            {item.images && item.images.map((img, idx) => (
+                              <div key={idx} className="relative w-[30%]">
+                                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-3xl blur-xl"></div>
+                                <div className="relative">
+                                  <div className="bg-white w-full aspect-[9/16] mx-auto rounded-[24px] overflow-hidden border-[4.8px] border-gray-800 shadow-xl relative">
+                                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-[30%] h-[1.5%] bg-black rounded-b-xl z-10"></div>
+                                    <img 
+                                      src={img} 
+                                      alt={`${item.title} - Phone ${idx+1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="relative max-w-xs mx-auto">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-3xl blur-xl"></div>
+                            <div className="relative">
+                              <div className="bg-white w-[38.4px] h-[300px] mx-auto rounded-[24px] overflow-hidden border-[4.8px] border-gray-800 shadow-xl relative">
+                                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-[19.2px] h-[3.6px] bg-black rounded-b-xl z-10"></div>
+                                <img 
+                                  src={item.image} 
+                                  alt={item.title} 
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -642,15 +684,7 @@ const HomePage = () => {
             
             <div className="flex justify-center gap-4 mt-8">
               <CarouselPrevious className="relative -left-0 top-0 translate-y-0 mx-2" />
-              <div className="flex gap-2">
-                {processSteps.map((_, index) => (
-                  <button
-                    key={index}
-                    className={`w-3 h-3 rounded-full ${index === activeProcessStep ? 'bg-primary' : 'bg-gray-300'}`}
-                    onClick={() => setActiveProcessStep(index)}
-                  />
-                ))}
-              </div>
+              <CarouselDots count={processSteps.length} className="flex gap-2" />
               <CarouselNext className="relative -right-0 top-0 translate-y-0 mx-2" />
             </div>
           </Carousel>
