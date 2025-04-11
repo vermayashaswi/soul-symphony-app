@@ -4,24 +4,18 @@ import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-route
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
-import { signInWithGoogle, debugAuthState } from '@/services/authService';
-import { useDebugLog } from '@/utils/debug/DebugContext';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { signInWithGoogle } from '@/services/authService';
 
 export default function Auth() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<any>({});
-  const [debugOpen, setDebugOpen] = useState(true); // Set debug to open by default
-  const { addEvent, isEnabled, toggleEnabled } = useDebugLog();
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -30,75 +24,13 @@ export default function Auth() {
   // Determine where to redirect after auth
   const redirectTo = redirectParam || fromLocation || storedRedirect || '/app/home';
 
-  // Enhanced debug logging
   useEffect(() => {
-    console.log('Auth component mounted - initial render');
-    
-    // Enable debug mode by default
-    if (!isEnabled) {
-      toggleEnabled();
-    }
-    
-    const debugData = {
-      pathname: location.pathname,
-      search: location.search,
-      hash: location.hash,
-      redirectTo,
-      hasUser: !!user,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      windowSize: `${window.innerWidth}x${window.innerHeight}`,
-      authLoadingState: authLoading,
-      redirectingState: redirecting
-    };
-    
-    setDebugInfo(prev => ({...prev, initialMount: debugData}));
-    console.log('Auth: Component mounted', debugData);
-    addEvent('auth', 'Auth component mounted', 'info', debugData);
-
-    // Debug auth state on component mount
-    debugAuthState().then(({ session, user }) => {
-      const authStateData = { 
-        hasSession: !!session, 
-        hasUser: !!user,
-        userEmail: user?.email,
-        sessionExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
-        provider: user?.app_metadata?.provider || null
-      };
-      
-      setDebugInfo(prev => ({...prev, initialAuthState: authStateData}));
-      console.log('Auth: Initial auth state', authStateData);
-      addEvent('auth', 'Initial auth state checked', !!session ? 'success' : 'info', authStateData);
-    });
-    
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    const authStateData = { 
-      user: !!user, 
-      authLoading, 
-      redirectTo,
-      authError,
-      timestamp: new Date().toISOString()
-    };
-    
-    setDebugInfo(prev => ({...prev, currentAuthState: authStateData}));
-    console.log('Auth: Current session state:', authStateData);
-    addEvent('auth', 'Current session state updated', !!user ? 'success' : 'info', authStateData);
-    
     // If user is logged in and page has finished initial loading, redirect
     if (user && !authLoading && !redirecting) {
-      const redirectData = {
-        destination: redirectTo,
-        user: user.email,
-        timestamp: new Date().toISOString()
-      };
-      
-      setDebugInfo(prev => ({...prev, redirectAttempt: redirectData}));
-      console.log('Auth: User authenticated, redirecting to:', redirectData);
-      addEvent('auth', 'User authenticated, redirecting', 'success', redirectData);
       setRedirecting(true);
       
       // Clean up stored redirect
@@ -118,76 +50,12 @@ export default function Auth() {
       setIsLoading(true);
       setAuthError(null);
       
-      const signInData = {
-        timestamp: new Date().toISOString(),
-        redirectTo: redirectTo,
-        currentPath: location.pathname
-      };
-      
-      setDebugInfo(prev => ({...prev, signInAttempt: signInData}));
-      console.log('Auth: Initiating Google sign-in', signInData);
-      addEvent('auth', 'Initiating Google sign-in', 'info', signInData);
-      
       await signInWithGoogle();
-      addEvent('auth', 'Google sign-in initialization successful', 'success');
       // The page will be redirected by Supabase, so no need to do anything else here
     } catch (error: any) {
-      const errorData = {
-        message: error.message,
-        stack: error.stack,
-        timestamp: new Date().toISOString()
-      };
-      
-      setDebugInfo(prev => ({...prev, signInError: errorData}));
-      console.error('Auth: Failed to initiate Google sign-in:', error);
-      addEvent('auth', 'Failed to initiate Google sign-in', 'error', errorData);
       setAuthError(error.message);
       toast.error('Failed to initiate sign-in. Please try again.');
       setIsLoading(false);
-    }
-  };
-  
-  const forceDebugState = async () => {
-    const state = await debugAuthState();
-    setDebugInfo(prev => ({
-      ...prev, 
-      forcedDebugState: {
-        ...state,
-        timestamp: new Date().toISOString(),
-        hasSession: !!state.session,
-        hasUser: !!state.user,
-        sessionExpiry: state.session?.expires_at ? new Date(state.session.expires_at * 1000).toISOString() : null,
-        signInMethodData: state.session?.user?.app_metadata
-      }
-    }));
-    addEvent('auth', 'Forced debug state check', 'info', state);
-    
-    // Check local storage for redirect info
-    const localStorageItems = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key) {
-        try {
-          localStorageItems[key] = localStorage.getItem(key);
-        } catch (e) {
-          localStorageItems[key] = '[Error reading value]';
-        }
-      }
-    }
-    
-    setDebugInfo(prev => ({
-      ...prev,
-      localStorage: {
-        items: localStorageItems,
-        timestamp: new Date().toISOString()
-      }
-    }));
-    
-    addEvent('auth', 'Local storage checked', 'info', { localStorage: localStorageItems });
-    
-    // Also enable debug mode
-    if (!isEnabled) {
-      toggleEnabled();
     }
   };
 
@@ -202,7 +70,6 @@ export default function Auth() {
 
   // If already logged in, redirect to target page
   if (user) {
-    console.log('Auth: User already logged in, redirecting to:', redirectTo);
     return <Navigate to={redirectTo} replace />;
   }
 
@@ -254,52 +121,6 @@ export default function Auth() {
           <div className="text-center text-sm text-muted-foreground">
             <p>By signing in, you agree to our Terms of Service and Privacy Policy</p>
           </div>
-        </div>
-        
-        {/* Debug Button and Collapsible Debug Panel */}
-        <div className="mt-8 border-t pt-4">
-          <Collapsible open={debugOpen} onOpenChange={setDebugOpen}>
-            <div className="flex justify-between items-center">
-              <CollapsibleTrigger asChild>
-                <Button variant="outline" size="sm" className="w-full">
-                  {debugOpen ? "Hide Debugging Info" : "Show Debugging Info"}
-                </Button>
-              </CollapsibleTrigger>
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                className="ml-2"
-                onClick={forceDebugState}
-              >
-                Refresh Debug
-              </Button>
-            </div>
-            <CollapsibleContent className="mt-4 space-y-2">
-              <div className="rounded border p-2 text-xs bg-slate-50 overflow-auto max-h-80">
-                <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
-              </div>
-              <div className="flex justify-between">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    const debugData = JSON.stringify(debugInfo, null, 2);
-                    navigator.clipboard.writeText(debugData);
-                    toast.success("Debug info copied to clipboard");
-                  }}
-                >
-                  Copy Debug Info
-                </Button>
-                <Button 
-                  variant={isEnabled ? "default" : "outline"}
-                  size="sm"
-                  onClick={toggleEnabled}
-                >
-                  {isEnabled ? "Disable Debug Mode" : "Enable Debug Mode"}
-                </Button>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
         </div>
       </motion.div>
     </div>

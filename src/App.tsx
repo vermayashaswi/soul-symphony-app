@@ -12,8 +12,6 @@ import { supabase } from "./integrations/supabase/client";
 import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
 import { useEffect } from 'react';
-import { DebugLogProvider } from "./utils/debug/DebugContext";
-import DebugLogPanel from "./components/debug/DebugLogPanel";
 import { handleAuthCallback } from "./services/authService";
 
 const queryClient = new QueryClient({
@@ -34,32 +32,35 @@ const App = () => {
   useEffect(() => {
     // Add a global error listener to catch runtime errors
     const handleGlobalError = (event: ErrorEvent) => {
-      console.error('Global error:', event.message, {
-        filename: event.filename,
-        lineno: event.lineno,
-        colno: event.colno,
-        stack: event.error?.stack
-      });
+      console.error('Global error:', event.message);
     };
     
     // Add a global unhandled rejection listener
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled promise rejection:', event.reason, {
-        reason: event.reason,
-        stack: event.reason?.stack
-      });
+      console.error('Unhandled promise rejection:', event.reason);
     };
     
-    // Set up Supabase auth debugging - this is outside React context
+    // Set up Supabase auth basic listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed in App.tsx:', event, {
-        user: session?.user?.email || 'No user',
-        expires_at: session?.expires_at,
-        pathname: window.location.pathname,
-        search: window.location.search,
-        hash: window.location.hash,
-        href: window.location.href
-      });
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Create user session when signed in
+        const userId = session.user.id;
+        const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+        
+        // Create session entry
+        supabase.from('user_sessions')
+          .insert({
+            user_id: userId,
+            device_type: deviceType,
+            user_agent: navigator.userAgent,
+            entry_page: window.location.pathname,
+            last_active_page: window.location.pathname,
+            is_active: true
+          })
+          .then(({ error }) => {
+            if (error) console.error('Error creating user session:', error);
+          });
+      }
     });
     
     // Check for auth callback hash/query parameters on page load
@@ -68,54 +69,11 @@ const App = () => {
                          window.location.hash.includes('error');
     
     if (hasAuthParams) {
-      console.log('Auth callback parameters detected at app startup:', {
-        pathname: window.location.pathname,
-        hash: window.location.hash,
-        search: window.location.search,
-        href: window.location.href
-      });
-      
       // Process auth callback using the correct method
-      handleAuthCallback().then(session => {
-        if (session) {
-          console.log('Successfully processed auth callback at app startup:', {
-            user: session.user.email,
-            expires: session.expires_at,
-            provider: session.user.app_metadata?.provider
-          });
-        } else {
-          console.warn('No session found after processing auth callback');
-        }
-      }).catch(err => {
+      handleAuthCallback().catch(err => {
         console.error('Error handling auth callback at app startup:', err);
       });
     }
-    
-    // Debug the current session on app load
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial auth session in App.tsx:', {
-        user: session?.user?.email || 'No user',
-        expires_at: session?.expires_at,
-        pathname: window.location.pathname,
-        search: window.location.search,
-        hash: window.location.hash,
-        href: window.location.href
-      });
-      
-      // Check local storage for auth tokens
-      const localStorageAuthItems = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.includes('supabase') || key.includes('auth'))) {
-          try {
-            localStorageAuthItems[key] = localStorage.getItem(key);
-          } catch (e) {
-            localStorageAuthItems[key] = '[Error reading value]';
-          }
-        }
-      }
-      console.log('Local storage auth items:', localStorageAuthItems);
-    });
     
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
@@ -169,24 +127,21 @@ const App = () => {
       <TooltipProvider>
         <BrowserRouter>
           <ThemeProvider>
-            <DebugLogProvider>
-              <AuthProvider>
-                <div className="relative min-h-screen">
-                  <div className="relative z-10">
-                    {/* Add the TouchAnimation component here */}
-                    <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
-                      <TouchAnimation />
-                    </div>
-                    <Toaster />
-                    <Sonner position="top-center" closeButton={false} />
-                    <AnimatePresence mode="wait">
-                      <AppRoutes />
-                    </AnimatePresence>
-                    <DebugLogPanel />
+            <AuthProvider>
+              <div className="relative min-h-screen">
+                <div className="relative z-10">
+                  {/* Add the TouchAnimation component here */}
+                  <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
+                    <TouchAnimation />
                   </div>
+                  <Toaster />
+                  <Sonner position="top-center" closeButton={false} />
+                  <AnimatePresence mode="wait">
+                    <AppRoutes />
+                  </AnimatePresence>
                 </div>
-              </AuthProvider>
-            </DebugLogProvider>
+              </div>
+            </AuthProvider>
           </ThemeProvider>
         </BrowserRouter>
       </TooltipProvider>

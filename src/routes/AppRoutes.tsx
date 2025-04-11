@@ -17,7 +17,6 @@ import ViewportManager from './ViewportManager';
 import OnboardingCheck from './OnboardingCheck';
 import MobileNavigation from './MobileNavigation';
 import HomePage from '@/pages/website/HomePage';
-import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import NotFound from '@/pages/NotFound';
 import Navbar from '@/components/website/Navbar'; // Import the website Navbar component
 
@@ -31,27 +30,11 @@ const AppRoutes = () => {
   const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
   const location = useLocation();
   
-  useEffect(() => {
-    console.log("Setting up Supabase auth debugging listener");
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth event outside React context:", event, session?.user?.email);
-    });
-    
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-  
   // Find the NotFound route
   const notFoundRoute = specialRoutes.find(route => route.path === '*');
   
   // Determine if we should show the website navbar
   const shouldShowWebsiteNavbar = !isNativeApp() && !isAppRoute(location.pathname);
-  
-  console.log("Current path:", location.pathname);
-  console.log("Should show website navbar:", shouldShowWebsiteNavbar);
-  console.log("Is native app:", isNativeApp());
-  console.log("Is app route:", isAppRoute(location.pathname));
   
   return (
     <>
