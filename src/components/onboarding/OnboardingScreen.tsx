@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { RecordingVisualizer } from "@/components/voice-recorder/RecordingVisualizer";
 import { toast } from "sonner";
+import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -731,6 +733,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const [name, setName] = useState('');
   const navigate = useNavigate();
   const { setColorTheme } = useTheme();
+  const contentRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     setColorTheme('Calm');
@@ -754,7 +757,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       if (onComplete) {
         onComplete();
       } else {
-        navigate("/auth");
+        navigate("/app/auth");
       }
     }
   };
@@ -774,9 +777,24 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     if (onComplete) {
       onComplete();
     } else {
-      navigate("/auth");
+      navigate("/app/auth");
     }
   };
+
+  // Add swipe gesture handling
+  useSwipeGesture(contentRef, {
+    onSwipeLeft: () => {
+      if (currentStep < ONBOARDING_STEPS.length - 1) {
+        handleNext();
+      }
+    },
+    onSwipeRight: () => {
+      if (currentStep > 0) {
+        handlePrevious();
+      }
+    },
+    minDistance: 50
+  });
 
   const CurrentIllustration = ONBOARDING_STEPS[currentStep].illustration;
   const currentStepData = ONBOARDING_STEPS[currentStep];
@@ -786,8 +804,11 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const isFirstStep = currentStep === 0;
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-background">
-      <div className="flex-1 flex flex-col overflow-hidden relative">
+    <div className="flex flex-col h-[100dvh] bg-background dark">
+      <div 
+        ref={contentRef}
+        className="flex-1 flex flex-col overflow-hidden relative"
+      >
         <div className="absolute inset-0 bg-gradient-to-b from-background to-theme/5 pointer-events-none" />
         
         <div className="absolute top-4 left-0 right-0 z-10 flex justify-center">
@@ -807,7 +828,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         </div>
         
         <div className="absolute top-4 right-4 z-10">
-          <Button variant="ghost" size="sm" onClick={handleSkip}>
+          <Button variant="ghost" size="sm" onClick={handleSkip} className="text-foreground hover:text-theme">
             Skip
           </Button>
         </div>
@@ -852,9 +873,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                 variant="outline" 
                 size="icon" 
                 onClick={handlePrevious}
-                className="bg-background hover:bg-muted h-10 w-10"
+                className="bg-background/50 dark:bg-muted/20 border-muted hover:bg-muted/30 h-10 w-10"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5 text-foreground" />
               </Button>
             ) : (
               <div className="w-10"></div> // Empty div to maintain layout
@@ -868,6 +889,23 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
               {currentStepData.buttonText}
               {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
             </Button>
+          </div>
+        </div>
+        
+        <div className="absolute bottom-36 left-0 right-0 flex justify-center items-center text-muted-foreground/50 text-sm">
+          <div className="flex items-center gap-6">
+            {currentStep > 0 && (
+              <div className="flex items-center gap-1">
+                <ChevronLeft className="w-4 h-4" />
+                <span>Swipe right</span>
+              </div>
+            )}
+            {currentStep < ONBOARDING_STEPS.length - 1 && (
+              <div className="flex items-center gap-1">
+                <span>Swipe left</span>
+                <ChevronRight className="w-4 h-4" />
+              </div>
+            )}
           </div>
         </div>
       </div>
