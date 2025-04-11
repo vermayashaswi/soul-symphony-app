@@ -57,9 +57,7 @@ const Footer = () => {
             <Play className="h-5 w-5" />
             <span>{t('download.googlePlay')}</span>
           </Button>
-          <Button variant="outline" asChild>
-            <Link to="/app">{t('navbar.tryWebApp')}</Link>
-          </Button>
+          {/* Removed "Try Web App" button */}
         </div>
         
         <p className="text-muted-foreground mb-8">

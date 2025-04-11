@@ -10,25 +10,25 @@ const features = [
     title: "Voice Journaling",
     description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
     icon: Mic,
-    image: "/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png",
+    image: "/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png", // Voice journal image
   },
   {
     title: "AI Analysis",
     description: "Gain insights into your patterns and emotions through advanced AI analysis.",
     icon: Brain,
-    image: "/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png",
+    image: "/lovable-uploads/5b18686b-4a3c-4341-a072-479db470ac1d.png", // AI analysis visualization
   },
   {
     title: "Emotional Tracking",
     description: "Visualize your emotional journey over time with interactive charts.",
     icon: LineChart,
-    image: "/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png",
+    image: "/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png", // Emotional tracking charts
   },
   {
     title: "AI Assistant",
     description: "Chat with your journal and get personalized insights from your past entries.",
     icon: MessageSquare,
-    image: "/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png",
+    image: "/lovable-uploads/241062d6-3971-492c-aaeb-a110d1256c7a.png", // AI chat interface
   }
 ];
 
