@@ -14,23 +14,14 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ className }) => {
       ref={containerRef}
       className={`relative w-full h-full overflow-hidden ${className}`}
     >
-      {/* Glowing center */}
+      {/* Glowing center with softer blur */}
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
         <div className="w-24 h-24 rounded-full bg-cyan-300 blur-xl opacity-80"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-white blur-md opacity-90"></div>
       </div>
       
-      {/* User provided image with reduced opacity */}
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-50 z-0">
-        <img 
-          src="/lovable-uploads/fbca5601-f42c-41b3-94af-779d961a1d06.png" 
-          alt="Energy silhouette" 
-          className="w-full h-full object-contain"
-        />
-      </div>
-      
-      {/* Radiating pulses */}
-      {[...Array(8)].map((_, index) => (
+      {/* Radiating pulses with smoother transitions */}
+      {[...Array(12)].map((_, index) => (
         <motion.div
           key={index}
           className="absolute top-1/2 left-1/2 rounded-full"
@@ -52,19 +43,20 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ className }) => {
           }}
           transition={{ 
             repeat: Infinity, 
-            duration: 4 + index * 0.5, 
+            duration: 4 + index * 0.4, 
             ease: "easeOut",
-            delay: index * 0.7
+            delay: index * 0.8,
+            repeatDelay: 0.2
           }}
         />
       ))}
       
-      {/* Background gradients */}
+      {/* Background gradients with enhanced colors */}
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-violet-800/20 to-blue-900/20"></div>
       <div className="absolute inset-0 bg-gradient-to-tr from-indigo-900/20 via-purple-800/20 to-cyan-900/20"></div>
       
-      {/* Additional smaller, faster pulses */}
-      {[...Array(12)].map((_, index) => (
+      {/* Additional smaller, faster pulses with improved timing */}
+      {[...Array(16)].map((_, index) => (
         <motion.div
           key={`small-${index}`}
           className="absolute top-1/2 left-1/2 rounded-full"
@@ -86,9 +78,36 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ className }) => {
           }}
           transition={{ 
             repeat: Infinity, 
-            duration: 2 + index * 0.3, 
+            duration: 2 + index * 0.2, 
             ease: "easeOut",
-            delay: index * 0.4
+            delay: index * 0.5,
+            repeatDelay: 0.1
+          }}
+        />
+      ))}
+      
+      {/* Ultra-small particles with random paths */}
+      {[...Array(20)].map((_, index) => (
+        <motion.div
+          key={`particle-${index}`}
+          className="absolute top-1/2 left-1/2 rounded-full bg-white/80"
+          initial={{ 
+            width: 3, 
+            height: 3, 
+            x: -1.5, 
+            y: -1.5, 
+            opacity: 0.9
+          }}
+          animate={{ 
+            x: -1.5 + (Math.random() * 300 - 150),
+            y: -1.5 + (Math.random() * 300 - 150),
+            opacity: 0
+          }}
+          transition={{ 
+            repeat: Infinity, 
+            duration: 3 + Math.random() * 2,
+            delay: index * 0.3,
+            ease: "easeOut"
           }}
         />
       ))}
