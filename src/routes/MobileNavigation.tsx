@@ -15,14 +15,43 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  
+  useEffect(() => {
+    // Detect keyboard visibility
+    const handleVisualViewportResize = () => {
+      if (window.visualViewport) {
+        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.8;
+        setIsKeyboardVisible(isKeyboard);
+      }
+    };
+    
+    // Initial check
+    handleVisualViewportResize();
+    
+    // Set up listeners
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+      window.addEventListener('resize', handleVisualViewportResize);
+    }
+    
+    // Clean up listeners
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
+        window.removeEventListener('resize', handleVisualViewportResize);
+      }
+    };
+  }, []);
   
   useEffect(() => {
     // Only show mobile navigation for app routes in mobile or native app
     const shouldShowNav = (isMobile || isNativeApp()) && 
                           isAppRoute(location.pathname) &&
-                          onboardingComplete !== false;
+                          onboardingComplete !== false &&
+                          !isKeyboardVisible; // Hide when keyboard is visible
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, onboardingComplete]);
+  }, [location.pathname, isMobile, onboardingComplete, isKeyboardVisible]);
   
   if (!isVisible) {
     return null;

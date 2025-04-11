@@ -68,6 +68,10 @@ export default function MobileChatInput({
         const isKeyboard = window.visualViewport.height < window.innerHeight * 0.8;
         setIsKeyboardVisible(isKeyboard);
         
+        // Dispatch custom event to notify other components
+        const eventName = isKeyboard ? 'keyboardOpen' : 'keyboardClose';
+        window.dispatchEvent(new Event(eventName));
+        
         // If keyboard is visible, ensure input is visible
         if (isKeyboard && inputRef.current) {
           // Delay scrolling to ensure UI has updated
@@ -114,6 +118,9 @@ export default function MobileChatInput({
         
         // Set keyboard visible state to ensure proper positioning
         setIsKeyboardVisible(true);
+        
+        // Dispatch custom event
+        window.dispatchEvent(new Event('keyboardOpen'));
       }, 300);
     };
 

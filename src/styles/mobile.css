@@ -531,6 +531,20 @@
   .mobile-chat-interface .p-2.bg-background.border-t.fixed {
     z-index: 9999 !important;
   }
+  
+  /* NEW: Hide navigation bar when keyboard is active */
+  body:has(input:focus) .fixed.bottom-0.left-0.right-0.h-16.bg-background\/90,
+  body:has(textarea:focus) .fixed.bottom-0.left-0.right-0.h-16.bg-background\/90,
+  body:has(.input-keyboard-active) .fixed.bottom-0.left-0.right-0.h-16.bg-background\/90 {
+    display: none !important;
+  }
+  
+  /* NEW: Adjust spacing for when navbar is hidden */
+  body:has(input:focus) .smart-chat-container,
+  body:has(textarea:focus) .smart-chat-container,
+  body:has(.input-keyboard-active) .smart-chat-container {
+    padding-bottom: 0 !important;
+  }
 }
 
 /* Dark mode support for sticky elements */

@@ -4,10 +4,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEffect, useState } from 'react';
 
 const MobileNavbar = () => {
   const location = useLocation();
   const { user } = useAuth();
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
   const navItems = [
     { path: '/home', label: 'Home', icon: Home },
@@ -19,6 +21,46 @@ const MobileNavbar = () => {
 
   // Only show the navbar if the user is logged in or on the home page
   if (!user && location.pathname !== '/') {
+    return null;
+  }
+  
+  // Listen for keyboard visibility changes
+  useEffect(() => {
+    const handleVisualViewportResize = () => {
+      if (window.visualViewport) {
+        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.8;
+        setIsKeyboardVisible(isKeyboard);
+      }
+    };
+    
+    // Initial check
+    handleVisualViewportResize();
+    
+    // Set up listeners
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+      window.addEventListener('resize', handleVisualViewportResize);
+    }
+    
+    // Custom event for keyboard visibility
+    const handleKeyboardOpen = () => setIsKeyboardVisible(true);
+    const handleKeyboardClose = () => setIsKeyboardVisible(false);
+    
+    window.addEventListener('keyboardOpen', handleKeyboardOpen);
+    window.addEventListener('keyboardClose', handleKeyboardClose);
+    
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
+        window.removeEventListener('resize', handleVisualViewportResize);
+      }
+      window.removeEventListener('keyboardOpen', handleKeyboardOpen);
+      window.removeEventListener('keyboardClose', handleKeyboardClose);
+    };
+  }, []);
+
+  // Return null when keyboard is visible
+  if (isKeyboardVisible) {
     return null;
   }
 
