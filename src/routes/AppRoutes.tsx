@@ -1,7 +1,6 @@
 
 import React, { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
@@ -9,6 +8,7 @@ import { websiteRoutes, appRoutes, specialRoutes } from './routeConfig';
 import { 
   isNativeApp, 
   isAppRoute,
+  isWebsiteRoute,
   AppRouteWrapper, 
   WebsiteRouteWrapper, 
   RedirectRoute
@@ -36,6 +36,7 @@ const AppRoutes = () => {
       user: !!user,
       onboardingComplete,
       isAppRoute: isAppRoute(location.pathname),
+      isWebsiteRoute: isWebsiteRoute(location.pathname),
       isNativeApp: isNativeApp()
     });
   }, [location.pathname, user, onboardingComplete]);
@@ -44,14 +45,14 @@ const AppRoutes = () => {
   const notFoundRoute = specialRoutes.find(route => route.path === '*');
   
   // Determine if we should show the website navbar
-  const shouldShowWebsiteNavbar = !isNativeApp() && !isAppRoute(location.pathname);
+  const shouldShowWebsiteNavbar = isWebsiteRoute(location.pathname) && !isNativeApp();
   
   return (
     <>
       <ViewportManager />
       <ScrollToTop />
       
-      {/* Render website navbar when not in app routes and not in native app */}
+      {/* Render website navbar when on website routes and not in native app */}
       {shouldShowWebsiteNavbar && <Navbar />}
       
       <OnboardingCheck 

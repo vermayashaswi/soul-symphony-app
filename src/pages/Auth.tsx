@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
 import { signInWithGoogle } from '@/services/authService';
+import { isAppRoute } from '@/routes/RouteHelpers';
 
 export default function Auth() {
   const location = useLocation();
@@ -21,15 +22,22 @@ export default function Auth() {
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
+  // Make sure we redirect to an app route
+  const getValidRedirectPath = (path: string | null) => {
+    if (!path) return '/app/home';
+    return isAppRoute(path) ? path : '/app/home';
+  };
+  
   // Determine where to redirect after auth
-  const redirectTo = redirectParam || fromLocation || storedRedirect || '/app/home';
+  const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
 
   console.log('Auth page mounted', { 
     redirectTo, 
     redirectParam, 
     fromLocation,
     storedRedirect,
-    hasUser: !!user
+    hasUser: !!user,
+    currentPath: location.pathname
   });
 
   useEffect(() => {

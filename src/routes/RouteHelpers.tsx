@@ -8,10 +8,17 @@ export const isNativeApp = (): boolean => {
 };
 
 export const isAppRoute = (pathname: string): boolean => {
-  return pathname.startsWith('/app');
+  // More strict checking for app routes
+  return pathname === '/app' || pathname.startsWith('/app/');
 };
 
+export const isWebsiteRoute = (pathname: string): boolean => {
+  // Website routes are anything that doesn't start with /app
+  return !isAppRoute(pathname);
+}
+
 export const WebsiteRouteWrapper = ({ element }: { element: React.ReactNode }) => {
+  // Website routes don't require any auth
   return (
     <div className="website-route">
       {element}
