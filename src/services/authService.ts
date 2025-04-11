@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -465,7 +464,7 @@ export const debugAuthState = async (): Promise<{session: any, user: any}> => {
     });
     
     // Check for user session records
-    let sessionRecord = null;
+    let userSessionData = null;
     if (userData.user) {
       try {
         const { data: sessionRecords, error: sessionError } = await supabase
@@ -478,8 +477,8 @@ export const debugAuthState = async (): Promise<{session: any, user: any}> => {
         if (sessionError) {
           console.error('Error fetching user session records:', sessionError);
         } else {
-          sessionRecord = sessionRecords?.[0] || null;
-          console.log('User session record:', sessionRecord);
+          userSessionData = sessionRecords?.[0] || null;
+          console.log('User session record:', userSessionData);
         }
       } catch (e) {
         console.error('Exception fetching user session records:', e);
@@ -488,8 +487,7 @@ export const debugAuthState = async (): Promise<{session: any, user: any}> => {
     
     return {
       session: sessionData.session,
-      user: userData.user,
-      sessionRecord
+      user: userData.user
     };
   } catch (error) {
     console.error('Error debugging auth state:', error);
