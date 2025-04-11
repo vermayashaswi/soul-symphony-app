@@ -46,11 +46,8 @@ const HomePage = () => {
   
   const handleEmailSubmit = (e) => {
     e.preventDefault();
-    // Handle newsletter signup
     console.log('Email submitted:', email);
-    // Clear the input
     setEmail('');
-    // Show success message (you'd typically use a toast here)
     alert('Thanks for subscribing!');
   };
 
@@ -132,7 +129,6 @@ const HomePage = () => {
   };
 
   useEffect(() => {
-    // Auto-rotate features every 5 seconds
     const interval = setInterval(() => {
       nextFeature();
     }, 5000);
@@ -144,7 +140,6 @@ const HomePage = () => {
     <div className="min-h-screen bg-white">
       <Navbar />
       
-      {/* Hero Section */}
       <section className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-24 md:pt-32 pb-16 md:pb-24 overflow-hidden">
         <div 
           className="absolute inset-0 z-0 bg-cover bg-center opacity-20"
@@ -209,22 +204,40 @@ const HomePage = () => {
               transition={{ duration: 1, delay: 0.3 }}
               className="w-full lg:w-1/2"
             >
-              {/* Rich Voice Animation - Using embedded base64 video for reliability */}
               <div className="relative mx-auto max-w-md">
-                <div className="absolute -inset-4 bg-gradient-to-r from-primary/30 to-purple-500/30 rounded-2xl blur-xl opacity-70"></div>
-                <div className="relative overflow-hidden rounded-xl shadow-2xl border border-white/50 shadow-primary/20">
+                <div className="absolute -inset-4 bg-gradient-to-r from-primary/50 to-purple-500/50 rounded-2xl blur-xl opacity-80"></div>
+                <div className="relative overflow-hidden rounded-xl shadow-2xl border-2 border-white/80">
                   <img 
-                    src="https://cdn.dribbble.com/users/257123/screenshots/4587547/media/8dd82cc86cb84fca02086855abd6a7e7.gif" 
+                    src="/lovable-uploads/241062d6-3971-492c-aaeb-a110d1256c7a.png" 
                     alt="Voice to insights animation"
                     className="w-full h-auto rounded-xl bg-white"
                   />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-full h-full bg-gradient-to-r from-blue-600/20 to-purple-600/20 backdrop-blur-sm flex items-center justify-center">
+                      <div className="text-center p-6 relative z-10">
+                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/90 shadow-lg flex items-center justify-center animate-pulse">
+                          <Mic className="h-10 w-10 text-primary" />
+                        </div>
+                        <div className="flex items-center justify-center gap-3 mb-4">
+                          <div className="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
+                          <div className="w-3 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.2s" }}></div>
+                          <div className="w-3 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.4s" }}></div>
+                          <div className="w-3 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.6s" }}></div>
+                          <div className="w-3 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.8s" }}></div>
+                        </div>
+                        <div className="w-20 h-20 mx-auto mt-4 rounded-full bg-white/90 shadow-lg flex items-center justify-center animate-pulse" style={{ animationDelay: "1s" }}>
+                          <Brain className="h-10 w-10 text-purple-500" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 
-                {/* Floating particles effect */}
                 <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                  <div className="absolute top-1/4 right-1/4 w-20 h-20 rounded-full bg-primary/20 blur-xl animate-pulse"></div>
-                  <div className="absolute bottom-1/3 left-1/3 w-16 h-16 rounded-full bg-purple-500/20 blur-xl animate-pulse" style={{animationDelay: "1s"}}></div>
-                  <div className="absolute top-1/2 right-1/3 w-12 h-12 rounded-full bg-blue-500/20 blur-xl animate-pulse" style={{animationDelay: "0.5s"}}></div>
+                  <div className="absolute top-1/4 right-1/4 w-24 h-24 rounded-full bg-primary/40 blur-xl animate-pulse"></div>
+                  <div className="absolute bottom-1/3 left-1/3 w-20 h-20 rounded-full bg-purple-500/40 blur-xl animate-pulse" style={{animationDelay: "1s"}}></div>
+                  <div className="absolute top-1/2 right-1/3 w-16 h-16 rounded-full bg-blue-500/40 blur-xl animate-pulse" style={{animationDelay: "0.5s"}}></div>
+                  <div className="absolute bottom-1/4 right-1/2 w-12 h-12 rounded-full bg-indigo-500/40 blur-xl animate-pulse" style={{animationDelay: "1.5s"}}></div>
                 </div>
               </div>
             </motion.div>
@@ -232,7 +245,6 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* App Features Carousel */}
       <section className="py-16 md:py-24 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -315,7 +327,6 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* How It Works Section */}
       <section className="py-16 md:py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -372,7 +383,6 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* Privacy Section */}
       <section className="py-16 md:py-24 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center gap-12">
@@ -428,7 +438,6 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* Testimonials */}
       <section className="py-16 md:py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -484,7 +493,6 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* Pricing Section */}
       <section className="py-16 md:py-24 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -505,7 +513,6 @@ const HomePage = () => {
             </Tabs>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              {/* Free Plan */}
               <motion.div 
                 className="bg-white rounded-xl overflow-hidden shadow-lg border border-gray-100"
                 initial={{ opacity: 0, y: 20 }}
@@ -549,7 +556,6 @@ const HomePage = () => {
                 </div>
               </motion.div>
               
-              {/* Premium Plan */}
               <motion.div 
                 className="bg-white rounded-xl overflow-hidden shadow-lg border border-primary relative"
                 initial={{ opacity: 0, y: 20 }}
@@ -602,7 +608,6 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* FAQs */}
       <section className="py-16 md:py-24 bg-white">
         <div className="container mx-auto px-4 max-w-4xl">
           <div className="text-center mb-12">
@@ -659,7 +664,6 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* CTA Section */}
       <section id="download-section" className="py-16 md:py-24 bg-gradient-to-br from-primary/10 to-purple-100">
         <div className="container mx-auto px-4 text-center max-w-3xl">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Start Your Self-Discovery Journey?</h2>
@@ -713,7 +717,6 @@ const HomePage = () => {
         </div>
       </section>
       
-      {/* Footer */}
       <Footer />
     </div>
   );

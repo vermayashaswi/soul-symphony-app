@@ -14,6 +14,11 @@ const Navbar = () => {
       downloadSection.scrollIntoView({ behavior: 'smooth' });
     } else {
       console.log("Download section not found");
+      // Fallback: scroll to a reasonable position if section not found
+      window.scrollTo({
+        top: document.body.scrollHeight - window.innerHeight,
+        behavior: 'smooth'
+      });
     }
   };
 
