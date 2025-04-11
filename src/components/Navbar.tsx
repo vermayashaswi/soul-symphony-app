@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -58,7 +59,7 @@ export function Navbar() {
   };
 
   const navItems = [
-    { path: '/', label: 'Home', icon: Home },
+    { path: '/', label: t('navbar.home'), icon: Home },
     { path: '/app/home', label: 'Dashboard', icon: Home },
     { path: '/app/journal', label: 'Journal', icon: Home },
     { path: '/app/insights', label: 'Insights', icon: BarChart2 },

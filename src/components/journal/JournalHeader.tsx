@@ -32,7 +32,7 @@ const JournalHeader = () => {
               transition={{ duration: 0.5 }}
             >
               <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500 shrink-0" />
-              <span className="inline-block">Your <SouloLogo className="inline-flex" useColorTheme={true} /> Journal</span>
+              <span className="inline-block">{t('journal.header.your')} <SouloLogo className="inline-flex" useColorTheme={true} /> {t('journal.header.journal')}</span>
             </motion.h1>
             <motion.p 
               className="text-muted-foreground mt-0.5 text-sm sm:text-base"
@@ -40,7 +40,7 @@ const JournalHeader = () => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              Record your thoughts or browse your previous journal entries
+              {t('journal.header.subtitle')}
             </motion.p>
           </div>
         </div>

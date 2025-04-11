@@ -7,68 +7,72 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
-
-// Blog post data
-const featuredPost = {
-  id: 1,
-  slug: 'why-voice-journaling-is-the-future',
-  title: 'Why Voice Journaling Is The Future',
-  excerpt: 'Discover how voice journaling is revolutionizing self-reflection and personal growth in our digital age.',
-  image: '/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png',
-  date: 'April 10, 2025',
-  author: 'Sarah Johnson',
-  readTime: '8 min read',
-  category: 'Personal Growth'
-};
-
-const blogPosts = [
-  {
-    id: 2,
-    slug: 'how-ai-enhances-your-journaling-experience',
-    title: 'How AI Enhances Your Journaling Experience',
-    excerpt: 'Explore the ways artificial intelligence can provide deeper insights into your thoughts and emotions.',
-    image: '/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png',
-    date: 'April 8, 2025',
-    author: 'Michael Chen',
-    readTime: '9 min read',
-    category: 'Technology'
-  },
-  {
-    id: 3,
-    slug: 'benefits-of-daily-reflection-through-voice-journals',
-    title: 'Benefits of Daily Reflection Through Voice Journals',
-    excerpt: 'Learn how daily voice journaling can improve your mental clarity, emotional well-being, and overall life satisfaction.',
-    image: '/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png',
-    date: 'April 5, 2025',
-    author: 'Emily Rodriguez',
-    readTime: '10 min read',
-    category: 'Wellness'
-  },
-  {
-    id: 4,
-    slug: 'voice-journaling-for-busy-professionals',
-    title: 'Voice Journaling for Busy Professionals',
-    excerpt: 'How busy professionals can incorporate voice journaling into their hectic schedules for better work-life balance.',
-    image: '/lovable-uploads/cb710491-93f0-42be-a596-f64d80d9800e.png',
-    date: 'April 2, 2025',
-    author: 'James Wilson',
-    readTime: '8 min read',
-    category: 'Productivity'
-  },
-  {
-    id: 5,
-    slug: 'tracking-emotional-patterns-with-voice-journaling',
-    title: 'Tracking Emotional Patterns with Voice Journaling',
-    excerpt: 'Discover how voice journaling can help you identify and understand your emotional patterns over time.',
-    image: '/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png',
-    date: 'March 30, 2025',
-    author: 'Olivia Thompson',
-    readTime: '9 min read',
-    category: 'Mental Health'
-  }
-];
+import { useTranslation } from 'react-i18next';
 
 const BlogPage = () => {
+  const { t } = useTranslation();
+  
+  // Blog post data - this would ideally come from a CMS or API
+  // We're hardcoding for demonstration but using translation keys
+  const featuredPost = {
+    id: 1,
+    slug: 'why-voice-journaling-is-the-future',
+    title: t('blog.featuredPost.title'),
+    excerpt: t('blog.featuredPost.excerpt'),
+    image: '/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png',
+    date: t('blog.featuredPost.date'),
+    author: t('blog.featuredPost.author'),
+    readTime: t('blog.featuredPost.readTime'),
+    category: t('blog.featuredPost.category')
+  };
+
+  const blogPosts = [
+    {
+      id: 2,
+      slug: 'how-ai-enhances-your-journaling-experience',
+      title: t('blog.posts.0.title'),
+      excerpt: t('blog.posts.0.excerpt'),
+      image: '/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png',
+      date: t('blog.posts.0.date'),
+      author: t('blog.posts.0.author'),
+      readTime: t('blog.posts.0.readTime'),
+      category: t('blog.posts.0.category')
+    },
+    {
+      id: 3,
+      slug: 'benefits-of-daily-reflection-through-voice-journals',
+      title: t('blog.posts.1.title'),
+      excerpt: t('blog.posts.1.excerpt'),
+      image: '/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png',
+      date: t('blog.posts.1.date'),
+      author: t('blog.posts.1.author'),
+      readTime: t('blog.posts.1.readTime'),
+      category: t('blog.posts.1.category')
+    },
+    {
+      id: 4,
+      slug: 'voice-journaling-for-busy-professionals',
+      title: t('blog.posts.2.title'),
+      excerpt: t('blog.posts.2.excerpt'),
+      image: '/lovable-uploads/cb710491-93f0-42be-a596-f64d80d9800e.png',
+      date: t('blog.posts.2.date'),
+      author: t('blog.posts.2.author'),
+      readTime: t('blog.posts.2.readTime'),
+      category: t('blog.posts.2.category')
+    },
+    {
+      id: 5,
+      slug: 'tracking-emotional-patterns-with-voice-journaling',
+      title: t('blog.posts.3.title'),
+      excerpt: t('blog.posts.3.excerpt'),
+      image: '/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png',
+      date: t('blog.posts.3.date'),
+      author: t('blog.posts.3.author'),
+      readTime: t('blog.posts.3.readTime'),
+      category: t('blog.posts.3.category')
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -76,9 +80,9 @@ const BlogPage = () => {
       <div className="pt-24 md:pt-32 pb-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">SOULo Blog</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">{t('blog.pageTitle')}</h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Insights and guidance for your self-discovery journey through voice journaling.
+              {t('blog.pageSubtitle')}
             </p>
           </div>
           
@@ -126,7 +130,7 @@ const BlogPage = () => {
                         </div>
                       </div>
                       <Button className="w-full group">
-                        Read More
+                        {t('blog.readMore')}
                         <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                       </Button>
                     </div>
@@ -138,7 +142,7 @@ const BlogPage = () => {
           
           {/* Blog Posts Grid */}
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-8">Latest Articles</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-8">{t('blog.latestArticles')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {blogPosts.map((post, index) => (
                 <motion.div

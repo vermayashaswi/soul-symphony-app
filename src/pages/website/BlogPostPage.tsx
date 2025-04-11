@@ -7,11 +7,13 @@ import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import { getBlogPostBySlug } from '@/utils/blog-utils';
 import { BlogPost } from '@/types/blog';
+import { useTranslation } from 'react-i18next';
 
 const BlogPostPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (slug) {
@@ -40,12 +42,12 @@ const BlogPostPage = () => {
       <div className="min-h-screen bg-white">
         <Navbar />
         <div className="pt-32 pb-16 container mx-auto px-4 text-center">
-          <h1 className="text-3xl font-bold mb-4">Blog Post Not Found</h1>
+          <h1 className="text-3xl font-bold mb-4">{t('blog.postNotFound')}</h1>
           <p className="text-muted-foreground mb-8">
-            The blog post you're looking for doesn't exist or has been moved.
+            {t('blog.postNotFoundMessage')}
           </p>
           <Button asChild>
-            <Link to="/blog">Back to Blog</Link>
+            <Link to="/blog">{t('blog.backToBlog')}</Link>
           </Button>
         </div>
         <Footer />
@@ -62,7 +64,7 @@ const BlogPostPage = () => {
           <div className="max-w-3xl mx-auto">
             <Link to="/blog" className="flex items-center text-primary hover:underline mb-8">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Blog
+              {t('blog.backToBlog')}
             </Link>
             
             <div className="aspect-video overflow-hidden rounded-lg mb-8">
@@ -106,12 +108,12 @@ const BlogPostPage = () => {
                   </div>
                   <div>
                     <p className="font-medium">{post.author}</p>
-                    <p className="text-sm text-muted-foreground">Author</p>
+                    <p className="text-sm text-muted-foreground">{t('blog.author')}</p>
                   </div>
                 </div>
                 <div className="flex gap-4">
                   <Button variant="outline" asChild>
-                    <Link to="/blog">More Articles</Link>
+                    <Link to="/blog">{t('blog.moreArticles')}</Link>
                   </Button>
                 </div>
               </div>

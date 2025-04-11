@@ -44,7 +44,7 @@ export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
               repeatType: "reverse"
             }}
           >
-            Speak in any language!!
+            {t('voiceRecorder.speakAnyLanguage')}
           </motion.span>
         </motion.div>
       )}
