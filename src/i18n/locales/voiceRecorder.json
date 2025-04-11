@@ -1,0 +1,17 @@
+
+{
+  "speakAnyLanguage": "Speak in any language, I'll understand you!",
+  "startRecording": "Start Recording",
+  "stopRecording": "Stop Recording",
+  "processingAudio": "Processing your audio...",
+  "recordingTime": "Recording: {seconds} seconds",
+  "tapToStart": "Tap to start recording",
+  "holdToRecord": "Hold to record",
+  "releaseToStop": "Release to stop",
+  "errorOccurred": "An error occurred",
+  "tryAgain": "Please try again",
+  "transcribing": "Transcribing your recording...",
+  "analyzing": "Analyzing your journal...",
+  "somethingWentWrong": "Something went wrong",
+  "notEnoughAudio": "Not enough audio to process. Please record for at least 2 seconds."
+}

@@ -3,8 +3,11 @@ import React from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import SouloLogo from '@/components/SouloLogo';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export default function PrivacyPolicy() {
+  const { t } = useTranslation();
+  
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-12">
@@ -12,87 +15,87 @@ export default function PrivacyPolicy() {
           <Link to="/" className="inline-flex items-center gap-2 mb-8">
             <SouloLogo useColorTheme={true} />
           </Link>
-          <h1 className="text-3xl font-bold mb-2 text-theme-color text-center">Privacy Policy</h1>
-          <p className="text-muted-foreground text-center">How we protect your data and respect your privacy</p>
+          <h1 className="text-3xl font-bold mb-2 text-theme-color text-center">{t('privacy.title')}</h1>
+          <p className="text-muted-foreground text-center">{t('privacy.subtitle')}</p>
         </div>
         
         <div className="bg-background rounded-xl p-6 shadow-sm border">
           <ScrollArea className="pr-4">
             <div className="space-y-6 py-2">
-              <p className="text-sm text-muted-foreground">Last Updated: April 8, 2025</p>
+              <p className="text-sm text-muted-foreground">{t('privacy.lastUpdated', { date: 'April 8, 2025' })}</p>
               
               <div className="space-y-2">
-                <h3 className="text-xl font-semibold">Introduction</h3>
+                <h3 className="text-xl font-semibold">{t('privacy.introTitle')}</h3>
                 <p className="text-muted-foreground">
-                  Welcome to SOuLO ("we," "our," or "us"). We are committed to protecting your privacy and handling your data with transparency and care. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our journaling application.
+                  {t('privacy.introText')}
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-xl font-semibold">Information We Collect</h3>
+                <h3 className="text-xl font-semibold">{t('privacy.dataCollectionTitle')}</h3>
                 <p className="text-muted-foreground">
-                  <strong>Account Information:</strong> When you create an account, we collect your email address, name, and password.
+                  <strong>{t('privacy.accountInfoTitle')}</strong> {t('privacy.accountInfoText')}
                 </p>
                 <p className="text-muted-foreground">
-                  <strong>Journal Entries:</strong> We store the content of your journal entries, including text and voice recordings.
+                  <strong>{t('privacy.journalEntriesTitle')}</strong> {t('privacy.journalEntriesText')}
                 </p>
                 <p className="text-muted-foreground">
-                  <strong>Usage Data:</strong> We collect information about how you interact with our application, such as features used, time spent, and actions taken.
+                  <strong>{t('privacy.usageDataTitle')}</strong> {t('privacy.usageDataText')}
                 </p>
                 <p className="text-muted-foreground">
-                  <strong>Device Information:</strong> We collect information about your device, including IP address, browser type, and operating system.
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-xl font-semibold">How We Use Your Information</h3>
-                <p className="text-muted-foreground">
-                  <strong>Provide and Improve Services:</strong> We use your information to deliver our journaling features, analyze your entries, and generate insights.
-                </p>
-                <p className="text-muted-foreground">
-                  <strong>Personalization:</strong> We personalize your experience based on your preferences and usage patterns.
-                </p>
-                <p className="text-muted-foreground">
-                  <strong>Communication:</strong> We may send you notifications, updates, and support messages.
-                </p>
-                <p className="text-muted-foreground">
-                  <strong>Research and Development:</strong> We use anonymized data to improve our AI algorithms and develop new features.
+                  <strong>{t('privacy.deviceInfoTitle')}</strong> {t('privacy.deviceInfoText')}
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-xl font-semibold">Data Security</h3>
+                <h3 className="text-xl font-semibold">{t('privacy.dataUseTitle')}</h3>
                 <p className="text-muted-foreground">
-                  We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the Internet or electronic storage is 100% secure, and we cannot guarantee absolute security.
+                  <strong>{t('privacy.provideServicesTitle')}</strong> {t('privacy.provideServicesText')}
+                </p>
+                <p className="text-muted-foreground">
+                  <strong>{t('privacy.personalizationTitle')}</strong> {t('privacy.personalizationText')}
+                </p>
+                <p className="text-muted-foreground">
+                  <strong>{t('privacy.communicationTitle')}</strong> {t('privacy.communicationText')}
+                </p>
+                <p className="text-muted-foreground">
+                  <strong>{t('privacy.researchTitle')}</strong> {t('privacy.researchText')}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-xl font-semibold">{t('privacy.securityTitle')}</h3>
+                <p className="text-muted-foreground">
+                  {t('privacy.securityText')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-xl font-semibold">Your Rights</h3>
+                <h3 className="text-xl font-semibold">{t('privacy.rightsTitle')}</h3>
                 <p className="text-muted-foreground">
-                  Depending on your location, you may have rights regarding your personal information, including:
+                  {t('privacy.rightsText')}
                 </p>
                 <ul className="list-disc pl-5 text-muted-foreground space-y-1">
-                  <li>Access to your personal data</li>
-                  <li>Correction of inaccurate data</li>
-                  <li>Deletion of your data</li>
-                  <li>Restriction of processing</li>
-                  <li>Data portability</li>
-                  <li>Objection to processing</li>
+                  <li>{t('privacy.rightsAccess')}</li>
+                  <li>{t('privacy.rightsCorrection')}</li>
+                  <li>{t('privacy.rightsDeletion')}</li>
+                  <li>{t('privacy.rightsRestriction')}</li>
+                  <li>{t('privacy.rightsPortability')}</li>
+                  <li>{t('privacy.rightsObjection')}</li>
                 </ul>
                 <p className="text-muted-foreground mt-2">
-                  To exercise these rights, please contact us at support@soulo.online.
+                  {t('privacy.rightsContact')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-xl font-semibold">Contact Us</h3>
+                <h3 className="text-xl font-semibold">{t('privacy.contactUsTitle')}</h3>
                 <p className="text-muted-foreground">
-                  If you have any questions or concerns about this Privacy Policy or our data practices, please contact us at:
+                  {t('privacy.contactUsText')}
                 </p>
                 <p className="text-muted-foreground">
-                  Email: support@soulo.online<br />
-                  Address: 123 Journal Street, San Francisco, CA 94105, USA
+                  {t('privacy.contactEmail')}: support@soulo.online<br />
+                  {t('privacy.contactAddress')}: 123 Journal Street, San Francisco, CA 94105, USA
                 </p>
               </div>
             </div>
@@ -101,10 +104,10 @@ export default function PrivacyPolicy() {
         
         <div className="mt-8 text-center">
           <Link to="/" className="text-theme-color hover:underline">
-            Return to Homepage
+            {t('privacy.returnHome')}
           </Link>
           <p className="text-xs text-muted-foreground mt-6">
-            © {new Date().getFullYear()} SOuLO. All rights reserved.
+            © {new Date().getFullYear()} SOuLO. {t('footer.rights')}
           </p>
         </div>
       </div>

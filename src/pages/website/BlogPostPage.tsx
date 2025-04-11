@@ -13,7 +13,7 @@ const BlogPostPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   useEffect(() => {
     if (slug) {
@@ -55,6 +55,39 @@ const BlogPostPage = () => {
     );
   }
 
+  // Get translated content based on current language
+  const getTranslatedContent = () => {
+    // This is a simplified example - in a real app, you would fetch translated content from your API
+    // or have translations for each content piece
+    if (i18n.language === 'en' || !post.translations) {
+      return {
+        title: post.title,
+        excerpt: post.excerpt,
+        content: post.content,
+        category: post.category
+      };
+    }
+    
+    const translations = post.translations?.[i18n.language];
+    if (translations) {
+      return {
+        title: translations.title || post.title,
+        excerpt: translations.excerpt || post.excerpt,
+        content: translations.content || post.content,
+        category: translations.category || post.category
+      };
+    }
+    
+    return {
+      title: post.title,
+      excerpt: post.excerpt,
+      content: post.content,
+      category: post.category
+    };
+  };
+
+  const translatedContent = getTranslatedContent();
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -70,7 +103,7 @@ const BlogPostPage = () => {
             <div className="aspect-video overflow-hidden rounded-lg mb-8">
               <img 
                 src={post.image} 
-                alt={post.title}
+                alt={translatedContent.title}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -78,7 +111,7 @@ const BlogPostPage = () => {
             <div className="mb-8">
               <div className="flex flex-wrap items-center gap-4 mb-4 text-sm text-muted-foreground">
                 <span className="text-xs font-medium uppercase text-primary bg-primary/10 px-2 py-1 rounded-full">
-                  {post.category}
+                  {translatedContent.category}
                 </span>
                 <div className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
@@ -94,11 +127,11 @@ const BlogPostPage = () => {
                 </div>
               </div>
               
-              <h1 className="text-3xl md:text-4xl font-bold mb-4">{post.title}</h1>
-              <p className="text-lg text-muted-foreground">{post.excerpt}</p>
+              <h1 className="text-3xl md:text-4xl font-bold mb-4">{translatedContent.title}</h1>
+              <p className="text-lg text-muted-foreground">{translatedContent.excerpt}</p>
             </div>
             
-            <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: post.content }}></div>
+            <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: translatedContent.content }}></div>
             
             <div className="border-t border-gray-100 mt-12 pt-8">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
