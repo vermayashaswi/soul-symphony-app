@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bug, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Bug, X, ChevronDown, ChevronRight, Check, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useDebugLog } from '@/utils/debug/DebugContext';
@@ -13,11 +13,50 @@ type LanguageAction = {
   details?: any;
 };
 
+type TranslationCheck = {
+  element: string;
+  translated: boolean;
+  expected: string;
+  actual: string;
+};
+
 const LanguageDebugPanel = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [actions, setActions] = useState<LanguageAction[]>([]);
-  const { i18n } = useTranslation();
+  const [translationChecks, setTranslationChecks] = useState<TranslationCheck[]>([]);
+  const { i18n, t } = useTranslation();
   const { addEvent } = useDebugLog();
+
+  // Check if key elements on the page are properly translated
+  const checkTranslations = () => {
+    // Common keys to check across pages
+    const keysToCheck = [
+      { key: 'mainTagline', element: 'Main Tagline' },
+      { key: 'hero.welcome', element: 'Hero Welcome' },
+      { key: 'hero.tagline', element: 'Hero Tagline' },
+      { key: 'hero.getStarted', element: 'Get Started Button' },
+      { key: 'features.title', element: 'Features Title' }
+    ];
+
+    const checks = keysToCheck.map(item => {
+      const translated = t(item.key) !== item.key;
+      return {
+        element: item.element,
+        translated,
+        expected: item.key,
+        actual: t(item.key)
+      };
+    });
+
+    setTranslationChecks(checks);
+    
+    // Log the translation checks to the debug log
+    addEvent('i18n', 'Translation check performed', 'info', {
+      checks,
+      currentLanguage: i18n.language,
+      pageUrl: window.location.pathname
+    });
+  };
 
   // Listen for language changes
   useEffect(() => {
@@ -29,12 +68,16 @@ const LanguageDebugPanel = () => {
         details: {
           localStorage: localStorage.getItem('i18nextLng'),
           navigatorLanguage: navigator.language,
-          documentLang: document.documentElement.lang
+          documentLang: document.documentElement.lang,
+          pageElements: document.querySelectorAll('[data-i18n]').length
         }
       };
       
       setActions(prev => [action, ...prev]);
       addEvent('i18n', `Language changed to ${lng}`, 'info', action.details);
+      
+      // Run translation checks when language changes
+      setTimeout(checkTranslations, 100);
     };
 
     // Add listener for language changes
@@ -52,14 +95,37 @@ const LanguageDebugPanel = () => {
         availableLanguages: i18n.options.supportedLngs
       }
     }]);
+    
+    // Run initial translation check
+    checkTranslations();
+
+    const observer = new MutationObserver(() => {
+      // Only update translation checks if debug panel is open
+      if (isOpen) {
+        checkTranslations();
+      }
+    });
+
+    // Observe the document body for changes that might indicate content translation
+    observer.observe(document.body, { 
+      childList: true, 
+      subtree: true,
+      characterData: true 
+    });
 
     return () => {
       i18n.off('languageChanged', handleLanguageChanged);
+      observer.disconnect();
     };
-  }, [i18n, addEvent]);
+  }, [i18n, addEvent, isOpen]);
 
   const copyDebugInfo = () => {
-    const debugInfo = JSON.stringify(actions, null, 2);
+    const debugInfo = JSON.stringify({
+      actions,
+      translationChecks,
+      currentUrl: window.location.href,
+      userAgent: navigator.userAgent
+    }, null, 2);
     navigator.clipboard.writeText(debugInfo);
     toast.success('Debug info copied to clipboard');
   };
@@ -70,6 +136,15 @@ const LanguageDebugPanel = () => {
 
   const togglePanel = () => {
     setIsOpen(!isOpen);
+    if (!isOpen) {
+      // Refresh translation checks when panel is opened
+      checkTranslations();
+    }
+  };
+
+  const checkPageTranslation = () => {
+    checkTranslations();
+    toast.success('Translation check completed');
   };
 
   return (
@@ -146,12 +221,38 @@ const LanguageDebugPanel = () => {
             <h3 className="text-sm font-semibold">Current Language: <span className="text-primary">{i18n.language}</span></h3>
             <div className="text-xs mt-1">
               <div>localStorage: <span className="font-mono">{localStorage.getItem('i18nextLng') || 'not set'}</span></div>
-              <div>navigator: <span className="font-mono">{navigator.language}</span></div>
+              <div className="flex items-center">
+                navigator: <span className="font-mono ml-1">{navigator.language}</span>
+                <span className="text-amber-500 ml-1 text-xs">(browser setting, can't be changed by website)</span>
+              </div>
               <div>document: <span className="font-mono">{document.documentElement.lang}</span></div>
-              <div>reload after change: <span className="font-mono">true</span></div>
+            </div>
+            <div className="mt-2">
+              <Button variant="outline" size="sm" className="w-full" onClick={checkPageTranslation}>
+                Check Page Translation
+              </Button>
             </div>
           </div>
 
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold mb-2">Translation Checks</h3>
+            <div className="space-y-1">
+              {translationChecks.map((check, index) => (
+                <div key={index} className="p-1 border rounded flex items-center text-xs">
+                  {check.translated ? 
+                    <Check className="h-3 w-3 text-green-500 mr-1" /> : 
+                    <AlertCircle className="h-3 w-3 text-red-500 mr-1" />
+                  }
+                  <span className="font-medium">{check.element}:</span>
+                  <span className="ml-1 truncate flex-1">
+                    {check.translated ? check.actual : `Not translated (${check.expected})`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <h3 className="text-sm font-semibold mb-2">Language Change History</h3>
           <div className="space-y-2">
             {actions.map((action, index) => (
               <div key={index} className="p-2 border rounded text-sm">
