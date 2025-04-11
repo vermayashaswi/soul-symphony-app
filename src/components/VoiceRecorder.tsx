@@ -302,7 +302,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     });
   };
 
-  // Determine if we should show the animated prompt
   const shouldShowPrompt = !isRecording && !audioBlob;
 
   return (
@@ -319,8 +318,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           </div>
         )}
         
-        <div className="relative z-10 flex flex-col items-center justify-start w-full h-full pt-20">
-          {/* Add the animated prompt here */}
+        <div className="relative z-10 flex flex-col items-center justify-start w-full h-full pt-4">
           <AnimatedPrompt show={shouldShowPrompt} />
           
           <div className="relative z-10 flex justify-center items-center mt-40">

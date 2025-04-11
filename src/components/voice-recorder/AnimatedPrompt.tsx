@@ -28,9 +28,9 @@ export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
       {isVisible && (
         <motion.div 
           className="w-full flex justify-center mb-4 text-center"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 20 }}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.5, ease: "easeInOut" }}
         >
           <motion.div 
@@ -44,8 +44,8 @@ export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
               repeatType: "reverse"
             }}
           >
-            <span>Speak in any language,</span>
-            <span>I'll understand you!</span>
+            <span>{t('voiceRecorder.speakAnyLanguage', 'Speak in any language,')}</span>
+            <span>{t('voiceRecorder.illUnderstandYou', "I'll understand you!")}</span>
           </motion.div>
         </motion.div>
       )}
