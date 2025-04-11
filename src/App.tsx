@@ -14,6 +14,8 @@ import "./styles/mobile.css";
 import { useEffect } from 'react';
 import { handleAuthCallback } from "./services/authService";
 import { DebugLogProvider } from "./utils/debug/DebugContext";
+import { I18nextProvider } from 'react-i18next';
+import i18n from './i18n/i18n';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -124,31 +126,33 @@ const App = () => {
   }, []);
   
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <ThemeProvider>
-            <AuthProvider>
-              <DebugLogProvider>
-                <div className="relative min-h-screen">
-                  <div className="relative z-10">
-                    {/* Add the TouchAnimation component here */}
-                    <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
-                      <TouchAnimation />
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <BrowserRouter>
+            <ThemeProvider>
+              <AuthProvider>
+                <DebugLogProvider>
+                  <div className="relative min-h-screen">
+                    <div className="relative z-10">
+                      {/* Add the TouchAnimation component here */}
+                      <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
+                        <TouchAnimation />
+                      </div>
+                      <Toaster />
+                      <Sonner position="top-center" closeButton={false} />
+                      <AnimatePresence mode="wait">
+                        <AppRoutes />
+                      </AnimatePresence>
                     </div>
-                    <Toaster />
-                    <Sonner position="top-center" closeButton={false} />
-                    <AnimatePresence mode="wait">
-                      <AppRoutes />
-                    </AnimatePresence>
                   </div>
-                </div>
-              </DebugLogProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+                </DebugLogProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </I18nextProvider>
   );
 };
 

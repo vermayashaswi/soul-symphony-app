@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
 import { 
@@ -39,14 +39,28 @@ const languageOptions = [
 const LanguageSelector = () => {
   const { i18n } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [currentLang, setCurrentLang] = useState(i18n.language);
 
-  const currentLanguage = languageOptions.find(lang => lang.code === i18n.language) || languageOptions[0];
+  useEffect(() => {
+    // Ensure language is applied from localStorage on component mount
+    const savedLang = localStorage.getItem('i18nextLng');
+    if (savedLang && savedLang !== i18n.language) {
+      i18n.changeLanguage(savedLang);
+      setCurrentLang(savedLang);
+    }
+  }, [i18n]);
+
+  const currentLanguage = languageOptions.find(lang => lang.code === currentLang) || languageOptions[0];
 
   const changeLanguage = (code: string) => {
     i18n.changeLanguage(code);
+    setCurrentLang(code);
     setOpen(false);
     // Save language preference
     localStorage.setItem('i18nextLng', code);
+    
+    // Force reload to ensure all components update with the new language
+    window.location.reload();
   };
 
   return (
@@ -61,7 +75,7 @@ const LanguageSelector = () => {
           <DropdownMenuItem
             key={language.code}
             onClick={() => changeLanguage(language.code)}
-            className={i18n.language === language.code ? 'bg-muted font-medium' : ''}
+            className={currentLang === language.code ? 'bg-muted font-medium' : ''}
           >
             {language.name}
           </DropdownMenuItem>

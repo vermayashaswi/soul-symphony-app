@@ -93,6 +93,7 @@ const resources = {
   }
 };
 
+// Initialize i18next
 i18n
   // Detect user language
   .use(LanguageDetector)
@@ -108,8 +109,17 @@ i18n
     },
     detection: {
       order: ['localStorage', 'navigator'],
+      lookupLocalStorage: 'i18nextLng',
       caches: ['localStorage']
+    },
+    react: {
+      useSuspense: false // This prevents issues with suspense during language loading
     }
   });
+
+// Add a language change listener to help debug
+i18n.on('languageChanged', (lng) => {
+  console.log(`Language changed to: ${lng}`);
+});
 
 export default i18n;
