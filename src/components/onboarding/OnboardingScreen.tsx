@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -521,7 +522,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
               placeholder="Enter your name"
               value={props.name}
               onChange={(e) => props.setName(e.target.value)}
-              className="bg-background/80 border-theme/20 focus:border-theme"
+              className="bg-background/80 border-theme/20 focus:border-theme text-white"
               autoFocus
             />
             
