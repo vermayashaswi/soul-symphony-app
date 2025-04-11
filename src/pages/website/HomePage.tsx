@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail } from 'lucide-react';
@@ -158,7 +159,6 @@ const HomePage = () => {
               transition={{ duration: 0.8 }}
               className="w-full lg:w-1/2 text-center lg:text-left"
             >
-              {/* Removed logo as requested */}
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
                 Express. Reflect. <span className="text-primary">Grow.</span>
               </h1>
@@ -210,7 +210,7 @@ const HomePage = () => {
               transition={{ duration: 1, delay: 0.3 }}
               className="w-full lg:w-1/2"
             >
-              {/* Voice to Insights Animation - Replaced static image with animation */}
+              {/* Voice to Insights Animation - Improved with clearer animation */}
               <div className="relative mx-auto max-w-md">
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-xl"></div>
                 <div className="relative overflow-hidden shadow-2xl border border-white/50 rounded-xl">
@@ -220,16 +220,29 @@ const HomePage = () => {
                     muted 
                     playsInline
                     className="w-full h-auto"
+                    style={{ maxHeight: "400px" }}
                   >
                     <source 
-                      src="https://static.vecteezy.com/system/resources/previews/023/610/147/mp4/smart-assistant-voice-control-interface-concept-audio-waves-and-digital-sound-visualization-free-video.mp4" 
+                      src="https://cdn.pixabay.com/vimeo/802619079/voice-170750.mp4?width=640&hash=d6c1a6583d73c7ed16d0c8f3c37db89fce1ab731" 
                       type="video/mp4" 
+                    />
+                    <source 
+                      src="https://cdn.pixabay.com/vimeo/802619079/voice-170750.webm?width=640&hash=bd4c9c7553fe4be290531a075c99c3f5e5e9a72d" 
+                      type="video/webm" 
                     />
                     Your browser does not support the video tag.
                   </video>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-lg">
-                      <p className="text-sm font-medium text-gray-800">Voice → AI → Insights</p>
+                  
+                  <div className="absolute bottom-4 left-4 right-4 bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-lg text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <Mic className="h-5 w-5 text-primary animate-pulse" />
+                      <span className="text-sm font-medium text-gray-800">Voice</span>
+                      <ArrowRight className="h-4 w-4" />
+                      <Brain className="h-5 w-5 text-primary" />
+                      <span className="text-sm font-medium text-gray-800">AI</span>
+                      <ArrowRight className="h-4 w-4" />
+                      <LineChart className="h-5 w-5 text-primary" />
+                      <span className="text-sm font-medium text-gray-800">Insights</span>
                     </div>
                   </div>
                 </div>
