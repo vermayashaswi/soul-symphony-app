@@ -408,13 +408,6 @@ const HomePage = () => {
                   <Play className="h-5 w-5" />
                   <span>Google Play</span>
                 </Button>
-                <Button 
-                  size="lg" 
-                  variant="outline" 
-                  asChild
-                >
-                  <a href="/app">Try Web App</a>
-                </Button>
               </div>
               
               <div className="flex items-center justify-center lg:justify-start gap-8 text-sm text-gray-500">
@@ -446,9 +439,7 @@ const HomePage = () => {
       <section className="py-16 md:py-24 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
-              App Features
-            </span>
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">App Features</span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOULo's Features</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
@@ -894,13 +885,6 @@ const HomePage = () => {
             >
               <Play className="h-5 w-5" />
               <span>Google Play</span>
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              asChild
-            >
-              <a href="/app">Try Web App</a>
             </Button>
           </div>
           
