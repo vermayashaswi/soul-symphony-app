@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
+import { useTranslation } from 'react-i18next';
 
 interface AnimatedPromptProps {
   show: boolean;
@@ -10,6 +11,7 @@ interface AnimatedPromptProps {
 export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
   const [isVisible, setIsVisible] = useState(false);
   const { theme } = useTheme();
+  const { t } = useTranslation();
   
   useEffect(() => {
     // Small delay to make sure the animation runs properly

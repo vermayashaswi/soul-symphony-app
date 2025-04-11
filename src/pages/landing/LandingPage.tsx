@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Shield, MessageSquare, Brain, LineChart, Mic, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 // Components
 import Navbar from '@/components/Navbar';
@@ -16,6 +17,8 @@ import PrivacySection from './components/PrivacySection';
 import Footer from './components/Footer';
 
 const LandingPage = () => {
+  const { t } = useTranslation();
+  
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -39,23 +42,23 @@ const LandingPage = () => {
   const features = [
     {
       icon: Mic,
-      title: "Voice Journaling",
-      description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically."
+      title: t('feature1.title'),
+      description: t('feature1.description')
     },
     {
       icon: Brain,
-      title: "AI Analysis",
-      description: "Gain insights into your patterns and emotions through advanced AI analysis."
+      title: t('feature2.title'),
+      description: t('feature2.description')
     },
     {
       icon: LineChart,
-      title: "Emotional Tracking",
-      description: "Visualize your emotional journey over time with interactive charts."
+      title: t('feature3.title'),
+      description: t('feature3.description')
     },
     {
       icon: MessageSquare,
-      title: "AI Assistant",
-      description: "Chat with your journal and get personalized insights from your past entries."
+      title: t('feature4.title'),
+      description: t('feature4.description')
     }
   ];
 
@@ -82,22 +85,18 @@ const LandingPage = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <motion.div className="w-full md:w-1/2 text-center md:text-left" variants={itemVariants}>
               <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
-                Introducing SOULo
+                {t('hero.welcome')}
               </span>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
-                Express. Reflect.{" "}
-                <span className="text-primary">Grow.</span>
+                {t('hero.tagline')}
               </h1>
-              <p className="text-xl md:text-2xl mb-8 text-muted-foreground">
-                Discover yourself through voice journaling and AI-powered insights with SOULo.
-              </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                 <Button size="lg" className="group">
-                  Download App
+                  {t('navbar.download')}
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 <Button size="lg" variant="outline" asChild>
-                  <Link to="/blog">Explore Blog</Link>
+                  <Link to="/blog">{t('navbar.blog')}</Link>
                 </Button>
               </div>
             </motion.div>
@@ -127,7 +126,7 @@ const LandingPage = () => {
             transition={{ delay: 1.5, duration: 0.5 }}
             onClick={scrollToFeatures}
           >
-            <span className="text-sm text-muted-foreground">Discover More</span>
+            <span className="text-sm text-muted-foreground">{t('hero.exploreMore')}</span>
             <ChevronDown className="animate-bounce" />
           </motion.div>
         </div>
@@ -137,7 +136,7 @@ const LandingPage = () => {
       <section className="py-12 md:py-16 bg-primary/5 backdrop-blur-sm">
         <div className="container mx-auto text-center">
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-medium max-w-4xl mx-auto">
-            Keep a journal and capture your day without writing down a single word!
+            {t('mainTagline')}
           </h2>
         </div>
       </section>
@@ -146,10 +145,12 @@ const LandingPage = () => {
       <section id="features" className="py-16 md:py-24">
         <div className="container mx-auto max-w-6xl px-4">
           <div className="text-center mb-12">
-            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Features</span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">How SOULo Works</h2>
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
+              {t('features.title')}
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('features.title')}</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
+              {t('features.subtitle')}
             </p>
           </div>
           

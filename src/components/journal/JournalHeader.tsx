@@ -7,10 +7,12 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import SouloLogo from '@/components/SouloLogo';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
+import { useTranslation } from 'react-i18next';
 
 const JournalHeader = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const { t } = useTranslation();
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldAdjustForMobile = isMobile || mobileDemo;
