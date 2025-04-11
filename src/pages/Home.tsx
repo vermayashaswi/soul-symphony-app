@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
@@ -111,33 +110,37 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="p-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-theme">{getJournalName()}</h1>
-        <p className="text-muted-foreground font-medium">{formattedDate}</p>
+    <div className="min-h-screen bg-background text-foreground relative">
+      <EnergyAnimation fullScreen={true} />
+      
+      <div className="relative z-10">
+        <div className="p-6 flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-theme">{getJournalName()}</h1>
+          <p className="text-muted-foreground font-medium">{formattedDate}</p>
+        </div>
+
+        <motion.div
+          className="px-4 py-8"
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+        >
+          <motion.div variants={itemVariants} className="mb-8">
+            <Card className="overflow-hidden rounded-xl max-w-md mx-auto backdrop-blur-sm bg-background/60">
+              <div 
+                className="h-64 w-full cursor-pointer relative"
+                onClick={handleNavigateToJournal}
+              >
+                <EnergyAnimation />
+              </div>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={itemVariants} key={refreshKey}>
+            <InspirationalQuote />
+          </motion.div>
+        </motion.div>
       </div>
-
-      <motion.div
-        className="px-4 py-8"
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-      >
-        <motion.div variants={itemVariants} className="mb-8">
-          <Card className="overflow-hidden rounded-xl max-w-md mx-auto">
-            <div 
-              className="h-64 w-full cursor-pointer relative"
-              onClick={handleNavigateToJournal}
-            >
-              <EnergyAnimation />
-            </div>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={itemVariants} key={refreshKey}>
-          <InspirationalQuote />
-        </motion.div>
-      </motion.div>
     </div>
   );
 };
