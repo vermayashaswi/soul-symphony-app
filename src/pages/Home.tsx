@@ -18,6 +18,12 @@ const Home = () => {
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   
+  // Preload the chat avatar image
+  useEffect(() => {
+    const preloadImage = new Image();
+    preloadImage.src = '/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png';
+  }, []);
+  
   useEffect(() => {
     console.log('Home component mounted');
     
@@ -106,6 +112,16 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-background text-foreground relative">
       <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
+      
+      {/* Hidden div to preload chat avatar image */}
+      <div className="hidden">
+        <img 
+          src="/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png" 
+          alt="Preload Ruh's avatar" 
+          width="1" 
+          height="1"
+        />
+      </div>
       
       <div className="relative z-10 flex flex-col h-[calc(100vh-80px)]">
         <div className="p-6 flex items-center justify-between">
