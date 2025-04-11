@@ -16,7 +16,14 @@ const languageOptions = [
   { code: 'es', name: 'Español' },
   { code: 'fr', name: 'Français' },
   { code: 'de', name: 'Deutsch' },
-  { code: 'zh', name: '中文' }
+  { code: 'zh', name: '中文' },
+  { code: 'ja', name: '日本語' },
+  { code: 'ru', name: 'Русский' },
+  { code: 'pt', name: 'Português' },
+  { code: 'ar', name: 'العربية' },
+  { code: 'hi', name: 'हिन्दी' },
+  { code: 'it', name: 'Italiano' },
+  { code: 'ko', name: '한국어' }
 ];
 
 const LanguageSelector: React.FC = () => {
@@ -38,7 +45,7 @@ const LanguageSelector: React.FC = () => {
           <span className="hidden md:inline">{currentLanguage.name}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-background">
+      <DropdownMenuContent align="end" className="bg-background max-h-80 overflow-y-auto">
         {languageOptions.map((language) => (
           <DropdownMenuItem 
             key={language.code}

@@ -9,6 +9,13 @@ import esTranslation from './locales/es.json';
 import frTranslation from './locales/fr.json';
 import deTranslation from './locales/de.json';
 import zhTranslation from './locales/zh.json';
+import jaTranslation from './locales/ja.json';
+import ruTranslation from './locales/ru.json';
+import ptTranslation from './locales/pt.json';
+import arTranslation from './locales/ar.json';
+import hiTranslation from './locales/hi.json';
+import itTranslation from './locales/it.json';
+import koTranslation from './locales/ko.json';
 
 // Resources for i18next
 const resources = {
@@ -26,6 +33,27 @@ const resources = {
   },
   zh: {
     translation: zhTranslation
+  },
+  ja: {
+    translation: jaTranslation
+  },
+  ru: {
+    translation: ruTranslation
+  },
+  pt: {
+    translation: ptTranslation
+  },
+  ar: {
+    translation: arTranslation
+  },
+  hi: {
+    translation: hiTranslation
+  },
+  it: {
+    translation: itTranslation
+  },
+  ko: {
+    translation: koTranslation
   }
 };
 

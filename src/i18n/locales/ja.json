@@ -1,0 +1,51 @@
+
+{
+  "navbar": {
+    "home": "ホーム",
+    "blog": "ブログ",
+    "faq": "よくある質問",
+    "download": "ダウンロード",
+    "openApp": "アプリを開く",
+    "tryWebApp": "ウェブアプリを試す",
+    "signIn": "ログイン"
+  },
+  "hero": {
+    "welcome": "ようこそ",
+    "tagline": "音声ジャーナリングを使用した感情的な健康と自己反省のためのパーソナルAIコンパニオン",
+    "getStarted": "始める",
+    "exploreMore": "もっと探る"
+  },
+  "features": {
+    "title": "SOULoの仕組み",
+    "subtitle": "私たちの革新的なアプローチは、音声ジャーナリングとAI技術を組み合わせて、あなた自身に関する意味のある洞察を提供します。"
+  },
+  "feature1": {
+    "title": "音声ジャーナリング",
+    "description": "音声であなたの考えを記録し、SOULoが自動的にそれらを文字起こしして分析します。"
+  },
+  "feature2": {
+    "title": "AI分析",
+    "description": "高度なAI分析を通じて、あなたのパターンと感情についての洞察を得ましょう。"
+  },
+  "feature3": {
+    "title": "感情追跡",
+    "description": "インタラクティブなチャートであなたの感情の旅を視覚化します。"
+  },
+  "feature4": {
+    "title": "AIアシスタント",
+    "description": "あなたのジャーナルとチャットし、過去のエントリーから個別化された洞察を得ましょう。"
+  },
+  "download": {
+    "title": "今日SOULoを入手",
+    "subtitle": "iOSとAndroidで利用可能",
+    "appStore": "App Store",
+    "googlePlay": "Google Play"
+  },
+  "footer": {
+    "contact": "いつでもご連絡いただけます",
+    "rights": "全著作権所有。",
+    "privacy": "プライバシーポリシー",
+    "terms": "利用規約"
+  },
+  "mainTagline": "一言も書かずに日記をつけて一日を記録しましょう！"
+}
