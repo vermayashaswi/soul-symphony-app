@@ -1,12 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { Button } from '@/components/ui/button';
-import { ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/use-theme';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 import EnergyAnimation from '@/components/EnergyAnimation';
@@ -17,7 +15,6 @@ const Home = () => {
   const { colorTheme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const navigate = useNavigate();
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   
@@ -91,10 +88,6 @@ const Home = () => {
     return 'Your Journal';
   };
 
-  const handleNavigateToJournal = () => {
-    navigate('/journal');
-  };
-
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -120,26 +113,19 @@ const Home = () => {
           <p className="text-muted-foreground font-medium">{formattedDate}</p>
         </div>
 
-        <motion.div
-          className="px-4 py-8"
-          variants={containerVariants}
-          initial="hidden"
-          animate="show"
-        >
-          <motion.div variants={itemVariants} className="mb-8">
-            <Button 
-              onClick={handleNavigateToJournal}
-              className="w-full py-6 text-lg flex items-center justify-between relative z-10"
-            >
-              Start Journaling
-              <ChevronRight />
-            </Button>
-          </motion.div>
-
-          <motion.div variants={itemVariants} key={refreshKey} className="relative z-20">
+        <div className="flex-1 flex flex-col justify-between" style={{ minHeight: 'calc(100vh - 160px)' }}>
+          <div>
+            {/* Content can be added here in the future */}
+          </div>
+          
+          <motion.div 
+            variants={itemVariants} 
+            key={refreshKey} 
+            className="relative z-20 mb-20"
+          >
             <InspirationalQuote />
           </motion.div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
