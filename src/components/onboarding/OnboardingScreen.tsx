@@ -63,7 +63,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
         >
           <div className="absolute inset-0 z-0">
             <motion.div 
-              className="w-full h-full rounded-full bg-theme-lighter flex items-center justify-center overflow-hidden"
+              className="w-full h-full rounded-full bg-theme-dark dark:bg-theme-dark flex items-center justify-center overflow-hidden"
               animate={{ 
                 boxShadow: ["0 0 0 0px rgba(var(--color-theme), 0.2)", "0 0 0 20px rgba(var(--color-theme), 0)", "0 0 0 0px rgba(var(--color-theme), 0.2)"]
               }}
@@ -101,7 +101,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             {[...Array(5)].map((_, i) => (
               <motion.div
                 key={`particle-${i}`}
-                className="absolute rounded-full bg-theme-lighter"
+                className="absolute rounded-full bg-theme-dark dark:bg-theme-dark"
                 style={{
                   width: Math.random() * 30 + 10,
                   height: Math.random() * 30 + 10,
@@ -170,7 +170,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
           transition={{ duration: 0.5 }}
         >
           <motion.div
-            className="absolute w-56 h-56 bg-theme-lighter rounded-full opacity-20"
+            className="absolute w-56 h-56 bg-theme-dark dark:bg-theme-dark rounded-full opacity-20"
             animate={{
               scale: [1, 1.1, 1],
             }}
@@ -311,113 +311,45 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     description: "Record your thoughts with voice notes that are automatically transcribed and analyzed for emotional patterns.",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
-        <div className="relative w-64 h-64 bg-theme-lighter rounded-full flex items-center justify-center overflow-hidden">
-          <div className="absolute inset-0 flex items-center justify-center">
+        <div className="relative w-64 h-64 flex items-center justify-center overflow-hidden">
+          {/* Concentric circles that pulse with the mic button */}
+          {[60, 80, 100, 120].map((size, index) => (
             <motion.div
-              className="absolute w-[140px] h-[140px] rounded-full bg-theme/10"
-              animate={{
-                scale: [1, 1.15, 1],
-                opacity: [0.3, 0.2, 0.3]
-              }}
-              transition={{
-                duration: 2.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.1
-              }}
-            />
-            
-            <motion.div
-              className="absolute w-[120px] h-[120px] rounded-full bg-theme/20"
-              animate={{
-                scale: [1, 1.25, 1],
-                opacity: [0.4, 0.3, 0.4]
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.3
-              }}
-            />
-            
-            <motion.div
-              className="absolute w-[100px] h-[100px] rounded-full bg-theme/30"
-              animate={{
-                scale: [1, 1.35, 1],
-                opacity: [0.5, 0.4, 0.5]
-              }}
-              transition={{
-                duration: 3.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.5
-              }}
-            />
-            
-            <motion.div
-              className="absolute w-[80px] h-[80px] rounded-full bg-theme/40"
-              animate={{
-                scale: [1, 1.45, 1],
-                opacity: [0.6, 0.5, 0.6]
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.7
-              }}
-            />
-            
-            <motion.div
-              className="absolute w-[60px] h-[60px] rounded-full bg-theme/50"
-              animate={{
-                scale: [1, 1.55, 1],
-                opacity: [0.7, 0.6, 0.7]
-              }}
-              transition={{
-                duration: 4.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.9
-              }}
-            />
-            
-            <motion.div
-              className="relative w-28 h-28 rounded-full bg-theme-light flex items-center justify-center"
+              key={`circle-${index}`}
+              className="absolute rounded-full bg-theme/20 dark:bg-theme/20"
+              style={{ width: size, height: size }}
               animate={{
                 scale: [1, 1.2, 1],
-                boxShadow: [
-                  "0 0 0 0 rgba(var(--color-theme), 0.7)",
-                  "0 0 0 25px rgba(var(--color-theme), 0)",
-                  "0 0 0 0 rgba(var(--color-theme), 0)"
-                ]
+                opacity: [0.15, 0.25, 0.15]
               }}
               transition={{
-                duration: 1.5,
+                duration: 2 + index * 0.5,
                 repeat: Infinity,
-                ease: "easeInOut"
+                ease: "easeInOut",
+                delay: index * 0.2
               }}
-            >
-              <div className="w-20 h-20 rounded-full bg-theme flex items-center justify-center text-white">
-                <Mic className="w-10 h-10 animate-pulse" />
-              </div>
-            </motion.div>
-          </div>
+            />
+          ))}
           
-          <motion.div 
-            className="absolute inset-0 opacity-20"
-            animate={{ 
-              scale: [1, 1.2, 1],
-              opacity: [0.2, 0.3, 0.2] 
+          <motion.div
+            className="relative w-28 h-28 rounded-full bg-theme-light flex items-center justify-center"
+            animate={{
+              scale: [1, 1.1, 1],
+              boxShadow: [
+                "0 0 0 0 rgba(var(--color-theme), 0.7)",
+                "0 0 0 15px rgba(var(--color-theme), 0)",
+                "0 0 0 0 rgba(var(--color-theme), 0)"
+              ]
             }}
-            transition={{ 
-              repeat: Infinity, 
-              duration: 2,
-              ease: "easeInOut" 
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              ease: "easeInOut"
             }}
           >
-            <div className="w-full h-full rounded-full bg-theme"></div>
+            <div className="w-20 h-20 rounded-full bg-theme flex items-center justify-center text-white">
+              <Mic className="w-10 h-10 animate-pulse" />
+            </div>
           </motion.div>
         </div>
       </div>
@@ -430,9 +362,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     description: "Get insights into your emotional patterns and growth through advanced AI analysis.",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
-        <div className="relative w-64 h-64 bg-theme-lighter rounded-full flex flex-col items-center justify-center overflow-hidden p-4">
+        <div className="relative w-64 h-64 flex flex-col items-center justify-center overflow-hidden p-4">
           <motion.div 
-            className="absolute inset-0 bg-theme opacity-5 rounded-full"
+            className="absolute inset-0 bg-theme opacity-5 dark:bg-theme dark:opacity-10 rounded-full"
             animate={{
               scale: [1, 1.1, 1]
             }}
@@ -494,7 +426,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     description: "Ask questions about your emotions, patterns, and growth through natural conversation with AI.",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2 w-full">
-        <div className="relative w-full max-w-xs bg-theme-lighter rounded-xl flex items-center justify-center overflow-hidden p-4">
+        <div className="relative w-full max-w-xs bg-theme-dark/30 dark:bg-theme-dark/30 rounded-xl flex items-center justify-center overflow-hidden p-4">
           <motion.div
             className="absolute inset-0 bg-gradient-to-b from-transparent to-theme/10"
             animate={{ opacity: [0.3, 0.5, 0.3] }}
@@ -507,7 +439,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
           
           <div className="relative z-10 flex flex-col gap-3 w-full mt-4 mb-2">
             <motion.div 
-              className="self-start max-w-[90%] bg-muted p-2.5 rounded-2xl rounded-bl-none text-sm"
+              className="self-start max-w-[90%] bg-white dark:bg-white p-2.5 rounded-2xl rounded-bl-none text-sm text-gray-800"
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
@@ -544,9 +476,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     description: "See your emotional patterns and growth over time with beautiful visualizations.",
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
-        <div className="relative w-64 h-64 bg-theme-lighter rounded-full flex items-center justify-center overflow-hidden">
+        <div className="relative w-64 h-64 flex items-center justify-center overflow-hidden">
           <motion.div
-            className="absolute inset-0 bg-gradient-to-b from-theme/5 to-theme/20"
+            className="absolute inset-0 bg-gradient-to-b from-theme/10 to-theme/30 dark:from-theme/10 dark:to-theme/30"
             animate={{ 
               opacity: [0.3, 0.5, 0.3],
               rotate: [0, 5, 0, -5, 0]
@@ -637,7 +569,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     illustration: (props: NameStepProps) => (
       <div className="flex flex-col justify-center items-center my-2 w-full">
         <motion.div 
-          className="relative w-full max-w-xs bg-theme-lighter rounded-xl flex flex-col items-center justify-center overflow-hidden p-8"
+          className="relative w-full max-w-xs bg-theme-dark/30 dark:bg-theme-dark/30 rounded-xl flex flex-col items-center justify-center overflow-hidden p-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -674,9 +606,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             className="absolute -z-10 inset-0 opacity-20"
             animate={{ 
               background: [
-                "radial-gradient(circle at 20% 20%, var(--color-theme-light) 0%, transparent 70%)",
-                "radial-gradient(circle at 80% 80%, var(--color-theme-light) 0%, transparent 70%)",
-                "radial-gradient(circle at 20% 20%, var(--color-theme-light) 0%, transparent 70%)"
+                "radial-gradient(circle at 20% 20%, var(--color-theme-dark) 0%, transparent 70%)",
+                "radial-gradient(circle at 80% 80%, var(--color-theme-dark) 0%, transparent 70%)",
+                "radial-gradient(circle at 20% 20%, var(--color-theme-dark) 0%, transparent 70%)"
               ]
             }}
             transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
@@ -693,7 +625,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <motion.div 
-          className="relative w-64 h-64 rounded-xl flex items-center justify-center overflow-hidden bg-theme-lighter"
+          className="relative w-64 h-64 rounded-xl flex items-center justify-center overflow-hidden bg-theme-dark dark:bg-theme-dark"
           animate={{ 
             boxShadow: ["0 0 0 0px rgba(var(--color-theme), 0.2)", "0 0 0 20px rgba(var(--color-theme), 0)", "0 0 0 0px rgba(var(--color-theme), 0.2)"]
           }}
@@ -889,23 +821,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
               {currentStepData.buttonText}
               {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
             </Button>
-          </div>
-        </div>
-        
-        <div className="absolute bottom-36 left-0 right-0 flex justify-center items-center text-muted-foreground/50 text-sm">
-          <div className="flex items-center gap-6">
-            {currentStep > 0 && (
-              <div className="flex items-center gap-1">
-                <ChevronLeft className="w-4 h-4" />
-                <span>Swipe right</span>
-              </div>
-            )}
-            {currentStep < ONBOARDING_STEPS.length - 1 && (
-              <div className="flex items-center gap-1">
-                <span>Swipe left</span>
-                <ChevronRight className="w-4 h-4" />
-              </div>
-            )}
           </div>
         </div>
       </div>
