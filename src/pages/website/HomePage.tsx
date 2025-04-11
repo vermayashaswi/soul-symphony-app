@@ -293,7 +293,7 @@ const HomePage = () => {
   const features = [
     {
       title: "Voice Journaling",
-      description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
+      description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically.",
       icon: Mic,
       image: "https://images.unsplash.com/photo-1589254065878-42c9da997008?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
     },
@@ -301,7 +301,7 @@ const HomePage = () => {
       title: "AI Analysis",
       description: "Gain insights into your patterns and emotions through advanced AI analysis.",
       icon: Brain,
-      image: "https://images.unsplash.com/photo-1581092583537-20d51b4b4f1b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+      image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
     },
     {
       title: "Emotional Tracking",
@@ -319,7 +319,7 @@ const HomePage = () => {
 
   const testimonials = [
     {
-      text: "SOULo has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
+      text: "SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
       author: "Sarah K., Designer",
       avatar: "/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png"
     },
@@ -329,7 +329,7 @@ const HomePage = () => {
       avatar: "/lovable-uploads/5b18686b-4a3c-4341-a072-479db470ac1d.png"
     },
     {
-      text: "The emotional insights I get from SOULo have helped me understand my patterns and make positive changes.",
+      text: "The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes.",
       author: "Jamie L., Therapist",
       avatar: "/lovable-uploads/cb710491-93f0-42be-a596-f64d80d9800e.png"
     }
@@ -339,7 +339,7 @@ const HomePage = () => {
     {
       step: "1",
       title: "Record Your Thoughts",
-      description: "Speak freely in any language about your day, feelings, or thoughts you want to capture. SOULo works even in noisy environments and understands multiple languages. No writing required - just talk naturally!",
+      description: "Speak freely in any language about your day, feelings, or thoughts you want to capture. SOuLO works even in noisy environments and understands multiple languages. No writing required - just talk naturally!",
       image: "/lovable-uploads/eb66a92e-1044-4a85-9380-4790da9cf683.png",
       icon: Mic
     },
@@ -487,7 +487,7 @@ const HomePage = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">App Features</span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOULo's Features</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOuLO's Features</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
             </p>
@@ -639,7 +639,7 @@ const HomePage = () => {
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Privacy</span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Your Privacy is Our Priority</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              At SOULo, we believe that your personal thoughts and feelings should remain private. 
+              At SOuLO, we believe that your personal thoughts and feelings should remain private. 
               We've built our platform with privacy at its core.
             </p>
           </div>
@@ -699,14 +699,14 @@ const HomePage = () => {
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Testimonials</span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Join thousands of people who have transformed their self-reflection practice with SOULo
+              Join thousands of people who have transformed their self-reflection practice with SOuLO
             </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {[
               {
-                text: "SOULo has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
+                text: "SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
                 author: "Sarah K., Designer",
                 avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
               },
@@ -716,7 +716,7 @@ const HomePage = () => {
                 avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
               },
               {
-                text: "The emotional insights I get from SOULo have helped me understand my patterns and make positive changes.",
+                text: "The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes.",
                 author: "Jamie L., Therapist",
                 avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
               }
@@ -869,7 +869,7 @@ const HomePage = () => {
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">FAQ</span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Everything you need to know about SOULo
+              Everything you need to know about SOuLO
             </p>
           </div>
           
@@ -877,19 +877,19 @@ const HomePage = () => {
             {[
               {
                 question: "How does voice journaling work?",
-                answer: "SOULo makes it easy to capture your thoughts by speaking. Just open the app, tap the record button, and speak freely. Our AI will transcribe your voice and analyze the content for emotional patterns and key themes."
+                answer: "SOuLO makes it easy to capture your thoughts by speaking. Just open the app, tap the record button, and speak freely. Our AI will transcribe your voice and analyze the content for emotional patterns and key themes."
               },
               {
                 question: "Is my data private and secure?",
                 answer: "Absolutely. Your privacy is our top priority. All your journal entries are end-to-end encrypted, and you have complete control over what you share. We do not sell or share your data with third parties."
               },
               {
-                question: "Can I use SOULo without internet connection?",
+                question: "Can I use SOuLO without internet connection?",
                 answer: "Yes, you can record your journal entries offline. They will be stored locally on your device and will sync with our servers when you reconnect to the internet."
               },
               {
-                question: "What languages does SOULo support?",
-                answer: "Currently, SOULo supports English, Spanish, French, German, and Japanese. We're continuously working to add more languages."
+                question: "What languages does SOuLO support?",
+                answer: "Currently, SOuLO supports English, Spanish, French, German, and Japanese. We're continuously working to add more languages."
               },
               {
                 question: "Can I cancel my subscription anytime?",
@@ -923,7 +923,7 @@ const HomePage = () => {
         <div className="container mx-auto px-4 text-center max-w-3xl">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Start Your Self-Discovery Journey?</h2>
           <p className="text-xl text-gray-700 mb-8">
-            Join thousands of people who have transformed their self-reflection practice with SOULo.
+            Join thousands of people who have transformed their self-reflection practice with SOuLO.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">

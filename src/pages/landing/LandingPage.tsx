@@ -67,22 +67,22 @@ const LandingPage = () => {
     {
       icon: Mic,
       title: t('feature1.title'),
-      description: t('feature1.description')
+      description: t('feature1.description').replace('SOULo', 'SOuLO')
     },
     {
       icon: Brain,
       title: t('feature2.title'),
-      description: t('feature2.description')
+      description: t('feature2.description').replace('SOULo', 'SOuLO')
     },
     {
       icon: LineChart,
       title: t('feature3.title'),
-      description: t('feature3.description')
+      description: t('feature3.description').replace('SOULo', 'SOuLO')
     },
     {
       icon: MessageSquare,
       title: t('feature4.title'),
-      description: t('feature4.description')
+      description: t('feature4.description').replace('SOULo', 'SOuLO')
     }
   ];
 
@@ -164,7 +164,7 @@ const LandingPage = () => {
             {t('homepage.expressReflectGrow')}
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-3xl mx-auto" data-i18n-key="mainTagline">
-            {t('mainTagline')}
+            {t('mainTagline').replace('SOULo', 'SOuLO')}
           </p>
         </div>
       </section>
@@ -284,9 +284,9 @@ const LandingPage = () => {
       <section className="py-16 md:py-24" data-i18n-section="landing-cta">
         <div className="container mx-auto max-w-6xl px-4">
           <div className="bg-primary/10 rounded-3xl p-8 md:p-12 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4" data-i18n-key="homepage.cta.title">{t('homepage.cta.title')}</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4" data-i18n-key="homepage.cta.title">{t('homepage.cta.title').replace('SOULo', 'SOuLO')}</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto mb-8" data-i18n-key="homepage.cta.description">
-              {t('homepage.cta.description')}
+              {t('homepage.cta.description').replace('SOULo', 'SOuLO')}
             </p>
             <Button size="lg" className="group">
               <span data-i18n-key="homepage.cta.buttonText">{t('homepage.cta.buttonText')}</span>

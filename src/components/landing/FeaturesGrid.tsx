@@ -51,7 +51,7 @@ const FeaturesGrid: React.FC = () => {
   const features = [
     {
       title: "Voice Journaling",
-      description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
+      description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically.",
       icon: Mic,
       cta: "Start Journaling",
       ctaAction: () => navigateToFeature('/journal'),

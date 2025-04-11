@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 const features = [
   {
     title: "Voice Journaling",
-    description: "Record your thoughts with voice and let SOULo transcribe and analyze them automatically.",
+    description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically.",
     icon: Mic,
     image: "https://images.unsplash.com/photo-1589254065878-42c9da997008?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Person speaking into microphone
   },
@@ -16,7 +16,7 @@ const features = [
     title: "AI Analysis",
     description: "Gain insights into your patterns and emotions through advanced AI analysis.",
     icon: Brain,
-    image: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Better AI visualization image with shorter height
+    image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Better AI visualization image with shorter height
   },
   {
     title: "Emotional Tracking",
@@ -50,7 +50,7 @@ const AppFeatureCarousel = () => {
           <span className="px-3 py-1 rounded-full bg-theme-lighter text-theme text-sm font-medium mb-4 inline-block">
             App Features
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-theme-color">Discover SOULo's Features</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-theme-color">Discover SOuLO's Features</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
           </p>
