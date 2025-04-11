@@ -57,8 +57,8 @@ export default function Auth() {
         search: window.location.search
       });
       
-      // Process the hash - this should trigger the auth state change listener
-      supabase.auth.getSessionFromUrl().then(({ data, error }) => {
+      // Process the hash using the correct method
+      supabase.auth.getSession().then(({ data, error }) => {
         if (error) {
           console.error('Auth: Error getting session from URL', error);
           setAuthError(error.message);

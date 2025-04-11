@@ -69,8 +69,8 @@ const App = () => {
         search: window.location.search
       });
       
-      // Process auth callback - this should trigger the onAuthStateChange event
-      supabase.auth.getSessionFromUrl().then(({ data, error }) => {
+      // Process auth callback using the correct method
+      supabase.auth.getSession().then(({ data, error }) => {
         if (error) {
           console.error('Error handling auth callback at app startup:', error);
         } else if (data.session) {
