@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
 import { signInWithGoogle, debugAuthState } from '@/services/authService';
+import { useDebugLog } from '@/utils/debug/DebugContext';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export default function Auth() {
   const location = useLocation();
@@ -17,6 +19,9 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(true);
   const { user, isLoading: authLoading } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>({});
+  const [debugOpen, setDebugOpen] = useState(false);
+  const { addEvent, isEnabled, toggleEnabled } = useDebugLog();
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -27,21 +32,37 @@ export default function Auth() {
 
   // Enhanced debug logging
   useEffect(() => {
-    console.log('Auth: Component mounted', {
+    const debugData = {
       pathname: location.pathname,
       search: location.search,
       hash: location.hash,
       redirectTo,
       hasUser: !!user,
-    });
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      windowSize: `${window.innerWidth}x${window.innerHeight}`,
+      authLoadingState: authLoading,
+      redirectingState: redirecting
+    };
+    
+    setDebugInfo(prev => ({...prev, initialMount: debugData}));
+    console.log('Auth: Component mounted', debugData);
+    addEvent('auth', 'Auth component mounted', 'info', debugData);
 
     // Debug auth state on component mount
     debugAuthState().then(({ session, user }) => {
-      console.log('Auth: Initial auth state', { 
+      const authStateData = { 
         hasSession: !!session, 
         hasUser: !!user,
-        userEmail: user?.email
-      });
+        userEmail: user?.email,
+        sessionExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+        provider: user?.app_metadata?.provider || null
+      };
+      
+      setDebugInfo(prev => ({...prev, initialAuthState: authStateData}));
+      console.log('Auth: Initial auth state', authStateData);
+      addEvent('auth', 'Initial auth state checked', !!session ? 'success' : 'info', authStateData);
     });
   }, []);
 
@@ -52,29 +73,68 @@ export default function Auth() {
                           window.location.search.includes('error');
                           
     if (hasHashParams) {
-      console.log('Auth: Detected hash params in URL, processing auth result', {
+      const hashData = {
         hash: window.location.hash,
-        search: window.location.search
-      });
+        search: window.location.search,
+        timestamp: new Date().toISOString()
+      };
+      
+      setDebugInfo(prev => ({...prev, hashParams: hashData}));
+      console.log('Auth: Detected hash params in URL, processing auth result', hashData);
+      addEvent('auth', 'Detected hash params in URL', 'info', hashData);
       
       // Process the hash using the correct method
       supabase.auth.getSession().then(({ data, error }) => {
         if (error) {
+          const errorData = {
+            message: error.message,
+            code: error.code,
+            status: error.status,
+            timestamp: new Date().toISOString()
+          };
+          
+          setDebugInfo(prev => ({...prev, sessionError: errorData}));
           console.error('Auth: Error getting session from URL', error);
+          addEvent('auth', 'Error getting session from URL', 'error', errorData);
           setAuthError(error.message);
           toast.error(`Authentication failed: ${error.message}`);
         } else if (data.session) {
-          console.log('Auth: Successfully got session from URL', {
+          const sessionData = {
             user: data.session.user.email,
-            expires: data.session.expires_at
-          });
+            expires: data.session.expires_at ? new Date(data.session.expires_at * 1000).toISOString() : null,
+            provider: data.session.user.app_metadata?.provider || null,
+            accessTokenLength: data.session.access_token ? data.session.access_token.length : 0,
+            hasRefreshToken: !!data.session.refresh_token,
+            timestamp: new Date().toISOString()
+          };
+          
+          setDebugInfo(prev => ({...prev, sessionSuccess: sessionData}));
+          console.log('Auth: Successfully got session from URL', sessionData);
+          addEvent('auth', 'Successfully got session from URL', 'success', sessionData);
+        } else {
+          const noSessionData = {
+            message: 'No session returned but no error either',
+            timestamp: new Date().toISOString()
+          };
+          
+          setDebugInfo(prev => ({...prev, noSession: noSessionData}));
+          console.warn('Auth: No session returned from URL', noSessionData);
+          addEvent('auth', 'No session returned from URL', 'warning', noSessionData);
         }
         setIsLoading(false);
       });
       
       // Show error toast if error in URL
       if (window.location.hash.includes('error') || window.location.search.includes('error')) {
-        console.error('Auth: Error detected in redirect URL');
+        const urlErrorData = {
+          hash: window.location.hash,
+          search: window.location.search,
+          timestamp: new Date().toISOString()
+        };
+        
+        setDebugInfo(prev => ({...prev, urlError: urlErrorData}));
+        console.error('Auth: Error detected in redirect URL', urlErrorData);
+        addEvent('auth', 'Error detected in redirect URL', 'error', urlErrorData);
         toast.error('Authentication failed. Please try again.');
         setAuthError('Error detected in redirect URL');
       }
@@ -84,16 +144,29 @@ export default function Auth() {
   }, []);
 
   useEffect(() => {
-    console.log('Auth: Current session state:', { 
+    const authStateData = { 
       user: !!user, 
       authLoading, 
       redirectTo,
-      authError
-    });
+      authError,
+      timestamp: new Date().toISOString()
+    };
+    
+    setDebugInfo(prev => ({...prev, currentAuthState: authStateData}));
+    console.log('Auth: Current session state:', authStateData);
+    addEvent('auth', 'Current session state updated', !!user ? 'success' : 'info', authStateData);
     
     // If user is logged in and page has finished initial loading, redirect
     if (user && !authLoading && !redirecting) {
-      console.log('Auth: User authenticated, redirecting to:', redirectTo);
+      const redirectData = {
+        destination: redirectTo,
+        user: user.email,
+        timestamp: new Date().toISOString()
+      };
+      
+      setDebugInfo(prev => ({...prev, redirectAttempt: redirectData}));
+      console.log('Auth: User authenticated, redirecting to:', redirectData);
+      addEvent('auth', 'User authenticated, redirecting', 'success', redirectData);
       setRedirecting(true);
       
       // Clean up stored redirect
@@ -112,14 +185,76 @@ export default function Auth() {
     try {
       setIsLoading(true);
       setAuthError(null);
-      console.log('Auth: Initiating Google sign-in');
+      
+      const signInData = {
+        timestamp: new Date().toISOString(),
+        redirectTo: redirectTo,
+        currentPath: location.pathname
+      };
+      
+      setDebugInfo(prev => ({...prev, signInAttempt: signInData}));
+      console.log('Auth: Initiating Google sign-in', signInData);
+      addEvent('auth', 'Initiating Google sign-in', 'info', signInData);
+      
       await signInWithGoogle();
+      addEvent('auth', 'Google sign-in initialization successful', 'success');
       // The page will be redirected by Supabase, so no need to do anything else here
     } catch (error: any) {
+      const errorData = {
+        message: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      };
+      
+      setDebugInfo(prev => ({...prev, signInError: errorData}));
       console.error('Auth: Failed to initiate Google sign-in:', error);
+      addEvent('auth', 'Failed to initiate Google sign-in', 'error', errorData);
       setAuthError(error.message);
       toast.error('Failed to initiate sign-in. Please try again.');
       setIsLoading(false);
+    }
+  };
+  
+  const forceDebugState = async () => {
+    const state = await debugAuthState();
+    setDebugInfo(prev => ({
+      ...prev, 
+      forcedDebugState: {
+        ...state,
+        timestamp: new Date().toISOString(),
+        hasSession: !!state.session,
+        hasUser: !!state.user,
+        sessionExpiry: state.session?.expires_at ? new Date(state.session.expires_at * 1000).toISOString() : null
+      }
+    }));
+    addEvent('auth', 'Forced debug state check', 'info', state);
+    
+    // Check local storage for redirect info
+    const localStorageItems = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        try {
+          localStorageItems[key] = localStorage.getItem(key);
+        } catch (e) {
+          localStorageItems[key] = '[Error reading value]';
+        }
+      }
+    }
+    
+    setDebugInfo(prev => ({
+      ...prev,
+      localStorage: {
+        items: localStorageItems,
+        timestamp: new Date().toISOString()
+      }
+    }));
+    
+    addEvent('auth', 'Local storage checked', 'info', { localStorage: localStorageItems });
+    
+    // Also enable debug mode
+    if (!isEnabled) {
+      toggleEnabled();
     }
   };
 
@@ -186,6 +321,52 @@ export default function Auth() {
           <div className="text-center text-sm text-muted-foreground">
             <p>By signing in, you agree to our Terms of Service and Privacy Policy</p>
           </div>
+        </div>
+        
+        {/* Debug Button and Collapsible Debug Panel */}
+        <div className="mt-8 border-t pt-4">
+          <Collapsible open={debugOpen} onOpenChange={setDebugOpen}>
+            <div className="flex justify-between items-center">
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full">
+                  {debugOpen ? "Hide Debugging Info" : "Show Debugging Info"}
+                </Button>
+              </CollapsibleTrigger>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="ml-2"
+                onClick={forceDebugState}
+              >
+                Refresh Debug
+              </Button>
+            </div>
+            <CollapsibleContent className="mt-4 space-y-2">
+              <div className="rounded border p-2 text-xs bg-slate-50 overflow-auto max-h-80">
+                <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+              </div>
+              <div className="flex justify-between">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    const debugData = JSON.stringify(debugInfo, null, 2);
+                    navigator.clipboard.writeText(debugData);
+                    toast.success("Debug info copied to clipboard");
+                  }}
+                >
+                  Copy Debug Info
+                </Button>
+                <Button 
+                  variant={isEnabled ? "default" : "outline"}
+                  size="sm"
+                  onClick={toggleEnabled}
+                >
+                  {isEnabled ? "Disable Debug Mode" : "Enable Debug Mode"}
+                </Button>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </motion.div>
     </div>

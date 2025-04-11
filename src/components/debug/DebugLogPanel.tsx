@@ -1,271 +1,207 @@
 
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { X, Info, CheckCircle, AlertTriangle, AlertCircle, Filter, Download, Trash2 } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { formatLogTimestamp, getLogLevelColor, getLogLevelBgColor } from '@/utils/debug/debugUtils';
 import { useDebugLog } from '@/utils/debug/DebugContext';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { formatLogTimestamp, getLogLevelColor, getLogLevelBgColor } from '@/utils/debug/debugUtils';
 import { LogLevel } from '@/utils/debug/debugLogTypes';
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronRight, ChevronDown, X, Copy, Trash2, Bug } from 'lucide-react';
+import { toast } from 'sonner';
 
-interface DebugLogPanelProps {
-  onClose: () => void;
-}
+const DebugLogPanel: React.FC = () => {
+  const { logs, clearLogs, isEnabled, toggleEnabled } = useDebugLog();
+  const [isOpen, setIsOpen] = useState(false);
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [filterLevel, setFilterLevel] = useState<LogLevel | null>(null);
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
 
-const DebugLogPanel: React.FC<DebugLogPanelProps> = ({ onClose }) => {
-  const { logs, clearLogs } = useDebugLog();
-  const [activeTab, setActiveTab] = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  
   // Get unique categories
-  const categories = React.useMemo(() => {
-    const uniqueCategories = new Set<string>();
-    logs.forEach(log => uniqueCategories.add(log.category));
-    return Array.from(uniqueCategories).sort();
-  }, [logs]);
-  
-  // Filter logs by tab and category
-  const filteredLogs = React.useMemo(() => {
-    return logs.filter(log => {
-      // Filter by level (tab)
-      if (activeTab !== 'all' && log.level !== activeTab) {
-        return false;
-      }
-      
-      // Filter by category
-      if (categoryFilter && log.category !== categoryFilter) {
-        return false;
-      }
-      
-      return true;
-    });
-  }, [logs, activeTab, categoryFilter]);
-  
-  // Get icon for log level
-  const getLevelIcon = (level: LogLevel) => {
-    switch (level) {
-      case 'info':
-        return <Info className="h-4 w-4 text-blue-500" />;
-      case 'success':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'warning':
-        return <AlertTriangle className="h-4 w-4 text-amber-500" />;
-      case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Info className="h-4 w-4 text-gray-500" />;
+  const categories = [...new Set(logs.map(log => log.category))];
+  const levels: LogLevel[] = ['info', 'success', 'warning', 'error'];
+
+  // Filter logs based on category and level
+  const filteredLogs = logs.filter(log => {
+    if (filterCategory && log.category !== filterCategory) return false;
+    if (filterLevel && log.level !== filterLevel) return false;
+    return true;
+  });
+
+  // Toggle a log's expanded state
+  const toggleLogExpanded = (id: string) => {
+    const newExpandedLogs = new Set(expandedLogs);
+    if (newExpandedLogs.has(id)) {
+      newExpandedLogs.delete(id);
+    } else {
+      newExpandedLogs.add(id);
     }
+    setExpandedLogs(newExpandedLogs);
   };
-  
-  // Get count for each level
-  const getCounts = () => {
-    const counts = {
-      all: logs.length,
-      info: 0,
-      success: 0,
-      warning: 0,
-      error: 0
-    };
-    
-    logs.forEach(log => {
-      counts[log.level] = (counts[log.level] || 0) + 1;
-    });
-    
-    return counts;
-  };
-  
-  const counts = getCounts();
-  
-  // Export logs as JSON
-  const exportLogs = () => {
-    const dataStr = JSON.stringify(logs, null, 2);
-    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
-    
-    const exportFileDefaultName = `debug-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-  };
-  
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">Debug Logs</h2>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="text-xs" 
-              onClick={exportLogs}
-            >
-              <Download className="h-3.5 w-3.5 mr-1" />
-              Export
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="text-xs text-red-500 hover:text-red-700" 
-              onClick={clearLogs}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-1" />
-              Clear
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        
-        <div className="p-4">
-          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
-            <div className="flex justify-between items-center mb-4">
-              <TabsList>
-                <TabsTrigger value="all">
-                  All
-                  <Badge variant="secondary" className="ml-1 bg-gray-100">{counts.all}</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="info">
-                  Info
-                  <Badge variant="secondary" className="ml-1 bg-blue-50 text-blue-500">{counts.info}</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="success">
-                  Success
-                  <Badge variant="secondary" className="ml-1 bg-green-50 text-green-500">{counts.success}</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="warning">
-                  Warning
-                  <Badge variant="secondary" className="ml-1 bg-amber-50 text-amber-500">{counts.warning}</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="error">
-                  Error
-                  <Badge variant="secondary" className="ml-1 bg-red-50 text-red-500">{counts.error}</Badge>
-                </TabsTrigger>
-              </TabsList>
-              
-              {categories.length > 0 && (
-                <div className="relative">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className={categoryFilter ? "bg-primary/10" : ""}
-                    onClick={() => setCategoryFilter(null)}
-                  >
-                    <Filter className="h-4 w-4 mr-1" />
-                    {categoryFilter || "All Categories"}
-                  </Button>
-                  
-                  {categoryFilter && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute -right-2 -top-2 h-5 w-5 p-0 rounded-full"
-                      onClick={() => setCategoryFilter(null)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            {categories.length > 1 && !categoryFilter && (
-              <div className="flex flex-wrap gap-1 mb-3">
-                {categories.map(category => (
-                  <Badge 
-                    key={category}
-                    variant="outline" 
-                    className="cursor-pointer hover:bg-secondary"
-                    onClick={() => setCategoryFilter(category)}
-                  >
-                    {category}
-                  </Badge>
-                ))}
-              </div>
-            )}
-            
-            <TabsContent value="all" className="m-0">
-              <LogList logs={filteredLogs} getLevelIcon={getLevelIcon} />
-            </TabsContent>
-            <TabsContent value="info" className="m-0">
-              <LogList logs={filteredLogs} getLevelIcon={getLevelIcon} />
-            </TabsContent>
-            <TabsContent value="success" className="m-0">
-              <LogList logs={filteredLogs} getLevelIcon={getLevelIcon} />
-            </TabsContent>
-            <TabsContent value="warning" className="m-0">
-              <LogList logs={filteredLogs} getLevelIcon={getLevelIcon} />
-            </TabsContent>
-            <TabsContent value="error" className="m-0">
-              <LogList logs={filteredLogs} getLevelIcon={getLevelIcon} />
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
-    </div>
-  );
-};
 
-interface LogListProps {
-  logs: any[];
-  getLevelIcon: (level: LogLevel) => JSX.Element;
-}
+  // Copy logs to clipboard
+  const copyLogs = () => {
+    const logsText = JSON.stringify(filteredLogs, null, 2);
+    navigator.clipboard.writeText(logsText);
+    toast.success('Logs copied to clipboard');
+  };
 
-const LogList: React.FC<LogListProps> = ({ logs, getLevelIcon }) => {
-  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
-  
-  if (logs.length === 0) {
+  if (!isEnabled) {
     return (
-      <div className="text-center p-8 text-gray-500">
-        No logs to display
-      </div>
+      <Button
+        className="fixed bottom-4 right-4 z-50 shadow-lg"
+        size="sm"
+        onClick={toggleEnabled}
+      >
+        <Bug className="mr-2 h-4 w-4" /> Enable Debug Mode
+      </Button>
     );
   }
-  
+
   return (
-    <ScrollArea className="h-[50vh]">
-      <div className="space-y-2">
-        {logs.map(log => (
-          <div 
-            key={log.id}
-            className={`p-3 rounded-md transition-all ${getLogLevelBgColor(log.level)} ${
-              expandedLogId === log.id ? 'ring-2 ring-primary/20' : ''
-            }`}
-            onClick={() => setExpandedLogId(prev => prev === log.id ? null : log.id)}
+    <div className="fixed bottom-0 right-0 z-50 w-full md:w-auto max-w-full md:max-w-md border shadow-lg bg-white dark:bg-gray-900 rounded-t-lg overflow-hidden transition-all duration-300 ease-in-out"
+      style={{ 
+        height: isOpen ? 'min(80vh, 500px)' : '40px',
+        transform: isEnabled ? 'translateY(0)' : 'translateY(100%)'
+      }}
+    >
+      {/* Header */}
+      <div 
+        className="flex items-center justify-between p-2 bg-slate-100 dark:bg-slate-800 cursor-pointer"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center">
+          <Bug className="mr-2 h-4 w-4" />
+          <span className="font-medium">Debug Logs</span>
+          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+            {filteredLogs.length} logs
+          </span>
+          {isOpen ? <ChevronDown className="ml-2 h-4 w-4" /> : <ChevronRight className="ml-2 h-4 w-4" />}
+        </div>
+        <div className="flex items-center space-x-1">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0" 
+            onClick={(e) => {
+              e.stopPropagation();
+              clearLogs();
+            }}
           >
-            <div className="flex items-start">
-              <div className="flex-shrink-0 mr-2">
-                {getLevelIcon(log.level)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <div className="font-medium truncate">{log.category}</div>
-                  <div className="text-xs text-muted-foreground ml-2">
-                    {formatLogTimestamp(log.timestamp)}
-                  </div>
-                </div>
-                <div className="text-sm mt-1">{log.message}</div>
-                
-                {expandedLogId === log.id && log.details && (
-                  <div className="mt-2 pt-2 border-t border-gray-200 text-xs">
-                    <div className="font-semibold mb-1">Details:</div>
-                    <pre className="bg-black/5 p-2 rounded overflow-x-auto">
-                      {typeof log.details === 'object' 
-                        ? JSON.stringify(log.details, null, 2)
-                        : String(log.details)
-                      }
-                    </pre>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0" 
+            onClick={(e) => {
+              e.stopPropagation();
+              copyLogs();
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0" 
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleEnabled();
+            }}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
-    </ScrollArea>
+
+      {/* Content */}
+      <CollapsibleContent forceMount className={`${isOpen ? 'block' : 'hidden'} overflow-hidden h-[calc(100%-40px)]`}>
+        <div className="flex flex-col h-full">
+          {/* Filters */}
+          <div className="p-2 border-b flex flex-wrap gap-2">
+            <select
+              className="text-xs px-2 py-1 border rounded"
+              value={filterCategory || ''}
+              onChange={(e) => setFilterCategory(e.target.value || null)}
+            >
+              <option value="">All Categories</option>
+              {categories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+            <select
+              className="text-xs px-2 py-1 border rounded"
+              value={filterLevel || ''}
+              onChange={(e) => setFilterLevel((e.target.value || null) as LogLevel | null)}
+            >
+              <option value="">All Levels</option>
+              {levels.map(level => (
+                <option key={level} value={level}>{level}</option>
+              ))}
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs py-1 h-7"
+              onClick={() => {
+                setFilterCategory(null);
+                setFilterLevel(null);
+              }}
+            >
+              Clear Filters
+            </Button>
+          </div>
+
+          {/* Logs */}
+          <div className="overflow-auto flex-1 p-2">
+            {filteredLogs.length === 0 ? (
+              <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
+                No logs to display
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredLogs.map(log => {
+                  const isExpanded = expandedLogs.has(log.id);
+                  return (
+                    <div key={log.id} className={`border rounded overflow-hidden ${getLogLevelBgColor(log.level)}`}>
+                      <div 
+                        className="flex items-center justify-between px-2 py-1 cursor-pointer"
+                        onClick={() => toggleLogExpanded(log.id)}
+                      >
+                        <div className="flex items-center">
+                          {isExpanded ? 
+                            <ChevronDown className="h-3 w-3 mr-1" /> : 
+                            <ChevronRight className="h-3 w-3 mr-1" />
+                          }
+                          <span className={`text-xs font-medium ${getLogLevelColor(log.level)}`}>
+                            {log.level.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex-1 mx-2 truncate text-xs">
+                          <span className="font-medium">[{log.category}]</span> {log.message}
+                        </div>
+                        <div className="text-xs text-gray-500 whitespace-nowrap">
+                          {formatLogTimestamp(log.timestamp)}
+                        </div>
+                      </div>
+                      {isExpanded && log.details && (
+                        <div className="p-2 border-t bg-white dark:bg-gray-800 overflow-auto max-h-40">
+                          <pre className="text-xs whitespace-pre-wrap">
+                            {typeof log.details === 'object' 
+                              ? JSON.stringify(log.details, null, 2)
+                              : String(log.details)
+                            }
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </CollapsibleContent>
+    </div>
   );
 };
 

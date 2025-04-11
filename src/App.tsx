@@ -11,6 +11,8 @@ import { supabase } from "./integrations/supabase/client";
 import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
 import { useEffect } from 'react';
+import { DebugLogProvider } from "./utils/debug/DebugContext";
+import DebugLogPanel from "./components/debug/DebugLogPanel";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -145,21 +147,24 @@ const App = () => {
       <TooltipProvider>
         <BrowserRouter>
           <ThemeProvider>
-            <AuthProvider>
-              <div className="relative min-h-screen">
-                <div className="relative z-10">
-                  {/* Add the TouchAnimation component here */}
-                  <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
-                    <TouchAnimation />
+            <DebugLogProvider>
+              <AuthProvider>
+                <div className="relative min-h-screen">
+                  <div className="relative z-10">
+                    {/* Add the TouchAnimation component here */}
+                    <div className="fixed inset-0 overflow-hidden pointer-events-none z-50">
+                      <TouchAnimation />
+                    </div>
+                    <Toaster />
+                    <Sonner position="top-center" closeButton={false} />
+                    <AnimatePresence mode="wait">
+                      <AppRoutes />
+                    </AnimatePresence>
+                    <DebugLogPanel />
                   </div>
-                  <Toaster />
-                  <Sonner position="top-center" closeButton={false} />
-                  <AnimatePresence mode="wait">
-                    <AppRoutes />
-                  </AnimatePresence>
                 </div>
-              </div>
-            </AuthProvider>
+              </AuthProvider>
+            </DebugLogProvider>
           </ThemeProvider>
         </BrowserRouter>
       </TooltipProvider>

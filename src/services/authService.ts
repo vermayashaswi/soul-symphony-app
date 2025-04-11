@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -6,6 +7,13 @@ import { isAppRoute } from '@/routes/RouteHelpers';
  * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
+  console.log('Getting redirect URL for auth with location:', {
+    origin: window.location.origin,
+    hostname: window.location.hostname,
+    pathname: window.location.pathname,
+    search: window.location.search
+  });
+
   // This is a production environment fix specifically for soulo.online
   // Force the correct URL for production environment
   if (window.location.hostname === 'soulo.online' || 
@@ -19,6 +27,7 @@ export const getRedirectUrl = (): string => {
   const redirectTo = urlParams.get('redirectTo');
   if (redirectTo) {
     localStorage.setItem('authRedirectTo', redirectTo);
+    console.log('Stored redirectTo in localStorage:', redirectTo);
   }
   
   // For iOS in standalone mode (PWA), we need to handle redirects differently
@@ -31,7 +40,13 @@ export const getRedirectUrl = (): string => {
     // @ts-ignore - This is valid on iOS Safari but not in the TypeScript types
     const iosSafariStandalone = window.navigator.standalone;
     
-    return standaloneCheck || iosSafariStandalone;
+    const result = standaloneCheck || iosSafariStandalone;
+    console.log('Standalone mode check:', { 
+      standaloneCheck, 
+      iosSafariStandalone, 
+      result 
+    });
+    return result;
   };
     
   // For PWA on iOS, we want to avoid redirects that might break the app
@@ -54,7 +69,25 @@ export const signInWithGoogle = async (): Promise<void> => {
     const redirectUrl = getRedirectUrl();
     console.log('Using redirect URL for Google auth:', redirectUrl);
     
-    const { error } = await supabase.auth.signInWithOAuth({
+    // Log detailed information about the auth request
+    console.log('Auth params:', {
+      provider: 'google',
+      redirectUrl,
+      userAgent: navigator.userAgent,
+      screenSize: `${window.innerWidth}x${window.innerHeight}`,
+      language: navigator.language,
+      cookiesEnabled: navigator.cookieEnabled,
+      location: {
+        origin: window.location.origin,
+        hostname: window.location.hostname,
+        pathname: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
@@ -67,10 +100,26 @@ export const signInWithGoogle = async (): Promise<void> => {
     });
 
     if (error) {
+      console.error('Supabase OAuth error:', {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+        timestamp: new Date().toISOString()
+      });
       throw error;
     }
+    
+    console.log('Auth request successful, redirect should happen:', {
+      provider: 'google',
+      url: data?.url,
+      timestamp: new Date().toISOString()
+    });
   } catch (error: any) {
-    console.error('Error signing in with Google:', error);
+    console.error('Error signing in with Google:', {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
     
     // Only show toast if we're in an app route
     const currentPath = window.location.pathname;
@@ -278,19 +327,43 @@ export const debugAuthState = async (): Promise<{session: any, user: any}> => {
     const { data: sessionData } = await supabase.auth.getSession();
     const { data: userData } = await supabase.auth.getUser();
     
+    const detailedSessionInfo = sessionData.session ? {
+      user: {
+        email: sessionData.session.user.email,
+        id: sessionData.session.user.id,
+        app_metadata: sessionData.session.user.app_metadata,
+      },
+      expires_at: sessionData.session.expires_at,
+      access_token_length: sessionData.session.access_token.length,
+      access_token_first10: sessionData.session.access_token.substring(0, 10) + '...',
+      refresh_token_present: !!sessionData.session.refresh_token,
+      provider: sessionData.session.user.app_metadata?.provider
+    } : null;
+
+    const detailedUserInfo = userData.user ? {
+      email: userData.user.email,
+      id: userData.user.id,
+      app_metadata: userData.user.app_metadata,
+      provider: userData.user.app_metadata?.provider,
+      created_at: userData.user.created_at,
+      last_sign_in_at: userData.user.last_sign_in_at,
+      user_metadata: userData.user.user_metadata,
+    } : null;
+    
     console.log('Current auth state:', {
-      session: sessionData.session ? {
-        user: sessionData.session.user.email,
-        expires_at: sessionData.session.expires_at,
-        access_token_length: sessionData.session.access_token.length,
-        refresh_token_present: !!sessionData.session.refresh_token,
-      } : null,
-      user: userData.user ? {
-        email: userData.user.email,
-        id: userData.user.id,
-        app_metadata: userData.user.app_metadata,
-        provider: userData.user.app_metadata?.provider,
-      } : null
+      session: detailedSessionInfo,
+      user: detailedUserInfo,
+      cookies: document.cookie ? 'Present' : 'None',
+      localStorage: {
+        authRedirectTo: localStorage.getItem('authRedirectTo') || 'Not set'
+      },
+      timestamp: new Date().toISOString(),
+      location: {
+        hostname: window.location.hostname,
+        pathname: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash
+      }
     });
     
     return {
