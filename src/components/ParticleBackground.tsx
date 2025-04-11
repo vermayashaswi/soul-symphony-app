@@ -1,6 +1,5 @@
 
 import React, { useEffect, useRef } from 'react';
-import { useTheme } from '@/hooks/use-theme';
 
 interface Particle {
   x: number;
@@ -20,21 +19,13 @@ export function ParticleBackground() {
   const animationRef = useRef<number>();
   const mousePos = useRef<{ x: number, y: number } | null>(null);
   const lastTouchTime = useRef<number>(0);
-  const { theme } = useTheme();
   
-  // Golden color palette - works well in both light and dark modes
-  const goldenColors = [
-    '#FFD700', // Gold
-    '#FFC125', // Goldenrod
-    '#FFCC33', // Golden yellow
-    '#F4BB44', // Amber gold
-    '#DAA520', // Goldenrod
-    '#B8860B', // Dark goldenrod
-    '#FEF7CD', // Soft gold (light)
-    '#FEC661', // Light golden
+  const colors = [
+    '#9b87f5', '#7E69AB', '#FDE1D3', '#D3E4FD', '#E5DEFF', 
+    '#FFDEE2', '#D6BCFA', '#33C3F0', '#FF6B6B', '#FFD166'
   ];
   
-  const getRandomGoldenColor = () => goldenColors[Math.floor(Math.random() * goldenColors.length)];
+  const getRandomColor = () => colors[Math.floor(Math.random() * colors.length)];
   
   const createRipple = (x: number, y: number, count = 15) => {
     for (let i = 0; i < count; i++) {
@@ -47,7 +38,7 @@ export function ParticleBackground() {
         size: 2 + Math.random() * 5,
         speedX: Math.cos(angle) * speed,
         speedY: Math.sin(angle) * speed,
-        color: getRandomGoldenColor(),
+        color: getRandomColor(),
         opacity: 0.8,
         life: 0,
         maxLife: 50 + Math.random() * 100
@@ -65,7 +56,7 @@ export function ParticleBackground() {
         size: 1.5 + Math.random() * 3,
         speedX: (Math.random() - 0.5) * 0.8,
         speedY: (Math.random() - 0.5) * 0.8,
-        color: getRandomGoldenColor(),
+        color: getRandomColor(),
         opacity: 0.4 + Math.random() * 0.4,
         life: 0,
         maxLife: 200 + Math.random() * 200
@@ -102,23 +93,11 @@ export function ParticleBackground() {
         particle.speedX *= 0.991;
         particle.speedY *= 0.991;
         
-        // Add a glow effect to the golden particles
-        if (theme === 'dark') {
-          ctx.shadowColor = particle.color;
-          ctx.shadowBlur = 6;
-        } else {
-          ctx.shadowColor = particle.color;
-          ctx.shadowBlur = 4;
-        }
-        
         ctx.globalAlpha = particle.opacity;
         ctx.fillStyle = particle.color;
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
         ctx.fill();
-        
-        // Reset shadow effect
-        ctx.shadowBlur = 0;
         
         liveParticles.push(particle);
       }
@@ -191,7 +170,7 @@ export function ParticleBackground() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [theme]);
+  }, []);
   
   return (
     <canvas
