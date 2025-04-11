@@ -36,31 +36,32 @@ const languageOptions = [
   { code: 'or', name: 'ଓଡ଼ିଆ' }         // Odia
 ];
 
-const LanguageSelector: React.FC = () => {
+const LanguageSelector = () => {
   const { i18n } = useTranslation();
   const [open, setOpen] = useState(false);
-  
+
   const currentLanguage = languageOptions.find(lang => lang.code === i18n.language) || languageOptions[0];
-  
-  const changeLanguage = (languageCode: string) => {
-    i18n.changeLanguage(languageCode);
+
+  const changeLanguage = (code: string) => {
+    i18n.changeLanguage(code);
     setOpen(false);
+    // Save language preference
+    localStorage.setItem('i18nextLng', code);
   };
-  
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="flex items-center gap-1">
-          <Globe className="h-4 w-4" />
-          <span className="hidden md:inline">{currentLanguage.name}</span>
+        <Button variant="ghost" size="icon" className="rounded-full" aria-label="Select language">
+          <Globe className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-background max-h-80 overflow-y-auto">
+      <DropdownMenuContent align="end">
         {languageOptions.map((language) => (
-          <DropdownMenuItem 
+          <DropdownMenuItem
             key={language.code}
             onClick={() => changeLanguage(language.code)}
-            className={i18n.language === language.code ? 'bg-muted' : ''}
+            className={i18n.language === language.code ? 'bg-muted font-medium' : ''}
           >
             {language.name}
           </DropdownMenuItem>
