@@ -60,23 +60,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="absolute inset-0 z-0 flex items-center justify-center">
-            <motion.div 
-              className="w-full h-full flex items-center justify-center overflow-hidden"
-              animate={{ 
-                boxShadow: ["0 0 0 0px rgba(var(--color-theme), 0.2)", "0 0 0 20px rgba(var(--color-theme), 0)", "0 0 0 0px rgba(var(--color-theme), 0.2)"]
-              }}
-              transition={{ 
-                repeat: Infinity, 
-                duration: 2.5,
-                ease: "easeInOut" 
-              }}
-            />
-          </div>
-          
           <div className="absolute inset-0 flex items-center justify-center z-10 mb-20">
             <div className="relative z-20">
-              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={true} animate={true} textClassName="font-bold" />
+              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={false} textClassName="font-bold text-white" />
             </div>
           </div>
           
@@ -267,7 +253,6 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 flex items-center justify-center overflow-hidden">
-          {/* Multiple concentric circles with theme colors that pulse with the mic button */}
           {[45, 60, 80, 100].map((size, index) => (
             <motion.div
               key={`circle-${index}`}
@@ -752,7 +737,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                 <ChevronLeft className="w-5 h-5 text-foreground" />
               </Button>
             ) : (
-              <div className="w-10"></div> // Empty div to maintain layout
+              <div className="w-10"></div>
             )}
             
             <Button 
