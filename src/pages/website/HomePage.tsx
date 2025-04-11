@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail, Calendar } from 'lucide-react';
@@ -687,9 +688,38 @@ const HomePage = () => {
               {
                 text: "SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
                 author: "Sarah K., Designer",
-                avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80"
+                avatar: "/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png"
               },
               {
                 text: "As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible.",
                 author: "Michael T., Engineer",
-                avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.
+                avatar: "/lovable-uploads/5b18686b-4a3c-4341-a072-479db470ac1d.png"
+              },
+              {
+                text: "The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes.",
+                author: "Jamie L., Therapist",
+                avatar: "/lovable-uploads/cb710491-93f0-42be-a596-f64d80d9800e.png"
+              }
+            ].map((testimonial, index) => (
+              <div key={index} className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                <p className="mb-4 text-gray-600">{testimonial.text}</p>
+                <div className="flex items-center gap-3">
+                  <img 
+                    src={testimonial.avatar} 
+                    alt={testimonial.author} 
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                  <p className="font-medium">{testimonial.author}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      
+      <Footer />
+    </div>
+  );
+};
+
+export default HomePage;
