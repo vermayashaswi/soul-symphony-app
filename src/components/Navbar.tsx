@@ -26,12 +26,12 @@ import { useTheme } from '@/hooks/use-theme';
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth(); // Changed logout to signOut to match AuthContextType
   const { theme, setTheme } = useTheme();
   const isMobile = useIsMobile();
 
   const handleLogout = async () => {
-    await logout();
+    await signOut(); // Changed logout to signOut
     navigate('/auth');
   };
 
@@ -131,9 +131,9 @@ const Navbar = () => {
                 className="cursor-pointer"
                 onClick={() => navigate('/profile')}
               >
-                <AvatarImage src={user?.avatar} />
+                <AvatarImage src={user.user_metadata?.avatar_url || user.user_metadata?.picture} />
                 <AvatarFallback>
-                  {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  {user.user_metadata?.name ? user.user_metadata.name.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
             </>
