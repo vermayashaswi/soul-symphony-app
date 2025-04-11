@@ -2,6 +2,7 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -14,6 +15,7 @@ import EnergyAnimation from '@/components/EnergyAnimation';
 
 const Index = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const isMobile = useIsMobile();
@@ -62,6 +64,12 @@ const Index = () => {
         variants={containerVariants}
       >
         <HeroSection user={user} />
+        
+        {/* Main Tagline with translation */}
+        <div className="text-center my-12">
+          <h2 className="text-2xl md:text-3xl font-medium">{t('mainTagline')}</h2>
+        </div>
+        
         <FeaturesGrid />
       </motion.main>
     </div>

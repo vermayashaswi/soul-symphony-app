@@ -2,11 +2,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import SouloLogo from '@/components/SouloLogo';
 import { Button } from '@/components/ui/button';
+import LanguageSelector from '@/components/LanguageSelector';
 
 const Navbar = () => {
   console.log("Website Navbar rendering"); // Debug log
+  const { t } = useTranslation();
 
   const scrollToDownloadSection = () => {
     const downloadSection = document.getElementById('download-section');
@@ -37,21 +40,22 @@ const Navbar = () => {
         
         <div className="flex items-center gap-4">
           <Button variant="ghost" asChild>
-            <Link to="/">Home</Link>
+            <Link to="/">{t('navbar.home')}</Link>
           </Button>
           <Button variant="ghost" asChild>
-            <Link to="/blog">Blog</Link>
+            <Link to="/blog">{t('navbar.blog')}</Link>
           </Button>
           <Button variant="ghost" asChild>
-            <Link to="/faq">FAQ</Link>
+            <Link to="/faq">{t('navbar.faq')}</Link>
           </Button>
           <Button 
             variant="default" 
             className="bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={scrollToDownloadSection}
           >
-            Download
+            {t('navbar.download')}
           </Button>
+          <LanguageSelector />
         </div>
       </div>
     </motion.nav>

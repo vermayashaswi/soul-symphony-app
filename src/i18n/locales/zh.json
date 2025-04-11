@@ -1,0 +1,51 @@
+
+{
+  "navbar": {
+    "home": "主页",
+    "blog": "博客",
+    "faq": "常见问题",
+    "download": "下载",
+    "openApp": "打开应用",
+    "tryWebApp": "尝试网页应用",
+    "signIn": "登录"
+  },
+  "hero": {
+    "welcome": "欢迎使用",
+    "tagline": "您的个人AI伴侣，使用语音日记进行情感健康和自我反思",
+    "getStarted": "开始使用",
+    "exploreMore": "了解更多"
+  },
+  "features": {
+    "title": "SOULo如何工作",
+    "subtitle": "我们创新的方法将语音日记与AI技术相结合，为您提供有关自己的有意义的见解。"
+  },
+  "feature1": {
+    "title": "语音日记",
+    "description": "用语音记录您的想法，让SOULo自动转录和分析它们。"
+  },
+  "feature2": {
+    "title": "AI分析",
+    "description": "通过高级AI分析了解您的模式和情绪。"
+  },
+  "feature3": {
+    "title": "情感追踪",
+    "description": "通过交互式图表可视化您的情感旅程。"
+  },
+  "feature4": {
+    "title": "AI助手",
+    "description": "与您的日记聊天，从过去的条目中获取个性化的见解。"
+  },
+  "download": {
+    "title": "今天就获取SOULo",
+    "subtitle": "iOS和Android均可使用",
+    "appStore": "App Store",
+    "googlePlay": "Google Play"
+  },
+  "footer": {
+    "contact": "您可以随时通过以下方式联系我们",
+    "rights": "保留所有权利。",
+    "privacy": "隐私政策",
+    "terms": "服务条款"
+  },
+  "mainTagline": "记录日记并捕捉您的一天，无需写下一个字！"
+}

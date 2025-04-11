@@ -1,0 +1,51 @@
+
+{
+  "navbar": {
+    "home": "Accueil",
+    "blog": "Blog",
+    "faq": "FAQ",
+    "download": "Télécharger",
+    "openApp": "Ouvrir l'App",
+    "tryWebApp": "Essayer l'App Web",
+    "signIn": "Se Connecter"
+  },
+  "hero": {
+    "welcome": "Bienvenue à",
+    "tagline": "Votre compagnon IA personnel pour le bien-être émotionnel et l'auto-réflexion utilisant le journal VOCAL",
+    "getStarted": "Commencer",
+    "exploreMore": "Découvrir Plus"
+  },
+  "features": {
+    "title": "Comment Fonctionne SOULo",
+    "subtitle": "Notre approche innovante combine le journal vocal avec la technologie IA pour vous fournir des insights significatifs sur vous-même."
+  },
+  "feature1": {
+    "title": "Journal Vocal",
+    "description": "Enregistrez vos pensées avec votre voix et laissez SOULo les transcrire et les analyser automatiquement."
+  },
+  "feature2": {
+    "title": "Analyse IA",
+    "description": "Obtenez des insights sur vos modèles et émotions grâce à l'analyse IA avancée."
+  },
+  "feature3": {
+    "title": "Suivi Émotionnel",
+    "description": "Visualisez votre parcours émotionnel au fil du temps avec des graphiques interactifs."
+  },
+  "feature4": {
+    "title": "Assistant IA",
+    "description": "Discutez avec votre journal et obtenez des insights personnalisés de vos entrées passées."
+  },
+  "download": {
+    "title": "Obtenez SOULo Aujourd'hui",
+    "subtitle": "Disponible sur iOS et Android",
+    "appStore": "App Store",
+    "googlePlay": "Google Play"
+  },
+  "footer": {
+    "contact": "Vous pouvez nous contacter à tout moment à",
+    "rights": "Tous droits réservés.",
+    "privacy": "Politique de Confidentialité",
+    "terms": "Conditions d'Utilisation"
+  },
+  "mainTagline": "Tenez un journal et capturez votre journée sans écrire un seul mot!"
+}

@@ -1,0 +1,51 @@
+
+{
+  "navbar": {
+    "home": "Home",
+    "blog": "Blog",
+    "faq": "FAQ",
+    "download": "Download",
+    "openApp": "Open App",
+    "tryWebApp": "Try Web App",
+    "signIn": "Sign In"
+  },
+  "hero": {
+    "welcome": "Welcome to",
+    "tagline": "Your personal AI companion for emotional wellness and self-reflection using VOICE journaling",
+    "getStarted": "Get Started",
+    "exploreMore": "Discover More"
+  },
+  "features": {
+    "title": "How SOULo Works",
+    "subtitle": "Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself."
+  },
+  "feature1": {
+    "title": "Voice Journaling",
+    "description": "Record your thoughts with voice and let SOULo transcribe and analyze them automatically."
+  },
+  "feature2": {
+    "title": "AI Analysis",
+    "description": "Gain insights into your patterns and emotions through advanced AI analysis."
+  },
+  "feature3": {
+    "title": "Emotional Tracking",
+    "description": "Visualize your emotional journey over time with interactive charts."
+  },
+  "feature4": {
+    "title": "AI Assistant",
+    "description": "Chat with your journal and get personalized insights from your past entries."
+  },
+  "download": {
+    "title": "Get SOULo Today",
+    "subtitle": "Available on iOS and Android",
+    "appStore": "App Store",
+    "googlePlay": "Google Play"
+  },
+  "footer": {
+    "contact": "You can contact us anytime at",
+    "rights": "All rights reserved.",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service"
+  },
+  "mainTagline": "Keep a journal and capture your day without writing down a single word!"
+}

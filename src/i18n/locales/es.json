@@ -1,0 +1,51 @@
+
+{
+  "navbar": {
+    "home": "Inicio",
+    "blog": "Blog",
+    "faq": "Preguntas Frecuentes",
+    "download": "Descargar",
+    "openApp": "Abrir App",
+    "tryWebApp": "Probar Web App",
+    "signIn": "Iniciar Sesión"
+  },
+  "hero": {
+    "welcome": "Bienvenido a",
+    "tagline": "Tu compañero de IA personal para el bienestar emocional y la autorreflexión usando diario por VOZ",
+    "getStarted": "Comenzar",
+    "exploreMore": "Descubrir Más"
+  },
+  "features": {
+    "title": "Cómo Funciona SOULo",
+    "subtitle": "Nuestro enfoque innovador combina el diario por voz con tecnología de IA para brindarte información significativa sobre ti mismo."
+  },
+  "feature1": {
+    "title": "Diario por Voz",
+    "description": "Graba tus pensamientos con la voz y deja que SOULo los transcriba y analice automáticamente."
+  },
+  "feature2": {
+    "title": "Análisis de IA",
+    "description": "Obtén información sobre tus patrones y emociones a través del análisis avanzado de IA."
+  },
+  "feature3": {
+    "title": "Seguimiento Emocional",
+    "description": "Visualiza tu viaje emocional a lo largo del tiempo con gráficos interactivos."
+  },
+  "feature4": {
+    "title": "Asistente de IA",
+    "description": "Chatea con tu diario y obtén información personalizada de tus entradas anteriores."
+  },
+  "download": {
+    "title": "Obtén SOULo Hoy",
+    "subtitle": "Disponible en iOS y Android",
+    "appStore": "App Store",
+    "googlePlay": "Google Play"
+  },
+  "footer": {
+    "contact": "Puedes contactarnos en cualquier momento en",
+    "rights": "Todos los derechos reservados.",
+    "privacy": "Política de Privacidad",
+    "terms": "Términos de Servicio"
+  },
+  "mainTagline": "¡Mantén un diario y captura tu día sin escribir una sola palabra!"
+}

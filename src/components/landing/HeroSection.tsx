@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import SouloLogo from '@/components/SouloLogo';
@@ -14,6 +15,7 @@ interface HeroSectionProps {
 const HeroSection: React.FC<HeroSectionProps> = ({ user }) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { t } = useTranslation();
   
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -37,12 +39,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ user }) => {
       <div className="relative z-10">
         <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-3 flex items-center justify-center`}>
           <span className="text-foreground dark:text-white">
-            Welcome to
+            {t('hero.welcome')}
           </span> 
           <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} animate={true} />
         </h1>
         <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse mt-4 mb-8`}>
-          Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
+          {t('hero.tagline')}
         </p>
         
         {!user && (
@@ -55,7 +57,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ user }) => {
               onClick={() => navigate('/auth')}
               className="animate-pulse relative z-10"
             >
-              Get Started
+              {t('hero.getStarted')}
             </Button>
           </motion.div>
         )}

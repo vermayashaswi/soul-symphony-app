@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +12,7 @@ import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 import EnergyAnimation from '@/components/EnergyAnimation';
 
 const Home = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);

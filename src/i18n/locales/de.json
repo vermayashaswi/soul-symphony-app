@@ -1,0 +1,51 @@
+
+{
+  "navbar": {
+    "home": "Startseite",
+    "blog": "Blog",
+    "faq": "FAQ",
+    "download": "Herunterladen",
+    "openApp": "App Öffnen",
+    "tryWebApp": "Web-App Testen",
+    "signIn": "Anmelden"
+  },
+  "hero": {
+    "welcome": "Willkommen bei",
+    "tagline": "Ihr persönlicher KI-Begleiter für emotionales Wohlbefinden und Selbstreflexion mit SPRACH-Journaling",
+    "getStarted": "Loslegen",
+    "exploreMore": "Mehr Entdecken"
+  },
+  "features": {
+    "title": "Wie SOULo Funktioniert",
+    "subtitle": "Unser innovativer Ansatz kombiniert Sprach-Journaling mit KI-Technologie, um Ihnen bedeutungsvolle Einblicke über sich selbst zu geben."
+  },
+  "feature1": {
+    "title": "Sprach-Journaling",
+    "description": "Nehmen Sie Ihre Gedanken mit Ihrer Stimme auf und lassen Sie SOULo sie automatisch transkribieren und analysieren."
+  },
+  "feature2": {
+    "title": "KI-Analyse",
+    "description": "Gewinnen Sie Einblicke in Ihre Muster und Emotionen durch fortschrittliche KI-Analyse."
+  },
+  "feature3": {
+    "title": "Emotionales Tracking",
+    "description": "Visualisieren Sie Ihre emotionale Reise im Laufe der Zeit mit interaktiven Diagrammen."
+  },
+  "feature4": {
+    "title": "KI-Assistent",
+    "description": "Chatten Sie mit Ihrem Journal und erhalten Sie personalisierte Einblicke aus Ihren vergangenen Einträgen."
+  },
+  "download": {
+    "title": "Holen Sie sich SOULo Heute",
+    "subtitle": "Verfügbar für iOS und Android",
+    "appStore": "App Store",
+    "googlePlay": "Google Play"
+  },
+  "footer": {
+    "contact": "Sie können uns jederzeit kontaktieren unter",
+    "rights": "Alle Rechte vorbehalten.",
+    "privacy": "Datenschutzrichtlinie",
+    "terms": "Nutzungsbedingungen"
+  },
+  "mainTagline": "Führen Sie ein Tagebuch und halten Sie Ihren Tag fest, ohne ein einziges Wort aufzuschreiben!"
+}

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Home, MessageCircle, BarChart2, Settings, Menu, X, LogOut, LogIn } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import SouloLogo from '@/components/SouloLogo';
+import LanguageSelector from '@/components/LanguageSelector';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,8 +27,8 @@ export function Navbar() {
   const isMobile = useIsMobile();
   const [scrolled, setScrolled] = useState(false);
   const { user, signOut } = useAuth();
+  const { t } = useTranslation();
   
-  // Check for mobile view after all hooks have been called
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldHideNavbar = isMobile.isMobile || mobileDemo;
@@ -55,7 +57,6 @@ export function Navbar() {
     return "U";
   };
 
-  // Use prefixed routes for app navigation
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/app/home', label: 'Dashboard', icon: Home },
@@ -85,12 +86,10 @@ export function Navbar() {
 
   const closeMenu = () => setIsOpen(false);
 
-  // Show website navbar only for non-app routes
   if (shouldHideNavbar || isAppRoute(location.pathname)) {
     return null;
   }
 
-  // Only show the website navigation
   return (
     <nav 
       className={cn(
@@ -112,14 +111,16 @@ export function Navbar() {
 
         <div className="hidden md:flex items-center gap-1">
           <Button variant="ghost" asChild>
-            <Link to="/blog">Blog</Link>
+            <Link to="/blog">{t('navbar.blog')}</Link>
           </Button>
           <Button variant="ghost" asChild>
-            <Link to="/faq">FAQ</Link>
+            <Link to="/faq">{t('navbar.faq')}</Link>
           </Button>
           <Button variant="ghost" asChild>
-            <Link to="/app">Open App</Link>
+            <Link to="/app">{t('navbar.openApp')}</Link>
           </Button>
+          
+          <LanguageSelector />
           
           {user ? (
             <DropdownMenu>
@@ -150,15 +151,16 @@ export function Navbar() {
             <Button variant="ghost" asChild>
               <Link to="/app/auth">
                 <LogIn className="mr-2 h-4 w-4" />
-                Sign In
+                {t('navbar.signIn')}
               </Link>
             </Button>
           )}
         </div>
 
         <div className="md:hidden flex items-center gap-2">
+          <LanguageSelector />
           <Link to="/app">
-            <Button size="sm">Open App</Button>
+            <Button size="sm">{t('navbar.openApp')}</Button>
           </Link>
           
           <button 
@@ -187,16 +189,16 @@ export function Navbar() {
         >
           <div className="py-4 flex flex-col gap-2">
             <Button variant="ghost" asChild>
-              <Link to="/" onClick={closeMenu}>Home</Link>
+              <Link to="/" onClick={closeMenu}>{t('navbar.home')}</Link>
             </Button>
             <Button variant="ghost" asChild>
-              <Link to="/blog" onClick={closeMenu}>Blog</Link>
+              <Link to="/blog" onClick={closeMenu}>{t('navbar.blog')}</Link>
             </Button>
             <Button variant="ghost" asChild>
-              <Link to="/faq" onClick={closeMenu}>FAQ</Link>
+              <Link to="/faq" onClick={closeMenu}>{t('navbar.faq')}</Link>
             </Button>
             <Button variant="ghost" asChild>
-              <Link to="/app" onClick={closeMenu}>Open App</Link>
+              <Link to="/app" onClick={closeMenu}>{t('navbar.openApp')}</Link>
             </Button>
           </div>
         </motion.div>
