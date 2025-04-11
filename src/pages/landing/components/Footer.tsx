@@ -1,12 +1,9 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import SouloLogo from '@/components/SouloLogo';
-import LanguageSelector from '@/components/LanguageSelector';
 
 const Footer = () => {
-  const { t } = useTranslation();
   const currentYear = new Date().getFullYear();
   
   return (
@@ -19,7 +16,7 @@ const Footer = () => {
               <span className="text-xl font-bold">SOULo</span>
             </div>
             <p className="mb-4 text-white/80 max-w-md">
-              {t('mainTagline')}
+              Keep a journal and capture your day without writing down a single word!
             </p>
             <div className="flex space-x-3">
               <a href="https://twitter.com" className="text-white hover:text-white/80 transition-colors" aria-label="Twitter">
@@ -40,17 +37,17 @@ const Footer = () => {
             <ul className="space-y-2">
               <li>
                 <Link to="/" className="text-white/80 hover:text-white transition-colors">
-                  {t('navbar.home')}
+                  Home
                 </Link>
               </li>
               <li>
                 <Link to="/blog" className="text-white/80 hover:text-white transition-colors">
-                  {t('navbar.blog')}
+                  Blog
                 </Link>
               </li>
               <li>
                 <Link to="/faq" className="text-white/80 hover:text-white transition-colors">
-                  {t('navbar.faq')}
+                  FAQ
                 </Link>
               </li>
             </ul>
@@ -61,18 +58,13 @@ const Footer = () => {
             <ul className="space-y-2">
               <li>
                 <Link to="/privacy" className="text-white/80 hover:text-white transition-colors">
-                  {t('footer.privacy')}
+                  Privacy Policy
                 </Link>
               </li>
               <li>
                 <Link to="/terms" className="text-white/80 hover:text-white transition-colors">
-                  {t('footer.terms')}
+                  Terms of Service
                 </Link>
-              </li>
-              <li>
-                <div className="mt-4">
-                  <LanguageSelector />
-                </div>
               </li>
             </ul>
           </div>
@@ -80,10 +72,10 @@ const Footer = () => {
         
         <div className="mt-12 pt-8 border-t border-white/20 flex flex-col md:flex-row justify-between items-center">
           <p className="text-white/80 text-sm mb-4 md:mb-0">
-            &copy; {currentYear} SOULo. {t('footer.rights')}
+            &copy; {currentYear} SOULo. All rights reserved.
           </p>
           <p className="text-white/80 text-sm">
-            {t('footer.contact')} <a href="mailto:contact@soulo.online" className="text-white hover:underline">contact@soulo.online</a>
+            Contact us: <a href="mailto:contact@soulo.online" className="text-white hover:underline">contact@soulo.online</a>
           </p>
         </div>
       </div>
