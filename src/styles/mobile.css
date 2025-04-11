@@ -520,6 +520,29 @@
   }
 }
 
+/* Dark mode support for the bottom navigation bar */
+.dark .fixed.bottom-0.bg-background,
+.dark .fixed.bottom-0.bg-white {
+  background-color: hsl(var(--background)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Improve the contrast of the navigation text in dark mode */
+.dark .text-muted-foreground {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Fix for any lingering white backgrounds in dark mode */
+.dark [class*="bg-white"] {
+  background-color: hsl(var(--background)) !important;
+}
+
+/* Ensure the bottom nav has a subtle blur in dark mode */
+.dark .fixed.bottom-0 {
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
+}
+
 /* Dark mode support for sticky elements */
 .dark .sticky {
   background-color: hsl(var(--background));

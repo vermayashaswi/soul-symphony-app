@@ -73,7 +73,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   return (
     <motion.div 
-      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-2 z-50"
+      className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted p-2 z-50"
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
@@ -90,7 +90,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 "flex flex-col items-center p-2 transition-colors",
                 isActive 
                   ? "text-primary" 
-                  : "text-gray-500 hover:text-primary"
+                  : "text-muted-foreground hover:text-primary"
               )}
             >
               <div className="relative">
