@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -69,6 +70,39 @@ export const getRedirectUrl = (): string => {
   const isAppAuth = pathname.includes('/app/auth');
   return `${origin}${isAppAuth ? '/app/auth' : '/auth'}`;
 };
+
+/**
+ * Function to create a user session record in the database
+ */
+async function createUserSession(userId: string) {
+  try {
+    console.log('Attempting to create user session for user:', userId);
+    
+    // Get device and location info
+    const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+    
+    // Create session entry
+    const { data, error } = await supabase
+      .from('user_sessions')
+      .insert({
+        user_id: userId,
+        device_type: deviceType,
+        user_agent: navigator.userAgent,
+        entry_page: window.location.pathname,
+        last_active_page: window.location.pathname,
+        is_active: true
+      });
+    
+    if (error) {
+      console.error('Error creating user session:', error);
+      return;
+    }
+    
+    console.log('User session created successfully:', data);
+  } catch (e) {
+    console.error('Exception creating user session:', e);
+  }
+}
 
 /**
  * Sign in with Google
@@ -162,13 +196,18 @@ export const signInWithGoogle = async (): Promise<void> => {
  */
 export const signInWithEmail = async (email: string, password: string): Promise<void> => {
   try {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error, data } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
       throw error;
+    }
+    
+    // Create a user session record after successful sign-in
+    if (data.user) {
+      await createUserSession(data.user.id);
     }
   } catch (error: any) {
     console.error('Error signing in with email:', error);
@@ -187,13 +226,18 @@ export const signInWithEmail = async (email: string, password: string): Promise<
  */
 export const signUp = async (email: string, password: string): Promise<void> => {
   try {
-    const { error } = await supabase.auth.signUp({
+    const { error, data } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (error) {
       throw error;
+    }
+    
+    // Create a user session record after successful sign-up
+    if (data.user) {
+      await createUserSession(data.user.id);
     }
   } catch (error: any) {
     console.error('Error signing up:', error);
@@ -420,12 +464,77 @@ export const debugAuthState = async (): Promise<{session: any, user: any}> => {
       }
     });
     
+    // Check for user session records
+    let sessionRecord = null;
+    if (userData.user) {
+      try {
+        const { data: sessionRecords, error: sessionError } = await supabase
+          .from('user_sessions')
+          .select('*')
+          .eq('user_id', userData.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        if (sessionError) {
+          console.error('Error fetching user session records:', sessionError);
+        } else {
+          sessionRecord = sessionRecords?.[0] || null;
+          console.log('User session record:', sessionRecord);
+        }
+      } catch (e) {
+        console.error('Exception fetching user session records:', e);
+      }
+    }
+    
     return {
       session: sessionData.session,
-      user: userData.user
+      user: userData.user,
+      sessionRecord
     };
   } catch (error) {
     console.error('Error debugging auth state:', error);
     return { session: null, user: null };
+  }
+};
+
+/**
+ * Fix for handling the auth callback
+ * This is specifically added to fix the auth flow
+ */
+export const handleAuthCallback = async () => {
+  try {
+    // Check if we have hash params that might indicate an auth callback
+    const hasHashParams = window.location.hash.includes('access_token') || 
+                         window.location.hash.includes('error') ||
+                         window.location.search.includes('error');
+    
+    if (hasHashParams) {
+      console.log('Detected auth callback parameters, processing auth result');
+      
+      // Get the session
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error handling auth callback:', error);
+        return null;
+      } 
+      
+      if (data.session?.user) {
+        console.log('Successfully processed auth callback:', {
+          user: data.session.user.email,
+          provider: data.session.user.app_metadata?.provider
+        });
+        
+        // Create a user session record
+        await createUserSession(data.session.user.id);
+        
+        return data.session;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error in handleAuthCallback:', error);
+    return null;
   }
 };

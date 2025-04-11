@@ -32,6 +32,8 @@ export default function Auth() {
 
   // Enhanced debug logging
   useEffect(() => {
+    console.log('Auth component mounted - initial render');
+    
     // Enable debug mode by default
     if (!isEnabled) {
       toggleEnabled();
@@ -55,32 +57,6 @@ export default function Auth() {
     console.log('Auth: Component mounted', debugData);
     addEvent('auth', 'Auth component mounted', 'info', debugData);
 
-    // Add additional debugging info for the URL and navigation timing
-    const navTiming = window.performance && window.performance.timing ? {
-      navigationStart: window.performance.timing.navigationStart,
-      redirectStart: window.performance.timing.redirectStart,
-      redirectEnd: window.performance.timing.redirectEnd,
-      fetchStart: window.performance.timing.fetchStart,
-      domainLookupStart: window.performance.timing.domainLookupStart,
-      domainLookupEnd: window.performance.timing.domainLookupEnd,
-      connectStart: window.performance.timing.connectStart,
-      connectEnd: window.performance.timing.connectEnd,
-      secureConnectionStart: window.performance.timing.secureConnectionStart,
-      requestStart: window.performance.timing.requestStart,
-      responseStart: window.performance.timing.responseStart,
-      responseEnd: window.performance.timing.responseEnd,
-      domLoading: window.performance.timing.domLoading,
-      domInteractive: window.performance.timing.domInteractive,
-      domContentLoadedEventStart: window.performance.timing.domContentLoadedEventStart,
-      domContentLoadedEventEnd: window.performance.timing.domContentLoadedEventEnd,
-      domComplete: window.performance.timing.domComplete,
-      loadEventStart: window.performance.timing.loadEventStart,
-      loadEventEnd: window.performance.timing.loadEventEnd
-    } : 'Navigation Timing API not available';
-    
-    setDebugInfo(prev => ({...prev, navigationTiming: navTiming}));
-    addEvent('auth', 'Navigation timing info', 'info', navTiming);
-
     // Debug auth state on component mount
     debugAuthState().then(({ session, user }) => {
       const authStateData = { 
@@ -95,83 +71,8 @@ export default function Auth() {
       console.log('Auth: Initial auth state', authStateData);
       addEvent('auth', 'Initial auth state checked', !!session ? 'success' : 'info', authStateData);
     });
-  }, []);
-
-  useEffect(() => {
-    // Check if we're coming back from OAuth with hash parameters
-    const hasHashParams = window.location.hash.includes('access_token') || 
-                          window.location.hash.includes('error') ||
-                          window.location.search.includes('error');
-                          
-    if (hasHashParams) {
-      const hashData = {
-        hash: window.location.hash,
-        search: window.location.search,
-        timestamp: new Date().toISOString()
-      };
-      
-      setDebugInfo(prev => ({...prev, hashParams: hashData}));
-      console.log('Auth: Detected hash params in URL, processing auth result', hashData);
-      addEvent('auth', 'Detected hash params in URL', 'info', hashData);
-      
-      // Process the hash using the correct method
-      supabase.auth.getSession().then(({ data, error }) => {
-        if (error) {
-          const errorData = {
-            message: error.message,
-            code: error.code,
-            status: error.status,
-            timestamp: new Date().toISOString()
-          };
-          
-          setDebugInfo(prev => ({...prev, sessionError: errorData}));
-          console.error('Auth: Error getting session from URL', error);
-          addEvent('auth', 'Error getting session from URL', 'error', errorData);
-          setAuthError(error.message);
-          toast.error(`Authentication failed: ${error.message}`);
-        } else if (data.session) {
-          const sessionData = {
-            user: data.session.user.email,
-            expires: data.session.expires_at ? new Date(data.session.expires_at * 1000).toISOString() : null,
-            provider: data.session.user.app_metadata?.provider || null,
-            accessTokenLength: data.session.access_token ? data.session.access_token.length : 0,
-            hasRefreshToken: !!data.session.refresh_token,
-            timestamp: new Date().toISOString()
-          };
-          
-          setDebugInfo(prev => ({...prev, sessionSuccess: sessionData}));
-          console.log('Auth: Successfully got session from URL', sessionData);
-          addEvent('auth', 'Successfully got session from URL', 'success', sessionData);
-        } else {
-          const noSessionData = {
-            message: 'No session returned but no error either',
-            timestamp: new Date().toISOString()
-          };
-          
-          setDebugInfo(prev => ({...prev, noSession: noSessionData}));
-          console.warn('Auth: No session returned from URL', noSessionData);
-          addEvent('auth', 'No session returned from URL', 'warning', noSessionData);
-        }
-        setIsLoading(false);
-      });
-      
-      // Show error toast if error in URL
-      if (window.location.hash.includes('error') || window.location.search.includes('error')) {
-        const urlErrorData = {
-          hash: window.location.hash,
-          search: window.location.search,
-          timestamp: new Date().toISOString()
-        };
-        
-        setDebugInfo(prev => ({...prev, urlError: urlErrorData}));
-        console.error('Auth: Error detected in redirect URL', urlErrorData);
-        addEvent('auth', 'Error detected in redirect URL', 'error', urlErrorData);
-        toast.error('Authentication failed. Please try again.');
-        setAuthError('Error detected in redirect URL');
-      }
-    } else {
-      setIsLoading(false);
-    }
+    
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -283,37 +184,6 @@ export default function Auth() {
     }));
     
     addEvent('auth', 'Local storage checked', 'info', { localStorage: localStorageItems });
-    
-    // Check cookies
-    const cookieData = document.cookie ? document.cookie.split(';').reduce((acc, cookie) => {
-      const [key, value] = cookie.trim().split('=');
-      acc[key] = value;
-      return acc;
-    }, {}) : {};
-    
-    setDebugInfo(prev => ({
-      ...prev,
-      cookies: {
-        items: cookieData,
-        timestamp: new Date().toISOString()
-      }
-    }));
-    
-    addEvent('auth', 'Cookies checked', 'info', { cookies: cookieData });
-    
-    // Check network connectivity
-    const connectionData = {
-      online: navigator.onLine,
-      effectiveType: (navigator as any).connection ? (navigator as any).connection.effectiveType : 'unknown',
-      timestamp: new Date().toISOString()
-    };
-    
-    setDebugInfo(prev => ({
-      ...prev,
-      networkConnection: connectionData
-    }));
-    
-    addEvent('auth', 'Network connection checked', 'info', connectionData);
     
     // Also enable debug mode
     if (!isEnabled) {

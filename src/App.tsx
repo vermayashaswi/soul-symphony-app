@@ -14,6 +14,7 @@ import "./styles/mobile.css";
 import { useEffect } from 'react';
 import { DebugLogProvider } from "./utils/debug/DebugContext";
 import DebugLogPanel from "./components/debug/DebugLogPanel";
+import { handleAuthCallback } from "./services/authService";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,18 +76,18 @@ const App = () => {
       });
       
       // Process auth callback using the correct method
-      supabase.auth.getSession().then(({ data, error }) => {
-        if (error) {
-          console.error('Error handling auth callback at app startup:', error);
-        } else if (data.session) {
+      handleAuthCallback().then(session => {
+        if (session) {
           console.log('Successfully processed auth callback at app startup:', {
-            user: data.session.user.email,
-            expires: data.session.expires_at,
-            provider: data.session.user.app_metadata?.provider
+            user: session.user.email,
+            expires: session.expires_at,
+            provider: session.user.app_metadata?.provider
           });
         } else {
           console.warn('No session found after processing auth callback');
         }
+      }).catch(err => {
+        console.error('Error handling auth callback at app startup:', err);
       });
     }
     

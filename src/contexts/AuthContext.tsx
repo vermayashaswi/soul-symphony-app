@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,6 +33,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
   const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const location = useLocation();
+
+  const createUserSession = async (userId: string) => {
+    try {
+      console.log('Creating user session record for user:', userId);
+      
+      const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+      
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .insert({
+          user_id: userId,
+          device_type: deviceType,
+          user_agent: navigator.userAgent,
+          entry_page: window.location.pathname,
+          last_active_page: window.location.pathname,
+          is_active: true
+        });
+      
+      if (error) {
+        console.error('Error creating user session from AuthContext:', error);
+        return;
+      }
+      
+      console.log('User session created successfully from AuthContext:', data);
+    } catch (e) {
+      console.error('Exception creating user session from AuthContext:', e);
+    }
+  };
 
   useEffect(() => {
     const checkMobile = () => {
@@ -89,6 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
+        
+        await createUserSession(user.id);
+        
         return true;
       } else {
         const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}`;
@@ -336,7 +366,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && currentSession?.user) {
+        if (currentSession?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+          setTimeout(() => {
+            createUserSession(currentSession.user.id)
+              .catch(error => {
+                console.error('Error creating user session on auth state change:', error);
+              });
+          }, 0);
+          
           const initialDelay = isMobileDevice ? 1500 : 1000;
           logProfile(`Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
           
@@ -360,7 +397,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         setIsLoading(false);
 
-        // Only show sign-in notification for app routes, not website routes
         if (event === 'SIGNED_IN') {
           logInfo('User signed in successfully', 'AuthContext');
           if (isAppRoute(location.pathname)) {
@@ -377,7 +413,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAutoRetryTimeoutId(null);
           }
           
-          // Only show sign-out notification for app routes
           if (isAppRoute(location.pathname)) {
             toast.info('Signed out');
           }
@@ -391,6 +426,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
+        setTimeout(() => {
+          createUserSession(currentSession.user.id)
+            .catch(error => {
+              console.error('Error creating user session on initial session check:', error);
+            });
+        }, 0);
+        
         const initialDelay = isMobileDevice ? 1500 : 1000;
         logProfile(`Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
         
