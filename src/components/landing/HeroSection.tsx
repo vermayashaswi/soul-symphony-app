@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import SouloLogo from '@/components/SouloLogo';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import EnergyAnimation from '@/components/EnergyAnimation';
 
 interface HeroSectionProps {
   user: any;
@@ -35,10 +34,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ user }) => {
       className="text-center mb-4 relative" 
       variants={itemVariants}
     >
-      <div className="absolute inset-0 overflow-hidden">
-        <EnergyAnimation />
-      </div>
-      
       <div className="relative z-10">
         <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-3 flex items-center justify-center`}>
           <span className="text-foreground dark:text-white">
