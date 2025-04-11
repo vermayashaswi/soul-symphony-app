@@ -16,7 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, CircleDot } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -288,6 +288,37 @@ export function EmotionChart({
     });
   };
 
+  // Custom dot renderer to show zero-value emotions with black circle
+  const CustomDot = (props: any) => {
+    const { cx, cy, stroke, strokeWidth, r, value, dataKey } = props;
+    
+    if (value === 0) {
+      return (
+        <g>
+          <circle 
+            cx={cx} 
+            cy={cy} 
+            r={r + 1} 
+            fill="transparent" 
+            stroke="#000" 
+            strokeWidth={1.5} 
+          />
+        </g>
+      );
+    }
+    
+    return (
+      <circle 
+        cx={cx} 
+        cy={cy} 
+        r={r} 
+        fill={theme === 'dark' ? '#1e293b' : 'white'} 
+        stroke={stroke} 
+        strokeWidth={strokeWidth} 
+      />
+    );
+  };
+
   const renderLineChart = () => {
     if (lineData.length === 0) {
       return (
@@ -348,7 +379,7 @@ export function EmotionChart({
                 dataKey={emotion}
                 stroke={getEmotionColor(emotion, index)}
                 strokeWidth={2}
-                dot={{ r: isMobile ? 3 : 4 }}
+                dot={<CustomDot />}
                 activeDot={{ r: isMobile ? 5 : 6 }}
                 name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
                 label={isMobile ? null : <EmotionLineLabel />}
@@ -390,8 +421,12 @@ export function EmotionChart({
           })}
         </div>
         
-        <div className="mt-4 text-center text-xs text-muted-foreground">
-          * Click on a legend item to focus on that emotion, click multiple to compare
+        <div className="flex justify-center flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <CircleDot className="h-4 w-4 stroke-black dark:stroke-white" strokeWidth={1.5} />
+            <span>Emotion has no score</span>
+          </div>
+          <span>* Click on a legend item to focus on that emotion</span>
         </div>
       </div>
     );
