@@ -8,9 +8,10 @@ interface ColorPickerProps {
   value: string;
   onChange: (hexColor: string) => void;
   className?: string;
+  applyImmediately?: boolean;
 }
 
-export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
+export function ColorPicker({ value, onChange, className, applyImmediately = false }: ColorPickerProps) {
   const [hue, setHue] = useState(0);
   const [saturation, setSaturation] = useState(80);
   const [lightness, setLightness] = useState(60);
@@ -35,7 +36,12 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
   useEffect(() => {
     const hexColor = hslToHex(hue, saturation, lightness);
     setCurrentColor(hexColor);
-  }, [hue, saturation, lightness]);
+    
+    // If applyImmediately is true, call onChange with every change
+    if (applyImmediately) {
+      onChange(hexColor);
+    }
+  }, [hue, saturation, lightness, applyImmediately, onChange]);
 
   const handleHueChange = (newHue: number[]) => {
     setHue(newHue[0]);
@@ -216,6 +222,17 @@ export function ColorPicker({ value, onChange, className }: ColorPickerProps) {
           className="w-full"
         />
       </div>
+      
+      {/* Only show apply button if not applying immediately */}
+      {!applyImmediately && (
+        <button
+          onClick={applyColor}
+          className="mt-4 px-4 py-2 bg-theme text-white rounded-md flex items-center justify-center gap-2 hover:bg-theme-dark transition-colors"
+        >
+          <CheckIcon className="h-4 w-4" />
+          Apply Color
+        </button>
+      )}
     </div>
   );
 }

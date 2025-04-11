@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
@@ -46,10 +47,10 @@ const AppFeatureCarousel = () => {
     <section className="py-16 md:py-24 bg-gray-50">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">
+          <span className="px-3 py-1 rounded-full bg-theme-lighter text-theme text-sm font-medium mb-4 inline-block">
             App Features
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Discover SOULo's Features</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-theme-color">Discover SOULo's Features</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself.
           </p>
@@ -60,7 +61,7 @@ const AppFeatureCarousel = () => {
             <Button 
               variant="outline" 
               size="icon" 
-              className="absolute left-0 z-10 rounded-full"
+              className="absolute left-0 z-10 rounded-full border-theme text-theme hover:bg-theme hover:text-white"
               onClick={prevFeature}
             >
               <ChevronLeft className="h-6 w-6" />
@@ -76,7 +77,7 @@ const AppFeatureCarousel = () => {
                   transition={{ duration: 0.5 }}
                   className="w-full md:w-1/2 p-4"
                 >
-                  <Card className="overflow-hidden border-primary/10 shadow-lg bg-white">
+                  <Card className="overflow-hidden border-theme/10 shadow-lg bg-white">
                     <CardContent className="p-0">
                       <img 
                         src={features[activeFeature].image} 
@@ -95,10 +96,10 @@ const AppFeatureCarousel = () => {
                   transition={{ duration: 0.5, delay: 0.2 }}
                   className="w-full md:w-1/2 p-4 text-center md:text-left"
                 >
-                  <div className="bg-primary/10 rounded-full w-16 h-16 flex items-center justify-center mb-6 mx-auto md:mx-0">
-                    {React.createElement(features[activeFeature].icon, { className: "h-8 w-8 text-primary" })}
+                  <div className="bg-theme/10 rounded-full w-16 h-16 flex items-center justify-center mb-6 mx-auto md:mx-0">
+                    {React.createElement(features[activeFeature].icon, { className: "h-8 w-8 text-theme" })}
                   </div>
-                  <h3 className="text-2xl md:text-3xl font-bold mb-4">{features[activeFeature].title}</h3>
+                  <h3 className="text-2xl md:text-3xl font-bold mb-4 text-theme-color">{features[activeFeature].title}</h3>
                   <p className="text-muted-foreground text-lg">{features[activeFeature].description}</p>
                 </motion.div>
               </div>
@@ -107,7 +108,7 @@ const AppFeatureCarousel = () => {
             <Button 
               variant="outline" 
               size="icon" 
-              className="absolute right-0 z-10 rounded-full"
+              className="absolute right-0 z-10 rounded-full border-theme text-theme hover:bg-theme hover:text-white"
               onClick={nextFeature}
             >
               <ChevronRight className="h-6 w-6" />
@@ -118,7 +119,7 @@ const AppFeatureCarousel = () => {
             {features.map((_, index) => (
               <button
                 key={index}
-                className={`w-3 h-3 rounded-full ${index === activeFeature ? 'bg-primary' : 'bg-gray-300'}`}
+                className={`w-3 h-3 rounded-full ${index === activeFeature ? 'bg-theme' : 'bg-gray-300'}`}
                 onClick={() => setActiveFeature(index)}
               />
             ))}

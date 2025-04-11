@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = 'light' | 'dark' | 'system';
@@ -146,45 +147,82 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     
     if (primaryRgb) {
       const [h, s, l] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+      
+      // Update the primary and ring HSL variables
       root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
       root.style.setProperty('--ring', `${h} ${s}% ${l}%`);
       
+      // Update primary-h, primary-s, primary-l for components that use direct HSL values
+      root.style.setProperty('--primary-h', `${h}`);
+      root.style.setProperty('--primary-s', `${s}%`);
+      root.style.setProperty('--primary-l', `${l}%`);
+      
+      // Create or update style element for global theme colors
       const style = document.getElementById('theme-colors-style') || document.createElement('style');
       style.id = 'theme-colors-style';
       
+      // Apply more comprehensive CSS variables and utility classes
       style.textContent = `
-        .text-theme-color { color: ${primaryHex} !important; }
-        .border-theme-color { border-color: ${primaryHex} !important; }
-        .bg-theme-color { background-color: ${primaryHex} !important; }
-        .hover\\:bg-theme-color:hover { background-color: ${primaryHex} !important; }
-        .hover\\:text-theme-color:hover { color: ${primaryHex} !important; }
-        .hover\\:border-theme-color:hover { border-color: ${primaryHex} !important; }
-        .focus\\:ring-theme-color:focus { --tw-ring-color: ${primaryHex} !important; }
-        .stroke-theme-color { stroke: ${primaryHex} !important; }
-        .fill-theme-color { fill: ${primaryHex} !important; }
+        :root {
+          --theme-color: ${primaryHex};
+          --theme-color-rgb: ${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b};
+          --theme-light: color-mix(in srgb, ${primaryHex} 30%, white);
+          --theme-lighter: color-mix(in srgb, ${primaryHex} 15%, white);
+          --theme-dark: color-mix(in srgb, ${primaryHex} 30%, black);
+          --theme-darker: color-mix(in srgb, ${primaryHex} 50%, black);
+        }
+        .text-theme { color: ${primaryHex} !important; }
+        .text-theme-light { color: var(--theme-light) !important; }
+        .text-theme-dark { color: var(--theme-dark) !important; }
         
-        button.bg-theme-color { background-color: ${primaryHex} !important; }
-        button.text-theme-color { color: ${primaryHex} !important; }
-        button.border-theme-color { border-color: ${primaryHex} !important; }
+        .bg-theme { background-color: ${primaryHex} !important; }
+        .bg-theme-light { background-color: var(--theme-light) !important; }
+        .bg-theme-lighter { background-color: var(--theme-lighter) !important; }
+        .bg-theme-dark { background-color: var(--theme-dark) !important; }
         
-        .icon-theme-color { color: ${primaryHex} !important; }
-        .icon-theme-color svg { color: ${primaryHex} !important; }
+        .border-theme { border-color: ${primaryHex} !important; }
+        .ring-theme { --tw-ring-color: ${primaryHex} !important; }
         
-        h1.text-theme-color, h2.text-theme-color, h3.text-theme-color, 
-        h4.text-theme-color, h5.text-theme-color, h6.text-theme-color,
-        p.text-theme-color, span.text-theme-color { color: ${primaryHex} !important; }
+        .stroke-theme { stroke: ${primaryHex} !important; }
+        .fill-theme { fill: ${primaryHex} !important; }
+        
+        .hover\\:bg-theme:hover { background-color: ${primaryHex} !important; }
+        .hover\\:text-theme:hover { color: ${primaryHex} !important; }
+        .hover\\:border-theme:hover { border-color: ${primaryHex} !important; }
+        
+        .text-theme-color, .theme-text { color: ${primaryHex} !important; }
+        .bg-theme-color, .theme-bg { background-color: ${primaryHex} !important; }
+        .border-theme-color, .theme-border { border-color: ${primaryHex} !important; }
+        
+        button.theme-button, 
+        .theme-button {
+          background-color: ${primaryHex} !important;
+          color: white !important;
+        }
+        
+        button.theme-button-outline, 
+        .theme-button-outline {
+          background-color: transparent !important;
+          border-color: ${primaryHex} !important;
+          color: ${primaryHex} !important;
+        }
+        
+        .theme-shadow {
+          box-shadow: 0 4px 14px rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.25) !important;
+        }
       `;
-      document.head.appendChild(style);
       
-      document.documentElement.style.setProperty('--primary-h', `${h}`);
-      document.documentElement.style.setProperty('--primary-s', `${s}%`);
-      document.documentElement.style.setProperty('--primary-l', `${l}%`);
+      if (!document.getElementById('theme-colors-style')) {
+        document.head.appendChild(style);
+      }
     }
   }, [colorTheme, customColor]);
 
+  // This effect specifically handles when custom color changes
   useEffect(() => {
     localStorage.setItem('feelosophy-custom-color', customColor);
     
+    // Only update the theme if currently using Custom theme
     if (colorTheme === 'Custom') {
       const root = window.document.documentElement;
       root.style.setProperty('--color-theme', customColor);
@@ -194,6 +232,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         const [h, s, l] = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
         root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
         root.style.setProperty('--ring', `${h} ${s}% ${l}%`);
+        root.style.setProperty('--primary-h', `${h}`);
+        root.style.setProperty('--primary-s', `${s}%`);
+        root.style.setProperty('--primary-l', `${l}%`);
       }
     }
   }, [customColor, colorTheme]);
