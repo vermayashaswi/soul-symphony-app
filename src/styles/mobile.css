@@ -470,18 +470,18 @@
     transition: transform 0.2s ease-out;
   }
   
-  /* UPDATED: Input visibility improvements with better spacing from nav bar */
+  /* UPDATED: Input visibility improvements with better spacing from nav bar (reduced by 75%) */
   .mobile-chat-interface .input-container {
     position: relative;
-    padding-bottom: calc(env(safe-area-inset-bottom, 10px) + 60px); /* Added more padding to ensure visibility above nav */
+    padding-bottom: calc(env(safe-area-inset-bottom, 10px) + 15px); /* Reduced by 75% from original 60px */
     z-index: 1000;
     background-color: hsl(var(--background));
     margin-bottom: 56px; /* Space for bottom nav bar */
   }
   
-  /* UPDATED: Chat area scrolling adjustments to prevent content being hidden */
+  /* UPDATED: Chat area scrolling adjustments to prevent content being hidden (reduced by 75%) */
   .mobile-chat-area {
-    padding-bottom: calc(100px + 56px) !important; /* Added height of nav bar */
+    padding-bottom: calc(100px + 14px) !important; /* Reduced by 75% from additional 56px */
     margin-bottom: env(safe-area-inset-bottom, 20px);
   }
   
@@ -506,9 +506,9 @@
     margin-bottom: 56px; /* Add space above the navbar */
   }
   
-  /* NEW: Add bottom area protection for chat content */
+  /* NEW: Add bottom area protection for chat content (reduced by 75%) */
   .mobile-chat-interface .chat-content-container {
-    padding-bottom: calc(56px + 60px); /* Navigation height plus extra space */
+    padding-bottom: calc(56px + 15px); /* Reduced by 75% from additional 60px */
   }
   
   /* NEW: Improve visibility of fixed elements at the bottom */
