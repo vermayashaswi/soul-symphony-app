@@ -42,6 +42,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
     const startDelay = setTimeout(() => {
       setIsAnimating(false);
       
+      // Start immediate movement upon appearance
       const updatePosition = () => {
         if (!bubbleRef.current) return;
         
@@ -56,8 +57,8 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
         animationFrameId = requestAnimationFrame(updatePosition);
       };
       
-      // Start the animation loop
-      animationFrameId = requestAnimationFrame(updatePosition);
+      // Start the animation loop immediately
+      updatePosition();
     }, delay);
     
     return () => {
@@ -102,7 +103,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
         scale: 1,
         opacity: 1,
         transition: {
-          duration: 0.8, // Slower animation
+          duration: 0.4, // Faster animation for quicker appearance
           ease: "easeOut"
         }
       } : controls}
@@ -157,12 +158,14 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     position: { x: number; y: number };
     velocity: { x: number; y: number };
     delay: number;
-    distanceFromCenter: number; // Add distance tracking
+    distanceFromCenter: number;
+    creationTime: number; // Track when the bubble was created
   }>>([]);
   const [themePool, setThemePool] = useState<ThemeData[]>([]);
   const { colorTheme, customColor } = useTheme();
   const popCenterRef = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
   const bubbleGenerationInProgress = useRef<boolean>(false);
+  const lastBubbleGenerationTime = useRef<number>(0);
   
   // Get the theme color based on the current theme
   const getThemeColorHex = (): string => {
@@ -243,7 +246,17 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
   const createBubble = () => {
     if (activeBubbles.length >= maxBubbles || !themePool.length || bubbleGenerationInProgress.current) return;
     
+    // Check if enough time has passed since the last bubble generation
+    const currentTime = Date.now();
+    const timeSinceLastBubble = currentTime - lastBubbleGenerationTime.current;
+    const requiredDelay = activeBubbles.length > 0 ? 3000 : 0; // 3 seconds if there are bubbles, 0 if first bubble
+    
+    if (timeSinceLastBubble < requiredDelay) {
+      return; // Not enough time has passed
+    }
+    
     bubbleGenerationInProgress.current = true;
+    lastBubbleGenerationTime.current = currentTime;
     
     // Choose random theme from pool
     const themeIndex = Math.floor(Math.random() * themePool.length);
@@ -286,15 +299,15 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     
     // Generate random direction for velocity
     const angle = Math.random() * Math.PI * 2; // Random angle in radians
-    const speedFactor = 0.5;
-    const speed = (Math.random() * 0.5 + 0.25) * speedFactor;
+    const speedFactor = 0.8; // Increased speed factor for more obvious movement
+    const speed = (Math.random() * 0.5 + 0.5) * speedFactor; // Increased base speed
     
     const velocity = {
       x: Math.cos(angle) * speed,
       y: Math.sin(angle) * speed
     };
     
-    const delay = 100; // Small delay for animation
+    const delay = 50; // Shorter delay for faster appearance animation
     
     // Add bubble with animation from center
     setActiveBubbles(prev => [
@@ -306,7 +319,8 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         position, 
         velocity,
         delay,
-        distanceFromCenter: 0 
+        distanceFromCenter: 0,
+        creationTime: Date.now()
       }
     ]);
     
@@ -316,8 +330,8 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     }, 100);
   };
   
-  // Check if any bubble has moved far enough from center to trigger next bubble
-  const checkDistancesAndCreateBubble = () => {
+  // Check if it's time to create a new bubble
+  const checkForNewBubbleGeneration = () => {
     if (bubbleGenerationInProgress.current || activeBubbles.length >= maxBubbles) return;
     
     if (activeBubbles.length === 0) {
@@ -326,17 +340,11 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       return;
     }
     
-    // Check if any bubble is at least 15px away from center
-    const popCenter = popCenterRef.current;
-    const hasMovedEnough = activeBubbles.some(bubble => {
-      const bubbleCenter = {
-        x: bubble.position.x + bubble.size / 2,
-        y: bubble.position.y + bubble.size / 2
-      };
-      return calculateDistance(popCenter, bubbleCenter) > 15;
-    });
+    // Check if 3 seconds have passed since the last bubble was created
+    const currentTime = Date.now();
+    const timeSinceLastBubble = currentTime - lastBubbleGenerationTime.current;
     
-    if (hasMovedEnough && !wouldCollideAtPopPoint(50)) { // Using 50 as a default size estimate
+    if (timeSinceLastBubble >= 3000 && !wouldCollideAtPopPoint(50)) {
       createBubble();
     }
   };
@@ -444,8 +452,8 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         });
       });
       
-      // Check if we should create a new bubble based on existing bubble distances
-      checkDistancesAndCreateBubble();
+      // Check if we should create a new bubble based on time delay
+      checkForNewBubbleGeneration();
     };
     
     // Create initial bubble if none exist
