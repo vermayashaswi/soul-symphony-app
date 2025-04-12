@@ -31,6 +31,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [typingPlaceholder, setTypingPlaceholder] = useState("");
   const [isTyping, setIsTyping] = useState(true);
   const [typingIndex, setTypingIndex] = useState(0);
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Set up the typing animation for the placeholder text
@@ -146,8 +147,20 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     onSelectEntry(entry);
   };
 
+  const handleFocus = () => {
+    setIsFocused(true);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+  };
+
   return (
-    <Card className="w-full sticky top-0 z-10 bg-background shadow-sm">
+    <Card 
+      className={`w-full transition-all duration-300 ${isFocused 
+        ? 'fixed top-0 left-0 right-0 z-50 rounded-none shadow-md' 
+        : 'sticky top-0 z-10 bg-background shadow-sm'}`}
+    >
       <CardContent className="p-4">
         <div className="flex flex-col space-y-4">
           <div className="relative">
@@ -158,6 +171,8 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
               placeholder={`Search for ${typingPlaceholder}${isTyping ? '|' : ''}`}
               value={searchQuery}
               onChange={handleSearchChange}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
               className="w-full pl-9"
             />
           </div>
