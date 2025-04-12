@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -121,10 +120,6 @@ const Home = () => {
   const navigateToJournal = () => {
     try {
       navigate('/app/journal');
-      toast({
-        title: "Opening journal",
-        description: "Taking you to your journal entries",
-      });
     } catch (error) {
       console.error("Navigation error:", error);
     }
