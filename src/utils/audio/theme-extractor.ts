@@ -40,7 +40,7 @@ export async function triggerThemeExtraction(entryId: number): Promise<boolean> 
     const { error } = await supabase.functions.invoke('generate-themes', {
       body: {
         text: text,
-        entryId: entryId
+        entryId: entryId  // Ensure entryId is passed as a number
       }
     });
     
