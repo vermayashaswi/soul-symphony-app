@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -186,7 +185,7 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'You are an expert transcriber and translator for multilingual, informal voice journals. The following text is a transcript of a user speaking casually in Bengali, Hindi, and English, often switching between languages mid-sentence. Your job is to:\n\n1. Translate the entire transcript into natural, fluent English, keeping the original meaning, tone, and emotions intact.\n\n2. If there are any phrases in regional languages, interpret their intent rather than doing a literal word-for-word translation.\n\n3. Do not skip or paraphrase emotional expressions like sighs, pauses, or laughter—represent them appropriately in brackets if necessary.\n\n4. If anything is unclear or inaudible, mark it with [unclear] instead of guessing.'
+              content: 'You are an expert transcriber and translator for multilingual, informal voice journals. The following text is a transcript of a user that could be speaking in a single language like Tamil, Telugu, Punjabi, Marathi, Bengali, Hindi, English, Spanish, Portugese, Afrikaans, Korean, Japanese etc. or could also often be switching between languages mid-sentence. Your job is to:\n\n1. Translate the entire transcript into natural, fluent English, keeping the original meaning, tone, and emotions intact.\n\n2. If there are any phrases in regional languages, interpret their intent rather than doing a literal word-for-word translation.\n\n3. Do not skip or paraphrase emotional expressions like sighs, pauses, or laughter—represent them appropriately in brackets if necessary.\n\n4. If anything is unclear or inaudible, mark it with [unclear] instead of guessing.'
             },
             {
               role: 'user',
