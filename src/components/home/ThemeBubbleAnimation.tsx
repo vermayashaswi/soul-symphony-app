@@ -52,14 +52,14 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
     };
   }, [controls, initialPosition, velocity]);
 
-  // Calculate font size based on text length
+  // Calculate font size based on text length and bubble size
   const calculateFontSize = () => {
     const textLength = themeData.theme.length;
     
-    if (textLength <= 3) return '14px';
-    if (textLength <= 6) return '12px';
-    if (textLength <= 10) return '10px';
-    return '9px';
+    if (textLength <= 3) return '16px';
+    if (textLength <= 6) return '14px';
+    if (textLength <= 10) return '12px';
+    return '10px';
   };
   
   return (
@@ -74,7 +74,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
         width: size, 
         height: size,
         background: 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 5%, rgba(173, 216, 230, 0.7) 20%, rgba(173, 216, 230, 0.5) 60%, rgba(173, 216, 230, 0.2) 100%)',
-        boxShadow: '0 0 12px 3px rgba(255, 255, 255, 0.4), inset 0 0 20px rgba(255, 255, 255, 0.7), 0 0 8px rgba(70, 130, 180, 0.2)',
+        boxShadow: '0 0 12px 6px rgba(255, 255, 255, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.7), 0 0 12px rgba(70, 130, 180, 0.3)',
         backdropFilter: 'blur(3px)',
         border: '1px solid rgba(255, 255, 255, 0.5)',
       }}
@@ -164,9 +164,22 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       newThemePool.splice(themeIndex, 1);
       setThemePool(newThemePool);
       
-      // Set a fixed size, reduced by 30% (assuming original avg was ~100px)
-      // Original size was 70, now we reduce by additional 30%
-      const FIXED_SIZE = 50;
+      // Basic bubble size and text length-based sizing
+      const MIN_SIZE = 50; // Current baseline size
+      const MAX_SIZE = 75; // 1.5x increase from baseline
+      
+      // Calculate size based on text length to avoid text wrapping
+      const textLength = themeData.theme.length;
+      let bubbleSize = MIN_SIZE;
+      
+      // Adjust size based on text length
+      if (textLength > 10) {
+        bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 1.5);
+      } else if (textLength > 6) {
+        bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength);
+      } else if (textLength > 3) {
+        bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 0.8);
+      }
       
       // Determine entry edge (0: top, 1: right, 2: bottom, 3: left)
       const edge = Math.floor(Math.random() * 4);
@@ -175,14 +188,14 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       let position: { x: number; y: number };
       let velocity: { x: number; y: number };
       
-      // Reduced velocity from previous implementation - cutting in half
+      // Reduced velocity
       const speedFactor = 0.5;
       
       switch (edge) {
         case 0: // Top edge
           position = { 
-            x: Math.random() * (dimensions.width - FIXED_SIZE), 
-            y: -FIXED_SIZE 
+            x: Math.random() * (dimensions.width - bubbleSize), 
+            y: -bubbleSize 
           };
           velocity = { 
             x: (Math.random() - 0.5) * speedFactor, 
@@ -192,7 +205,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         case 1: // Right edge
           position = { 
             x: dimensions.width, 
-            y: Math.random() * (dimensions.height - FIXED_SIZE) 
+            y: Math.random() * (dimensions.height - bubbleSize) 
           };
           velocity = { 
             x: -(Math.random() * speedFactor + 0.25), 
@@ -201,7 +214,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           break;
         case 2: // Bottom edge
           position = { 
-            x: Math.random() * (dimensions.width - FIXED_SIZE), 
+            x: Math.random() * (dimensions.width - bubbleSize), 
             y: dimensions.height 
           };
           velocity = { 
@@ -211,8 +224,8 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           break;
         case 3: // Left edge
           position = { 
-            x: -FIXED_SIZE, 
-            y: Math.random() * (dimensions.height - FIXED_SIZE) 
+            x: -bubbleSize, 
+            y: Math.random() * (dimensions.height - bubbleSize) 
           };
           velocity = { 
             x: Math.random() * speedFactor + 0.25, 
@@ -230,7 +243,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         { 
           id: `bubble-${Date.now()}-${Math.random()}`,
           themeData, 
-          size: FIXED_SIZE, 
+          size: bubbleSize, 
           position, 
           velocity 
         }

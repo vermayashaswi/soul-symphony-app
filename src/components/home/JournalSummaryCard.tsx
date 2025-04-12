@@ -95,7 +95,7 @@ const JournalSummaryCard: React.FC = () => {
   }, [user?.id]);
 
   return (
-    <Card className="w-full bg-transparent shadow-none border-none h-full"> {/* Updated to full height */}
+    <Card className="w-full h-full bg-transparent shadow-none border-none">
       <CardContent className="p-0 h-full">
         {loading ? (
           <div className="h-full flex items-center justify-center">

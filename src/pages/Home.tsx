@@ -124,9 +124,13 @@ const Home = () => {
       
       <div className="relative z-10 flex flex-col h-screen">
         <div className="p-4 flex flex-col">
-          <h1 className="text-2xl font-bold text-theme">{getJournalName()}</h1>
-          <p className="text-xs text-muted-foreground">Your last 7 days</p>
-          <div className="ml-auto text-muted-foreground font-medium">{formattedDate}</div>
+          <div className="flex justify-between items-start w-full">
+            <div>
+              <h1 className="text-2xl font-bold text-theme">{getJournalName()}</h1>
+              <p className="text-xs text-muted-foreground">Your last 7 days</p>
+            </div>
+            <div className="text-muted-foreground font-medium">{formattedDate}</div>
+          </div>
         </div>
 
         <div className="flex-1 px-0">
