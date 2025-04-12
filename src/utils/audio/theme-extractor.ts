@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 /**
  * Manually triggers theme extraction for a journal entry
  */
-export async function triggerThemeExtraction(entryId: string | number): Promise<boolean> {
+export async function triggerThemeExtraction(entryId: number): Promise<boolean> {
   try {
     console.log("Manually triggering theme extraction for entry:", entryId);
     

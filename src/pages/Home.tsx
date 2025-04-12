@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { useTheme } from '@/hooks/use-theme';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 import EnergyAnimation from '@/components/EnergyAnimation';
+import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -129,12 +130,24 @@ const Home = () => {
           <p className="text-muted-foreground font-medium">{formattedDate}</p>
         </div>
 
-        <div className="flex-1">
-          {/* Content can be added here in the future */}
+        <div className="flex-1 px-6 pb-6">
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="max-w-3xl mx-auto"
+          >
+            <motion.div 
+              variants={itemVariants}
+              className="mb-8"
+            >
+              <JournalSummaryCard />
+            </motion.div>
+          </motion.div>
         </div>
       </div>
       
-      {/* InspirationalQuote is now positioned absolutely and covers the full screen */}
+      {/* InspirationalQuote is positioned absolutely and covers the full screen */}
       <InspirationalQuote />
     </div>
   );
