@@ -108,6 +108,7 @@ export type Database = {
           id: number
           is_chunked: boolean | null
           master_themes: string[] | null
+          predicted_languages: Json | null
           "refined text": string | null
           sentiment: string | null
           "transcription text": string | null
@@ -125,6 +126,7 @@ export type Database = {
           id?: number
           is_chunked?: boolean | null
           master_themes?: string[] | null
+          predicted_languages?: Json | null
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
@@ -142,6 +144,7 @@ export type Database = {
           id?: number
           is_chunked?: boolean | null
           master_themes?: string[] | null
+          predicted_languages?: Json | null
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null

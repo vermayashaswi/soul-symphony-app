@@ -183,13 +183,14 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'You are an expert transcriber and translator for multilingual, informal voice journals. The following text is a transcript of a user that could be speaking in a single language like Tamil, Telugu, Punjabi, Marathi, Bengali, Hindi, English, Spanish, Portugese, Afrikaans, Korean, Japanese etc. or could also often be switching between languages mid-sentence. Your job is to:\n\n1. Translate the entire transcript into natural, fluent English, keeping the original meaning, tone, and emotions intact.\n\n2. If there are any phrases in regional languages, interpret their intent rather than doing a literal word-for-word translation.\n\n3. Do not skip or paraphrase emotional expressions like sighs, pauses, or laughter—represent them appropriately in brackets if necessary.\n\n4. If anything is unclear or inaudible, mark it with [unclear] instead of guessing.'
+              content: 'You are an expert transcriber and translator for multilingual, informal voice journals. The following text is a transcript of a user that could be speaking in a single language like Tamil, Telugu, Punjabi, Marathi, Bengali, Hindi, English, Spanish, Portugese, Afrikaans, Korean, Japanese etc. or could also often be switching between languages mid-sentence. Your job is to:\n\n1. Translate the entire transcript into natural, fluent English, keeping the original meaning, tone, and emotions intact.\n\n2. If there are any phrases in regional languages, interpret their intent rather than doing a literal word-for-word translation.\n\n3. Do not skip or paraphrase emotional expressions like sighs, pauses, or laughter—represent them appropriately in brackets if necessary.\n\n4. If anything is unclear or inaudible, mark it with [unclear] instead of guessing.\n\n5. Additionally, provide a structured JSON output indicating which languages you detected in the transcript and the approximate percentage of each language used. For example: {"languages": {"english": 70, "hindi": 20, "tamil": 10}} or {"languages": {"english": 100}} if only English was used. This will help us better understand the language patterns in the recording.'
             },
             {
               role: 'user',
               content: `Here is the transcript: "${transcribedText}"`
             }
           ],
+          response_format: { type: "json_object" }
         }),
       });
 
@@ -200,9 +201,28 @@ serve(async (req) => {
       }
 
       const gptResult = await gptResponse.json();
-      const refinedText = gptResult.choices[0].message.content;
+      const gptResponseContent = gptResult.choices[0].message.content;
       
-      console.log("Refinement successful:", refinedText);
+      console.log("GPT Response:", gptResponseContent);
+      
+      let refinedText = '';
+      let predictedLanguages = null;
+      
+      try {
+        // Parse the JSON response
+        const parsedResponse = JSON.parse(gptResponseContent);
+        
+        // Extract the refined text and language information
+        refinedText = parsedResponse.translation || parsedResponse.text || transcribedText;
+        predictedLanguages = parsedResponse.languages || null;
+        
+        console.log("Parsed refined text:", refinedText);
+        console.log("Predicted languages:", predictedLanguages);
+      } catch (parseError) {
+        console.error("Error parsing GPT response:", parseError);
+        // Fallback to using the whole response as refined text
+        refinedText = gptResponseContent;
+      }
 
       const emotions = await analyzeEmotions(refinedText);
       console.log("Emotion analysis:", emotions);
@@ -230,7 +250,8 @@ serve(async (req) => {
               "duration": audioDuration,
               "emotions": emotions,
               "sentiment": sentimentScore,
-              "entities": entities
+              "entities": entities,
+              "predicted_languages": predictedLanguages
             }])
             .select();
               
@@ -339,6 +360,7 @@ serve(async (req) => {
           emotions: emotions,
           sentiment: sentimentScore,
           entities: entities,
+          predictedLanguages: predictedLanguages,
           success: true
         }),
         { 

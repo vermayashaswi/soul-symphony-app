@@ -104,7 +104,8 @@ export const fetchJournalEntries = async (
       console.log('[JournalService] First entry sample:', {
         id: data[0].id,
         text: data[0]["refined text"],
-        created: data[0].created_at
+        created: data[0].created_at,
+        languages: data[0].predicted_languages
       });
     } else {
       console.log('[JournalService] No entries found for this user');
@@ -118,6 +119,7 @@ export const fetchJournalEntries = async (
       sentiment: item.sentiment,
       themes: item.master_themes,
       foreignKey: item["foreign key"],
+      predictedLanguages: item.predicted_languages,
       entities: item.entities ? (item.entities as any[]).map(entity => ({
         type: entity.type,
         name: entity.name,

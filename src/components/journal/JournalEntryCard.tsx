@@ -18,18 +18,18 @@ export interface JournalEntry {
   content: string;
   created_at: string;
   audio_url?: string;
-  sentiment?: string | {
-    sentiment: string;
-    score: number;
-  };
-  themes?: string[];
+  sentiment?: string | null;
+  themes?: string[] | null;
   master_themes?: string[];
-  entities?: {
-    text: string;
+  entities?: Array<{
     type: string;
-    name?: string;
-  }[];
+    name: string;
+    text?: string;
+  }>;
   foreignKey?: string;
+  predictedLanguages?: {
+    [key: string]: number;
+  } | null;
 }
 
 interface JournalEntryCardProps {
@@ -49,7 +49,7 @@ export function JournalEntryCard({
     id: entry?.id || 0,
     content: entry?.content || "Processing entry...",
     created_at: entry?.created_at || new Date().toISOString(),
-    sentiment: entry?.sentiment || "",
+    sentiment: entry?.sentiment || null,
     master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
     themes: Array.isArray(entry?.themes) ? entry.themes : []
   };
