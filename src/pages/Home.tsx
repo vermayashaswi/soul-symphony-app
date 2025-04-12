@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -123,7 +122,6 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
-      {/* Energy Animation - innermost layer (z-index: 0) */}
       <div className="absolute inset-0 z-0">
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
       </div>
@@ -137,7 +135,6 @@ const Home = () => {
         />
       </div>
       
-      {/* Text content - top layer (z-index: 20) with fully transparent background */}
       <div className="relative z-20 flex flex-col h-screen">
         <div className="p-4 flex flex-col">
           <div className="flex justify-between items-start w-full relative">
@@ -177,8 +174,7 @@ const Home = () => {
         </div>
       </div>
       
-      {/* Arrow button to navigate to journal page - moved up by 20px (z-index: 10) */}
-      <div className="absolute top-[calc(50%-20px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+      <div className="absolute top-[calc(50%-35px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
         <motion.button
           onClick={navigateToJournal}
           className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg"
@@ -192,7 +188,6 @@ const Home = () => {
         </motion.button>
       </div>
       
-      {/* Theme Strips - In the z-30 layer */}
       <div className="flex-1 px-0 absolute inset-0 z-30">
         <motion.div
           variants={containerVariants}
@@ -211,7 +206,6 @@ const Home = () => {
         </motion.div>
       </div>
       
-      {/* Inspirational Quote - Moved to bottom above navigation with padding (z-index: 25) */}
       <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
       </div>
