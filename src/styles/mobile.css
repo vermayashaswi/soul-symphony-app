@@ -232,7 +232,7 @@
     padding: 0.5rem !important;
   }
   
-  /* Mobile chat input specific fixes */
+  /* Mobile chat input specific fixes - UPDATED for consistent bottom positioning */
   .mobile-chat-input-container {
     position: fixed;
     bottom: 16px;
@@ -241,6 +241,7 @@
     background-color: hsl(var(--background));
     z-index: 50;
     padding-bottom: env(safe-area-inset-bottom, 10px);
+    margin-bottom: 0 !important;
   }
   
   /* Add space at the bottom of the chat content to prevent messages from being hidden behind the input */
@@ -457,7 +458,7 @@
     -webkit-tap-highlight-color: transparent !important;
   }
   
-  /* Chat input keyboard adjustments */
+  /* Chat input keyboard adjustments - UPDATED for consistent positioning */
   .keyboard-visible {
     position: fixed;
     bottom: 0;
@@ -472,35 +473,42 @@
   
   /* UPDATED: Input visibility improvements with better spacing from nav bar */
   .mobile-chat-interface .input-container {
-    position: relative;
-    padding-bottom: 0px; /* Completely removed padding bottom */
+    position: fixed;
+    bottom: 56px; /* Fixed position above bottom nav */
+    left: 0;
+    right: 0;
+    padding-bottom: 0;
     z-index: 1000;
     background-color: hsl(var(--background));
-    margin-bottom: 56px; /* Space for bottom nav bar only */
+    margin-bottom: 0 !important; /* No extra margin */
+    border-top: 1px solid hsl(var(--border));
   }
   
   /* UPDATED: Chat area scrolling adjustments */
   .mobile-chat-area {
-    padding-bottom: 30px !important; /* UPDATED: Changed from 70px to 30px as requested */
-    margin-bottom: env(safe-area-inset-bottom, 10px);
+    padding-bottom: 30px !important;
+    margin-bottom: 56px !important; /* Match the navbar height */
   }
   
-  /* NEW: Added specific chat input spacing when keyboard is closed */
-  .p-2.bg-background.border-t.flex.items-center.gap-2:not(.input-keyboard-active) {
-    margin-bottom: 25px; /* UPDATED: Changed from 56px to 25px as requested */
+  /* FIXED: Input spacing when keyboard is closed - no unnecessary gap */
+  .p-2.bg-background.border-t.border-border.flex.items-center.gap-2:not(.input-keyboard-active) {
+    margin-bottom: 0 !important; 
+    position: fixed;
+    bottom: 56px; /* Position directly above navbar */
+    left: 0;
+    right: 0;
+    z-index: 40;
   }
   
   /* NEW: Add bottom area protection for chat content */
   .mobile-chat-interface .chat-content-container {
-    padding-bottom: 56px; /* Only space for the navbar */
+    padding-bottom: 96px; /* 56px for navbar + 40px for input area */
   }
   
-  /* NEW: Improve visibility of fixed elements at the bottom */
-  .fixed-bottom-element {
-    margin-bottom: 56px !important; /* Space for bottom nav */
-    background-color: hsl(var(--background));
-    z-index: 40;
-    border-top: 1px solid hsl(var(--border));
+  /* NEW: Ensure input is always visible regardless of content */
+  .mobile-chat-interface {
+    position: relative;
+    height: 100%;
   }
 }
 

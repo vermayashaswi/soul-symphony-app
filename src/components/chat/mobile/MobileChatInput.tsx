@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -129,7 +130,7 @@ export default function MobileChatInput({
       }`}
       style={{
         paddingBottom: isKeyboardVisible ? '10px' : 'env(safe-area-inset-bottom, 10px)',
-        marginBottom: !isKeyboardVisible ? '25px' : '0'
+        marginBottom: 0 // Removed dynamic margin to keep it consistent
       }}
     >
       <div className="flex-1 relative">
