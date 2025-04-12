@@ -84,12 +84,18 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
         </div>
       </div>
       
-      {/* Animation area restricted to between header and the quote component, moved up by 10px */}
-      <div className="absolute inset-x-0 top-16 bottom-62 pointer-events-none">
+      {/* Animation area restricted to between header and the quote component */}
+      <div className="absolute inset-x-0 top-20 bottom-52 pointer-events-none">
         {uniqueThemes.slice(0, 6).map((themeItem, index) => {
-          // Distribute strips evenly across different vertical positions
-          const yPosition = 10 + (index * 15); // Each strip gets its own vertical position
+          // Calculate vertical position using a more spread out distribution
+          // Divide the container height into equal sections based on number of themes
+          const sectionHeight = 100 / Math.min(6, uniqueThemes.length);
+          // Place each strip in the center of its section with a small random offset
+          const randomOffset = Math.random() * 5 - 2.5; // Random offset between -2.5% and 2.5%
+          const yPosition = (index * sectionHeight) + (sectionHeight / 2) + randomOffset;
+          
           const direction = index % 2 === 0; // Alternate direction
+          const speed = 15 + Math.random() * 10; // Random speed between 15-25 seconds
           
           return (
             <motion.div
@@ -97,7 +103,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               className="absolute left-0 w-auto h-8 rounded-md px-3 py-1 flex items-center"
               style={{
                 top: `${yPosition}%`,
-                backgroundColor: `${themeColor}50`, // Increased opacity to 50%
+                backgroundColor: `${themeColor}50`, // 50% opacity
                 borderLeft: `3px solid ${themeColor}`,
                 borderRight: `3px solid ${themeColor}`,
                 boxShadow: `0 0 1px 0 ${themeColor}40`,
@@ -109,11 +115,11 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                 opacity: 0 
               }}
               animate={{ 
-                x: direction ? ['100vw', '0vw', '-100vw'] : ['0vw', '100vw', '0vw'],
+                x: direction ? ['100vw', '0vw', '-100vw'] : ['-100vw', '0vw', '100vw'],
                 opacity: [0, 1, 0]
               }}
               transition={{
-                duration: 15 + Math.random() * 10, // 15-25 seconds for full animation
+                duration: speed, // Variable duration for full animation
                 repeat: Infinity,
                 repeatType: 'loop',
                 ease: 'linear',
