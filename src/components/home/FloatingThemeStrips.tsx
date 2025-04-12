@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useTheme } from '@/hooks/use-theme';
 
 interface ThemeData {
   theme: string;
@@ -17,6 +18,8 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   themeColor
 }) => {
   const [uniqueThemes, setUniqueThemes] = useState<ThemeData[]>([]);
+  const { theme } = useTheme();
+  const isDarkMode = theme === 'dark';
   
   // Deduplicate themes and limit to 8 for better display
   useEffect(() => {
@@ -85,7 +88,8 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       </div>
       
       {/* Animation area restricted to between header and the quote component */}
-      <div className="absolute inset-x-0 top-20 bottom-52 pointer-events-none">
+      {/* Adjusted to prevent overlap with quote section by increasing bottom distance */}
+      <div className="absolute inset-x-0 top-20 bottom-80 pointer-events-none">
         {uniqueThemes.slice(0, 6).map((themeItem, index) => {
           // Calculate vertical position using a more spread out distribution
           // Divide the container height into equal sections based on number of themes
@@ -129,7 +133,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               <span 
                 className="text-sm md:text-base font-medium whitespace-nowrap"
                 style={{
-                  color: themeColor,
+                  color: isDarkMode ? '#ffffff' : '#000000',
                   textShadow: 'none',
                   fontWeight: 500,
                   WebkitFontSmoothing: 'antialiased',
