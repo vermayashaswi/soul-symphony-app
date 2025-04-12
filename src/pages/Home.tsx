@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -152,7 +153,10 @@ const Home = () => {
         </div>
       </div>
       
-      <InspirationalQuote />
+      {/* Ensure the InspirationalQuote component is visible */}
+      <div className="relative z-30">
+        <InspirationalQuote />
+      </div>
     </div>
   );
 };
