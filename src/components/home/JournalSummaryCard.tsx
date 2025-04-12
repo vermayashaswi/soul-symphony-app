@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -122,7 +123,7 @@ const JournalSummaryCard: React.FC = () => {
   const themeColor = getThemeColorHex();
   
   const createBubbleBackground = () => {
-    return `radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 5%, ${themeColor}40 20%, ${themeColor}30 60%, ${themeColor}10 100%)`;
+    return `radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 1) 5%, ${themeColor} 20%, ${themeColor} 60%, ${themeColor} 100%)`;
   };
 
   return (
@@ -135,13 +136,13 @@ const JournalSummaryCard: React.FC = () => {
               className="w-5 h-5 rounded-full flex items-center justify-center pointer-events-auto"
               style={{ 
                 background: createBubbleBackground(),
-                boxShadow: `0 0 6px 3px rgba(255, 255, 255, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.4), 0 0 6px ${themeColor}30`,
+                boxShadow: `0 0 6px 3px rgba(255, 255, 255, 1), inset 0 0 10px rgba(255, 255, 255, 1), 0 0 6px ${themeColor}`,
                 backdropFilter: 'blur(2px)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 1)',
               }}
               title="Journal themes from recent entries"
             >
-              <span className="text-center text-[6px] font-medium" style={{ color: 'rgba(0, 0, 0, 0.7)' }}>
+              <span className="text-center text-[6px] font-medium" style={{ color: 'rgba(0, 0, 0, 1)' }}>
                 theme
               </span>
             </div>

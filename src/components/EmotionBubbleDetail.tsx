@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -138,15 +139,15 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
         className={cn(
           "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow relative",
           color,
-          isHighlighted ? "ring-4 ring-primary ring-opacity-70" : "",
+          isHighlighted ? "ring-4 ring-primary ring-opacity-100" : "",
           isDragging ? "shadow-lg z-50" : "",
           className
         )}
         style={{ width: bubbleSize, height: bubbleSize }}
-        initial={{ opacity: 0.9 }}
+        initial={{ opacity: 1 }}
         whileHover={{ 
           scale: 1.1, 
-          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
+          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 1)",
           transition: { duration: 0.2 }
         }}
         onClick={handleBubbleClick}

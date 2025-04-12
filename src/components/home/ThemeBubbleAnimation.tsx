@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -65,14 +64,14 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
     return '10px';
   };
 
-  // Create a background with gradient based on theme color
+  // Create a background with gradient based on theme color - removing all transparency
   const createBubbleBackground = () => {
-    return `radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 5%, ${themeColor}40 20%, ${themeColor}30 60%, ${themeColor}10 100%)`;
+    return `radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 1) 5%, ${themeColor} 20%, ${themeColor} 60%, ${themeColor} 100%)`;
   };
   
   // Create shadow with theme color
   const createBubbleShadow = () => {
-    return `0 0 12px 6px rgba(255, 255, 255, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.7), 0 0 12px ${themeColor}30`;
+    return `0 0 12px 6px rgba(255, 255, 255, 1), inset 0 0 20px rgba(255, 255, 255, 1), 0 0 12px ${themeColor}`;
   };
   
   return (
@@ -89,7 +88,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
         background: createBubbleBackground(),
         boxShadow: createBubbleShadow(),
         backdropFilter: 'blur(3px)',
-        border: '1px solid rgba(255, 255, 255, 0.5)',
+        border: '1px solid rgba(255, 255, 255, 1)',
       }}
     >
       <span 
@@ -97,8 +96,8 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
         style={{ 
           fontSize: calculateFontSize(),
           fontWeight: 500,
-          color: 'rgba(0, 0, 0, 0.7)',
-          textShadow: '0 1px 2px rgba(255, 255, 255, 0.6)',
+          color: 'rgba(0, 0, 0, 1)',
+          textShadow: '0 1px 2px rgba(255, 255, 255, 1)',
           maxWidth: '90%',
           maxHeight: '90%',
           display: 'flex',
