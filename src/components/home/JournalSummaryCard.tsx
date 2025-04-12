@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Calendar } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ThemeBubbleAnimation from './ThemeBubbleAnimation';
 
@@ -96,16 +95,7 @@ const JournalSummaryCard: React.FC = () => {
   }, [user?.id]);
 
   return (
-    <Card className="w-full bg-transparent shadow-none border-none h-[calc(100vh-136px)]"> {/* Adjusted height to end just above bottom nav */}
-      <CardHeader className="pb-0">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-lg flex items-center gap-2 bg-card text-foreground px-3 py-1 rounded-full">
-            <Calendar className="h-5 w-5 text-primary" />
-            Your last 7 days
-          </CardTitle>
-          {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-        </div>
-      </CardHeader>
+    <Card className="w-full bg-transparent shadow-none border-none h-full"> {/* Updated to full height */}
       <CardContent className="p-0 h-full">
         {loading ? (
           <div className="h-full flex items-center justify-center">

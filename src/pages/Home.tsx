@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -121,10 +122,11 @@ const Home = () => {
         />
       </div>
       
-      <div className="relative z-10 flex flex-col h-[calc(100vh-80px)]">
-        <div className="p-4 flex items-center justify-between">
+      <div className="relative z-10 flex flex-col h-screen">
+        <div className="p-4 flex flex-col">
           <h1 className="text-2xl font-bold text-theme">{getJournalName()}</h1>
-          <p className="text-muted-foreground font-medium">{formattedDate}</p>
+          <p className="text-xs text-muted-foreground">Your last 7 days</p>
+          <div className="ml-auto text-muted-foreground font-medium">{formattedDate}</div>
         </div>
 
         <div className="flex-1 px-0">
