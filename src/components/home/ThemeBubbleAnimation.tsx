@@ -215,63 +215,27 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 0.8);
       }
       
-      // Determine entry edge (0: top, 1: right, 2: bottom, 3: left)
-      const edge = Math.floor(Math.random() * 4);
+      // NEW: Center position with random direction
+      const centerX = dimensions.width / 2; 
+      const centerY = dimensions.height / 2;
       
-      // Calculate entry position and velocity
-      let position: { x: number; y: number };
-      let velocity: { x: number; y: number };
+      // Start position at center
+      const position = { 
+        x: centerX - bubbleSize / 2, 
+        y: centerY - bubbleSize / 2
+      };
       
-      // Reduced velocity
+      // Generate random direction for velocity
+      const angle = Math.random() * Math.PI * 2; // Random angle in radians
       const speedFactor = 0.5;
+      const speed = (Math.random() * 0.5 + 0.25) * speedFactor;
       
-      switch (edge) {
-        case 0: // Top edge
-          position = { 
-            x: Math.random() * (dimensions.width - bubbleSize), 
-            y: -bubbleSize 
-          };
-          velocity = { 
-            x: (Math.random() - 0.5) * speedFactor, 
-            y: Math.random() * speedFactor + 0.25 
-          };
-          break;
-        case 1: // Right edge
-          position = { 
-            x: dimensions.width, 
-            y: Math.random() * (dimensions.height - bubbleSize) 
-          };
-          velocity = { 
-            x: -(Math.random() * speedFactor + 0.25), 
-            y: (Math.random() - 0.5) * speedFactor 
-          };
-          break;
-        case 2: // Bottom edge
-          position = { 
-            x: Math.random() * (dimensions.width - bubbleSize), 
-            y: dimensions.height 
-          };
-          velocity = { 
-            x: (Math.random() - 0.5) * speedFactor, 
-            y: -(Math.random() * speedFactor + 0.25) 
-          };
-          break;
-        case 3: // Left edge
-          position = { 
-            x: -bubbleSize, 
-            y: Math.random() * (dimensions.height - bubbleSize) 
-          };
-          velocity = { 
-            x: Math.random() * speedFactor + 0.25, 
-            y: (Math.random() - 0.5) * speedFactor 
-          };
-          break;
-        default:
-          position = { x: 0, y: 0 };
-          velocity = { x: 0.25, y: 0.25 };
-      }
+      const velocity = {
+        x: Math.cos(angle) * speed,
+        y: Math.sin(angle) * speed
+      };
       
-      // Add bubble
+      // Add bubble with animation from center
       setActiveBubbles(prev => [
         ...prev, 
         { 
