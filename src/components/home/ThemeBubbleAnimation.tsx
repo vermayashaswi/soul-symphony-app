@@ -16,6 +16,7 @@ interface ThemeBubbleProps {
   onCollision: (id: string, newVelocity: { x: number; y: number }) => void;
   id: string;
   themeColor: string;
+  delay: number; // Added delay prop for staggered animation
 }
 
 const ThemeBubble: React.FC<ThemeBubbleProps> = ({ 
@@ -25,35 +26,45 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
   velocity, 
   onCollision,
   id,
-  themeColor
+  themeColor,
+  delay
 }) => {
   const controls = useAnimation();
   const bubbleRef = useRef<HTMLDivElement>(null);
+  const [isAnimating, setIsAnimating] = useState(true);
   
   useEffect(() => {
     let currentPosition = { ...initialPosition };
     let currentVelocity = { ...velocity };
     let animationFrameId: number;
     
-    const updatePosition = () => {
-      if (!bubbleRef.current) return;
+    // Delayed animation start for staggered effect
+    const startDelay = setTimeout(() => {
+      setIsAnimating(false);
       
-      // Update position based on velocity
-      currentPosition.x += currentVelocity.x;
-      currentPosition.y += currentVelocity.y;
+      const updatePosition = () => {
+        if (!bubbleRef.current) return;
+        
+        // Update position based on velocity
+        currentPosition.x += currentVelocity.x;
+        currentPosition.y += currentVelocity.y;
+        
+        // Apply the position
+        controls.set({ x: currentPosition.x, y: currentPosition.y });
+        
+        animationFrameId = requestAnimationFrame(updatePosition);
+      };
       
-      // Apply the position
-      controls.set({ x: currentPosition.x, y: currentPosition.y });
-      
-      animationFrameId = requestAnimationFrame(updatePosition);
-    };
-    
-    updatePosition();
+      updatePosition();
+    }, delay);
     
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      clearTimeout(startDelay);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
-  }, [controls, initialPosition, velocity]);
+  }, [controls, initialPosition, velocity, delay]);
 
   // Calculate font size based on text length and bubble size
   const calculateFontSize = () => {
@@ -79,8 +90,20 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
     <motion.div
       ref={bubbleRef}
       className="absolute flex items-center justify-center rounded-full cursor-pointer"
-      initial={{ x: initialPosition.x, y: initialPosition.y }}
-      animate={controls}
+      initial={{ 
+        x: initialPosition.x, 
+        y: initialPosition.y,
+        scale: 0,
+        opacity: 0 
+      }}
+      animate={isAnimating ? {
+        scale: 1,
+        opacity: 1,
+        transition: {
+          duration: 0.8, // Slower animation
+          ease: "easeOut"
+        }
+      } : controls}
       whileHover={{ scale: 1.1 }}
       transition={{ duration: 0.2 }}
       style={{ 
@@ -131,6 +154,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     size: number;
     position: { x: number; y: number };
     velocity: { x: number; y: number };
+    delay: number; // Added delay property
   }>>([]);
   const [themePool, setThemePool] = useState<ThemeData[]>([]);
   const { colorTheme, customColor } = useTheme();
@@ -215,9 +239,9 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 0.8);
       }
       
-      // NEW: Center position with random direction
+      // Center position with adjustment (moved up by 7px)
       const centerX = dimensions.width / 2; 
-      const centerY = dimensions.height / 2;
+      const centerY = dimensions.height / 2 - 7; // Moved up by 7px
       
       // Start position at center
       const position = { 
@@ -235,6 +259,9 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         y: Math.sin(angle) * speed
       };
       
+      // Calculate delay based on bubble index for sequential appearance
+      const delay = activeBubbles.length * 800; // 800ms between each bubble appearance
+      
       // Add bubble with animation from center
       setActiveBubbles(prev => [
         ...prev, 
@@ -243,7 +270,8 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           themeData, 
           size: bubbleSize, 
           position, 
-          velocity 
+          velocity,
+          delay 
         }
       ]);
     };
@@ -389,6 +417,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           velocity={bubble.velocity}
           onCollision={handleCollision}
           themeColor={themeColor}
+          delay={bubble.delay} // Pass delay to individual bubbles
         />
       ))}
     </div>
