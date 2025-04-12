@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 
@@ -15,6 +14,42 @@ interface ThemeBubbleProps {
   onCollision: (id: string, newVelocity: { x: number; y: number }) => void;
   id: string;
 }
+
+const getSentimentGradient = (sentiment: number) => {
+  const normalizedSentiment = (sentiment + 1) / 2;
+  
+  if (normalizedSentiment < 0.4) {
+    return `radial-gradient(circle at 30% 30%, 
+      rgba(255, 255, 255, 0.9) 5%, 
+      rgba(222, 184, 207, 0.7) 20%, 
+      rgba(200, 160, 190, 0.5) 60%, 
+      rgba(180, 140, 170, 0.2) 100%)`;
+  } else if (normalizedSentiment < 0.6) {
+    return `radial-gradient(circle at 30% 30%, 
+      rgba(255, 255, 255, 0.9) 5%, 
+      rgba(173, 216, 230, 0.7) 20%, 
+      rgba(173, 216, 230, 0.5) 60%, 
+      rgba(173, 216, 230, 0.2) 100%)`;
+  } else {
+    return `radial-gradient(circle at 30% 30%, 
+      rgba(255, 255, 255, 0.9) 5%, 
+      rgba(173, 230, 203, 0.7) 20%, 
+      rgba(173, 230, 203, 0.5) 60%, 
+      rgba(173, 230, 203, 0.2) 100%)`;
+  }
+};
+
+const getSentimentGlow = (sentiment: number) => {
+  const normalizedSentiment = (sentiment + 1) / 2;
+  
+  if (normalizedSentiment < 0.4) {
+    return 'rgba(180, 100, 140, 0.3)';
+  } else if (normalizedSentiment < 0.6) {
+    return 'rgba(70, 130, 180, 0.3)';
+  } else {
+    return 'rgba(70, 180, 140, 0.3)';
+  }
+};
 
 const ThemeBubble: React.FC<ThemeBubbleProps> = ({ 
   themeData, 
@@ -35,11 +70,9 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
     const updatePosition = () => {
       if (!bubbleRef.current) return;
       
-      // Update position based on velocity
       currentPosition.x += currentVelocity.x;
       currentPosition.y += currentVelocity.y;
       
-      // Apply the position
       controls.set({ x: currentPosition.x, y: currentPosition.y });
       
       animationFrameId = requestAnimationFrame(updatePosition);
@@ -52,7 +85,6 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
     };
   }, [controls, initialPosition, velocity]);
 
-  // Calculate font size based on text length and bubble size
   const calculateFontSize = () => {
     const textLength = themeData.theme.length;
     
@@ -61,6 +93,9 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
     if (textLength <= 10) return '12px';
     return '10px';
   };
+  
+  const bubbleGradient = getSentimentGradient(themeData.sentiment);
+  const bubbleGlow = getSentimentGlow(themeData.sentiment);
   
   return (
     <motion.div
@@ -73,8 +108,8 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
       style={{ 
         width: size, 
         height: size,
-        background: 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 5%, rgba(173, 216, 230, 0.7) 20%, rgba(173, 216, 230, 0.5) 60%, rgba(173, 216, 230, 0.2) 100%)',
-        boxShadow: '0 0 12px 6px rgba(255, 255, 255, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.7), 0 0 12px rgba(70, 130, 180, 0.3)',
+        background: bubbleGradient,
+        boxShadow: `0 0 12px 6px rgba(255, 255, 255, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.7), 0 0 12px ${bubbleGlow}`,
         backdropFilter: 'blur(3px)',
         border: '1px solid rgba(255, 255, 255, 0.5)',
       }}
@@ -121,14 +156,11 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
   }>>([]);
   const [themePool, setThemePool] = useState<ThemeData[]>([]);
   
-  // Track current animation frame for cleanup
   const animationFrameRef = useRef<number | null>(null);
   
-  // Setup container dimensions and themes
   useEffect(() => {
     if (!themesData.length) return;
     
-    // Initial theme pool with duplicates to make animation more interesting
     setThemePool([...themesData, ...themesData].sort(() => Math.random() - 0.5));
     
     const updateDimensions = () => {
@@ -148,31 +180,25 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     };
   }, [themesData]);
   
-  // Bubble management (creation, movement, collision)
   useEffect(() => {
     if (dimensions.width === 0 || dimensions.height === 0 || !themePool.length) return;
     
     const createBubble = () => {
       if (activeBubbles.length >= maxBubbles || !themePool.length) return;
       
-      // Choose random theme from pool
       const themeIndex = Math.floor(Math.random() * themePool.length);
       const themeData = themePool[themeIndex];
       
-      // Remove used theme from pool
       const newThemePool = [...themePool];
       newThemePool.splice(themeIndex, 1);
       setThemePool(newThemePool);
       
-      // Basic bubble size and text length-based sizing
-      const MIN_SIZE = 50; // Current baseline size
-      const MAX_SIZE = 75; // 1.5x increase from baseline
+      const MIN_SIZE = 50;
+      const MAX_SIZE = 75;
       
-      // Calculate size based on text length to avoid text wrapping
       const textLength = themeData.theme.length;
       let bubbleSize = MIN_SIZE;
       
-      // Adjust size based on text length
       if (textLength > 10) {
         bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 1.5);
       } else if (textLength > 6) {
@@ -181,18 +207,15 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 0.8);
       }
       
-      // Determine entry edge (0: top, 1: right, 2: bottom, 3: left)
       const edge = Math.floor(Math.random() * 4);
       
-      // Calculate entry position and velocity
       let position: { x: number; y: number };
       let velocity: { x: number; y: number };
       
-      // Reduced velocity
       const speedFactor = 0.5;
       
       switch (edge) {
-        case 0: // Top edge
+        case 0:
           position = { 
             x: Math.random() * (dimensions.width - bubbleSize), 
             y: -bubbleSize 
@@ -202,7 +225,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
             y: Math.random() * speedFactor + 0.25 
           };
           break;
-        case 1: // Right edge
+        case 1:
           position = { 
             x: dimensions.width, 
             y: Math.random() * (dimensions.height - bubbleSize) 
@@ -212,7 +235,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
             y: (Math.random() - 0.5) * speedFactor 
           };
           break;
-        case 2: // Bottom edge
+        case 2:
           position = { 
             x: Math.random() * (dimensions.width - bubbleSize), 
             y: dimensions.height 
@@ -222,7 +245,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
             y: -(Math.random() * speedFactor + 0.25) 
           };
           break;
-        case 3: // Left edge
+        case 3:
           position = { 
             x: -bubbleSize, 
             y: Math.random() * (dimensions.height - bubbleSize) 
@@ -237,7 +260,6 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           velocity = { x: 0.25, y: 0.25 };
       }
       
-      // Add bubble
       setActiveBubbles(prev => [
         ...prev, 
         { 
@@ -252,7 +274,6 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     
     const updateBubbles = () => {
       setActiveBubbles(bubbles => {
-        // Update bubble positions
         const updatedBubbles = bubbles.map(bubble => {
           const newX = bubble.position.x + bubble.velocity.x;
           const newY = bubble.position.y + bubble.velocity.y;
@@ -263,7 +284,6 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           };
         });
         
-        // Check for collisions between bubbles
         for (let i = 0; i < updatedBubbles.length; i++) {
           for (let j = i + 1; j < updatedBubbles.length; j++) {
             const b1 = updatedBubbles[i];
@@ -275,12 +295,10 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
             const minDistance = (b1.size + b2.size) / 2;
             
             if (distance < minDistance) {
-              // Calculate collision response
               const angle = Math.atan2(dy, dx);
               const sin = Math.sin(angle);
               const cos = Math.cos(angle);
               
-              // Rotate velocities
               const v1 = { 
                 x: b1.velocity.x * cos + b1.velocity.y * sin,
                 y: b1.velocity.y * cos - b1.velocity.x * sin
@@ -290,12 +308,10 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
                 y: b2.velocity.y * cos - b2.velocity.x * sin
               };
               
-              // Swap velocities
               const temp = { x: v1.x, y: v1.y };
               v1.x = v2.x;
               v2.x = temp.x;
               
-              // Rotate back
               updatedBubbles[i].velocity = {
                 x: v1.x * cos - v1.y * sin,
                 y: v1.y * cos + v1.x * sin
@@ -305,7 +321,6 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
                 y: v2.y * cos + v2.x * sin
               };
               
-              // Move bubbles apart to prevent sticking
               const overlap = minDistance - distance;
               const moveX = overlap * Math.cos(angle) / 2;
               const moveY = overlap * Math.sin(angle) / 2;
@@ -318,7 +333,6 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           }
         }
         
-        // Remove bubbles that are out of bounds
         return updatedBubbles.filter(bubble => {
           const outOfBounds =
             bubble.position.x < -bubble.size * 2 ||
@@ -326,7 +340,6 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
             bubble.position.y < -bubble.size * 2 ||
             bubble.position.y > dimensions.height + bubble.size * 2;
           
-          // If removing, add theme back to pool
           if (outOfBounds) {
             setThemePool(prev => [...prev, bubble.themeData]);
           }
@@ -336,19 +349,13 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       });
     };
     
-    // Create initial bubbles
-    if (activeBubbles.length < maxBubbles) {
-      createBubble();
-    }
-    
-    // Setup intervals for creating new bubbles and updating positions
     const bubbleCreationInterval = setInterval(() => {
       createBubble();
     }, 2000);
     
     const updateInterval = setInterval(() => {
       updateBubbles();
-    }, 16); // ~60fps
+    }, 16);
     
     return () => {
       clearInterval(bubbleCreationInterval);
