@@ -60,20 +60,20 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Theme header strip - MADE SMALLER */}
-      <div className="absolute top-4 left-2 z-50">
+      {/* Theme header strip - MADE SMALLER AND POSITIONED JUST BELOW JOURNAL NAME */}
+      <div className="absolute top-10 left-1 z-50">
         <div
-          className="px-2 py-0.5 rounded-md"
+          className="px-1.5 py-0.5 rounded-md"
           style={{
             backgroundColor: `${themeColor}30`, // 30% opacity
-            borderLeft: `2px solid ${themeColor}`,
-            borderRight: `2px solid ${themeColor}`,
+            borderLeft: `1px solid ${themeColor}`,
+            borderRight: `1px solid ${themeColor}`,
             boxShadow: `0 0 1px 0 ${themeColor}40`,
             backdropFilter: 'blur(4px)',
           }}
         >
           <span 
-            className="text-[10px] font-medium whitespace-nowrap"
+            className="text-[8px] font-medium whitespace-nowrap"
             style={{
               color: themeColor,
               fontWeight: 500,
@@ -82,7 +82,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               MozOsxFontSmoothing: 'grayscale'
             }}
           >
-            Themes - 7 days
+            7-day themes
           </span>
         </div>
       </div>
