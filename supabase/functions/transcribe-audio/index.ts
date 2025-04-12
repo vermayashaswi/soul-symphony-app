@@ -192,7 +192,7 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. Correct for words which don't have any meaning either normally or colloquially in the context. Preserve the emotional tone and personal nature of the content.'
+              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. Correct for words which do not have any meaning either normally or colloquially in the context. Preserve the emotional tone and personal nature of the content.'
             },
             {
               role: 'user',
