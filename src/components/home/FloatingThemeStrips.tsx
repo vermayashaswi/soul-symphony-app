@@ -57,23 +57,23 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Top area reserved for quotes */}
-      <div className="absolute inset-0 top-1/3 pointer-events-none">
-        {uniqueThemes.map((themeItem, index) => {
-          // Calculate positions that avoid the center where quotes are displayed
-          const yPosition = 15 + (index % 4) * 20; // Four rows in the top section
+      {/* Top area (first 1/3) for floating strips */}
+      <div className="absolute inset-0 bottom-2/3 pointer-events-none">
+        {uniqueThemes.slice(0, 4).map((themeItem, index) => {
+          // Position strips only in the top third
+          const yPosition = 5 + (index % 4) * 18; // Four rows in the top section
           const strip = index % 2 === 0;
           
           return (
             <motion.div
-              key={`theme-${themeItem.theme}`}
+              key={`theme-top-${themeItem.theme}`}
               className="absolute left-0 w-auto h-8 rounded-md px-3 py-1 flex items-center"
               style={{
                 top: `${yPosition}%`,
-                backgroundColor: `${themeColor}20`, // 20% opacity
+                backgroundColor: `${themeColor}15`, // 15% opacity
                 borderLeft: `3px solid ${themeColor}`,
                 borderRight: `3px solid ${themeColor}`,
-                boxShadow: `0 0 4px 0 ${themeColor}40`,
+                boxShadow: `0 0 1px 0 ${themeColor}40`,
                 backdropFilter: 'blur(4px)',
                 zIndex: 15, // Below the buttons and indicators
               }}
@@ -109,10 +109,11 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
         })}
       </div>
       
-      {/* Bottom area for additional themes */}
+      {/* Bottom area (last 1/3) for additional themes */}
       <div className="absolute inset-0 top-2/3 pointer-events-none">
-        {uniqueThemes.slice(0, 5).map((themeItem, index) => {
-          const yPosition = 60 + (index % 3) * 12; // Three rows in the bottom section
+        {uniqueThemes.slice(4, 8).map((themeItem, index) => {
+          // Position strips only in the bottom third
+          const yPosition = 70 + (index % 3) * 10; // Three rows in the bottom section
           const strip = index % 2 === 1;
           
           return (
@@ -124,7 +125,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                 backgroundColor: `${themeColor}15`, // 15% opacity
                 borderLeft: `2px solid ${themeColor}`,
                 borderRight: `2px solid ${themeColor}`,
-                boxShadow: `0 0 3px 0 ${themeColor}30`,
+                boxShadow: `0 0 1px 0 ${themeColor}30`,
                 backdropFilter: 'blur(3px)',
                 zIndex: 15, // Below the buttons and indicators
               }}

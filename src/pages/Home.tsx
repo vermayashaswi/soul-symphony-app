@@ -125,11 +125,11 @@ const Home = () => {
         />
       </div>
       
-      {/* Text content - middle layer (z-index: 20) with semi-transparent background for visibility */}
+      {/* Text content - middle layer (z-index: 20) with fully transparent background */}
       <div className="relative z-20 flex flex-col h-screen">
         <div className="p-4 flex flex-col">
           <div className="flex justify-between items-start w-full relative">
-            <div className="relative backdrop-blur-sm bg-background/30 px-2 py-1 rounded">
+            <div className="relative">
               <h1 
                 className="text-2xl font-bold text-theme" 
                 style={{ 
@@ -143,7 +143,7 @@ const Home = () => {
               </h1>
             </div>
             <div 
-              className="text-muted-foreground font-medium backdrop-blur-sm bg-background/30 px-2 py-1 rounded" 
+              className="text-muted-foreground font-medium" 
               style={{ 
                 fontWeight: 500,
                 letterSpacing: '0.01em',
