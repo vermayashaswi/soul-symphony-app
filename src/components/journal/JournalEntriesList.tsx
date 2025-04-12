@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,6 @@ import EmptyJournalState from './EmptyJournalState';
 import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
-import { Skeleton } from '@/components/ui/skeleton';
 import JournalSearch from './JournalSearch';
 import { getProcessingEntries } from '@/utils/audio-processing';
 
@@ -41,17 +39,14 @@ export default function JournalEntriesList({
   const hasNoValidEntries = useRef(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
 
-  // Load processing entries from localStorage when component mounts or when user navigates back
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
       const persistedEntries = getProcessingEntries();
       setPersistedProcessingEntries(persistedEntries);
     };
     
-    // Load on mount
     loadPersistedProcessingEntries();
     
-    // Add an event listener to get updates when processing entries change
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
       if (event.detail && Array.isArray(event.detail.entries)) {
         setPersistedProcessingEntries(event.detail.entries);
@@ -60,7 +55,6 @@ export default function JournalEntriesList({
     
     window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
     
-    // Also reload on visibility change (user switches back to tab)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         loadPersistedProcessingEntries();
@@ -190,7 +184,6 @@ export default function JournalEntriesList({
     setIsSearchActive(results.length !== localEntries.length);
   };
   
-  // Combine processing entries from props and localStorage
   const allProcessingEntries = [...new Set([...processingEntries, ...persistedProcessingEntries])];
   const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !hasProcessingEntries;
   

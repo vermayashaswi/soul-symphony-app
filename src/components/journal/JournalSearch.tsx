@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
 
 interface JournalSearchProps {
   entries: JournalEntry[];
@@ -33,7 +32,6 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [isTyping, setIsTyping] = useState(true);
   const [typingIndex, setTypingIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const totalEntriesCount = entries.length;
 
   // Set up the typing animation for the placeholder text
   useEffect(() => {
@@ -148,8 +146,6 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     onSelectEntry(entry);
   };
 
-  const displayedCount = searchQuery.trim() ? filteredEntries.length : entries.length;
-
   return (
     <Card className="w-full sticky top-0 z-10 bg-background shadow-sm">
       <CardContent className="p-4">
@@ -168,21 +164,9 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-sm text-muted-foreground ml-auto">
-              {totalEntriesCount} total {totalEntriesCount === 1 ? 'entry' : 'entries'}
+              {filteredEntries.length} total {filteredEntries.length === 1 ? 'entry' : 'entries'}
             </div>
           </div>
-
-          {searchQuery.trim() && (
-            <div className="pt-2">
-              {displayedCount > 0 ? (
-                <Badge variant="secondary" className="mb-2">
-                  {displayedCount} {displayedCount === 1 ? 'entry' : 'entries'} found
-                </Badge>
-              ) : (
-                <div className="text-muted-foreground">No entries found.</div>
-              )}
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
