@@ -16,15 +16,7 @@ interface ThemeBubbleProps {
   id: string;
 }
 
-const getSentimentColor = (sentiment: number): string => {
-  if (sentiment >= 0.3) {
-    return 'bg-[#F2FCE2] text-green-600 border-green-300'; // Positive sentiment
-  } else if (sentiment >= -0.1) {
-    return 'bg-[#FEF7CD] text-yellow-600 border-yellow-300'; // Neutral sentiment
-  } else {
-    return 'bg-red-100 text-red-600 border-red-300'; // Negative sentiment
-  }
-};
+// Removed getSentimentColor as we're no longer color-coding by sentiment
 
 const ThemeBubble: React.FC<ThemeBubbleProps> = ({ 
   themeData, 
@@ -36,7 +28,6 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
 }) => {
   const controls = useAnimation();
   const bubbleRef = useRef<HTMLDivElement>(null);
-  const colorClass = getSentimentColor(themeData.sentiment);
   
   useEffect(() => {
     let currentPosition = { ...initialPosition };
@@ -62,21 +53,52 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
       cancelAnimationFrame(animationFrameId);
     };
   }, [controls, initialPosition, velocity]);
+
+  // Calculate font size based on text length
+  const calculateFontSize = () => {
+    const textLength = themeData.theme.length;
+    
+    if (textLength <= 3) return '14px';
+    if (textLength <= 6) return '12px';
+    if (textLength <= 10) return '11px';
+    return '10px';
+  };
   
   return (
     <motion.div
       ref={bubbleRef}
-      className={`absolute flex items-center justify-center ${colorClass} border font-medium rounded-full shadow-sm`}
+      className="absolute flex items-center justify-center rounded-full cursor-pointer"
       initial={{ x: initialPosition.x, y: initialPosition.y }}
       animate={controls}
-      whileHover={{ scale: 1.1, boxShadow: "0 0 15px rgba(var(--primary), 0.5)" }}
+      whileHover={{ scale: 1.1 }}
       transition={{ duration: 0.2 }}
       style={{ 
         width: size, 
         height: size,
+        background: 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8) 5%, rgba(173, 216, 230, 0.6) 20%, rgba(173, 216, 230, 0.4) 60%, rgba(173, 216, 230, 0.2) 100%)',
+        boxShadow: '0 0 10px 2px rgba(255, 255, 255, 0.3), inset 0 0 15px rgba(255, 255, 255, 0.6), 0 0 5px rgba(0, 0, 0, 0.1)',
+        backdropFilter: 'blur(2px)',
+        border: '1px solid rgba(255, 255, 255, 0.3)',
       }}
     >
-      <span className="px-2 text-sm text-center whitespace-normal overflow-hidden">{themeData.theme}</span>
+      <span 
+        className="text-center overflow-hidden px-2"
+        style={{ 
+          fontSize: calculateFontSize(),
+          fontWeight: 500,
+          color: 'rgba(0, 0, 0, 0.7)',
+          textShadow: '0 1px 1px rgba(255, 255, 255, 0.5)',
+          maxWidth: '85%',
+          maxHeight: '85%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          lineHeight: 1.2,
+          wordBreak: 'break-word',
+        }}
+      >
+        {themeData.theme}
+      </span>
     </motion.div>
   );
 };
@@ -144,12 +166,9 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       newThemePool.splice(themeIndex, 1);
       setThemePool(newThemePool);
       
-      // Calculate random size between 80-120px, making sure it can fit the text
-      // Adjust size based on text length
-      const baseSize = Math.min(Math.floor(Math.random() * 40) + 80, 120);
-      const textLength = themeData.theme.length;
-      // Increase size for longer text (up to a limit)
-      const size = Math.min(baseSize + (textLength > 10 ? (textLength - 10) * 3 : 0), 140);
+      // Set a fixed size, reduced by 30% (assuming original avg was ~100px)
+      // Original range was 80-120, new size is 70% of original
+      const FIXED_SIZE = 70;
       
       // Determine entry edge (0: top, 1: right, 2: bottom, 3: left)
       const edge = Math.floor(Math.random() * 4);
@@ -158,14 +177,14 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       let position: { x: number; y: number };
       let velocity: { x: number; y: number };
       
-      // REDUCED VELOCITY: Reduced speed factor from 2 to 1 (halving the velocity)
+      // Reduced velocity from previous implementation
       const speedFactor = 1;
       
       switch (edge) {
         case 0: // Top edge
           position = { 
-            x: Math.random() * (dimensions.width - size), 
-            y: -size 
+            x: Math.random() * (dimensions.width - FIXED_SIZE), 
+            y: -FIXED_SIZE 
           };
           velocity = { 
             x: (Math.random() - 0.5) * speedFactor, 
@@ -175,7 +194,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         case 1: // Right edge
           position = { 
             x: dimensions.width, 
-            y: Math.random() * (dimensions.height - size) 
+            y: Math.random() * (dimensions.height - FIXED_SIZE) 
           };
           velocity = { 
             x: -(Math.random() * speedFactor + 0.5), 
@@ -184,7 +203,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           break;
         case 2: // Bottom edge
           position = { 
-            x: Math.random() * (dimensions.width - size), 
+            x: Math.random() * (dimensions.width - FIXED_SIZE), 
             y: dimensions.height 
           };
           velocity = { 
@@ -194,8 +213,8 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           break;
         case 3: // Left edge
           position = { 
-            x: -size, 
-            y: Math.random() * (dimensions.height - size) 
+            x: -FIXED_SIZE, 
+            y: Math.random() * (dimensions.height - FIXED_SIZE) 
           };
           velocity = { 
             x: Math.random() * speedFactor + 0.5, 
@@ -213,7 +232,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         { 
           id: `bubble-${Date.now()}-${Math.random()}`,
           themeData, 
-          size, 
+          size: FIXED_SIZE, 
           position, 
           velocity 
         }
