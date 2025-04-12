@@ -129,7 +129,7 @@ export default function MobileChatInput({
         isKeyboardVisible ? 'fixed bottom-0 left-0 right-0 z-[9999] input-keyboard-active' : ''
       }`}
       style={{
-        paddingBottom: isKeyboardVisible ? '10px' : 'env(safe-area-inset-bottom, 10px)',
+        paddingBottom: isKeyboardVisible ? '7px' : 'env(safe-area-inset-bottom, 10px)',
         marginBottom: 0 // Removed dynamic margin to keep it consistent
       }}
     >
@@ -163,4 +163,4 @@ export default function MobileChatInput({
       </div>
     </div>
   );
-}
+};

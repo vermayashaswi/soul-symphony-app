@@ -474,7 +474,7 @@
   /* UPDATED: Input visibility improvements with better spacing from nav bar */
   .mobile-chat-interface .input-container {
     position: fixed;
-    bottom: 56px; /* Fixed position above bottom nav */
+    bottom: 61px; /* Fixed position above bottom nav, added 5px */
     left: 0;
     right: 0;
     padding-bottom: 0;
@@ -487,14 +487,14 @@
   /* UPDATED: Chat area scrolling adjustments */
   .mobile-chat-area {
     padding-bottom: 30px !important;
-    margin-bottom: 56px !important; /* Match the navbar height */
+    margin-bottom: 61px !important; /* Match the navbar height + 5px */
   }
   
   /* FIXED: Input spacing when keyboard is closed - no unnecessary gap */
   .p-2.bg-background.border-t.border-border.flex.items-center.gap-2:not(.input-keyboard-active) {
     margin-bottom: 0 !important; 
     position: fixed;
-    bottom: 56px; /* Position directly above navbar */
+    bottom: 61px; /* Position directly above navbar + 5px */
     left: 0;
     right: 0;
     z-index: 40;
@@ -502,7 +502,7 @@
   
   /* NEW: Add bottom area protection for chat content */
   .mobile-chat-interface .chat-content-container {
-    padding-bottom: 96px; /* 56px for navbar + 40px for input area */
+    padding-bottom: 101px; /* 61px for navbar + 40px for input area */
   }
   
   /* NEW: Ensure input is always visible regardless of content */

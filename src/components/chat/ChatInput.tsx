@@ -46,7 +46,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full" style={{ marginBottom: '5px' }}>
       <form onSubmit={handleSubmit} className="relative flex items-center w-full">
         <div className="flex items-center w-full relative">
           <Textarea

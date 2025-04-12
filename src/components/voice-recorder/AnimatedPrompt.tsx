@@ -25,7 +25,7 @@ export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
     <AnimatePresence>
       {isVisible && (
         <motion.div 
-          className="w-full flex justify-center mb-4 text-center"
+          className="w-full flex justify-center mt-4 mb-2 text-center"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}

@@ -462,9 +462,16 @@ export function EmotionChart({
                   preventOverlap={true}
                   onEmotionClick={handleEmotionClick}
                 />
-                <div className="absolute bottom-3 right-3 text-xs text-muted-foreground bg-background/70 px-2 py-1 rounded-md">
+                <div className="absolute bottom-3 right-3 text-xs text-muted-foreground bg-background/70 px-2 py-1 rounded-md z-50">
                   Tip: Tap bubbles to see percentages
                 </div>
+                {selectedEmotionInfo && (
+                  <div 
+                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-background/90 py-2 px-4 rounded-lg shadow-lg text-primary font-medium z-50"
+                  >
+                    {selectedEmotionInfo.name}: {selectedEmotionInfo.percentage}%
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
