@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
@@ -62,19 +61,16 @@ export const InspirationalQuote: React.FC = () => {
     }
   };
 
-  // Effect to fetch quotes when component is in view or visibility changes
   useEffect(() => {
     if (inView) {
       console.log('Quote component in view, fetching quotes');
       fetchQuotes();
       return () => {
-        // Reset state when component goes out of view
         setCurrentQuoteIndex(0);
       };
     }
   }, [inView]);
 
-  // Add effect to detect page visibility changes
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && inView) {
@@ -85,7 +81,6 @@ export const InspirationalQuote: React.FC = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Add event listener for page refocus
     window.addEventListener('focus', handleVisibilityChange);
 
     return () => {
@@ -94,7 +89,6 @@ export const InspirationalQuote: React.FC = () => {
     };
   }, [inView]);
 
-  // Effect to rotate through quotes
   useEffect(() => {
     if (quotes.length > 0) {
       console.log('Setting up quote rotation with', quotes.length, 'quotes');
@@ -105,7 +99,7 @@ export const InspirationalQuote: React.FC = () => {
           setAuthor(quotes[newIndex].author || 'Unknown');
           return newIndex;
         });
-      }, 7000); // Changed from 4 seconds to 7 seconds per quote
+      }, 7000);
       
       return () => clearInterval(intervalId);
     }
@@ -121,7 +115,7 @@ export const InspirationalQuote: React.FC = () => {
   return (
     <motion.div
       ref={ref}
-      className="fixed inset-0 w-full h-full flex items-center justify-center z-10 pointer-events-none"
+      className="fixed inset-0 w-full h-full flex items-center justify-center pointer-events-none"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.8 }}
@@ -158,11 +152,11 @@ export const InspirationalQuote: React.FC = () => {
                 <div className="flex mb-4 justify-center">
                   <Quote className="h-8 w-8 text-theme opacity-70" />
                 </div>
-                <p className="text-foreground text-center text-xl font-medium italic mb-2 opacity-80">
+                <p className="text-foreground text-center text-xl font-medium italic mb-2">
                   "{quote}"
                 </p>
                 {author && (
-                  <p className="text-theme text-center font-medium">
+                  <p className="text-theme text-center font-bold">
                     — {author}
                   </p>
                 )}
