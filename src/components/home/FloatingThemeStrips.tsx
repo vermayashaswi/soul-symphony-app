@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -21,11 +20,9 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
   
-  // Deduplicate themes and limit to 8 for better display
   useEffect(() => {
     if (themesData.length === 0) return;
     
-    // Create a map to count occurrences and track highest sentiment
     const themeMap = new Map<string, { count: number, sentiment: number }>();
     
     themesData.forEach(item => {
@@ -35,16 +32,15 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
         const existing = themeMap.get(item.theme)!;
         themeMap.set(item.theme, { 
           count: existing.count + 1,
-          sentiment: (existing.sentiment + item.sentiment) / 2 // Average sentiment
+          sentiment: (existing.sentiment + item.sentiment) / 2
         });
       }
     });
     
-    // Convert map to array and sort by occurrence count
     const sortedThemes = Array.from(themeMap.entries())
       .map(([theme, { count, sentiment }]) => ({ theme, count, sentiment }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 8) // Limit to top 8 themes
+      .slice(0, 8)
       .map(({ theme, sentiment }) => ({ theme, sentiment }));
     
     setUniqueThemes(sortedThemes);
@@ -60,22 +56,19 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Theme header strip - MADE SMALLER AND POSITIONED JUST BELOW JOURNAL NAME */}
-      <div className="absolute top-10 left-1 z-50">
+      <div className="absolute top-14 left-6 z-50">
         <div
-          className="px-1.5 py-0.5 rounded-md"
+          className="px-3 py-1 rounded-full text-center"
           style={{
-            backgroundColor: `${themeColor}30`, // 30% opacity
-            borderLeft: `1px solid ${themeColor}`,
-            borderRight: `1px solid ${themeColor}`,
-            boxShadow: `0 0 1px 0 ${themeColor}40`,
-            backdropFilter: 'blur(4px)',
+            backgroundColor: `${themeColor}70`,
+            border: `1px solid ${themeColor}`,
+            boxShadow: `0 0 2px 0 ${themeColor}40`,
           }}
         >
           <span 
-            className="text-[8px] font-medium whitespace-nowrap"
+            className="text-xs font-medium whitespace-nowrap"
             style={{
-              color: themeColor,
+              color: isDarkMode ? '#ffffff' : '#000000',
               fontWeight: 500,
               letterSpacing: '0.01em',
               WebkitFontSmoothing: 'antialiased',
@@ -87,19 +80,14 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
         </div>
       </div>
       
-      {/* Animation area restricted to between header and the quote component */}
-      {/* Adjusted to prevent overlap with quote section by increasing bottom distance */}
       <div className="absolute inset-x-0 top-20 bottom-80 pointer-events-none">
         {uniqueThemes.slice(0, 6).map((themeItem, index) => {
-          // Calculate vertical position using a more spread out distribution
-          // Divide the container height into equal sections based on number of themes
           const sectionHeight = 100 / Math.min(6, uniqueThemes.length);
-          // Place each strip in the center of its section with a small random offset
-          const randomOffset = Math.random() * 5 - 2.5; // Random offset between -2.5% and 2.5%
+          const randomOffset = Math.random() * 5 - 2.5;
           const yPosition = (index * sectionHeight) + (sectionHeight / 2) + randomOffset;
           
-          const direction = index % 2 === 0; // Alternate direction
-          const speed = 15 + Math.random() * 10; // Random speed between 15-25 seconds
+          const direction = index % 2 === 0;
+          const speed = 15 + Math.random() * 10;
           
           return (
             <motion.div
@@ -107,12 +95,12 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               className="absolute left-0 w-auto h-8 rounded-md px-3 py-1 flex items-center"
               style={{
                 top: `${yPosition}%`,
-                backgroundColor: `${themeColor}50`, // 50% opacity
+                backgroundColor: `${themeColor}50`,
                 borderLeft: `3px solid ${themeColor}`,
                 borderRight: `3px solid ${themeColor}`,
                 boxShadow: `0 0 1px 0 ${themeColor}40`,
                 backdropFilter: 'blur(4px)',
-                zIndex: 15, // Below the buttons and indicators
+                zIndex: 15,
               }}
               initial={{ 
                 x: direction ? -300 : '100vw',
@@ -123,11 +111,11 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                 opacity: [0, 1, 0]
               }}
               transition={{
-                duration: speed, // Variable duration for full animation
+                duration: speed,
                 repeat: Infinity,
                 repeatType: 'loop',
                 ease: 'linear',
-                delay: index * 2.5, // Stagger the animations
+                delay: index * 2.5,
               }}
             >
               <span 
