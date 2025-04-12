@@ -28,6 +28,11 @@ export type RouteConfig = {
 // Website public routes (always accessible)
 export const websiteRoutes: RouteConfig[] = [
   {
+    path: '/',
+    element: <HomePage />,
+    isWebsiteRoute: true,
+  },
+  {
     path: '/blog',
     element: <BlogPage />,
     isWebsiteRoute: true,
