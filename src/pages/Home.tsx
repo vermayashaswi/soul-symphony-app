@@ -130,7 +130,7 @@ const Home = () => {
           <p className="text-muted-foreground font-medium">{formattedDate}</p>
         </div>
 
-        <div className="flex-1 px-4">
+        <div className="flex-1 px-4 pb-[calc(100vh-400px)]">
           <motion.div
             variants={containerVariants}
             initial="hidden"

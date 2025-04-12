@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
-import EntityBubbles from './EntityBubbles';
+import PhysicsEntityBubbles from './PhysicsEntityBubbles';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SummaryResponse {
@@ -63,7 +63,7 @@ const JournalSummaryCard: React.FC = () => {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-24 flex items-center justify-center">
+          <div className="h-28 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
           </div>
         ) : error ? (
@@ -80,19 +80,21 @@ const JournalSummaryCard: React.FC = () => {
           </motion.div>
         ) : (
           <>
-            <motion.div 
-              className="mb-2 p-2 rounded-lg bg-primary/5"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-            >
-              <p className="text-foreground">{summaryData.summary}</p>
-            </motion.div>
+            {summaryData.summary && (
+              <motion.div 
+                className="mb-1 rounded-lg bg-primary/5"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+              >
+                <p className="text-foreground text-xs px-2 py-1 leading-tight">{summaryData.summary}</p>
+              </motion.div>
+            )}
             
             {summaryData.topEntities.length > 0 && (
-              <EntityBubbles 
-                entities={summaryData.topEntities.slice(0, 7)} 
-                className="h-24" 
+              <PhysicsEntityBubbles 
+                entities={summaryData.topEntities} 
+                className="h-28" 
               />
             )}
           </>
