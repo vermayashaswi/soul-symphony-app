@@ -131,7 +131,18 @@ const JournalSummaryCard: React.FC = () => {
       {isReady && !loading && (
         <>
           <div className="absolute top-12 left-4 flex items-center gap-2 z-50 pointer-events-none">
-            <p className="text-xs text-muted-foreground shadow-sm text-shadow-sm" style={{ opacity: 1, fontSmooth: 'always', WebkitFontSmoothing: 'antialiased' }}>Your last 7 days</p>
+            <p 
+              className="text-xs text-muted-foreground" 
+              style={{ 
+                textShadow: '0 0 10px #fff, 0 0 5px #fff', 
+                opacity: 1,
+                fontWeight: 500,
+                letterSpacing: '0.01em',
+                WebkitFontSmoothing: 'subpixel-antialiased'
+              }}
+            >
+              Your last 7 days
+            </p>
             <div 
               className="w-5 h-5 rounded-full flex items-center justify-center pointer-events-auto"
               style={{ 
@@ -142,7 +153,15 @@ const JournalSummaryCard: React.FC = () => {
               }}
               title="Journal themes from recent entries"
             >
-              <span className="text-center text-[6px] font-medium" style={{ color: 'rgba(0, 0, 0, 1)', opacity: 1, fontSmooth: 'always', WebkitFontSmoothing: 'antialiased' }}>
+              <span 
+                className="text-center text-[6px] font-medium" 
+                style={{ 
+                  color: 'rgba(0, 0, 0, 1)', 
+                  opacity: 1, 
+                  fontWeight: 600,
+                  WebkitFontSmoothing: 'subpixel-antialiased'
+                }}
+              >
                 theme
               </span>
             </div>

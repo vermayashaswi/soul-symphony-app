@@ -130,11 +130,29 @@ const Home = () => {
         <div className="p-4 flex flex-col">
           <div className="flex justify-between items-start w-full">
             <div>
-              <h1 className="text-2xl font-bold text-theme text-shadow-sm" style={{ opacity: 1, fontSmooth: 'always', WebkitFontSmoothing: 'antialiased' }}>
+              <h1 
+                className="text-2xl font-bold text-theme" 
+                style={{ 
+                  textShadow: '0 0 12px #fff, 0 0 6px #fff',
+                  opacity: 1,
+                  fontWeight: 700,
+                  letterSpacing: '0.01em',
+                  WebkitFontSmoothing: 'subpixel-antialiased'
+                }}
+              >
                 {getJournalName()}
               </h1>
             </div>
-            <div className="text-muted-foreground font-medium text-shadow-sm" style={{ opacity: 1, fontSmooth: 'always', WebkitFontSmoothing: 'antialiased' }}>
+            <div 
+              className="text-muted-foreground font-medium" 
+              style={{ 
+                textShadow: '0 0 10px #fff, 0 0 5px #fff',
+                opacity: 1,
+                fontWeight: 500,
+                letterSpacing: '0.01em',
+                WebkitFontSmoothing: 'subpixel-antialiased'
+              }}
+            >
               {formattedDate}
             </div>
           </div>

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -95,7 +96,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
         className="text-center overflow-hidden px-2"
         style={{ 
           fontSize: calculateFontSize(),
-          fontWeight: 500,
+          fontWeight: 600,
           color: 'rgba(0, 0, 0, 1)',
           textShadow: '0 1px 2px rgba(255, 255, 255, 1)',
           maxWidth: '90%',
@@ -105,6 +106,8 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
           justifyContent: 'center',
           lineHeight: 1.1,
           wordBreak: 'break-word',
+          WebkitFontSmoothing: 'subpixel-antialiased',
+          letterSpacing: '0.01em',
         }}
       >
         {themeData.theme}

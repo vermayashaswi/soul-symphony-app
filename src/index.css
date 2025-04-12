@@ -231,3 +231,26 @@ html {
 .entity-bubble-glow:hover {
   box-shadow: 0 0 15px 5px rgba(var(--primary), 0.6);
 }
+
+/* Add custom styles for better text rendering */
+.crisp-text {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.01em;
+}
+
+/* Strong text shadow for elements that need to be visible over backgrounds */
+.text-glow {
+  text-shadow: 
+    0 0 10px rgba(255, 255, 255, 1),
+    0 0 5px rgba(255, 255, 255, 1);
+}
+
+/* Stronger glow for titles and important text */
+.text-glow-strong {
+  text-shadow: 
+    0 0 15px rgba(255, 255, 255, 1),
+    0 0 8px rgba(255, 255, 255, 1),
+    0 0 3px rgba(255, 255, 255, 1);
+}

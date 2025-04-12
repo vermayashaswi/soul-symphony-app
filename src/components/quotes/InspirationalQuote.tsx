@@ -133,24 +133,20 @@ export const InspirationalQuote: React.FC = () => {
             <div className="flex mb-4 justify-center">
               <Quote className="h-8 w-8 text-theme opacity-100" />
             </div>
-            <p className="text-foreground text-center text-xl font-medium italic mb-2 px-3 py-2 rounded-lg text-shadow-sm" 
+            <p className="text-foreground text-center text-xl font-medium italic mb-2 px-3 py-2 rounded-lg" 
                style={{ 
                  backgroundColor: 'rgba(0,0,0,0)', 
                  textShadow: '0px 0px 8px rgba(255,255,255,0.9), 0px 0px 4px rgba(255,255,255,0.8)',
-                 opacity: 1,
-                 fontSmooth: 'always',
-                 WebkitFontSmoothing: 'antialiased'
+                 opacity: 1
                }}>
               "{quote}"
             </p>
             {author && (
-              <p className="text-theme text-center font-bold px-2 py-1 rounded-lg text-shadow-sm" 
+              <p className="text-theme text-center font-bold px-2 py-1 rounded-lg" 
                  style={{ 
                    backgroundColor: 'rgba(0,0,0,0)', 
                    textShadow: '0px 0px 6px rgba(255,255,255,0.8), 0px 0px 3px rgba(255,255,255,0.7)',
-                   opacity: 1,
-                   fontSmooth: 'always',
-                   WebkitFontSmoothing: 'antialiased'
+                   opacity: 1
                  }}>
                 — {author}
               </p>
