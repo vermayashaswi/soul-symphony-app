@@ -71,8 +71,10 @@ export default function MobileChatInput({
         window.dispatchEvent(new Event(eventName));
         
         if (isKeyboard && inputRef.current) {
+          // Ensure the chat input is visible by scrolling to it
           setTimeout(() => {
-            inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            // More aggressive scrolling - ensure we see the input box clearly
+            inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             window.scrollTo({
               top: document.body.scrollHeight,
               behavior: 'smooth'
@@ -100,6 +102,7 @@ export default function MobileChatInput({
   useEffect(() => {
     const handleFocus = () => {
       setTimeout(() => {
+        // More aggressive scrolling and positioning for focus events
         window.scrollTo({
           top: document.body.scrollHeight,
           behavior: 'smooth'

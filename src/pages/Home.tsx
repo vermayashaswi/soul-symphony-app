@@ -13,7 +13,7 @@ import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 const Home = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { colorTheme } = useTheme();
+  const { colorTheme, theme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const today = new Date();
@@ -109,6 +109,11 @@ const Home = () => {
     show: { opacity: 1, y: 0 }
   };
 
+  const dateStripVariants = {
+    hidden: { x: 100, opacity: 0 },
+    visible: { x: 0, opacity: 1, transition: { duration: 0.5, ease: "easeOut" } }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground relative">
       {/* Energy Animation - innermost layer (z-index: 0) */}
@@ -142,17 +147,25 @@ const Home = () => {
                 {getJournalName()}
               </h1>
             </div>
-            <div 
-              className="text-muted-foreground font-medium" 
-              style={{ 
-                fontWeight: 500,
-                letterSpacing: '0.01em',
-                WebkitFontSmoothing: 'antialiased',
-                MozOsxFontSmoothing: 'grayscale'
-              }}
+            
+            <motion.div 
+              variants={dateStripVariants}
+              initial="hidden"
+              animate="visible"
+              className={`px-3 py-1 rounded-l-md ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
             >
-              {formattedDate}
-            </div>
+              <div 
+                className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
+                style={{ 
+                  fontWeight: 500,
+                  letterSpacing: '0.01em',
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale'
+                }}
+              >
+                {formattedDate}
+              </div>
+            </motion.div>
           </div>
         </div>
       </div>

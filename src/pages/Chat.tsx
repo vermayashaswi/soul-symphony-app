@@ -50,6 +50,24 @@ const Chat = () => {
       .chat-sidebar-close-duplicate {
         display: none !important;
       }
+      
+      /* Ensure chat input is always visible */
+      .mobile-chat-input-container {
+        padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 5px);
+        z-index: 9999;
+      }
+      
+      /* Add extra padding to chat area to prevent content from being hidden */
+      .chat-messages-container {
+        padding-bottom: 90px;
+      }
+      
+      /* Ensure keyboard doesn't obscure input */
+      .input-keyboard-active {
+        position: sticky !important; 
+        bottom: 0 !important;
+        z-index: 9999 !important;
+      }
     `;
     document.head.appendChild(style);
     

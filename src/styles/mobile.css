@@ -478,10 +478,10 @@
     left: 0;
     right: 0;
     padding-bottom: 0;
-    z-index: 1000;
-    background-color: hsl(var(--background));
-    margin-bottom: 0 !important; /* No extra margin */
-    border-top: 1px solid hsl(var(--border));
+    z-index: 50;
+    background-color: var(--background);
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
   }
   
   /* UPDATED: Chat area scrolling adjustments */
@@ -505,10 +505,14 @@
     padding-bottom: 101px; /* 61px for navbar + 40px for input area */
   }
   
-  /* NEW: Ensure input is always visible regardless of content */
-  .mobile-chat-interface {
-    position: relative;
-    height: 100%;
+  /* NEW: When keyboard is open on mobile, ensure input stays visible */
+  .mobile-chat-interface.keyboard-visible .input-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    padding-bottom: 3px; /* Reduced to 3px as requested */
   }
 }
 

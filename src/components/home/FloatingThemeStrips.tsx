@@ -62,7 +62,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
         <div
           className="px-4 py-1.5 rounded-md"
           style={{
-            backgroundColor: `${themeColor}15`, // 15% opacity
+            backgroundColor: `${themeColor}30`, // 30% opacity
             borderLeft: `3px solid ${themeColor}`,
             borderRight: `3px solid ${themeColor}`,
             boxShadow: `0 0 1px 0 ${themeColor}40`,
@@ -84,8 +84,8 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
         </div>
       </div>
       
-      {/* Animation area restricted to between header and the quote component, moved up by 20px */}
-      <div className="absolute inset-x-0 top-16 bottom-52 pointer-events-none">
+      {/* Animation area restricted to between header and the quote component, moved up by 10px */}
+      <div className="absolute inset-x-0 top-16 bottom-62 pointer-events-none">
         {uniqueThemes.slice(0, 6).map((themeItem, index) => {
           // Distribute strips evenly in the available space
           const yPosition = 10 + (index % 6) * 14; // Six positions spread out
@@ -97,7 +97,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               className="absolute left-0 w-auto h-8 rounded-md px-3 py-1 flex items-center"
               style={{
                 top: `${yPosition}%`,
-                backgroundColor: `${themeColor}15`, // 15% opacity
+                backgroundColor: `${themeColor}30`, // 30% opacity (increased)
                 borderLeft: `3px solid ${themeColor}`,
                 borderRight: `3px solid ${themeColor}`,
                 boxShadow: `0 0 1px 0 ${themeColor}40`,

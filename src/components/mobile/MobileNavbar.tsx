@@ -64,10 +64,9 @@ const MobileNavbar = () => {
     return null;
   }
 
-  // Ensure only one active item by using exact path matching with endsWith check
-  // This solves the back navigation issue where multiple tabs could be highlighted
+  // Improved active route detection to ensure only one tab is active
   const getActiveStatus = (path: string) => {
-    // For paths with exact routes, we need an exact match
+    // Exact path matching to ensure only one active tab
     return location.pathname === path;
   };
 
@@ -79,7 +78,6 @@ const MobileNavbar = () => {
       transition={{ duration: 0.3 }}
     >
       {navItems.map(item => {
-        // Use the new active status function
         const isActive = getActiveStatus(item.path);
         
         return (
