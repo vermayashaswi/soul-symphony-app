@@ -65,14 +65,14 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
     return '10px';
   };
 
-  // Create a background with gradient based on theme color - removing all transparency
+  // Create a background with enhanced gradient and glow
   const createBubbleBackground = () => {
     return `radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 1) 5%, ${themeColor} 20%, ${themeColor} 60%, ${themeColor} 100%)`;
   };
   
-  // Create shadow with theme color
+  // Create shadow with theme color - enhanced glow
   const createBubbleShadow = () => {
-    return `0 0 12px 6px rgba(255, 255, 255, 1), inset 0 0 20px rgba(255, 255, 255, 1), 0 0 12px ${themeColor}`;
+    return `0 0 15px 10px rgba(255, 255, 255, 1), inset 0 0 20px rgba(255, 255, 255, 1), 0 0 20px ${themeColor}`;
   };
   
   return (
@@ -93,10 +93,10 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
       }}
     >
       <span 
-        className="text-center overflow-hidden px-2"
+        className="text-center overflow-hidden px-2 neon-bubble-text"
         style={{ 
           fontSize: calculateFontSize(),
-          fontWeight: 600,
+          fontWeight: 800,
           color: 'rgba(0, 0, 0, 1)',
           textShadow: '0 1px 2px rgba(255, 255, 255, 1)',
           maxWidth: '90%',
@@ -106,7 +106,8 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
           justifyContent: 'center',
           lineHeight: 1.1,
           wordBreak: 'break-word',
-          WebkitFontSmoothing: 'subpixel-antialiased',
+          WebkitFontSmoothing: 'antialiased',
+          MozOsxFontSmoothing: 'grayscale',
           letterSpacing: '0.01em',
         }}
       >

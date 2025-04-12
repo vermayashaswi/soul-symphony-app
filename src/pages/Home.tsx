@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -130,24 +131,27 @@ const Home = () => {
           <div className="flex justify-between items-start w-full">
             <div>
               <h1 
-                className="text-2xl font-bold text-theme text-glow-strong" 
+                className="text-2xl font-bold text-theme neon-text-glow" 
                 style={{ 
-                  fontWeight: 700,
-                  letterSpacing: '0.005em',
+                  fontWeight: 800,
+                  letterSpacing: '0.02em',
                   WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale'
+                  MozOsxFontSmoothing: 'grayscale',
+                  textShadow: '0 0 5px var(--color-theme), 0 0 15px var(--color-theme), 0 0 25px var(--color-theme), 0 0 30px var(--color-theme)',
+                  color: 'var(--color-theme)',
                 }}
               >
                 {getJournalName()}
               </h1>
             </div>
             <div 
-              className="text-muted-foreground font-medium text-glow" 
+              className="text-muted-foreground font-medium neon-date-glow" 
               style={{ 
-                fontWeight: 500,
-                letterSpacing: '0.01em',
+                fontWeight: 600,
+                letterSpacing: '0.02em',
                 WebkitFontSmoothing: 'antialiased',
-                MozOsxFontSmoothing: 'grayscale'
+                MozOsxFontSmoothing: 'grayscale',
+                textShadow: '0 0 5px rgba(255, 255, 255, 1), 0 0 10px rgba(255, 255, 255, 1), 0 0 15px rgba(255, 255, 255, 0.8)',
               }}
             >
               {formattedDate}

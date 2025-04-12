@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -131,12 +132,13 @@ const JournalSummaryCard: React.FC = () => {
         <>
           <div className="absolute top-12 left-4 flex items-center gap-2 z-50 pointer-events-none">
             <p 
-              className="text-xs text-muted-foreground text-glow"
+              className="text-xs text-white neon-small-text-glow"
               style={{ 
-                fontWeight: 500,
-                letterSpacing: '0.01em',
+                fontWeight: 600,
+                letterSpacing: '0.03em',
                 WebkitFontSmoothing: 'antialiased',
-                MozOsxFontSmoothing: 'grayscale'
+                MozOsxFontSmoothing: 'grayscale',
+                textShadow: '0 0 5px rgba(255, 255, 255, 1), 0 0 10px rgba(255, 255, 255, 1), 0 0 15px rgba(255, 255, 255, 0.9)',
               }}
             >
               Your last 7 days
@@ -145,7 +147,7 @@ const JournalSummaryCard: React.FC = () => {
               className="w-5 h-5 rounded-full flex items-center justify-center pointer-events-auto"
               style={{ 
                 background: createBubbleBackground(),
-                boxShadow: `0 0 6px 3px rgba(255, 255, 255, 1), inset 0 0 10px rgba(255, 255, 255, 1), 0 0 6px ${themeColor}`,
+                boxShadow: `0 0 10px 5px rgba(255, 255, 255, 1), inset 0 0 10px rgba(255, 255, 255, 1), 0 0 15px ${themeColor}`,
                 backdropFilter: 'blur(2px)',
                 border: '1px solid rgba(255, 255, 255, 1)',
               }}
@@ -155,7 +157,7 @@ const JournalSummaryCard: React.FC = () => {
                 className="text-center text-[6px] font-medium" 
                 style={{ 
                   color: 'rgba(0, 0, 0, 1)',
-                  fontWeight: 600,
+                  fontWeight: 800,
                   WebkitFontSmoothing: 'antialiased',
                   MozOsxFontSmoothing: 'grayscale'
                 }}
