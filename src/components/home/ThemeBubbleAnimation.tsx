@@ -76,7 +76,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
         height: size,
       }}
     >
-      <span className="px-2 text-sm text-center">{themeData.theme}</span>
+      <span className="px-2 text-sm text-center whitespace-normal overflow-hidden">{themeData.theme}</span>
     </motion.div>
   );
 };
@@ -144,8 +144,12 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       newThemePool.splice(themeIndex, 1);
       setThemePool(newThemePool);
       
-      // Calculate random size between 80-120px
-      const size = Math.floor(Math.random() * 40) + 80;
+      // Calculate random size between 80-120px, making sure it can fit the text
+      // Adjust size based on text length
+      const baseSize = Math.min(Math.floor(Math.random() * 40) + 80, 120);
+      const textLength = themeData.theme.length;
+      // Increase size for longer text (up to a limit)
+      const size = Math.min(baseSize + (textLength > 10 ? (textLength - 10) * 3 : 0), 140);
       
       // Determine entry edge (0: top, 1: right, 2: bottom, 3: left)
       const edge = Math.floor(Math.random() * 4);
@@ -154,7 +158,8 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       let position: { x: number; y: number };
       let velocity: { x: number; y: number };
       
-      const speedFactor = 2;
+      // REDUCED VELOCITY: Reduced speed factor from 2 to 1 (halving the velocity)
+      const speedFactor = 1;
       
       switch (edge) {
         case 0: // Top edge
@@ -164,7 +169,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           };
           velocity = { 
             x: (Math.random() - 0.5) * speedFactor, 
-            y: Math.random() * speedFactor + 1 
+            y: Math.random() * speedFactor + 0.5 
           };
           break;
         case 1: // Right edge
@@ -173,7 +178,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
             y: Math.random() * (dimensions.height - size) 
           };
           velocity = { 
-            x: -(Math.random() * speedFactor + 1), 
+            x: -(Math.random() * speedFactor + 0.5), 
             y: (Math.random() - 0.5) * speedFactor 
           };
           break;
@@ -184,7 +189,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           };
           velocity = { 
             x: (Math.random() - 0.5) * speedFactor, 
-            y: -(Math.random() * speedFactor + 1) 
+            y: -(Math.random() * speedFactor + 0.5) 
           };
           break;
         case 3: // Left edge
@@ -193,13 +198,13 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
             y: Math.random() * (dimensions.height - size) 
           };
           velocity = { 
-            x: Math.random() * speedFactor + 1, 
+            x: Math.random() * speedFactor + 0.5, 
             y: (Math.random() - 0.5) * speedFactor 
           };
           break;
         default:
           position = { x: 0, y: 0 };
-          velocity = { x: 1, y: 1 };
+          velocity = { x: 0.5, y: 0.5 };
       }
       
       // Add bubble

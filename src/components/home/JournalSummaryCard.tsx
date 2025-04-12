@@ -96,7 +96,7 @@ const JournalSummaryCard: React.FC = () => {
   }, [user?.id]);
 
   return (
-    <Card className="w-full bg-transparent shadow-none border-none h-[168px]">
+    <Card className="w-full bg-transparent shadow-none border-none h-[calc(100vh-136px)]"> {/* Adjusted height to end just above bottom nav */}
       <CardHeader className="pb-0">
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg flex items-center gap-2 bg-card text-foreground px-3 py-1 rounded-full">
