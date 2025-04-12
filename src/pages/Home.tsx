@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -110,6 +111,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
+      {/* Energy Animation - innermost layer (z-index: 0) */}
       <div className="absolute inset-0 z-0">
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
       </div>
@@ -123,6 +125,7 @@ const Home = () => {
         />
       </div>
       
+      {/* Text content - middle layer (z-index: 10) */}
       <div className="relative z-10 flex flex-col h-screen">
         <div className="p-4 flex flex-col">
           <div className="flex justify-between items-start w-full">
@@ -134,7 +137,8 @@ const Home = () => {
         </div>
       </div>
       
-      <div className="flex-1 px-0 absolute inset-0 z-20">
+      {/* Theme Bubbles - outermost layer (z-index: 40) */}
+      <div className="flex-1 px-0 absolute inset-0 z-40">
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -152,6 +156,7 @@ const Home = () => {
         </motion.div>
       </div>
       
+      {/* Inspirational Quote - fixed position (z-index: 30) */}
       <div className="fixed inset-0 flex items-center justify-center z-30">
         <InspirationalQuote />
       </div>

@@ -129,8 +129,8 @@ const JournalSummaryCard: React.FC = () => {
     <div className="h-full w-full">
       {isReady && !loading && (
         <>
-          <div className="absolute top-12 left-4 flex items-center gap-2 z-30 pointer-events-none">
-            <p className="text-xs text-muted-foreground">Your last 7 days</p>
+          <div className="absolute top-12 left-4 flex items-center gap-2 z-50 pointer-events-none">
+            <p className="text-xs text-muted-foreground shadow-sm text-shadow-sm">Your last 7 days</p>
             <div 
               className="w-5 h-5 rounded-full flex items-center justify-center pointer-events-auto"
               style={{ 
