@@ -1,9 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { Quote } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTheme } from '@/hooks/use-theme';
 
 export const InspirationalQuote: React.FC = () => {
   const [quote, setQuote] = useState<string>('');
@@ -16,6 +18,7 @@ export const InspirationalQuote: React.FC = () => {
     triggerOnce: false,
     threshold: 0.1,
   });
+  const { colorTheme } = useTheme();
 
   const fetchQuotes = async () => {
     try {

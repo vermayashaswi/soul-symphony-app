@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
+import { useTheme } from '@/hooks/use-theme';
 
 interface ThemeData {
   theme: string;
@@ -14,6 +15,7 @@ interface ThemeBubbleProps {
   velocity: { x: number; y: number };
   onCollision: (id: string, newVelocity: { x: number; y: number }) => void;
   id: string;
+  themeColor: string;
 }
 
 const ThemeBubble: React.FC<ThemeBubbleProps> = ({ 
@@ -22,7 +24,8 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
   initialPosition, 
   velocity, 
   onCollision,
-  id 
+  id,
+  themeColor
 }) => {
   const controls = useAnimation();
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -61,6 +64,16 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
     if (textLength <= 10) return '12px';
     return '10px';
   };
+
+  // Create a background with gradient based on theme color
+  const createBubbleBackground = () => {
+    return `radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 5%, ${themeColor}40 20%, ${themeColor}30 60%, ${themeColor}10 100%)`;
+  };
+  
+  // Create shadow with theme color
+  const createBubbleShadow = () => {
+    return `0 0 12px 6px rgba(255, 255, 255, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.7), 0 0 12px ${themeColor}30`;
+  };
   
   return (
     <motion.div
@@ -73,8 +86,8 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
       style={{ 
         width: size, 
         height: size,
-        background: 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 5%, rgba(173, 216, 230, 0.7) 20%, rgba(173, 216, 230, 0.5) 60%, rgba(173, 216, 230, 0.2) 100%)',
-        boxShadow: '0 0 12px 6px rgba(255, 255, 255, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.7), 0 0 12px rgba(70, 130, 180, 0.3)',
+        background: createBubbleBackground(),
+        boxShadow: createBubbleShadow(),
         backdropFilter: 'blur(3px)',
         border: '1px solid rgba(255, 255, 255, 0.5)',
       }}
@@ -120,6 +133,27 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     velocity: { x: number; y: number };
   }>>([]);
   const [themePool, setThemePool] = useState<ThemeData[]>([]);
+  const { colorTheme, customColor } = useTheme();
+  
+  // Get the theme color based on the current theme
+  const getThemeColorHex = (): string => {
+    switch (colorTheme) {
+      case 'Default':
+        return '#3b82f6';
+      case 'Calm':
+        return '#8b5cf6';
+      case 'Soothing':
+        return '#FFDEE2';
+      case 'Energy':
+        return '#f59e0b';
+      case 'Focus':
+        return '#10b981';
+      case 'Custom':
+        return customColor;
+      default:
+        return '#3b82f6';
+    }
+  };
   
   // Track current animation frame for cleanup
   const animationFrameRef = useRef<number | null>(null);
@@ -377,6 +411,8 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     );
   }
   
+  const themeColor = getThemeColorHex();
+  
   return (
     <div ref={containerRef} className="relative w-full h-full overflow-hidden">
       {activeBubbles.map(bubble => (
@@ -388,6 +424,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           initialPosition={bubble.position}
           velocity={bubble.velocity}
           onCollision={handleCollision}
+          themeColor={themeColor}
         />
       ))}
     </div>
