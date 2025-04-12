@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +11,7 @@ import EnergyAnimation from '@/components/EnergyAnimation';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Card, CardContent } from '@/components/ui/card';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -161,7 +163,7 @@ const Home = () => {
               className={`px-3 py-1 rounded-l-md ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
             >
               <div 
-                className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
+                className={`text-xs font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
                 style={{ 
                   fontWeight: 500,
                   letterSpacing: '0.01em',
@@ -176,8 +178,21 @@ const Home = () => {
         </div>
       </div>
       
-      {/* Arrow button to navigate to journal page (z-index: 10) */}
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+      {/* Compact card and arrow button (z-index: 10) */}
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 translate-y-[-15px] z-10 flex flex-col items-center">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+          className="mb-4 w-full max-w-[250px]"
+        >
+          <Card className="border-primary/20 bg-background/80 backdrop-blur-sm">
+            <CardContent className="p-4 text-center">
+              <h3 className="text-sm font-medium text-foreground">Start your Voice Journaling Journey</h3>
+            </CardContent>
+          </Card>
+        </motion.div>
+        
         <motion.button
           onClick={navigateToJournal}
           className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg"
