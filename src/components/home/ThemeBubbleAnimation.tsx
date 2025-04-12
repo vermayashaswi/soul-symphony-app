@@ -16,7 +16,7 @@ interface ThemeBubbleProps {
   onCollision: (id: string, newVelocity: { x: number; y: number }) => void;
   id: string;
   themeColor: string;
-  delay: number; // Added delay prop for staggered animation
+  delay: number;
 }
 
 const ThemeBubble: React.FC<ThemeBubbleProps> = ({ 
@@ -154,10 +154,13 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     size: number;
     position: { x: number; y: number };
     velocity: { x: number; y: number };
-    delay: number; // Added delay property
+    delay: number;
+    distanceFromCenter: number; // Add distance tracking
   }>>([]);
   const [themePool, setThemePool] = useState<ThemeData[]>([]);
   const { colorTheme, customColor } = useTheme();
+  const popCenterRef = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
+  const bubbleGenerationInProgress = useRef<boolean>(false);
   
   // Get the theme color based on the current theme
   const getThemeColorHex = (): string => {
@@ -206,12 +209,72 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     };
   }, [themesData]);
   
+  // Calculate distance between two points
+  const calculateDistance = (p1: {x: number, y: number}, p2: {x: number, y: number}): number => {
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+  };
+  
+  // Check if a new bubble would collide with existing bubbles
+  const wouldCollideAtPopPoint = (newBubbleSize: number): boolean => {
+    const popCenter = popCenterRef.current;
+    const newBubbleRadius = newBubbleSize / 2;
+    const collisionThreshold = 5; // 5px space around pop point
+    
+    for (const bubble of activeBubbles) {
+      const bubbleCenter = {
+        x: bubble.position.x + bubble.size / 2,
+        y: bubble.position.y + bubble.size / 2
+      };
+      
+      const distance = calculateDistance(popCenter, bubbleCenter);
+      const minSafeDistance = newBubbleRadius + bubble.size / 2 + collisionThreshold;
+      
+      if (distance < minSafeDistance) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+  
+  // Check if any bubble has moved far enough from center to trigger next bubble
+  const checkDistancesAndCreateBubble = () => {
+    if (bubbleGenerationInProgress.current || activeBubbles.length >= maxBubbles) return;
+    
+    if (activeBubbles.length === 0) {
+      // Create first bubble if none exist
+      createBubble();
+      return;
+    }
+    
+    // Check if any bubble is at least 15px away from center
+    const popCenter = popCenterRef.current;
+    const hasMovedEnough = activeBubbles.some(bubble => {
+      const bubbleCenter = {
+        x: bubble.position.x + bubble.size / 2,
+        y: bubble.position.y + bubble.size / 2
+      };
+      return calculateDistance(popCenter, bubbleCenter) > 15;
+    });
+    
+    if (hasMovedEnough && !wouldCollideAtPopPoint(50)) { // Using 50 as a default size estimate
+      createBubble();
+    }
+  };
+  
   // Bubble management (creation, movement, collision)
   useEffect(() => {
     if (dimensions.width === 0 || dimensions.height === 0 || !themePool.length) return;
     
+    // Set the popping center location (moved up by 17px from center)
+    const centerX = dimensions.width / 2; 
+    const centerY = dimensions.height / 2 - 17; // Moved up by 17px total
+    popCenterRef.current = { x: centerX, y: centerY };
+    
     const createBubble = () => {
-      if (activeBubbles.length >= maxBubbles || !themePool.length) return;
+      if (activeBubbles.length >= maxBubbles || !themePool.length || bubbleGenerationInProgress.current) return;
+      
+      bubbleGenerationInProgress.current = true;
       
       // Choose random theme from pool
       const themeIndex = Math.floor(Math.random() * themePool.length);
@@ -239,11 +302,14 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 0.8);
       }
       
-      // Center position with adjustment (moved up by 7px)
-      const centerX = dimensions.width / 2; 
-      const centerY = dimensions.height / 2 - 7; // Moved up by 7px
+      // Check for collision at pop point
+      if (wouldCollideAtPopPoint(bubbleSize)) {
+        // Try again later
+        bubbleGenerationInProgress.current = false;
+        return;
+      }
       
-      // Start position at center
+      // Position at the pop center
       const position = { 
         x: centerX - bubbleSize / 2, 
         y: centerY - bubbleSize / 2
@@ -259,8 +325,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         y: Math.sin(angle) * speed
       };
       
-      // Calculate delay based on bubble index for sequential appearance
-      const delay = activeBubbles.length * 800; // 800ms between each bubble appearance
+      const delay = 100; // Small delay for animation
       
       // Add bubble with animation from center
       setActiveBubbles(prev => [
@@ -271,9 +336,15 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           size: bubbleSize, 
           position, 
           velocity,
-          delay 
+          delay,
+          distanceFromCenter: 0 
         }
       ]);
+      
+      // Reset flag after a short delay to allow animation to start
+      setTimeout(() => {
+        bubbleGenerationInProgress.current = false;
+      }, 100);
     };
     
     const updateBubbles = () => {
@@ -283,9 +354,18 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           const newX = bubble.position.x + bubble.velocity.x;
           const newY = bubble.position.y + bubble.velocity.y;
           
+          // Calculate new distance from center
+          const bubbleCenterX = newX + bubble.size / 2;
+          const bubbleCenterY = newY + bubble.size / 2;
+          const distanceFromCenter = calculateDistance(
+            popCenterRef.current,
+            { x: bubbleCenterX, y: bubbleCenterY }
+          );
+          
           return {
             ...bubble,
-            position: { x: newX, y: newY }
+            position: { x: newX, y: newY },
+            distanceFromCenter
           };
         });
         
@@ -360,24 +440,22 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           return !outOfBounds;
         });
       });
+      
+      // Check if we should create a new bubble based on existing bubble distances
+      checkDistancesAndCreateBubble();
     };
     
-    // Create initial bubbles
-    if (activeBubbles.length < maxBubbles) {
+    // Create initial bubble if none exist
+    if (activeBubbles.length === 0 && !bubbleGenerationInProgress.current) {
       createBubble();
     }
     
-    // Setup intervals for creating new bubbles and updating positions
-    const bubbleCreationInterval = setInterval(() => {
-      createBubble();
-    }, 2000);
-    
+    // Setup intervals for updating positions and checking for new bubbles
     const updateInterval = setInterval(() => {
       updateBubbles();
     }, 16); // ~60fps
     
     return () => {
-      clearInterval(bubbleCreationInterval);
       clearInterval(updateInterval);
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -417,7 +495,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           velocity={bubble.velocity}
           onCollision={handleCollision}
           themeColor={themeColor}
-          delay={bubble.delay} // Pass delay to individual bubbles
+          delay={bubble.delay}
         />
       ))}
     </div>
