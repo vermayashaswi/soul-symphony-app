@@ -235,7 +235,7 @@ html {
 /* Add custom styles for better text rendering */
 .crisp-text {
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: subpixel-antialiased;
+  -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: 0.01em;
 }

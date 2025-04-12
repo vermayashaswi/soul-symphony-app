@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
@@ -136,8 +135,7 @@ export const InspirationalQuote: React.FC = () => {
             <p className="text-foreground text-center text-xl font-medium italic mb-2 px-3 py-2 rounded-lg" 
                style={{ 
                  backgroundColor: 'rgba(0,0,0,0)', 
-                 textShadow: '0px 0px 8px rgba(255,255,255,0.9), 0px 0px 4px rgba(255,255,255,0.8)',
-                 opacity: 1
+                 textShadow: '0px 0px 8px rgba(255,255,255,1), 0px 0px 4px rgba(255,255,255,1)',
                }}>
               "{quote}"
             </p>
@@ -145,8 +143,7 @@ export const InspirationalQuote: React.FC = () => {
               <p className="text-theme text-center font-bold px-2 py-1 rounded-lg" 
                  style={{ 
                    backgroundColor: 'rgba(0,0,0,0)', 
-                   textShadow: '0px 0px 6px rgba(255,255,255,0.8), 0px 0px 3px rgba(255,255,255,0.7)',
-                   opacity: 1
+                   textShadow: '0px 0px 6px rgba(255,255,255,1), 0px 0px 3px rgba(255,255,255,1)',
                  }}>
                 — {author}
               </p>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -132,13 +131,12 @@ const JournalSummaryCard: React.FC = () => {
         <>
           <div className="absolute top-12 left-4 flex items-center gap-2 z-50 pointer-events-none">
             <p 
-              className="text-xs text-muted-foreground" 
+              className="text-xs text-muted-foreground text-glow"
               style={{ 
-                textShadow: '0 0 10px #fff, 0 0 5px #fff', 
-                opacity: 1,
                 fontWeight: 500,
                 letterSpacing: '0.01em',
-                WebkitFontSmoothing: 'subpixel-antialiased'
+                WebkitFontSmoothing: 'antialiased',
+                MozOsxFontSmoothing: 'grayscale'
               }}
             >
               Your last 7 days
@@ -156,10 +154,10 @@ const JournalSummaryCard: React.FC = () => {
               <span 
                 className="text-center text-[6px] font-medium" 
                 style={{ 
-                  color: 'rgba(0, 0, 0, 1)', 
-                  opacity: 1, 
+                  color: 'rgba(0, 0, 0, 1)',
                   fontWeight: 600,
-                  WebkitFontSmoothing: 'subpixel-antialiased'
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale'
                 }}
               >
                 theme
