@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import ThemeBubbleAnimation from './ThemeBubbleAnimation';
 import { useTheme } from '@/hooks/use-theme';
+import FloatingThemeStrips from './FloatingThemeStrips';
 
 interface SummaryResponse {
   summary: string | null;
@@ -121,10 +121,6 @@ const JournalSummaryCard: React.FC = () => {
   }
 
   const themeColor = getThemeColorHex();
-  
-  const createBubbleBackground = () => {
-    return `radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 1) 5%, ${themeColor} 20%, ${themeColor} 60%, ${themeColor} 100%)`;
-  };
 
   return (
     <div className="h-full w-full">
@@ -145,7 +141,7 @@ const JournalSummaryCard: React.FC = () => {
             <div 
               className="w-5 h-5 rounded-full flex items-center justify-center pointer-events-auto"
               style={{ 
-                background: createBubbleBackground(),
+                background: `linear-gradient(to right, ${themeColor}, ${themeColor})`,
                 boxShadow: `0 0 1.5px 0.75px rgba(255, 255, 255, 1), inset 0 0 2.5px rgba(255, 255, 255, 1), 0 0 1.5px ${themeColor}`,
                 backdropFilter: 'blur(2px)',
                 border: '1px solid rgba(255, 255, 255, 1)',
@@ -165,9 +161,9 @@ const JournalSummaryCard: React.FC = () => {
               </span>
             </div>
           </div>
-          <ThemeBubbleAnimation 
-            themesData={themeData} 
-            maxBubbles={5}
+          <FloatingThemeStrips 
+            themesData={themeData}
+            themeColor={themeColor}
           />
         </>
       )}
