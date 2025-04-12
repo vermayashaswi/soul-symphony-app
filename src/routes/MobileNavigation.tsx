@@ -90,6 +90,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     >
       <div className="flex justify-around items-center">
         {navItems.map((item) => {
+          // Use exact path matching to ensure only one item is active
           const isActive = location.pathname === item.path;
           
           return (

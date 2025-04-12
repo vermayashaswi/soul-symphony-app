@@ -72,6 +72,7 @@ const MobileNavbar = () => {
       transition={{ duration: 0.3 }}
     >
       {navItems.map(item => {
+        // Exact matching to ensure only one item is active at a time
         const isActive = location.pathname === item.path;
         
         return (
