@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Mic } from 'lucide-react';
 import EmptyJournalState from './EmptyJournalState';
 import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
@@ -253,13 +253,29 @@ export default function JournalEntriesList({
             )}
             
             {safeLocalEntries.length === 0 && !hasProcessingEntries && !loading ? (
-              <div className="flex flex-col items-center justify-center h-64 p-8 border border-dashed border-muted rounded-lg">
-                <p className="text-muted-foreground mb-4">No journal entries to display</p>
-                <Button onClick={onStartRecording} size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" />
-                  Create Your First Entry
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center justify-center h-64 p-8 text-center"
+              >
+                <div className="mb-6">
+                  <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mb-4 mx-auto">
+                    <Mic className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-medium mb-2">Welcome to SOuLO!</h3>
+                  <p className="text-muted-foreground mb-6">
+                    Your journal journey begins with your voice. Start recording your first entry now.
+                  </p>
+                </div>
+                <Button 
+                  onClick={onStartRecording} 
+                  size="lg" 
+                  className="gap-2 animate-pulse"
+                >
+                  <Mic className="h-5 w-5" />
+                  Start Journaling
                 </Button>
-              </div>
+              </motion.div>
             ) : (
               safeLocalEntries.map((entry, index) => (
                 <ErrorBoundary key={`entry-boundary-${entry.id}`}>

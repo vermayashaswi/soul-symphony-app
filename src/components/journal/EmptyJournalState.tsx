@@ -2,7 +2,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 interface EmptyJournalStateProps {
@@ -12,21 +11,28 @@ interface EmptyJournalStateProps {
 const EmptyJournalState: React.FC<EmptyJournalStateProps> = ({ onStartRecording }) => {
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="text-center py-8"
     >
-      <Card>
-        <CardContent className="flex flex-col items-center py-12">
-          <Mic className="h-16 w-16 text-muted-foreground mb-4" />
-          <h3 className="text-xl font-medium mb-2">Your Journal Is Empty</h3>
-          <p className="text-muted-foreground text-center mb-6">
-            Record your thoughts to begin your journaling experience
-          </p>
-          <Button onClick={onStartRecording}>
-            Record Your First Entry
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mb-4 mx-auto">
+        <Mic className="h-8 w-8 text-primary" />
+      </div>
+      
+      <h3 className="text-xl font-medium mb-2">Welcome to Voice Journaling</h3>
+      <p className="text-muted-foreground max-w-md mx-auto mb-6">
+        Just speak and we'll do the rest. Your personal AI journaling companion is ready.
+      </p>
+      
+      <Button 
+        onClick={onStartRecording} 
+        size="lg" 
+        className="gap-2 animate-pulse"
+      >
+        <Mic className="h-5 w-5" />
+        Start Journaling
+      </Button>
     </motion.div>
   );
 };

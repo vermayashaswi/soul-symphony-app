@@ -155,7 +155,7 @@ const Home = () => {
               className={`px-3 py-1 rounded-l-md ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
             >
               <div 
-                className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
+                className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
                 style={{ 
                   fontWeight: 500,
                   letterSpacing: '0.01em',
