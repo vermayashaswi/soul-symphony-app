@@ -18,6 +18,15 @@ export const InspirationalQuote: React.FC = () => {
   });
   const { colorTheme } = useTheme();
 
+  useEffect(() => {
+    // Set a default quote immediately for visibility testing
+    setQuote("Every moment is a fresh beginning.");
+    setAuthor("T.S. Eliot");
+    setIsReady(true);
+    
+    console.log("InspirationalQuote component mounted, default quote set");
+  }, []);
+
   const fetchQuotes = async () => {
     try {
       setError(null);
@@ -100,24 +109,18 @@ export const InspirationalQuote: React.FC = () => {
     }
   }, [quotes]);
 
-  // Don't render anything until ready
   if (!isReady && !error) {
     return null;
   }
 
   return (
-    <motion.div
+    <div 
       ref={ref}
-      className="fixed inset-0 w-full h-full flex items-center justify-center pointer-events-none z-30"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.8 }}
+      className="flex items-center justify-center w-full h-full"
       style={{ transform: 'translateY(-5px)' }}
     >
       <AnimatePresence mode="wait">
-        {error ? (
-          null // Don't show errors to the user
-        ) : (
+        {isReady && (
           <motion.div
             key={currentQuoteIndex}
             className="flex flex-col justify-center w-full max-w-2xl px-6"
@@ -126,24 +129,20 @@ export const InspirationalQuote: React.FC = () => {
             exit={{ opacity: 0 }}
             transition={{ duration: 1.2 }}
           >
-            {isReady && quotes.length > 0 && (
-              <>
-                <div className="flex mb-4 justify-center">
-                  <Quote className="h-8 w-8 text-theme opacity-70" />
-                </div>
-                <p className="text-foreground text-center text-xl font-medium italic mb-2">
-                  "{quote}"
-                </p>
-                {author && (
-                  <p className="text-theme text-center font-bold">
-                    — {author}
-                  </p>
-                )}
-              </>
+            <div className="flex mb-4 justify-center">
+              <Quote className="h-8 w-8 text-theme opacity-70" />
+            </div>
+            <p className="text-foreground text-center text-xl font-medium italic mb-2 bg-background/60 backdrop-blur-sm px-3 py-2 rounded-lg">
+              "{quote}"
+            </p>
+            {author && (
+              <p className="text-theme text-center font-bold bg-background/60 backdrop-blur-sm px-2 py-1 rounded-lg">
+                — {author}
+              </p>
             )}
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 };
