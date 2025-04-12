@@ -125,47 +125,10 @@ const JournalSummaryCard: React.FC = () => {
   return (
     <div className="h-full w-full">
       {isReady && !loading && (
-        <>
-          <div className="absolute top-12 left-4 flex items-center gap-2 z-50 pointer-events-none">
-            <p 
-              className="text-xs text-muted-foreground px-2 py-1 rounded"
-              style={{ 
-                fontWeight: 500,
-                letterSpacing: '0.01em',
-                WebkitFontSmoothing: 'antialiased',
-                MozOsxFontSmoothing: 'grayscale'
-              }}
-            >
-              Your last 7 days
-            </p>
-            <div 
-              className="w-5 h-5 rounded-full flex items-center justify-center pointer-events-auto"
-              style={{ 
-                background: `linear-gradient(to right, ${themeColor}, ${themeColor})`,
-                boxShadow: `0 0 1.5px 0.75px rgba(255, 255, 255, 1), inset 0 0 2.5px rgba(255, 255, 255, 1), 0 0 1.5px ${themeColor}`,
-                backdropFilter: 'blur(2px)',
-                border: '1px solid rgba(255, 255, 255, 1)',
-              }}
-              title="Journal themes from recent entries"
-            >
-              <span 
-                className="text-center text-[6px] font-medium" 
-                style={{ 
-                  color: 'rgba(0, 0, 0, 1)',
-                  fontWeight: 600,
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale'
-                }}
-              >
-                theme
-              </span>
-            </div>
-          </div>
-          <FloatingThemeStrips 
-            themesData={themeData}
-            themeColor={themeColor}
-          />
-        </>
+        <FloatingThemeStrips 
+          themesData={themeData}
+          themeColor={themeColor}
+        />
       )}
     </div>
   );

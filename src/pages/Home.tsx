@@ -176,8 +176,8 @@ const Home = () => {
         </motion.div>
       </div>
       
-      {/* Inspirational Quote - Moved to bottom above navigation (z-index: 25) */}
-      <div className="fixed inset-x-0 bottom-16 z-25">
+      {/* Inspirational Quote - Moved to bottom above navigation with padding (z-index: 25) */}
+      <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
       </div>
     </div>

@@ -57,8 +57,35 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Animation area restricted to between "Your last 7 days" and the quote component */}
-      <div className="absolute inset-x-0 top-16 bottom-32 pointer-events-none">
+      {/* Theme header strip */}
+      <div className="absolute top-12 left-4 z-50">
+        <div
+          className="px-4 py-1.5 rounded-md"
+          style={{
+            backgroundColor: `${themeColor}15`, // 15% opacity
+            borderLeft: `3px solid ${themeColor}`,
+            borderRight: `3px solid ${themeColor}`,
+            boxShadow: `0 0 1px 0 ${themeColor}40`,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <span 
+            className="text-xs font-medium whitespace-nowrap"
+            style={{
+              color: themeColor,
+              fontWeight: 500,
+              letterSpacing: '0.01em',
+              WebkitFontSmoothing: 'antialiased',
+              MozOsxFontSmoothing: 'grayscale'
+            }}
+          >
+            Themes - Your last 7 days
+          </span>
+        </div>
+      </div>
+      
+      {/* Animation area restricted to between header and the quote component, moved up by 20px */}
+      <div className="absolute inset-x-0 top-16 bottom-52 pointer-events-none">
         {uniqueThemes.slice(0, 6).map((themeItem, index) => {
           // Distribute strips evenly in the available space
           const yPosition = 10 + (index % 6) * 14; // Six positions spread out
@@ -100,6 +127,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                   textShadow: 'none',
                   fontWeight: 500,
                   WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale',
                 }}
               >
                 {themeItem.theme}
