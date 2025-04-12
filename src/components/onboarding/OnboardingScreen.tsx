@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -52,7 +51,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
   {
     title: "Welcome to SOuLO",
     subtitle: "",
-    description: "Express your thoughts and feelings with voice notes - we'll do the rest.",
+    description: "Welcome to Voice Journaling - Just speak and we'll do the rest",
     illustration: (props: {}) => (
       <div className="flex flex-col justify-center items-center my-2">
         <motion.div 
