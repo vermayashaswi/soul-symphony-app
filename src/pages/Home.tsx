@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,6 +8,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 import EnergyAnimation from '@/components/EnergyAnimation';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
+import { ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -18,6 +19,7 @@ const Home = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
+  const navigate = useNavigate();
   
   useEffect(() => {
     const preloadImage = new Image();
@@ -113,6 +115,10 @@ const Home = () => {
     hidden: { x: 100, opacity: 0 },
     visible: { x: 0, opacity: 1, transition: { duration: 0.5, ease: "easeOut" } }
   };
+  
+  const navigateToJournal = () => {
+    navigate('/app/journal');
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
@@ -168,6 +174,21 @@ const Home = () => {
             </motion.div>
           </div>
         </div>
+      </div>
+      
+      {/* Arrow button to navigate to journal page (z-index: 10) */}
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+        <motion.button
+          onClick={navigateToJournal}
+          className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <ArrowRight className="text-primary-foreground h-6 w-6" />
+        </motion.button>
       </div>
       
       {/* Theme Strips - In the z-30 layer */}
