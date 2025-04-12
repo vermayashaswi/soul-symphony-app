@@ -105,7 +105,8 @@ export const fetchJournalEntries = async (
         id: data[0].id,
         text: data[0]["refined text"],
         created: data[0].created_at,
-        languages: data[0].predicted_languages
+        languages: data[0].predicted_languages,
+        duration: data[0].duration
       });
     } else {
       console.log('[JournalService] No entries found for this user');
@@ -129,7 +130,8 @@ export const fetchJournalEntries = async (
         type: entity.type,
         name: entity.name,
         text: entity.text
-      })) : undefined
+      })) : undefined,
+      duration: item.duration
     }));
     
     return typedEntries;

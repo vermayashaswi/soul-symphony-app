@@ -144,8 +144,25 @@ serve(async (req) => {
       // Analyze sentiment and extract entities using Google NL API
       const { sentiment: sentimentScore, entities } = await analyzeWithGoogleNL(refinedText, GOOGLE_NL_API_KEY);
 
-      // Calculate audio duration
-      const audioDuration = Math.floor(binaryAudio.length / 16000);
+      // Calculate audio duration more accurately based on file type and bytes
+      let audioDuration = 0;
+      
+      if (detectedFileType === 'webm') {
+        // For WebM, use the recordingTime from the client if available, or estimate
+        // WebM is compressed so bytes don't directly correlate to duration
+        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : transcribedText.length / 15;
+      } else if (detectedFileType === 'wav') {
+        // For WAV (assuming 48kHz, 16-bit, stereo)
+        // 48000 samples/sec * 2 bytes/sample * 2 channels = 192000 bytes/sec
+        audioDuration = Math.round(binaryAudio.length / 192000);
+      } else {
+        // Fallback estimation based on transcription length
+        // Average speaking rate is ~150 words per minute
+        const wordCount = transcribedText.split(/\s+/).length;
+        audioDuration = Math.max(1, Math.round(wordCount / 2.5)); // ~150 words/min = 2.5 words/sec
+      }
+      
+      console.log(`Calculated audio duration: ${audioDuration} seconds`);
 
       // Store journal entry in database
       const entryId = await storeJournalEntry(
