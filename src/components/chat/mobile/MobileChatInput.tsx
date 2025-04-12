@@ -133,7 +133,9 @@ export default function MobileChatInput({
       }`}
       style={{
         paddingBottom: isKeyboardVisible ? '7px' : 'env(safe-area-inset-bottom, 10px)',
-        marginBottom: 0 // Removed dynamic margin to keep it consistent
+        marginBottom: 0, // Keep consistent margin
+        // Add a clear visual separation from the navbar with a slight shadow
+        boxShadow: '0 -2px 5px rgba(0, 0, 0, 0.05)'
       }}
     >
       <div className="flex-1 relative">
