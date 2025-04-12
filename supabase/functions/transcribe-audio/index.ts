@@ -132,12 +132,10 @@ serve(async (req) => {
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'json');
     
-    // Specify that we want high-fidelity transcription
-    if (highQuality) {
-      formData.append('language', 'en'); // Specify language to help with accuracy
-    }
+    // Always force the language to be English regardless of high-quality setting
+    formData.append('language', 'en');
 
-    console.log("Sending to Whisper API for high-quality transcription using the latest model (whisper-1)...");
+    console.log("Sending to Whisper API with forced language: English (en)");
     console.log("Using file type:", detectedFileType, "with MIME type:", mimeType);
     
     try {
