@@ -132,10 +132,8 @@ serve(async (req) => {
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'json');
     
-    // Always force the language to be English regardless of high-quality setting
-    formData.append('language', 'en');
-
-    console.log("Sending to Whisper API with forced language: English (en)");
+    // Removed forced language setting to let Whisper auto-detect the language
+    console.log("Sending to Whisper API with auto language detection");
     console.log("Using file type:", detectedFileType, "with MIME type:", mimeType);
     
     try {
