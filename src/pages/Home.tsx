@@ -175,9 +175,28 @@ const Home = () => {
       </div>
       
       <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+        <motion.div
+          className="absolute inset-0 rounded-full bg-primary/30 blur-md z-0"
+          initial={{ scale: 1, opacity: 0.5 }}
+          animate={{ 
+            scale: [1, 1.15, 1],
+            opacity: [0.5, 0.8, 0.5]
+          }}
+          transition={{ 
+            repeat: Infinity,
+            duration: 2,
+            ease: "easeInOut"
+          }}
+          style={{ 
+            width: "calc(100% + 16px)", 
+            height: "calc(100% + 16px)", 
+            top: "-8px", 
+            left: "-8px" 
+          }}
+        />
         <motion.button
           onClick={navigateToJournal}
-          className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg"
+          className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg relative z-20"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           initial={{ opacity: 0 }}
