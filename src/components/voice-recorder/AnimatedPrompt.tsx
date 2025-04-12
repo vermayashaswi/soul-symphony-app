@@ -32,7 +32,7 @@ export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
           transition={{ duration: 0.5, ease: "easeInOut" }}
         >
           <motion.div 
-            className={`px-4 py-2 flex flex-col text-lg font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
+            className={`px-4 py-2 flex flex-col text-lg font-medium text-white`}
             animate={{ 
               scale: [1, 1.03, 1],
             }}
