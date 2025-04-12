@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -185,7 +186,7 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. This transcribed entry might be multi-lingual and could have multiple languages. Correct for words, spellings etc. which do not have any meaning either normally or colloquially in the context. Preserve the emotional tone and personal nature of the content.'
+              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning or describing what it is. Your one and only job is to translate it to English. This transcribed entry might be coming from a person who would\'ve spoken multiple languages like Hindi, Japanese, English, Bengali, Tamil, Spanish or any other global language (some entries might have a mix of languages also). Recognize segments of differnt languages and translate each of them to English, then concatenate and respond. Recognize errors in transcriptions by observing the context and language and colloquial usages. Preserve the emotional tone and personal nature of the content.'
             },
             {
               role: 'user',
