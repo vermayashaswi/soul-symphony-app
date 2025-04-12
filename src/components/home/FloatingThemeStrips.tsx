@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -56,9 +57,9 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      <div className="absolute top-14 left-6 z-50">
+      <div className="absolute top-0 left-6 z-50 mt-12">
         <div
-          className="px-3 py-1 rounded-full text-center"
+          className="px-2 py-0.5 text-center"
           style={{
             backgroundColor: `${themeColor}70`,
             border: `1px solid ${themeColor}`,
@@ -92,7 +93,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
           return (
             <motion.div
               key={`theme-strip-${themeItem.theme}`}
-              className="absolute left-0 w-auto h-8 rounded-md px-3 py-1 flex items-center"
+              className="absolute left-0 w-auto h-8 px-3 py-1 flex items-center"
               style={{
                 top: `${yPosition}%`,
                 backgroundColor: `${themeColor}50`,
