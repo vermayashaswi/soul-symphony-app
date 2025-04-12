@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ThemeBubbleAnimation from './ThemeBubbleAnimation';
+import { ThemeData } from './ThemeBubble';
 
 interface SummaryResponse {
   summary: string | null;
@@ -13,11 +14,6 @@ interface SummaryResponse {
   entryCount?: number;
   masterThemes?: string[];
   error?: string;
-}
-
-interface ThemeData {
-  theme: string;
-  sentiment: number;
 }
 
 const JournalSummaryCard: React.FC = () => {
