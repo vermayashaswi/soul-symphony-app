@@ -174,7 +174,7 @@ const Home = () => {
         </div>
       </div>
       
-      <div className="absolute top-[calc(50%-35px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+      <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
         <motion.button
           onClick={navigateToJournal}
           className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg"
