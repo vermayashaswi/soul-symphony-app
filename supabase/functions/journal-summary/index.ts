@@ -59,7 +59,10 @@ serve(async (req) => {
         entry.entities.forEach(entity => {
           if (entity && entity.name) {
             const key = entity.name.toLowerCase();
-            entitiesMap.set(key, (entitiesMap.get(key) || 0) + 1);
+            if (!entitiesMap.has(key)) {
+              entitiesMap.set(key, { count: 0, type: entity.type });
+            }
+            entitiesMap.get(key).count += 1;
           }
         });
       }
@@ -67,9 +70,9 @@ serve(async (req) => {
     
     // Get top entities
     const topEntities = Array.from(entitiesMap.entries())
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 10)
-      .map(([name, count]) => ({ name, count }));
+      .map(([name, data]) => ({ name, count: data.count, type: data.type }));
     
     // If no entries found, return early
     if (!entries.length) {

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 interface Entity {
   name: string;
   count: number;
+  type?: string; // Add type property to the interface
 }
 
 interface EntityBubblesProps {
@@ -35,20 +36,22 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({ entities, className }) =>
     }
   }, []);
 
-  // Skip rendering if no entities or container not measured yet
-  if (!entities.length || dimensions.width === 0) {
+  // Filter out entities with type "others" and skip rendering if no valid entities or container not measured yet
+  const filteredEntities = entities.filter(entity => entity.type !== 'others');
+  
+  if (!filteredEntities.length || dimensions.width === 0) {
     return <div ref={containerRef} className={cn("w-full h-24", className)}></div>;
   }
 
   // Find the max count to normalize sizes
-  const maxCount = Math.max(...entities.map(e => e.count));
+  const maxCount = Math.max(...filteredEntities.map(e => e.count));
   
   // Generate random positions ensuring they don't overlap too much
-  const positions = entities.map((entity, index) => {
+  const positions = filteredEntities.map((entity, index) => {
     const size = 20 + (entity.count / maxCount) * 30; // Size between 20px and 50px
     
     // Distribute across the width
-    const section = dimensions.width / entities.length;
+    const section = dimensions.width / filteredEntities.length;
     const baseX = index * section + (section / 2);
     
     // Random offset within the section
@@ -67,7 +70,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({ entities, className }) =>
       ref={containerRef} 
       className={cn("relative w-full overflow-hidden", className)}
     >
-      {entities.map((entity, index) => {
+      {filteredEntities.map((entity, index) => {
         const { x, y, size } = positions[index];
         const opacity = 0.5 + (entity.count / maxCount) * 0.5; // Between 0.5 and 1.0
         

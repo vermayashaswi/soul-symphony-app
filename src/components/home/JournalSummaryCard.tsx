@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface SummaryResponse {
   summary: string | null;
-  topEntities: Array<{ name: string; count: number }>;
+  topEntities: Array<{ name: string; count: number; type?: string }>;
   hasEntries: boolean;
   entryCount?: number;
   error?: string;
