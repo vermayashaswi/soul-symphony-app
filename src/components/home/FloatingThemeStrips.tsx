@@ -47,9 +47,12 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     setUniqueThemes(sortedThemes);
   }, [themesData]);
 
-  // Removed the "No themes found..." message when themesData is empty
   if (!themesData.length) {
-    return null;
+    return (
+      <div className="h-full flex items-center justify-center text-muted-foreground">
+        <p>No themes found in your recent journal entries</p>
+      </div>
+    );
   }
 
   return (
