@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -210,4 +209,19 @@ html {
   /* Style for user chat messages */
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
+}
+
+/* Custom text sizes for entity bubbles */
+.text-2xs {
+  font-size: 0.65rem;
+  line-height: 1rem;
+}
+
+/* Entity bubble glow effect */
+.entity-bubble-glow {
+  box-shadow: 0 0 10px 2px rgba(var(--primary), 0.3);
+  transition: box-shadow 0.3s ease;
+}
+.entity-bubble-glow:hover {
+  box-shadow: 0 0 15px 5px rgba(var(--primary), 0.6);
 }

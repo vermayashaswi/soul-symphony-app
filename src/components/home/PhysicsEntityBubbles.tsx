@@ -134,11 +134,12 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
       const initialY = dimensions.height / 2 + (index % 2 === 0 ? -30 : 30);
       
       const circle = Bodies.circle(initialX, initialY, radius, {
-        restitution: 0.8,
-        friction: 0.005,
-        frictionAir: 0.01,
+        restitution: 0.6, // Reduced for smoother collisions
+        friction: 0.002,   // Reduced for smoother movement
+        frictionAir: 0.03, // Increased to reduce flickering
         render: {
-          fillStyle: `rgba(var(--primary), 0.2)`,
+          fillStyle: `rgba(var(--primary), 0.15)`, // More visible bubble
+          strokeStyle: `rgba(var(--primary), 0.4)`, // Add border for visibility
           lineWidth: 1,
         },
         plugin: {
@@ -149,10 +150,10 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
         }
       });
       
-      // Set initial velocity
+      // Set initial velocity - gentler to reduce flickering
       Matter.Body.setVelocity(circle, {
-        x: (Math.random() - 0.5) * 2,
-        y: (Math.random() - 0.5) * 2,
+        x: (Math.random() - 0.5) * 1, // Reduced velocity
+        y: (Math.random() - 0.5) * 1, // Reduced velocity
       });
       
       World.add(engine.world, circle);
@@ -203,7 +204,13 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
     
     World.add(engine.world, mouseConstraint);
     
-    Matter.Runner.run(engine);
+    // Run engine with fixed timestep to prevent flickering
+    const runner = Matter.Runner.create({
+      isFixed: true,
+      delta: 1000 / 60 // Lock at 60 FPS for smooth rendering
+    });
+    Matter.Runner.run(runner, engine);
+    
     Render.run(render);
     
     setInitialized(true);
@@ -253,8 +260,8 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
             key={entity.name}
             className={cn(
               "absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none",
-              "flex items-center justify-center rounded-full transition-all duration-100",
-              isHighlighted ? "text-primary font-semibold" : "text-primary/90"
+              "flex items-center justify-center rounded-full transition-all duration-150",
+              isHighlighted ? "text-primary font-semibold" : "text-primary/80"
             )}
             style={{
               left: body.position.x,
@@ -265,12 +272,12 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
               textShadow: isHighlighted ? '0 0 5px rgba(255,255,255,0.7)' : 'none',
             }}
           >
-            <span className="text-center px-1">{entity.name}</span>
+            <span className="text-center px-1 leading-tight">{entity.name}</span>
           </div>
         );
       })}
       
-      {/* Highlight effects */}
+      {/* Highlight effects for glowing */}
       {initialized && engineRef.current && highlightedEntity && filteredEntities.map((entity) => {
         if (entity.name !== highlightedEntity) return null;
         
@@ -291,7 +298,7 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
               height: body.circleRadius * 2,
               transform: 'translate(-50%, -50%)',
               boxShadow: '0 0 15px 5px rgba(var(--primary), 0.5)',
-              backgroundColor: 'transparent',
+              backgroundColor: 'rgba(var(--primary), 0.1)',
               zIndex: -1,
             }}
           />
@@ -302,3 +309,4 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
 };
 
 export default PhysicsEntityBubbles;
+

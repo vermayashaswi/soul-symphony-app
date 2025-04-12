@@ -79,25 +79,25 @@ const JournalSummaryCard: React.FC = () => {
             <p className="text-sm">Start today and see insights appear here!</p>
           </motion.div>
         ) : (
-          <>
+          <div className="space-y-2">
             {summaryData.summary && (
               <motion.div 
-                className="mb-1 rounded-lg bg-primary/5"
+                className="mb-3 rounded-md bg-primary/5 px-2 py-1"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
               >
-                <p className="text-foreground text-xs px-2 py-1 leading-tight">{summaryData.summary}</p>
+                <p className="text-foreground text-2xs leading-tight">{summaryData.summary}</p>
               </motion.div>
             )}
             
             {summaryData.topEntities.length > 0 && (
               <PhysicsEntityBubbles 
                 entities={summaryData.topEntities} 
-                className="h-28" 
+                className="h-28 w-full" 
               />
             )}
-          </>
+          </div>
         )}
       </CardContent>
     </Card>
