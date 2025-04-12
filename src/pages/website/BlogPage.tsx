@@ -8,14 +8,70 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import { useTranslation } from 'react-i18next';
-import { getAllBlogPosts, getFeaturedBlogPost } from '@/data/blogData';
 
 const BlogPage = () => {
   const { t } = useTranslation();
   
-  // Get blog data from our data source
-  const featuredPost = getFeaturedBlogPost();
-  const blogPosts = getAllBlogPosts().slice(1); // Skip the featured post
+  // Blog post data - this would ideally come from a CMS or API
+  // We're hardcoding for demonstration but using translation keys
+  const featuredPost = {
+    id: 1,
+    slug: 'why-voice-journaling-is-the-future',
+    title: t('blog.featuredPost.title'),
+    excerpt: t('blog.featuredPost.excerpt'),
+    image: '/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png',
+    date: t('blog.featuredPost.date'),
+    author: t('blog.featuredPost.author'),
+    readTime: t('blog.featuredPost.readTime'),
+    category: t('blog.featuredPost.category')
+  };
+
+  const blogPosts = [
+    {
+      id: 2,
+      slug: 'how-ai-enhances-your-journaling-experience',
+      title: t('blog.posts.0.title'),
+      excerpt: t('blog.posts.0.excerpt'),
+      image: '/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png',
+      date: t('blog.posts.0.date'),
+      author: t('blog.posts.0.author'),
+      readTime: t('blog.posts.0.readTime'),
+      category: t('blog.posts.0.category')
+    },
+    {
+      id: 3,
+      slug: 'benefits-of-daily-reflection-through-voice-journals',
+      title: t('blog.posts.1.title'),
+      excerpt: t('blog.posts.1.excerpt'),
+      image: '/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png',
+      date: t('blog.posts.1.date'),
+      author: t('blog.posts.1.author'),
+      readTime: t('blog.posts.1.readTime'),
+      category: t('blog.posts.1.category')
+    },
+    {
+      id: 4,
+      slug: 'voice-journaling-for-busy-professionals',
+      title: t('blog.posts.2.title'),
+      excerpt: t('blog.posts.2.excerpt'),
+      image: '/lovable-uploads/cb710491-93f0-42be-a596-f64d80d9800e.png',
+      date: t('blog.posts.2.date'),
+      author: t('blog.posts.2.author'),
+      readTime: t('blog.posts.2.readTime'),
+      category: t('blog.posts.2.category')
+    },
+    {
+      id: 5,
+      slug: 'tracking-emotional-patterns-with-voice-journaling',
+      title: t('blog.posts.3.title'),
+      excerpt: t('blog.posts.3.excerpt'),
+      image: '/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png',
+      date: t('blog.posts.3.date'),
+      author: t('blog.posts.3.author'),
+      readTime: t('blog.posts.3.readTime'),
+      category: t('blog.posts.3.category')
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-white">
@@ -24,11 +80,9 @@ const BlogPage = () => {
       <div className="pt-24 md:pt-32 pb-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-foreground crisp-text">
-              {t('blog.pageTitle', 'SOULo Blog')}
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto crisp-text">
-              {t('blog.pageSubtitle', 'Insights and guidance for your self-discovery journey through voice journaling.')}
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">{t('blog.pageTitle')}</h1>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              {t('blog.pageSubtitle')}
             </p>
           </div>
           
@@ -52,15 +106,15 @@ const BlogPage = () => {
                   <div className="p-6 md:p-8 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xs font-medium uppercase text-primary bg-primary/10 px-2 py-1 rounded-full crisp-text">
+                        <span className="text-xs font-medium uppercase text-primary bg-primary/10 px-2 py-1 rounded-full">
                           {featuredPost.category}
                         </span>
-                        <span className="text-sm text-muted-foreground crisp-text">{featuredPost.date}</span>
+                        <span className="text-sm text-muted-foreground">{featuredPost.date}</span>
                       </div>
-                      <h2 className="text-2xl md:text-3xl font-bold mb-4 group-hover:text-primary transition-colors crisp-text">
+                      <h2 className="text-2xl md:text-3xl font-bold mb-4 group-hover:text-primary transition-colors">
                         {featuredPost.title}
                       </h2>
-                      <p className="text-muted-foreground mb-4 crisp-text">
+                      <p className="text-muted-foreground mb-4">
                         {featuredPost.excerpt}
                       </p>
                     </div>
@@ -68,15 +122,15 @@ const BlogPage = () => {
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-primary" />
-                          <span className="text-sm crisp-text">{featuredPost.author.name}</span>
+                          <span className="text-sm">{featuredPost.author}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-primary" />
-                          <span className="text-sm crisp-text">{featuredPost.readTime}</span>
+                          <span className="text-sm">{featuredPost.readTime}</span>
                         </div>
                       </div>
                       <Button className="w-full group">
-                        <span className="crisp-text">{t('blog.readMore', 'Read More')}</span>
+                        {t('blog.readMore')}
                         <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                       </Button>
                     </div>
@@ -88,7 +142,7 @@ const BlogPage = () => {
           
           {/* Blog Posts Grid */}
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-8 crisp-text">{t('blog.latestArticles', 'Latest Articles')}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-8">{t('blog.latestArticles')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {blogPosts.map((post, index) => (
                 <motion.div
@@ -108,16 +162,16 @@ const BlogPage = () => {
                       </div>
                       <CardHeader className="pb-2">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs font-medium uppercase text-primary bg-primary/10 px-2 py-1 rounded-full crisp-text">
+                          <span className="text-xs font-medium uppercase text-primary bg-primary/10 px-2 py-1 rounded-full">
                             {post.category}
                           </span>
                         </div>
-                        <CardTitle className="text-xl hover:text-primary transition-colors line-clamp-2 crisp-text">
+                        <CardTitle className="text-xl hover:text-primary transition-colors line-clamp-2">
                           {post.title}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="pb-0">
-                        <CardDescription className="line-clamp-3 crisp-text">
+                        <CardDescription className="line-clamp-3">
                           {post.excerpt}
                         </CardDescription>
                       </CardContent>
@@ -125,11 +179,11 @@ const BlogPage = () => {
                         <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <User className="h-3 w-3" />
-                            <span className="crisp-text">{post.author.name}</span>
+                            <span>{post.author}</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            <span className="crisp-text">{post.readTime}</span>
+                            <span>{post.readTime}</span>
                           </div>
                         </div>
                       </CardFooter>
