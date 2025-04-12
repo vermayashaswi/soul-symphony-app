@@ -57,7 +57,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      <div className="absolute top-[15px] left-6 z-50">
+      <div className="absolute top-[45px] left-6 z-50">
         <div
           className="px-2 py-0.5 text-center"
           style={{
