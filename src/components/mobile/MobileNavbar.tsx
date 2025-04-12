@@ -10,6 +10,7 @@ const MobileNavbar = () => {
   const location = useLocation();
   const { user } = useAuth();
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [isChatInputActive, setIsChatInputActive] = useState(false);
   
   const navItems = [
     { path: '/home', label: 'Home', icon: Home },
@@ -24,7 +25,7 @@ const MobileNavbar = () => {
     return null;
   }
   
-  // Listen for keyboard visibility changes
+  // Listen for keyboard visibility changes and chat input focus
   useEffect(() => {
     const handleVisualViewportResize = () => {
       if (window.visualViewport) {
@@ -33,14 +34,25 @@ const MobileNavbar = () => {
       }
     };
     
+    // Check if the chat input is active
+    const checkChatInputActive = () => {
+      const chatInputFocused = document.querySelector('.mobile-chat-interface input:focus');
+      setIsChatInputActive(!!chatInputFocused);
+    };
+    
     // Initial check
     handleVisualViewportResize();
+    checkChatInputActive();
     
-    // Set up listeners
+    // Set up event listeners
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleVisualViewportResize);
       window.addEventListener('resize', handleVisualViewportResize);
     }
+    
+    // Listen for focus events on chat inputs
+    document.addEventListener('focusin', checkChatInputActive);
+    document.addEventListener('focusout', checkChatInputActive);
     
     // Custom event for keyboard visibility
     const handleKeyboardOpen = () => setIsKeyboardVisible(true);
@@ -54,13 +66,16 @@ const MobileNavbar = () => {
         window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
         window.removeEventListener('resize', handleVisualViewportResize);
       }
+      document.removeEventListener('focusin', checkChatInputActive);
+      document.removeEventListener('focusout', checkChatInputActive);
       window.removeEventListener('keyboardOpen', handleKeyboardOpen);
       window.removeEventListener('keyboardClose', handleKeyboardClose);
     };
   }, []);
 
-  // Return null when keyboard is visible
-  if (isKeyboardVisible) {
+  // Return null when keyboard is visible or chat input is active in chat page
+  const isChatPage = location.pathname === '/smart-chat';
+  if (isKeyboardVisible || (isChatPage && isChatInputActive)) {
     return null;
   }
 
@@ -72,7 +87,7 @@ const MobileNavbar = () => {
 
   return (
     <motion.div 
-      className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-muted flex items-center justify-around z-50 px-1 backdrop-blur-sm"
+      className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-muted flex items-center justify-around z-40 px-1 backdrop-blur-sm"
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}

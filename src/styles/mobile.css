@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -474,7 +475,7 @@
   /* UPDATED: Input visibility improvements with better spacing from nav bar */
   .mobile-chat-interface .input-container {
     position: fixed;
-    bottom: 70px; /* Increased from 61px to ensure it stays fully above the navbar */
+    bottom: 85px; /* Increased to ensure it stays fully above the navbar */
     left: 0;
     right: 0;
     padding-bottom: 0;
@@ -486,15 +487,15 @@
   
   /* UPDATED: Chat area scrolling adjustments */
   .mobile-chat-area {
-    padding-bottom: 90px !important; /* Increased from 61px to create more space */
-    margin-bottom: 70px !important; /* Increased to match the navbar height + input height */
+    padding-bottom: 120px !important; /* Increased to create more space */
+    margin-bottom: 90px !important; /* Increased to match the navbar height + input height */
   }
   
   /* FIXED: Input spacing when keyboard is closed - preventing overlap with navbar */
   .p-2.bg-background.border-t.border-border.flex.items-center.gap-2:not(.input-keyboard-active) {
     margin-bottom: 0 !important; 
     position: fixed;
-    bottom: 70px; /* Increased from 61px to stay above navbar */
+    bottom: 85px; /* Increased to stay well above navbar */
     left: 0;
     right: 0;
     z-index: 40;
@@ -502,7 +503,7 @@
   
   /* NEW: Add bottom area protection for chat content */
   .mobile-chat-interface .chat-content-container {
-    padding-bottom: 120px; /* Increased from 101px to provide more space */
+    padding-bottom: 150px; /* Increased to provide more space */
   }
   
   /* NEW: When keyboard is open on mobile, ensure input stays visible */
@@ -513,6 +514,16 @@
     right: 0;
     z-index: 9999;
     padding-bottom: 3px;
+  }
+  
+  /* ADDITIONAL: Add extra spacing at the bottom of chat interface to prevent overlap */
+  .mobile-chat-interface .chat-area {
+    margin-bottom: 15px;
+  }
+  
+  /* ADDITIONAL: Ensure the chat input stays visible and provides enough clearance above navbar */
+  .mobile-chat-input {
+    margin-bottom: 75px !important;
   }
 }
 
