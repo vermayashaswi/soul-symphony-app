@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import EntityBubbles from './EntityBubbles';
@@ -60,48 +60,40 @@ const JournalSummaryCard: React.FC = () => {
           </CardTitle>
           {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
-        <CardDescription>
-          A brief summary of your recent journal entries
-        </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-32 flex items-center justify-center">
+          <div className="h-24 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
           </div>
         ) : error ? (
-          <div className="text-destructive text-sm p-4">{error}</div>
+          <div className="text-destructive text-sm p-2">{error}</div>
         ) : !summaryData?.hasEntries ? (
           <motion.div 
-            className="text-center py-8 text-muted-foreground"
+            className="text-center py-4 text-muted-foreground"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <p className="mb-2 text-lg font-medium">You haven't journaled anything yet</p>
+            <p className="text-lg font-medium">You haven't journaled anything yet</p>
             <p className="text-sm">Start today and see insights appear here!</p>
           </motion.div>
         ) : (
           <>
             <motion.div 
-              className="mb-4 p-4 rounded-lg bg-primary/5"
+              className="mb-2 p-2 rounded-lg bg-primary/5"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
             >
               <p className="text-foreground">{summaryData.summary}</p>
-              {summaryData.entryCount && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Based on {summaryData.entryCount} {summaryData.entryCount === 1 ? 'entry' : 'entries'}
-                </p>
-              )}
             </motion.div>
             
             {summaryData.topEntities.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm font-medium mb-2">Key topics mentioned:</h4>
-                <EntityBubbles entities={summaryData.topEntities} className="h-40" />
-              </div>
+              <EntityBubbles 
+                entities={summaryData.topEntities.slice(0, 7)} 
+                className="h-24" 
+              />
             )}
           </>
         )}

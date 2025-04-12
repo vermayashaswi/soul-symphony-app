@@ -125,12 +125,12 @@ const Home = () => {
       </div>
       
       <div className="relative z-10 flex flex-col h-[calc(100vh-80px)]">
-        <div className="p-6 flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-theme">{getJournalName()}</h1>
+        <div className="p-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-theme">{getJournalName()}</h1>
           <p className="text-muted-foreground font-medium">{formattedDate}</p>
         </div>
 
-        <div className="flex-1 px-6 pb-6">
+        <div className="flex-1 px-4">
           <motion.div
             variants={containerVariants}
             initial="hidden"
@@ -139,7 +139,7 @@ const Home = () => {
           >
             <motion.div 
               variants={itemVariants}
-              className="mb-8"
+              className="mb-4"
             >
               <JournalSummaryCard />
             </motion.div>

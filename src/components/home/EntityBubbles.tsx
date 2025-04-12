@@ -37,7 +37,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({ entities, className }) =>
 
   // Skip rendering if no entities or container not measured yet
   if (!entities.length || dimensions.width === 0) {
-    return <div ref={containerRef} className={cn("w-full h-32", className)}></div>;
+    return <div ref={containerRef} className={cn("w-full h-24", className)}></div>;
   }
 
   // Find the max count to normalize sizes
@@ -45,7 +45,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({ entities, className }) =>
   
   // Generate random positions ensuring they don't overlap too much
   const positions = entities.map((entity, index) => {
-    const size = 20 + (entity.count / maxCount) * 40; // Size between 20px and 60px
+    const size = 20 + (entity.count / maxCount) * 30; // Size between 20px and 50px
     
     // Distribute across the width
     const section = dimensions.width / entities.length;
@@ -65,7 +65,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({ entities, className }) =>
   return (
     <div 
       ref={containerRef} 
-      className={cn("relative w-full h-32 overflow-hidden", className)}
+      className={cn("relative w-full overflow-hidden", className)}
     >
       {entities.map((entity, index) => {
         const { x, y, size } = positions[index];
@@ -78,14 +78,17 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({ entities, className }) =>
             initial={{ scale: 0, x: dimensions.width / 2, y: dimensions.height / 2 }}
             animate={{ 
               scale: 1, 
-              x, 
-              y,
+              x: [x, x + (Math.random() - 0.5) * 40, x - (Math.random() - 0.5) * 30, x],
+              y: [y, y - (Math.random() - 0.5) * 20, y + (Math.random() - 0.5) * 30, y],
               opacity
             }}
             transition={{ 
               type: "spring",
-              stiffness: 100,
-              damping: 15,
+              stiffness: 50,
+              damping: 10,
+              repeat: Infinity,
+              repeatType: "mirror",
+              duration: 4 + Math.random() * 3,
               delay: index * 0.1
             }}
             style={{
