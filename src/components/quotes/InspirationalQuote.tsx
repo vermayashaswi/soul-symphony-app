@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
@@ -117,8 +116,7 @@ export const InspirationalQuote: React.FC = () => {
   return (
     <div 
       ref={ref}
-      className="flex items-center justify-center w-full h-full"
-      style={{ transform: 'translateY(-5px)' }}
+      className="flex items-center justify-center w-full py-2"
     >
       <AnimatePresence mode="wait">
         {isReady && (
@@ -130,14 +128,14 @@ export const InspirationalQuote: React.FC = () => {
             exit={{ opacity: 0 }}
             transition={{ duration: 1.2 }}
           >
-            <div className="flex mb-4 justify-center">
-              <Quote className="h-8 w-8 text-theme opacity-100" />
+            <div className="flex mb-2 justify-center">
+              <Quote className="h-6 w-6 text-theme opacity-100" />
             </div>
-            <p className="text-foreground text-center text-xl font-medium italic mb-2">
+            <p className="text-foreground text-center text-lg font-medium italic mb-1">
               "{quote}"
             </p>
             {author && (
-              <p className="text-theme text-center font-bold">
+              <p className="text-theme text-center font-bold text-sm">
                 — {author}
               </p>
             )}

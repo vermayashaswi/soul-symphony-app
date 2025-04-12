@@ -125,7 +125,7 @@ const Home = () => {
         />
       </div>
       
-      {/* Text content - middle layer (z-index: 20) with fully transparent background */}
+      {/* Text content - top layer (z-index: 20) with fully transparent background */}
       <div className="relative z-20 flex flex-col h-screen">
         <div className="p-4 flex flex-col">
           <div className="flex justify-between items-start w-full relative">
@@ -176,8 +176,8 @@ const Home = () => {
         </motion.div>
       </div>
       
-      {/* Inspirational Quote - Center layer (z-index: 25) */}
-      <div className="fixed inset-0 flex items-center justify-center z-25">
+      {/* Inspirational Quote - Moved to bottom above navigation (z-index: 25) */}
+      <div className="fixed inset-x-0 bottom-16 z-25">
         <InspirationalQuote />
       </div>
     </div>

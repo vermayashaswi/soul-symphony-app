@@ -57,16 +57,16 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Top area (first 1/3) for floating strips */}
-      <div className="absolute inset-0 bottom-2/3 pointer-events-none">
-        {uniqueThemes.slice(0, 4).map((themeItem, index) => {
-          // Position strips only in the top third
-          const yPosition = 5 + (index % 4) * 18; // Four rows in the top section
+      {/* Animation area restricted to between "Your last 7 days" and the quote component */}
+      <div className="absolute inset-x-0 top-16 bottom-32 pointer-events-none">
+        {uniqueThemes.slice(0, 6).map((themeItem, index) => {
+          // Distribute strips evenly in the available space
+          const yPosition = 10 + (index % 6) * 14; // Six positions spread out
           const strip = index % 2 === 0;
           
           return (
             <motion.div
-              key={`theme-top-${themeItem.theme}`}
+              key={`theme-strip-${themeItem.theme}`}
               className="absolute left-0 w-auto h-8 rounded-md px-3 py-1 flex items-center"
               style={{
                 top: `${yPosition}%`,
@@ -95,58 +95,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
             >
               <span 
                 className="text-sm md:text-base font-medium whitespace-nowrap"
-                style={{
-                  color: themeColor,
-                  textShadow: 'none',
-                  fontWeight: 500,
-                  WebkitFontSmoothing: 'antialiased',
-                }}
-              >
-                {themeItem.theme}
-              </span>
-            </motion.div>
-          );
-        })}
-      </div>
-      
-      {/* Bottom area (last 1/3) for additional themes */}
-      <div className="absolute inset-0 top-2/3 pointer-events-none">
-        {uniqueThemes.slice(4, 8).map((themeItem, index) => {
-          // Position strips only in the bottom third
-          const yPosition = 70 + (index % 3) * 10; // Three rows in the bottom section
-          const strip = index % 2 === 1;
-          
-          return (
-            <motion.div
-              key={`theme-bottom-${themeItem.theme}`}
-              className="absolute left-0 w-auto h-7 rounded-md px-3 py-1 flex items-center"
-              style={{
-                top: `${yPosition}%`,
-                backgroundColor: `${themeColor}15`, // 15% opacity
-                borderLeft: `2px solid ${themeColor}`,
-                borderRight: `2px solid ${themeColor}`,
-                boxShadow: `0 0 1px 0 ${themeColor}30`,
-                backdropFilter: 'blur(3px)',
-                zIndex: 15, // Below the buttons and indicators
-              }}
-              initial={{ 
-                x: strip ? -300 : '100vw',
-                opacity: 0 
-              }}
-              animate={{ 
-                x: strip ? ['0vw', '-100vw', '100vw'] : ['100vw', '0vw', '-100vw'],
-                opacity: [0, 1, 0]
-              }}
-              transition={{
-                duration: 20 + Math.random() * 15, // 20-35 seconds for full animation
-                repeat: Infinity,
-                repeatType: 'loop',
-                ease: 'linear',
-                delay: index * 3 + 5, // Stagger with offset from top section
-              }}
-            >
-              <span 
-                className="text-xs md:text-sm font-medium whitespace-nowrap"
                 style={{
                   color: themeColor,
                   textShadow: 'none',
