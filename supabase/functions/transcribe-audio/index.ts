@@ -186,11 +186,11 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning or describing what it is. Your one and only job is to translate it to English. This transcribed entry might be coming from a person who would\'ve spoken multiple languages like Hindi, Japanese, English, Bengali, Tamil, Spanish or any other global language (some entries might have a mix of languages also). Recognize segments of differnt languages and translate each of them to English, then concatenate and respond. Recognize errors in transcriptions by observing the context and language and colloquial usages. Preserve the emotional tone and personal nature of the content.'
+              content: 'You are an expert transcriber and translator for multilingual, informal voice journals. The following text is a transcript of a user speaking casually in Bengali, Hindi, and English, often switching between languages mid-sentence. Your job is to:\n\n1. Translate the entire transcript into natural, fluent English, keeping the original meaning, tone, and emotions intact.\n\n2. If there are any phrases in regional languages, interpret their intent rather than doing a literal word-for-word translation.\n\n3. Do not skip or paraphrase emotional expressions like sighs, pauses, or laughter—represent them appropriately in brackets if necessary.\n\n4. If anything is unclear or inaudible, mark it with [unclear] instead of guessing.'
             },
             {
               role: 'user',
-              content: `Here is a voice journal entry that needs processing: "${transcribedText}"`
+              content: `Here is the transcript: "${transcribedText}"`
             }
           ],
         }),
