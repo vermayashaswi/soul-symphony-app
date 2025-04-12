@@ -237,6 +237,83 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     return false;
   };
   
+  // Function to create a new bubble
+  const createBubble = () => {
+    if (activeBubbles.length >= maxBubbles || !themePool.length || bubbleGenerationInProgress.current) return;
+    
+    bubbleGenerationInProgress.current = true;
+    
+    // Choose random theme from pool
+    const themeIndex = Math.floor(Math.random() * themePool.length);
+    const themeData = themePool[themeIndex];
+    
+    // Remove used theme from pool
+    const newThemePool = [...themePool];
+    newThemePool.splice(themeIndex, 1);
+    setThemePool(newThemePool);
+    
+    // Basic bubble size and text length-based sizing
+    const MIN_SIZE = 50; // Current baseline size
+    const MAX_SIZE = 75; // 1.5x increase from baseline
+    
+    // Calculate size based on text length to avoid text wrapping
+    const textLength = themeData.theme.length;
+    let bubbleSize = MIN_SIZE;
+    
+    // Adjust size based on text length
+    if (textLength > 10) {
+      bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 1.5);
+    } else if (textLength > 6) {
+      bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength);
+    } else if (textLength > 3) {
+      bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 0.8);
+    }
+    
+    // Check for collision at pop point
+    if (wouldCollideAtPopPoint(bubbleSize)) {
+      // Try again later
+      bubbleGenerationInProgress.current = false;
+      return;
+    }
+    
+    // Position at the pop center
+    const position = { 
+      x: popCenterRef.current.x - bubbleSize / 2, 
+      y: popCenterRef.current.y - bubbleSize / 2
+    };
+    
+    // Generate random direction for velocity
+    const angle = Math.random() * Math.PI * 2; // Random angle in radians
+    const speedFactor = 0.5;
+    const speed = (Math.random() * 0.5 + 0.25) * speedFactor;
+    
+    const velocity = {
+      x: Math.cos(angle) * speed,
+      y: Math.sin(angle) * speed
+    };
+    
+    const delay = 100; // Small delay for animation
+    
+    // Add bubble with animation from center
+    setActiveBubbles(prev => [
+      ...prev, 
+      { 
+        id: `bubble-${Date.now()}-${Math.random()}`,
+        themeData, 
+        size: bubbleSize, 
+        position, 
+        velocity,
+        delay,
+        distanceFromCenter: 0 
+      }
+    ]);
+    
+    // Reset flag after a short delay to allow animation to start
+    setTimeout(() => {
+      bubbleGenerationInProgress.current = false;
+    }, 100);
+  };
+  
   // Check if any bubble has moved far enough from center to trigger next bubble
   const checkDistancesAndCreateBubble = () => {
     if (bubbleGenerationInProgress.current || activeBubbles.length >= maxBubbles) return;
@@ -270,82 +347,6 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     const centerX = dimensions.width / 2; 
     const centerY = dimensions.height / 2 - 17; // Moved up by 17px total
     popCenterRef.current = { x: centerX, y: centerY };
-    
-    const createBubble = () => {
-      if (activeBubbles.length >= maxBubbles || !themePool.length || bubbleGenerationInProgress.current) return;
-      
-      bubbleGenerationInProgress.current = true;
-      
-      // Choose random theme from pool
-      const themeIndex = Math.floor(Math.random() * themePool.length);
-      const themeData = themePool[themeIndex];
-      
-      // Remove used theme from pool
-      const newThemePool = [...themePool];
-      newThemePool.splice(themeIndex, 1);
-      setThemePool(newThemePool);
-      
-      // Basic bubble size and text length-based sizing
-      const MIN_SIZE = 50; // Current baseline size
-      const MAX_SIZE = 75; // 1.5x increase from baseline
-      
-      // Calculate size based on text length to avoid text wrapping
-      const textLength = themeData.theme.length;
-      let bubbleSize = MIN_SIZE;
-      
-      // Adjust size based on text length
-      if (textLength > 10) {
-        bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 1.5);
-      } else if (textLength > 6) {
-        bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength);
-      } else if (textLength > 3) {
-        bubbleSize = Math.min(MAX_SIZE, MIN_SIZE + textLength * 0.8);
-      }
-      
-      // Check for collision at pop point
-      if (wouldCollideAtPopPoint(bubbleSize)) {
-        // Try again later
-        bubbleGenerationInProgress.current = false;
-        return;
-      }
-      
-      // Position at the pop center
-      const position = { 
-        x: centerX - bubbleSize / 2, 
-        y: centerY - bubbleSize / 2
-      };
-      
-      // Generate random direction for velocity
-      const angle = Math.random() * Math.PI * 2; // Random angle in radians
-      const speedFactor = 0.5;
-      const speed = (Math.random() * 0.5 + 0.25) * speedFactor;
-      
-      const velocity = {
-        x: Math.cos(angle) * speed,
-        y: Math.sin(angle) * speed
-      };
-      
-      const delay = 100; // Small delay for animation
-      
-      // Add bubble with animation from center
-      setActiveBubbles(prev => [
-        ...prev, 
-        { 
-          id: `bubble-${Date.now()}-${Math.random()}`,
-          themeData, 
-          size: bubbleSize, 
-          position, 
-          velocity,
-          delay,
-          distanceFromCenter: 0 
-        }
-      ]);
-      
-      // Reset flag after a short delay to allow animation to start
-      setTimeout(() => {
-        bubbleGenerationInProgress.current = false;
-      }, 100);
-    };
     
     const updateBubbles = () => {
       setActiveBubbles(bubbles => {
