@@ -32,10 +32,10 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
   const controls = useAnimation();
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [isAnimating, setIsAnimating] = useState(true);
+  const positionRef = useRef({ ...initialPosition });
+  const velocityRef = useRef({ ...velocity });
   
   useEffect(() => {
-    let currentPosition = { ...initialPosition };
-    let currentVelocity = { ...velocity };
     let animationFrameId: number;
     
     // Delayed animation start for staggered effect
@@ -46,16 +46,18 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
         if (!bubbleRef.current) return;
         
         // Update position based on velocity
-        currentPosition.x += currentVelocity.x;
-        currentPosition.y += currentVelocity.y;
+        positionRef.current.x += velocityRef.current.x;
+        positionRef.current.y += velocityRef.current.y;
         
         // Apply the position
-        controls.set({ x: currentPosition.x, y: currentPosition.y });
+        controls.set({ x: positionRef.current.x, y: positionRef.current.y });
         
+        // Continue the animation loop
         animationFrameId = requestAnimationFrame(updatePosition);
       };
       
-      updatePosition();
+      // Start the animation loop
+      animationFrameId = requestAnimationFrame(updatePosition);
     }, delay);
     
     return () => {
@@ -350,7 +352,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     
     const updateBubbles = () => {
       setActiveBubbles(bubbles => {
-        // Update bubble positions
+        // Update bubble positions based on their velocity
         const updatedBubbles = bubbles.map(bubble => {
           const newX = bubble.position.x + bubble.velocity.x;
           const newY = bubble.position.y + bubble.velocity.y;
@@ -376,8 +378,8 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
             const b1 = updatedBubbles[i];
             const b2 = updatedBubbles[j];
             
-            const dx = b2.position.x - b1.position.x;
-            const dy = b2.position.y - b1.position.y;
+            const dx = (b2.position.x + b2.size/2) - (b1.position.x + b1.size/2);
+            const dy = (b2.position.y + b2.size/2) - (b1.position.y + b1.size/2);
             const distance = Math.sqrt(dx * dx + dy * dy);
             const minDistance = (b1.size + b2.size) / 2;
             
@@ -451,7 +453,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       createBubble();
     }
     
-    // Setup intervals for updating positions and checking for new bubbles
+    // Setup interval for updating positions and checking for new bubbles
     const updateInterval = setInterval(() => {
       updateBubbles();
     }, 16); // ~60fps
