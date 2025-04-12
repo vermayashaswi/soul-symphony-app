@@ -2,8 +2,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 
-interface ThemeBubbleProps {
+interface ThemeData {
   theme: string;
+  sentiment: number;
+}
+
+interface ThemeBubbleProps {
+  themeData: ThemeData;
   size: number;
   initialPosition: { x: number; y: number };
   velocity: { x: number; y: number };
@@ -11,8 +16,18 @@ interface ThemeBubbleProps {
   id: string;
 }
 
+const getSentimentColor = (sentiment: number): string => {
+  if (sentiment >= 0.3) {
+    return 'bg-[#F2FCE2] text-green-600 border-green-300'; // Positive sentiment
+  } else if (sentiment >= -0.1) {
+    return 'bg-[#FEF7CD] text-yellow-600 border-yellow-300'; // Neutral sentiment
+  } else {
+    return 'bg-red-100 text-red-600 border-red-300'; // Negative sentiment
+  }
+};
+
 const ThemeBubble: React.FC<ThemeBubbleProps> = ({ 
-  theme, 
+  themeData, 
   size, 
   initialPosition, 
   velocity, 
@@ -21,6 +36,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
 }) => {
   const controls = useAnimation();
   const bubbleRef = useRef<HTMLDivElement>(null);
+  const colorClass = getSentimentColor(themeData.sentiment);
   
   useEffect(() => {
     let currentPosition = { ...initialPosition };
@@ -50,50 +66,50 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
   return (
     <motion.div
       ref={bubbleRef}
-      className="absolute flex items-center justify-center bg-primary/30 text-primary font-medium rounded-full shadow-sm"
+      className={`absolute flex items-center justify-center ${colorClass} border font-medium rounded-full shadow-sm`}
       initial={{ x: initialPosition.x, y: initialPosition.y }}
       animate={controls}
-      whileHover={{ scale: 1.1, backgroundColor: "rgba(var(--primary), 0.5)" }}
+      whileHover={{ scale: 1.1, boxShadow: "0 0 15px rgba(var(--primary), 0.5)" }}
       transition={{ duration: 0.2 }}
       style={{ 
         width: size, 
         height: size,
       }}
     >
-      <span className="px-2 text-sm text-center">{theme}</span>
+      <span className="px-2 text-sm text-center">{themeData.theme}</span>
     </motion.div>
   );
 };
 
 interface ThemeBubbleAnimationProps {
-  themes: string[];
+  themesData: ThemeData[];
   maxBubbles?: number;
 }
 
 const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({ 
-  themes, 
+  themesData, 
   maxBubbles = 5
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [activeBubbles, setActiveBubbles] = useState<Array<{
     id: string;
-    theme: string;
+    themeData: ThemeData;
     size: number;
     position: { x: number; y: number };
     velocity: { x: number; y: number };
   }>>([]);
-  const [themePool, setThemePool] = useState<string[]>([]);
+  const [themePool, setThemePool] = useState<ThemeData[]>([]);
   
   // Track current animation frame for cleanup
   const animationFrameRef = useRef<number | null>(null);
   
   // Setup container dimensions and themes
   useEffect(() => {
-    if (!themes.length) return;
+    if (!themesData.length) return;
     
     // Initial theme pool with duplicates to make animation more interesting
-    setThemePool([...themes, ...themes].sort(() => Math.random() - 0.5));
+    setThemePool([...themesData, ...themesData].sort(() => Math.random() - 0.5));
     
     const updateDimensions = () => {
       if (containerRef.current) {
@@ -110,7 +126,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     return () => {
       window.removeEventListener('resize', updateDimensions);
     };
-  }, [themes]);
+  }, [themesData]);
   
   // Bubble management (creation, movement, collision)
   useEffect(() => {
@@ -121,7 +137,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       
       // Choose random theme from pool
       const themeIndex = Math.floor(Math.random() * themePool.length);
-      const theme = themePool[themeIndex];
+      const themeData = themePool[themeIndex];
       
       // Remove used theme from pool
       const newThemePool = [...themePool];
@@ -191,7 +207,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         ...prev, 
         { 
           id: `bubble-${Date.now()}-${Math.random()}`,
-          theme, 
+          themeData, 
           size, 
           position, 
           velocity 
@@ -277,7 +293,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           
           // If removing, add theme back to pool
           if (outOfBounds) {
-            setThemePool(prev => [...prev, bubble.theme]);
+            setThemePool(prev => [...prev, bubble.themeData]);
           }
           
           return !outOfBounds;
@@ -318,10 +334,10 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     );
   };
   
-  if (!themes.length) {
+  if (!themesData.length) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground">
-        <p>No themes found in your journal entries</p>
+        <p>No themes found in your recent journal entries</p>
       </div>
     );
   }
@@ -332,7 +348,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         <ThemeBubble
           key={bubble.id}
           id={bubble.id}
-          theme={bubble.theme}
+          themeData={bubble.themeData}
           size={bubble.size}
           initialPosition={bubble.position}
           velocity={bubble.velocity}

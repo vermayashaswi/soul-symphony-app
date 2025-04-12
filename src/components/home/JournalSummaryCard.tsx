@@ -16,12 +16,17 @@ interface SummaryResponse {
   error?: string;
 }
 
+interface ThemeData {
+  theme: string;
+  sentiment: number;
+}
+
 const JournalSummaryCard: React.FC = () => {
   const { user } = useAuth();
   const [summaryData, setSummaryData] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [masterThemes, setMasterThemes] = useState<string[]>([]);
+  const [themeData, setThemeData] = useState<ThemeData[]>([]);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -42,26 +47,40 @@ const JournalSummaryCard: React.FC = () => {
           return;
         }
         
-        // Fetch master themes from Journal Entries
+        // Calculate date 7 days ago from now
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        // Fetch master themes and sentiment from Journal Entries from last 7 days
         const { data: journalEntries, error: entriesError } = await supabase
           .from('Journal Entries')
-          .select('master_themes')
+          .select('master_themes, sentiment')
           .eq('user_id', user.id)
-          .not('master_themes', 'is', null)
-          .limit(15);
+          .gte('created_at', sevenDaysAgo.toISOString())
+          .not('master_themes', 'is', null);
         
         if (entriesError) {
           console.error('Error fetching master themes:', entriesError);
         } else {
-          // Extract and flatten all master themes
-          const allThemes = journalEntries
-            .map(entry => entry.master_themes || [])
-            .flat()
-            .filter((theme): theme is string => Boolean(theme));
+          // Extract themes with their associated sentiment
+          const themesWithSentiment: ThemeData[] = [];
           
-          // Remove duplicates
-          const uniqueThemes = [...new Set(allThemes)];
-          setMasterThemes(uniqueThemes);
+          journalEntries.forEach(entry => {
+            if (entry.master_themes && Array.isArray(entry.master_themes)) {
+              const sentimentScore = entry.sentiment ? parseFloat(entry.sentiment) : 0;
+              
+              entry.master_themes.forEach(theme => {
+                if (theme && typeof theme === 'string') {
+                  themesWithSentiment.push({
+                    theme,
+                    sentiment: sentimentScore
+                  });
+                }
+              });
+            }
+          });
+          
+          setThemeData(themesWithSentiment);
         }
         
         setSummaryData(summaryData);
@@ -77,7 +96,7 @@ const JournalSummaryCard: React.FC = () => {
   }, [user?.id]);
 
   return (
-    <Card className="w-full bg-transparent shadow-none border-none h-[146px]">
+    <Card className="w-full bg-transparent shadow-none border-none h-[168px]">
       <CardHeader className="pb-0">
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg flex items-center gap-2 bg-card text-foreground px-3 py-1 rounded-full">
@@ -97,7 +116,7 @@ const JournalSummaryCard: React.FC = () => {
         ) : (
           <div className="h-full w-full">
             <ThemeBubbleAnimation 
-              themes={masterThemes} 
+              themesData={themeData} 
               maxBubbles={5}
             />
           </div>

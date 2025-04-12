@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,7 +18,6 @@ const Home = () => {
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   
-  // Preload the chat avatar image
   useEffect(() => {
     const preloadImage = new Image();
     preloadImage.src = '/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png';
@@ -114,7 +112,6 @@ const Home = () => {
     <div className="min-h-screen bg-background text-foreground relative">
       <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
       
-      {/* Hidden div to preload chat avatar image */}
       <div className="hidden">
         <img 
           src="/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png" 
@@ -141,13 +138,14 @@ const Home = () => {
               variants={itemVariants}
               className="h-full w-full"
             >
-              <JournalSummaryCard />
+              <div className="w-full h-full">
+                <JournalSummaryCard />
+              </div>
             </motion.div>
           </motion.div>
         </div>
       </div>
       
-      {/* InspirationalQuote is positioned absolutely and covers the full screen */}
       <InspirationalQuote />
     </div>
   );
