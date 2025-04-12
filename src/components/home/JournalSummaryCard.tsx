@@ -5,7 +5,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ThemeBubbleAnimation from './ThemeBubbleAnimation';
-import { ThemeData } from './ThemeBubble';
 
 interface SummaryResponse {
   summary: string | null;
@@ -14,6 +13,11 @@ interface SummaryResponse {
   entryCount?: number;
   masterThemes?: string[];
   error?: string;
+}
+
+interface ThemeData {
+  theme: string;
+  sentiment: number;
 }
 
 const JournalSummaryCard: React.FC = () => {
@@ -57,8 +61,6 @@ const JournalSummaryCard: React.FC = () => {
         if (entriesError) {
           console.error('Error fetching master themes:', entriesError);
         } else {
-          console.log('Journal entries with themes:', journalEntries.length);
-          
           // Extract themes with their associated sentiment
           const themesWithSentiment: ThemeData[] = [];
           
@@ -77,7 +79,6 @@ const JournalSummaryCard: React.FC = () => {
             }
           });
           
-          console.log('Extracted themes with sentiment:', themesWithSentiment.length);
           setThemeData(themesWithSentiment);
         }
         
@@ -93,11 +94,9 @@ const JournalSummaryCard: React.FC = () => {
     fetchSummary();
   }, [user?.id]);
 
-  console.log('Rendering JournalSummaryCard, themeData length:', themeData.length);
-
   return (
     <Card className="w-full h-full bg-transparent shadow-none border-none">
-      <CardContent className="p-4 h-full">
+      <CardContent className="p-0 h-full">
         {loading ? (
           <div className="h-full flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
@@ -105,7 +104,7 @@ const JournalSummaryCard: React.FC = () => {
         ) : error ? (
           <div className="text-destructive text-sm p-2">{error}</div>
         ) : (
-          <div className="h-full w-full min-h-[300px]">
+          <div className="h-full w-full">
             <ThemeBubbleAnimation 
               themesData={themeData} 
               maxBubbles={5}

@@ -121,7 +121,7 @@ export const InspirationalQuote: React.FC = () => {
   return (
     <motion.div
       ref={ref}
-      className="fixed inset-0 w-full h-full flex items-center justify-center z-20 pointer-events-none"
+      className="fixed inset-0 w-full h-full flex items-end justify-center z-20 pointer-events-none"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.8 }}
@@ -130,7 +130,7 @@ export const InspirationalQuote: React.FC = () => {
         {error ? (
           <motion.div
             key="error"
-            className="flex flex-col items-center justify-center w-full px-6"
+            className="flex flex-col items-center justify-center mb-28 w-full px-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -147,7 +147,7 @@ export const InspirationalQuote: React.FC = () => {
         ) : (
           <motion.div
             key={currentQuoteIndex}
-            className="flex flex-col justify-center w-full px-6"
+            className="flex flex-col justify-end w-full px-6 mb-28"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
