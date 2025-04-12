@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -158,7 +159,7 @@ const Home = () => {
               variants={dateStripVariants}
               initial="hidden"
               animate="visible"
-              className={`px-3 py-1 rounded-l-md ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
+              className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
             >
               <div 
                 className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
@@ -176,8 +177,8 @@ const Home = () => {
         </div>
       </div>
       
-      {/* Arrow button to navigate to journal page (z-index: 10) */}
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+      {/* Arrow button to navigate to journal page - moved up by 20px (z-index: 10) */}
+      <div className="absolute top-[calc(50%-20px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
         <motion.button
           onClick={navigateToJournal}
           className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg"
