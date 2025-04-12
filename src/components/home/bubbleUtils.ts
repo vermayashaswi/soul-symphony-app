@@ -23,8 +23,8 @@ export const createBubble = (
   const newThemePool = [...themePool];
   newThemePool.splice(themeIndex, 1);
   
-  const MIN_SIZE = 50;
-  const MAX_SIZE = 75;
+  const MIN_SIZE = 80; // Increased from 50
+  const MAX_SIZE = 120; // Increased from 75
   
   const textLength = themeData.theme.length;
   let bubbleSize = MIN_SIZE;
@@ -42,10 +42,10 @@ export const createBubble = (
   let position: { x: number; y: number };
   let velocity: { x: number; y: number };
   
-  const speedFactor = 0.5;
+  const speedFactor = 0.8; // Increased from 0.5
   
   switch (edge) {
-    case 0:
+    case 0: // Top
       position = { 
         x: Math.random() * (dimensions.width - bubbleSize), 
         y: -bubbleSize 
@@ -55,7 +55,7 @@ export const createBubble = (
         y: Math.random() * speedFactor + 0.25 
       };
       break;
-    case 1:
+    case 1: // Right
       position = { 
         x: dimensions.width, 
         y: Math.random() * (dimensions.height - bubbleSize) 
@@ -65,7 +65,7 @@ export const createBubble = (
         y: (Math.random() - 0.5) * speedFactor 
       };
       break;
-    case 2:
+    case 2: // Bottom
       position = { 
         x: Math.random() * (dimensions.width - bubbleSize), 
         y: dimensions.height 
@@ -75,7 +75,7 @@ export const createBubble = (
         y: -(Math.random() * speedFactor + 0.25) 
       };
       break;
-    case 3:
+    case 3: // Left
       position = { 
         x: -bubbleSize, 
         y: Math.random() * (dimensions.height - bubbleSize) 
@@ -87,7 +87,7 @@ export const createBubble = (
       break;
     default:
       position = { x: 0, y: 0 };
-      velocity = { x: 0.25, y: 0.25 };
+      velocity = { x: 0.5, y: 0.5 };
   }
   
   const newBubble = {
@@ -97,6 +97,8 @@ export const createBubble = (
     position, 
     velocity
   };
+  
+  console.log(`Created bubble at position: (${position.x.toFixed(2)}, ${position.y.toFixed(2)}), size: ${bubbleSize}`);
   
   return { newBubble, updatedThemePool: newThemePool };
 };

@@ -52,6 +52,9 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
   useEffect(() => {
     if (dimensions.width === 0 || dimensions.height === 0 || !themePool.length) return;
     
+    console.log('Starting bubble animation with dimensions:', dimensions);
+    console.log('Theme pool size:', themePool.length);
+    
     const createBubbleInterval = setInterval(() => {
       const { newBubble, updatedThemePool } = createBubble(
         themePool,
@@ -61,6 +64,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       );
       
       if (newBubble) {
+        console.log('Created new bubble:', newBubble.themeData.theme);
         setThemePool(updatedThemePool);
         setActiveBubbles(prev => [...prev, newBubble]);
       }
@@ -98,6 +102,8 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     );
   };
   
+  console.log('Active bubbles:', activeBubbles.length);
+  
   if (!themesData.length) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -107,7 +113,11 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
   }
   
   return (
-    <div ref={containerRef} className="relative w-full h-full overflow-hidden">
+    <div 
+      ref={containerRef} 
+      className="relative w-full h-full overflow-hidden border border-dashed border-primary/20 rounded-lg"
+      style={{ minHeight: '300px' }}
+    >
       {activeBubbles.map(bubble => (
         <ThemeBubble
           key={bubble.id}

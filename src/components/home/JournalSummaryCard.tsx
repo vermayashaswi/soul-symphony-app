@@ -57,6 +57,8 @@ const JournalSummaryCard: React.FC = () => {
         if (entriesError) {
           console.error('Error fetching master themes:', entriesError);
         } else {
+          console.log('Journal entries with themes:', journalEntries.length);
+          
           // Extract themes with their associated sentiment
           const themesWithSentiment: ThemeData[] = [];
           
@@ -75,6 +77,7 @@ const JournalSummaryCard: React.FC = () => {
             }
           });
           
+          console.log('Extracted themes with sentiment:', themesWithSentiment.length);
           setThemeData(themesWithSentiment);
         }
         
@@ -90,9 +93,11 @@ const JournalSummaryCard: React.FC = () => {
     fetchSummary();
   }, [user?.id]);
 
+  console.log('Rendering JournalSummaryCard, themeData length:', themeData.length);
+
   return (
     <Card className="w-full h-full bg-transparent shadow-none border-none">
-      <CardContent className="p-0 h-full">
+      <CardContent className="p-4 h-full">
         {loading ? (
           <div className="h-full flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
@@ -100,7 +105,7 @@ const JournalSummaryCard: React.FC = () => {
         ) : error ? (
           <div className="text-destructive text-sm p-2">{error}</div>
         ) : (
-          <div className="h-full w-full">
+          <div className="h-full w-full min-h-[300px]">
             <ThemeBubbleAnimation 
               themesData={themeData} 
               maxBubbles={5}

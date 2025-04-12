@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 
 export interface ThemeData {
@@ -63,7 +63,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
   const controls = useAnimation();
   const bubbleRef = useRef<HTMLDivElement>(null);
   
-  React.useEffect(() => {
+  useEffect(() => {
     let currentPosition = { ...initialPosition };
     let currentVelocity = { ...velocity };
     let animationFrameId: number;
@@ -101,7 +101,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
   return (
     <motion.div
       ref={bubbleRef}
-      className="absolute flex items-center justify-center rounded-full cursor-pointer"
+      className="absolute flex items-center justify-center rounded-full cursor-pointer z-10"
       initial={{ x: initialPosition.x, y: initialPosition.y }}
       animate={controls}
       whileHover={{ scale: 1.1 }}
