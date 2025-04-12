@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -131,10 +130,14 @@ serve(async (req) => {
     
     // Update to use the latest available Whisper model
     formData.append('model', 'whisper-1');
-    formData.append('response_format', 'verbose_json'); // Request verbose JSON to get language info
+    formData.append('response_format', 'json');
     
-    // Remove language specification to allow Whisper to auto-detect languages
-    console.log("Sending to Whisper API for transcription with auto-language detection...");
+    // Specify that we want high-fidelity transcription
+    if (highQuality) {
+      formData.append('language', 'en'); // Specify language to help with accuracy
+    }
+
+    console.log("Sending to Whisper API for high-quality transcription using the latest model (whisper-1)...");
     console.log("Using file type:", detectedFileType, "with MIME type:", mimeType);
     
     try {
@@ -155,22 +158,13 @@ serve(async (req) => {
       const whisperResult = await whisperResponse.json();
       const transcribedText = whisperResult.text;
       
-      // Extract language information
-      const detectedLanguages = whisperResult.language || '';
-      const languageData = {
-        primary: detectedLanguages,
-        confidence: whisperResult.language_probs || null
-      };
-      
       console.log("Transcription successful:", transcribedText);
-      console.log("Detected languages:", languageData);
 
-      // If we're in direct transcription mode, simply return the transcribed text and language info
+      // If we're in direct transcription mode, simply return the transcribed text
       if (directTranscription) {
         return new Response(
           JSON.stringify({
             transcription: transcribedText,
-            languages: languageData,
             success: true
           }),
           { 
@@ -180,7 +174,6 @@ serve(async (req) => {
       }
 
       // Continue with the standard processing flow for journal entries
-      // Update GPT prompt to include language information and improved instructions
       const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -192,11 +185,11 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. Correct for words which do not have any meaning either normally or colloquially in the context. Preserve the emotional tone and personal nature of the content.'
+              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. Preserve the emotional tone and personal nature of the content.'
             },
             {
               role: 'user',
-              content: `Here is multilingual voice journal data. The primary detected language is: ${detectedLanguages}. Please translate it to English: "${transcribedText}"`
+              content: `Here is a multilingual voice journal data of a user in their local language. Please translate it to English logically "${transcribedText}"`
             }
           ],
         }),
@@ -239,8 +232,7 @@ serve(async (req) => {
               "duration": audioDuration,
               "emotions": emotions,
               "sentiment": sentimentScore,
-              "entities": entities,
-              "recognized_languages": languageData
+              "entities": entities
             }])
             .select();
               
@@ -349,7 +341,6 @@ serve(async (req) => {
           emotions: emotions,
           sentiment: sentimentScore,
           entities: entities,
-          languages: languageData,
           success: true
         }),
         { 
