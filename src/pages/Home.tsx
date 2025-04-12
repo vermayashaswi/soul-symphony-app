@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -129,9 +130,13 @@ const Home = () => {
         <div className="p-4 flex flex-col">
           <div className="flex justify-between items-start w-full">
             <div>
-              <h1 className="text-2xl font-bold text-theme text-shadow-sm">{getJournalName()}</h1>
+              <h1 className="text-2xl font-bold text-theme text-shadow-sm" style={{ opacity: 1, fontSmooth: 'always', WebkitFontSmoothing: 'antialiased' }}>
+                {getJournalName()}
+              </h1>
             </div>
-            <div className="text-muted-foreground font-medium text-shadow-sm">{formattedDate}</div>
+            <div className="text-muted-foreground font-medium text-shadow-sm" style={{ opacity: 1, fontSmooth: 'always', WebkitFontSmoothing: 'antialiased' }}>
+              {formattedDate}
+            </div>
           </div>
         </div>
       </div>
