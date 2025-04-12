@@ -47,8 +47,11 @@ export async function processRecordingInBackground(
     console.log('[BackgroundProcessor] Sending audio to transcribe function');
     
     // Calculate recording duration in seconds from blob
+    // Since Blob doesn't have a duration property, we need to estimate it differently
+    // We can calculate based on the audio blob size and sample rate as an approximation
     const recordingTimeMs = audioBlob.size > 0 
-      ? (audioBlob.duration || (audioBlob.size / 16000)) * 1000 
+      ? (audioBlob as any).duration ? (audioBlob as any).duration * 1000 // Use custom duration if available
+      : (audioBlob.size / 16000) * 1000 // Estimate based on size and 16kHz sample rate
       : 0;
     
     // Invoke the Supabase function to process the audio
