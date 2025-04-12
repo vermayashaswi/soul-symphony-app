@@ -87,9 +87,9 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       {/* Animation area restricted to between header and the quote component, moved up by 10px */}
       <div className="absolute inset-x-0 top-16 bottom-62 pointer-events-none">
         {uniqueThemes.slice(0, 6).map((themeItem, index) => {
-          // Distribute strips evenly in the available space
-          const yPosition = 10 + (index % 6) * 14; // Six positions spread out
-          const strip = index % 2 === 0;
+          // Distribute strips evenly across different vertical positions
+          const yPosition = 10 + (index * 15); // Each strip gets its own vertical position
+          const direction = index % 2 === 0; // Alternate direction
           
           return (
             <motion.div
@@ -97,7 +97,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               className="absolute left-0 w-auto h-8 rounded-md px-3 py-1 flex items-center"
               style={{
                 top: `${yPosition}%`,
-                backgroundColor: `${themeColor}30`, // 30% opacity (increased)
+                backgroundColor: `${themeColor}50`, // Increased opacity to 50%
                 borderLeft: `3px solid ${themeColor}`,
                 borderRight: `3px solid ${themeColor}`,
                 boxShadow: `0 0 1px 0 ${themeColor}40`,
@@ -105,11 +105,11 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                 zIndex: 15, // Below the buttons and indicators
               }}
               initial={{ 
-                x: strip ? -300 : '100vw',
+                x: direction ? -300 : '100vw',
                 opacity: 0 
               }}
               animate={{ 
-                x: strip ? ['100vw', '0vw', '-100vw'] : ['0vw', '100vw', '0vw'],
+                x: direction ? ['100vw', '0vw', '-100vw'] : ['0vw', '100vw', '0vw'],
                 opacity: [0, 1, 0]
               }}
               transition={{
