@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -111,7 +110,9 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
-      <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
+      <div className="absolute inset-0 z-0">
+        <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
+      </div>
       
       <div className="hidden">
         <img 
@@ -133,7 +134,7 @@ const Home = () => {
           </div>
         </div>
 
-        <div className="flex-1 px-0">
+        <div className="flex-1 px-0 absolute inset-0 z-0 pointer-events-none">
           <motion.div
             variants={containerVariants}
             initial="hidden"

@@ -95,24 +95,24 @@ const JournalSummaryCard: React.FC = () => {
   }, [user?.id]);
 
   return (
-    <Card className="w-full h-full bg-transparent shadow-none border-none">
-      <CardContent className="p-0 h-full">
-        {loading ? (
-          <div className="h-full flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
-          </div>
-        ) : error ? (
-          <div className="text-destructive text-sm p-2">{error}</div>
-        ) : (
-          <div className="h-full w-full">
-            <ThemeBubbleAnimation 
-              themesData={themeData} 
-              maxBubbles={5}
-            />
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="w-full h-full">
+      {loading ? (
+        <div className="h-full flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
+        </div>
+      ) : error ? (
+        <div className="text-destructive text-sm p-2 flex items-center justify-center h-full">
+          {error}
+        </div>
+      ) : (
+        <div className="h-full w-full">
+          <ThemeBubbleAnimation 
+            themesData={themeData} 
+            maxBubbles={5}
+          />
+        </div>
+      )}
+    </div>
   );
 };
 
