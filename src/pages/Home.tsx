@@ -125,11 +125,11 @@ const Home = () => {
         />
       </div>
       
-      {/* Text content - middle layer (z-index: 10) */}
-      <div className="relative z-10 flex flex-col h-screen">
+      {/* Text content - middle layer (z-index: 10) with semi-transparent background for visibility */}
+      <div className="relative z-20 flex flex-col h-screen"> {/* Changed z-index from 10 to 20 */}
         <div className="p-4 flex flex-col">
-          <div className="flex justify-between items-start w-full">
-            <div>
+          <div className="flex justify-between items-start w-full relative">
+            <div className="relative backdrop-blur-sm bg-background/30 px-2 py-1 rounded">
               <h1 
                 className="text-2xl font-bold text-theme" 
                 style={{ 
@@ -143,7 +143,7 @@ const Home = () => {
               </h1>
             </div>
             <div 
-              className="text-muted-foreground font-medium" 
+              className="text-muted-foreground font-medium backdrop-blur-sm bg-background/30 px-2 py-1 rounded" 
               style={{ 
                 fontWeight: 500,
                 letterSpacing: '0.01em',
@@ -158,7 +158,7 @@ const Home = () => {
       </div>
       
       {/* Theme Bubbles - outermost layer (z-index: 40) */}
-      <div className="flex-1 px-0 absolute inset-0 z-40">
+      <div className="flex-1 px-0 absolute inset-0 z-30"> {/* Changed z-index from 40 to 30 */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -177,7 +177,7 @@ const Home = () => {
       </div>
       
       {/* Inspirational Quote - fixed position (z-index: 30) */}
-      <div className="fixed inset-0 flex items-center justify-center z-30">
+      <div className="fixed inset-0 flex items-center justify-center z-10"> {/* Changed z-index from 30 to 10 */}
         <InspirationalQuote />
       </div>
     </div>

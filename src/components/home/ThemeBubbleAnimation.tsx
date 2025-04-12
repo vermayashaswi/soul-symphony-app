@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -90,6 +89,8 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
         boxShadow: createBubbleShadow(),
         backdropFilter: 'blur(3px)',
         border: '1px solid rgba(255, 255, 255, 1)',
+        mixBlendMode: 'normal',
+        opacity: 0.9,
       }}
     >
       <span 
@@ -417,7 +418,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
   
   return (
     <div ref={containerRef} className="relative w-full h-full overflow-hidden">
-      {activeBubbles.map(bubble => (
+      {activeBubbles.map((bubble, index) => (
         <ThemeBubble
           key={bubble.id}
           id={bubble.id}

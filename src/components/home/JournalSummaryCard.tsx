@@ -132,7 +132,7 @@ const JournalSummaryCard: React.FC = () => {
         <>
           <div className="absolute top-12 left-4 flex items-center gap-2 z-50 pointer-events-none">
             <p 
-              className="text-xs text-muted-foreground"
+              className="text-xs text-muted-foreground backdrop-blur-sm bg-background/30 px-2 py-1 rounded"
               style={{ 
                 fontWeight: 500,
                 letterSpacing: '0.01em',
