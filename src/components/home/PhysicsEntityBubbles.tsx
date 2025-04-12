@@ -118,29 +118,33 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
     
     World.add(engine.world, walls);
     
-    // Create bubbles
-    const maxBubbleSize = Math.min(dimensions.width / 3, dimensions.height / 2.5);
+    // Calculate maximum bubble size that would allow 3 bubbles to stack vertically
+    const maxBubbleSize = Math.min(dimensions.width / 3, dimensions.height / 3);
+    
+    // Create bubbles with improved spacing
+    const bubbleSpacing = dimensions.width / (filteredEntities.length + 1);
     
     filteredEntities.forEach((entity, index) => {
-      // Size based on count and ensuring size fits text
+      // Size based on count while ensuring it's large enough to fit text
+      const normFactor = 0.4 + (entity.count / maxCount) * 0.6; // Ensuring minimum size
       const radius = Math.max(
-        25, 
-        15 + (entity.count / maxCount) * (maxBubbleSize / 2)
+        30, // Minimum bubble size
+        maxBubbleSize * normFactor / 2
       );
       
-      // Distribute initial positions
-      const sectionWidth = dimensions.width / filteredEntities.length;
-      const initialX = index * sectionWidth + sectionWidth / 2;
-      const initialY = dimensions.height / 2 + (index % 2 === 0 ? -30 : 30);
+      // Position bubbles with more spacing to prevent immediate collisions
+      const initialX = (index + 1) * bubbleSpacing;
+      const initialY = dimensions.height / 2 + (index % 3 - 1) * 20; // Staggered heights
       
       const circle = Bodies.circle(initialX, initialY, radius, {
-        restitution: 0.6, // Reduced for smoother collisions
-        friction: 0.002,   // Reduced for smoother movement
-        frictionAir: 0.03, // Increased to reduce flickering
+        restitution: 0.7, // Bounciness
+        friction: 0.001,   // Very low friction
+        frictionAir: 0.02, // Slightly reduced air friction for smoother movement
+        density: 0.001,    // Lower density for gentler collisions
         render: {
-          fillStyle: `rgba(var(--primary), 0.15)`, // More visible bubble
-          strokeStyle: `rgba(var(--primary), 0.4)`, // Add border for visibility
-          lineWidth: 1,
+          fillStyle: `rgba(var(--primary), 0.2)`, // More visible bubble
+          strokeStyle: `rgba(var(--primary), 0.5)`, // More visible border
+          lineWidth: 2,
         },
         plugin: {
           entityData: {
@@ -150,21 +154,21 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
         }
       });
       
-      // Set initial velocity - gentler to reduce flickering
+      // Set very gentle initial velocity
       Matter.Body.setVelocity(circle, {
-        x: (Math.random() - 0.5) * 1, // Reduced velocity
-        y: (Math.random() - 0.5) * 1, // Reduced velocity
+        x: (Math.random() - 0.5) * 0.7, // Reduced velocity
+        y: (Math.random() - 0.5) * 0.7, // Reduced velocity
       });
       
       World.add(engine.world, circle);
     });
     
-    // Add mouse interaction
+    // Add mouse interaction with reduced stiffness for gentler movement
     const mouse = Mouse.create(canvasRef.current);
     const mouseConstraint = MouseConstraint.create(engine, {
       mouse: mouse,
       constraint: {
-        stiffness: 0.2,
+        stiffness: 0.1, // Reduced stiffness for more gentle interactions
         render: {
           visible: false
         }
@@ -204,7 +208,7 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
     
     World.add(engine.world, mouseConstraint);
     
-    // Run engine with fixed timestep to prevent flickering
+    // Run engine with fixed timestep for smoother rendering
     const runner = Matter.Runner.create({
       isFixed: true,
       delta: 1000 / 60 // Lock at 60 FPS for smooth rendering
@@ -217,6 +221,8 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
     
     // Cleanup on unmount
     return () => {
+      // Properly stop and clear everything
+      if (runner) Matter.Runner.stop(runner);
       Render.stop(render);
       World.clear(engine.world, false);
       Engine.clear(engine);
@@ -259,7 +265,7 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
           <div 
             key={entity.name}
             className={cn(
-              "absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none",
+              "absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center",
               "flex items-center justify-center rounded-full transition-all duration-150",
               isHighlighted ? "text-primary font-semibold" : "text-primary/80"
             )}
@@ -268,7 +274,7 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
               top: body.position.y,
               width: body.circleRadius * 1.8,
               height: body.circleRadius * 1.8,
-              fontSize: '0.65rem',
+              fontSize: '0.6rem',
               textShadow: isHighlighted ? '0 0 5px rgba(255,255,255,0.7)' : 'none',
             }}
           >
@@ -290,7 +296,7 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
         return (
           <div 
             key={`highlight-${entity.name}`}
-            className="absolute rounded-full pointer-events-none animate-pulse"
+            className="absolute rounded-full pointer-events-none entity-bubble-glow"
             style={{
               left: body.position.x,
               top: body.position.y,
@@ -298,7 +304,7 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
               height: body.circleRadius * 2,
               transform: 'translate(-50%, -50%)',
               boxShadow: '0 0 15px 5px rgba(var(--primary), 0.5)',
-              backgroundColor: 'rgba(var(--primary), 0.1)',
+              backgroundColor: 'rgba(var(--primary), 0.15)',
               zIndex: -1,
             }}
           />
@@ -309,4 +315,3 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
 };
 
 export default PhysicsEntityBubbles;
-

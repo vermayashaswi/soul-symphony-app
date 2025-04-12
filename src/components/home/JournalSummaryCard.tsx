@@ -63,7 +63,7 @@ const JournalSummaryCard: React.FC = () => {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-28 flex items-center justify-center">
+          <div className="h-32 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
           </div>
         ) : error ? (
@@ -94,7 +94,7 @@ const JournalSummaryCard: React.FC = () => {
             {summaryData.topEntities.length > 0 && (
               <PhysicsEntityBubbles 
                 entities={summaryData.topEntities} 
-                className="h-28 w-full" 
+                className="h-32 w-full" 
               />
             )}
           </div>
