@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -133,27 +132,27 @@ const Home = () => {
             <div className="text-muted-foreground font-medium">{formattedDate}</div>
           </div>
         </div>
-
-        <div className="flex-1 px-0 absolute inset-0 z-20 pointer-events-none">
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="h-full w-full"
-          >
-            <motion.div 
-              variants={itemVariants}
-              className="h-full w-full"
-            >
-              <div className="w-full h-full">
-                <JournalSummaryCard />
-              </div>
-            </motion.div>
-          </motion.div>
-        </div>
       </div>
       
-      <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-40">
+      <div className="flex-1 px-0 absolute inset-0 z-20">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="h-full w-full"
+        >
+          <motion.div 
+            variants={itemVariants}
+            className="h-full w-full"
+          >
+            <div className="w-full h-full">
+              <JournalSummaryCard />
+            </div>
+          </motion.div>
+        </motion.div>
+      </div>
+      
+      <div className="fixed inset-0 flex items-center justify-center z-30">
         <InspirationalQuote />
       </div>
     </div>

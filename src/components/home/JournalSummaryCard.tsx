@@ -129,10 +129,10 @@ const JournalSummaryCard: React.FC = () => {
     <div className="h-full w-full">
       {isReady && !loading && (
         <>
-          <div className="absolute top-12 left-4 flex items-center gap-2 z-20 pointer-events-auto">
+          <div className="absolute top-12 left-4 flex items-center gap-2 z-30 pointer-events-none">
             <p className="text-xs text-muted-foreground">Your last 7 days</p>
             <div 
-              className="w-5 h-5 rounded-full flex items-center justify-center"
+              className="w-5 h-5 rounded-full flex items-center justify-center pointer-events-auto"
               style={{ 
                 background: createBubbleBackground(),
                 boxShadow: `0 0 6px 3px rgba(255, 255, 255, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.4), 0 0 6px ${themeColor}30`,
