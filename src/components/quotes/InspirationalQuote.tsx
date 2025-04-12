@@ -121,7 +121,7 @@ export const InspirationalQuote: React.FC = () => {
   return (
     <motion.div
       ref={ref}
-      className="fixed inset-0 w-full h-full flex items-center justify-center z-20 pointer-events-none"
+      className="fixed inset-0 w-full h-full flex items-center justify-center z-10 pointer-events-none"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.8 }}
@@ -158,11 +158,11 @@ export const InspirationalQuote: React.FC = () => {
                 <div className="flex mb-4 justify-center">
                   <Quote className="h-8 w-8 text-theme opacity-70" />
                 </div>
-                <p className="text-foreground text-center text-xl font-medium italic mb-2 opacity-90">
+                <p className="text-foreground text-center text-xl font-medium italic mb-2 opacity-80">
                   "{quote}"
                 </p>
                 {author && (
-                  <p className="text-muted-foreground text-center opacity-70">
+                  <p className="text-theme text-center font-medium">
                     — {author}
                   </p>
                 )}

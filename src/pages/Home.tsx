@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -134,7 +135,7 @@ const Home = () => {
           </div>
         </div>
 
-        <div className="flex-1 px-0 absolute inset-0 z-0 pointer-events-none">
+        <div className="flex-1 px-0 absolute inset-0 z-20 pointer-events-none">
           <motion.div
             variants={containerVariants}
             initial="hidden"
