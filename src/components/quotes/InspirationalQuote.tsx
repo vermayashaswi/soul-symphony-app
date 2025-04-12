@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
@@ -113,6 +112,7 @@ export const InspirationalQuote: React.FC = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.8 }}
+      style={{ transform: 'translateY(-5px)' }}
     >
       <AnimatePresence mode="wait">
         {error ? (

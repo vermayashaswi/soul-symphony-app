@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -129,7 +128,6 @@ const Home = () => {
           <div className="flex justify-between items-start w-full">
             <div>
               <h1 className="text-2xl font-bold text-theme">{getJournalName()}</h1>
-              <p className="text-xs text-muted-foreground">Your last 7 days</p>
             </div>
             <div className="text-muted-foreground font-medium">{formattedDate}</div>
           </div>

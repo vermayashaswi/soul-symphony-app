@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import ThemeBubbleAnimation from './ThemeBubbleAnimation';
+import { useTheme } from '@/hooks/use-theme';
 
 interface SummaryResponse {
   summary: string | null;
@@ -20,11 +20,31 @@ interface ThemeData {
 
 const JournalSummaryCard: React.FC = () => {
   const { user } = useAuth();
+  const { colorTheme, customColor } = useTheme();
   const [summaryData, setSummaryData] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [themeData, setThemeData] = useState<ThemeData[]>([]);
   const [isReady, setIsReady] = useState(false);
+
+  const getThemeColorHex = (): string => {
+    switch (colorTheme) {
+      case 'Default':
+        return '#3b82f6';
+      case 'Calm':
+        return '#8b5cf6';
+      case 'Soothing':
+        return '#FFDEE2';
+      case 'Energy':
+        return '#f59e0b';
+      case 'Focus':
+        return '#10b981';
+      case 'Custom':
+        return customColor;
+      default:
+        return '#3b82f6';
+    }
+  };
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -34,7 +54,6 @@ const JournalSummaryCard: React.FC = () => {
         setLoading(true);
         setError(null);
         
-        // Fetch summary data from Supabase function
         const { data: summaryData, error: summaryError } = await supabase.functions.invoke('journal-summary', {
           body: { userId: user.id, days: 7 }
         });
@@ -45,11 +64,9 @@ const JournalSummaryCard: React.FC = () => {
           return;
         }
         
-        // Calculate date 7 days ago from now
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
-        // Fetch master themes and sentiment from Journal Entries from last 7 days
         const { data: journalEntries, error: entriesError } = await supabase
           .from('Journal Entries')
           .select('master_themes, sentiment')
@@ -60,7 +77,6 @@ const JournalSummaryCard: React.FC = () => {
         if (entriesError) {
           console.error('Error fetching master themes:', entriesError);
         } else {
-          // Extract themes with their associated sentiment
           const themesWithSentiment: ThemeData[] = [];
           
           journalEntries.forEach(entry => {
@@ -87,7 +103,6 @@ const JournalSummaryCard: React.FC = () => {
         setError('Unexpected error loading your journal summary');
       } finally {
         setLoading(false);
-        // Set isReady regardless of loading outcome
         setIsReady(true);
       }
     };
@@ -95,24 +110,47 @@ const JournalSummaryCard: React.FC = () => {
     fetchSummary();
   }, [user?.id]);
 
-  // Don't render anything until ready
   if (!isReady) {
     return null;
   }
 
-  // In case of error, just return empty div rather than showing error messages
   if (error) {
     console.error('JournalSummaryCard error:', error);
     return <div className="h-full w-full"></div>;
   }
 
+  const themeColor = getThemeColorHex();
+  
+  const createBubbleBackground = () => {
+    return `radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 5%, ${themeColor}40 20%, ${themeColor}30 60%, ${themeColor}10 100%)`;
+  };
+
   return (
     <div className="h-full w-full">
       {isReady && !loading && (
-        <ThemeBubbleAnimation 
-          themesData={themeData} 
-          maxBubbles={5}
-        />
+        <>
+          <div className="absolute top-12 left-4 flex items-center gap-2 z-20 pointer-events-auto">
+            <p className="text-xs text-muted-foreground">Your last 7 days</p>
+            <div 
+              className="w-5 h-5 rounded-full flex items-center justify-center"
+              style={{ 
+                background: createBubbleBackground(),
+                boxShadow: `0 0 6px 3px rgba(255, 255, 255, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.4), 0 0 6px ${themeColor}30`,
+                backdropFilter: 'blur(2px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+              }}
+              title="Journal themes from recent entries"
+            >
+              <span className="text-center text-[6px] font-medium" style={{ color: 'rgba(0, 0, 0, 0.7)' }}>
+                theme
+              </span>
+            </div>
+          </div>
+          <ThemeBubbleAnimation 
+            themesData={themeData} 
+            maxBubbles={5}
+          />
+        </>
       )}
     </div>
   );
