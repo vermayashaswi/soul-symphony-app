@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +11,7 @@ import EnergyAnimation from '@/components/EnergyAnimation';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from '@/components/ui/use-toast';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -117,7 +119,15 @@ const Home = () => {
   };
   
   const navigateToJournal = () => {
-    navigate('/app/journal');
+    try {
+      navigate('/app/journal');
+      toast({
+        title: "Opening journal",
+        description: "Taking you to your journal entries",
+      });
+    } catch (error) {
+      console.error("Navigation error:", error);
+    }
   };
 
   return (
@@ -174,7 +184,8 @@ const Home = () => {
         </div>
       </div>
       
-      <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+      {/* Arrow button with glowing effect - always visible for all users */}
+      <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
         <motion.div
           className="absolute inset-0 rounded-full bg-primary/30 blur-md z-0"
           initial={{ scale: 1, opacity: 0.5 }}
