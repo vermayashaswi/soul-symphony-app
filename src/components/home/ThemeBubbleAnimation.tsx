@@ -70,9 +70,9 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
     return `radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 1) 5%, ${themeColor} 20%, ${themeColor} 60%, ${themeColor} 100%)`;
   };
   
-  // Create shadow with theme color
+  // Create shadow with theme color - reduced by 75%
   const createBubbleShadow = () => {
-    return `0 0 12px 6px rgba(255, 255, 255, 1), inset 0 0 20px rgba(255, 255, 255, 1), 0 0 12px ${themeColor}`;
+    return `0 0 3px 1.5px rgba(255, 255, 255, 1), inset 0 0 5px rgba(255, 255, 255, 1), 0 0 3px ${themeColor}`;
   };
   
   return (
@@ -98,7 +98,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
           fontSize: calculateFontSize(),
           fontWeight: 600,
           color: 'rgba(0, 0, 0, 1)',
-          textShadow: '0 1px 2px rgba(255, 255, 255, 1)',
+          textShadow: 'none',
           maxWidth: '90%',
           maxHeight: '90%',
           display: 'flex',

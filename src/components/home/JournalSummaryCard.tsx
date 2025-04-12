@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -131,7 +132,7 @@ const JournalSummaryCard: React.FC = () => {
         <>
           <div className="absolute top-12 left-4 flex items-center gap-2 z-50 pointer-events-none">
             <p 
-              className="text-xs text-muted-foreground text-glow"
+              className="text-xs text-muted-foreground"
               style={{ 
                 fontWeight: 500,
                 letterSpacing: '0.01em',
@@ -145,7 +146,7 @@ const JournalSummaryCard: React.FC = () => {
               className="w-5 h-5 rounded-full flex items-center justify-center pointer-events-auto"
               style={{ 
                 background: createBubbleBackground(),
-                boxShadow: `0 0 6px 3px rgba(255, 255, 255, 1), inset 0 0 10px rgba(255, 255, 255, 1), 0 0 6px ${themeColor}`,
+                boxShadow: `0 0 1.5px 0.75px rgba(255, 255, 255, 1), inset 0 0 2.5px rgba(255, 255, 255, 1), 0 0 1.5px ${themeColor}`,
                 backdropFilter: 'blur(2px)',
                 border: '1px solid rgba(255, 255, 255, 1)',
               }}
