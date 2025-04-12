@@ -109,7 +109,7 @@ export const InspirationalQuote: React.FC = () => {
   return (
     <motion.div
       ref={ref}
-      className="fixed inset-0 w-full h-full flex items-center justify-center pointer-events-none"
+      className="fixed inset-0 w-full h-full flex items-center justify-center pointer-events-none z-30"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.8 }}
