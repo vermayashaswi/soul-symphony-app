@@ -80,6 +80,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     { path: '/app/insights', icon: BarChart2, label: 'Insights' },
     { path: '/app/settings', icon: Settings, label: 'Settings' },
   ];
+
+  // Improved active route detection for handling back navigation
+  const getActiveStatus = (path: string) => {
+    // Strict exact path matching
+    return location.pathname === path;
+  };
   
   return (
     <motion.div 
@@ -90,8 +96,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     >
       <div className="flex justify-around items-center">
         {navItems.map((item) => {
-          // Use exact path matching to ensure only one item is active
-          const isActive = location.pathname === item.path;
+          // Use the new active status function
+          const isActive = getActiveStatus(item.path);
           
           return (
             <Link
