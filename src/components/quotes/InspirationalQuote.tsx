@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { Quote } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
 
 export const InspirationalQuote: React.FC = () => {
@@ -12,7 +11,7 @@ export const InspirationalQuote: React.FC = () => {
   const [author, setAuthor] = useState<string>('');
   const [quotes, setQuotes] = useState<Array<{quote: string, author: string}>>([]);
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [isReady, setIsReady] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const { ref, inView } = useInView({
     triggerOnce: false,
@@ -22,7 +21,6 @@ export const InspirationalQuote: React.FC = () => {
 
   const fetchQuotes = async () => {
     try {
-      setLoading(true);
       setError(null);
       
       console.log('Fetching inspirational quotes from edge function');
@@ -31,7 +29,6 @@ export const InspirationalQuote: React.FC = () => {
       if (error) {
         console.error('Error fetching quotes:', error);
         setError('Could not load inspirational quotes');
-        toast.error('Could not load inspirational quotes');
         return;
       }
       
@@ -45,22 +42,18 @@ export const InspirationalQuote: React.FC = () => {
         if (shuffledQuotes.length > 0) {
           setQuote(shuffledQuotes[0].quote);
           setAuthor(shuffledQuotes[0].author || 'Unknown');
+          setIsReady(true);
         }
       } else if (data && data.error) {
         console.error('Error from edge function:', data.error);
         setError(data.error);
-        toast.error('Error loading quotes');
       } else {
         console.error('Unexpected response format:', data);
         setError('Received invalid response format');
-        toast.error('Received invalid response format');
       }
     } catch (err) {
       console.error('Exception when fetching quotes:', err);
       setError('Failed to load inspirational quotes');
-      toast.error('Failed to load inspirational quotes');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -108,12 +101,10 @@ export const InspirationalQuote: React.FC = () => {
     }
   }, [quotes]);
 
-  console.log('Rendering quote component with state:', { 
-    loading, 
-    error, 
-    quotesCount: quotes.length, 
-    currentQuote: quote.substring(0, 30) + '...' 
-  });
+  // Don't render anything until ready
+  if (!isReady && !error) {
+    return null;
+  }
 
   return (
     <motion.div
@@ -125,22 +116,7 @@ export const InspirationalQuote: React.FC = () => {
     >
       <AnimatePresence mode="wait">
         {error ? (
-          <motion.div
-            key="error"
-            className="flex flex-col items-center justify-center w-full px-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.2 }}
-          >
-            <p className="text-muted-foreground opacity-100">{error}</p>
-            <button 
-              onClick={fetchQuotes}
-              className="mt-4 px-4 py-2 text-foreground rounded-md transition-colors opacity-100 pointer-events-auto hover:underline"
-            >
-              Try Again
-            </button>
-          </motion.div>
+          null // Don't show errors to the user
         ) : (
           <motion.div
             key={currentQuoteIndex}
@@ -150,7 +126,7 @@ export const InspirationalQuote: React.FC = () => {
             exit={{ opacity: 0 }}
             transition={{ duration: 1.2 }}
           >
-            {!loading && quotes.length > 0 && (
+            {isReady && quotes.length > 0 && (
               <>
                 <div className="flex mb-4 justify-center">
                   <Quote className="h-8 w-8 text-theme opacity-70" />

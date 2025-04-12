@@ -1,8 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ThemeBubbleAnimation from './ThemeBubbleAnimation';
 
@@ -26,6 +24,7 @@ const JournalSummaryCard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [themeData, setThemeData] = useState<ThemeData[]>([]);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -88,29 +87,32 @@ const JournalSummaryCard: React.FC = () => {
         setError('Unexpected error loading your journal summary');
       } finally {
         setLoading(false);
+        // Set isReady regardless of loading outcome
+        setIsReady(true);
       }
     };
     
     fetchSummary();
   }, [user?.id]);
 
+  // Don't render anything until ready
+  if (!isReady) {
+    return null;
+  }
+
+  // In case of error, just return empty div rather than showing error messages
+  if (error) {
+    console.error('JournalSummaryCard error:', error);
+    return <div className="h-full w-full"></div>;
+  }
+
   return (
-    <div className="w-full h-full">
-      {loading ? (
-        <div className="h-full flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
-        </div>
-      ) : error ? (
-        <div className="text-destructive text-sm p-2 flex items-center justify-center h-full">
-          {error}
-        </div>
-      ) : (
-        <div className="h-full w-full">
-          <ThemeBubbleAnimation 
-            themesData={themeData} 
-            maxBubbles={5}
-          />
-        </div>
+    <div className="h-full w-full">
+      {isReady && !loading && (
+        <ThemeBubbleAnimation 
+          themesData={themeData} 
+          maxBubbles={5}
+        />
       )}
     </div>
   );
