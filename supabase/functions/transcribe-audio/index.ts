@@ -185,11 +185,11 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. Preserve the emotional tone and personal nature of the content.'
+              content: 'You are a helpful assistant that translates multilingual text to English and improves its clarity and grammar without changing the meaning. This transcribed entry might be multi-lingual and could have multiple languages. Correct for words, spellings etc. which do not have any meaning either normally or colloquially in the context. Preserve the emotional tone and personal nature of the content.'
             },
             {
               role: 'user',
-              content: `Here is a multilingual voice journal data of a user in their local language. Please translate it to English logically "${transcribedText}"`
+              content: `Here is a voice journal entry that needs processing: "${transcribedText}"`
             }
           ],
         }),
