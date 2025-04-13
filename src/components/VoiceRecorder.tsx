@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -47,6 +46,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     startRecording,
     stopRecording,
     clearRecording,
+    hasPermission,
+    audioLevel,
+    ripples,
     requestPermissions
   } = useVoiceRecorder({
     onRecordingComplete: (blob, tempId, useGoogleSTT) => {
@@ -309,7 +311,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     });
   };
 
-  const shouldShowPrompt = !isRecording && !audioBlob;
+  const shouldShowPrompt = status !== 'recording' && !audioBlob;
 
   return (
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
@@ -342,7 +344,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
             <RecordingButton
               isRecording={isRecording}
               isProcessing={isProcessing}
-              hasPermission={null}
+              hasPermission={hasPermission}
               onRecordingStart={async () => {
                 console.log('[VoiceRecorder] Starting new recording');
                 await ensureAllToastsCleared();
@@ -356,7 +358,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                 console.log('[VoiceRecorder] Requesting permissions');
                 requestPermissions();
               }}
-              audioLevel={0}
+              audioLevel={audioLevel}
               showAnimation={false}
               audioBlob={audioBlob}
             />
