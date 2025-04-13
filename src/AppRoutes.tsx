@@ -1,13 +1,14 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Index from './pages/Index';  // Assuming you have an Index page
 
 const AppRoutes = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<div>Home Page</div>} />
-        {/* Add more routes as needed */}
+        <Route path="/" element={<Index />} />
+        {/* Add more routes as needed, preserving the existing route structure */}
       </Routes>
     </Router>
   );
