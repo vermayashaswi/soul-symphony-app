@@ -335,7 +335,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               <ModelSelector 
                 selectedModel={transcriptionModel} 
                 onChange={setTranscriptionModel} 
-                disabled={status === 'recording' || isProcessing}
+                disabled={isRecording || isProcessing}
               />
             </div>
           )}
