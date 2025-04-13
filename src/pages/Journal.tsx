@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -757,7 +756,6 @@ const Journal = () => {
           </>
         )}
         
-        {/* Add the debug panel */}
         <JournalDebugPanel />
       </div>
     </ErrorBoundary>
