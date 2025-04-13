@@ -6,8 +6,8 @@ import { processBase64Chunks, detectFileType } from "./audioProcessing.ts";
 import { 
   generateEmbedding, 
   analyzeEmotions, 
-  translateAudioWithWhisper,
-  enhanceTranslatedText
+  transcribeAudioWithWhisper,
+  translateWithGPT
 } from "./aiProcessing.ts";
 import { analyzeWithGoogleNL } from "./nlProcessing.ts";
 import { 
@@ -57,7 +57,7 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload');
     }
 
-    const { audio, userId, directTranscription, useTranslation } = payload;
+    const { audio, userId, directTranscription } = payload;
     
     // Validate required fields
     if (!audio) {
@@ -74,7 +74,7 @@ serve(async (req) => {
     console.log("Received audio data, processing...");
     console.log("User ID:", userId);
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
-    console.log("Using Whisper translation API:", useTranslation ? "YES" : "NO");
+    console.log("Using two-step process: Whisper transcription + GPT translation");
     
     // Ensure user profile exists
     if (userId) {
@@ -115,19 +115,24 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: mimeType });
     
     try {
-      // Directly translate audio using Whisper
-      console.log("Using Whisper translation API for direct translation to English");
-      const translatedText = await translateAudioWithWhisper(blob, detectedFileType, openAIApiKey);
-      console.log("Translation successful:", translatedText);
+      // Step 1: Transcribe audio using Whisper with language detection
+      console.log("STEP 1: Transcribing audio with Whisper (language auto-detection)");
+      const { text: transcription, detectedLanguages } = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
+      console.log("Transcription successful:", transcription.slice(0, 100) + "...");
+      console.log("Detected languages:", detectedLanguages ? JSON.stringify(detectedLanguages) : "None detected");
 
-      // If direct transcription mode, return just the transcription/translation
+      // If direct transcription mode, return just the transcription
       if (directTranscription) {
-        return createSuccessResponse({ transcription: translatedText });
+        return createSuccessResponse({ 
+          transcription,
+          predictedLanguages: detectedLanguages
+        });
       }
 
-      // Since we're using Whisper's direct translation, we'll use the same text
-      // for both transcription and refined text
-      const refinedText = translatedText;
+      // Step 2: Translate transcription to English using GPT
+      console.log("STEP 2: Translating transcription with GPT");
+      const refinedText = await translateWithGPT(transcription, detectedLanguages, openAIApiKey);
+      console.log("Translation successful:", refinedText.slice(0, 100) + "...");
 
       // Get emotions from the translated text
       const { data: emotionsData, error: emotionsError } = await supabase
@@ -152,7 +157,7 @@ serve(async (req) => {
       if (detectedFileType === 'webm') {
         // For WebM, use the recordingTime from the client if available, or estimate
         // WebM is compressed so bytes don't directly correlate to duration
-        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : translatedText.length / 15;
+        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : transcription.length / 15;
       } else if (detectedFileType === 'wav') {
         // For WAV (assuming 48kHz, 16-bit, stereo)
         // 48000 samples/sec * 2 bytes/sample * 2 channels = 192000 bytes/sec
@@ -160,33 +165,34 @@ serve(async (req) => {
       } else {
         // Fallback estimation based on translation length
         // Average speaking rate is ~150 words per minute
-        const wordCount = translatedText.split(/\s+/).length;
+        const wordCount = transcription.split(/\s+/).length;
         audioDuration = Math.max(1, Math.round(wordCount / 2.5)); // ~150 words/min = 2.5 words/sec
       }
       
       console.log(`Calculated audio duration: ${audioDuration} seconds`);
 
-      // Store journal entry in database - use the translated text for both fields
-      // since we're getting direct translation from Whisper
+      // Store journal entry in database
       console.log("Storing journal entry with data:", {
-        transcription_length: translatedText.length,
+        transcription_length: transcription.length,
         refined_text_length: refinedText.length,
         audio_url: audioUrl ? "present" : "absent",
         user_id: userId ? "present" : "absent",
         emotions: emotions ? "present" : "absent",
         entities: entities ? `${entities.length} entities` : "absent",
+        predicted_languages: detectedLanguages ? "present" : "absent"
       });
       
       const entryId = await storeJournalEntry(
         supabase,
-        translatedText, // Use translated text as transcription 
-        refinedText,    // Use the same translated text as refined text
+        transcription,    // Original transcription with detected language
+        refinedText,      // GPT-translated English text
         audioUrl,
         userId,
         audioDuration,
         emotions,
         sentimentScore,
-        entities
+        entities,
+        detectedLanguages // Store detected languages in the database
       );
 
       if (entryId) {
@@ -244,13 +250,14 @@ serve(async (req) => {
 
       // Return success response
       return createSuccessResponse({
-        transcription: translatedText,
+        transcription: transcription,
         refinedText: refinedText,
         audioUrl: audioUrl,
         entryId: entryId,
         emotions: emotions,
         sentiment: sentimentScore,
-        entities: entities
+        entities: entities,
+        predictedLanguages: detectedLanguages
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);

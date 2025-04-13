@@ -44,7 +44,7 @@ export async function processRecordingInBackground(
     }
     
     console.log('[BackgroundProcessor] Audio converted to base64');
-    console.log('[BackgroundProcessor] Sending audio to transcribe function for direct translation');
+    console.log('[BackgroundProcessor] Sending audio to transcribe function for processing');
     
     // Calculate recording duration in seconds from blob
     // Since Blob doesn't have a duration property, we need to estimate it differently
@@ -59,8 +59,7 @@ export async function processRecordingInBackground(
       body: {
         audio: base64Audio,
         userId: userId,
-        recordingTime: recordingTimeMs,
-        useTranslation: true // Add flag to use Whisper's translation API
+        recordingTime: recordingTimeMs
       }
     });
     
@@ -75,6 +74,7 @@ export async function processRecordingInBackground(
     console.log('[BackgroundProcessor] EntryId:', data?.entryId);
     console.log('[BackgroundProcessor] Transcription length:', data?.transcription?.length || 0);
     console.log('[BackgroundProcessor] Refined text length:', data?.refinedText?.length || 0);
+    console.log('[BackgroundProcessor] Predicted languages:', data?.predictedLanguages || 'None');
     
     // Stop tracking this processing task
     updateProcessingEntries(tempId, 'remove');
