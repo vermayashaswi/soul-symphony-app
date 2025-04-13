@@ -1,3 +1,4 @@
+
 /**
  * Database operations for the transcribe-audio function
  */
@@ -190,6 +191,7 @@ export async function storeJournalEntry(
     
     console.log('Storing journal entry with content of length:', content.length);
     console.log('Sentiment score:', sentiment);
+    console.log('Predicted languages:', predictedLanguages ? JSON.stringify(predictedLanguages) : 'None');
     
     const { data, error } = await supabase
       .from('Journal Entries')
