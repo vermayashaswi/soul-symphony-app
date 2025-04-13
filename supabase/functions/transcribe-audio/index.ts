@@ -178,8 +178,7 @@ serve(async (req) => {
         audioDuration,
         emotions,
         sentimentScore,
-        entities,
-        null // Passing null for predictedLanguages
+        entities
       );
 
       console.log("Journal entry stored with ID:", entryId);

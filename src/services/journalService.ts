@@ -105,7 +105,6 @@ export const fetchJournalEntries = async (
         id: data[0].id,
         text: data[0]["refined text"],
         created: data[0].created_at,
-        languages: data[0].predicted_languages,
         duration: data[0].duration
       });
     } else {
@@ -120,12 +119,7 @@ export const fetchJournalEntries = async (
       sentiment: item.sentiment,
       themes: item.master_themes,
       foreignKey: item["foreign key"],
-      predictedLanguages: item.predicted_languages ? 
-        // Ensure we're returning the right type for predictedLanguages
-        (typeof item.predicted_languages === 'string' ? 
-          JSON.parse(item.predicted_languages) : 
-          item.predicted_languages) : 
-        null,
+      predictedLanguages: null, // Set to null as we no longer use this field
       entities: item.entities ? (item.entities as any[]).map(entity => ({
         type: entity.type,
         name: entity.name,

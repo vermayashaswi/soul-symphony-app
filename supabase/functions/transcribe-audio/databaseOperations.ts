@@ -96,14 +96,13 @@ export async function storeJournalEntry(
   audioDuration: number,
   emotions: any,
   sentimentScore: string,
-  entities: any[],
-  predictedLanguages: any
+  entities: any[]
 ) {
   try {
     // Convert userId to text format explicitly to match column type in DB table
     const userIdForDb = userId ? userId : null;
     
-    // Create entry object without predictedLanguages if it's null
+    // Create entry object without predictedLanguages
     const entryData: any = { 
       "transcription text": transcribedText,
       "refined text": refinedText,
@@ -114,11 +113,6 @@ export async function storeJournalEntry(
       "sentiment": sentimentScore,
       "entities": entities
     };
-    
-    // Only add predictedLanguages field if it's not null
-    if (predictedLanguages !== null) {
-      entryData["predicted_languages"] = predictedLanguages;
-    }
     
     const { data: entryResult, error: insertError } = await supabase
       .from('Journal Entries')
