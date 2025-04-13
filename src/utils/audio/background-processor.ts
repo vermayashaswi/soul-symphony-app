@@ -92,7 +92,7 @@ export async function processRecordingInBackground(
     console.log('[BackgroundProcessor] Transcription service:', result.data?.transcriptionService || 'whisper');
     
     // Show success notification
-    toast.success('Journal entry saved successfully', {
+    toast.success(`Journal entry saved successfully ${useGoogleSTT ? '(using OpenAI Whisper fallback)' : ''}`, {
       id: `success-${tempId}`,
       duration: 3000,
     });
