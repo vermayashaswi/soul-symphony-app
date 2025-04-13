@@ -6,8 +6,8 @@ import { processBase64Chunks, detectFileType } from "./audioProcessing.ts";
 import { 
   generateEmbedding, 
   analyzeEmotions, 
-  transcribeAudioWithWhisper,
-  translateAndRefineText
+  translateAudioWithWhisper,
+  enhanceTranslatedText
 } from "./aiProcessing.ts";
 import { analyzeWithGoogleNL } from "./nlProcessing.ts";
 import { 
@@ -115,17 +115,18 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: mimeType });
     
     try {
-      // Transcribe audio file
-      const transcribedText = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
-      console.log("Transcription successful:", transcribedText);
+      // Directly translate audio using Whisper
+      console.log("Using Whisper translation API for direct translation to English");
+      const translatedText = await translateAudioWithWhisper(blob, detectedFileType, openAIApiKey);
+      console.log("Translation successful:", translatedText);
 
-      // If direct transcription mode, return just the transcription
+      // If direct transcription mode, return just the transcription/translation
       if (directTranscription) {
-        return createSuccessResponse({ transcription: transcribedText });
+        return createSuccessResponse({ transcription: translatedText });
       }
 
-      // Process with GPT for translation and refinement
-      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey);
+      // Optionally enhance the translated text if needed
+      const { refinedText } = await enhanceTranslatedText(translatedText, openAIApiKey);
 
       // Get emotions from the refined text
       const { data: emotionsData, error: emotionsError } = await supabase
@@ -150,23 +151,24 @@ serve(async (req) => {
       if (detectedFileType === 'webm') {
         // For WebM, use the recordingTime from the client if available, or estimate
         // WebM is compressed so bytes don't directly correlate to duration
-        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : transcribedText.length / 15;
+        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : translatedText.length / 15;
       } else if (detectedFileType === 'wav') {
         // For WAV (assuming 48kHz, 16-bit, stereo)
         // 48000 samples/sec * 2 bytes/sample * 2 channels = 192000 bytes/sec
         audioDuration = Math.round(binaryAudio.length / 192000);
       } else {
-        // Fallback estimation based on transcription length
+        // Fallback estimation based on translation length
         // Average speaking rate is ~150 words per minute
-        const wordCount = transcribedText.split(/\s+/).length;
+        const wordCount = translatedText.split(/\s+/).length;
         audioDuration = Math.max(1, Math.round(wordCount / 2.5)); // ~150 words/min = 2.5 words/sec
       }
       
       console.log(`Calculated audio duration: ${audioDuration} seconds`);
 
-      // Store journal entry in database
+      // Store journal entry in database - use the translated text for both fields
+      // since we're getting direct translation from Whisper
       console.log("Storing journal entry with data:", {
-        transcription_length: transcribedText.length,
+        transcription_length: translatedText.length,
         refined_text_length: refinedText.length,
         audio_url: audioUrl ? "present" : "absent",
         user_id: userId ? "present" : "absent",
@@ -176,8 +178,8 @@ serve(async (req) => {
       
       const entryId = await storeJournalEntry(
         supabase,
-        transcribedText,
-        refinedText,
+        translatedText, // Use translated text as transcription 
+        refinedText,    // Use enhanced text as refined text
         audioUrl,
         userId,
         audioDuration,
@@ -241,7 +243,7 @@ serve(async (req) => {
 
       // Return success response
       return createSuccessResponse({
-        transcription: transcribedText,
+        transcription: translatedText,
         refinedText: refinedText,
         audioUrl: audioUrl,
         entryId: entryId,

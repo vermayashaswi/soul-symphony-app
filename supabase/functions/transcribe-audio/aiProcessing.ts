@@ -1,4 +1,3 @@
-
 /**
  * AI processing utilities for transcription, translation, and analysis
  */
@@ -103,9 +102,9 @@ export async function analyzeEmotions(text: string, emotions: any[], openAIApiKe
 }
 
 /**
- * Transcribes audio and translates it if needed
+ * Transcribes and translates audio using Whisper's translation capability
  */
-export async function transcribeAudioWithWhisper(
+export async function translateAudioWithWhisper(
   audioBlob: Blob, 
   fileType: string, 
   openAIApiKey: string
@@ -115,10 +114,13 @@ export async function transcribeAudioWithWhisper(
   formData.append('model', 'whisper-1');
   formData.append('response_format', 'json');
   
-  // No language parameter - let Whisper auto-detect
-  console.log("Sending to Whisper API with auto language detection");
+  // Set response_format to be "text" to get plain text
+  // Add translate=true parameter to use Whisper's translation capabilities
+  formData.append('translate', 'true');
   
-  const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+  console.log("Sending to Whisper API with translation enabled");
+  
+  const whisperResponse = await fetch('https://api.openai.com/v1/audio/translations', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${openAIApiKey}`,
@@ -137,14 +139,62 @@ export async function transcribeAudioWithWhisper(
 }
 
 /**
- * Translates and refines the transcribed text
+ * Optional post-processing for translated text (if needed)
  */
+export async function enhanceTranslatedText(
+  translatedText: string,
+  openAIApiKey: string
+): Promise<{ refinedText: string }> {
+  try {
+    console.log("Enhancing translated text:", translatedText.slice(0, 100) + "...");
+    
+    const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert editor who enhances translated text to sound more natural and fluent in English while preserving the original meaning, tone, and emotions. You do minimal editing, focusing on fixing awkward phrasing and preserving the authentic voice of the author. Do not skip or paraphrase emotional expressions like sighs, pauses, or laughter—represent them appropriately in brackets if necessary. If anything is unclear or inaudible, keep it as is without adding interpretation.'
+          },
+          {
+            role: 'user',
+            content: `Here is the translated text to enhance: "${translatedText}"`
+          }
+        ]
+      }),
+    });
+
+    if (!gptResponse.ok) {
+      const errorText = await gptResponse.text();
+      console.error("GPT API error:", errorText);
+      throw new Error(`GPT API error: ${errorText}`);
+    }
+
+    const gptResult = await gptResponse.json();
+    const refinedText = gptResult.choices[0].message.content;
+    
+    console.log("Enhanced text (first 100 chars):", refinedText.slice(0, 100) + "...");
+    
+    return { refinedText };
+  } catch (error) {
+    console.error("Error in enhanceTranslatedText:", error);
+    // If enhancement fails, return original text
+    return { refinedText: translatedText };
+  }
+}
+
+// Keep the original translateAndRefineText as a fallback or for compatibility
 export async function translateAndRefineText(
   transcribedText: string,
   openAIApiKey: string
 ): Promise<{ refinedText: string }> {
   try {
-    console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
+    console.log("Using legacy translation method:", transcribedText.slice(0, 100) + "...");
     
     const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

@@ -23,7 +23,7 @@ export async function sendAudioForTranscription(
       throw new Error('No audio data provided');
     }
 
-    console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
+    console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} translation processing using Whisper`);
     console.log(`Audio data size: ${base64Audio.length} characters`);
     
     // Call the Supabase edge function with a longer timeout
@@ -63,7 +63,7 @@ export async function sendAudioForTranscription(
       };
     }
 
-    console.log('Transcription successful:', {
+    console.log('Translation with Whisper successful:', {
       directMode: directTranscription,
       transcriptionLength: response.data?.transcription?.length || 0,
       hasEntryId: !!response.data?.entryId
