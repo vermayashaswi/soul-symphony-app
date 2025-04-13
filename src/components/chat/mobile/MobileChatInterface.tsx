@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Brain, BarChart2, Search, Lightbulb, Trash2 } from "lucide-react";
+import { Menu, Brain, BarChart2, Search, Lightbulb, Trash2 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage } from "@/services/chatService";
@@ -533,8 +533,6 @@ const MobileChatInterfaceContent = ({
     }
   };
 
-  
-
   return (
     <div className="flex flex-col h-full" ref={containerRef}>
       <div className="mobile-chat-header flex items-center justify-between py-2 px-3 sticky top-0 z-10 bg-background border-b">
@@ -545,16 +543,6 @@ const MobileChatInterfaceContent = ({
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 sm:max-w-sm w-[85vw]">
-            <div className="flex justify-end p-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-9 w-9" 
-                onClick={() => setSheetOpen(false)}
-              >
-                <X className="h-6 w-6" />
-              </Button>
-            </div>
             <ChatThreadList 
               userId={userId || user?.id} 
               onSelectThread={handleSelectThread}

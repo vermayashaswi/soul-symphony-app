@@ -228,37 +228,25 @@ export default function ChatThreadList({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-2 border-b flex items-center justify-between">
+      <div className="p-2 border-b">
         {newChatButtonWidth === "full" ? (
-          <>
-            <Button
-              variant="default"
-              className="w-full justify-start"
-              onClick={handleNewThread}
-            >
-              <PlusCircle className="h-4 w-4 mr-2" />
-              New Chat
-            </Button>
-          </>
+          <Button
+            variant="default"
+            className="w-full justify-start"
+            onClick={handleNewThread}
+          >
+            <PlusCircle className="h-4 w-4 mr-2" />
+            New Chat
+          </Button>
         ) : (
-          <>
-            <Button
-              variant="default"
-              className="flex-1 justify-center"
-              onClick={handleNewThread}
-            >
-              <PlusCircle className="h-4 w-4 mr-1" />
-              New Chat
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => window.dispatchEvent(new CustomEvent('closeChatSidebar'))}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </>
+          <Button
+            variant="default"
+            className="w-full justify-center"
+            onClick={handleNewThread}
+          >
+            <PlusCircle className="h-4 w-4 mr-1" />
+            New Chat
+          </Button>
         )}
       </div>
       
