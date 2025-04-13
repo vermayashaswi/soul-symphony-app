@@ -1,5 +1,4 @@
 
-
 import { supabase } from '@/integrations/supabase/client';
 
 interface TranscriptionResult {
@@ -24,44 +23,39 @@ export async function sendAudioForTranscription(
       throw new Error('No audio data provided');
     }
 
-    if (!userId) {
-      throw new Error('User ID is required for transcription');
-    }
-
-    console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} transcription with Whisper + GPT translation`);
+    console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`Audio data size: ${base64Audio.length} characters`);
-    console.log(`User ID: ${userId}`);
     
     // Call the Supabase edge function with a longer timeout
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+    const response = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64Audio,
         userId: userId || null,
-        directTranscription: directTranscription
+        directTranscription: directTranscription,
+        highQuality: true // Add flag to indicate this is a high-quality recording
       }
     });
 
     // Handle response errors
-    if (error) {
-      console.error('Edge function error:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
+    if (response.error) {
+      console.error('Edge function error:', response.error);
       return {
         success: false,
-        error: error?.message || 'Failed to process audio'
+        error: response.error?.message || 'Failed to process audio'
       };
     }
 
     // Check if the response has a success field
-    if (data?.success === false) {
-      console.error('Processing error:', data.error || data.message);
+    if (response.data?.success === false) {
+      console.error('Processing error:', response.data.error || response.data.message);
       return {
         success: false,
-        error: data.error || data.message || 'Unknown error in audio processing'
+        error: response.data.error || response.data.message || 'Unknown error in audio processing'
       };
     }
 
     // Validate that we have data back
-    if (!data) {
+    if (!response.data) {
       console.error('No data returned from edge function');
       return {
         success: false,
@@ -69,20 +63,18 @@ export async function sendAudioForTranscription(
       };
     }
 
-    console.log('Transcription with Whisper + GPT successful:', {
+    console.log('Transcription successful:', {
       directMode: directTranscription,
-      transcriptionLength: data?.transcription?.length || 0,
-      hasEntryId: !!data?.entryId,
-      predictedLanguages: data?.predictedLanguages ? 'present' : 'none'
+      transcriptionLength: response.data?.transcription?.length || 0,
+      hasEntryId: !!response.data?.entryId
     });
 
     return {
       success: true,
-      data: data
+      data: response.data
     };
   } catch (error: any) {
     console.error('Error in sendAudioForTranscription:', error);
-    console.error('Stack trace:', error.stack);
     return {
       success: false,
       error: error.message || 'Unknown error occurred'

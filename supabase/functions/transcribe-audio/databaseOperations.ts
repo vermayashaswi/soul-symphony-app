@@ -1,23 +1,20 @@
 /**
  * Database operations for the transcribe-audio function
  */
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 /**
- * Creates a Supabase admin client
+ * Creates a Supabase client with admin privileges
  */
-export function createSupabaseAdmin(url: string, serviceKey: string) {
-  return createClient(url, serviceKey);
+export function createSupabaseAdmin(supabaseUrl: string, supabaseServiceKey: string) {
+  return createClient(supabaseUrl, supabaseServiceKey);
 }
 
 /**
- * Ensures the user profile exists
+ * Ensures a user profile exists, creates one if it doesn't
  */
 export async function createProfileIfNeeded(supabase: any, userId: string) {
-  if (!userId) {
-    console.error("Cannot create profile: No user ID provided");
-    return;
-  }
+  if (!userId) return;
   
   try {
     console.log("Checking if profile exists for user:", userId);
@@ -33,7 +30,7 @@ export async function createProfileIfNeeded(supabase: any, userId: string) {
       console.log("Profile not found, creating one");
       
       // Get user data from auth
-      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+      const { data: userData, error: userError } = await supabase.auth.getUser(userId);
       if (userError) {
         console.error("Error getting user data:", userError);
         return;
@@ -65,9 +62,9 @@ export async function createProfileIfNeeded(supabase: any, userId: string) {
 }
 
 /**
- * Extracts themes from journal entry text
+ * Extracts themes from text for a journal entry
  */
-export async function extractThemes(supabase: any, text: string, entryId: number) {
+export async function extractThemes(supabase: any, text: string, entryId: number): Promise<void> {
   try {
     console.log(`Automatically extracting themes for entry ${entryId}`);
     
@@ -88,15 +85,80 @@ export async function extractThemes(supabase: any, text: string, entryId: number
 }
 
 /**
+ * Stores a journal entry in the database
+ */
+export async function storeJournalEntry(
+  supabase: any,
+  transcribedText: string,
+  refinedText: string,
+  audioUrl: string | null,
+  userId: string | null,
+  audioDuration: number,
+  emotions: any,
+  sentimentScore: string,
+  entities: any[]
+) {
+  try {
+    // Convert userId to text format explicitly to match column type in DB table
+    const userIdForDb = userId ? userId : null;
+    
+    console.log("Inserting entry with data:", {
+      transcribed_text_length: transcribedText?.length || 0,
+      refined_text_length: refinedText?.length || 0,
+      has_audio_url: !!audioUrl,
+      user_id_present: !!userIdForDb,
+      has_emotions: !!emotions,
+      sentiment: sentimentScore,
+      entities_count: entities?.length || 0,
+      duration: audioDuration
+    });
+    
+    const { data: entryData, error: insertError } = await supabase
+      .from('Journal Entries')
+      .insert([{ 
+        "transcription text": transcribedText,
+        "refined text": refinedText,
+        "audio_url": audioUrl,
+        "user_id": userIdForDb,
+        "duration": audioDuration,
+        "emotions": emotions,
+        "sentiment": sentimentScore,
+        "entities": entities
+      }])
+      .select();
+        
+    if (insertError) {
+      console.error('Error creating entry in database:', insertError);
+      console.error('Error details:', JSON.stringify(insertError));
+      throw new Error(`Database insert error: ${insertError.message}`);
+    } else if (entryData && entryData.length > 0) {
+      console.log("Journal entry saved to database:", entryData[0].id);
+      return entryData[0].id;
+    } else {
+      console.error("No data returned from insert operation");
+      throw new Error("Failed to create journal entry in database");
+    }
+  } catch (dbErr) {
+    console.error("Database error:", dbErr);
+    throw new Error(`Database error: ${dbErr.message}`);
+  }
+}
+
+/**
  * Stores an embedding for a journal entry
  */
-export async function storeEmbedding(supabase: any, entryId: number, text: string, embedding: number[]) {
+export async function storeEmbedding(
+  supabase: any,
+  entryId: number,
+  refinedText: string,
+  embedding: number[]
+) {
   try {
     const { error: embeddingError } = await supabase
       .from('journal_embeddings')
       .insert([{ 
         journal_entry_id: entryId,
-        content: text,
+        content: refinedText,
         embedding: embedding
       }]);
         
@@ -115,14 +177,11 @@ export async function storeEmbedding(supabase: any, entryId: number, text: strin
 }
 
 /**
- * Verifies a journal entry exists
+ * Verifies that a journal entry was successfully stored
  */
 export async function verifyJournalEntry(supabase: any, entryId: number) {
   try {
-    if (!entryId) {
-      console.error("Cannot verify entry: No entry ID provided");
-      return false;
-    }
+    if (!entryId) return false;
     
     const { data: verifyEntry, error: verifyError } = await supabase
       .from('Journal Entries')
@@ -140,106 +199,5 @@ export async function verifyJournalEntry(supabase: any, entryId: number) {
   } catch (verifyErr) {
     console.error('Error verifying entry in database:', verifyErr);
     return false;
-  }
-}
-
-/**
- * Stores a new journal entry in the database
- */
-export async function storeJournalEntry(
-  supabase: any,
-  transcriptionText: string,
-  refinedText: string,
-  audioUrl: string | null,
-  userId: string | null,
-  audioDuration: number = 0,
-  emotions: any = null,
-  sentimentScore: number = 0,
-  entities: any[] = [],
-  predictedLanguages: {[key: string]: number} | null = null
-) {
-  try {
-    if (!transcriptionText && !refinedText) {
-      throw new Error('No text provided for journal entry');
-    }
-
-    if (!userId) {
-      throw new Error('User ID is required to store journal entry');
-    }
-
-    let content = refinedText || transcriptionText;
-    
-    // Determine which content to use
-    if (content.trim() === '') {
-      content = 'Empty entry';
-    }
-
-    // Add fallback sentiment
-    let sentiment = sentimentScore;
-    if (sentiment === 0 && emotions) {
-      // Try to calculate sentiment from emotions
-      const positiveEmotions = ['joy', 'gratitude', 'serenity', 'interest', 'hope', 'pride', 'amusement', 'inspiration'];
-      const negativeEmotions = ['anger', 'fear', 'disgust', 'sadness', 'guilt', 'envy', 'anxiety', 'shame'];
-      
-      let positiveScore = 0;
-      let negativeScore = 0;
-      
-      Object.entries(emotions).forEach(([emotion, score]) => {
-        const numericScore = typeof score === 'number' ? score : 0;
-        if (positiveEmotions.includes(emotion.toLowerCase())) {
-          positiveScore += numericScore;
-        }
-        if (negativeEmotions.includes(emotion.toLowerCase())) {
-          negativeScore += numericScore;
-        }
-      });
-      
-      sentiment = positiveScore - negativeScore;
-      // Clamp the sentiment score between -1 and 1
-      sentiment = Math.max(-1, Math.min(1, sentiment));
-    }
-    
-    console.log('Storing journal entry with content of length:', content.length);
-    console.log('User ID:', userId);
-    console.log('Sentiment score:', sentiment);
-    console.log('Predicted languages:', predictedLanguages ? JSON.stringify(predictedLanguages) : 'None');
-    
-    // Insert the entry with all available data
-    const insertResult = await supabase
-      .from('Journal Entries')
-      .insert([
-        {
-          content: content,
-          "transcription text": transcriptionText,
-          "refined text": refinedText,
-          audio_url: audioUrl,
-          user_id: userId,
-          sentiment: sentiment,
-          emotions: emotions ? JSON.stringify(emotions) : null,
-          duration: audioDuration,
-          entities: entities || [],
-          predicted_languages: predictedLanguages
-        }
-      ])
-      .select('id');
-      
-    if (insertResult.error) {
-      console.error('Error storing journal entry in database:', insertResult.error);
-      console.error('Error details:', JSON.stringify(insertResult.error, null, 2));
-      throw insertResult.error;
-    }
-    
-    if (!insertResult.data || insertResult.data.length === 0) {
-      console.error('No data returned from journal entry insert');
-      throw new Error('Failed to create journal entry - no ID returned');
-    }
-    
-    const entryId = insertResult.data[0].id;
-    console.log('Journal entry stored with ID:', entryId);
-    
-    return entryId;
-  } catch (err) {
-    console.error('Error in storeJournalEntry:', err);
-    throw err;
   }
 }

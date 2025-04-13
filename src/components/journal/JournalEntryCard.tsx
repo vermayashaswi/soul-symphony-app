@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -52,8 +51,7 @@ export function JournalEntryCard({
     created_at: entry?.created_at || new Date().toISOString(),
     sentiment: entry?.sentiment || null,
     master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
-    themes: Array.isArray(entry?.themes) ? entry.themes : [],
-    predictedLanguages: entry?.predictedLanguages || null
+    themes: Array.isArray(entry?.themes) ? entry.themes : []
   };
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -191,26 +189,9 @@ export function JournalEntryCard({
     }
   };
 
-  // Format detected languages for display
-  const formatLanguages = () => {
-    if (!safeEntry.predictedLanguages) return null;
-    
-    try {
-      return Object.entries(safeEntry.predictedLanguages)
-        .sort((a, b) => b[1] - a[1]) // Sort by confidence (highest first)
-        .filter(([_, conf]) => conf > 0.1) // Only show languages with >10% confidence
-        .map(([lang, conf]) => `${lang} (${Math.round(conf * 100)}%)`)
-        .join(', ');
-    } catch (error) {
-      console.error('[JournalEntryCard] Error formatting languages:', error);
-      return null;
-    }
-  };
-
   const isSentimentProcessing = !safeEntry.sentiment && isNew;
   const isThemesProcessing = isProcessing || isEntryBeingProcessed();
   const isContentProcessing = !safeEntry.content || safeEntry.content === "Processing entry..." || isProcessing;
-  const languagesDisplay = formatLanguages();
 
   if (hasError) {
     return (
@@ -273,23 +254,15 @@ export function JournalEntryCard({
             </ErrorBoundary>
             
             {isExpanded && (
-              <>
-                <ErrorBoundary>
-                  <ThemeLoader 
-                    entryId={safeEntry.id}
-                    initialThemes={initialThemes}
-                    content={safeEntry.content}
-                    isProcessing={isThemesProcessing}
-                    isNew={isNew}
-                  />
-                </ErrorBoundary>
-                
-                {languagesDisplay && (
-                  <div className="mt-4 text-sm text-muted-foreground">
-                    <span className="font-medium">Detected languages:</span> {languagesDisplay}
-                  </div>
-                )}
-              </>
+              <ErrorBoundary>
+                <ThemeLoader 
+                  entryId={safeEntry.id}
+                  initialThemes={initialThemes}
+                  content={safeEntry.content}
+                  isProcessing={isThemesProcessing}
+                  isNew={isNew}
+                />
+              </ErrorBoundary>
             )}
           </div>
         </Card>

@@ -123,7 +123,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       isProcessing,
       hasAudioBlob: !!audioBlob,
       audioSize: audioBlob?.size || 0,
-      audioType: audioBlob?.type || 'none',
       isRecording,
       hasPermission,
       audioDuration,
@@ -131,8 +130,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       hasPlayedOnce,
       audioPrepared,
       waitingForClear,
-      toastsCleared,
-      userId: user?.id || 'none'
+      toastsCleared
     });
     
     if (updateDebugInfo) {
@@ -143,7 +141,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         duration: audioDuration || recordingTime
       });
     }
-  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo, user]);
+  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
   useEffect(() => {
     return () => {
@@ -230,17 +228,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         duration: audioDuration,
         recordingTime: recordingTime,
         hasPlayedOnce: hasPlayedOnce,
-        audioPrepared: audioPrepared,
-        userId: user?.id || 'none'
+        audioPrepared: audioPrepared
       });
       
       if (!hasPlayedOnce && audioDuration === 0 && recordingTime > 0) {
         const estimatedDuration = recordingTime / 1000;
         console.log(`[VoiceRecorder] Recording not played yet, estimating duration as ${estimatedDuration}s`);
-      }
-      
-      if (!user?.id) {
-        console.warn('[VoiceRecorder] No user ID available, this may cause recording to fail');
       }
       
       if (onRecordingComplete) {

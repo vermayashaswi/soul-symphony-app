@@ -7,7 +7,7 @@ import {
   generateEmbedding, 
   analyzeEmotions, 
   transcribeAudioWithWhisper,
-  translateWithGPT
+  translateAndRefineText
 } from "./aiProcessing.ts";
 import { analyzeWithGoogleNL } from "./nlProcessing.ts";
 import { 
@@ -57,17 +57,12 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload');
     }
 
-    const { audio, userId, directTranscription } = payload;
+    const { audio, userId, directTranscription, highQuality } = payload;
     
     // Validate required fields
     if (!audio) {
       console.error('No audio data provided in payload');
       throw new Error('No audio data provided');
-    }
-
-    if (!userId) {
-      console.error('No user ID provided in payload');
-      throw new Error('User ID is required');
     }
 
     if (!openAIApiKey) {
@@ -79,7 +74,7 @@ serve(async (req) => {
     console.log("Received audio data, processing...");
     console.log("User ID:", userId);
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
-    console.log("Using two-step process: Whisper transcription + GPT translation");
+    console.log("High quality mode:", highQuality ? "YES" : "NO");
     
     // Ensure user profile exists
     if (userId) {
@@ -120,26 +115,19 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: mimeType });
     
     try {
-      // Step 1: Transcribe audio using Whisper with language detection
-      console.log("STEP 1: Transcribing audio with Whisper (language auto-detection)");
-      const { text: transcription, detectedLanguages } = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
-      console.log("Transcription successful:", transcription.slice(0, 100) + "...");
-      console.log("Detected languages:", detectedLanguages ? JSON.stringify(detectedLanguages) : "None detected");
+      // Transcribe audio file
+      const transcribedText = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
+      console.log("Transcription successful:", transcribedText);
 
       // If direct transcription mode, return just the transcription
       if (directTranscription) {
-        return createSuccessResponse({ 
-          transcription,
-          predictedLanguages: detectedLanguages
-        });
+        return createSuccessResponse({ transcription: transcribedText });
       }
 
-      // Step 2: Translate transcription to English using GPT
-      console.log("STEP 2: Translating transcription with GPT");
-      const refinedText = await translateWithGPT(transcription, detectedLanguages, openAIApiKey);
-      console.log("Translation successful:", refinedText.slice(0, 100) + "...");
+      // Process with GPT for translation and refinement
+      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey);
 
-      // Get emotions from the translated text
+      // Get emotions from the refined text
       const { data: emotionsData, error: emotionsError } = await supabase
         .from('emotions')
         .select('name, description')
@@ -147,31 +135,14 @@ serve(async (req) => {
         
       if (emotionsError) {
         console.error('Error fetching emotions from database:', emotionsError);
-        // Continue without emotions data
+        throw new Error('Failed to fetch emotions data');
       }
       
-      // Analyze emotions in the translated text
-      let emotions = null;
-      try {
-        if (emotionsData) {
-          emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
-        }
-      } catch (emotionErr) {
-        console.error('Error analyzing emotions:', emotionErr);
-        // Continue without emotions
-      }
+      // Analyze emotions in the refined text
+      const emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
 
       // Analyze sentiment and extract entities using Google NL API
-      let sentimentScore = 0;
-      let entities = [];
-      try {
-        const nlResults = await analyzeWithGoogleNL(refinedText, GOOGLE_NL_API_KEY);
-        sentimentScore = nlResults.sentiment;
-        entities = nlResults.entities;
-      } catch (nlErr) {
-        console.error('Error in NL processing:', nlErr);
-        // Continue without NL results
-      }
+      const { sentiment: sentimentScore, entities } = await analyzeWithGoogleNL(refinedText, GOOGLE_NL_API_KEY);
 
       // Calculate audio duration more accurately based on file type and bytes
       let audioDuration = 0;
@@ -179,15 +150,15 @@ serve(async (req) => {
       if (detectedFileType === 'webm') {
         // For WebM, use the recordingTime from the client if available, or estimate
         // WebM is compressed so bytes don't directly correlate to duration
-        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : transcription.length / 15;
+        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : transcribedText.length / 15;
       } else if (detectedFileType === 'wav') {
         // For WAV (assuming 48kHz, 16-bit, stereo)
         // 48000 samples/sec * 2 bytes/sample * 2 channels = 192000 bytes/sec
         audioDuration = Math.round(binaryAudio.length / 192000);
       } else {
-        // Fallback estimation based on translation length
+        // Fallback estimation based on transcription length
         // Average speaking rate is ~150 words per minute
-        const wordCount = transcription.split(/\s+/).length;
+        const wordCount = transcribedText.split(/\s+/).length;
         audioDuration = Math.max(1, Math.round(wordCount / 2.5)); // ~150 words/min = 2.5 words/sec
       }
       
@@ -195,26 +166,24 @@ serve(async (req) => {
 
       // Store journal entry in database
       console.log("Storing journal entry with data:", {
-        transcription_length: transcription.length,
+        transcription_length: transcribedText.length,
         refined_text_length: refinedText.length,
         audio_url: audioUrl ? "present" : "absent",
-        user_id: userId ? userId : "absent",
+        user_id: userId ? "present" : "absent",
         emotions: emotions ? "present" : "absent",
         entities: entities ? `${entities.length} entities` : "absent",
-        predicted_languages: detectedLanguages ? "present" : "absent"
       });
       
       const entryId = await storeJournalEntry(
         supabase,
-        transcription,    // Original transcription with detected language
-        refinedText,      // GPT-translated English text
+        transcribedText,
+        refinedText,
         audioUrl,
         userId,
         audioDuration,
         emotions,
         sentimentScore,
-        entities,
-        detectedLanguages // Store detected languages in the database
+        entities
       );
 
       if (entryId) {
@@ -272,14 +241,13 @@ serve(async (req) => {
 
       // Return success response
       return createSuccessResponse({
-        transcription: transcription,
+        transcription: transcribedText,
         refinedText: refinedText,
         audioUrl: audioUrl,
         entryId: entryId,
         emotions: emotions,
         sentiment: sentimentScore,
-        entities: entities,
-        predictedLanguages: detectedLanguages
+        entities: entities
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);
