@@ -65,6 +65,11 @@ serve(async (req) => {
       throw new Error('No audio data provided');
     }
 
+    if (!userId) {
+      console.error('No user ID provided in payload');
+      throw new Error('User ID is required');
+    }
+
     if (!openAIApiKey) {
       console.error('OpenAI API key is missing or empty in environment variables');
       throw new Error('OpenAI API key is not configured. Please set the OPENAI_API_KEY secret in the Supabase dashboard.');
@@ -142,14 +147,31 @@ serve(async (req) => {
         
       if (emotionsError) {
         console.error('Error fetching emotions from database:', emotionsError);
-        throw new Error('Failed to fetch emotions data');
+        // Continue without emotions data
       }
       
       // Analyze emotions in the translated text
-      const emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
+      let emotions = null;
+      try {
+        if (emotionsData) {
+          emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
+        }
+      } catch (emotionErr) {
+        console.error('Error analyzing emotions:', emotionErr);
+        // Continue without emotions
+      }
 
       // Analyze sentiment and extract entities using Google NL API
-      const { sentiment: sentimentScore, entities } = await analyzeWithGoogleNL(refinedText, GOOGLE_NL_API_KEY);
+      let sentimentScore = 0;
+      let entities = [];
+      try {
+        const nlResults = await analyzeWithGoogleNL(refinedText, GOOGLE_NL_API_KEY);
+        sentimentScore = nlResults.sentiment;
+        entities = nlResults.entities;
+      } catch (nlErr) {
+        console.error('Error in NL processing:', nlErr);
+        // Continue without NL results
+      }
 
       // Calculate audio duration more accurately based on file type and bytes
       let audioDuration = 0;
@@ -176,7 +198,7 @@ serve(async (req) => {
         transcription_length: transcription.length,
         refined_text_length: refinedText.length,
         audio_url: audioUrl ? "present" : "absent",
-        user_id: userId ? "present" : "absent",
+        user_id: userId ? userId : "absent",
         emotions: emotions ? "present" : "absent",
         entities: entities ? `${entities.length} entities` : "absent",
         predicted_languages: detectedLanguages ? "present" : "absent"

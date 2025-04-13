@@ -23,8 +23,13 @@ export async function sendAudioForTranscription(
       throw new Error('No audio data provided');
     }
 
+    if (!userId) {
+      throw new Error('User ID is required for transcription');
+    }
+
     console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} transcription with Whisper + GPT translation`);
     console.log(`Audio data size: ${base64Audio.length} characters`);
+    console.log(`User ID: ${userId}`);
     
     // Call the Supabase edge function with a longer timeout
     const response = await supabase.functions.invoke('transcribe-audio', {
@@ -38,6 +43,7 @@ export async function sendAudioForTranscription(
     // Handle response errors
     if (response.error) {
       console.error('Edge function error:', response.error);
+      console.error('Error details:', JSON.stringify(response.error, null, 2));
       return {
         success: false,
         error: response.error?.message || 'Failed to process audio'
@@ -75,6 +81,7 @@ export async function sendAudioForTranscription(
     };
   } catch (error: any) {
     console.error('Error in sendAudioForTranscription:', error);
+    console.error('Stack trace:', error.stack);
     return {
       success: false,
       error: error.message || 'Unknown error occurred'

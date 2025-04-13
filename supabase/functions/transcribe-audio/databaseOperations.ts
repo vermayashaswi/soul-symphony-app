@@ -14,7 +14,10 @@ export function createSupabaseAdmin(url: string, serviceKey: string) {
  * Ensures the user profile exists
  */
 export async function createProfileIfNeeded(supabase: any, userId: string) {
-  if (!userId) return;
+  if (!userId) {
+    console.error("Cannot create profile: No user ID provided");
+    return;
+  }
   
   try {
     console.log("Checking if profile exists for user:", userId);
@@ -30,7 +33,7 @@ export async function createProfileIfNeeded(supabase: any, userId: string) {
       console.log("Profile not found, creating one");
       
       // Get user data from auth
-      const { data: userData, error: userError } = await supabase.auth.getUser(userId);
+      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
       if (userError) {
         console.error("Error getting user data:", userError);
         return;
@@ -116,7 +119,10 @@ export async function storeEmbedding(supabase: any, entryId: number, text: strin
  */
 export async function verifyJournalEntry(supabase: any, entryId: number) {
   try {
-    if (!entryId) return false;
+    if (!entryId) {
+      console.error("Cannot verify entry: No entry ID provided");
+      return false;
+    }
     
     const { data: verifyEntry, error: verifyError } = await supabase
       .from('Journal Entries')
@@ -157,6 +163,10 @@ export async function storeJournalEntry(
       throw new Error('No text provided for journal entry');
     }
 
+    if (!userId) {
+      throw new Error('User ID is required to store journal entry');
+    }
+
     let content = refinedText || transcriptionText;
     
     // Determine which content to use
@@ -190,10 +200,12 @@ export async function storeJournalEntry(
     }
     
     console.log('Storing journal entry with content of length:', content.length);
+    console.log('User ID:', userId);
     console.log('Sentiment score:', sentiment);
     console.log('Predicted languages:', predictedLanguages ? JSON.stringify(predictedLanguages) : 'None');
     
-    const { data, error } = await supabase
+    // Insert the entry with all available data
+    const insertResult = await supabase
       .from('Journal Entries')
       .insert([
         {
@@ -211,17 +223,18 @@ export async function storeJournalEntry(
       ])
       .select('id');
       
-    if (error) {
-      console.error('Error storing journal entry in database:', error);
-      throw error;
+    if (insertResult.error) {
+      console.error('Error storing journal entry in database:', insertResult.error);
+      console.error('Error details:', JSON.stringify(insertResult.error, null, 2));
+      throw insertResult.error;
     }
     
-    if (!data || data.length === 0) {
+    if (!insertResult.data || insertResult.data.length === 0) {
       console.error('No data returned from journal entry insert');
       throw new Error('Failed to create journal entry - no ID returned');
     }
     
-    const entryId = data[0].id;
+    const entryId = insertResult.data[0].id;
     console.log('Journal entry stored with ID:', entryId);
     
     return entryId;
