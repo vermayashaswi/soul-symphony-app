@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { resetProcessingState, setProcessingLock, updateProcessingEntries } from './processing-state';
+import { sendAudioForTranscription } from './transcription-service';
 
 /**
  * Process recording in the background
@@ -59,29 +60,19 @@ export async function processRecordingInBackground(
     
     console.log('[BackgroundProcessor] Estimated recording time:', recordingTimeMs, 'ms');
     
-    // Invoke the Supabase function to process the audio
-    console.log('[BackgroundProcessor] Calling transcribe-audio edge function with userId:', userId);
+    // Use our transcription service directly instead of calling the edge function again
+    console.log('[BackgroundProcessor] Sending audio for full transcription using transcription service');
     
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-      body: {
-        audio: base64Audio,
-        userId: userId,
-        recordingTime: recordingTimeMs
-      }
-    });
+    const result = await sendAudioForTranscription(base64Audio, userId, false);
     
-    console.log('[BackgroundProcessor] Edge function response received');
-    
-    if (error) {
-      console.error('[BackgroundProcessor] Error invoking transcribe-audio function:', error);
-      console.error('[BackgroundProcessor] Error details:', JSON.stringify(error, null, 2));
-      throw error;
+    if (!result.success) {
+      console.error('[BackgroundProcessor] Transcription service error:', result.error);
+      throw new Error(result.error || 'Failed to transcribe audio');
     }
     
-    if (!data) {
-      console.error('[BackgroundProcessor] No data returned from edge function');
-      throw new Error('No data received from server');
-    }
+    const data = result.data;
+    
+    console.log('[BackgroundProcessor] Transcription service response received');
     
     // Add detailed logging to track successful processing
     console.log('[BackgroundProcessor] Audio processing complete for tempId:', tempId);

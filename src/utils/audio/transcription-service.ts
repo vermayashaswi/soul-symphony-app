@@ -32,7 +32,7 @@ export async function sendAudioForTranscription(
     console.log(`User ID: ${userId}`);
     
     // Call the Supabase edge function with a longer timeout
-    const response = await supabase.functions.invoke('transcribe-audio', {
+    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64Audio,
         userId: userId || null,
@@ -41,26 +41,26 @@ export async function sendAudioForTranscription(
     });
 
     // Handle response errors
-    if (response.error) {
-      console.error('Edge function error:', response.error);
-      console.error('Error details:', JSON.stringify(response.error, null, 2));
+    if (error) {
+      console.error('Edge function error:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       return {
         success: false,
-        error: response.error?.message || 'Failed to process audio'
+        error: error?.message || 'Failed to process audio'
       };
     }
 
     // Check if the response has a success field
-    if (response.data?.success === false) {
-      console.error('Processing error:', response.data.error || response.data.message);
+    if (data?.success === false) {
+      console.error('Processing error:', data.error || data.message);
       return {
         success: false,
-        error: response.data.error || response.data.message || 'Unknown error in audio processing'
+        error: data.error || data.message || 'Unknown error in audio processing'
       };
     }
 
     // Validate that we have data back
-    if (!response.data) {
+    if (!data) {
       console.error('No data returned from edge function');
       return {
         success: false,
@@ -70,14 +70,14 @@ export async function sendAudioForTranscription(
 
     console.log('Transcription with Whisper + GPT successful:', {
       directMode: directTranscription,
-      transcriptionLength: response.data?.transcription?.length || 0,
-      hasEntryId: !!response.data?.entryId,
-      predictedLanguages: response.data?.predictedLanguages ? 'present' : 'none'
+      transcriptionLength: data?.transcription?.length || 0,
+      hasEntryId: !!data?.entryId,
+      predictedLanguages: data?.predictedLanguages ? 'present' : 'none'
     });
 
     return {
       success: true,
-      data: response.data
+      data: data
     };
   } catch (error: any) {
     console.error('Error in sendAudioForTranscription:', error);

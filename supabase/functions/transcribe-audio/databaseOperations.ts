@@ -1,7 +1,7 @@
-
 /**
  * Database operations for the transcribe-audio function
  */
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * Creates a Supabase admin client
@@ -210,13 +210,13 @@ export async function storeJournalEntry(
       .insert([
         {
           content: content,
-          raw_transcript: transcriptionText,
-          refined_text: refinedText,
+          "transcription text": transcriptionText,
+          "refined text": refinedText,
           audio_url: audioUrl,
           user_id: userId,
           sentiment: sentiment,
-          emotions_json: emotions ? JSON.stringify(emotions) : null,
-          audio_duration: audioDuration,
+          emotions: emotions ? JSON.stringify(emotions) : null,
+          duration: audioDuration,
           entities: entities || [],
           predicted_languages: predictedLanguages
         }
