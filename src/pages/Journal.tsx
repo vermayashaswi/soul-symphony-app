@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording } from '@/utils/audio-processing';
@@ -11,7 +12,8 @@ import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
-import { debugLogger, logInfo, logError } from '@/components/debug/DebugPanel';
+import { useDebugLog } from '@/utils/debug/DebugContext';
+import JournalDebugPanel from '@/components/journal/JournalDebugPanel';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -44,13 +46,14 @@ const Journal = () => {
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
   const [entriesReady, setEntriesReady] = useState(false);
   const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { addEvent } = useDebugLog();
 
   useEffect(() => {
-    logInfo('Journal page mounted', 'Journal');
+    addEvent('Journal', 'Journal page mounted', 'info');
     
     const handleError = (event: ErrorEvent) => {
       console.error('[Journal] Caught render error:', event);
-      logError(`Render error: ${event.message}`, 'Journal', {
+      addEvent('Journal', `Render error: ${event.message}`, 'error', {
         filename: event.filename,
         lineno: event.lineno,
         stack: event.error?.stack
@@ -61,7 +64,7 @@ const Journal = () => {
     window.addEventListener('error', handleError);
     
     return () => {
-      logInfo('Journal page unmounted', 'Journal');
+      addEvent('Journal', 'Journal page unmounted', 'info');
       window.removeEventListener('error', handleError);
       if (autoRetryTimeoutRef.current) {
         clearTimeout(autoRetryTimeoutRef.current);
@@ -69,7 +72,7 @@ const Journal = () => {
       
       clearAllToasts();
     };
-  }, []);
+  }, [addEvent]);
 
   const { 
     entries, 
@@ -309,6 +312,7 @@ const Journal = () => {
 
   const handleStartRecording = () => {
     console.log('Starting new recording');
+    addEvent('Journal', 'Starting new recording', 'info');
     setActiveTab('record');
     setLastAction('Start Recording Tab');
     setProcessingError(null);
@@ -316,6 +320,7 @@ const Journal = () => {
 
   const handleTabChange = (value: string) => {
     console.log(`[Journal] Tab change requested to: ${value}. Current safeToSwitchTab: ${safeToSwitchTab}`);
+    addEvent('Journal', `Tab change requested to: ${value}`, 'info', { safeToSwitchTab });
     
     if (value === 'entries' && !safeToSwitchTab) {
       console.log('[Journal] User attempting to switch to entries while processing');
@@ -351,6 +356,11 @@ const Journal = () => {
   const handleRecordingComplete = async (audioBlob: Blob) => {
     if (!audioBlob || !user?.id) {
       console.error('[Journal] Cannot process recording: missing audio blob or user ID');
+      addEvent('Journal', 'Cannot process recording: missing audio blob or user ID', 'error', {
+        hasAudioBlob: !!audioBlob,
+        hasUserId: !!user?.id,
+        audioSize: audioBlob?.size
+      });
       setProcessingError('Cannot process recording: missing required information');
       setIsRecordingComplete(false);
       setIsSavingRecording(false);
@@ -359,6 +369,11 @@ const Journal = () => {
     }
     
     try {
+      addEvent('Journal', 'Recording complete, processing starting', 'info', {
+        audioSize: audioBlob.size,
+        audioDuration: (audioBlob as any).duration || 'unknown'
+      });
+      
       await new Promise<void>((resolve) => {
         clearAllToasts();
         setTimeout(() => {
@@ -396,10 +411,18 @@ const Journal = () => {
       });
       
       console.log('[Journal] Starting processing for audio file:', audioBlob.size, 'bytes');
+      addEvent('Journal', 'Starting processing for audio file', 'info', {
+        size: audioBlob.size,
+        type: audioBlob.type,
+        userId: user.id
+      });
+      
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
       
       if (success && tempId) {
         console.log('[Journal] Processing started with tempId:', tempId);
+        addEvent('Journal', 'Processing started successfully', 'success', { tempId });
+        
         setProcessingEntries(prev => [...prev, tempId]);
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
@@ -412,6 +435,7 @@ const Journal = () => {
         for (const interval of pollIntervals) {
           setTimeout(() => {
             console.log(`[Journal] Polling for entry data at ${interval}ms interval`);
+            addEvent('Journal', `Polling for entry data at ${interval}ms interval`, 'info', { tempId });
             fetchEntries();
             setRefreshKey(prev => prev + 1);
           }, interval);
@@ -422,6 +446,7 @@ const Journal = () => {
           setProcessingEntries(prev => {
             if (prev.includes(tempId)) {
               console.log('[Journal] Maximum processing time reached for tempId:', tempId);
+              addEvent('Journal', 'Maximum processing time reached', 'warning', { tempId });
               setLastAction(`Max Processing Time Reached (${tempId})`);
               
               if (toastIds[tempId]) {
@@ -451,7 +476,8 @@ const Journal = () => {
         }, 20000);
       } else {
         console.error('[Journal] Processing failed:', error);
-        setProcessingError(error || 'Unknown error occurred');
+        addEvent('Journal', 'Processing failed', 'error', { error });
+        setProcessingError(error || 'Unknown error in audio processing');
         setLastAction(`Processing Failed: ${error || 'Unknown'}`);
         
         toast.dismiss(toastId);
@@ -473,6 +499,10 @@ const Journal = () => {
       }
     } catch (error: any) {
       console.error('Error processing recording:', error);
+      addEvent('Journal', 'Error processing recording', 'error', { 
+        message: error?.message, 
+        stack: error?.stack
+      });
       setProcessingError(error?.message || 'Unknown error occurred');
       setLastAction(`Exception: ${error?.message || 'Unknown'}`);
       
@@ -585,6 +615,7 @@ const Journal = () => {
 
   const updateDebugInfo = (info: {status: string, duration?: number}) => {
     setAudioStatus(info.status);
+    addEvent('Journal', `Recorder status: ${info.status}`, 'info', info);
     if (info.duration !== undefined) {
       setRecordingDuration(info.duration);
     }
@@ -617,6 +648,7 @@ const Journal = () => {
                   variant="outline" 
                   className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
                   onClick={() => {
+                    addEvent('Journal', 'Retry loading entries after error', 'info', { entriesError });
                     setRefreshKey(prev => prev + 1);
                     fetchEntries();
                   }}
@@ -663,6 +695,7 @@ const Journal = () => {
                     variant="outline" 
                     className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
                     onClick={() => {
+                      addEvent('Journal', 'Retry recording after error', 'info', { processingError });
                       setProcessingError(null);
                       setActiveTab('record');
                     }}
@@ -723,6 +756,9 @@ const Journal = () => {
             </Tabs>
           </>
         )}
+        
+        {/* Add the debug panel */}
+        <JournalDebugPanel />
       </div>
     </ErrorBoundary>
   );
