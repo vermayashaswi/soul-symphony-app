@@ -6,8 +6,8 @@ import { processBase64Chunks, detectFileType } from "./audioProcessing.ts";
 import { 
   generateEmbedding, 
   analyzeEmotions, 
-  transcribeAudioWithWhisper,
-  translateWithGPT
+  translateAudioWithWhisper,
+  enhanceTranslatedText
 } from "./aiProcessing.ts";
 import { analyzeWithGoogleNL } from "./nlProcessing.ts";
 import { 
@@ -57,7 +57,7 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload');
     }
 
-    const { audio, userId, directTranscription } = payload;
+    const { audio, userId, directTranscription, highQuality } = payload;
     
     // Validate required fields
     if (!audio) {
@@ -74,7 +74,7 @@ serve(async (req) => {
     console.log("Received audio data, processing...");
     console.log("User ID:", userId);
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
-    console.log("Using two-step process: Whisper transcription + GPT translation");
+    console.log("High quality mode:", highQuality ? "YES" : "NO");
     
     // Ensure user profile exists
     if (userId) {
@@ -100,26 +100,11 @@ serve(async (req) => {
     const timestamp = Date.now();
     const filename = `journal-entry-${userId ? userId + '-' : ''}${timestamp}.${detectedFileType}`;
     
-    // Check storage bucket exists
-    try {
-      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-      if (bucketsError) {
-        console.error("Error listing buckets:", bucketsError);
-      } else {
-        console.log("Existing buckets:", buckets.map(b => b.name).join(', '));
-      }
-    } catch (err) {
-      console.error("Error checking buckets:", err);
-    }
-    
     let audioUrl = null;
     try {
-      console.log("Attempting to store audio file...");
       audioUrl = await storeAudioFile(supabase, binaryAudio, filename, detectedFileType);
-      console.log("Store audio result:", audioUrl ? "Success" : "Failed");
     } catch (err) {
       console.error("Storage error:", err);
-      console.error("Storage error stack:", err.stack);
     }
     
     // Prepare audio file for transcription
@@ -130,25 +115,20 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: mimeType });
     
     try {
-      // Step 1: Transcribe audio using Whisper with language detection
-      console.log("STEP 1: Transcribing audio with Whisper (language auto-detection)");
-      const { text: transcription, detectedLanguages } = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
-      console.log("Transcription successful:", transcription.slice(0, 100) + "...");
-      console.log("Detected languages:", detectedLanguages ? JSON.stringify(detectedLanguages) : "None detected");
+      // Directly translate audio using Whisper
+      console.log("Using Whisper translation API for direct translation to English");
+      const translatedText = await translateAudioWithWhisper(blob, detectedFileType, openAIApiKey);
+      console.log("Translation successful:", translatedText);
 
-      // If direct transcription mode, return just the transcription
+      // If direct transcription mode, return just the transcription/translation
       if (directTranscription) {
-        return createSuccessResponse({ 
-          transcription
-        });
+        return createSuccessResponse({ transcription: translatedText });
       }
 
-      // Step 2: Translate transcription to English using GPT
-      console.log("STEP 2: Translating transcription with GPT");
-      const refinedText = await translateWithGPT(transcription, detectedLanguages, openAIApiKey);
-      console.log("Translation successful:", refinedText.slice(0, 100) + "...");
+      // Optionally enhance the translated text if needed
+      const { refinedText } = await enhanceTranslatedText(translatedText, openAIApiKey);
 
-      // Get emotions from the translated text
+      // Get emotions from the refined text
       const { data: emotionsData, error: emotionsError } = await supabase
         .from('emotions')
         .select('name, description')
@@ -159,7 +139,7 @@ serve(async (req) => {
         throw new Error('Failed to fetch emotions data');
       }
       
-      // Analyze emotions in the translated text
+      // Analyze emotions in the refined text
       const emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
 
       // Analyze sentiment and extract entities using Google NL API
@@ -171,7 +151,7 @@ serve(async (req) => {
       if (detectedFileType === 'webm') {
         // For WebM, use the recordingTime from the client if available, or estimate
         // WebM is compressed so bytes don't directly correlate to duration
-        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : transcription.length / 15;
+        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : translatedText.length / 15;
       } else if (detectedFileType === 'wav') {
         // For WAV (assuming 48kHz, 16-bit, stereo)
         // 48000 samples/sec * 2 bytes/sample * 2 channels = 192000 bytes/sec
@@ -179,26 +159,27 @@ serve(async (req) => {
       } else {
         // Fallback estimation based on translation length
         // Average speaking rate is ~150 words per minute
-        const wordCount = transcription.split(/\s+/).length;
+        const wordCount = translatedText.split(/\s+/).length;
         audioDuration = Math.max(1, Math.round(wordCount / 2.5)); // ~150 words/min = 2.5 words/sec
       }
       
       console.log(`Calculated audio duration: ${audioDuration} seconds`);
 
-      // Store journal entry in database
+      // Store journal entry in database - use the translated text for both fields
+      // since we're getting direct translation from Whisper
       console.log("Storing journal entry with data:", {
-        transcription_length: transcription.length,
+        transcription_length: translatedText.length,
         refined_text_length: refinedText.length,
         audio_url: audioUrl ? "present" : "absent",
         user_id: userId ? "present" : "absent",
         emotions: emotions ? "present" : "absent",
-        entities: entities ? `${entities.length} entities` : "absent"
+        entities: entities ? `${entities.length} entities` : "absent",
       });
       
       const entryId = await storeJournalEntry(
         supabase,
-        transcription,    // Original transcription with detected language
-        refinedText,      // GPT-translated English text
+        translatedText, // Use translated text as transcription 
+        refinedText,    // Use enhanced text as refined text
         audioUrl,
         userId,
         audioDuration,
@@ -215,7 +196,6 @@ serve(async (req) => {
           try {
             // Use waitUntil to run in background but also log any errors
             const themePromise = extractThemes(supabase, refinedText, entryId);
-            //@ts-ignore - EdgeRuntime exists in Supabase edge functions
             EdgeRuntime.waitUntil(
               themePromise.catch(err => {
                 console.error("Background theme extraction failed:", err);
@@ -238,7 +218,6 @@ serve(async (req) => {
             }
           });
           
-          //@ts-ignore - EdgeRuntime exists in Supabase edge functions
           EdgeRuntime.waitUntil(
             entityExtractionPromise.catch(err => {
               console.error("Background entity extraction failed:", err);
@@ -264,7 +243,7 @@ serve(async (req) => {
 
       // Return success response
       return createSuccessResponse({
-        transcription: transcription,
+        transcription: translatedText,
         refinedText: refinedText,
         audioUrl: audioUrl,
         entryId: entryId,
@@ -274,12 +253,10 @@ serve(async (req) => {
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);
-      console.error("Error stack:", error.stack);
       return createErrorResponse(error);
     }
   } catch (error) {
     console.error("Error in transcribe-audio function:", error);
-    console.error("Error stack:", error.stack);
     return createErrorResponse(error);
   }
 });

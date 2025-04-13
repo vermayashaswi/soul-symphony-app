@@ -32,7 +32,6 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   // Validate initial state and get tempId
   const validationResult = await validateInitialState(audioBlob, userId);
   if (!validationResult.success) {
-    console.error('[AudioProcessing] Validation failed:', validationResult.error);
     return validationResult;
   }
   
@@ -50,18 +49,16 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     updateProcessingEntries(tempId, 'add');
     
     // Log the audio details
-    console.log('[AudioProcessing] Processing audio:', {
+    console.log('Processing audio:', {
       size: audioBlob?.size || 0,
       type: audioBlob?.type || 'unknown',
-      userId: userId || 'anonymous',
-      tempId
+      userId: userId || 'anonymous'
     });
     
     // Launch the processing without awaiting it
     processRecordingInBackground(audioBlob, userId, tempId)
       .catch(err => {
-        console.error('[AudioProcessing] Background processing error:', err);
-        console.error('[AudioProcessing] Error stack:', err.stack);
+        console.error('Background processing error:', err);
         setIsEntryBeingProcessed(false);
         setProcessingLock(false);
         
@@ -71,8 +68,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     // Return immediately with the temp ID
     return { success: true, tempId };
   } catch (error: any) {
-    console.error('[AudioProcessing] Error initiating recording process:', error);
-    console.error('[AudioProcessing] Error stack:', error.stack);
+    console.error('Error initiating recording process:', error);
     setIsEntryBeingProcessed(false);
     setProcessingLock(false);
     
