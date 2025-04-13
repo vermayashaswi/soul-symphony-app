@@ -1,4 +1,5 @@
 
+
 import { supabase } from '@/integrations/supabase/client';
 
 interface TranscriptionResult {
@@ -66,7 +67,8 @@ export async function sendAudioForTranscription(
     console.log('Transcription successful:', {
       directMode: directTranscription,
       transcriptionLength: response.data?.transcription?.length || 0,
-      hasEntryId: !!response.data?.entryId
+      hasEntryId: !!response.data?.entryId,
+      predictedLanguages: response.data?.predictedLanguages || null
     });
 
     return {

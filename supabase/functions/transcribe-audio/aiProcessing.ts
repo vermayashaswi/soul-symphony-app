@@ -142,46 +142,58 @@ export async function transcribeAudioWithWhisper(
 export async function translateAndRefineText(
   transcribedText: string,
   openAIApiKey: string
-): Promise<{ refinedText: string }> {
-  try {
-    console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
-    
-    const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert translator for multilingual, informal voice journals. The following text is a transliterated text of a user that could be speaking in a single language like Tamil, Telugu, Punjabi, Marathi, Bengali, Hindi, English, Spanish, Portugese, Afrikaans, Korean, Japanese etc. or could also often be switching between languages mid-sentence. Your job is to translate the entire transcript into natural, fluent English, keeping the original meaning, tone, and emotions intact. If there are any phrases in regional languages, interpret their intent rather than doing a literal word-for-word translation. Do not skip or paraphrase emotional expressions like sighs, pauses, or laughter—represent them appropriately in brackets if necessary. If anything is unclear or inaudible, mark it with [unclear] instead of guessing.'
-          },
-          {
-            role: 'user',
-            content: `Here is the transcript: "${transcribedText}"`
-          }
-        ]
-      }),
-    });
+): Promise<{ refinedText: string, predictedLanguages: any }> {
+  const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openAIApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert translator for multilingual, informal voice journals. The following text is a transliterated text of a user that could be speaking in a single language like Tamil, Telugu, Punjabi, Marathi, Bengali, Hindi, English, Spanish, Portugese, Afrikaans, Korean, Japanese etc. or could also often be switching between languages mid-sentence. Your job is to translate the entire transcript into natural, fluent English, keeping the original meaning, tone, and emotions intact. If there are any phrases in regional languages, interpret their intent rather than doing a literal word-for-word translation. Do not skip or paraphrase emotional expressions like sighs, pauses, or laughter—represent them appropriately in brackets if necessary. If anything is unclear or inaudible, mark it with [unclear] instead of guessing.'
+        },
+        {
+          role: 'user',
+          content: `Here is the transcript: "${transcribedText}"`
+        }
+      ],
+      response_format: { type: "json_object" }
+    }),
+  });
 
-    if (!gptResponse.ok) {
-      const errorText = await gptResponse.text();
-      console.error("GPT API error:", errorText);
-      throw new Error(`GPT API error: ${errorText}`);
-    }
-
-    const gptResult = await gptResponse.json();
-    const refinedText = gptResult.choices[0].message.content;
-    
-    console.log("GPT Response (first 100 chars):", refinedText.slice(0, 100) + "...");
-    
-    return { refinedText };
-  } catch (error) {
-    console.error("Error in translateAndRefineText:", error);
-    // If translation fails, return original text as refined text
-    return { refinedText: transcribedText };
+  if (!gptResponse.ok) {
+    const errorText = await gptResponse.text();
+    console.error("GPT API error:", errorText);
+    throw new Error(`GPT API error: ${errorText}`);
   }
+
+  const gptResult = await gptResponse.json();
+  const gptResponseContent = gptResult.choices[0].message.content;
+  
+  console.log("GPT Response:", gptResponseContent);
+  
+  let refinedText = '';
+  let predictedLanguages = null;
+  
+  try {
+    // Parse the JSON response
+    const parsedResponse = JSON.parse(gptResponseContent);
+    
+    // Extract the refined text and language information
+    refinedText = parsedResponse.translation || parsedResponse.text || transcribedText;
+    predictedLanguages = parsedResponse.languages || null;
+    
+    console.log("Parsed refined text:", refinedText);
+    console.log("Predicted languages:", predictedLanguages);
+  } catch (parseError) {
+    console.error("Error parsing GPT response:", parseError);
+    // Fallback to using the whole response as refined text
+    refinedText = gptResponseContent;
+  }
+
+  return { refinedText, predictedLanguages };
 }

@@ -28,6 +28,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
       if (inputContainerRef.current) {
         inputContainerRef.current.style.visibility = 'visible';
         inputContainerRef.current.style.opacity = '1';
+        inputContainerRef.current.style.display = 'block';
       }
     };
 
@@ -35,11 +36,20 @@ const ChatInput: React.FC<ChatInputProps> = ({
     ensureInputVisibility();
 
     // Also set up an interval to periodically check visibility
-    const visibilityInterval = setInterval(ensureInputVisibility, 500);
+    const visibilityInterval = setInterval(ensureInputVisibility, 250);
     
     return () => {
       clearInterval(visibilityInterval);
     };
+  }, [isLoading]);
+
+  // Focus the textarea when loading completes
+  useEffect(() => {
+    if (!isLoading && textareaRef.current) {
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 300);
+    }
   }, [isLoading]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -68,8 +78,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div 
-      className="w-full" 
-      style={{ marginBottom: '5px', position: 'relative', zIndex: 20 }}
+      className="w-full"
+      style={{ 
+        marginBottom: '5px', 
+        position: 'relative', 
+        zIndex: 50,
+        transition: 'opacity 0.2s ease-in-out',
+      }}
       ref={inputContainerRef}
     >
       <form onSubmit={handleSubmit} className="relative flex items-center w-full">
@@ -85,6 +100,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSubmit(e);
+                
+                // Close keyboard on mobile
+                if (isMobile) {
+                  textareaRef.current?.blur();
+                }
               }
             }}
             onFocus={() => {

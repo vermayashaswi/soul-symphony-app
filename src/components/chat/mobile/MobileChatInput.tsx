@@ -30,18 +30,28 @@ export default function MobileChatInput({
       if (inputContainerRef.current) {
         inputContainerRef.current.style.visibility = 'visible';
         inputContainerRef.current.style.opacity = '1';
+        inputContainerRef.current.style.display = 'block';
       }
     };
     
     // Run immediately
     ensureInputVisibility();
     
-    // And set an interval to check periodically
-    const visibilityInterval = setInterval(ensureInputVisibility, 500);
+    // And set an interval to check periodically (more frequently)
+    const visibilityInterval = setInterval(ensureInputVisibility, 250);
     
     return () => {
       clearInterval(visibilityInterval);
     };
+  }, [isLoading, isSubmitting]);
+
+  // Focus input when loading completes
+  useEffect(() => {
+    if (!isLoading && !isSubmitting && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 300);
+    }
   }, [isLoading, isSubmitting]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +62,9 @@ export default function MobileChatInput({
     if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
       e.preventDefault();
       handleSendMessage();
+      
+      // Close keyboard
+      inputRef.current?.blur();
     }
   };
 
@@ -69,7 +82,7 @@ export default function MobileChatInput({
         
         setInputValue("");
         if (inputRef.current) {
-          inputRef.current.focus();
+          inputRef.current.blur(); // Close keyboard after sending
         }
         
         chatDebug.addEvent("User Input", "Reset input field after sending", "success");
@@ -159,7 +172,8 @@ export default function MobileChatInput({
         // Add a clear visual separation from the navbar with a slight shadow
         boxShadow: '0 -2px 5px rgba(0, 0, 0, 0.05)',
         position: 'relative',
-        zIndex: 50 // Ensure input stays on top
+        zIndex: 50, // Ensure input stays on top
+        transition: 'opacity 0.2s ease-in-out',
       }}
     >
       <div className="flex-1 relative">

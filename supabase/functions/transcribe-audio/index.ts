@@ -124,8 +124,8 @@ serve(async (req) => {
         return createSuccessResponse({ transcription: transcribedText });
       }
 
-      // Process with GPT for translation and refinement
-      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey);
+      // Process with GPT for translation and language detection
+      const { refinedText, predictedLanguages } = await translateAndRefineText(transcribedText, openAIApiKey);
 
       // Get emotions from the refined text
       const { data: emotionsData, error: emotionsError } = await supabase
@@ -165,15 +165,6 @@ serve(async (req) => {
       console.log(`Calculated audio duration: ${audioDuration} seconds`);
 
       // Store journal entry in database
-      console.log("Storing journal entry with data:", {
-        transcription_length: transcribedText.length,
-        refined_text_length: refinedText.length,
-        audio_url: audioUrl ? "present" : "absent",
-        user_id: userId ? "present" : "absent",
-        emotions: emotions ? "present" : "absent",
-        entities: entities ? `${entities.length} entities` : "absent",
-      });
-      
       const entryId = await storeJournalEntry(
         supabase,
         transcribedText,
@@ -183,12 +174,11 @@ serve(async (req) => {
         audioDuration,
         emotions,
         sentimentScore,
-        entities
+        entities,
+        predictedLanguages
       );
 
       if (entryId) {
-        console.log("Journal entry stored successfully with ID:", entryId);
-        
         // Extract themes for the entry
         if (refinedText) {
           try {
@@ -236,8 +226,7 @@ serve(async (req) => {
       }
 
       // Verify journal entry was stored
-      const verified = await verifyJournalEntry(supabase, entryId);
-      console.log("Journal entry verification result:", verified);
+      await verifyJournalEntry(supabase, entryId);
 
       // Return success response
       return createSuccessResponse({
@@ -247,7 +236,8 @@ serve(async (req) => {
         entryId: entryId,
         emotions: emotions,
         sentiment: sentimentScore,
-        entities: entities
+        entities: entities,
+        predictedLanguages: predictedLanguages
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);
