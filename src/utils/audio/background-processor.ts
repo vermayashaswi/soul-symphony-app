@@ -1,5 +1,5 @@
 
-import { convertBlobToBase64 } from './blob-utils';
+import { blobToBase64 } from './blob-utils';
 import { sendAudioForTranscription } from '../audio/transcription-service';
 import { 
   resetProcessingState,
@@ -33,7 +33,7 @@ export async function processRecordingInBackground(
     
     // Convert blob to base64
     console.log('[BackgroundProcessor] Converting audio blob to base64');
-    const base64Audio = await convertBlobToBase64(audioBlob);
+    const base64Audio = await blobToBase64(audioBlob);
     console.log('[BackgroundProcessor] Audio converted, size:', base64Audio.length);
     
     if (!base64Audio) {
