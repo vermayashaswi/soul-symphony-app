@@ -365,9 +365,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           </div>
 
           <AnimatePresence mode="wait">
-            {status === 'recording' ? (
+            {isRecording ? (
               <RecordingStatus 
-                isRecording={status === 'recording'} 
+                isRecording={isRecording} 
                 recordingTime={typeof recordingTime === 'string' ? recordingTime : '00:00'} 
               />
             ) : audioBlob ? (
