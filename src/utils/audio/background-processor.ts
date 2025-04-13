@@ -33,15 +33,19 @@ export async function processRecordingInBackground(
     
     // Convert blob to base64
     console.log('[BackgroundProcessor] Converting audio blob to base64');
+    console.log('[BackgroundProcessor] Audio blob type:', audioBlob.type);
+    console.log('[BackgroundProcessor] Audio blob size:', audioBlob.size);
+    
     const base64Audio = await blobToBase64(audioBlob);
-    console.log('[BackgroundProcessor] Audio converted, size:', base64Audio.length);
     
     if (!base64Audio) {
       throw new Error("Failed to convert audio to base64");
     }
     
-    console.log('[BackgroundProcessor] Sending audio for transcription and analysis');
+    console.log('[BackgroundProcessor] Audio converted, size:', base64Audio.length);
+    
     // Process audio through the transcription service
+    console.log('[BackgroundProcessor] Sending audio for transcription and analysis');
     const result = await sendAudioForTranscription(base64Audio, userId);
     
     // Handle the result

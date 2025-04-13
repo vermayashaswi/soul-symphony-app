@@ -103,28 +103,35 @@ export async function storeJournalEntry(
     // Convert userId to text format explicitly to match column type in DB table
     const userIdForDb = userId ? userId : null;
     
-    const { data: entryData, error: insertError } = await supabase
+    // Create entry object without predictedLanguages if it's null
+    const entryData: any = { 
+      "transcription text": transcribedText,
+      "refined text": refinedText,
+      "audio_url": audioUrl,
+      "user_id": userIdForDb,
+      "duration": audioDuration,
+      "emotions": emotions,
+      "sentiment": sentimentScore,
+      "entities": entities
+    };
+    
+    // Only add predictedLanguages field if it's not null
+    if (predictedLanguages !== null) {
+      entryData["predicted_languages"] = predictedLanguages;
+    }
+    
+    const { data: entryResult, error: insertError } = await supabase
       .from('Journal Entries')
-      .insert([{ 
-        "transcription text": transcribedText,
-        "refined text": refinedText,
-        "audio_url": audioUrl,
-        "user_id": userIdForDb,
-        "duration": audioDuration,
-        "emotions": emotions,
-        "sentiment": sentimentScore,
-        "entities": entities,
-        "predicted_languages": predictedLanguages
-      }])
+      .insert([entryData])
       .select();
         
     if (insertError) {
       console.error('Error creating entry in database:', insertError);
       console.error('Error details:', JSON.stringify(insertError));
       throw new Error(`Database insert error: ${insertError.message}`);
-    } else if (entryData && entryData.length > 0) {
-      console.log("Journal entry saved to database:", entryData[0].id);
-      return entryData[0].id;
+    } else if (entryResult && entryResult.length > 0) {
+      console.log("Journal entry saved to database:", entryResult[0].id);
+      return entryResult[0].id;
     } else {
       console.error("No data returned from insert operation");
       throw new Error("Failed to create journal entry in database");

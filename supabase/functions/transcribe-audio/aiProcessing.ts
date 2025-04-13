@@ -20,8 +20,6 @@ You are an assistant that helps refine speech-to-text transcriptions from journa
 2. Maintain the original meaning and sentiment.
 3. Preserve personal names, places, and technical terms even if they seem unusual.
 4. Format the text in clear paragraphs with proper sentence structure.
-5. Identify the languages used in the entry (primary and any secondary languages).
-6. If the text is in a non-English language, provide an English translation while preserving the original non-English text.
 
 DO NOT:
 - Add information that wasn't in the original text
@@ -30,8 +28,7 @@ DO NOT:
 
 Output format:
 {
-  "refinedText": "The corrected and properly formatted text, with English translation only if the original was non-English",
-  "predictedLanguages": [{"name": "Language name", "code": "ISO code", "confidence": 0-1 value, "primary": boolean}]
+  "refinedText": "The corrected and properly formatted text, with English translation only if the original was non-English"
 }
 `;
 
@@ -74,10 +71,10 @@ Output format:
       const parsedResult = JSON.parse(result);
       console.log("Text refinement completed successfully");
       
-      // Extract the refined text and predicted languages
+      // Return only the refined text since we no longer need language prediction
       return {
         refinedText: parsedResult.refinedText || transcribedText,
-        predictedLanguages: parsedResult.predictedLanguages || null
+        predictedLanguages: null
       };
     } catch (parseError) {
       console.error("Error parsing GPT response:", parseError);
