@@ -96,12 +96,22 @@ export async function storeJournalEntry(
   audioDuration: number,
   emotions: any,
   sentimentScore: string,
-  entities: any[],
-  predictedLanguages: any
+  entities: any[]
 ) {
   try {
     // Convert userId to text format explicitly to match column type in DB table
     const userIdForDb = userId ? userId : null;
+    
+    console.log("Inserting entry with data:", {
+      transcribed_text_length: transcribedText?.length || 0,
+      refined_text_length: refinedText?.length || 0,
+      has_audio_url: !!audioUrl,
+      user_id_present: !!userIdForDb,
+      has_emotions: !!emotions,
+      sentiment: sentimentScore,
+      entities_count: entities?.length || 0,
+      duration: audioDuration
+    });
     
     const { data: entryData, error: insertError } = await supabase
       .from('Journal Entries')
@@ -113,8 +123,7 @@ export async function storeJournalEntry(
         "duration": audioDuration,
         "emotions": emotions,
         "sentiment": sentimentScore,
-        "entities": entities,
-        "predicted_languages": predictedLanguages
+        "entities": entities
       }])
       .select();
         

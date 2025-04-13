@@ -68,8 +68,12 @@ export async function processRecordingInBackground(
       throw error;
     }
     
+    // Add detailed logging to track successful processing
     console.log('[BackgroundProcessor] Audio processing complete for tempId:', tempId);
-    console.log('[BackgroundProcessor] Result:', data ? 'Success' : 'Empty result');
+    console.log('[BackgroundProcessor] Result:', data);
+    console.log('[BackgroundProcessor] EntryId:', data?.entryId);
+    console.log('[BackgroundProcessor] Transcription length:', data?.transcription?.length || 0);
+    console.log('[BackgroundProcessor] Refined text length:', data?.refinedText?.length || 0);
     
     // Stop tracking this processing task
     updateProcessingEntries(tempId, 'remove');
