@@ -99,16 +99,13 @@ export type Database = {
         Row: {
           audio_url: string | null
           categories: string[] | null
-          chunks_count: number | null
           created_at: string
           duration: number | null
           emotions: Json | null
           entities: Json | null
           "foreign key": string | null
           id: number
-          is_chunked: boolean | null
           master_themes: string[] | null
-          predicted_languages: Json | null
           "refined text": string | null
           sentiment: string | null
           "transcription text": string | null
@@ -117,16 +114,13 @@ export type Database = {
         Insert: {
           audio_url?: string | null
           categories?: string[] | null
-          chunks_count?: number | null
           created_at?: string
           duration?: number | null
           emotions?: Json | null
           entities?: Json | null
           "foreign key"?: string | null
           id?: number
-          is_chunked?: boolean | null
           master_themes?: string[] | null
-          predicted_languages?: Json | null
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
@@ -135,16 +129,13 @@ export type Database = {
         Update: {
           audio_url?: string | null
           categories?: string[] | null
-          chunks_count?: number | null
           created_at?: string
           duration?: number | null
           emotions?: Json | null
           entities?: Json | null
           "foreign key"?: string | null
           id?: number
-          is_chunked?: boolean | null
           master_themes?: string[] | null
-          predicted_languages?: Json | null
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
