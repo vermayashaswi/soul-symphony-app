@@ -80,6 +80,20 @@ export async function processRecordingInBackground(
     
     if (!result.success) {
       console.error('[BackgroundProcessor] Error in transcription:', result.error);
+      
+      // Show specific message for Google STT failures
+      if (useGoogleSTT) {
+        toast.error(`Google Speech-to-Text failed: ${result.error || 'Unknown error'}`, {
+          id: `error-${tempId}`,
+          duration: 5000,
+        });
+      } else {
+        toast.error(`Failed to process recording: ${result.error || 'Unknown error'}`, {
+          id: `error-${tempId}`,
+          duration: 3000,
+        });
+      }
+      
       throw new Error(result.error || 'Unknown transcription error');
     }
     
@@ -89,10 +103,10 @@ export async function processRecordingInBackground(
     console.log('[BackgroundProcessor] EntryId:', result.data?.entryId);
     console.log('[BackgroundProcessor] Transcription length:', result.data?.transcription?.length || 0);
     console.log('[BackgroundProcessor] Refined text length:', result.data?.refinedText?.length || 0);
-    console.log('[BackgroundProcessor] Transcription service:', result.data?.transcriptionService || 'whisper');
+    console.log('[BackgroundProcessor] Transcription service:', result.data?.transcriptionService || (useGoogleSTT ? 'google' : 'whisper'));
     
     // Show success notification
-    toast.success(`Journal entry saved successfully ${useGoogleSTT ? '(using OpenAI Whisper fallback)' : ''}`, {
+    toast.success(`Journal entry saved successfully using ${useGoogleSTT ? 'Google Speech' : 'OpenAI Whisper'}`, {
       id: `success-${tempId}`,
       duration: 3000,
     });

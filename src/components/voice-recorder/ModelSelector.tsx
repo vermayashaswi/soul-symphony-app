@@ -33,13 +33,13 @@ export function ModelSelector({ selectedModel, onChange, disabled = false }: Mod
           <SelectItem value="openai">
             <div className="flex items-center gap-2">
               <Mic className="w-3.5 h-3.5" />
-              <span>OpenAI Whisper (Recommended)</span>
+              <span>OpenAI Whisper</span>
             </div>
           </SelectItem>
           <SelectItem value="google">
             <div className="flex items-center gap-2">
               <Globe className="w-3.5 h-3.5" />
-              <span>Google Speech (Experimental)</span>
+              <span>Google Speech</span>
             </div>
           </SelectItem>
         </SelectContent>

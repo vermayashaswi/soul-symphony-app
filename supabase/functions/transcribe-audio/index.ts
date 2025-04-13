@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCorsRequest, createErrorResponse, createSuccessResponse } from "../_shared/utils.ts";
@@ -127,8 +128,13 @@ serve(async (req) => {
       let transcribedText;
       
       if (useGoogleSTT) {
-        transcribedText = await transcribeAudioWithGoogle(blob, detectedFileType, GOOGLE_SPEECH_API_KEY);
-        console.log("Google STT Transcription successful:", transcribedText);
+        try {
+          transcribedText = await transcribeAudioWithGoogle(blob, detectedFileType, GOOGLE_SPEECH_API_KEY);
+          console.log("Google STT Transcription successful:", transcribedText);
+        } catch (googleError) {
+          console.error("Google STT failed:", googleError);
+          throw new Error(`Google Speech-to-Text failed: ${googleError.message || 'Unknown error'}`);
+        }
       } else {
         transcribedText = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
         console.log("Whisper Transcription successful:", transcribedText);

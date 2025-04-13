@@ -57,19 +57,6 @@ export async function sendAudioForTranscription(
       // Handle response errors
       if (response.error) {
         console.error('[TranscriptionService] Edge function error:', response.error);
-        
-        // If Google STT was attempted but failed, retry with Whisper
-        if (useGoogleSTT) {
-          console.log('[TranscriptionService] Google STT failed, falling back to Whisper');
-          toast.error('Google Speech service unavailable, falling back to OpenAI Whisper', {
-            duration: 3000,
-            id: 'google-stt-fallback'
-          });
-          
-          // Retry with Whisper
-          return sendAudioForTranscription(base64Audio, userId, directTranscription, false);
-        }
-        
         return {
           success: false,
           error: response.error?.message || 'Failed to process audio'
@@ -79,19 +66,6 @@ export async function sendAudioForTranscription(
       // Check if the response has a success field
       if (response.data?.success === false) {
         console.error('[TranscriptionService] Processing error:', response.data.error || response.data.message);
-        
-        // If Google STT was attempted but failed, retry with Whisper
-        if (useGoogleSTT && (response.data.error?.includes('Google') || response.data.message?.includes('Google'))) {
-          console.log('[TranscriptionService] Google STT failed, falling back to Whisper');
-          toast.error('Google Speech service unavailable, falling back to OpenAI Whisper', {
-            duration: 3000,
-            id: 'google-stt-fallback'
-          });
-          
-          // Retry with Whisper
-          return sendAudioForTranscription(base64Audio, userId, directTranscription, false);
-        }
-        
         return {
           success: false,
           error: response.data.error || response.data.message || 'Unknown error in audio processing'
@@ -111,7 +85,7 @@ export async function sendAudioForTranscription(
         directMode: directTranscription,
         transcriptionLength: response.data?.transcription?.length || 0,
         hasEntryId: !!response.data?.entryId,
-        service: response.data?.transcriptionService || 'whisper'
+        service: response.data?.transcriptionService || (useGoogleSTT ? 'google' : 'whisper')
       });
 
       return {
@@ -120,19 +94,6 @@ export async function sendAudioForTranscription(
       };
     } catch (invokeError: any) {
       console.error('[TranscriptionService] Error invoking edge function:', invokeError);
-      
-      // If Google STT was attempted but failed, retry with Whisper
-      if (useGoogleSTT) {
-        console.log('[TranscriptionService] Google STT failed, falling back to Whisper');
-        toast.error('Google Speech service unavailable, falling back to OpenAI Whisper', {
-          duration: 3000,
-          id: 'google-stt-fallback'
-        });
-        
-        // Retry with Whisper
-        return sendAudioForTranscription(base64Audio, userId, directTranscription, false);
-      }
-      
       throw invokeError;
     }
   } catch (error: any) {
