@@ -85,7 +85,7 @@ export async function sendAudioForTranscription(
     
     try {
       // Use Promise.race to implement a timeout
-      const response = await Promise.race([
+      const response: any = await Promise.race([
         supabase.functions.invoke('transcribe-audio', { body: payload }),
         timeoutPromise
       ]);
