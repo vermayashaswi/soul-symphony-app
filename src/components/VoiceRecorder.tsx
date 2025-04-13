@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
+import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
@@ -13,11 +13,10 @@ import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { AnimatedPrompt } from '@/components/voice-recorder/AnimatedPrompt';
-import { ModelSelector } from '@/components/voice-recorder/ModelSelector';
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
 
 interface VoiceRecorderProps {
-  onRecordingComplete?: (audioBlob: Blob, tempId?: string, useGoogleSTT?: boolean) => void;
+  onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
   onCancel?: () => void;
   className?: string;
   updateDebugInfo?: (info: {status: string, duration?: number}) => void;
@@ -32,7 +31,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [audioPrepared, setAudioPrepared] = useState(false);
   const [waitingForClear, setWaitingForClear] = useState(false);
   const [toastsCleared, setToastsCleared] = useState(false);
-  const [transcriptionModel, setTranscriptionModel] = useState<string>("openai"); // Default to OpenAI
   const saveCompleteRef = useRef(false);
   const savingInProgressRef = useRef(false);
   const domClearAttemptedRef = useRef(false);
@@ -40,32 +38,20 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const { isMobile } = useIsMobile();
   
   const {
-    status,
+    isRecording,
     recordingTime,
-    recordingBlob: audioBlob,
+    audioBlob,
+    audioLevel,
+    hasPermission,
+    ripples,
     startRecording,
     stopRecording,
-    clearRecording,
-    hasPermission,
-    audioLevel,
-    ripples,
-    requestPermissions
-  } = useVoiceRecorder({
-    onRecordingComplete: (blob, tempId, useGoogleSTT) => {
-      console.log('[VoiceRecorder] Recording complete callback from hook with:', {
-        blobSize: blob?.size,
-        tempId,
-        useGoogleSTT
-      });
-    },
-    onError: (error) => {
-      console.error('[VoiceRecorder] Error from recording hook:', error);
-      setRecordingError(error?.message || "An unexpected error occurred");
-    },
-    useGoogleSTT: transcriptionModel === "google"
+    requestPermissions,
+    resetRecording
+  } = useRecordRTCRecorder({ 
+    noiseReduction: false,
+    maxDuration: 300
   });
-  
-  const isRecording = status === 'recording';
   
   const {
     isPlaying,
@@ -107,7 +93,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   }, [isRecording]);
   
   useEffect(() => {
-    if (isRecording && typeof recordingTime === 'number' && recordingTime >= 120) {
+    if (isRecording && recordingTime >= 120) {
       toast.warning("Your recording is quite long. Consider stopping now for better processing.", {
         duration: 3000,
       });
@@ -138,13 +124,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       hasAudioBlob: !!audioBlob,
       audioSize: audioBlob?.size || 0,
       isRecording,
+      hasPermission,
       audioDuration,
       hasSaved,
       hasPlayedOnce,
       audioPrepared,
       waitingForClear,
-      toastsCleared,
-      status
+      toastsCleared
     });
     
     if (updateDebugInfo) {
@@ -152,10 +138,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         status: isRecording 
           ? 'Recording' 
           : (audioBlob ? 'Recorded' : 'No Recording'),
-        duration: audioDuration || (typeof recordingTime === 'number' ? recordingTime : 0)
+        duration: audioDuration || recordingTime
       });
     }
-  }, [isProcessing, audioBlob, isRecording, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo, status]);
+  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
   useEffect(() => {
     return () => {
@@ -242,41 +228,25 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         duration: audioDuration,
         recordingTime: recordingTime,
         hasPlayedOnce: hasPlayedOnce,
-        audioPrepared: audioPrepared,
-        model: transcriptionModel,
-        user: !!user
+        audioPrepared: audioPrepared
       });
       
-      if (!user) {
-        console.error('[VoiceRecorder] No user found. User must be authenticated to save recordings');
-        setRecordingError("You must be signed in to save recordings");
-        setIsProcessing(false);
-        setHasSaved(false);
-        savingInProgressRef.current = false;
-        return;
-      }
-      
-      if (!hasPlayedOnce && audioDuration === 0 && typeof recordingTime === 'number' && recordingTime > 0) {
+      if (!hasPlayedOnce && audioDuration === 0 && recordingTime > 0) {
         const estimatedDuration = recordingTime / 1000;
         console.log(`[VoiceRecorder] Recording not played yet, estimating duration as ${estimatedDuration}s`);
       }
       
       if (onRecordingComplete) {
         try {
-          console.log('[VoiceRecorder] Calling recording completion callback with model:', transcriptionModel);
+          console.log('[VoiceRecorder] Calling recording completion callback');
           saveCompleteRef.current = false;
           
-          await onRecordingComplete(normalizedBlob, undefined, transcriptionModel === "google");
+          await onRecordingComplete(normalizedBlob);
           
           saveCompleteRef.current = true;
           savingInProgressRef.current = false;
           
           console.log('[VoiceRecorder] Recording callback completed successfully');
-          
-          toast.success("Recording saved successfully", {
-            id: 'success-toast',
-            duration: 3000
-          });
         } catch (error: any) {
           console.error('[VoiceRecorder] Error in recording callback:', error);
           setRecordingError(error?.message || "An unexpected error occurred");
@@ -292,12 +262,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           setHasSaved(false);
           savingInProgressRef.current = false;
         }
-      } else {
-        console.error('[VoiceRecorder] No onRecordingComplete callback provided');
-        setRecordingError("Application error: Missing save handler");
-        setIsProcessing(false);
-        setHasSaved(false);
-        savingInProgressRef.current = false;
       }
     } catch (error: any) {
       console.error('[VoiceRecorder] Error in save entry:', error);
@@ -319,7 +283,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const handleRestart = async () => {
     await ensureAllToastsCleared();
     
-    clearRecording();
+    resetRecording();
     resetPlayback();
     setRecordingError(null);
     setShowAnimation(true);
@@ -338,7 +302,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     });
   };
 
-  const shouldShowPrompt = status !== 'recording' && !audioBlob;
+  const shouldShowPrompt = !isRecording && !audioBlob;
 
   return (
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
@@ -356,16 +320,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         
         <div className="relative z-10 flex flex-col items-center justify-start w-full h-full pt-4">
           <AnimatedPrompt show={shouldShowPrompt} />
-          
-          {shouldShowPrompt && (
-            <div className="absolute top-4 right-4 z-20 w-48">
-              <ModelSelector 
-                selectedModel={transcriptionModel} 
-                onChange={setTranscriptionModel} 
-                disabled={isRecording || isProcessing}
-              />
-            </div>
-          )}
           
           <div className="relative z-10 flex justify-center items-center mt-40">
             <RecordingButton
@@ -395,15 +349,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
             {isRecording ? (
               <RecordingStatus 
                 isRecording={isRecording} 
-                recordingTime={typeof recordingTime === 'string' ? recordingTime : '00:00'} 
+                recordingTime={recordingTime} 
               />
             ) : audioBlob ? (
               <div className="flex flex-col items-center w-full relative z-10 mt-auto mb-8">
-                <div className="mb-4 px-4 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Using {transcriptionModel === 'google' ? 'Google Speech-to-Text' : 'OpenAI Whisper'} for transcription
-                  </p>
-                </div>
                 <PlaybackControls
                   audioBlob={audioBlob}
                   isPlaying={isPlaying}
@@ -420,7 +369,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                   onSeek={seekTo}
                 />
               </div>
-            ) : false ? (
+            ) : hasPermission === false ? (
               <motion.p
                 key="permission"
                 initial={{ opacity: 0, y: 10 }}

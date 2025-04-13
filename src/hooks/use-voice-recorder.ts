@@ -3,15 +3,13 @@ import { useState, useRef, useEffect } from "react";
 import RecordRTC, { StereoAudioRecorder } from "recordrtc";
 
 interface UseVoiceRecorderProps {
-  onRecordingComplete: (audioBlob: Blob, tempId?: string, useGoogleSTT?: boolean) => void;
+  onRecordingComplete: (audioBlob: Blob, tempId?: string) => void;
   onError?: (error: any) => void;
-  useGoogleSTT?: boolean;
 }
 
 export function useVoiceRecorder({
   onRecordingComplete,
   onError,
-  useGoogleSTT = false,
 }: UseVoiceRecorderProps) {
   const [status, setStatus] = useState<
     "idle" | "acquiring_media" | "recording" | "stopping"
@@ -21,9 +19,6 @@ export function useVoiceRecorder({
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const [startTime, setStartTime] = useState<number>(0);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [audioLevel, setAudioLevel] = useState<number>(0);
-  const [ripples, setRipples] = useState<number[]>([]);
   const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startRecording = async () => {
@@ -40,7 +35,6 @@ export function useVoiceRecorder({
       setStatus("acquiring_media");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setMediaStream(stream);
-      setHasPermission(true);
 
       const recorder = new RecordRTC(stream, {
         type: "audio",
@@ -71,7 +65,6 @@ export function useVoiceRecorder({
     } catch (err) {
       console.error("Error starting recording:", err);
       setStatus("idle");
-      setHasPermission(false);
       if (onError) onError(err);
       
       // Dispatch error event for debugging
@@ -120,7 +113,7 @@ export function useVoiceRecorder({
         if (blob.size > 0) {
           if (onRecordingComplete) {
             const tempId = generateTempId();
-            onRecordingComplete(blob, tempId, useGoogleSTT);
+            onRecordingComplete(blob, tempId);
             
             if (opId) {
               window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
@@ -128,7 +121,7 @@ export function useVoiceRecorder({
                   id: opId,
                   status: 'success',
                   message: 'Recording completed',
-                  details: `Audio size: ${formatBytes(blob.size)}, Duration: ${formatTime(elapsedTime)}, TempID: ${tempId}, Using Google STT: ${useGoogleSTT ? 'Yes' : 'No'}`
+                  details: `Audio size: ${formatBytes(blob.size)}, Duration: ${formatTime(elapsedTime)}, TempID: ${tempId}`
                 }
               }));
             }
@@ -169,17 +162,6 @@ export function useVoiceRecorder({
     }
   };
 
-  const requestPermissions = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop());
-      setHasPermission(true);
-    } catch (err) {
-      setHasPermission(false);
-      if (onError) onError(err);
-    }
-  };
-
   const clearRecording = () => {
     setRecordingBlob(null);
   };
@@ -202,10 +184,6 @@ export function useVoiceRecorder({
     clearRecording,
     recordingBlob,
     recordingTime,
-    hasPermission,
-    audioLevel,
-    ripples,
-    requestPermissions
   };
 }
 

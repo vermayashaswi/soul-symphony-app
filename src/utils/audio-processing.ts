@@ -19,17 +19,12 @@ import { processRecordingInBackground } from './audio/background-processor';
  * Processes an audio recording for transcription and analysis
  * Returns immediately with a temporary ID while processing continues in background
  */
-export async function processRecording(
-  audioBlob: Blob | null, 
-  userId: string | undefined,
-  useGoogleSTT: boolean = false
-): Promise<{
+export async function processRecording(audioBlob: Blob | null, userId: string | undefined): Promise<{
   success: boolean;
   tempId?: string;
   error?: string;
 }> {
   console.log('[AudioProcessing] Starting processing with blob:', audioBlob?.size, audioBlob?.type);
-  console.log('[AudioProcessing] Using Google STT:', useGoogleSTT ? 'Yes' : 'No');
   
   // Clear all toasts to ensure UI is clean before processing
   clearAllToasts();
@@ -57,12 +52,11 @@ export async function processRecording(
     console.log('Processing audio:', {
       size: audioBlob?.size || 0,
       type: audioBlob?.type || 'unknown',
-      userId: userId || 'anonymous',
-      useGoogleSTT: useGoogleSTT
+      userId: userId || 'anonymous'
     });
     
     // Launch the processing without awaiting it
-    processRecordingInBackground(audioBlob, userId, tempId, useGoogleSTT)
+    processRecordingInBackground(audioBlob, userId, tempId)
       .catch(err => {
         console.error('Background processing error:', err);
         setIsEntryBeingProcessed(false);
