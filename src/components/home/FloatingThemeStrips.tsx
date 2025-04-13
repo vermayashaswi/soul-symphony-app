@@ -55,12 +55,21 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   return (
     <div className="relative w-full h-full overflow-hidden">
       <div className="absolute top-[45px] left-6 z-50">
-        <div
-          className="px-2 py-0.5 text-center"
+        <motion.div
+          initial={{ scale: 1 }}
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            repeatType: "reverse"
+          }}
+          className="px-1.5 py-0.5 text-center rounded-sm scale-75"
           style={{
-            backgroundColor: `${themeColor}70`,
-            border: `1px solid ${themeColor}`,
-            boxShadow: `0 0 2px 0 ${themeColor}40`,
+            backgroundColor: `${themeColor}50`,
+            borderLeft: `3px solid ${themeColor}`,
+            borderRight: `3px solid ${themeColor}`,
+            boxShadow: `0 0 1px 0 ${themeColor}40`,
+            backdropFilter: 'blur(4px)',
           }}
         >
           <span 
@@ -75,7 +84,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
           >
             7-day themes
           </span>
-        </div>
+        </motion.div>
       </div>
       
       <div className="absolute inset-x-0 top-20 bottom-80 pointer-events-none">
