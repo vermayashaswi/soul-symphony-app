@@ -12,7 +12,7 @@ export const useChatDebug = () => ({
   addLog: (category?: string, message?: string, level?: string, details?: any) => {},
   addEvent: (category?: string, message?: string, level?: string, details?: any) => {}, // Added with parameters
   clearLogs: () => {},
-  isEnabled: false,
+  isEnabled: true, // Always enabled now
   toggleEnabled: () => {}
 });
 

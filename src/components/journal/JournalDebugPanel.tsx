@@ -11,7 +11,7 @@ import { formatShortDate } from '@/utils/format-time';
 import { supabase } from '@/integrations/supabase/client';
 
 const JournalDebugPanel = () => {
-  const { logs, clearLogs, isEnabled, toggleEnabled } = useDebugLog();
+  const { logs, clearLogs } = useDebugLog();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('logs');
   const [serviceStatus, setServiceStatus] = useState<Record<string, boolean>>({});
@@ -188,11 +188,6 @@ const JournalDebugPanel = () => {
     }
   };
 
-  const handleToggleLogging = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleEnabled();
-  };
-
   return (
     <div className="fixed top-4 right-4 z-[9999]">
       {!isOpen ? (
@@ -233,16 +228,9 @@ const JournalDebugPanel = () => {
             
             <div className="p-2">
               <div className="flex justify-between mb-2">
-                <Badge variant={isEnabled ? "default" : "outline"}>
-                  Logging: {isEnabled ? "Enabled" : "Disabled"}
+                <Badge variant="default">
+                  Logging: Enabled
                 </Badge>
-                <Button 
-                  size="sm" 
-                  variant={isEnabled ? "outline" : "default"} 
-                  onClick={handleToggleLogging}
-                >
-                  {isEnabled ? "Disable" : "Enable"} Logging
-                </Button>
               </div>
             </div>
             
@@ -250,7 +238,7 @@ const JournalDebugPanel = () => {
               <ScrollArea className="h-[400px] p-2">
                 {logs.length === 0 ? (
                   <div className="p-4 text-center text-gray-500">
-                    No logs recorded. Enable logging and perform some actions.
+                    No logs recorded yet. Perform some actions to generate logs.
                   </div>
                 ) : (
                   <div className="space-y-2">

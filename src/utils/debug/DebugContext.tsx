@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { createLogEntry } from './debugUtils';
 import { DebugLogContextType, DebugLogEntry, LogLevel } from './debugLogTypes';
@@ -9,39 +8,26 @@ const DebugLogContext = createContext<DebugLogContextType>({
   addEvent: () => {},
   addLog: () => {}, // Added for backwards compatibility 
   clearLogs: () => {},
-  isEnabled: false,
+  isEnabled: true, // Changed to true by default
   toggleEnabled: () => {}
 });
 
 // Debug provider component
 export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [logs, setLogs] = useState<DebugLogEntry[]>([]);
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const [isEnabled, setIsEnabled] = useState<boolean>(true); // Set to true by default
   
   // Local storage key for saving debug preferences
   const STORAGE_KEY = 'debug_preferences';
   
-  // Initialize from local storage
-  React.useEffect(() => {
-    const savedPreferences = localStorage.getItem(STORAGE_KEY);
-    if (savedPreferences) {
-      try {
-        const { enabled } = JSON.parse(savedPreferences);
-        setIsEnabled(enabled || false);
-      } catch (e) {
-        console.error("Error parsing debug preferences:", e);
-      }
-    }
-  }, []);
-
-  // Save preferences to local storage
+  // We'll keep this function for backward compatibility
   const savePreferences = useCallback(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled: isEnabled }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled: true }));
     } catch (e) {
       console.error("Error saving debug preferences:", e);
     }
-  }, [isEnabled]);
+  }, []);
 
   // Add a new event log (primary method name)
   const addEvent = useCallback((
@@ -50,13 +36,12 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
     level: LogLevel = 'info',
     details?: any
   ) => {
-    if (!isEnabled) return;
-    
+    // We always log now, removed isEnabled check
     setLogs(prev => {
       const newEntry = createLogEntry(category, message, level, details);
       return [...prev, newEntry];
     });
-  }, [isEnabled]);
+  }, []);
   
   // Add for backward compatibility
   const addLog = useCallback((
@@ -73,14 +58,11 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
     setLogs([]);
   }, []);
   
-  // Toggle debug mode
+  // Toggle debug mode - kept for backward compatibility
   const toggleEnabled = useCallback(() => {
-    setIsEnabled(prev => {
-      const newState = !prev;
-      // Schedule saving the new state
-      setTimeout(() => savePreferences(), 0);
-      return newState;
-    });
+    // No need to actually toggle, but keeping the function for API compatibility
+    setIsEnabled(true);
+    setTimeout(() => savePreferences(), 0);
   }, [savePreferences]);
   
   // The context value
@@ -89,7 +71,7 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
     addEvent,
     addLog, // Added for backwards compatibility
     clearLogs,
-    isEnabled,
+    isEnabled: true, // Always return true
     toggleEnabled
   };
   

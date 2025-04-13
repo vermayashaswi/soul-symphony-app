@@ -9,7 +9,7 @@ import { ChevronRight, ChevronDown, X, Copy, Trash2, Bug } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DebugLogPanel: React.FC = () => {
-  const { logs, clearLogs, isEnabled, toggleEnabled } = useDebugLog();
+  const { logs, clearLogs } = useDebugLog();
   const [isOpen, setIsOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [filterLevel, setFilterLevel] = useState<LogLevel | null>(null);
@@ -44,23 +44,13 @@ const DebugLogPanel: React.FC = () => {
     toast.success('Logs copied to clipboard');
   };
 
-  if (!isEnabled) {
-    return (
-      <Button
-        className="fixed bottom-4 right-4 z-50 shadow-lg"
-        size="sm"
-        onClick={toggleEnabled}
-      >
-        <Bug className="mr-2 h-4 w-4" /> Enable Debug Mode
-      </Button>
-    );
-  }
+  // Removed the conditional rendering for isEnabled=false since it's always enabled now
 
   return (
     <div className="fixed bottom-0 right-0 z-50 w-full md:w-auto max-w-full md:max-w-md border shadow-lg bg-white dark:bg-gray-900 rounded-t-lg overflow-hidden transition-all duration-300 ease-in-out"
       style={{ 
         height: isOpen ? 'min(80vh, 500px)' : '40px',
-        transform: isEnabled ? 'translateY(0)' : 'translateY(100%)'
+        transform: 'translateY(0)' // Always show, removed conditional transform
       }}
     >
       {/* Header */}
@@ -105,7 +95,7 @@ const DebugLogPanel: React.FC = () => {
             className="h-7 w-7 p-0" 
             onClick={(e) => {
               e.stopPropagation();
-              toggleEnabled();
+              setIsOpen(false);
             }}
           >
             <X className="h-4 w-4" />
