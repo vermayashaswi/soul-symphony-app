@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 interface TranscriptionResult {
@@ -61,18 +62,26 @@ export async function sendAudioForTranscription(
     });
     window.dispatchEvent(debugEvent);
     
-    // Use the standard timeout option provided by Supabase
-    const response = await supabase.functions.invoke('transcribe-audio', {
-      body: {
-        audio: cleanBase64,
-        userId: userId || null,
-        directTranscription: directTranscription,
-        recordingTime: Date.now() - startTime,
-        timestamp: Date.now()
-      },
-      // Use timeout instead of abortSignal
-      timeout: 60000 // 60 seconds timeout
+    // Create a manual timeout promise that we'll race against the function call
+    const timeoutPromise = new Promise<{ error: { message: string } }>((_, reject) => {
+      setTimeout(() => {
+        reject({ error: { message: 'Function call timed out after 60 seconds' } });
+      }, 60000); // 60 seconds timeout
     });
+    
+    // Use Promise.race to implement a timeout
+    const response = await Promise.race([
+      supabase.functions.invoke('transcribe-audio', {
+        body: {
+          audio: cleanBase64,
+          userId: userId || null,
+          directTranscription: directTranscription,
+          recordingTime: Date.now() - startTime,
+          timestamp: Date.now()
+        }
+      }),
+      timeoutPromise
+    ]);
     
     const edgeFnEndTime = Date.now();
     
