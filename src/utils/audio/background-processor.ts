@@ -1,7 +1,12 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { resetProcessingState, setProcessingLock, updateProcessingEntries } from './processing-state';
+import { 
+  setProcessingLock, 
+  setIsEntryBeingProcessed,
+  updateProcessingEntries,
+  resetProcessingState
+} from './processing-state';
 import { sendAudioForTranscription } from './transcription-service';
 
 /**
@@ -77,112 +82,87 @@ export async function processRecordingInBackground(
       }
     }));
     
+    // Send audio to transcription service
     console.log('[BackgroundProcessor] Sending audio to transcription service for processing');
     
-    // Calculate recording duration in seconds from blob
-    const recordingTimeMs = audioBlob.size > 0 
-      ? (audioBlob as any).duration ? (audioBlob as any).duration * 1000 
-      : (audioBlob.size / 16000) * 1000 
-      : 0;
+    const transcriptionResult = await sendAudioForTranscription(base64Audio, userId);
     
     window.dispatchEvent(new CustomEvent('debug:audio-processing', {
       detail: {
-        step: 'pre-transcription',
+        step: 'transcription-complete',
         tempId,
         timestamp: Date.now(),
-        recordingTimeMs,
-        audioType: audioBlob.type,
-        audioSize: audioBlob.size
+        success: transcriptionResult.success,
+        hasError: !!transcriptionResult.error,
+        errorMessage: transcriptionResult.error,
+        hasData: !!transcriptionResult.data,
+        entryId: transcriptionResult.data?.entryId
       }
     }));
     
-    // Use the transcription service to process the audio
-    const { success, data, error } = await sendAudioForTranscription(base64Audio, userId);
-    
-    window.dispatchEvent(new CustomEvent('debug:audio-processing', {
-      detail: {
-        step: 'post-transcription',
-        tempId,
-        timestamp: Date.now(),
-        success,
-        error: error || null,
-        hasData: !!data,
-        entryId: data?.entryId,
-        transcriptionLength: data?.transcription?.length || 0,
-        refinedTextLength: data?.refinedText?.length || 0
-      }
-    }));
-    
-    if (!success || error) {
-      console.error('[BackgroundProcessor] Error processing audio:', error);
-      throw new Error(error || 'Unknown error in audio processing');
+    if (!transcriptionResult.success) {
+      // Handle transcription failure
+      console.error('[BackgroundProcessor] Transcription failed:', transcriptionResult.error);
+      
+      toast.error('Failed to process audio', {
+        description: transcriptionResult.error || 'Unknown error occurred',
+        duration: 5000
+      });
+      
+      // Clean up processing state
+      updateProcessingEntries(tempId, 'remove');
+      setIsEntryBeingProcessed(false);
+      setProcessingLock(false);
+      
+      throw new Error(transcriptionResult.error || 'Transcription failed');
     }
     
-    // Add detailed logging to track successful processing
-    console.log('[BackgroundProcessor] Audio processing complete for tempId:', tempId);
-    console.log('[BackgroundProcessor] Result:', data);
-    console.log('[BackgroundProcessor] EntryId:', data?.entryId);
-    console.log('[BackgroundProcessor] Transcription length:', data?.transcription?.length || 0);
-    console.log('[BackgroundProcessor] Refined text length:', data?.refinedText?.length || 0);
-    console.log('[BackgroundProcessor] Audio URL:', data?.audioUrl || 'Not stored');
-    
-    window.dispatchEvent(new CustomEvent('debug:audio-processing', {
-      detail: {
-        step: 'complete',
-        tempId,
-        timestamp: Date.now(),
-        entryId: data?.entryId,
-        transcriptionLength: data?.transcription?.length || 0,
-        refinedTextLength: data?.refinedText?.length || 0,
-        audioUrl: data?.audioUrl
-      }
-    }));
-    
-    // Display success notification
-    toast.success('Entry successfully processed and saved!', {
-      id: `success-${tempId}`,
-      duration: 3000,
+    // Success path
+    console.log('[BackgroundProcessor] Processing completed successfully', {
+      entryId: transcriptionResult.data?.entryId,
+      hasTranscription: !!transcriptionResult.data?.transcription,
+      transcriptionLength: transcriptionResult.data?.transcription?.length || 0
     });
     
-    // Stop tracking this processing task
+    // Show success notification
+    toast.success('Entry saved successfully', {
+      description: 'Your journal entry has been processed and saved',
+      duration: 4000
+    });
+    
+    // Clean up processing state
     updateProcessingEntries(tempId, 'remove');
+    setIsEntryBeingProcessed(false);
+    setProcessingLock(false);
+    
+    // Manually trigger a refetch of entries
+    window.dispatchEvent(new CustomEvent('refetchJournalEntries'));
     
   } catch (error: any) {
-    console.error('[BackgroundProcessor] Processing error:', error);
+    console.error('[BackgroundProcessor] Error in background processing:', error);
+    
+    // Handle errors that weren't caught earlier
+    toast.error('Error processing audio', {
+      description: error.message || 'An unexpected error occurred',
+      duration: 5000
+    });
+    
+    // Ensure processing state is cleaned up
+    updateProcessingEntries(tempId, 'remove');
+    setIsEntryBeingProcessed(false);
+    setProcessingLock(false);
     
     window.dispatchEvent(new CustomEvent('debug:audio-processing', {
       detail: {
         step: 'error',
         tempId,
         timestamp: Date.now(),
-        error: error?.message || 'Unknown error',
-        stack: error?.stack
-      }
-    }));
-    
-    toast.error('Failed to process recording: ' + (error?.message || 'Unknown error'), {
-      id: `error-${tempId}`,
-      duration: 3000,
-    });
-    
-    // Remove from processing entries regardless of success/failure
-    updateProcessingEntries(tempId, 'remove');
-    
-  } finally {
-    setProcessingLock(false);
-    
-    // Check if this was the last processing entry and clean up state if so
-    const remainingProcessingEntries = localStorage.getItem('processingEntries');
-    if (!remainingProcessingEntries || remainingProcessingEntries === '[]') {
-      resetProcessingState();
-    }
-    
-    window.dispatchEvent(new CustomEvent('debug:audio-processing', {
-      detail: {
-        step: 'cleanup',
-        tempId,
-        timestamp: Date.now()
+        error: error.message,
+        stack: error.stack
       }
     }));
   }
 }
+
+// Re-export useful functions from child modules
+export { resetProcessingState };

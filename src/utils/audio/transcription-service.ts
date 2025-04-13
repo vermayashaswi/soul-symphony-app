@@ -69,132 +69,139 @@ export async function sendAudioForTranscription(
       }, 60000); // 60 seconds timeout
     });
     
-    // Use Promise.race to implement a timeout
-    const response = await Promise.race([
-      supabase.functions.invoke('transcribe-audio', {
-        body: {
-          audio: cleanBase64,
-          userId: userId || null,
-          directTranscription: directTranscription,
-          recordingTime: Date.now() - startTime,
-          timestamp: Date.now()
-        }
-      }),
-      timeoutPromise
-    ]);
-    
-    const edgeFnEndTime = Date.now();
-    
-    debugEvent = new CustomEvent('debug:transcription', {
-      detail: {
-        step: 'edge-function-end',
-        timestamp: edgeFnEndTime,
-        durationMs: edgeFnEndTime - edgeFnStartTime,
-        hasError: !!response.error,
-        statusText: response.error?.message || 'OK',
-        responseSize: JSON.stringify(response).length
-      }
-    });
-    window.dispatchEvent(debugEvent);
-
-    // Handle response errors
-    if (response.error) {
-      console.error('Edge function error:', response.error);
-      
-      debugEvent = new CustomEvent('debug:transcription', {
-        detail: {
-          step: 'edge-function-error',
-          timestamp: Date.now(),
-          error: response.error?.message,
-          statusText: response.error?.message || 'Unknown error'
-        }
-      });
-      window.dispatchEvent(debugEvent);
-      
-      return {
-        success: false,
-        error: response.error?.message || 'Failed to process audio'
-      };
-    }
-
-    // Type guard to ensure we have a proper response with data
-    const hasData = (resp: any): resp is { data: any } => {
-      return resp && typeof resp === 'object' && 'data' in resp;
+    // The payload to send to the edge function
+    const payload = {
+      audio: cleanBase64,
+      userId: userId || null,
+      directTranscription: directTranscription,
+      recordingTime: Date.now() - startTime,
+      timestamp: Date.now()
     };
-    
-    // Check if the response has data
-    if (!hasData(response)) {
-      console.error('Invalid response format from edge function');
-      return {
-        success: false,
-        error: 'Invalid response format from server'
-      };
-    }
 
-    // Check if the response has a success field
-    if (response.data?.success === false) {
-      console.error('Processing error:', response.data.error || response.data.message);
-      
-      debugEvent = new CustomEvent('debug:transcription', {
-        detail: {
-          step: 'processing-error',
-          timestamp: Date.now(),
-          error: response.data.error || response.data.message
-        }
-      });
-      window.dispatchEvent(debugEvent);
-      
-      return {
-        success: false,
-        error: response.data.error || response.data.message || 'Unknown error in audio processing'
-      };
-    }
-
-    // Validate that we have data back
-    if (!response.data) {
-      console.error('No data returned from edge function');
-      
-      debugEvent = new CustomEvent('debug:transcription', {
-        detail: {
-          step: 'no-data-error',
-          timestamp: Date.now()
-        }
-      });
-      window.dispatchEvent(debugEvent);
-      
-      return {
-        success: false,
-        error: 'No data returned from server'
-      };
-    }
-
-    console.log('Transcription with Whisper + GPT successful:', {
-      directMode: directTranscription,
-      transcriptionLength: response.data?.transcription?.length || 0,
-      hasEntryId: !!response.data?.entryId
+    console.log('Sending payload to transcribe-audio function', { 
+      payloadSize: JSON.stringify(payload).length,
+      userId: userId ? 'present' : 'not provided'
     });
     
-    debugEvent = new CustomEvent('debug:transcription', {
-      detail: {
-        step: 'success',
-        timestamp: Date.now(),
-        totalDurationMs: Date.now() - startTime,
+    try {
+      // Use Promise.race to implement a timeout
+      const response = await Promise.race([
+        supabase.functions.invoke('transcribe-audio', { body: payload }),
+        timeoutPromise
+      ]);
+      
+      const edgeFnEndTime = Date.now();
+      
+      debugEvent = new CustomEvent('debug:transcription', {
+        detail: {
+          step: 'edge-function-end',
+          timestamp: edgeFnEndTime,
+          durationMs: edgeFnEndTime - edgeFnStartTime,
+          hasError: !!response.error,
+          statusText: response.error?.message || 'OK',
+          responseSize: JSON.stringify(response).length
+        }
+      });
+      window.dispatchEvent(debugEvent);
+      
+      // Handle response errors
+      if (response.error) {
+        console.error('Edge function error:', response.error);
+        
+        debugEvent = new CustomEvent('debug:transcription', {
+          detail: {
+            step: 'edge-function-error',
+            timestamp: Date.now(),
+            error: response.error?.message,
+            statusText: response.error?.message || 'Unknown error'
+          }
+        });
+        window.dispatchEvent(debugEvent);
+        
+        return {
+          success: false,
+          error: response.error?.message || 'Failed to process audio'
+        };
+      }
+      
+      // At this point, we know we have a successful response
+      console.log('Function call successful, got response:', { 
+        hasData: !!response.data,
+        dataLength: JSON.stringify(response.data || {}).length
+      });
+      
+      if (!response.data) {
+        console.error('No data returned from edge function');
+        return {
+          success: false,
+          error: 'No data returned from server'
+        };
+      }
+      
+      // Check if the response data indicates a success or not
+      if (response.data.success === false) {
+        console.error('Processing error:', response.data.error || response.data.message);
+        
+        debugEvent = new CustomEvent('debug:transcription', {
+          detail: {
+            step: 'processing-error',
+            timestamp: Date.now(),
+            error: response.data.error || response.data.message
+          }
+        });
+        window.dispatchEvent(debugEvent);
+        
+        return {
+          success: false,
+          error: response.data.error || response.data.message || 'Unknown error in audio processing'
+        };
+      }
+      
+      console.log('Transcription with Whisper + GPT successful:', {
         directMode: directTranscription,
         transcriptionLength: response.data?.transcription?.length || 0,
-        refinedTextLength: response.data?.refinedText?.length || 0,
-        hasEntryId: !!response.data?.entryId,
-        entryId: response.data?.entryId,
-        hasEmotions: !!response.data?.emotions,
-        hasSentiment: response.data?.sentiment !== undefined,
-        audioUrl: response.data?.audioUrl || null
-      }
-    });
-    window.dispatchEvent(debugEvent);
-
-    return {
-      success: true,
-      data: response.data
-    };
+        hasEntryId: !!response.data?.entryId
+      });
+      
+      debugEvent = new CustomEvent('debug:transcription', {
+        detail: {
+          step: 'success',
+          timestamp: Date.now(),
+          totalDurationMs: Date.now() - startTime,
+          directMode: directTranscription,
+          transcriptionLength: response.data?.transcription?.length || 0,
+          refinedTextLength: response.data?.refinedText?.length || 0,
+          hasEntryId: !!response.data?.entryId,
+          entryId: response.data?.entryId,
+          hasEmotions: !!response.data?.emotions,
+          hasSentiment: response.data?.sentiment !== undefined,
+          audioUrl: response.data?.audioUrl || null
+        }
+      });
+      window.dispatchEvent(debugEvent);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (callError: any) {
+      console.error('Error calling edge function:', callError);
+      const errorMessage = callError.message || 'Unknown error calling transcription service';
+      
+      debugEvent = new CustomEvent('debug:transcription', {
+        detail: {
+          step: 'function-call-error',
+          timestamp: Date.now(),
+          error: errorMessage
+        }
+      });
+      window.dispatchEvent(debugEvent);
+      
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
   } catch (error: any) {
     console.error('Error in sendAudioForTranscription:', error);
     
