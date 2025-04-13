@@ -305,6 +305,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       });
       
       setShowAnimation(true);
+      
+      setTimeout(() => {
+        console.log('[VoiceRecorder] Auto-starting recording after restart');
+        startRecording();
+      }, 300);
     }, 100);
   };
 
