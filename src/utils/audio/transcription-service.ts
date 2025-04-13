@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { FunctionsResponse } from '@supabase/supabase-js';
 
 interface TranscriptionResult {
   success: boolean;
@@ -118,13 +117,13 @@ export async function sendAudioForTranscription(
       };
     }
 
-    // Type guard to ensure we have a proper Supabase response with data
-    const isFunctionsResponse = (resp: any): resp is FunctionsResponse<any> => {
-      return resp && 'data' in resp;
+    // Type guard to ensure we have a proper response with data
+    const hasData = (resp: any): resp is { data: any } => {
+      return resp && typeof resp === 'object' && 'data' in resp;
     };
     
-    // Check if the response is a valid FunctionsResponse
-    if (!isFunctionsResponse(response)) {
+    // Check if the response has data
+    if (!hasData(response)) {
       console.error('Invalid response format from edge function');
       return {
         success: false,
