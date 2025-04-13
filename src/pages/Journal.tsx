@@ -348,7 +348,7 @@ const Journal = () => {
     }, 50);
   };
 
-  const handleRecordingComplete = async (audioBlob: Blob) => {
+  const handleRecordingComplete = async (audioBlob: Blob, tempId?: string, useGoogleSTT?: boolean) => {
     if (!audioBlob || !user?.id) {
       console.error('[Journal] Cannot process recording: missing audio blob or user ID');
       setProcessingError('Cannot process recording: missing required information');
@@ -396,13 +396,14 @@ const Journal = () => {
       });
       
       console.log('[Journal] Starting processing for audio file:', audioBlob.size, 'bytes');
-      const { success, tempId, error } = await processRecording(audioBlob, user.id);
+      console.log('[Journal] Using Google STT:', useGoogleSTT ? 'Yes' : 'No');
+      const { success, tempId: resultTempId, error } = await processRecording(audioBlob, user.id, useGoogleSTT);
       
-      if (success && tempId) {
-        console.log('[Journal] Processing started with tempId:', tempId);
-        setProcessingEntries(prev => [...prev, tempId]);
-        setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
-        setLastAction(`Processing Started (${tempId})`);
+      if (success && resultTempId) {
+        console.log('[Journal] Processing started with tempId:', resultTempId);
+        setProcessingEntries(prev => [...prev, resultTempId]);
+        setToastIds(prev => ({ ...prev, [resultTempId]: String(toastId) }));
+        setLastAction(`Processing Started (${resultTempId})`);
         
         await fetchEntries();
         setRefreshKey(prev => prev + 1);
@@ -418,14 +419,14 @@ const Journal = () => {
         }
         
         setTimeout(() => {
-          console.log('[Journal] Maximum processing time check for tempId:', tempId);
+          console.log('[Journal] Maximum processing time check for tempId:', resultTempId);
           setProcessingEntries(prev => {
-            if (prev.includes(tempId)) {
-              console.log('[Journal] Maximum processing time reached for tempId:', tempId);
-              setLastAction(`Max Processing Time Reached (${tempId})`);
+            if (prev.includes(resultTempId)) {
+              console.log('[Journal] Maximum processing time reached for tempId:', resultTempId);
+              setLastAction(`Max Processing Time Reached (${resultTempId})`);
               
-              if (toastIds[tempId]) {
-                toast.dismiss(toastIds[tempId]);
+              if (toastIds[resultTempId]) {
+                toast.dismiss(toastIds[resultTempId]);
                 
                 toast.success('Journal entry processed', { 
                   duration: 3000,
@@ -434,7 +435,7 @@ const Journal = () => {
                 
                 setToastIds(prev => {
                   const newToastIds = { ...prev };
-                  delete newToastIds[tempId];
+                  delete newToastIds[resultTempId];
                   return newToastIds;
                 });
               }
@@ -444,7 +445,7 @@ const Journal = () => {
               setIsSavingRecording(false);
               setSafeToSwitchTab(true);
               
-              return prev.filter(id => id !== tempId);
+              return prev.filter(id => id !== resultTempId);
             }
             return prev;
           });
