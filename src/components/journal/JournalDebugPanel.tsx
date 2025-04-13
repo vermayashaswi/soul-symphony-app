@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -31,14 +30,11 @@ const JournalDebugPanel = () => {
   const checkServices = async () => {
     setIsLoading((prev) => ({ ...prev, services: true }));
     try {
-      // Check Supabase connection
       const { data, error } = await supabase.auth.getSession();
       setServiceStatus(prev => ({
         ...prev,
         supabase: !error
       }));
-      
-      // If we wanted to check other services like OpenAI, we could do it here
     } catch (error) {
       console.error('Error checking services:', error);
     } finally {
@@ -133,15 +129,13 @@ const JournalDebugPanel = () => {
   const testWhisperEndpoint = async () => {
     setIsLoading((prev) => ({ ...prev, whisperTest: true }));
     try {
-      // Generate a simple audio file with a beep
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const dest = audioContext.createMediaStreamDestination();
       oscillator.connect(dest);
-      oscillator.frequency.value = 440; // A4 note
+      oscillator.frequency.value = 440;
       oscillator.start();
       
-      // Record for 1 second
       const mediaRecorder = new MediaRecorder(dest.stream);
       const chunks: BlobPart[] = [];
       
@@ -163,7 +157,6 @@ const JournalDebugPanel = () => {
       
       const audioBlob = await recordingPromise;
       
-      // Convert to base64
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve) => {
         reader.onloadend = () => {
@@ -175,7 +168,6 @@ const JournalDebugPanel = () => {
       
       const base64Audio = await base64Promise;
       
-      // Send to transcribe-audio edge function
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData?.user?.id;
       
@@ -183,7 +175,7 @@ const JournalDebugPanel = () => {
         body: {
           audio: base64Audio,
           userId: userId || null,
-          directTranscription: true // Just get raw transcription
+          directTranscription: true
         }
       });
       
@@ -194,6 +186,11 @@ const JournalDebugPanel = () => {
     } finally {
       setIsLoading((prev) => ({ ...prev, whisperTest: false }));
     }
+  };
+
+  const handleToggleLogging = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleEnabled();
   };
 
   return (
@@ -242,7 +239,7 @@ const JournalDebugPanel = () => {
                 <Button 
                   size="sm" 
                   variant={isEnabled ? "outline" : "default"} 
-                  onClick={toggleEnabled}
+                  onClick={handleToggleLogging}
                 >
                   {isEnabled ? "Disable" : "Enable"} Logging
                 </Button>
