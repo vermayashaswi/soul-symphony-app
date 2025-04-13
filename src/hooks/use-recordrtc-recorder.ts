@@ -59,13 +59,23 @@ export function useRecordRTCRecorder({
   }, []);
   
   const cleanupResources = () => {
+    console.log('[useRecordRTCRecorder] Cleaning up resources');
+    
     if (recorderRef.current) {
-      recorderRef.current.destroy();
+      try {
+        recorderRef.current.destroy();
+      } catch (e) {
+        console.error('[useRecordRTCRecorder] Error destroying recorder:', e);
+      }
       recorderRef.current = null;
     }
     
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      try {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      } catch (e) {
+        console.error('[useRecordRTCRecorder] Error stopping tracks:', e);
+      }
       streamRef.current = null;
     }
     
@@ -90,6 +100,8 @@ export function useRecordRTCRecorder({
       }
       audioContextRef.current = null;
     }
+    
+    analyzerRef.current = null;
   };
 
   const setupAudioProcessing = (stream: MediaStream) => {
@@ -164,6 +176,11 @@ export function useRecordRTCRecorder({
   
   const startRecording = async () => {
     try {
+      if (recorderRef.current || streamRef.current) {
+        console.log('[useRecordRTCRecorder] Cleaning up previous recording before starting new one');
+        cleanupResources();
+      }
+      
       setAudioBlob(null);
       setRecordingTime(0);
       
@@ -283,11 +300,13 @@ export function useRecordRTCRecorder({
   };
 
   const resetRecording = () => {
+    console.log('[useRecordRTCRecorder] Resetting recording state');
     cleanupResources();
     setAudioBlob(null);
     setRecordingTime(0);
     setAudioLevel(0);
     setRipples([]);
+    setIsRecording(false);
   };
 
   useEffect(() => {

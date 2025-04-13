@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCorsRequest, createErrorResponse, createSuccessResponse } from "../_shared/utils.ts";
@@ -126,6 +125,8 @@ serve(async (req) => {
 
       // Process with GPT for translation and language detection
       const { refinedText, predictedLanguages } = await translateAndRefineText(transcribedText, openAIApiKey);
+      console.log("Refined text:", refinedText?.substring(0, 100) + "...");
+      console.log("Detected languages:", predictedLanguages);
 
       // Get emotions from the refined text
       const { data: emotionsData, error: emotionsError } = await supabase
@@ -140,9 +141,12 @@ serve(async (req) => {
       
       // Analyze emotions in the refined text
       const emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
+      console.log("Emotions analysis:", emotions);
 
       // Analyze sentiment and extract entities using Google NL API
       const { sentiment: sentimentScore, entities } = await analyzeWithGoogleNL(refinedText, GOOGLE_NL_API_KEY);
+      console.log("Sentiment score:", sentimentScore);
+      console.log("Entities detected:", entities?.length || 0);
 
       // Calculate audio duration more accurately based on file type and bytes
       let audioDuration = 0;
@@ -177,6 +181,8 @@ serve(async (req) => {
         entities,
         predictedLanguages
       );
+
+      console.log("Journal entry stored with ID:", entryId);
 
       if (entryId) {
         // Extract themes for the entry
@@ -227,6 +233,7 @@ serve(async (req) => {
 
       // Verify journal entry was stored
       await verifyJournalEntry(supabase, entryId);
+      console.log("Journal entry verified successfully");
 
       // Return success response
       return createSuccessResponse({
