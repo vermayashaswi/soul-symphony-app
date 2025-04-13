@@ -99,7 +99,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
           return (
             <motion.div
               key={`theme-strip-${themeItem.theme}`}
-              className="absolute left-0 w-auto h-8 px-3 py-1 flex items-center"
+              className="absolute left-0 w-auto h-8 px-3 py-1 flex items-center rounded-sm"
               style={{
                 top: `${yPosition}%`,
                 backgroundColor: `${themeColor}50`,
