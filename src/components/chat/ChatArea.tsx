@@ -20,6 +20,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   threadId
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const chatAreaRef = useRef<HTMLDivElement>(null);
   const [prevMessageCount, setPrevMessageCount] = useState(0);
   const [lastUserMessage, setLastUserMessage] = useState<ChatMessageType | null>(null);
   const [localIsLoading, setLocalIsLoading] = useState(isLoading);
@@ -122,8 +123,25 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       setLastUserMessage(null);
     }
 
-    // Always scroll to bottom to ensure chat input is visible
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Improved scrolling behavior
+    const scrollToBottom = () => {
+      if (bottomRef.current) {
+        bottomRef.current.scrollIntoView({ 
+          behavior: chatMessages.length !== prevMessageCount ? 'smooth' : 'auto',
+          block: 'end'
+        });
+        
+        // Ensure chat input is visible by triggering a window scroll
+        setTimeout(() => {
+          window.scrollTo({
+            top: document.body.scrollHeight,
+            behavior: 'smooth'
+          });
+        }, 100);
+      }
+    };
+    
+    scrollToBottom();
     setPrevMessageCount(chatMessages.length);
     
     // If we have a completed response, clear the loading state
@@ -143,9 +161,38 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           sessionStorage.removeItem('chatProcessingThreadId');
           sessionStorage.removeItem('chatProcessingTimestamp');
         }
+        
+        // Ensure chat input is visible after a new message
+        document.dispatchEvent(new CustomEvent('chatMessageReceived'));
       }
     }
   }, [chatMessages, localIsLoading, prevMessageCount, threadId]);
+  
+  // Listen for chat message received event
+  useEffect(() => {
+    const ensureChatInputVisible = () => {
+      // Make sure chat input is visible
+      setTimeout(() => {
+        if (bottomRef.current) {
+          bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        window.scrollTo({
+          top: document.body.scrollHeight,
+          behavior: 'smooth'
+        });
+        
+        // Dispatch an event that can be listened to by the input component
+        document.dispatchEvent(new CustomEvent('ensureChatInputVisible'));
+      }, 300);
+    };
+    
+    document.addEventListener('chatMessageReceived', ensureChatInputVisible);
+    
+    return () => {
+      document.removeEventListener('chatMessageReceived', ensureChatInputVisible);
+    };
+  }, []);
   
   // Check for duplicates by content to prevent doubled rendering
   const uniqueMessages = chatMessages.reduce((acc: ChatMessageType[], current) => {
@@ -166,7 +213,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     : uniqueMessages;
   
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" ref={chatAreaRef}>
       {localIsLoading && lastUserMessage && (
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b pb-3 pt-2 px-4">
           <div className="flex items-start gap-3">
@@ -180,7 +227,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       )}
       
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 chat-messages-container">
         <AnimatePresence initial={false}>
           {filteredMessages.map((message, index) => {
             // Map 'error' role to 'assistant' for display purposes if needed
@@ -231,7 +278,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         
         <div 
           ref={bottomRef} 
-          className="h-20" // Add some height to ensure enough scroll space
+          className="h-24 chat-bottom-spacer" // Increased height to ensure enough scroll space
+          style={{ marginBottom: '10px' }}
         />
       </div>
     </div>
