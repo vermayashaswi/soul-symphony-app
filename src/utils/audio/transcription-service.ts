@@ -1,4 +1,5 @@
 
+
 import { supabase } from '@/integrations/supabase/client';
 
 interface TranscriptionResult {
@@ -32,8 +33,7 @@ export async function sendAudioForTranscription(
         audio: base64Audio,
         userId: userId || null,
         directTranscription: directTranscription,
-        highQuality: true, // Add flag to indicate this is a high-quality recording
-        recordingTime: Date.now() // Add current timestamp to help with debugging
+        highQuality: true // Add flag to indicate this is a high-quality recording
       }
     });
 
@@ -64,19 +64,11 @@ export async function sendAudioForTranscription(
       };
     }
 
-    // Additional validation to ensure critical fields exist
-    if (!response.data.transcription && !directTranscription) {
-      console.error('Missing transcription in response');
-      return {
-        success: false,
-        error: 'Missing transcription data in server response'
-      };
-    }
-
     console.log('Transcription successful:', {
       directMode: directTranscription,
       transcriptionLength: response.data?.transcription?.length || 0,
-      hasEntryId: !!response.data?.entryId
+      hasEntryId: !!response.data?.entryId,
+      predictedLanguages: response.data?.predictedLanguages || null
     });
 
     return {

@@ -281,10 +281,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   };
 
   const handleRestart = async () => {
-    console.log('[VoiceRecorder] Restarting recording');
-    
     await ensureAllToastsCleared();
     
+    resetRecording();
+    resetPlayback();
     setRecordingError(null);
     setShowAnimation(true);
     setIsProcessing(false);
@@ -295,22 +295,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     savingInProgressRef.current = false;
     domClearAttemptedRef.current = false;
     
-    resetPlayback();
+    await new Promise(resolve => setTimeout(resolve, 300));
     
-    setTimeout(() => {
-      resetRecording();
-      
-      toast.info("Starting a new recording", {
-        duration: 2000
-      });
-      
-      setShowAnimation(true);
-      
-      setTimeout(() => {
-        console.log('[VoiceRecorder] Auto-starting recording after restart');
-        startRecording();
-      }, 300);
-    }, 100);
+    toast.info("Starting a new recording", {
+      duration: 2000
+    });
   };
 
   const shouldShowPrompt = !isRecording && !audioBlob;

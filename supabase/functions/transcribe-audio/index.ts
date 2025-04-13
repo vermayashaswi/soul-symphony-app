@@ -124,9 +124,8 @@ serve(async (req) => {
         return createSuccessResponse({ transcription: transcribedText });
       }
 
-      // Process with GPT for translation and refinement (no longer storing language prediction)
-      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey);
-      console.log("Refined text:", refinedText?.substring(0, 100) + "...");
+      // Process with GPT for translation and language detection
+      const { refinedText, predictedLanguages } = await translateAndRefineText(transcribedText, openAIApiKey);
 
       // Get emotions from the refined text
       const { data: emotionsData, error: emotionsError } = await supabase
@@ -141,12 +140,9 @@ serve(async (req) => {
       
       // Analyze emotions in the refined text
       const emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
-      console.log("Emotions analysis:", emotions);
 
       // Analyze sentiment and extract entities using Google NL API
       const { sentiment: sentimentScore, entities } = await analyzeWithGoogleNL(refinedText, GOOGLE_NL_API_KEY);
-      console.log("Sentiment score:", sentimentScore);
-      console.log("Entities detected:", entities?.length || 0);
 
       // Calculate audio duration more accurately based on file type and bytes
       let audioDuration = 0;
@@ -168,7 +164,7 @@ serve(async (req) => {
       
       console.log(`Calculated audio duration: ${audioDuration} seconds`);
 
-      // Store journal entry in database - no longer storing predictedLanguages
+      // Store journal entry in database
       const entryId = await storeJournalEntry(
         supabase,
         transcribedText,
@@ -178,10 +174,9 @@ serve(async (req) => {
         audioDuration,
         emotions,
         sentimentScore,
-        entities
+        entities,
+        predictedLanguages
       );
-
-      console.log("Journal entry stored with ID:", entryId);
 
       if (entryId) {
         // Extract themes for the entry
@@ -232,9 +227,8 @@ serve(async (req) => {
 
       // Verify journal entry was stored
       await verifyJournalEntry(supabase, entryId);
-      console.log("Journal entry verified successfully");
 
-      // Return success response - no longer including predictedLanguages
+      // Return success response
       return createSuccessResponse({
         transcription: transcribedText,
         refinedText: refinedText,
@@ -242,7 +236,8 @@ serve(async (req) => {
         entryId: entryId,
         emotions: emotions,
         sentiment: sentimentScore,
-        entities: entities
+        entities: entities,
+        predictedLanguages: predictedLanguages
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);
