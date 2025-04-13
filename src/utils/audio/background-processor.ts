@@ -21,7 +21,7 @@ export async function processRecordingInBackground(
     }
 
     if (!userId) {
-      throw new Error('No user ID provided');
+      console.warn('[BackgroundProcessor] No user ID provided, proceeding with anonymous processing');
     }
 
     const debugEvent = new CustomEvent('debug:audio-processing', {
@@ -35,27 +35,38 @@ export async function processRecordingInBackground(
     });
     window.dispatchEvent(debugEvent);
 
+    // Validate audio blob
+    if (audioBlob.size === 0) {
+      throw new Error('Empty audio blob');
+    }
+
     // Convert audio to base64
     const reader = new FileReader();
     
-    await new Promise<void>((resolve, reject) => {
-      reader.onloadend = () => resolve();
-      reader.onerror = reject;
-      reader.readAsDataURL(audioBlob);
-    });
-    
-    if (!reader.result) {
+    let base64Audio = '';
+    try {
+      await new Promise<void>((resolve, reject) => {
+        reader.onloadend = () => {
+          if (typeof reader.result === 'string') {
+            base64Audio = reader.result;
+            resolve();
+          } else {
+            reject(new Error('FileReader did not return a string'));
+          }
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(audioBlob);
+      });
+    } catch (error) {
+      console.error('[BackgroundProcessor] Error reading audio file:', error);
       throw new Error('Failed to read audio file');
     }
     
-    // Extract base64 content without the data URL prefix
-    const base64Audio = (reader.result as string).split(',')[1];
-    
     if (!base64Audio) {
-      throw new Error('Invalid base64 audio data');
+      throw new Error('Failed to convert audio to base64');
     }
     
-    console.log('[BackgroundProcessor] Audio converted to base64');
+    console.log('[BackgroundProcessor] Audio converted to base64, length:', base64Audio.length);
     
     window.dispatchEvent(new CustomEvent('debug:audio-processing', {
       detail: {
@@ -79,7 +90,9 @@ export async function processRecordingInBackground(
         step: 'pre-transcription',
         tempId,
         timestamp: Date.now(),
-        recordingTimeMs
+        recordingTimeMs,
+        audioType: audioBlob.type,
+        audioSize: audioBlob.size
       }
     }));
     
@@ -111,6 +124,7 @@ export async function processRecordingInBackground(
     console.log('[BackgroundProcessor] EntryId:', data?.entryId);
     console.log('[BackgroundProcessor] Transcription length:', data?.transcription?.length || 0);
     console.log('[BackgroundProcessor] Refined text length:', data?.refinedText?.length || 0);
+    console.log('[BackgroundProcessor] Audio URL:', data?.audioUrl || 'Not stored');
     
     window.dispatchEvent(new CustomEvent('debug:audio-processing', {
       detail: {
@@ -119,9 +133,16 @@ export async function processRecordingInBackground(
         timestamp: Date.now(),
         entryId: data?.entryId,
         transcriptionLength: data?.transcription?.length || 0,
-        refinedTextLength: data?.refinedText?.length || 0
+        refinedTextLength: data?.refinedText?.length || 0,
+        audioUrl: data?.audioUrl
       }
     }));
+    
+    // Display success notification
+    toast.success('Entry successfully processed and saved!', {
+      id: `success-${tempId}`,
+      duration: 3000,
+    });
     
     // Stop tracking this processing task
     updateProcessingEntries(tempId, 'remove');
@@ -139,7 +160,7 @@ export async function processRecordingInBackground(
       }
     }));
     
-    toast.error('Failed to process recording', {
+    toast.error('Failed to process recording: ' + (error?.message || 'Unknown error'), {
       id: `error-${tempId}`,
       duration: 3000,
     });

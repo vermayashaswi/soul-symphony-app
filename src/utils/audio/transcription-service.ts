@@ -29,12 +29,22 @@ export async function sendAudioForTranscription(
     console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} transcription with Whisper + GPT translation`);
     console.log(`Audio data size: ${base64Audio.length} characters`);
     
+    // Make sure base64 data doesn't contain multiple data URL prefixes (can happen with some browsers)
+    let cleanBase64 = base64Audio;
+    if (base64Audio.includes('data:audio') && base64Audio.split('data:audio').length > 2) {
+      console.log('Detected multiple data URL prefixes, cleaning up...');
+      cleanBase64 = base64Audio.split('data:audio').pop() || '';
+      if (cleanBase64.includes(',')) {
+        cleanBase64 = cleanBase64.split(',')[1];
+      }
+    }
+    
     debugEvent = new CustomEvent('debug:transcription', {
       detail: {
         step: 'start',
         timestamp: startTime,
         directTranscription,
-        audioSize: base64Audio.length,
+        audioSize: cleanBase64.length,
         userId: userId || 'guest'
       }
     });
@@ -54,9 +64,15 @@ export async function sendAudioForTranscription(
     
     const response = await supabase.functions.invoke('transcribe-audio', {
       body: {
-        audio: base64Audio,
+        audio: cleanBase64,
         userId: userId || null,
-        directTranscription: directTranscription
+        directTranscription: directTranscription,
+        recordingTime: Date.now() - startTime, // Pass recording time to help with duration calculation
+        timestamp: Date.now()
+      },
+      // Increase the timeout to 60 seconds
+      options: {
+        timeout: 60000
       }
     });
     
@@ -149,7 +165,8 @@ export async function sendAudioForTranscription(
         hasEntryId: !!response.data?.entryId,
         entryId: response.data?.entryId,
         hasEmotions: !!response.data?.emotions,
-        hasSentiment: response.data?.sentiment !== undefined
+        hasSentiment: response.data?.sentiment !== undefined,
+        audioUrl: response.data?.audioUrl || null
       }
     });
     window.dispatchEvent(debugEvent);
