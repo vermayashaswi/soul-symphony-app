@@ -103,6 +103,81 @@ export async function analyzeEmotions(text: string, emotions: any[], openAIApiKe
 }
 
 /**
+ * Transcribes audio using Google Speech-to-Text API
+ */
+export async function transcribeAudioWithGoogle(
+  audioBlob: Blob, 
+  fileType: string, 
+  apiKey: string
+): Promise<string> {
+  console.log("Transcribing with Google Speech-to-Text...");
+  
+  try {
+    // Convert audio blob to base64
+    const audioArrayBuffer = await audioBlob.arrayBuffer();
+    const audioBase64 = btoa(
+      String.fromCharCode(...new Uint8Array(audioArrayBuffer))
+    );
+    
+    // Determine language code - let Google auto-detect
+    const languageCode = "en-US";  // Default to English, can be changed or auto-detected
+    
+    // Prepare Google Speech API request
+    const googleRequest = {
+      config: {
+        encoding: fileType === 'wav' ? 'LINEAR16' : 'WEBM_OPUS',
+        sampleRateHertz: 48000,  // Most common for web recordings
+        languageCode: languageCode,
+        model: "latest_long",  // For multi-sentence audio
+        enableAutomaticPunctuation: true,
+        enableWordTimeOffsets: false,
+        useEnhanced: true,
+        alternativeLanguageCodes: ["hi-IN", "fr-FR", "es-ES", "de-DE", "ja-JP", "ko-KR", "zh-CN"]  // Add languages you want to support
+      },
+      audio: {
+        content: audioBase64
+      }
+    };
+    
+    console.log("Sending request to Google Speech API");
+    
+    // Call the Google Speech-to-Text API
+    const response = await fetch(
+      `https://speech.googleapis.com/v1/speech:recognize?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(googleRequest)
+      }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Google Speech API error:", errorText);
+      throw new Error(`Google Speech API error: ${errorText}`);
+    }
+    
+    const result = await response.json();
+    
+    // Extract and combine the transcription results
+    let transcription = "";
+    if (result.results && result.results.length > 0) {
+      transcription = result.results
+        .map((result: any) => result.alternatives[0].transcript)
+        .join(' ');
+    }
+    
+    console.log("Google transcription completed:", transcription.slice(0, 100) + "...");
+    return transcription;
+  } catch (error) {
+    console.error("Error in Google speech transcription:", error);
+    throw error;
+  }
+}
+
+/**
  * Transcribes audio and translates it if needed
  */
 export async function transcribeAudioWithWhisper(

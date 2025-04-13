@@ -12,11 +12,13 @@ interface TranscriptionResult {
  * @param base64Audio - Base64 encoded audio data
  * @param userId - User ID for association with the transcription
  * @param directTranscription - If true, just returns the transcription without processing
+ * @param useGoogleSTT - If true, uses Google Speech-to-Text instead of OpenAI Whisper
  */
 export async function sendAudioForTranscription(
   base64Audio: string,
   userId: string | undefined,
-  directTranscription: boolean = false
+  directTranscription: boolean = false,
+  useGoogleSTT: boolean = false
 ): Promise<TranscriptionResult> {
   try {
     if (!base64Audio) {
@@ -25,6 +27,7 @@ export async function sendAudioForTranscription(
 
     console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`Audio data size: ${base64Audio.length} characters`);
+    console.log(`Using Google STT: ${useGoogleSTT ? 'Yes' : 'No'}`);
     
     // Call the Supabase edge function with a longer timeout
     const response = await supabase.functions.invoke('transcribe-audio', {
@@ -32,7 +35,8 @@ export async function sendAudioForTranscription(
         audio: base64Audio,
         userId: userId || null,
         directTranscription: directTranscription,
-        highQuality: true // Add flag to indicate this is a high-quality recording
+        highQuality: true, // Add flag to indicate this is a high-quality recording
+        useGoogleSTT: useGoogleSTT
       }
     });
 
@@ -66,7 +70,8 @@ export async function sendAudioForTranscription(
     console.log('Transcription successful:', {
       directMode: directTranscription,
       transcriptionLength: response.data?.transcription?.length || 0,
-      hasEntryId: !!response.data?.entryId
+      hasEntryId: !!response.data?.entryId,
+      service: response.data?.transcriptionService || 'whisper'
     });
 
     return {

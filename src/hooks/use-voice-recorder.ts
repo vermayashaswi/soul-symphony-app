@@ -3,13 +3,15 @@ import { useState, useRef, useEffect } from "react";
 import RecordRTC, { StereoAudioRecorder } from "recordrtc";
 
 interface UseVoiceRecorderProps {
-  onRecordingComplete: (audioBlob: Blob, tempId?: string) => void;
+  onRecordingComplete: (audioBlob: Blob, tempId?: string, useGoogleSTT?: boolean) => void;
   onError?: (error: any) => void;
+  useGoogleSTT?: boolean;
 }
 
 export function useVoiceRecorder({
   onRecordingComplete,
   onError,
+  useGoogleSTT = false,
 }: UseVoiceRecorderProps) {
   const [status, setStatus] = useState<
     "idle" | "acquiring_media" | "recording" | "stopping"
@@ -113,7 +115,7 @@ export function useVoiceRecorder({
         if (blob.size > 0) {
           if (onRecordingComplete) {
             const tempId = generateTempId();
-            onRecordingComplete(blob, tempId);
+            onRecordingComplete(blob, tempId, useGoogleSTT);
             
             if (opId) {
               window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
@@ -121,7 +123,7 @@ export function useVoiceRecorder({
                   id: opId,
                   status: 'success',
                   message: 'Recording completed',
-                  details: `Audio size: ${formatBytes(blob.size)}, Duration: ${formatTime(elapsedTime)}, TempID: ${tempId}`
+                  details: `Audio size: ${formatBytes(blob.size)}, Duration: ${formatTime(elapsedTime)}, TempID: ${tempId}, Using Google STT: ${useGoogleSTT ? 'Yes' : 'No'}`
                 }
               }));
             }

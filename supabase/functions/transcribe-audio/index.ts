@@ -7,6 +7,7 @@ import {
   generateEmbedding, 
   analyzeEmotions, 
   transcribeAudioWithWhisper,
+  transcribeAudioWithGoogle,
   translateAndRefineText
 } from "./aiProcessing.ts";
 import { analyzeWithGoogleNL } from "./nlProcessing.ts";
@@ -25,6 +26,7 @@ const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
 const GOOGLE_NL_API_KEY = Deno.env.get('GOOGLE_API') || '';
+const GOOGLE_SPEECH_API_KEY = Deno.env.get('GOOGLE_SPEECH_API_KEY') || '';
 
 // Create Supabase client
 const supabase = createSupabaseAdmin(supabaseUrl, supabaseServiceKey);
@@ -57,7 +59,7 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload');
     }
 
-    const { audio, userId, directTranscription, highQuality } = payload;
+    const { audio, userId, directTranscription, highQuality, useGoogleSTT = false } = payload;
     
     // Validate required fields
     if (!audio) {
@@ -65,9 +67,14 @@ serve(async (req) => {
       throw new Error('No audio data provided');
     }
 
-    if (!openAIApiKey) {
+    if (!openAIApiKey && !useGoogleSTT) {
       console.error('OpenAI API key is missing or empty in environment variables');
       throw new Error('OpenAI API key is not configured. Please set the OPENAI_API_KEY secret in the Supabase dashboard.');
+    }
+
+    if (useGoogleSTT && !GOOGLE_SPEECH_API_KEY) {
+      console.error('Google Speech API key is missing or empty in environment variables');
+      throw new Error('Google Speech API key is not configured. Please set the GOOGLE_SPEECH_API_KEY secret in the Supabase dashboard.');
     }
 
     // Log request details
@@ -75,6 +82,7 @@ serve(async (req) => {
     console.log("User ID:", userId);
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
     console.log("High quality mode:", highQuality ? "YES" : "NO");
+    console.log("Using Google STT:", useGoogleSTT ? "YES" : "NO");
     
     // Ensure user profile exists
     if (userId) {
@@ -84,6 +92,7 @@ serve(async (req) => {
     // Process audio data
     console.log("Audio data length:", audio.length);
     console.log("OpenAI API Key available:", !!openAIApiKey);
+    console.log("Google Speech API Key available:", !!GOOGLE_SPEECH_API_KEY);
     
     const binaryAudio = processBase64Chunks(audio);
     console.log("Processed binary audio size:", binaryAudio.length);
@@ -115,9 +124,16 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: mimeType });
     
     try {
-      // Transcribe audio file
-      const transcribedText = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
-      console.log("Transcription successful:", transcribedText);
+      // Transcribe audio file using selected service
+      let transcribedText;
+      
+      if (useGoogleSTT) {
+        transcribedText = await transcribeAudioWithGoogle(blob, detectedFileType, GOOGLE_SPEECH_API_KEY);
+        console.log("Google STT Transcription successful:", transcribedText);
+      } else {
+        transcribedText = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
+        console.log("Whisper Transcription successful:", transcribedText);
+      }
 
       // If direct transcription mode, return just the transcription
       if (directTranscription) {
@@ -247,7 +263,8 @@ serve(async (req) => {
         entryId: entryId,
         emotions: emotions,
         sentiment: sentimentScore,
-        entities: entities
+        entities: entities,
+        transcriptionService: useGoogleSTT ? 'google' : 'whisper'
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);
