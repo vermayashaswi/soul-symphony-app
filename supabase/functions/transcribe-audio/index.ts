@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCorsRequest, createErrorResponse, createSuccessResponse } from "../_shared/utils.ts";
@@ -26,7 +25,7 @@ const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
 const GOOGLE_NL_API_KEY = Deno.env.get('GOOGLE_API') || '';
-const GOOGLE_SPEECH_API_KEY = Deno.env.get('GOOGLE_SPEECH_API_KEY') || '';
+const GOOGLE_SPEECH_API_KEY = Deno.env.get('GOOGLE_API') || ''; // Using the existing Google API key
 
 // Create Supabase client
 const supabase = createSupabaseAdmin(supabaseUrl, supabaseServiceKey);
@@ -74,7 +73,7 @@ serve(async (req) => {
 
     if (useGoogleSTT && !GOOGLE_SPEECH_API_KEY) {
       console.error('Google Speech API key is missing or empty in environment variables');
-      throw new Error('Google Speech API key is not configured. Please set the GOOGLE_SPEECH_API_KEY secret in the Supabase dashboard.');
+      throw new Error('Google Speech API key is not configured. Please set the GOOGLE_API secret in the Supabase dashboard.');
     }
 
     // Log request details
