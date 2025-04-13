@@ -57,7 +57,7 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload');
     }
 
-    const { audio, userId, directTranscription, highQuality } = payload;
+    const { audio, userId, directTranscription, useTranslation } = payload;
     
     // Validate required fields
     if (!audio) {
@@ -74,7 +74,7 @@ serve(async (req) => {
     console.log("Received audio data, processing...");
     console.log("User ID:", userId);
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
-    console.log("High quality mode:", highQuality ? "YES" : "NO");
+    console.log("Using Whisper translation API:", useTranslation ? "YES" : "NO");
     
     // Ensure user profile exists
     if (userId) {
@@ -125,10 +125,11 @@ serve(async (req) => {
         return createSuccessResponse({ transcription: translatedText });
       }
 
-      // Optionally enhance the translated text if needed
-      const { refinedText } = await enhanceTranslatedText(translatedText, openAIApiKey);
+      // Since we're using Whisper's direct translation, we'll use the same text
+      // for both transcription and refined text
+      const refinedText = translatedText;
 
-      // Get emotions from the refined text
+      // Get emotions from the translated text
       const { data: emotionsData, error: emotionsError } = await supabase
         .from('emotions')
         .select('name, description')
@@ -139,7 +140,7 @@ serve(async (req) => {
         throw new Error('Failed to fetch emotions data');
       }
       
-      // Analyze emotions in the refined text
+      // Analyze emotions in the translated text
       const emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
 
       // Analyze sentiment and extract entities using Google NL API
@@ -179,7 +180,7 @@ serve(async (req) => {
       const entryId = await storeJournalEntry(
         supabase,
         translatedText, // Use translated text as transcription 
-        refinedText,    // Use enhanced text as refined text
+        refinedText,    // Use the same translated text as refined text
         audioUrl,
         userId,
         audioDuration,

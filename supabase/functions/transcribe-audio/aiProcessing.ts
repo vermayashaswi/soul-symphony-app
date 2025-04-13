@@ -114,10 +114,7 @@ export async function translateAudioWithWhisper(
   formData.append('model', 'whisper-1');
   formData.append('response_format', 'json');
   
-  // Set response_format to be "text" to get plain text
-  // Add translate=true parameter to use Whisper's translation capabilities
-  formData.append('translate', 'true');
-  
+  // Use Whisper's translation capabilities by sending to the translations endpoint
   console.log("Sending to Whisper API with translation enabled");
   
   const whisperResponse = await fetch('https://api.openai.com/v1/audio/translations', {
