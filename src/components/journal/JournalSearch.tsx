@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface JournalSearchProps {
   entries: JournalEntry[];
@@ -33,6 +34,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [typingIndex, setTypingIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mobile = useIsMobile();
 
   // Set up the typing animation for the placeholder text
   useEffect(() => {
@@ -75,6 +77,35 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
       }
     }
   }, [isTyping, typingIndex, placeholderIndex]);
+
+  // Handle back button on mobile
+  useEffect(() => {
+    const handleBackButton = (event: PopStateEvent) => {
+      if (isFocused) {
+        // Prevent default back behavior if search is focused
+        event.preventDefault();
+        
+        // Blur the search input and reset focus state
+        if (inputRef.current) {
+          inputRef.current.blur();
+        }
+        setIsFocused(false);
+        
+        // Push a new state to replace the one we just intercepted
+        window.history.pushState(null, '', window.location.pathname);
+      }
+    };
+    
+    // Add history state on focus so we can detect back button press
+    if (isFocused) {
+      window.history.pushState(null, '', window.location.pathname);
+      window.addEventListener('popstate', handleBackButton);
+    }
+    
+    return () => {
+      window.removeEventListener('popstate', handleBackButton);
+    };
+  }, [isFocused]);
 
   // Handle search functionality
   useEffect(() => {
