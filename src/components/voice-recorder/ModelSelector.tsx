@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Mic, GoogleChrome } from "lucide-react";
+import { Mic, Globe } from "lucide-react";
 
 interface ModelSelectorProps {
   selectedModel: string;
@@ -38,7 +38,7 @@ export function ModelSelector({ selectedModel, onChange, disabled = false }: Mod
           </SelectItem>
           <SelectItem value="google">
             <div className="flex items-center gap-2">
-              <GoogleChrome className="w-3.5 h-3.5" />
+              <Globe className="w-3.5 h-3.5" />
               <span>Google Speech</span>
             </div>
           </SelectItem>

@@ -44,13 +44,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     status,
     recordingTime,
     recordingBlob: audioBlob,
-    audioLevel,
-    hasPermission,
-    ripples,
     startRecording,
     stopRecording,
-    requestPermissions,
-    clearRecording
+    clearRecording,
+    requestPermissions
   } = useVoiceRecorder({
     onRecordingComplete: (blob, tempId, useGoogleSTT) => {
       // This is now handled in handleSaveEntry
@@ -60,6 +57,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     },
     useGoogleSTT: transcriptionModel === "google"
   });
+  
+  const isRecording = status === 'recording';
   
   const {
     isPlaying,
@@ -101,7 +100,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   }, [isRecording]);
   
   useEffect(() => {
-    if (isRecording && recordingTime >= 120) {
+    if (isRecording && typeof recordingTime === 'number' && recordingTime >= 120) {
       toast.warning("Your recording is quite long. Consider stopping now for better processing.", {
         duration: 3000,
       });
@@ -132,7 +131,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       hasAudioBlob: !!audioBlob,
       audioSize: audioBlob?.size || 0,
       isRecording,
-      hasPermission,
       audioDuration,
       hasSaved,
       hasPlayedOnce,
@@ -146,10 +144,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         status: isRecording 
           ? 'Recording' 
           : (audioBlob ? 'Recorded' : 'No Recording'),
-        duration: audioDuration || recordingTime
+        duration: audioDuration || (typeof recordingTime === 'number' ? recordingTime : 0)
       });
     }
-  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
+  }, [isProcessing, audioBlob, isRecording, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
   useEffect(() => {
     return () => {
@@ -240,7 +238,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         model: transcriptionModel
       });
       
-      if (!hasPlayedOnce && audioDuration === 0 && recordingTime > 0) {
+      if (!hasPlayedOnce && audioDuration === 0 && typeof recordingTime === 'number' && recordingTime > 0) {
         const estimatedDuration = recordingTime / 1000;
         console.log(`[VoiceRecorder] Recording not played yet, estimating duration as ${estimatedDuration}s`);
       }
@@ -342,9 +340,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           
           <div className="relative z-10 flex justify-center items-center mt-40">
             <RecordingButton
-              isRecording={status === 'recording'}
+              isRecording={isRecording}
               isProcessing={isProcessing}
-              hasPermission={hasPermission}
+              hasPermission={null}
               onRecordingStart={async () => {
                 console.log('[VoiceRecorder] Starting new recording');
                 await ensureAllToastsCleared();
@@ -358,7 +356,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                 console.log('[VoiceRecorder] Requesting permissions');
                 requestPermissions();
               }}
-              audioLevel={audioLevel}
+              audioLevel={0}
               showAnimation={false}
               audioBlob={audioBlob}
             />
@@ -368,7 +366,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
             {status === 'recording' ? (
               <RecordingStatus 
                 isRecording={status === 'recording'} 
-                recordingTime={recordingTime} 
+                recordingTime={typeof recordingTime === 'string' ? recordingTime : '00:00'} 
               />
             ) : audioBlob ? (
               <div className="flex flex-col items-center w-full relative z-10 mt-auto mb-8">
@@ -393,7 +391,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                   onSeek={seekTo}
                 />
               </div>
-            ) : hasPermission === false ? (
+            ) : false ? (
               <motion.p
                 key="permission"
                 initial={{ opacity: 0, y: 10 }}
