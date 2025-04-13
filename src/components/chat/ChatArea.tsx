@@ -122,14 +122,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       setLastUserMessage(null);
     }
 
-    // Only scroll to bottom if:
-    // 1. New messages were added
-    // 2. Loading state changed
-    // 3. First render
-    if (chatMessages.length > prevMessageCount || localIsLoading !== undefined) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-      setPrevMessageCount(chatMessages.length);
-    }
+    // Always scroll to bottom to ensure chat input is visible
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setPrevMessageCount(chatMessages.length);
     
     // If we have a completed response, clear the loading state
     if (chatMessages.length > prevMessageCount && prevMessageCount > 0) {
@@ -234,7 +229,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           )}
         </AnimatePresence>
         
-        <div ref={bottomRef} />
+        <div 
+          ref={bottomRef} 
+          className="h-20" // Add some height to ensure enough scroll space
+        />
       </div>
     </div>
   );

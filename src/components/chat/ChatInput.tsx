@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +20,27 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [message, setMessage] = useState("");
   const isMobile = useIsMobile();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
+
+  // Effect to ensure input stays visible
+  useEffect(() => {
+    const ensureInputVisibility = () => {
+      if (inputContainerRef.current) {
+        inputContainerRef.current.style.visibility = 'visible';
+        inputContainerRef.current.style.opacity = '1';
+      }
+    };
+
+    // Run on initial render and whenever isLoading changes
+    ensureInputVisibility();
+
+    // Also set up an interval to periodically check visibility
+    const visibilityInterval = setInterval(ensureInputVisibility, 500);
+    
+    return () => {
+      clearInterval(visibilityInterval);
+    };
+  }, [isLoading]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +67,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="w-full" style={{ marginBottom: '5px' }}>
+    <div 
+      className="w-full" 
+      style={{ marginBottom: '5px', position: 'relative', zIndex: 20 }}
+      ref={inputContainerRef}
+    >
       <form onSubmit={handleSubmit} className="relative flex items-center w-full">
         <div className="flex items-center w-full relative">
           <Textarea

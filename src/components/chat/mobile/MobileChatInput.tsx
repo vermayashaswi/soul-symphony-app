@@ -21,7 +21,28 @@ export default function MobileChatInput({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
   const chatDebug = useDebugLog();
+
+  // Effect to ensure input stays visible
+  useEffect(() => {
+    const ensureInputVisibility = () => {
+      if (inputContainerRef.current) {
+        inputContainerRef.current.style.visibility = 'visible';
+        inputContainerRef.current.style.opacity = '1';
+      }
+    };
+    
+    // Run immediately
+    ensureInputVisibility();
+    
+    // And set an interval to check periodically
+    const visibilityInterval = setInterval(ensureInputVisibility, 500);
+    
+    return () => {
+      clearInterval(visibilityInterval);
+    };
+  }, [isLoading, isSubmitting]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
@@ -128,6 +149,7 @@ export default function MobileChatInput({
 
   return (
     <div 
+      ref={inputContainerRef}
       className={`p-2 bg-background border-t border-border flex items-center gap-2 ${
         isKeyboardVisible ? 'fixed bottom-0 left-0 right-0 z-[9999] input-keyboard-active' : ''
       }`}
@@ -135,7 +157,9 @@ export default function MobileChatInput({
         paddingBottom: isKeyboardVisible ? '7px' : 'env(safe-area-inset-bottom, 10px)',
         marginBottom: 0, // Keep consistent margin
         // Add a clear visual separation from the navbar with a slight shadow
-        boxShadow: '0 -2px 5px rgba(0, 0, 0, 0.05)'
+        boxShadow: '0 -2px 5px rgba(0, 0, 0, 0.05)',
+        position: 'relative',
+        zIndex: 50 // Ensure input stays on top
       }}
     >
       <div className="flex-1 relative">
