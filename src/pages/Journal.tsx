@@ -127,7 +127,7 @@ const Journal = () => {
       
       if (newEntryIds.length > 0 && processingEntries.length > 0) {
         console.log('[Journal] New entries detected:', newEntryIds);
-        logInfo(`New entries detected: ${newEntryIds.join(', ')}`, 'Journal');
+        addEvent('Journal', `New entries detected: ${newEntryIds.join(', ')}`, 'info');
         setEntryHasBeenProcessed(true);
         
         setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
@@ -180,7 +180,7 @@ const Journal = () => {
     if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
       const timeoutId = setTimeout(() => {
         console.log('[Journal] Profile check taking too long, proceeding anyway');
-        logInfo('Profile check taking too long, proceeding anyway', 'Journal');
+        addEvent('Journal', 'Profile check taking too long, proceeding anyway', 'info');
         setIsCheckingProfile(false);
         setIsProfileChecked(true);
         profileCheckedOnceRef.current = true;
@@ -205,7 +205,7 @@ const Journal = () => {
     if (processingEntries.length > 0 || isSavingRecording) {
       const interval = setInterval(() => {
         console.log('[Journal] Polling for updates while processing entries');
-        logInfo('Polling for updates while processing entries', 'Journal');
+        addEvent('Journal', 'Polling for updates while processing entries', 'info');
         setRefreshKey(prev => prev + 1);
         fetchEntries();
       }, 2000);
@@ -221,18 +221,18 @@ const Journal = () => {
       setLastAction('Checking Profile');
       
       console.log('[Journal] Checking user profile for ID:', userId);
-      logInfo(`Checking user profile for ID: ${userId}`, 'Journal');
+      addEvent('Journal', `Checking user profile for ID: ${userId}`, 'info');
       
       const profileCreated = await ensureProfileExists();
       profileCheckedOnceRef.current = true;
       
       console.log('[Journal] Profile check result:', profileCreated);
-      logInfo(`Profile check result: ${profileCreated}`, 'Journal');
+      addEvent('Journal', `Profile check result: ${profileCreated}`, 'info');
       
       if (!profileCreated) {
         if (profileCreationAttempts < maxProfileAttempts) {
           setProfileCreationAttempts(prev => prev + 1);
-          logInfo(`Scheduling automatic profile creation retry ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
+          addEvent('Journal', `Scheduling automatic profile creation retry ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'info');
           
           const retryDelay = 1000 * Math.pow(1.5, profileCreationAttempts);
           
@@ -241,7 +241,7 @@ const Journal = () => {
           }
           
           autoRetryTimeoutRef.current = setTimeout(() => {
-            logInfo(`Executing automatic profile creation retry ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
+            addEvent('Journal', `Executing automatic profile creation retry ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'info');
             setLastAction(`Auto Retry Profile ${profileCreationAttempts + 1}`);
             
             if (profileCreationAttempts >= maxProfileAttempts - 1) {
@@ -262,7 +262,7 @@ const Journal = () => {
       setIsProfileChecked(true);
     } catch (error: any) {
       console.error('[Journal] Error checking/creating user profile:', error);
-      logError(`Error checking/creating user profile: ${error.message}`, 'Journal', error);
+      addEvent('Journal', `Error checking/creating user profile: ${error.message}`, 'error', error);
       
       const now = Date.now();
       if (now - lastProfileErrorTime > 60000) {
@@ -271,7 +271,7 @@ const Journal = () => {
       
       if (profileCreationAttempts < maxProfileAttempts) {
         setProfileCreationAttempts(prev => prev + 1);
-        logInfo(`Scheduling automatic profile creation retry after error ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
+        addEvent('Journal', `Scheduling automatic profile creation retry after error ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'info');
         
         const retryDelay = 1000 * Math.pow(1.5, profileCreationAttempts);
         
@@ -280,7 +280,7 @@ const Journal = () => {
         }
         
         autoRetryTimeoutRef.current = setTimeout(() => {
-          logInfo(`Executing automatic profile creation retry after error ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
+          addEvent('Journal', `Executing automatic profile creation retry after error ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'info');
           setLastAction(`Auto Retry Profile After Error ${profileCreationAttempts + 1}`);
           
           if (profileCreationAttempts >= maxProfileAttempts - 1) {

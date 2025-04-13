@@ -69,7 +69,7 @@ export async function sendAudioForTranscription(
         durationMs: edgeFnEndTime - edgeFnStartTime,
         totalElapsedMs: edgeFnEndTime - startTime,
         hasError: !!response.error,
-        statusCode: response.status,
+        statusText: response.error?.message || 'OK',
         responseSize: JSON.stringify(response).length
       }
     });
@@ -84,7 +84,7 @@ export async function sendAudioForTranscription(
           step: 'edge-function-error',
           timestamp: Date.now(),
           error: response.error?.message,
-          status: response.status
+          statusText: response.error?.message || 'Unknown error'
         }
       });
       window.dispatchEvent(debugEvent);
