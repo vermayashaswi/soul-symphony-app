@@ -1,21 +1,21 @@
 
 import React from "react";
 
-// Create a provider for backward compatibility
+// Create a provider for backward compatibility but it will render nothing
 export const ChatDebugProvider = ({ children }: { children: React.ReactNode }) => {
   return children;
 };
 
-// Create a null hook for backward compatibility that supports both addLog and addEvent
+// Create a null hook for backward compatibility 
 export const useChatDebug = () => ({
   logs: [],
-  addLog: (category?: string, message?: string, level?: string, details?: any) => {},
-  addEvent: (category?: string, message?: string, level?: string, details?: any) => {}, // Added with parameters
+  addLog: () => {},
+  addEvent: () => {},
   clearLogs: () => {},
-  isEnabled: true, // Always enabled now
+  isEnabled: false,
   toggleEnabled: () => {}
 });
 
-// Export the panel component for backward compatibility
+// Export an empty component for backward compatibility
 const DebugPanel = () => null;
 export default DebugPanel;

@@ -100,11 +100,26 @@ serve(async (req) => {
     const timestamp = Date.now();
     const filename = `journal-entry-${userId ? userId + '-' : ''}${timestamp}.${detectedFileType}`;
     
+    // Check storage bucket exists
+    try {
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+      if (bucketsError) {
+        console.error("Error listing buckets:", bucketsError);
+      } else {
+        console.log("Existing buckets:", buckets.map(b => b.name).join(', '));
+      }
+    } catch (err) {
+      console.error("Error checking buckets:", err);
+    }
+    
     let audioUrl = null;
     try {
+      console.log("Attempting to store audio file...");
       audioUrl = await storeAudioFile(supabase, binaryAudio, filename, detectedFileType);
+      console.log("Store audio result:", audioUrl ? "Success" : "Failed");
     } catch (err) {
       console.error("Storage error:", err);
+      console.error("Storage error stack:", err.stack);
     }
     
     // Prepare audio file for transcription
@@ -259,10 +274,12 @@ serve(async (req) => {
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);
+      console.error("Error stack:", error.stack);
       return createErrorResponse(error);
     }
   } catch (error) {
     console.error("Error in transcribe-audio function:", error);
+    console.error("Error stack:", error.stack);
     return createErrorResponse(error);
   }
 });
