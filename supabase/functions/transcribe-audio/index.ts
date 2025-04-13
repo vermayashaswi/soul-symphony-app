@@ -7,7 +7,7 @@ import {
   generateEmbedding, 
   analyzeEmotions, 
   transcribeAudioWithWhisper,
-  translateAndRefineText
+  translateWithGPT
 } from "./aiProcessing.ts";
 import { analyzeWithGoogleNL } from "./nlProcessing.ts";
 import { 
@@ -57,7 +57,7 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload');
     }
 
-    const { audio, userId, directTranscription, highQuality } = payload;
+    const { audio, userId, directTranscription } = payload;
     
     // Validate required fields
     if (!audio) {
@@ -74,7 +74,7 @@ serve(async (req) => {
     console.log("Received audio data, processing...");
     console.log("User ID:", userId);
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
-    console.log("High quality mode:", highQuality ? "YES" : "NO");
+    console.log("Using two-step process: Whisper transcription + GPT translation");
     
     // Ensure user profile exists
     if (userId) {
@@ -115,19 +115,26 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: mimeType });
     
     try {
-      // Transcribe audio file
-      const transcribedText = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
-      console.log("Transcription successful:", transcribedText);
+      // Step 1: Transcribe audio using Whisper with language detection
+      console.log("STEP 1: Transcribing audio with Whisper (language auto-detection)");
+      const { text: transcription, detectedLanguages } = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
+      console.log("Transcription successful:", transcription.slice(0, 100) + "...");
+      console.log("Detected languages:", detectedLanguages ? JSON.stringify(detectedLanguages) : "None detected");
 
       // If direct transcription mode, return just the transcription
       if (directTranscription) {
-        return createSuccessResponse({ transcription: transcribedText });
+        return createSuccessResponse({ 
+          transcription,
+          predictedLanguages: detectedLanguages
+        });
       }
 
-      // Process with GPT for translation and refinement
-      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey);
+      // Step 2: Translate transcription to English using GPT
+      console.log("STEP 2: Translating transcription with GPT");
+      const refinedText = await translateWithGPT(transcription, detectedLanguages, openAIApiKey);
+      console.log("Translation successful:", refinedText.slice(0, 100) + "...");
 
-      // Get emotions from the refined text
+      // Get emotions from the translated text
       const { data: emotionsData, error: emotionsError } = await supabase
         .from('emotions')
         .select('name, description')
@@ -138,7 +145,7 @@ serve(async (req) => {
         throw new Error('Failed to fetch emotions data');
       }
       
-      // Analyze emotions in the refined text
+      // Analyze emotions in the translated text
       const emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
 
       // Analyze sentiment and extract entities using Google NL API
@@ -150,15 +157,15 @@ serve(async (req) => {
       if (detectedFileType === 'webm') {
         // For WebM, use the recordingTime from the client if available, or estimate
         // WebM is compressed so bytes don't directly correlate to duration
-        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : transcribedText.length / 15;
+        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : transcription.length / 15;
       } else if (detectedFileType === 'wav') {
         // For WAV (assuming 48kHz, 16-bit, stereo)
         // 48000 samples/sec * 2 bytes/sample * 2 channels = 192000 bytes/sec
         audioDuration = Math.round(binaryAudio.length / 192000);
       } else {
-        // Fallback estimation based on transcription length
+        // Fallback estimation based on translation length
         // Average speaking rate is ~150 words per minute
-        const wordCount = transcribedText.split(/\s+/).length;
+        const wordCount = transcription.split(/\s+/).length;
         audioDuration = Math.max(1, Math.round(wordCount / 2.5)); // ~150 words/min = 2.5 words/sec
       }
       
@@ -166,24 +173,26 @@ serve(async (req) => {
 
       // Store journal entry in database
       console.log("Storing journal entry with data:", {
-        transcription_length: transcribedText.length,
+        transcription_length: transcription.length,
         refined_text_length: refinedText.length,
         audio_url: audioUrl ? "present" : "absent",
         user_id: userId ? "present" : "absent",
         emotions: emotions ? "present" : "absent",
         entities: entities ? `${entities.length} entities` : "absent",
+        predicted_languages: detectedLanguages ? "present" : "absent"
       });
       
       const entryId = await storeJournalEntry(
         supabase,
-        transcribedText,
-        refinedText,
+        transcription,    // Original transcription with detected language
+        refinedText,      // GPT-translated English text
         audioUrl,
         userId,
         audioDuration,
         emotions,
         sentimentScore,
-        entities
+        entities,
+        detectedLanguages // Store detected languages in the database
       );
 
       if (entryId) {
@@ -241,13 +250,14 @@ serve(async (req) => {
 
       // Return success response
       return createSuccessResponse({
-        transcription: transcribedText,
+        transcription: transcription,
         refinedText: refinedText,
         audioUrl: audioUrl,
         entryId: entryId,
         emotions: emotions,
         sentiment: sentimentScore,
-        entities: entities
+        entities: entities,
+        predictedLanguages: detectedLanguages
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);

@@ -1,4 +1,3 @@
-
 /**
  * AI processing utilities for transcription, translation, and analysis
  */
@@ -103,48 +102,87 @@ export async function analyzeEmotions(text: string, emotions: any[], openAIApiKe
 }
 
 /**
- * Transcribes audio and translates it if needed
+ * Transcribes audio using Whisper with language detection
  */
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob, 
   fileType: string, 
   openAIApiKey: string
-): Promise<string> {
-  const formData = new FormData();
-  formData.append('file', audioBlob, `audio.${fileType}`);
-  formData.append('model', 'whisper-1');
-  formData.append('response_format', 'json');
+): Promise<{
+  text: string, 
+  detectedLanguages: {[key: string]: number} | null
+}> {
+  try {
+    const formData = new FormData();
+    formData.append('file', audioBlob, `audio.${fileType}`);
+    formData.append('model', 'whisper-1');
+    formData.append('response_format', 'verbose_json');
+    formData.append('language', '');  // Auto-detect language
+    
+    console.log("Sending to Whisper API transcription endpoint with language auto-detection");
+    
+    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+      },
+      body: formData,
+    });
   
-  // No language parameter - let Whisper auto-detect
-  console.log("Sending to Whisper API with auto language detection");
+    if (!whisperResponse.ok) {
+      const errorText = await whisperResponse.text();
+      console.error("Whisper API error:", errorText);
+      throw new Error(`Whisper API error: ${errorText}`);
+    }
   
-  const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-    },
-    body: formData,
-  });
-
-  if (!whisperResponse.ok) {
-    const errorText = await whisperResponse.text();
-    console.error("Whisper API error:", errorText);
-    throw new Error(`Whisper API error: ${errorText}`);
+    const whisperResult = await whisperResponse.json();
+    console.log("Whisper transcription result:", whisperResult.text.slice(0, 100) + "...");
+    
+    // Extract detected languages from the verbose response
+    const detectedLanguages = whisperResult.language_probs || null;
+    if (detectedLanguages) {
+      console.log("Detected languages:", JSON.stringify(detectedLanguages));
+    } else {
+      console.log("No language detection information provided by Whisper");
+    }
+    
+    return {
+      text: whisperResult.text,
+      detectedLanguages
+    };
+  } catch (error) {
+    console.error("Error in transcribeAudioWithWhisper:", error);
+    return {
+      text: "",
+      detectedLanguages: null
+    };
   }
-
-  const whisperResult = await whisperResponse.json();
-  return whisperResult.text;
 }
 
 /**
- * Translates and refines the transcribed text
+ * Translates the transcribed text to English using GPT-4o-mini
  */
-export async function translateAndRefineText(
+export async function translateWithGPT(
   transcribedText: string,
+  detectedLanguages: {[key: string]: number} | null,
   openAIApiKey: string
-): Promise<{ refinedText: string }> {
+): Promise<string> {
   try {
-    console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
+    console.log("Translating text with GPT-4o-mini:", transcribedText.slice(0, 100) + "...");
+    
+    // Format the detected languages for the prompt
+    let languagesDescription = "an unknown language";
+    if (detectedLanguages) {
+      const languages = Object.entries(detectedLanguages)
+        .sort((a, b) => b[1] - a[1])  // Sort by probability (highest first)
+        .filter(([_, prob]) => prob > 0.1)  // Only include languages with probability > 10%
+        .map(([lang, prob]) => `${lang} (${Math.round(prob * 100)}%)`)
+        .join(", ");
+      
+      if (languages) {
+        languagesDescription = languages;
+      }
+    }
     
     const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -157,13 +195,14 @@ export async function translateAndRefineText(
         messages: [
           {
             role: 'system',
-            content: 'You are an expert translator for multilingual, informal voice journals. The following text is a transliterated text of a user that could be speaking in a single language like Tamil, Telugu, Punjabi, Marathi, Bengali, Hindi, English, Spanish, Portugese, Afrikaans, Korean, Japanese etc. or could also often be switching between languages mid-sentence. Your job is to translate the entire transcript into natural, fluent English, keeping the original meaning, tone, and emotions intact. If there are any phrases in regional languages, interpret their intent rather than doing a literal word-for-word translation. Do not skip or paraphrase emotional expressions like sighs, pauses, or laughter—represent them appropriately in brackets if necessary. If anything is unclear or inaudible, mark it with [unclear] instead of guessing.'
+            content: `This is a transcript of a person speaking in a mix of ${languagesDescription}. Please translate the full message into fluent English and fix any errors or incomplete expressions. Maintain the intended meaning, tone, cultural context and correct for errors logically in the sentences. Don't return anything else other than just the translation!!`
           },
           {
             role: 'user',
-            content: `Here is the transcript: "${transcribedText}"`
+            content: transcribedText
           }
-        ]
+        ],
+        temperature: 0.3,
       }),
     });
 
@@ -174,14 +213,32 @@ export async function translateAndRefineText(
     }
 
     const gptResult = await gptResponse.json();
-    const refinedText = gptResult.choices[0].message.content;
+    const translatedText = gptResult.choices[0].message.content;
     
-    console.log("GPT Response (first 100 chars):", refinedText.slice(0, 100) + "...");
+    console.log("GPT Translation (first 100 chars):", translatedText.slice(0, 100) + "...");
     
-    return { refinedText };
+    return translatedText;
   } catch (error) {
-    console.error("Error in translateAndRefineText:", error);
-    // If translation fails, return original text as refined text
-    return { refinedText: transcribedText };
+    console.error("Error in translateWithGPT:", error);
+    // If translation fails, return original text
+    return transcribedText;
   }
+}
+
+// Keep these functions as backwards compatibility
+export async function translateAudioWithWhisper(audioBlob: Blob, fileType: string, openAIApiKey: string): Promise<string> {
+  console.warn("translateAudioWithWhisper is deprecated, use transcribeAudioWithWhisper + translateWithGPT instead");
+  const { text } = await transcribeAudioWithWhisper(audioBlob, fileType, openAIApiKey);
+  return text;
+}
+
+export async function enhanceTranslatedText(translatedText: string, openAIApiKey: string): Promise<{ refinedText: string }> {
+  console.warn("enhanceTranslatedText is deprecated, use translateWithGPT instead");
+  return { refinedText: translatedText };
+}
+
+export async function translateAndRefineText(transcribedText: string, openAIApiKey: string): Promise<{ refinedText: string }> {
+  console.warn("translateAndRefineText is deprecated, use translateWithGPT instead");
+  const refinedText = await translateWithGPT(transcribedText, null, openAIApiKey);
+  return { refinedText };
 }
