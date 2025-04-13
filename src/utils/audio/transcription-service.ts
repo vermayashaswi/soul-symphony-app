@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 interface TranscriptionResult {
@@ -62,24 +61,18 @@ export async function sendAudioForTranscription(
     });
     window.dispatchEvent(debugEvent);
     
-    // Fix: Remove the 'options' property and instead use the 'abortSignal' property
-    // for setting a timeout using an AbortController
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 60000); // 60 seconds timeout
-    
+    // Use the standard timeout option provided by Supabase
     const response = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: cleanBase64,
         userId: userId || null,
         directTranscription: directTranscription,
-        recordingTime: Date.now() - startTime, // Pass recording time to help with duration calculation
+        recordingTime: Date.now() - startTime,
         timestamp: Date.now()
       },
-      abortSignal: abortController.signal
+      // Use timeout instead of abortSignal
+      timeout: 60000 // 60 seconds timeout
     });
-    
-    // Clear the timeout if the request completed successfully
-    clearTimeout(timeoutId);
     
     const edgeFnEndTime = Date.now();
     
@@ -88,7 +81,6 @@ export async function sendAudioForTranscription(
         step: 'edge-function-end',
         timestamp: edgeFnEndTime,
         durationMs: edgeFnEndTime - edgeFnStartTime,
-        totalElapsedMs: edgeFnEndTime - startTime,
         hasError: !!response.error,
         statusText: response.error?.message || 'OK',
         responseSize: JSON.stringify(response).length
