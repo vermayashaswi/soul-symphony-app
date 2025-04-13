@@ -124,8 +124,7 @@ serve(async (req) => {
       // If direct transcription mode, return just the transcription
       if (directTranscription) {
         return createSuccessResponse({ 
-          transcription,
-          predictedLanguages: detectedLanguages
+          transcription
         });
       }
 
@@ -178,8 +177,7 @@ serve(async (req) => {
         audio_url: audioUrl ? "present" : "absent",
         user_id: userId ? "present" : "absent",
         emotions: emotions ? "present" : "absent",
-        entities: entities ? `${entities.length} entities` : "absent",
-        predicted_languages: detectedLanguages ? "present" : "absent"
+        entities: entities ? `${entities.length} entities` : "absent"
       });
       
       const entryId = await storeJournalEntry(
@@ -191,8 +189,7 @@ serve(async (req) => {
         audioDuration,
         emotions,
         sentimentScore,
-        entities,
-        detectedLanguages // Store detected languages in the database
+        entities
       );
 
       if (entryId) {
@@ -203,6 +200,7 @@ serve(async (req) => {
           try {
             // Use waitUntil to run in background but also log any errors
             const themePromise = extractThemes(supabase, refinedText, entryId);
+            //@ts-ignore - EdgeRuntime exists in Supabase edge functions
             EdgeRuntime.waitUntil(
               themePromise.catch(err => {
                 console.error("Background theme extraction failed:", err);
@@ -225,6 +223,7 @@ serve(async (req) => {
             }
           });
           
+          //@ts-ignore - EdgeRuntime exists in Supabase edge functions
           EdgeRuntime.waitUntil(
             entityExtractionPromise.catch(err => {
               console.error("Background entity extraction failed:", err);
@@ -256,8 +255,7 @@ serve(async (req) => {
         entryId: entryId,
         emotions: emotions,
         sentiment: sentimentScore,
-        entities: entities,
-        predictedLanguages: detectedLanguages
+        entities: entities
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);

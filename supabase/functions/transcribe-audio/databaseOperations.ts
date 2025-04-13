@@ -1,6 +1,7 @@
 /**
  * Database operations for the transcribe-audio function
  */
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 /**
  * Creates a Supabase admin client
@@ -148,8 +149,7 @@ export async function storeJournalEntry(
   audioDuration: number = 0,
   emotions: any = null,
   sentimentScore: number = 0,
-  entities: any[] = [],
-  predictedLanguages: {[key: string]: number} | null = null
+  entities: any[] = []
 ) {
   try {
     if (!transcriptionText && !refinedText) {
@@ -203,8 +203,7 @@ export async function storeJournalEntry(
           sentiment: sentiment,
           emotions_json: emotions ? JSON.stringify(emotions) : null,
           audio_duration: audioDuration,
-          entities: entities || [],
-          predicted_languages: predictedLanguages
+          entities: entities || []
         }
       ])
       .select('id');

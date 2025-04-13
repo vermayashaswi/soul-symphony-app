@@ -65,8 +65,7 @@ export async function sendAudioForTranscription(
     console.log('Transcription with Whisper + GPT successful:', {
       directMode: directTranscription,
       transcriptionLength: response.data?.transcription?.length || 0,
-      hasEntryId: !!response.data?.entryId,
-      predictedLanguages: response.data?.predictedLanguages ? 'present' : 'none'
+      hasEntryId: !!response.data?.entryId
     });
 
     return {

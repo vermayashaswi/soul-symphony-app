@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { resetProcessingState, setProcessingLock, updateProcessingEntries } from './processing-state';
+import { sendAudioForTranscription } from './transcription-service';
 
 /**
  * Process recording in the background
@@ -44,28 +45,20 @@ export async function processRecordingInBackground(
     }
     
     console.log('[BackgroundProcessor] Audio converted to base64');
-    console.log('[BackgroundProcessor] Sending audio to transcribe function for processing');
+    console.log('[BackgroundProcessor] Sending audio to transcription service for processing');
     
     // Calculate recording duration in seconds from blob
-    // Since Blob doesn't have a duration property, we need to estimate it differently
-    // We can calculate based on the audio blob size and sample rate as an approximation
     const recordingTimeMs = audioBlob.size > 0 
-      ? (audioBlob as any).duration ? (audioBlob as any).duration * 1000 // Use custom duration if available
-      : (audioBlob.size / 16000) * 1000 // Estimate based on size and 16kHz sample rate
+      ? (audioBlob as any).duration ? (audioBlob as any).duration * 1000 
+      : (audioBlob.size / 16000) * 1000 
       : 0;
     
-    // Invoke the Supabase function to process the audio
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-      body: {
-        audio: base64Audio,
-        userId: userId,
-        recordingTime: recordingTimeMs
-      }
-    });
+    // Use the transcription service to process the audio
+    const { success, data, error } = await sendAudioForTranscription(base64Audio, userId);
     
-    if (error) {
-      console.error('[BackgroundProcessor] Error invoking transcribe-audio function:', error);
-      throw error;
+    if (!success || error) {
+      console.error('[BackgroundProcessor] Error processing audio:', error);
+      throw new Error(error || 'Unknown error in audio processing');
     }
     
     // Add detailed logging to track successful processing
@@ -74,7 +67,6 @@ export async function processRecordingInBackground(
     console.log('[BackgroundProcessor] EntryId:', data?.entryId);
     console.log('[BackgroundProcessor] Transcription length:', data?.transcription?.length || 0);
     console.log('[BackgroundProcessor] Refined text length:', data?.refinedText?.length || 0);
-    console.log('[BackgroundProcessor] Predicted languages:', data?.predictedLanguages || 'None');
     
     // Stop tracking this processing task
     updateProcessingEntries(tempId, 'remove');

@@ -27,9 +27,6 @@ export interface JournalEntry {
     text?: string;
   }>;
   foreignKey?: string;
-  predictedLanguages?: {
-    [key: string]: number;
-  } | null;
 }
 
 interface JournalEntryCardProps {
