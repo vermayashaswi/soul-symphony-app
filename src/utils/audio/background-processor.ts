@@ -26,17 +26,23 @@ export async function processRecordingInBackground(
       throw new Error('No user ID provided');
     }
 
+    console.log('[BackgroundProcessor] Audio blob size:', audioBlob.size, 'type:', audioBlob.type);
+    console.log('[BackgroundProcessor] User ID:', userId);
+
     // Convert audio to base64
     const reader = new FileReader();
     
     await new Promise<void>((resolve, reject) => {
       reader.onloadend = () => resolve();
-      reader.onerror = reject;
+      reader.onerror = (e) => {
+        console.error('[BackgroundProcessor] Error reading audio file:', e);
+        reject(new Error('Failed to read audio file: ' + e));
+      };
       reader.readAsDataURL(audioBlob);
     });
     
     if (!reader.result) {
-      throw new Error('Failed to read audio file');
+      throw new Error('Failed to read audio file - no result');
     }
     
     // Extract base64 content without the data URL prefix
@@ -46,7 +52,7 @@ export async function processRecordingInBackground(
       throw new Error('Invalid base64 audio data');
     }
     
-    console.log('[BackgroundProcessor] Audio converted to base64');
+    console.log('[BackgroundProcessor] Audio converted to base64, length:', base64Audio.length);
     console.log('[BackgroundProcessor] Sending audio to transcribe function');
     
     // Calculate recording duration in seconds from blob
@@ -56,6 +62,13 @@ export async function processRecordingInBackground(
       ? (audioBlob as any).duration ? (audioBlob as any).duration * 1000 // Use custom duration if available
       : (audioBlob.size / 16000) * 1000 // Estimate based on size and 16kHz sample rate
       : 0;
+    
+    // Check user auth status before processing
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      console.error('[BackgroundProcessor] Auth error or no session:', sessionError);
+      throw new Error('Authentication required');
+    }
     
     // Use the transcription service instead of direct invocation
     const result = await sendAudioForTranscription(
@@ -78,13 +91,19 @@ export async function processRecordingInBackground(
     console.log('[BackgroundProcessor] Refined text length:', result.data?.refinedText?.length || 0);
     console.log('[BackgroundProcessor] Transcription service:', result.data?.transcriptionService || 'whisper');
     
+    // Show success notification
+    toast.success('Journal entry saved successfully', {
+      id: `success-${tempId}`,
+      duration: 3000,
+    });
+    
     // Stop tracking this processing task
     updateProcessingEntries(tempId, 'remove');
     
   } catch (error: any) {
     console.error('[BackgroundProcessor] Processing error:', error);
     
-    toast.error('Failed to process recording', {
+    toast.error('Failed to process recording: ' + (error.message || 'Unknown error'), {
       id: `error-${tempId}`,
       duration: 3000,
     });

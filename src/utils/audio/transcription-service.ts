@@ -25,15 +25,27 @@ export async function sendAudioForTranscription(
       throw new Error('No audio data provided');
     }
 
-    console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
-    console.log(`Audio data size: ${base64Audio.length} characters`);
-    console.log(`Using Google STT: ${useGoogleSTT ? 'Yes' : 'No'}`);
+    if (!userId) {
+      throw new Error('No user ID provided');
+    }
+
+    console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
+    console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
+    console.log(`[TranscriptionService] Using Google STT: ${useGoogleSTT ? 'Yes' : 'No'}`);
+    console.log(`[TranscriptionService] User ID: ${userId}`);
+    
+    // Check auth status before proceeding
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      console.error('[TranscriptionService] Auth error or no session:', sessionError);
+      throw new Error('Authentication required for transcription');
+    }
     
     // Call the Supabase edge function with a longer timeout
     const response = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64Audio,
-        userId: userId || null,
+        userId: userId,
         directTranscription: directTranscription,
         highQuality: true, // Add flag to indicate this is a high-quality recording
         useGoogleSTT: useGoogleSTT
@@ -42,7 +54,7 @@ export async function sendAudioForTranscription(
 
     // Handle response errors
     if (response.error) {
-      console.error('Edge function error:', response.error);
+      console.error('[TranscriptionService] Edge function error:', response.error);
       return {
         success: false,
         error: response.error?.message || 'Failed to process audio'
@@ -51,7 +63,7 @@ export async function sendAudioForTranscription(
 
     // Check if the response has a success field
     if (response.data?.success === false) {
-      console.error('Processing error:', response.data.error || response.data.message);
+      console.error('[TranscriptionService] Processing error:', response.data.error || response.data.message);
       return {
         success: false,
         error: response.data.error || response.data.message || 'Unknown error in audio processing'
@@ -60,14 +72,14 @@ export async function sendAudioForTranscription(
 
     // Validate that we have data back
     if (!response.data) {
-      console.error('No data returned from edge function');
+      console.error('[TranscriptionService] No data returned from edge function');
       return {
         success: false,
         error: 'No data returned from server'
       };
     }
 
-    console.log('Transcription successful:', {
+    console.log('[TranscriptionService] Transcription successful:', {
       directMode: directTranscription,
       transcriptionLength: response.data?.transcription?.length || 0,
       hasEntryId: !!response.data?.entryId,
@@ -79,7 +91,7 @@ export async function sendAudioForTranscription(
       data: response.data
     };
   } catch (error: any) {
-    console.error('Error in sendAudioForTranscription:', error);
+    console.error('[TranscriptionService] Error in sendAudioForTranscription:', error);
     return {
       success: false,
       error: error.message || 'Unknown error occurred'

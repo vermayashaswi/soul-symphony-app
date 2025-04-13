@@ -52,9 +52,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     requestPermissions
   } = useVoiceRecorder({
     onRecordingComplete: (blob, tempId, useGoogleSTT) => {
-      // This is now handled in handleSaveEntry
+      console.log('[VoiceRecorder] Recording complete callback from hook with:', {
+        blobSize: blob?.size,
+        tempId,
+        useGoogleSTT
+      });
     },
     onError: (error) => {
+      console.error('[VoiceRecorder] Error from recording hook:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
     },
     useGoogleSTT: transcriptionModel === "google"
@@ -138,7 +143,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       hasPlayedOnce,
       audioPrepared,
       waitingForClear,
-      toastsCleared
+      toastsCleared,
+      status
     });
     
     if (updateDebugInfo) {
@@ -149,7 +155,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         duration: audioDuration || (typeof recordingTime === 'number' ? recordingTime : 0)
       });
     }
-  }, [isProcessing, audioBlob, isRecording, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
+  }, [isProcessing, audioBlob, isRecording, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo, status]);
   
   useEffect(() => {
     return () => {
@@ -237,8 +243,18 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         recordingTime: recordingTime,
         hasPlayedOnce: hasPlayedOnce,
         audioPrepared: audioPrepared,
-        model: transcriptionModel
+        model: transcriptionModel,
+        user: !!user
       });
+      
+      if (!user) {
+        console.error('[VoiceRecorder] No user found. User must be authenticated to save recordings');
+        setRecordingError("You must be signed in to save recordings");
+        setIsProcessing(false);
+        setHasSaved(false);
+        savingInProgressRef.current = false;
+        return;
+      }
       
       if (!hasPlayedOnce && audioDuration === 0 && typeof recordingTime === 'number' && recordingTime > 0) {
         const estimatedDuration = recordingTime / 1000;
@@ -256,6 +272,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           savingInProgressRef.current = false;
           
           console.log('[VoiceRecorder] Recording callback completed successfully');
+          
+          toast.success("Recording saved successfully", {
+            id: 'success-toast',
+            duration: 3000
+          });
         } catch (error: any) {
           console.error('[VoiceRecorder] Error in recording callback:', error);
           setRecordingError(error?.message || "An unexpected error occurred");
@@ -271,6 +292,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           setHasSaved(false);
           savingInProgressRef.current = false;
         }
+      } else {
+        console.error('[VoiceRecorder] No onRecordingComplete callback provided');
+        setRecordingError("Application error: Missing save handler");
+        setIsProcessing(false);
+        setHasSaved(false);
+        savingInProgressRef.current = false;
       }
     } catch (error: any) {
       console.error('[VoiceRecorder] Error in save entry:', error);
