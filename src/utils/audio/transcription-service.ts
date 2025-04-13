@@ -62,6 +62,11 @@ export async function sendAudioForTranscription(
     });
     window.dispatchEvent(debugEvent);
     
+    // Fix: Remove the 'options' property and instead use the 'abortSignal' property
+    // for setting a timeout using an AbortController
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 60000); // 60 seconds timeout
+    
     const response = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: cleanBase64,
@@ -70,11 +75,11 @@ export async function sendAudioForTranscription(
         recordingTime: Date.now() - startTime, // Pass recording time to help with duration calculation
         timestamp: Date.now()
       },
-      // Increase the timeout to 60 seconds
-      options: {
-        timeout: 60000
-      }
+      abortSignal: abortController.signal
     });
+    
+    // Clear the timeout if the request completed successfully
+    clearTimeout(timeoutId);
     
     const edgeFnEndTime = Date.now();
     
