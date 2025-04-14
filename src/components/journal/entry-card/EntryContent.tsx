@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 
 interface EntryContentProps {
@@ -9,21 +9,14 @@ interface EntryContentProps {
 }
 
 export function EntryContent({ content, isExpanded, isProcessing = false }: EntryContentProps) {
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Check if content is actually available
+  // Enhanced check to ensure content is actually available
   const contentIsLoading = isProcessing || 
                          !content || 
                          content === "Processing entry..." || 
                          content.trim() === "" ||
                          content === "Loading...";
-  
-  useEffect(() => {
-    // Update loading state when content changes
-    setIsLoading(contentIsLoading);
-  }, [contentIsLoading, content]);
 
-  if (isLoading) {
+  if (contentIsLoading) {
     return <LoadingEntryContent />;
   }
 
