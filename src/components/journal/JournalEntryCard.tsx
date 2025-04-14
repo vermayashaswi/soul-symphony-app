@@ -89,7 +89,6 @@ export function JournalEntryCard({
     }
   };
   
-  // Calculate sentiment-based border color
   const getSentimentBorderClass = (): string => {
     if (!safeEntry.sentiment || isProcessing) {
       return '';
@@ -107,13 +106,12 @@ export function JournalEntryCard({
       return '';
     }
 
-    // Apply border based on updated sentiment score thresholds
     if (score > 0.2) {
-      return 'border-green-500 border-2'; // Good - Green
+      return 'border-green-500 border-2';
     } else if (score >= -0.1 && score <= 0.2) {
-      return 'border-[#FEF7CD] border-2'; // Neutral - Yellow
+      return 'border-[#FEF7CD] border-2';
     } else {
-      return 'border-[#ea384c] border-2'; // Bad - Red
+      return 'border-[#ea384c] border-2';
     }
   };
   
@@ -303,12 +301,12 @@ export function JournalEntryCard({
         data-show-themes={showThemes ? "true" : "false"}
       >
         <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''} ${getSentimentBorderClass()}`}>
-          <div className="flex justify-between items-start p-3 md:p-4">
+          <div className="flex justify-between items-center p-3 md:p-4">
             <div className="flex items-center space-x-3">
               <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
             </div>
 
-            <div className="flex items-center space-x-2 md:space-x-3">
+            <div className="flex items-center space-x-2">
               <FloatingDotsToggle 
                 onClick={toggleThemes} 
                 isExpanded={showThemes}
@@ -331,27 +329,27 @@ export function JournalEntryCard({
               />
             </ErrorBoundary>
             
+            <div className="mt-3 mb-2 flex items-center">
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => handleUserFeedback(1)}
+                  className="text-green-500 hover:bg-green-100 p-1 rounded-full"
+                  aria-label="Thumbs up for translation"
+                >
+                  <ThumbsUp size={16} />
+                </button>
+                <button
+                  onClick={() => handleUserFeedback(0)}
+                  className="text-red-500 hover:bg-red-100 p-1 rounded-full"
+                  aria-label="Thumbs down for translation"
+                >
+                  <ThumbsDown size={16} />
+                </button>
+              </div>
+            </div>
+            
             {showThemes && (
-              <div>
-                <div className="mt-3 mb-2 flex items-center">
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleUserFeedback(1)}
-                      className="text-green-500 hover:bg-green-100 p-1 rounded-full"
-                      aria-label="Thumbs up for translation"
-                    >
-                      <ThumbsUp size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleUserFeedback(0)}
-                      className="text-red-500 hover:bg-red-100 p-1 rounded-full"
-                      aria-label="Thumbs down for translation"
-                    >
-                      <ThumbsDown size={16} />
-                    </button>
-                  </div>
-                </div>
-                
+              <div className="mt-2">
                 <ErrorBoundary>
                   <ThemeLoader 
                     entryId={safeEntry.id}

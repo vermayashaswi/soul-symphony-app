@@ -283,7 +283,7 @@ export function ThemeLoader({
       ) : (
         <ThemeBoxes 
           themes={themes} 
-          isDisturbed={themesLoaded} // Only apply animations after themes are confirmed loaded
+          isDisturbed={themesLoaded} 
           isLoading={false} 
         />
       )}
