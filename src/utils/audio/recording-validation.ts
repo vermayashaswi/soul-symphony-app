@@ -1,105 +1,50 @@
 
-/**
- * Audio recording validation utilities
- */
-import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
-import { verifyUserAuthentication } from './auth-utils';
-import { 
-  setProcessingLock, 
-  setIsEntryBeingProcessed, 
-  setProcessingTimeoutId,
-  getProcessingTimeoutId,
-  updateProcessingEntries
-} from './processing-state';
-import { validateAudioBlob } from './blob-utils';
+import { v4 as uuidv4 } from 'uuid';
+import { isProcessingLocked, resetProcessingState } from './processing-state';
 
 /**
- * Validates the initial state before audio processing
- * Returns a result object with success status and optional error message
+ * Validates the initial state before audio processing begins
  */
-export async function validateInitialState(
-  audioBlob: Blob | null, 
-  userId: string | undefined
-): Promise<{
+export async function validateInitialState(audioBlob: Blob | null, userId: string | undefined): Promise<{
   success: boolean;
-  error?: string;
   tempId?: string;
+  error?: string;
 }> {
-  // Clear all toasts to ensure UI is clean before processing
-  clearAllToasts();
+  // Generate a temporary ID for tracking this processing session
+  const tempId = `${Date.now()}-${uuidv4()}`;
   
-  // If there's already a processing operation in progress, wait briefly
-  if (await isProcessingLockActive()) {
-    console.log('[AudioValidation] Processing lock detected, waiting briefly...');
-    
-    try {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // If lock is still active after waiting, return an error
-      if (await isProcessingLockActive()) {
-        console.error('[AudioValidation] Processing lock still active, cannot process multiple recordings simultaneously');
-        return { success: false, error: 'Another recording is already being processed' };
-      }
-    } catch (err) {
-      console.error('[AudioValidation] Error waiting for processing lock:', err);
-    }
+  // Check for processing lock
+  if (isProcessingLocked()) {
+    console.warn('Processing is already locked. Enforcing reset.');
+    resetProcessingState();
   }
   
-  // Validate the audio blob
-  const validation = validateAudioBlob(audioBlob);
-  if (!validation.isValid) {
-    console.error('Audio validation failed:', validation.errorMessage);
-    return { success: false, error: validation.errorMessage };
+  // Validate audio blob
+  if (!audioBlob) {
+    return { success: false, error: 'No audio data provided' };
   }
   
-  // Verify the user ID is valid
+  // Validate user ID
   if (!userId) {
-    console.error('No user ID provided for audio processing');
-    return { success: false, error: 'Authentication required' };
+    console.warn('No user ID provided, using anonymous mode');
   }
   
-  // Generate a temporary ID for this recording
-  const tempId = `temp-${Date.now()}`;
+  // Validate blob size
+  if (audioBlob.size < 100) {
+    return { success: false, error: 'Audio recording is too short' };
+  }
   
   return { success: true, tempId };
 }
 
 /**
- * Sets up a timeout to ensure the processing lock is eventually released
+ * Sets up a timeout to prevent processing deadlocks
  */
-export function setupProcessingTimeout(): void {
-  // Clear existing timeout if any
-  if (getProcessingTimeoutId()) {
-    clearTimeout(getProcessingTimeoutId()!);
-  }
-  
-  // Set a timeout to release the lock after a maximum time to prevent deadlocks
-  const timeoutId = setTimeout(() => {
-    console.log('[AudioValidation] Releasing processing lock due to timeout');
-    setProcessingLock(false);
-    setIsEntryBeingProcessed(false);
-    
-    // Clean up any lingering entries after timeout
-    const entries = import('./processing-state').then(({ getProcessingEntries }) => {
-      return getProcessingEntries();
-    });
-    
-    entries.then(entries => {
-      if (entries.length > 0) {
-        entries.forEach(entry => {
-          updateProcessingEntries(entry, 'remove');
-        });
-      }
-    });
-  }, 30000); // 30 second maximum lock time
-  
-  setProcessingTimeoutId(timeoutId);
+export function setupProcessingTimeout(): NodeJS.Timeout {
+  // Auto-reset after 3 minutes to prevent deadlocks
+  return setTimeout(() => {
+    console.log('Audio processing max time elapsed, auto-resetting state');
+    resetProcessingState();
+  }, 3 * 60 * 1000);
 }
 
-/**
- * Checks if the processing lock is active
- */
-async function isProcessingLockActive(): Promise<boolean> {
-  const { getProcessingLock } = await import('./processing-state');
-  return getProcessingLock();
-}
