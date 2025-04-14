@@ -21,16 +21,16 @@ export default function JournalEntryLoadingSkeleton({ count = 1 }: JournalEntryL
           className="overflow-hidden"
         >
           <Card className="p-4 bg-card shadow-sm">
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex justify-between items-start mb-3">
               <div>
-                <ShimmerSkeleton className="h-5 w-32 mb-2" />
+                <ShimmerSkeleton className="h-4 w-28 mb-2" />
                 <div className="flex items-center">
-                  <ShimmerSkeleton className="h-5 w-5 rounded-full" />
+                  <ShimmerSkeleton className="h-4 w-4 rounded-full" />
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <ShimmerSkeleton className="h-8 w-8 rounded-md" />
-                <ShimmerSkeleton className="h-8 w-8 rounded-md" />
+                <ShimmerSkeleton className="h-6 w-6 rounded-md" />
+                <ShimmerSkeleton className="h-6 w-6 rounded-md" />
               </div>
             </div>
             

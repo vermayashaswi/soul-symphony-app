@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MoreHorizontal } from 'lucide-react';
 
 interface FloatingDotsToggleProps {
   onClick: () => void;
@@ -23,8 +22,6 @@ export function FloatingDotsToggle({ onClick, isExpanded }: FloatingDotsTogglePr
       whileTap={{ scale: 0.95 }}
       aria-label={isExpanded ? "Collapse entry" : "Expand entry"}
     >
-      <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-      
       {[0, 1, 2].map((i) => {
         const colors = [
           'bg-gradient-to-r from-blue-500 to-purple-500',
@@ -44,7 +41,7 @@ export function FloatingDotsToggle({ onClick, isExpanded }: FloatingDotsTogglePr
               top: '50%',
               x: -1, // Center dot horizontally (-1 for half of width)
               y: -1, // Center dot vertically (-1 for half of height)
-              zIndex: -1, // Make sure the dots are behind the chevron icon
+              zIndex: 10, // Make sure the dots are visible
             }}
             animate={{
               x: [
