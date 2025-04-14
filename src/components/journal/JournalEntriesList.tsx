@@ -61,12 +61,16 @@ export default function JournalEntriesList({
     const loadPersistedProcessingEntries = () => {
       const persistedEntries = getProcessingEntries();
       console.log('[JournalEntriesList] Loaded persisted entries:', persistedEntries);
-      setPersistedProcessingEntries(persistedEntries);
       
-      if (persistedEntries.length > 0) {
+      if (persistedEntries && persistedEntries.length > 0) {
+        setPersistedProcessingEntries(persistedEntries);
         setProcessingEntriesLoaded(true);
         setShowTemporaryProcessingEntries(true);
         setStableVisibleProcessingEntries(persistedEntries);
+      } else {
+        setPersistedProcessingEntries([]);
+        setShowTemporaryProcessingEntries(false);
+        setStableVisibleProcessingEntries([]);
       }
     };
     
@@ -365,6 +369,10 @@ export default function JournalEntriesList({
 
   const displayEntries = isSearchActive ? filteredEntries : localEntries;
   const safeLocalEntries = Array.isArray(displayEntries) ? displayEntries : [];
+  
+  const hasActiveProcessingEntries = showTemporaryProcessingEntries && 
+                                    stableVisibleProcessingEntries && 
+                                    stableVisibleProcessingEntries.length > 0;
 
   return (
     <ErrorBoundary>
@@ -387,7 +395,7 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4 mt-6">
-            {(showTemporaryProcessingEntries && stableVisibleProcessingEntries.length > 0) && (
+            {hasActiveProcessingEntries && (
               <div className="mb-4">
                 <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -397,7 +405,7 @@ export default function JournalEntriesList({
               </div>
             )}
             
-            {safeLocalEntries.length === 0 && !hasProcessingEntries && !loading && !processingEntriesLoaded ? (
+            {safeLocalEntries.length === 0 && !hasActiveProcessingEntries && !loading && !processingEntriesLoaded ? (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -201,6 +202,8 @@ export function JournalEntryCard({
   
   const isEntryBeingProcessed = () => {
     try {
+      // Only consider an entry as "being processed" if it's explicitly marked as processing
+      // AND if it's missing content or themes
       const noThemes = (!safeEntry.themes || safeEntry.themes.length === 0) && 
                      (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
       
@@ -216,9 +219,12 @@ export function JournalEntryCard({
     }
   };
 
+  // Only show processing indicators for entries that are actually being processed
   const isSentimentProcessing = !safeEntry.sentiment && (isNew || isProcessing);
   const isThemesProcessing = isProcessing || isEntryBeingProcessed();
-  const isContentProcessing = !contentLoaded || isProcessing || isEntryBeingProcessed();
+  
+  // IMPORTANT CHANGE: Don't mark content as processing for existing entries
+  const isContentProcessing = (!contentLoaded && isProcessing) || isEntryBeingProcessed();
 
   if (hasError) {
     return (

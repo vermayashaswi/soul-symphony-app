@@ -47,29 +47,16 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       clearTimeout(timeoutRef.current);
     }
     
-    // IMPROVED FIX: Better content loading state handling
-    if (contentIsLoading) {
+    // Only show loading state for genuinely new entries being processed
+    // Don't show loading for existing entries that are just being displayed
+    if (contentIsLoading && isProcessing) {
       setShowLoading(true);
       contentAvailableRef.current = false;
-    } else if (!contentAvailableRef.current) {
-      // Only when transitioning from loading to content-available
+    } else if (content && content.trim() !== "" && content !== "Processing entry..." && content !== "Loading...") {
+      // If we have actual content, show it immediately
+      setShowLoading(false);
+      setStableContent(content);
       contentAvailableRef.current = true;
-      
-      // IMPORTANT: Ensure loading state persists longer for a better transition experience
-      timeoutRef.current = setTimeout(() => {
-        if (prevProcessingRef.current && !isProcessing) {
-          // If transitioning from processing to done, delay a bit longer
-          timeoutRef.current = setTimeout(() => {
-            console.log('[EntryContent] Transitioning from loading to content display after delay');
-            setShowLoading(false);
-            setStableContent(content);
-          }, 1800); // Increased from 1200ms to 1800ms for a smoother experience
-        } else {
-          console.log('[EntryContent] Setting content directly after processing check');
-          setShowLoading(false);
-          setStableContent(content);
-        }
-      }, 2000); // Increased from 1500ms to 2000ms to ensure loading state visibility
     }
     
     // Update refs
