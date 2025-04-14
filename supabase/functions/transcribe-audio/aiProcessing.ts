@@ -1,4 +1,3 @@
-
 /**
  * AI processing utilities for transcription, translation, and analysis
  */
@@ -231,12 +230,11 @@ export async function translateAndRefineText(
             content: `You are an empathetic writing assistant helping users journal. The following transcription is a voice journal that may contain multiple languages, informal speech, and emotional content.
 
 Your task:
-1. Translate all non-English portions to English.
-2. Preserve the speaker's tone, intent, and emotional expression.
+1. Translate all non-English portions to English and concatenate these to make sense and completely translate complete sentences to english
+2. Preserve the speaker's tone, intent, emotional expression and cultural context.
 3. Maintain a first-person, personal narrative.
-4. Do NOT add commentary or analysis.
-5. Fix grammar or spelling issues only when necessary for clarity.
-6. Retain cultural texts and just transliterate those to English 
+4. DO NOT add commentary or analysis. JUST TRANSLATE as we will be showing your reponse to the user who's expect just to see the translation  
+5. Fix grammar or spelling issues only when necessary for clarity
 
 Detected languages in the text: ${languagesInfo}
 

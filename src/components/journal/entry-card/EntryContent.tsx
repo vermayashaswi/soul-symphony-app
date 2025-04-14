@@ -48,9 +48,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     // Keep showing loading state while content is being processed
     // Only transition to content when we have meaningful text to display
     if (contentIsLoading) {
-      timeoutRef.current = setTimeout(() => {
-        setShowLoading(true);
-      }, 150);
+      setShowLoading(true);
     } else {
       // If we have valid content, delay a bit for a smooth transition
       timeoutRef.current = setTimeout(() => {
