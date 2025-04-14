@@ -1,4 +1,3 @@
-
 /**
  * AI processing utilities for transcription, translation, and analysis
  */
@@ -157,13 +156,14 @@ export async function translateAndRefineText(
         messages: [
           {
             role: 'system',
-            content: 'You are an expert translator for multilingual, informal voice journals. The following text is a transliterated text of a user that could be speaking in a single language like Tamil, Telugu, Punjabi, Marathi, Bengali, Hindi, English, Spanish, Portugese, Afrikaans, Korean, Japanese etc. or could also often be switching between languages mid-sentence. Your job is to translate the entire transcript into natural, fluent English, keeping the original meaning, tone, and emotions intact. If there are any phrases in regional languages, interpret their intent rather than doing a literal word-for-word translation. Do not skip or paraphrase emotional expressions like sighs, pauses, or laughter—represent them appropriately in brackets if necessary. If anything is unclear or inaudible, mark it with [unclear] instead of guessing.'
+            content: 'You are an expert translator of multilingual audio feedbacks for users submitting their journal entries on an app called "SOuLO". Translate the following multi-lingual text to English. A user might be using multiple languages within this entry. Also correct any transcription errors, add proper punctuation, and format the text into readable paragraphs:'
           },
           {
             role: 'user',
-            content: `Here is the transcript: "${transcribedText}"`
+            content: `${transcribedText}`
           }
-        ]
+        ],
+        temperature: 0.3
       }),
     });
 
