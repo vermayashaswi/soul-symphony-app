@@ -54,7 +54,7 @@ export function JournalEntryCard({
     themes: Array.isArray(entry?.themes) ? entry.themes : []
   };
 
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(isNew);
   const [highlightNew, setHighlightNew] = useState(isNew);
   const [deletionCompleted, setDeletionCompleted] = useState(false);
   const [deletionInProgress, setDeletionInProgress] = useState(false);
@@ -132,6 +132,7 @@ export function JournalEntryCard({
   }, [isNew]);
 
   const toggleExpanded = () => {
+    console.log(`[JournalEntryCard] Toggling expansion for entry ${safeEntry.id}, current state:`, isExpanded);
     setIsExpanded(!isExpanded);
   };
 

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ChevronUp, MoreHorizontal } from 'lucide-react';
@@ -35,7 +34,6 @@ export function FloatingDotsToggle({ onClick, isExpanded }: FloatingDotsTogglePr
           'bg-gradient-to-r from-green-400 to-cyan-500',
         ];
         
-        // Define the orbital radius and angles
         const radius = 6;
         const baseAngle = (i * 2 * Math.PI) / 3; // Evenly space dots in a circle
         
