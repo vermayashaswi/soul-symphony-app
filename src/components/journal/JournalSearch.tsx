@@ -170,8 +170,8 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
         ? 'fixed top-0 left-0 right-0 z-50 rounded-none shadow-md' 
         : 'sticky top-0 z-10 bg-background shadow-sm'}`}
     >
-      <CardContent className="p-2 py-3">
-        <div className="flex flex-col space-y-2">
+      <CardContent className="p-1 py-2">
+        <div className="flex flex-col space-y-1">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -186,8 +186,8 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
             />
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm text-muted-foreground ml-auto">
+          <div className="flex flex-wrap items-center justify-end gap-1">
+            <div className="text-sm text-muted-foreground">
               {filteredEntries.length} total {filteredEntries.length === 1 ? 'entry' : 'entries'}
             </div>
           </div>

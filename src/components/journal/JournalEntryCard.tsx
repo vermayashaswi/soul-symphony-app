@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -108,13 +107,13 @@ export function JournalEntryCard({
       return '';
     }
 
-    // Apply border based on sentiment score
-    if (score >= 0.3) {
-      return 'border-[#F2FCE2] border-2'; // Good - Green
-    } else if (score <= -0.3) {
-      return 'border-[#ea384c] border-2'; // Bad - Red
-    } else {
+    // Apply border based on updated sentiment score thresholds
+    if (score > 0.2) {
+      return 'border-green-500 border-2'; // Good - Green
+    } else if (score >= -0.1 && score <= 0.2) {
       return 'border-[#FEF7CD] border-2'; // Neutral - Yellow
+    } else {
+      return 'border-[#ea384c] border-2'; // Bad - Red
     }
   };
   
@@ -334,7 +333,7 @@ export function JournalEntryCard({
             
             {showThemes && (
               <div>
-                <div className="mt-3 mb-2 flex items-center space-x-2">
+                <div className="mt-3 mb-2 flex items-center">
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handleUserFeedback(1)}
