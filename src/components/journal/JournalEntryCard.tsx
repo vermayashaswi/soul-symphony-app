@@ -266,7 +266,10 @@ export function JournalEntryCard({
             </div>
 
             <div className="flex items-center space-x-2 md:space-x-3">
-              <FloatingDotsToggle onClick={toggleExpanded} />
+              <FloatingDotsToggle 
+                onClick={toggleExpanded} 
+                isExpanded={isExpanded}
+              />
               <DeleteEntryDialog onDelete={handleDelete} />
             </div>
           </div>

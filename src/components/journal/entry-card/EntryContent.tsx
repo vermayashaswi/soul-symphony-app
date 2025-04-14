@@ -14,6 +14,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const prevProcessingRef = useRef(isProcessing);
   const prevContentRef = useRef(content);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const contentAvailableRef = useRef(false);
   
   // Add new logging for debugging
   useEffect(() => {
@@ -46,15 +47,19 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     }
     
     // Keep showing loading state while content is being processed
-    // Only transition to content when we have meaningful text to display
     if (contentIsLoading) {
       setShowLoading(true);
-    } else {
-      // If we have valid content, delay a bit for a smooth transition
+      contentAvailableRef.current = false;
+    } else if (!contentAvailableRef.current) {
+      // Only when transitioning from loading to content-available
+      // Important: we want to keep showing loading until we're SURE content is ready
+      contentAvailableRef.current = true;
+      
+      // Delay showing content for a smoother transition
       timeoutRef.current = setTimeout(() => {
         if (prevProcessingRef.current && !isProcessing) {
           // If transitioning from processing to done, delay a bit longer
-          setTimeout(() => {
+          timeoutRef.current = setTimeout(() => {
             setShowLoading(false);
             setStableContent(content);
           }, 800);
@@ -62,7 +67,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
           setShowLoading(false);
           setStableContent(content);
         }
-      }, 500);
+      }, 1000); // Increased delay to ensure main entry card is ready
     }
     
     // Update refs
@@ -74,7 +79,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [content, isProcessing]);
+  }, [content, isProcessing, showLoading]);
 
   return (
     <AnimatePresence mode="wait">

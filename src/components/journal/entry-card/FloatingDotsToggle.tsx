@@ -1,25 +1,33 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface FloatingDotsToggleProps {
   onClick: () => void;
+  isExpanded: boolean;
 }
 
-export function FloatingDotsToggle({ onClick }: FloatingDotsToggleProps) {
+export function FloatingDotsToggle({ onClick, isExpanded }: FloatingDotsToggleProps) {
   // Add a wrapper function to log when toggle is clicked
   const handleClick = () => {
-    console.log('[FloatingDotsToggle] Toggle clicked');
+    console.log('[FloatingDotsToggle] Toggle clicked, current state:', isExpanded);
     onClick();
   };
 
   return (
     <motion.div 
-      className="relative w-8 h-8 cursor-pointer"
+      className="relative w-8 h-8 cursor-pointer flex items-center justify-center"
       onClick={handleClick}
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.95 }}
     >
+      {isExpanded ? (
+        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+      ) : (
+        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+      )}
+      
       {[0, 1, 2].map((i) => {
         const colors = [
           'bg-gradient-to-r from-blue-500 to-purple-500',
@@ -40,6 +48,7 @@ export function FloatingDotsToggle({ onClick }: FloatingDotsToggleProps) {
               top: '50%',
               x: -1, // Center dot horizontally (-1 for half of width)
               y: -1, // Center dot vertically (-1 for half of height)
+              zIndex: -1, // Make sure the dots are behind the chevron icon
             }}
             animate={{
               x: [
