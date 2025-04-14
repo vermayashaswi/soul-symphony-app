@@ -1,304 +1,244 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
-import { toast } from 'sonner';
 
-interface UseRecordRTCRecorderOptions {
+interface RecordRTCOptions {
   noiseReduction?: boolean;
   maxDuration?: number;
 }
 
-interface UseRecordRTCRecorderReturn {
-  isRecording: boolean;
-  recordingTime: number;
-  audioBlob: Blob | null;
-  audioLevel: number;
-  hasPermission: boolean | null;
-  ripples: number[];
-  startRecording: () => Promise<void>;
-  stopRecording: () => void;
-  requestPermissions: () => Promise<void>;
-  resetRecording: () => void;
-}
-
-export function useRecordRTCRecorder({ 
-  noiseReduction = false,
-  maxDuration = 300
-}: UseRecordRTCRecorderOptions = {}): UseRecordRTCRecorderReturn {
+export function useRecordRTCRecorder(options: RecordRTCOptions = {}) {
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [ripples, setRipples] = useState<number[]>([]);
-  
-  const recorderRef = useRef<RecordRTC | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyzerRef = useRef<AnalyserNode | null>(null);
-  const timerRef = useRef<number | null>(null);
-  const audioLevelTimerRef = useRef<number | null>(null);
-  const maxDurationTimerRef = useRef<number | null>(null);
-  
-  useEffect(() => {
-    const checkMicPermission = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(track => track.stop());
-        setHasPermission(true);
-      } catch (error) {
-        console.error('Microphone permission error:', error);
-        setHasPermission(false);
-      }
-    };
-    
-    checkMicPermission();
-    
-    return () => {
-      cleanupResources();
-    };
-  }, []);
-  
-  const cleanupResources = () => {
-    if (recorderRef.current) {
-      recorderRef.current.destroy();
-      recorderRef.current = null;
-    }
-    
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    
-    if (audioLevelTimerRef.current) {
-      clearInterval(audioLevelTimerRef.current);
-      audioLevelTimerRef.current = null;
-    }
-    
-    if (maxDurationTimerRef.current) {
-      clearTimeout(maxDurationTimerRef.current);
-      maxDurationTimerRef.current = null;
-    }
-    
-    if (audioContextRef.current) {
-      if (audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(console.error);
-      }
-      audioContextRef.current = null;
-    }
-  };
+  const [recorder, setRecorder] = useState<RecordRTC | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const lastLevelUpdateRef = useRef<number>(0);
+  const { noiseReduction = true, maxDuration = 300 } = options;
 
-  const setupAudioProcessing = (stream: MediaStream) => {
-    try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      audioContextRef.current = audioContext;
-      
-      const analyzerNode = audioContext.createAnalyser();
-      analyzerNode.fftSize = 1024;
-      analyzerRef.current = analyzerNode;
-      
-      const source = audioContext.createMediaStreamSource(stream);
-      
-      if (noiseReduction) {
-        const highpassFilter = audioContext.createBiquadFilter();
-        highpassFilter.type = 'highpass';
-        highpassFilter.frequency.value = 100;
-        highpassFilter.Q.value = 0.7;
-        
-        const lowpassFilter = audioContext.createBiquadFilter();
-        lowpassFilter.type = 'lowpass';
-        lowpassFilter.frequency.value = 12000;
-        lowpassFilter.Q.value = 0.7;
-        
-        const compressor = audioContext.createDynamicsCompressor();
-        compressor.threshold.value = -24;
-        compressor.knee.value = 30;
-        compressor.ratio.value = 12;
-        compressor.attack.value = 0.003;
-        compressor.release.value = 0.25;
-        
-        source.connect(highpassFilter);
-        highpassFilter.connect(lowpassFilter);
-        lowpassFilter.connect(compressor);
-        compressor.connect(analyzerNode);
-      } else {
-        source.connect(analyzerNode);
-      }
-      
-      const dataArray = new Uint8Array(analyzerNode.frequencyBinCount);
-      
-      audioLevelTimerRef.current = window.setInterval(() => {
-        if (analyzerRef.current) {
-          analyzerRef.current.getByteFrequencyData(dataArray);
-          
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
-          }
-          const avg = sum / dataArray.length;
-          const scaledLevel = Math.min(100, Math.max(0, avg * 2.0));
-          
-          setAudioLevel(scaledLevel);
-          
-          if (isRecording) {
-            if (scaledLevel > 15) {
-              const probability = (scaledLevel / 100) * 0.7;
-              if (Math.random() < probability) {
-                setRipples(prev => [...prev, Date.now()]);
-              }
-            }
-          }
-        }
-      }, 100);
-      
-      return audioContext;
-    } catch (error) {
-      console.error('Error setting up audio processing:', error);
-      return null;
+  const normalizeVolume = useCallback(async (audioBlob: Blob): Promise<Blob> => {
+    const audioContext = new AudioContext();
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    // Calculate peak volume
+    let peakVolume = 0;
+    const channelData = audioBuffer.getChannelData(0);
+    for (let i = 0; i < channelData.length; i++) {
+      peakVolume = Math.max(peakVolume, Math.abs(channelData[i]));
     }
-  };
-  
-  const startRecording = async () => {
+
+    // Normalize volume
+    const normalizationFactor = 1.0 / peakVolume;
+    const normalizedBuffer = audioContext.createBuffer(
+      1, // mono
+      audioBuffer.length,
+      audioBuffer.sampleRate
+    );
+    const normalizedChannelData = normalizedBuffer.getChannelData(0);
+    
+    for (let i = 0; i < channelData.length; i++) {
+      normalizedChannelData[i] = channelData[i] * normalizationFactor;
+    }
+
+    // Convert back to Blob
+    const offlineContext = new OfflineAudioContext(
+      1, 
+      audioBuffer.length, 
+      audioBuffer.sampleRate
+    );
+    const source = offlineContext.createBufferSource();
+    source.buffer = normalizedBuffer;
+    source.connect(offlineContext.destination);
+    source.start();
+    const renderedBuffer = await offlineContext.startRendering();
+
+    return new Promise((resolve) => {
+      renderedBuffer.getChannelData(0);
+      const writer = new MediaRecorder(new AudioContext().createMediaStreamDestination().stream);
+      const chunks: Blob[] = [];
+      
+      writer.ondataavailable = (e) => chunks.push(e.data);
+      writer.onstop = () => resolve(new Blob(chunks, { type: 'audio/webm' }));
+      
+      writer.start();
+      const source = writer.stream.getAudioTracks()[0];
+      source.stop();
+      writer.stop();
+    });
+  }, []);
+
+  const startRecording = useCallback(async () => {
     try {
-      setAudioBlob(null);
-      setRecordingTime(0);
-      
-      toast.loading('Accessing microphone...');
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
-          noiseSuppression: true,
+          noiseSuppression: noiseReduction,
           autoGainControl: true,
           sampleRate: 48000,
-          sampleSize: 24,
-          channelCount: 2,
+          sampleSize: 16,
+          channelCount: 1
         }
       });
-      
-      toast.dismiss();
-      toast.success('Microphone accessed. Recording started!');
-      
-      streamRef.current = stream;
-      
-      setupAudioProcessing(stream);
-      
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      
-      const options = {
+
+      setStream(mediaStream);
+
+      const recordOptions = {
         type: 'audio',
         mimeType: 'audio/webm;codecs=opus',
         recorderType: StereoAudioRecorder,
-        numberOfAudioChannels: 2,
+        numberOfAudioChannels: 1, // Enforced mono recording
         desiredSampRate: 48000,
-        bufferSize: 16384,
         checkForInactiveTracks: true,
-        disableLogs: false,
-        timeSlice: isMobile ? 1000 : 2000,
-      };
-      
-      recorderRef.current = new RecordRTC(stream, options);
-      
-      recorderRef.current.startRecording();
-      setIsRecording(true);
-      
-      timerRef.current = window.setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-      
-      if (maxDuration > 0) {
-        maxDurationTimerRef.current = window.setTimeout(() => {
-          if (isRecording && recorderRef.current) {
-            console.log(`Max recording duration reached (${maxDuration}s), stopping automatically`);
-            stopRecording();
+        timeSlice: 50,
+        ondataavailable: async (blob: Blob) => {
+          if (blob.size > 0) {
+            const normalizedBlob = await normalizeVolume(blob);
+            setAudioBlob(normalizedBlob);
           }
-        }, maxDuration * 1000);
-      }
-      
-      setRipples([Date.now()]);
-      
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
-      toast.dismiss();
-      toast.error('Could not access microphone. Please check permissions and try again.');
+        }
+      };
+
+      const rtcRecorder = new RecordRTC(mediaStream, recordOptions);
+      rtcRecorder.startRecording();
+      setRecorder(rtcRecorder);
+      setIsRecording(true);
+      setAudioBlob(null);
+      setRecordingTime(0);
+      startTimeRef.current = Date.now();
+      lastLevelUpdateRef.current = Date.now();
+      setRipples([]);
+
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(mediaStream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      const updateAudioLevel = () => {
+        if (!isRecording) return;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / dataArray.length;
+        setAudioLevel(average);
+
+        const now = Date.now();
+        if (now - lastLevelUpdateRef.current > 100) {
+          setRipples(prev => {
+            const newRipples = [...prev, average];
+            if (newRipples.length > 10) {
+              newRipples.shift();
+            }
+            return newRipples;
+          });
+          lastLevelUpdateRef.current = now;
+        }
+
+        animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
+      };
+
+      updateAudioLevel();
+    } catch (error: any) {
+      console.error("Error starting recording:", error);
+      setIsRecording(false);
       setHasPermission(false);
     }
-  };
+  }, [noiseReduction, normalizeVolume, isRecording]);
 
-  const stopRecording = () => {
-    if (recorderRef.current && isRecording) {
-      console.log("Stopping recording...");
-      
-      recorderRef.current.stopRecording(() => {
-        console.log("Recording stopped, generating blob...");
-        const blob = recorderRef.current!.getBlob();
-        console.log("Recording blob created:", blob.type, blob.size, "bytes");
-        
-        setAudioBlob(blob);
-        setIsRecording(false);
-        
-        setRipples([]);
-        
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-        }
-        
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        
-        if (audioLevelTimerRef.current) {
-          clearInterval(audioLevelTimerRef.current);
-          audioLevelTimerRef.current = null;
-        }
-        
-        if (maxDurationTimerRef.current) {
-          clearTimeout(maxDurationTimerRef.current);
-          maxDurationTimerRef.current = null;
-        }
-        
-        toast.success('Recording saved!');
-      });
-    }
-  };
-  
-  const requestPermissions = async () => {
+  const stopRecording = useCallback(async () => {
+    if (!recorder) return;
+
     try {
-      toast.loading('Requesting microphone permission...');
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop());
-      setHasPermission(true);
-      toast.dismiss();
-      toast.success('Microphone permission granted!');
-    } catch (error) {
-      console.error('Failed to get permission:', error);
-      toast.dismiss();
-      toast.error('Microphone permission denied. Please adjust your browser settings.');
-    }
-  };
+      recorder.stopRecording(async () => {
+        setIsRecording(false);
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
 
-  const resetRecording = () => {
-    cleanupResources();
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          setStream(null);
+        }
+
+        const audioBlob = recorder.getBlob();
+        if (audioBlob.size > 0) {
+          const normalizedBlob = await normalizeVolume(audioBlob);
+          setAudioBlob(normalizedBlob);
+        }
+        setRecorder(null);
+      });
+    } catch (error) {
+      console.error("Error stopping recording:", error);
+    }
+  }, [recorder, stream, normalizeVolume]);
+
+  const resetRecording = useCallback(() => {
+    setIsRecording(false);
     setAudioBlob(null);
     setRecordingTime(0);
     setAudioLevel(0);
     setRipples([]);
-  };
+
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+
+    if (recorder) {
+      recorder.destroy();
+      setRecorder(null);
+    }
+  }, [recorder, stream]);
+
+  const requestPermissions = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setHasPermission(true);
+      stream.getTracks().forEach(track => track.stop());
+    } catch (error) {
+      console.error("Permission denied:", error);
+      setHasPermission(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (ripples.length > 0) {
-      const timer = setTimeout(() => {
-        setRipples(current => current.slice(1));
-      }, 1500);
-      
-      return () => clearTimeout(timer);
+    let intervalId: NodeJS.Timeout | null = null;
+
+    if (isRecording) {
+      intervalId = setInterval(() => {
+        const elapsedTime = Date.now() - startTimeRef.current;
+        if (elapsedTime >= maxDuration * 1000) {
+          stopRecording();
+          clearInterval(intervalId!);
+        } else {
+          setRecordingTime(Math.floor(elapsedTime / 1000));
+        }
+      }, 1000);
+    } else {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     }
-  }, [ripples]);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isRecording, maxDuration, stopRecording]);
 
   return {
     isRecording,
@@ -309,7 +249,8 @@ export function useRecordRTCRecorder({
     ripples,
     startRecording,
     stopRecording,
+    resetRecording,
     requestPermissions,
-    resetRecording
+    normalizeVolume
   };
 }

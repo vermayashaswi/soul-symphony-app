@@ -188,6 +188,25 @@ export function JournalEntryCard({
     }
   };
 
+  const handleUserFeedback = async (feedback: number) => {
+    try {
+      const { error } = await supabase
+        .from('Journal Entries')
+        .update({ user_feedback: feedback })
+        .eq('id', safeEntry.id);
+    
+      if (error) {
+        console.error('Error saving user feedback:', error);
+        toast.error('Failed to save feedback');
+      } else {
+        toast.success('Thank you for your feedback!');
+      }
+    } catch (error) {
+      console.error('Unexpected error saving feedback:', error);
+      toast.error('An unexpected error occurred');
+    }
+  };
+
   const createdAtFormatted = (() => {
     try {
       return formatShortDate(safeEntry.created_at);
@@ -297,6 +316,25 @@ export function JournalEntryCard({
               </ErrorBoundary>
             )}
           </div>
+
+          {isExpanded && (
+            <div className="flex items-center justify-end mt-2 space-x-2">
+              <button
+                onClick={() => handleUserFeedback(1)}
+                className="text-green-500 hover:bg-green-100 p-2 rounded-full"
+                aria-label="Thumbs up for translation"
+              >
+                👍
+              </button>
+              <button
+                onClick={() => handleUserFeedback(0)}
+                className="text-red-500 hover:bg-red-100 p-2 rounded-full"
+                aria-label="Thumbs down for translation"
+              >
+                👎
+              </button>
+            </div>
+          )}
         </Card>
       </motion.div>
     </ErrorBoundary>
