@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCorsRequest, createErrorResponse, createSuccessResponse } from "../_shared/utils.ts";
@@ -6,7 +7,9 @@ import {
   generateEmbedding, 
   analyzeEmotions, 
   transcribeAudioWithWhisper,
-  translateAndRefineText
+  translateAndRefineText,
+  detectLanguageFromAudio,
+  detectLanguages
 } from "./aiProcessing.ts";
 import { analyzeWithGoogleNL } from "./nlProcessing.ts";
 import { 
@@ -149,9 +152,14 @@ serve(async (req) => {
     const blob = new Blob([binaryAudio], { type: mimeType });
     
     try {
-      // Transcribe audio file
-      console.log("Sending audio to Whisper API for transcription...");
-      const transcribedText = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey);
+      // First detect primary language from audio
+      console.log("Detecting primary language from audio sample...");
+      const primaryLanguage = await detectLanguageFromAudio(blob, openAIApiKey);
+      console.log("Primary language detected:", primaryLanguage);
+      
+      // Transcribe audio file with detected language
+      console.log("Sending audio to Whisper API for transcription with language:", primaryLanguage);
+      const transcribedText = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey, primaryLanguage);
       console.log("Transcription successful:", transcribedText ? "yes" : "no");
       
       if (!transcribedText) {
@@ -163,9 +171,14 @@ serve(async (req) => {
         return createSuccessResponse({ transcription: transcribedText });
       }
 
-      // Process with GPT for translation and refinement
+      // Detect languages in the transcribed text for better refinement
+      console.log("Detecting languages in transcribed text...");
+      const detectedLanguages = await detectLanguages(transcribedText, openAIApiKey);
+      console.log("Languages detected in transcription:", detectedLanguages);
+      
+      // Process with GPT for translation and refinement with detected languages
       console.log("Processing transcription with GPT for refinement...");
-      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey);
+      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey, detectedLanguages);
 
       // Get emotions from the refined text - run inside try/catch to avoid failure
       let emotions = null;
@@ -295,7 +308,8 @@ serve(async (req) => {
         entryId: entryId,
         emotions: emotions,
         sentiment: sentimentScore,
-        entities: entities
+        entities: entities,
+        detectedLanguages: detectedLanguages
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);

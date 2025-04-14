@@ -1,3 +1,4 @@
+
 /**
  * AI processing utilities for transcription, translation, and analysis
  */
@@ -104,7 +105,7 @@ export async function analyzeEmotions(text: string, emotions: any[], openAIApiKe
 /**
  * Detects the languages present in the transcribed text
  */
-export async function detectLanguages(text: string): Promise<string[]> {
+export async function detectLanguages(text: string, openAIApiKey: string): Promise<string[]> {
   try {
     console.log('Detecting languages in text:', text.slice(0, 100) + '...');
     
@@ -112,7 +113,7 @@ export async function detectLanguages(text: string): Promise<string[]> {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -167,20 +168,81 @@ export async function detectLanguages(text: string): Promise<string[]> {
 }
 
 /**
+ * Detect language from audio before transcription
+ */
+export async function detectLanguageFromAudio(audioBlob: Blob, openAIApiKey: string): Promise<string> {
+  try {
+    console.log('Detecting language from audio sample...');
+    
+    // Create a small sample of the audio for language detection
+    // We'll use the first 30 seconds to determine the primary language
+    const sampleSize = Math.min(audioBlob.size, 1024 * 1024); // Max 1MB sample
+    const audioSample = audioBlob.slice(0, sampleSize);
+    
+    // Send a small sample to Whisper for language identification only
+    const formData = new FormData();
+    formData.append('file', audioSample, 'audio_sample.webm');
+    formData.append('model', 'whisper-1');
+    formData.append('response_format', 'json');
+    formData.append('prompt', 'This is a language detection sample.');
+    
+    console.log('Sending sample to Whisper API for language detection');
+    
+    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!whisperResponse.ok) {
+      const errorText = await whisperResponse.text();
+      console.error('Error detecting language from audio:', errorText);
+      return 'en'; // Default to English if detection fails
+    }
+
+    const sampleResult = await whisperResponse.json();
+    
+    // If we got a sample transcription, use detectLanguages to analyze it
+    if (sampleResult.text) {
+      const detectedLanguages = await detectLanguages(sampleResult.text, openAIApiKey);
+      console.log('Languages detected from audio sample:', detectedLanguages);
+      
+      // Return the primary language (first in the array)
+      if (detectedLanguages && detectedLanguages.length > 0) {
+        return detectedLanguages[0];
+      }
+    }
+    
+    return 'en'; // Default to English if no language detected
+  } catch (error) {
+    console.error('Error in detectLanguageFromAudio:', error);
+    return 'en'; // Default to English on error
+  }
+}
+
+/**
  * Transcribes audio and translates it if needed
  */
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob, 
   fileType: string, 
-  openAIApiKey: string
+  openAIApiKey: string,
+  primaryLanguage?: string
 ): Promise<string> {
   const formData = new FormData();
   formData.append('file', audioBlob, `audio.${fileType}`);
   formData.append('model', 'whisper-1');
   formData.append('response_format', 'json');
   
-  // No language parameter - let Whisper auto-detect
-  console.log("Sending to Whisper API with auto language detection");
+  // Use detected language if available
+  if (primaryLanguage && primaryLanguage !== 'en') {
+    console.log(`Using detected primary language for transcription: ${primaryLanguage}`);
+    formData.append('language', primaryLanguage);
+  } else {
+    console.log("Sending to Whisper API with auto language detection");
+  }
   
   const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
@@ -205,14 +267,15 @@ export async function transcribeAudioWithWhisper(
  */
 export async function translateAndRefineText(
   transcribedText: string,
-  openAIApiKey: string
+  openAIApiKey: string,
+  detectedLanguages?: string[]
 ): Promise<{ refinedText: string }> {
   try {
     console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
     
-    // First detect languages in the transcribed text
-    const detectedLanguages = await detectLanguages(transcribedText);
-    const languagesInfo = detectedLanguages.join(', ');
+    // First detect languages in the transcribed text if not provided
+    const languagesToUse = detectedLanguages || await detectLanguages(transcribedText, openAIApiKey);
+    const languagesInfo = languagesToUse.join(', ');
     
     console.log("Detected languages:", languagesInfo);
     
