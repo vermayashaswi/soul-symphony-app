@@ -104,7 +104,7 @@ export function JournalEntryCard({
     if (isNew && hasValidContent && !isExpanded) {
       setIsExpanded(true);
     }
-  }, [safeEntry.content, isNew, isExpanded]);
+  }, [safeEntry.content, isNew, isExpanded, isProcessing]);
   
   useEffect(() => {
     console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id}`);
@@ -218,26 +218,14 @@ export function JournalEntryCard({
   
   const initialThemes = extractThemes();
   
-  const isEntryBeingProcessed = () => {
-    try {
-      const noThemes = (!safeEntry.themes || safeEntry.themes.length === 0) && 
-                     (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
-      
-      const noContent = !safeEntry.content || 
-                       safeEntry.content === "Processing entry..." || 
-                       safeEntry.content === "Loading..." ||
-                       safeEntry.content.trim() === "";
-                       
-      return (noThemes || noContent) && (isNew || isProcessing);
-    } catch (error) {
-      console.error('[JournalEntryCard] Error checking if entry is being processed:', error);
-      return false;
-    }
-  };
-
-  const isSentimentProcessing = !safeEntry.sentiment && (isNew || isProcessing);
-  const isThemesProcessing = isProcessing || isEntryBeingProcessed();
-  const isContentProcessing = !contentLoaded || isProcessing || isEntryBeingProcessed();
+  const isContentProcessing = isProcessing && (!contentLoaded || !safeEntry.content || 
+                                              safeEntry.content === "Processing entry..." ||
+                                              safeEntry.content === "Loading...");
+  
+  const isSentimentProcessing = isProcessing && !safeEntry.sentiment && !contentLoaded;
+  const isThemesProcessing = isProcessing && !contentLoaded && 
+                           (!safeEntry.themes || safeEntry.themes.length === 0) && 
+                           (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
 
   if (hasError) {
     return (

@@ -119,33 +119,21 @@ export default function JournalEntriesList({
     
     const currentVersion = ++stateUpdateVersionRef.current;
     
-    if (allProcessingEntries.length > 0) {
-      setStableVisibleProcessingEntries(allProcessingEntries);
+    const entriesIds = entries.map(entry => String(entry.id));
+    const uniqueProcessingEntries = allProcessingEntries.filter(tempId => {
+      const possibleId = tempId.split('-').pop();
+      return !entriesIds.some(id => id === possibleId || tempId.includes(id));
+    });
+    
+    if (uniqueProcessingEntries.length > 0) {
+      setStableVisibleProcessingEntries(uniqueProcessingEntries);
       setShowTemporaryProcessingEntries(true);
       setProcessingEntriesLoaded(true);
+    } else if (allProcessingEntries.length === 0) {
+      setShowTemporaryProcessingEntries(false);
+      setStableVisibleProcessingEntries([]);
     }
-    
-    processingEntriesTimerRef.current = setTimeout(() => {
-      if (currentVersion === stateUpdateVersionRef.current) {
-        setStableVisibleProcessingEntries(prev => {
-          if (allProcessingEntries.length > prev.length) {
-            return allProcessingEntries;
-          }
-          else if (allProcessingEntries.length > 0) {
-            return prev;
-          }
-          return allProcessingEntries;
-        });
-        
-        if (allProcessingEntries.length > 0) {
-          setShowTemporaryProcessingEntries(true);
-          setProcessingEntriesLoaded(true);
-        }
-      }
-    }, timeSinceLastChange < 2000 ? 2000 : 500);
-    
-    lastProcessingChangeTimestamp.current = now;
-    
+
     let hasNewCompletedEntries = false;
     let hasEntriesWithContentButNoMetadata = false;
     
@@ -188,33 +176,20 @@ export default function JournalEntriesList({
       
       processingEntryRemovalTimerRef.current = setTimeout(() => {
         console.log("[JournalEntriesList] Executing delayed removal of processing indicators");
+        setShowTemporaryProcessingEntries(false);
         
-        const entriesToMarkComplete = entries.filter(entry => {
-          const entryIdStr = String(entry.id);
-          return allProcessingEntries.some(tempId => tempId.includes(entryIdStr)) &&
-                 entriesCheckedForCompletionRef.current[entryIdStr];
+        const updatedProcessingEntries = allProcessingEntries.filter(tempId => {
+          return !entries.some(entry => tempId.includes(String(entry.id)));
         });
         
-        if (entriesToMarkComplete.length > 0) {
-          setShowTemporaryProcessingEntries(false);
+        if (updatedProcessingEntries.length !== allProcessingEntries.length) {
+          localStorage.setItem('processingEntries', JSON.stringify(updatedProcessingEntries));
           
-          const updatedProcessingEntries = allProcessingEntries.filter(tempId => {
-            return !entriesToMarkComplete.some(entry => tempId.includes(String(entry.id)));
-          });
-          
-          if (updatedProcessingEntries.length !== allProcessingEntries.length) {
-            localStorage.setItem('processingEntries', JSON.stringify(updatedProcessingEntries));
-            
-            window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-              detail: { entries: updatedProcessingEntries, lastUpdate: Date.now() }
-            }));
-          }
+          window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+            detail: { entries: updatedProcessingEntries, lastUpdate: Date.now() }
+          }));
         }
-      }, 8000);
-    }
-    else if (hasEntriesWithContentButNoMetadata) {
-      console.log("[JournalEntriesList] Entries have content but waiting for metadata");
-      setShowTemporaryProcessingEntries(true);
+      }, 500);
     }
   }, [processingEntries, persistedProcessingEntries, entries]);
 
@@ -448,7 +423,7 @@ export default function JournalEntriesList({
                       entry={entry} 
                       onDelete={handleEntryDelete} 
                       isNew={animatedEntryIds.includes(entry.id)}
-                      isProcessing={allProcessingEntries.some(id => id.includes(String(entry.id)))}
+                      isProcessing={false}
                     />
                   </motion.div>
                 </ErrorBoundary>
