@@ -56,6 +56,7 @@ export function JournalEntryCard({
   };
 
   const [isExpanded, setIsExpanded] = useState(isNew);
+  const [showThemes, setShowThemes] = useState(isNew);
   const [highlightNew, setHighlightNew] = useState(isNew);
   const [deletionCompleted, setDeletionCompleted] = useState(false);
   const [deletionInProgress, setDeletionInProgress] = useState(false);
@@ -135,6 +136,11 @@ export function JournalEntryCard({
   const toggleExpanded = () => {
     console.log(`[JournalEntryCard] Toggling expansion for entry ${safeEntry.id}, current state:`, isExpanded);
     setIsExpanded(!isExpanded);
+  };
+
+  const toggleThemes = () => {
+    console.log(`[JournalEntryCard] Toggling themes visibility for entry ${safeEntry.id}, current state:`, showThemes);
+    setShowThemes(!showThemes);
   };
 
   const handleDelete = async () => {
@@ -260,6 +266,7 @@ export function JournalEntryCard({
         data-entry-id={safeEntry.id}
         data-processing={isProcessing ? "true" : "false"}
         data-expanded={isExpanded ? "true" : "false"}
+        data-show-themes={showThemes ? "true" : "false"}
       >
         <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
           <div className="flex justify-between items-start p-3 md:p-4">
@@ -293,8 +300,8 @@ export function JournalEntryCard({
 
             <div className="flex items-center space-x-2 md:space-x-3">
               <FloatingDotsToggle 
-                onClick={toggleExpanded} 
-                isExpanded={isExpanded}
+                onClick={toggleThemes} 
+                isExpanded={showThemes}
               />
               <DeleteEntryDialog onDelete={handleDelete} />
             </div>
@@ -309,7 +316,7 @@ export function JournalEntryCard({
               />
             </ErrorBoundary>
             
-            {isExpanded && (
+            {showThemes && (
               <ErrorBoundary>
                 <ThemeLoader 
                   entryId={safeEntry.id}
@@ -322,24 +329,14 @@ export function JournalEntryCard({
             )}
           </div>
 
-          {isExpanded && (
-            <div className="flex items-center justify-end mt-2 space-x-2">
-              <button
-                onClick={() => handleUserFeedback(1)}
-                className="text-green-500 hover:bg-green-100 p-2 rounded-full"
-                aria-label="Thumbs up for translation"
-              >
-                👍
-              </button>
-              <button
-                onClick={() => handleUserFeedback(0)}
-                className="text-red-500 hover:bg-red-100 p-2 rounded-full"
-                aria-label="Thumbs down for translation"
-              >
-                👎
-              </button>
-            </div>
-          )}
+          <div className="flex justify-end p-2">
+            <button
+              onClick={toggleExpanded}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {isExpanded ? 'Show less' : 'Show more'}
+            </button>
+          </div>
         </Card>
       </motion.div>
     </ErrorBoundary>
