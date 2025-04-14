@@ -4,11 +4,11 @@ import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 
 export function LoadingEntryContent() {
-  // Added motion effects for smoother appearance
+  // Added motion effects for smoother appearance and increased opacity
   return (
     <motion.div 
       className="space-y-2"
-      initial={{ opacity: 0.6 }}
+      initial={{ opacity: 0.8 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}

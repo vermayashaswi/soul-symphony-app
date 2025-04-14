@@ -51,8 +51,8 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     console.log('[AudioProcessing] Setup processing timeout');
     
     // Add this entry to localStorage to persist across navigations
-    updateProcessingEntries(tempId, 'add');
-    console.log('[AudioProcessing] Updated processing entries in localStorage');
+    const updatedEntries = updateProcessingEntries(tempId, 'add');
+    console.log('[AudioProcessing] Updated processing entries in localStorage:', updatedEntries);
     
     // Log the audio details
     console.log('[AudioProcessing] Processing audio:', {
@@ -77,6 +77,12 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     
     // Return immediately with the temp ID
     console.log('[AudioProcessing] Returning success with tempId:', tempId);
+    
+    // Force a custom event dispatch to ensure UI updates
+    window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+      detail: { entries: updatedEntries, lastUpdate: Date.now(), forceUpdate: true }
+    }));
+    
     return { success: true, tempId };
   } catch (error: any) {
     console.error('[AudioProcessing] Error initiating recording process:', error);

@@ -404,8 +404,18 @@ const Journal = () => {
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
         
-        await fetchEntries();
+        // Force a refresh of the entries list
+        fetchEntries();
         setRefreshKey(prev => prev + 1);
+        
+        // Make sure the placeholder entry is visible
+        window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+          detail: { 
+            entries: [...processingEntries, tempId], 
+            lastUpdate: Date.now(),
+            forceUpdate: true 
+          }
+        }));
         
         const pollIntervals = [1000, 2000, 3000, 5000, 8000, 10000, 15000];
         

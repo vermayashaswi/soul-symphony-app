@@ -27,8 +27,10 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
     
     if (action === 'add' && !entries.includes(tempId)) {
       entries.push(tempId);
+      console.log(`[Audio.ProcessingState] Added entry ${tempId} to processing list. Now tracking ${entries.length} entries.`);
     } else if (action === 'remove') {
       entries = entries.filter(id => id !== tempId);
+      console.log(`[Audio.ProcessingState] Removed entry ${tempId} from processing list. Now tracking ${entries.length} entries.`);
     }
     
     localStorage.setItem('processingEntries', JSON.stringify(entries));
@@ -49,7 +51,9 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
 export const getProcessingEntries = (): string[] => {
   try {
     const storedEntries = localStorage.getItem('processingEntries');
-    return storedEntries ? JSON.parse(storedEntries) : [];
+    const entries = storedEntries ? JSON.parse(storedEntries) : [];
+    console.log(`[Audio.ProcessingState] Retrieved ${entries.length} processing entries from storage.`);
+    return entries;
   } catch (error) {
     console.error('[Audio.ProcessingState] Error retrieving processing entries from storage:', error);
     return [];

@@ -48,25 +48,40 @@ export default function JournalEntriesList({
   const stateUpdateVersionRef = useRef(0);
 
   useEffect(() => {
+    console.log('[JournalEntriesList] Processing entries state:', {
+      processingEntries,
+      persistedProcessingEntries,
+      showTemporaryProcessingEntries,
+      stableVisibleProcessingEntries: stableVisibleProcessingEntries.length
+    });
+  }, [processingEntries, persistedProcessingEntries, showTemporaryProcessingEntries, stableVisibleProcessingEntries]);
+
+  useEffect(() => {
     const loadPersistedProcessingEntries = () => {
       const persistedEntries = getProcessingEntries();
+      console.log('[JournalEntriesList] Loaded persisted entries:', persistedEntries);
       setPersistedProcessingEntries(persistedEntries);
       
       if (persistedEntries.length > 0) {
         setProcessingEntriesLoaded(true);
         setShowTemporaryProcessingEntries(true);
+        setStableVisibleProcessingEntries(persistedEntries);
       }
     };
     
     loadPersistedProcessingEntries();
     
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
+      console.log('[JournalEntriesList] Processing entries changed event:', event.detail);
       if (event.detail && Array.isArray(event.detail.entries)) {
         setPersistedProcessingEntries(event.detail.entries);
         
         if (event.detail.entries.length > 0) {
           setProcessingEntriesLoaded(true);
           setShowTemporaryProcessingEntries(true);
+          if (event.detail.forceUpdate) {
+            setStableVisibleProcessingEntries(event.detail.entries);
+          }
         }
       }
     };
@@ -92,6 +107,7 @@ export default function JournalEntriesList({
 
   useEffect(() => {
     const allProcessingEntries = [...new Set([...processingEntries, ...persistedProcessingEntries])];
+    console.log('[JournalEntriesList] Combined processing entries:', allProcessingEntries);
     
     const now = Date.now();
     const timeSinceLastChange = now - lastProcessingChangeTimestamp.current;
@@ -101,6 +117,12 @@ export default function JournalEntriesList({
     }
     
     const currentVersion = ++stateUpdateVersionRef.current;
+    
+    if (allProcessingEntries.length > 0) {
+      setStableVisibleProcessingEntries(allProcessingEntries);
+      setShowTemporaryProcessingEntries(true);
+      setProcessingEntriesLoaded(true);
+    }
     
     processingEntriesTimerRef.current = setTimeout(() => {
       if (currentVersion === stateUpdateVersionRef.current) {
