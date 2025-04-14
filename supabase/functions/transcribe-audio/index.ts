@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCorsRequest, createErrorResponse, createSuccessResponse } from "../_shared/utils.ts";
@@ -166,6 +167,9 @@ serve(async (req) => {
       // Process with GPT for translation and refinement
       console.log("Processing transcription with GPT for refinement...");
       const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey);
+      
+      console.log("Original transcription:", transcribedText.slice(0, 100) + "...");
+      console.log("Refined text:", refinedText.slice(0, 100) + "...");
 
       // Get emotions from the refined text - run inside try/catch to avoid failure
       let emotions = null;

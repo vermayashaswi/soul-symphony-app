@@ -109,38 +109,39 @@ export async function transcribeAudioWithWhisper(
   audioBlob: Blob, 
   fileType: string, 
   openAIApiKey: string
-): Promise<{ text: string, language?: string }> {
-  const formData = new FormData();
-  formData.append('file', audioBlob, `audio.${fileType}`);
-  formData.append('model', 'whisper-1');
-  formData.append('response_format', 'verbose_json'); // Request verbose response to get language info
-  
-  // No language parameter - let Whisper auto-detect
-  console.log("Sending to Whisper API with auto language detection");
-  
-  const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-    },
-    body: formData,
-  });
+): Promise<string> {
+  try {
+    const formData = new FormData();
+    formData.append('file', audioBlob, `audio.${fileType}`);
+    formData.append('model', 'whisper-1');
+    
+    // No language parameter - let Whisper auto-detect
+    console.log("Sending to Whisper API with auto language detection");
+    
+    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+      },
+      body: formData,
+    });
 
-  if (!whisperResponse.ok) {
-    const errorText = await whisperResponse.text();
-    console.error("Whisper API error:", errorText);
-    throw new Error(`Whisper API error: ${errorText}`);
+    if (!whisperResponse.ok) {
+      const errorText = await whisperResponse.text();
+      console.error("Whisper API error:", errorText);
+      throw new Error(`Whisper API error: ${errorText}`);
+    }
+
+    const whisperResult = await whisperResponse.json();
+    
+    // Log detected language from Whisper
+    console.log("Whisper detected language:", whisperResult.language || "Not specified");
+    
+    return whisperResult.text;
+  } catch (error) {
+    console.error('Error in transcribeAudioWithWhisper:', error);
+    throw error;
   }
-
-  const whisperResult = await whisperResponse.json();
-  
-  // Log detected language from Whisper
-  console.log("Whisper detected language:", whisperResult.language || "Not specified");
-  
-  return { 
-    text: whisperResult.text,
-    language: whisperResult.language
-  };
 }
 
 /**
@@ -148,16 +149,10 @@ export async function transcribeAudioWithWhisper(
  */
 export async function translateAndRefineText(
   transcribedText: string,
-  openAIApiKey: string,
-  detectedLanguage?: string
+  openAIApiKey: string
 ): Promise<{ refinedText: string }> {
   try {
     console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
-    
-    // Use detected language from Whisper if available, otherwise mark as unknown
-    let languagesInfo = detectedLanguage || "unknown";
-    
-    console.log("Language information for GPT:", languagesInfo);
     
     const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -170,27 +165,20 @@ export async function translateAndRefineText(
         messages: [
           {
             role: 'system',
-            content: `You are an empathetic writing assistant helping users journal. The following transcription is a voice journal that may contain multiple languages, informal speech, and emotional content.
-
-Your task:
-1. Translate all non-English portions to English.
-2. Preserve the speaker's tone, intent, and emotional expression.
-3. Maintain a first-person, personal narrative.
-4. Do NOT add commentary or analysis.
-5. Fix grammar or spelling issues only when necessary for clarity.
-6. Retain cultural texts and just transliterate those to English 
-
-Detected language in the text: ${languagesInfo}
-
-Here is the transcription:`
+            content: `You are a helpful assistant that improves journal entries. Your goal is to:
+            1. Keep the original meaning intact
+            2. Fix any grammar or spelling errors
+            3. Improve clarity and readability
+            4. Structure the text into paragraphs if needed
+            5. If the text is in a language other than English, translate it to English while preserving the original meaning
+            
+            Do NOT add any new information, opinions, or comments not present in the original text.
+            Do NOT summarize - maintain all details from the original text.
+            Return ONLY the improved text without any explanations, comments, or extra text.`
           },
           {
             role: 'user',
-            content: `${transcribedText}`
-          },
-          {
-            role: 'system',
-            content: 'Reply with only the translated and corrected text. Apart from the translation of the audio entry, don\'t explain or provide any information from your end!'
+            content: transcribedText
           }
         ],
         temperature: 0.3
@@ -198,20 +186,25 @@ Here is the transcription:`
     });
 
     if (!gptResponse.ok) {
-      const errorText = await gptResponse.text();
-      console.error("GPT API error:", errorText);
-      throw new Error(`GPT API error: ${errorText}`);
+      const error = await gptResponse.text();
+      console.error('Error refining text with GPT:', error);
+      throw new Error('Failed to refine text');
     }
 
-    const gptResult = await gptResponse.json();
-    const refinedText = gptResult.choices[0].message.content;
+    const result = await gptResponse.json();
+    const refinedText = result.choices[0].message.content.trim();
     
-    console.log("GPT Response (first 100 chars):", refinedText.slice(0, 100) + "...");
+    // Make sure we got back actual refined text and it's different from the original
+    if (!refinedText || refinedText === transcribedText) {
+      console.warn('GPT returned same text or empty response, using original text');
+      return { refinedText: transcribedText };
+    }
     
+    console.log('Successfully refined text:', refinedText.slice(0, 100) + '...');
     return { refinedText };
   } catch (error) {
-    console.error("Error in translateAndRefineText:", error);
-    // If translation fails, return original text as refined text
+    console.error('Error in translateAndRefineText:', error);
+    // If there's an error, use the original text
     return { refinedText: transcribedText };
   }
 }
