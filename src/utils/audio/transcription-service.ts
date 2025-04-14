@@ -20,13 +20,15 @@ export async function sendAudioForTranscription(
 ): Promise<TranscriptionResult> {
   try {
     if (!base64Audio) {
+      console.error('[TranscriptionService] No audio data provided');
       throw new Error('No audio data provided');
     }
 
-    console.log(`Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
-    console.log(`Audio data size: ${base64Audio.length} characters`);
+    console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
+    console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
     
     // Call the Supabase edge function with a longer timeout
+    console.log('[TranscriptionService] Invoking transcribe-audio edge function');
     const response = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64Audio,
@@ -38,7 +40,7 @@ export async function sendAudioForTranscription(
 
     // Handle response errors
     if (response.error) {
-      console.error('Edge function error:', response.error);
+      console.error('[TranscriptionService] Edge function error:', response.error);
       return {
         success: false,
         error: response.error?.message || 'Failed to process audio'
@@ -47,7 +49,7 @@ export async function sendAudioForTranscription(
 
     // Check if the response has a success field
     if (response.data?.success === false) {
-      console.error('Processing error:', response.data.error || response.data.message);
+      console.error('[TranscriptionService] Processing error:', response.data.error || response.data.message);
       return {
         success: false,
         error: response.data.error || response.data.message || 'Unknown error in audio processing'
@@ -56,17 +58,21 @@ export async function sendAudioForTranscription(
 
     // Validate that we have data back
     if (!response.data) {
-      console.error('No data returned from edge function');
+      console.error('[TranscriptionService] No data returned from edge function');
       return {
         success: false,
         error: 'No data returned from server'
       };
     }
 
-    console.log('Transcription successful:', {
+    // Add more detailed logging about what was returned
+    console.log('[TranscriptionService] Transcription successful:', {
       directMode: directTranscription,
       transcriptionLength: response.data?.transcription?.length || 0,
-      hasEntryId: !!response.data?.entryId
+      refinedTextLength: response.data?.refinedText?.length || 0,
+      hasEntryId: !!response.data?.entryId,
+      entryId: response.data?.entryId || 'none',
+      audioUrl: response.data?.audioUrl ? 'exists' : 'none'
     });
 
     return {
@@ -74,7 +80,7 @@ export async function sendAudioForTranscription(
       data: response.data
     };
   } catch (error: any) {
-    console.error('Error in sendAudioForTranscription:', error);
+    console.error('[TranscriptionService] Error in sendAudioForTranscription:', error);
     return {
       success: false,
       error: error.message || 'Unknown error occurred'

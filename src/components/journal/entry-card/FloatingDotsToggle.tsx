@@ -7,10 +7,16 @@ interface FloatingDotsToggleProps {
 }
 
 export function FloatingDotsToggle({ onClick }: FloatingDotsToggleProps) {
+  // Add a wrapper function to log when toggle is clicked
+  const handleClick = () => {
+    console.log('[FloatingDotsToggle] Toggle clicked');
+    onClick();
+  };
+
   return (
     <motion.div 
       className="relative w-8 h-8 cursor-pointer"
-      onClick={onClick}
+      onClick={handleClick}
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.95 }}
     >

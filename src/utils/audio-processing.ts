@@ -33,33 +33,42 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   // Validate initial state and get tempId
   const validationResult = await validateInitialState(audioBlob, userId);
   if (!validationResult.success) {
+    console.error('[AudioProcessing] Initial validation failed:', validationResult.error);
     return validationResult;
   }
   
   const tempId = validationResult.tempId!;
+  console.log('[AudioProcessing] Generated temporary ID:', tempId);
   
   try {
     // Set processing lock to prevent multiple simultaneous processing
     setProcessingLock(true);
     setIsEntryBeingProcessed(true);
+    console.log('[AudioProcessing] Set processing locks');
     
     // Setup timeout to prevent deadlocks
     setupProcessingTimeout();
+    console.log('[AudioProcessing] Setup processing timeout');
     
     // Add this entry to localStorage to persist across navigations
     updateProcessingEntries(tempId, 'add');
+    console.log('[AudioProcessing] Updated processing entries in localStorage');
     
     // Log the audio details
-    console.log('Processing audio:', {
+    console.log('[AudioProcessing] Processing audio:', {
       size: audioBlob?.size || 0,
       type: audioBlob?.type || 'unknown',
       userId: userId || 'anonymous'
     });
     
     // Launch the processing without awaiting it
+    console.log('[AudioProcessing] Launching background processing');
     processRecordingInBackground(audioBlob, userId, tempId)
+      .then(result => {
+        console.log('[AudioProcessing] Background processing completed:', result);
+      })
       .catch(err => {
-        console.error('Background processing error:', err);
+        console.error('[AudioProcessing] Background processing error:', err);
         setIsEntryBeingProcessed(false);
         setProcessingLock(false);
         
@@ -67,9 +76,10 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       });
     
     // Return immediately with the temp ID
+    console.log('[AudioProcessing] Returning success with tempId:', tempId);
     return { success: true, tempId };
   } catch (error: any) {
-    console.error('Error initiating recording process:', error);
+    console.error('[AudioProcessing] Error initiating recording process:', error);
     setIsEntryBeingProcessed(false);
     setProcessingLock(false);
     
