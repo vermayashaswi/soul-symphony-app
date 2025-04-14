@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -61,9 +60,9 @@ export function JournalEntryCard({
   const [deletionInProgress, setDeletionInProgress] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [contentLoaded, setContentLoaded] = useState(false);
+  const [themesLoaded, setThemesLoaded] = useState(false);
   const mountedRef = useRef<boolean>(true);
   
-  // Check if content is ready to display
   useEffect(() => {
     const hasValidContent = safeEntry.content && 
                          safeEntry.content !== "Processing entry..." && 
@@ -72,32 +71,14 @@ export function JournalEntryCard({
     
     setContentLoaded(hasValidContent);
   }, [safeEntry.content]);
-
-  const extractThemes = (): string[] => {
-    try {
-      const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
-      const entryThemes = Array.isArray(safeEntry.themes) ? safeEntry.themes : [];
-      
-      const filteredMasterThemes = masterThemes.filter(theme => 
-        theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
-      );
-      const filteredEntryThemes = entryThemes.filter(theme => 
-        theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
-      );
-      
-      if (filteredMasterThemes.length > 0) {
-        return filteredMasterThemes;
-      } else if (filteredEntryThemes.length > 0) {
-        return filteredEntryThemes;
-      }
-      
-      return [];
-    } catch (error) {
-      console.error("[JournalEntryCard] Error extracting themes:", error);
-      return [];
-    }
-  };
   
+  useEffect(() => {
+    const hasThemes = (Array.isArray(safeEntry.master_themes) && safeEntry.master_themes.length > 0) || 
+                    (Array.isArray(safeEntry.themes) && safeEntry.themes.length > 0);
+    
+    setThemesLoaded(hasThemes);
+  }, [safeEntry.master_themes, safeEntry.themes]);
+
   useEffect(() => {
     console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id}`);
     mountedRef.current = true;
@@ -204,6 +185,7 @@ export function JournalEntryCard({
   const isSentimentProcessing = !safeEntry.sentiment && (isNew || isProcessing);
   const isThemesProcessing = isProcessing || isEntryBeingProcessed();
   const isContentProcessing = !contentLoaded || isProcessing;
+  const isFullyLoaded = contentLoaded && themesLoaded;
 
   if (hasError) {
     return (
@@ -236,6 +218,9 @@ export function JournalEntryCard({
         className="journal-entry-card" 
         data-entry-id={safeEntry.id}
         data-processing={isProcessing ? "true" : "false"}
+        data-content-loaded={contentLoaded ? "true" : "false"}
+        data-themes-loaded={themesLoaded ? "true" : "false"}
+        data-fully-loaded={isFullyLoaded ? "true" : "false"}
       >
         <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
           <div className="flex justify-between items-start p-3 md:p-4">

@@ -41,6 +41,8 @@ export default function JournalEntriesList({
   const [processingEntriesLoaded, setProcessingEntriesLoaded] = useState(false);
   const [showTemporaryProcessingEntries, setShowTemporaryProcessingEntries] = useState(true);
   const [visibleProcessingEntries, setVisibleProcessingEntries] = useState<string[]>([]);
+  const [entriesInTransition, setEntriesInTransition] = useState<{id: number, tempId: string}[]>([]);
+  const [completedProcessingIds, setCompletedProcessingIds] = useState<string[]>([]);
 
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
@@ -91,22 +93,59 @@ export default function JournalEntriesList({
       setProcessingEntriesLoaded(true);
     }
     
-    const hasCompletedEntries = entries.some(entry => {
-      const entryIdStr = String(entry.id);
-      return allProcessingEntries.some(tempId => tempId.includes(entryIdStr)) && 
-             entry.content && 
-             entry.content !== "Processing entry..." && 
-             entry.content.trim() !== "" &&
-             Array.isArray(entry.themes || entry.master_themes) && 
-             (entry.themes?.length > 0 || entry.master_themes?.length > 0);
-    });
+    if (Array.isArray(entries) && entries.length > 0 && allProcessingEntries.length > 0) {
+      const newCompletedIds: string[] = [];
+      const newTransitionEntries: {id: number, tempId: string}[] = [];
+      
+      entries.forEach(entry => {
+        allProcessingEntries.forEach(tempId => {
+          if (tempId.includes(String(entry.id)) && 
+              entry.content && 
+              entry.content !== "Processing entry..." && 
+              entry.content.trim() !== "") {
+            
+            const hasThemes = (Array.isArray(entry.themes) && entry.themes.length > 0) || 
+                            (Array.isArray(entry.master_themes) && entry.master_themes.length > 0);
+            
+            if (hasThemes) {
+              newCompletedIds.push(tempId);
+            } else {
+              newTransitionEntries.push({id: entry.id, tempId});
+            }
+          }
+        });
+      });
+      
+      if (newCompletedIds.length > 0) {
+        setCompletedProcessingIds(prev => [...prev, ...newCompletedIds]);
+        setTimeout(() => {
+          setVisibleProcessingEntries(prev => 
+            prev.filter(id => !newCompletedIds.includes(id))
+          );
+        }, 500);
+      }
+      
+      if (newTransitionEntries.length > 0) {
+        setEntriesInTransition(prev => {
+          const newEntries = [...prev];
+          newTransitionEntries.forEach(item => {
+            if (!newEntries.some(e => e.id === item.id)) {
+              newEntries.push(item);
+            }
+          });
+          return newEntries;
+        });
+      }
+    }
     
-    if (hasCompletedEntries && allProcessingEntries.length === 0) {
+    if (completedProcessingIds.length > 0 && 
+        completedProcessingIds.length === allProcessingEntries.length && 
+        allProcessingEntries.length > 0) {
       setTimeout(() => {
         setShowTemporaryProcessingEntries(false);
-      }, 2000);
+      }, 1000);
     }
-  }, [processingEntries, persistedProcessingEntries, entries]);
+  }, [processingEntries, persistedProcessingEntries, entries, completedProcessingIds]);
 
   useEffect(() => {
     try {
@@ -252,6 +291,10 @@ export default function JournalEntriesList({
 
   const displayEntries = isSearchActive ? filteredEntries : localEntries;
   const safeLocalEntries = Array.isArray(displayEntries) ? displayEntries : [];
+  
+  const currentlyProcessingEntries = visibleProcessingEntries.filter(
+    id => !completedProcessingIds.includes(id)
+  );
 
   return (
     <ErrorBoundary>
@@ -274,13 +317,13 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4 mt-6">
-            {(showTemporaryProcessingEntries || visibleProcessingEntries.length > 0) && (
+            {(showTemporaryProcessingEntries || currentlyProcessingEntries.length > 0) && (
               <div className="mb-4">
                 <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Processing your new entry...</span>
                 </div>
-                <JournalEntryLoadingSkeleton count={visibleProcessingEntries.length || 1} />
+                <JournalEntryLoadingSkeleton count={currentlyProcessingEntries.length || 1} />
               </div>
             )}
             
@@ -309,37 +352,45 @@ export default function JournalEntriesList({
                 </Button>
               </motion.div>
             ) : (
-              safeLocalEntries.map((entry, index) => (
-                <ErrorBoundary key={`entry-boundary-${entry.id}`}>
-                  <motion.div
-                    key={`entry-${entry.id}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ 
-                      opacity: 1, 
-                      y: 0,
-                      boxShadow: animatedEntryIds.includes(entry.id) ? 
-                        '0 0 0 2px rgba(var(--color-primary), 0.5)' : 
-                        'none'
-                    }}
-                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                    transition={{ 
-                      duration: 0.3, 
-                      delay: index === 0 && safeLocalEntries.length > prevEntriesLength ? 0 : 0.05 * Math.min(index, 5) 
-                    }}
-                    className={animatedEntryIds.includes(entry.id) ? 
-                      "rounded-lg shadow-md relative overflow-hidden" : 
-                      "relative overflow-hidden"
-                    }
-                  >
-                    <JournalEntryCard 
-                      entry={entry} 
-                      onDelete={handleEntryDelete} 
-                      isNew={animatedEntryIds.includes(entry.id)}
-                      isProcessing={allProcessingEntries.some(id => id.includes(String(entry.id)))}
-                    />
-                  </motion.div>
-                </ErrorBoundary>
-              ))
+              safeLocalEntries.map((entry, index) => {
+                const isEntryInTransition = entriesInTransition.some(e => e.id === entry.id);
+                const matchingTempId = entriesInTransition.find(e => e.id === entry.id)?.tempId;
+                
+                const showProcessing = currentlyProcessingEntries.some(id => id.includes(String(entry.id))) ||
+                                      isEntryInTransition;
+                
+                return (
+                  <ErrorBoundary key={`entry-boundary-${entry.id}`}>
+                    <motion.div
+                      key={`entry-${entry.id}`}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ 
+                        opacity: 1, 
+                        y: 0,
+                        boxShadow: animatedEntryIds.includes(entry.id) ? 
+                          '0 0 0 2px rgba(var(--color-primary), 0.5)' : 
+                          'none'
+                      }}
+                      exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                      transition={{ 
+                        duration: 0.3, 
+                        delay: index === 0 && safeLocalEntries.length > prevEntriesLength ? 0 : 0.05 * Math.min(index, 5) 
+                      }}
+                      className={animatedEntryIds.includes(entry.id) ? 
+                        "rounded-lg shadow-md relative overflow-hidden" : 
+                        "relative overflow-hidden"
+                      }
+                    >
+                      <JournalEntryCard 
+                        entry={entry} 
+                        onDelete={handleEntryDelete} 
+                        isNew={animatedEntryIds.includes(entry.id)}
+                        isProcessing={showProcessing}
+                      />
+                    </motion.div>
+                  </ErrorBoundary>
+                );
+              })
             )}
           </div>
         </AnimatePresence>
