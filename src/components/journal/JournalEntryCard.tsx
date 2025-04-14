@@ -12,6 +12,7 @@ import {
   EntryContent
 } from './entry-card';
 import ErrorBoundary from './ErrorBoundary';
+import { ThumbsUp, ThumbsDown } from 'lucide-react';
 
 export interface JournalEntry {
   id: number;
@@ -264,13 +265,29 @@ export function JournalEntryCard({
           <div className="flex justify-between items-start p-3 md:p-4">
             <div>
               <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-              <div className="mt-1">
+              <div className="mt-1 flex items-center space-x-2">
                 <ErrorBoundary>
                   <SentimentEmoji 
                     sentiment={safeEntry.sentiment} 
                     isProcessing={isSentimentProcessing}
                   />
                 </ErrorBoundary>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleUserFeedback(1)}
+                    className="text-green-500 hover:bg-green-100 p-1 rounded-full"
+                    aria-label="Thumbs up for translation"
+                  >
+                    <ThumbsUp size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleUserFeedback(0)}
+                    className="text-red-500 hover:bg-red-100 p-1 rounded-full"
+                    aria-label="Thumbs down for translation"
+                  >
+                    <ThumbsDown size={16} />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -328,3 +345,5 @@ export function JournalEntryCard({
     </ErrorBoundary>
   );
 }
+
+export default JournalEntryCard;
