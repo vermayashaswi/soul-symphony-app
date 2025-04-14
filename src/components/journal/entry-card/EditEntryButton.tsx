@@ -39,6 +39,8 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
+      console.log("Updating entry:", entryId, "with content:", editedContent.substring(0, 50) + "...");
+      
       // Update the journal entry content in the "refined text" column
       const { error } = await supabase
         .from('Journal Entries')
@@ -49,7 +51,12 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         })
         .eq('id', entryId);
         
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase update error:", error);
+        throw error;
+      }
+      
+      console.log("Update successful, triggering theme extraction");
       
       // Trigger theme extraction after content update
       const themeSuccess = await triggerThemeExtraction(entryId);
