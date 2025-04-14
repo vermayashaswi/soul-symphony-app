@@ -62,7 +62,6 @@ export function JournalEntryCard({
   const [contentLoaded, setContentLoaded] = useState(false);
   const mountedRef = useRef<boolean>(true);
   
-  // Extract themes from the entry
   const extractThemes = (): string[] => {
     try {
       const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
@@ -88,16 +87,20 @@ export function JournalEntryCard({
     }
   };
   
-  // Check if content is ready to display
   useEffect(() => {
     const hasValidContent = safeEntry.content && 
                          safeEntry.content !== "Processing entry..." && 
                          safeEntry.content !== "Loading..." &&
                          safeEntry.content.trim() !== "";
     
+    console.log(`[JournalEntryCard] Entry ${safeEntry.id} content status:`, {
+      hasValidContent,
+      contentLength: safeEntry.content?.length || 0,
+      isProcessing
+    });
+    
     setContentLoaded(hasValidContent);
     
-    // Automatically expand new entries
     if (isNew && hasValidContent && !isExpanded) {
       setIsExpanded(true);
     }
@@ -199,7 +202,13 @@ export function JournalEntryCard({
     try {
       const noThemes = (!safeEntry.themes || safeEntry.themes.length === 0) && 
                      (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
-      return noThemes && (isNew || isProcessing);
+      
+      const noContent = !safeEntry.content || 
+                       safeEntry.content === "Processing entry..." || 
+                       safeEntry.content === "Loading..." ||
+                       safeEntry.content.trim() === "";
+                       
+      return (noThemes || noContent) && (isNew || isProcessing);
     } catch (error) {
       console.error('[JournalEntryCard] Error checking if entry is being processed:', error);
       return false;
@@ -208,7 +217,7 @@ export function JournalEntryCard({
 
   const isSentimentProcessing = !safeEntry.sentiment && (isNew || isProcessing);
   const isThemesProcessing = isProcessing || isEntryBeingProcessed();
-  const isContentProcessing = !contentLoaded || isProcessing;
+  const isContentProcessing = !contentLoaded || isProcessing || isEntryBeingProcessed();
 
   if (hasError) {
     return (

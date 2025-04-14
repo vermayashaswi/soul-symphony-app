@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -21,17 +20,18 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     console.log('[EntryContent] Received content update:', {
       contentLength: content?.length || 0,
       isProcessing,
-      isExpanded
+      isExpanded,
+      contentIsEmpty: !content || content === "Processing entry..." || content.trim() === "" || content === "Loading..."
     });
   }, [content, isProcessing, isExpanded]);
   
   // Detect when content is actually available and worth showing
   useEffect(() => {
     const contentIsLoading = isProcessing || 
-                         !content || 
-                         content === "Processing entry..." || 
-                         content.trim() === "" ||
-                         content === "Loading...";
+                          !content || 
+                          content === "Processing entry..." || 
+                          content.trim() === "" ||
+                          content === "Loading...";
     
     console.log('[EntryContent] Content status check:', {
       contentIsLoading,
@@ -45,28 +45,26 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       clearTimeout(timeoutRef.current);
     }
     
-    // If transitioning from loading to content, delay a bit more for smoother transition
-    if (prevProcessingRef.current && !isProcessing && !contentIsLoading) {
-      console.log('[EntryContent] Transitioning from processing to content display');
+    // Keep showing loading state while content is being processed
+    // Only transition to content when we have meaningful text to display
+    if (contentIsLoading) {
       timeoutRef.current = setTimeout(() => {
-        setShowLoading(false);
-        if (content) {
-          setStableContent(content);
-          console.log('[EntryContent] Updated stable content with new content');
-        }
-      }, 800); // Longer delay when content becomes available for smoother transition
-    } 
-    // If still loading or just starting to load, delay is shorter
-    else {
+        setShowLoading(true);
+      }, 150);
+    } else {
+      // If we have valid content, delay a bit for a smooth transition
       timeoutRef.current = setTimeout(() => {
-        setShowLoading(contentIsLoading);
-        
-        // Only update the stable content when we have meaningful content
-        if (!contentIsLoading && content) {
+        if (prevProcessingRef.current && !isProcessing) {
+          // If transitioning from processing to done, delay a bit longer
+          setTimeout(() => {
+            setShowLoading(false);
+            setStableContent(content);
+          }, 800);
+        } else {
+          setShowLoading(false);
           setStableContent(content);
-          console.log('[EntryContent] Updated stable content with new content');
         }
-      }, contentIsLoading ? 150 : 500);
+      }, 500);
     }
     
     // Update refs
