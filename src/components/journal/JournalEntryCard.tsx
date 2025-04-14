@@ -6,11 +6,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   FloatingDotsToggle, 
-  SentimentEmoji, 
+  SentimentMeter, 
   ThemeLoader, 
   DeleteEntryDialog,
   EntryContent
 } from './entry-card';
+import { EditEntryButton } from './entry-card/EditEntryButton';
 import ErrorBoundary from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 
@@ -214,6 +215,13 @@ export function JournalEntryCard({
     }
   };
 
+  const handleRefresh = () => {
+    if (onDelete) {
+      console.log(`[JournalEntryCard] Refreshing entry ${safeEntry.id}`);
+      onDelete(safeEntry.id);
+    }
+  };
+
   const createdAtFormatted = (() => {
     try {
       return formatShortDate(safeEntry.created_at);
@@ -270,38 +278,25 @@ export function JournalEntryCard({
       >
         <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
           <div className="flex justify-between items-start p-3 md:p-4">
-            <div>
+            <div className="flex items-center space-x-3">
               <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-              <div className="mt-1 flex items-center space-x-2">
-                <ErrorBoundary>
-                  <SentimentEmoji 
-                    sentiment={safeEntry.sentiment} 
-                    isProcessing={isSentimentProcessing}
-                  />
-                </ErrorBoundary>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleUserFeedback(1)}
-                    className="text-green-500 hover:bg-green-100 p-1 rounded-full"
-                    aria-label="Thumbs up for translation"
-                  >
-                    <ThumbsUp size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleUserFeedback(0)}
-                    className="text-red-500 hover:bg-red-100 p-1 rounded-full"
-                    aria-label="Thumbs down for translation"
-                  >
-                    <ThumbsDown size={16} />
-                  </button>
-                </div>
-              </div>
+              <ErrorBoundary>
+                <SentimentMeter 
+                  sentiment={safeEntry.sentiment} 
+                  isProcessing={isSentimentProcessing}
+                />
+              </ErrorBoundary>
             </div>
 
             <div className="flex items-center space-x-2 md:space-x-3">
               <FloatingDotsToggle 
                 onClick={toggleThemes} 
                 isExpanded={showThemes}
+              />
+              <EditEntryButton 
+                entryId={safeEntry.id}
+                content={safeEntry.content}
+                onEntryUpdated={handleRefresh}
               />
               <DeleteEntryDialog onDelete={handleDelete} />
             </div>
@@ -317,15 +312,36 @@ export function JournalEntryCard({
             </ErrorBoundary>
             
             {showThemes && (
-              <ErrorBoundary>
-                <ThemeLoader 
-                  entryId={safeEntry.id}
-                  initialThemes={initialThemes}
-                  content={safeEntry.content}
-                  isProcessing={isThemesProcessing}
-                  isNew={isNew}
-                />
-              </ErrorBoundary>
+              <div>
+                <div className="mt-3 mb-2 flex items-center space-x-2">
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleUserFeedback(1)}
+                      className="text-green-500 hover:bg-green-100 p-1 rounded-full"
+                      aria-label="Thumbs up for translation"
+                    >
+                      <ThumbsUp size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleUserFeedback(0)}
+                      className="text-red-500 hover:bg-red-100 p-1 rounded-full"
+                      aria-label="Thumbs down for translation"
+                    >
+                      <ThumbsDown size={16} />
+                    </button>
+                  </div>
+                </div>
+                
+                <ErrorBoundary>
+                  <ThemeLoader 
+                    entryId={safeEntry.id}
+                    initialThemes={initialThemes}
+                    content={safeEntry.content}
+                    isProcessing={isThemesProcessing}
+                    isNew={isNew}
+                  />
+                </ErrorBoundary>
+              </div>
             )}
           </div>
 
@@ -334,7 +350,7 @@ export function JournalEntryCard({
               onClick={toggleExpanded}
               className="text-sm text-muted-foreground hover:text-foreground"
             >
-              {isExpanded ? 'Show less' : 'Show more'}
+              {isExpanded ? '' : 'Show more'}
             </button>
           </div>
         </Card>

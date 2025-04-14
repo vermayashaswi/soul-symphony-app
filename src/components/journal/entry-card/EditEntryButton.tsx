@@ -1,0 +1,108 @@
+
+import React, { useState } from 'react';
+import { Edit } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+interface EditEntryButtonProps {
+  entryId: number;
+  content: string;
+  onEntryUpdated: () => void;
+}
+
+export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryButtonProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editedContent, setEditedContent] = useState(content);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleOpenDialog = () => {
+    setEditedContent(content);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+  };
+
+  const handleSaveChanges = async () => {
+    if (!editedContent.trim() || editedContent === content) {
+      handleCloseDialog();
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      // Update the journal entry content
+      const { error } = await supabase
+        .from('Journal Entries')
+        .update({ 
+          content: editedContent,
+          themes: null, // Clear themes so they can be regenerated
+          master_themes: null 
+        })
+        .eq('id', entryId);
+        
+      if (error) throw error;
+      
+      toast.success('Journal entry updated');
+      handleCloseDialog();
+      onEntryUpdated();
+    } catch (error) {
+      console.error('Error updating journal entry:', error);
+      toast.error('Failed to update entry');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <Button 
+        variant="outline" 
+        size="icon" 
+        className="h-8 w-8 text-primary border-primary"
+        onClick={handleOpenDialog}
+        aria-label="Edit entry"
+      >
+        <Edit className="h-4 w-4" />
+      </Button>
+      
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Journal Entry</DialogTitle>
+          </DialogHeader>
+          
+          <Textarea
+            value={editedContent}
+            onChange={(e) => setEditedContent(e.target.value)}
+            className="min-h-[200px] mt-2"
+            placeholder="Edit your journal entry..."
+          />
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={handleCloseDialog}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveChanges}
+              disabled={isSubmitting || !editedContent.trim() || editedContent === content}
+            >
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+export default EditEntryButton;
