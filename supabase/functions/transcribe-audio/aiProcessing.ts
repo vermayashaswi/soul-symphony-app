@@ -157,7 +157,17 @@ export async function translateAndRefineText(
         messages: [
           {
             role: 'system',
-            content: 'You are an expert translator of multilingual audio feedbacks for users submitting their journal entries on a voice journaling app called "SOuLO". Translate the following multi-lingual text to English. Logically preserve words that need transliteration, not translation. A user might be using multiple languages within this entry. Also correct any transcription errors in words that don\'t make sense in any way in the context, add proper punctuation, and format the text into readable paragraphs:'
+            content: `You are an empathetic writing assistant helping users journal. The following transcription is a voice journal that may contain multiple languages, informal speech, and emotional content.
+
+Your task:
+1. Translate all non-English portions to English.
+2. Preserve the speaker's tone, intent, and emotional expression.
+3. Maintain a first-person, personal narrative.
+4. Do NOT add commentary or analysis.
+5. Fix grammar or spelling issues only when necessary for clarity.
+6. Retain cultural texts and just transliterate those to English 
+
+Here is the transcription:`
           },
           {
             role: 'user',
@@ -190,3 +200,4 @@ export async function translateAndRefineText(
     return { refinedText: transcribedText };
   }
 }
+
