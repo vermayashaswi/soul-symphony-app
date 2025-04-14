@@ -103,6 +103,71 @@ export async function analyzeEmotions(text: string, emotions: any[], openAIApiKe
 }
 
 /**
+ * Detects the languages present in the transcribed text
+ */
+export async function detectLanguages(text: string): Promise<string[]> {
+  try {
+    console.log('Detecting languages in text:', text.slice(0, 100) + '...');
+    
+    // Use a lightweight GPT model to detect languages
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a language detection expert. Identify all languages used in the provided text. 
+            Return ONLY a JSON array of language codes (e.g., ["en", "es", "fr"]). 
+            If the text is entirely in one language, return only that language code. 
+            Use ISO 639-1 two-letter language codes.`
+          },
+          {
+            role: 'user',
+            content: text
+          }
+        ],
+        temperature: 0.3,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error detecting languages:', error);
+      return ['en']; // Default to English if detection fails
+    }
+
+    const result = await response.json();
+    try {
+      const content = result.choices[0].message.content;
+      const langData = JSON.parse(content);
+      
+      if (Array.isArray(langData.languages)) {
+        console.log('Detected languages:', langData.languages);
+        return langData.languages;
+      } else if (Array.isArray(langData)) {
+        console.log('Detected languages:', langData);
+        return langData;
+      }
+      
+      return ['en']; // Default to English if format is unexpected
+    } catch (err) {
+      console.error('Error parsing language detection response:', err);
+      console.error('Raw response:', result.choices[0].message.content);
+      return ['en']; // Default to English on error
+    }
+  } catch (error) {
+    console.error('Error in detectLanguages:', error);
+    return ['en']; // Default to English on error
+  }
+}
+
+/**
  * Transcribes audio and translates it if needed
  */
 export async function transcribeAudioWithWhisper(
@@ -146,6 +211,12 @@ export async function translateAndRefineText(
   try {
     console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
     
+    // First detect languages in the transcribed text
+    const detectedLanguages = await detectLanguages(transcribedText);
+    const languagesInfo = detectedLanguages.join(', ');
+    
+    console.log("Detected languages:", languagesInfo);
+    
     const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -166,6 +237,8 @@ Your task:
 4. Do NOT add commentary or analysis.
 5. Fix grammar or spelling issues only when necessary for clarity.
 6. Retain cultural texts and just transliterate those to English 
+
+Detected languages in the text: ${languagesInfo}
 
 Here is the transcription:`
           },
@@ -200,4 +273,3 @@ Here is the transcription:`
     return { refinedText: transcribedText };
   }
 }
-
