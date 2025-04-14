@@ -13,14 +13,30 @@ type UseJournalEntriesReturn = {
   profileExists: boolean | null;
 };
 
+// CRITICAL FIX: Add global cache for entries to prevent reloading on tab switch
+const globalEntriesCache: {
+  entries: JournalEntry[];
+  lastFetchTime: Date | null;
+  userId?: string;
+} = {
+  entries: [],
+  lastFetchTime: null
+};
+
 export function useJournalEntries(
   userId: string | undefined, 
   refreshKey: number, 
   isProfileChecked: boolean = false
 ): UseJournalEntriesReturn {
-  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [entries, setEntries] = useState<JournalEntry[]>(() => {
+    // CRITICAL FIX: Initialize from cache if the same user
+    if (globalEntriesCache.userId === userId && globalEntriesCache.entries.length > 0) {
+      return globalEntriesCache.entries;
+    }
+    return [];
+  });
   const [loading, setLoading] = useState(true);
-  const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<Date | null>(() => globalEntriesCache.lastFetchTime);
   const [fetchCount, setFetchCount] = useState(0);
   const [lastRefreshKey, setLastRefreshKey] = useState(refreshKey);
   const [error, setError] = useState<string | null>(null);
@@ -32,10 +48,17 @@ export function useJournalEntries(
   const consecutiveEmptyFetchesRef = useRef(0);
   const entriesRef = useRef<JournalEntry[]>([]);
   const lastSuccessfulFetchRef = useRef<JournalEntry[]>([]);
+  const cacheInitializedRef = useRef(false);
 
   useEffect(() => {
     entriesRef.current = entries;
-  }, [entries]);
+    
+    // CRITICAL FIX: Update global cache when entries change
+    if (entries.length > 0 && userId) {
+      globalEntriesCache.entries = entries;
+      globalEntriesCache.userId = userId;
+    }
+  }, [entries, userId]);
 
   const verifyUserProfile = useCallback(async (userId: string) => {
     try {
@@ -66,10 +89,20 @@ export function useJournalEntries(
       return;
     }
     
-    console.log('[useJournalEntries] Starting fetch, currently fetching:', isFetchingRef.current);
+    // CRITICAL FIX: Better logging of fetch operation status
+    console.log('[useJournalEntries] Starting fetch, currently fetching:', isFetchingRef.current, 'cached entries:', globalEntriesCache.entries.length);
+    
     if (isFetchingRef.current) {
       console.log('[useJournalEntries] Already fetching, skipping this request');
       return;
+    }
+    
+    // CRITICAL FIX: If we have cached data, show it immediately while fetching fresh data
+    if (globalEntriesCache.userId === userId && globalEntriesCache.entries.length > 0 && !cacheInitializedRef.current) {
+      console.log('[useJournalEntries] Using cached entries while fetching fresh data');
+      setEntries(globalEntriesCache.entries);
+      setLoading(false);
+      cacheInitializedRef.current = true;
     }
     
     if (profileExists === false) {
@@ -121,6 +154,11 @@ export function useJournalEntries(
       // Save successful fetch for recovery
       lastSuccessfulFetchRef.current = journalEntries;
       
+      // Update global cache with fresh entries
+      globalEntriesCache.entries = journalEntries;
+      globalEntriesCache.userId = userId;
+      globalEntriesCache.lastFetchTime = new Date();
+      
       // Don't replace entries with empty array if we already have entries
       // and this fetch returned empty (could be a temporary connectivity issue)
       if (journalEntries.length > 0 || entriesRef.current.length === 0) {
@@ -156,13 +194,18 @@ export function useJournalEntries(
     if (userId) {
       const isInitialLoad = !initialFetchDoneRef.current;
       const hasRefreshKeyChanged = refreshKey !== lastRefreshKey;
+      const shouldFetchFresh = isInitialLoad || hasRefreshKeyChanged;
       
-      if (isInitialLoad || hasRefreshKeyChanged) {
+      if (shouldFetchFresh) {
         console.log(`[useJournalEntries] Effect triggered: initial=${isInitialLoad}, refreshKey changed=${hasRefreshKeyChanged}`);
         fetchEntries();
         setLastRefreshKey(refreshKey);
       } else {
         console.log(`[useJournalEntries] Skipping unnecessary fetch`);
+        // Even if skipping fetch, still mark as not loading if we have cached data
+        if (globalEntriesCache.userId === userId && globalEntriesCache.entries.length > 0) {
+          setLoading(false);
+        }
       }
     } else {
       console.log(`[useJournalEntries] Waiting for prerequisites: userId=${!!userId}`);

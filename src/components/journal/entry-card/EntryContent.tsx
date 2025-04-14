@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -46,28 +47,30 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       clearTimeout(timeoutRef.current);
     }
     
-    // Keep showing loading state while content is being processed
+    // CRITICAL FIX: Ensure loading state persists longer for long recordings
     if (contentIsLoading) {
       setShowLoading(true);
       contentAvailableRef.current = false;
     } else if (!contentAvailableRef.current) {
       // Only when transitioning from loading to content-available
-      // Important: we want to keep showing loading until we're SURE content is ready
       contentAvailableRef.current = true;
       
       // Delay showing content for a smoother transition
+      // CRITICAL FIX: Use a longer timeout to ensure content is fully ready
       timeoutRef.current = setTimeout(() => {
         if (prevProcessingRef.current && !isProcessing) {
           // If transitioning from processing to done, delay a bit longer
           timeoutRef.current = setTimeout(() => {
+            console.log('[EntryContent] Transitioning from loading to content display after delay');
             setShowLoading(false);
             setStableContent(content);
-          }, 800);
+          }, 1200); // Increased from 800ms to 1200ms
         } else {
+          console.log('[EntryContent] Setting content directly after processing check');
           setShowLoading(false);
           setStableContent(content);
         }
-      }, 1000); // Increased delay to ensure main entry card is ready
+      }, 1500); // Increased from 1000ms to 1500ms
     }
     
     // Update refs

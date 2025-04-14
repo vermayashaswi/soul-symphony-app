@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ export default function JournalEntriesList({
   const processingEntriesTimerRef = useRef<NodeJS.Timeout | null>(null);
   const processingEntryRemovalTimerRef = useRef<NodeJS.Timeout | null>(null);
   const stateUpdateVersionRef = useRef(0);
+  const entriesCheckedForCompletionRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     console.log('[JournalEntriesList] Processing entries state:', {
@@ -145,47 +147,72 @@ export default function JournalEntriesList({
     
     lastProcessingChangeTimestamp.current = now;
     
-    const hasCompletedEntries = entries.some(entry => {
+    // CRITICAL FIX: More robust completion detection that won't dismiss loaders too early
+    let hasNewCompletedEntries = false;
+    entries.forEach(entry => {
+      if (!entry || !entry.id) return;
+      
       const entryIdStr = String(entry.id);
       const isBeingProcessed = allProcessingEntries.some(tempId => tempId.includes(entryIdStr));
       
-      const isComplete = entry.content && 
-                        entry.content !== "Processing entry..." && 
-                        entry.content.trim() !== "" &&
-                        ((Array.isArray(entry.themes) && entry.themes.length > 0) || 
-                         (Array.isArray(entry.master_themes) && entry.master_themes.length > 0));
+      if (!isBeingProcessed) return;
       
-      if (isBeingProcessed && isComplete) {
-        console.log(`Entry ${entry.id} is now complete. Removing from processing list.`);
-        return true;
+      // Check if we've already verified this entry as complete
+      if (entriesCheckedForCompletionRef.current[entryIdStr]) return;
+      
+      const isContentComplete = entry.content && 
+                            entry.content !== "Processing entry..." && 
+                            entry.content.trim() !== "";
+                       
+      const hasThemesOrSentiment = (Array.isArray(entry.themes) && entry.themes.length > 0) || 
+                              (Array.isArray(entry.master_themes) && entry.master_themes.length > 0) ||
+                              entry.sentiment;
+      
+      // Only consider an entry fully complete when it has both content AND metadata
+      if (isContentComplete && hasThemesOrSentiment) {
+        console.log(`[JournalEntriesList] Entry ${entry.id} is fully complete with content and metadata`);
+        entriesCheckedForCompletionRef.current[entryIdStr] = true;
+        hasNewCompletedEntries = true;
+      } else if (isContentComplete) {
+        console.log(`[JournalEntriesList] Entry ${entry.id} has content but metadata is still processing`);
       }
-      
-      return false;
     });
     
-    if (hasCompletedEntries) {
-      console.log("Completed entries detected, scheduling processing indicators removal");
+    if (hasNewCompletedEntries) {
+      console.log("[JournalEntriesList] New completed entries detected, scheduling processing indicators removal");
       
       if (processingEntryRemovalTimerRef.current) {
         clearTimeout(processingEntryRemovalTimerRef.current);
       }
       
+      // CRITICAL FIX: Increased timeout to ensure UI transitions smoothly
       processingEntryRemovalTimerRef.current = setTimeout(() => {
-        console.log("Executing delayed removal of processing indicators");
-        setShowTemporaryProcessingEntries(false);
+        console.log("[JournalEntriesList] Executing delayed removal of processing indicators");
         
-        const updatedProcessingEntries = allProcessingEntries.filter(tempId => {
-          return !entries.some(entry => tempId.includes(String(entry.id)));
+        // First mark entries as complete
+        const entriesToMarkComplete = entries.filter(entry => {
+          const entryIdStr = String(entry.id);
+          return allProcessingEntries.some(tempId => tempId.includes(entryIdStr)) &&
+                 entriesCheckedForCompletionRef.current[entryIdStr];
         });
         
-        if (updatedProcessingEntries.length !== allProcessingEntries.length) {
-          localStorage.setItem('processingEntries', JSON.stringify(updatedProcessingEntries));
+        if (entriesToMarkComplete.length > 0) {
+          // Only hide the processing indicators after we have entries to show
+          setShowTemporaryProcessingEntries(false);
           
-          window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-            detail: { entries: updatedProcessingEntries, lastUpdate: Date.now() }
-          }));
+          const updatedProcessingEntries = allProcessingEntries.filter(tempId => {
+            return !entriesToMarkComplete.some(entry => tempId.includes(String(entry.id)));
+          });
+          
+          if (updatedProcessingEntries.length !== allProcessingEntries.length) {
+            localStorage.setItem('processingEntries', JSON.stringify(updatedProcessingEntries));
+            
+            window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+              detail: { entries: updatedProcessingEntries, lastUpdate: Date.now() }
+            }));
+          }
         }
-      }, 2500);
+      }, 5000); // Increased from 2500ms to 5000ms for better UX
     }
   }, [processingEntries, persistedProcessingEntries, entries]);
 
