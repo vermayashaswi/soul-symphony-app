@@ -8,10 +8,20 @@
 let isEntryBeingProcessed = false;
 let processingLock = false;
 let processingTimeoutId: NodeJS.Timeout | null = null;
+let lastStateChangeTime = 0;
+const DEBOUNCE_THRESHOLD = 500; // ms to prevent rapid state changes
 
 // Store processing entries in localStorage to persist across navigations
 export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove') => {
   try {
+    // Prevent rapid toggling by implementing a simple debounce
+    const now = Date.now();
+    if (now - lastStateChangeTime < DEBOUNCE_THRESHOLD) {
+      console.log('[Audio.ProcessingState] Debouncing rapid state change');
+      return getProcessingEntries(); // Return current state without changes
+    }
+    lastStateChangeTime = now;
+    
     const storedEntries = localStorage.getItem('processingEntries');
     let entries: string[] = storedEntries ? JSON.parse(storedEntries) : [];
     
@@ -49,6 +59,14 @@ export const getProcessingEntries = (): string[] => {
 // Remove processing entry by ID (useful when an entry is completed)
 export const removeProcessingEntryById = (entryId: number | string): void => {
   try {
+    // Prevent rapid toggling with debounce
+    const now = Date.now();
+    if (now - lastStateChangeTime < DEBOUNCE_THRESHOLD) {
+      console.log('[Audio.ProcessingState] Debouncing rapid removal request');
+      return;
+    }
+    lastStateChangeTime = now;
+    
     const idStr = String(entryId);
     const storedEntries = localStorage.getItem('processingEntries');
     let entries: string[] = storedEntries ? JSON.parse(storedEntries) : [];

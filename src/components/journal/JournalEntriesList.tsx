@@ -41,6 +41,9 @@ export default function JournalEntriesList({
   const [processingEntriesLoaded, setProcessingEntriesLoaded] = useState(false);
   const [showTemporaryProcessingEntries, setShowTemporaryProcessingEntries] = useState(true);
   const [visibleProcessingEntries, setVisibleProcessingEntries] = useState<string[]>([]);
+  const [stableVisibleProcessingEntries, setStableVisibleProcessingEntries] = useState<string[]>([]);
+  const lastProcessingChangeTimestamp = useRef(0);
+  const processingEntriesTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
@@ -79,17 +82,33 @@ export default function JournalEntriesList({
     return () => {
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (processingEntriesTimerRef.current) {
+        clearTimeout(processingEntriesTimerRef.current);
+      }
     };
   }, []);
 
   useEffect(() => {
     const allProcessingEntries = [...new Set([...processingEntries, ...persistedProcessingEntries])];
-    setVisibleProcessingEntries(allProcessingEntries);
     
-    if (allProcessingEntries.length > 0) {
-      setShowTemporaryProcessingEntries(true);
-      setProcessingEntriesLoaded(true);
+    const now = Date.now();
+    if (now - lastProcessingChangeTimestamp.current < 500) {
+      if (processingEntriesTimerRef.current) {
+        clearTimeout(processingEntriesTimerRef.current);
+      }
     }
+    
+    lastProcessingChangeTimestamp.current = now;
+    
+    processingEntriesTimerRef.current = setTimeout(() => {
+      setStableVisibleProcessingEntries(allProcessingEntries);
+      setVisibleProcessingEntries(allProcessingEntries);
+      
+      if (allProcessingEntries.length > 0) {
+        setShowTemporaryProcessingEntries(true);
+        setProcessingEntriesLoaded(true);
+      }
+    }, 300);
     
     const hasCompletedEntries = entries.some(entry => {
       const entryIdStr = String(entry.id);
@@ -298,13 +317,13 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4 mt-6">
-            {(showTemporaryProcessingEntries && visibleProcessingEntries.length > 0) && (
+            {(showTemporaryProcessingEntries && stableVisibleProcessingEntries.length > 0) && (
               <div className="mb-4">
                 <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Processing your new entry...</span>
                 </div>
-                <JournalEntryLoadingSkeleton count={visibleProcessingEntries.length || 1} />
+                <JournalEntryLoadingSkeleton count={stableVisibleProcessingEntries.length || 1} />
               </div>
             )}
             
