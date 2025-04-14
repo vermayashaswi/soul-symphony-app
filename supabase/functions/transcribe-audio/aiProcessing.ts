@@ -1,3 +1,4 @@
+
 /**
  * AI processing utilities for transcription, translation, and analysis
  */
@@ -106,6 +107,7 @@ export async function analyzeEmotions(text: string, emotions: any[], openAIApiKe
 
 /**
  * Detects the languages present in the transcribed text using franc
+ * Note: This is kept as a fallback in case Whisper doesn't detect languages properly
  */
 export async function detectLanguages(text: string): Promise<string[]> {
   try {
@@ -164,17 +166,17 @@ export async function detectLanguages(text: string): Promise<string[]> {
 }
 
 /**
- * Transcribes audio and translates it if needed
+ * Transcribes audio and returns detected language info from Whisper
  */
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob, 
   fileType: string, 
   openAIApiKey: string
-): Promise<string> {
+): Promise<{ text: string, language?: string }> {
   const formData = new FormData();
   formData.append('file', audioBlob, `audio.${fileType}`);
   formData.append('model', 'whisper-1');
-  formData.append('response_format', 'json');
+  formData.append('response_format', 'verbose_json'); // Request verbose response to get language info
   
   // No language parameter - let Whisper auto-detect
   console.log("Sending to Whisper API with auto language detection");
@@ -194,7 +196,14 @@ export async function transcribeAudioWithWhisper(
   }
 
   const whisperResult = await whisperResponse.json();
-  return whisperResult.text;
+  
+  // Log detected language from Whisper
+  console.log("Whisper detected language:", whisperResult.language || "Not specified");
+  
+  return { 
+    text: whisperResult.text,
+    language: whisperResult.language
+  };
 }
 
 /**
@@ -202,16 +211,22 @@ export async function transcribeAudioWithWhisper(
  */
 export async function translateAndRefineText(
   transcribedText: string,
-  openAIApiKey: string
+  openAIApiKey: string,
+  detectedLanguage?: string
 ): Promise<{ refinedText: string }> {
   try {
     console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
     
-    // First detect languages in the transcribed text
-    const detectedLanguages = await detectLanguages(transcribedText);
-    const languagesInfo = detectedLanguages.join(', ');
+    // If we don't have detected language from Whisper, use our fallback detection
+    let languagesInfo = detectedLanguage || "unknown";
     
-    console.log("Detected languages:", languagesInfo);
+    if (!detectedLanguage) {
+      // Use franc as fallback if language not detected by Whisper
+      const detectedLanguages = await detectLanguages(transcribedText);
+      languagesInfo = detectedLanguages.join(', ');
+    }
+    
+    console.log("Language information for GPT:", languagesInfo);
     
     const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -234,7 +249,7 @@ Your task:
 5. Fix grammar or spelling issues only when necessary for clarity.
 6. Retain cultural texts and just transliterate those to English 
 
-Detected languages in the text: ${languagesInfo}
+Detected language in the text: ${languagesInfo}
 
 Here is the transcription:`
           },
