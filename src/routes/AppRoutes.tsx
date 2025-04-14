@@ -10,6 +10,7 @@ import Settings from '@/pages/Settings';
 import ProtectedRoute from './ProtectedRoute';
 import MobileNavigation from './MobileNavigation';
 import { useAuth } from '@/contexts/AuthContext';
+import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -20,6 +21,9 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/app/auth" element={<Auth />} />
         <Route path="/auth" element={<Auth />} />
+        
+        {/* Onboarding route - accessible without auth */}
+        <Route path="/app/onboarding" element={<OnboardingScreen />} />
         
         <Route 
           path="/app/home" 
@@ -66,8 +70,15 @@ const AppRoutes = () => {
           } 
         />
         
-        <Route path="/app" element={<Navigate to="/app/home" replace />} />
-        <Route path="/" element={<Navigate to="/app/home" replace />} />
+        {/* Root app routes - conditionally redirect based on auth status */}
+        <Route 
+          path="/app" 
+          element={user ? <Navigate to="/app/home" replace /> : <Navigate to="/app/onboarding" replace />} 
+        />
+        <Route 
+          path="/" 
+          element={user ? <Navigate to="/app/home" replace /> : <Navigate to="/app/onboarding" replace />} 
+        />
       </Routes>
       {user && <MobileNavigation onboardingComplete={onboardingComplete} />}
     </>
