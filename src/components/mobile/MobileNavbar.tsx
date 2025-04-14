@@ -20,8 +20,8 @@ const MobileNavbar = () => {
     { path: '/app/settings', label: 'Settings', icon: Settings },
   ];
 
-  // Only show the navbar if the user is logged in
-  if (!user) {
+  // Only show the navbar if the user is logged in and not on auth page
+  if (!user || location.pathname === '/app/auth') {
     return null;
   }
   
