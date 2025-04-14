@@ -1,57 +1,31 @@
 
-// This file has been emptied as part of the Debug Mode removal.
-// It remains in place to prevent import errors, but its functionality has been removed.
-
-export type LogLevel = 'info' | 'warn' | 'error' | 'debug' | 'profile' | 'auth';
-
-export interface LogEntry {
-  id: number;
-  level: LogLevel;
-  message: string;
-  source: string;
-  timestamp: string;
-  details?: any;
-  stack?: string;
-}
-
-class DebugLogger {
-  private static instance: DebugLogger;
+// Simple debug logger utility for audio processing
+export const debugLogger = {
+  log: (level: 'info' | 'error' | 'warn', ...args: any[]) => {
+    const timestamp = new Date().toISOString();
+    console.log(`${timestamp} ${level}:`, ...args);
+  },
   
-  private constructor() {}
+  logInfo: (...args: any[]) => {
+    debugLogger.log('info', ...args);
+  },
   
-  public static getInstance(): DebugLogger {
-    if (!DebugLogger.instance) {
-      DebugLogger.instance = new DebugLogger();
-    }
-    return DebugLogger.instance;
+  logError: (...args: any[]) => {
+    debugLogger.log('error', ...args);
+  },
+  
+  logWarning: (...args: any[]) => {
+    debugLogger.log('warn', ...args);
   }
-  
-  public log(): void {}
-  public getLogs(): LogEntry[] { return []; }
-  public clearLogs(): void {}
-  public setEnabled(): void {}
-  public isEnabled(): boolean { return false; }
-  public subscribe(): () => void { return () => {}; }
-  public getFilteredLogs(): LogEntry[] { return []; }
-  public getErrorCount(): number { return 0; }
-  public getWarnCount(): number { return 0; }
-  public setLastProfileError(): void {}
-  public getLastProfileError(): string | null { return null; }
-}
+};
 
-export const debugLogger = DebugLogger.getInstance();
+// Re-export for backward compatibility
+export const logInfo = debugLogger.logInfo;
+export const logError = debugLogger.logError;
+export const logWarning = debugLogger.logWarning;
 
-export const logInfo = () => {};
-export const logWarn = () => {};
-export const logError = () => {};
-export const logDebug = () => {};
-export const logProfile = () => {};
-export const logAuth = () => {};
-export const logAuthError = () => {};
-export const logRender = () => {};
-export const logAPI = () => {};
-export const logAction = () => {};
+const DebugPanel = () => {
+  return null; // No UI for now
+};
 
-export default function DebugPanel() {
-  return null;
-}
+export default DebugPanel;

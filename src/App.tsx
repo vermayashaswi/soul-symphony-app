@@ -13,6 +13,7 @@ import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
 import { useEffect } from 'react';
 import { handleAuthCallback } from "./services/authService";
+import { debugLogger } from "@/components/debug/DebugPanel";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,6 +32,17 @@ const queryClient = new QueryClient({
 const App = () => {
   useEffect(() => {
     console.log('App mounted, path:', window.location.pathname);
+    debugLogger.log('info', '🔍 Audio debugging initialized');
+    debugLogger.log('info', `[${new Date().toISOString()}] App initialized`);
+    
+    // Log detection info
+    debugLogger.log('info', `[${new Date().toISOString()}] Mobile detection:`, {
+      userAgent: navigator.userAgent,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      }
+    });
     
     // Add a global error listener to catch runtime errors
     const handleGlobalError = (event: ErrorEvent) => {
