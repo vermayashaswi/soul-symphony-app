@@ -1,7 +1,9 @@
-
 /**
  * AI processing utilities for transcription, translation, and analysis
  */
+
+import { franc } from "https://deno.land/x/franc@v6.1.0/index.js";
+import langTag from "https://deno.land/x/language_tags@1.0.0/mod.ts";
 
 /**
  * Generates an embedding for text using OpenAI
@@ -103,64 +105,58 @@ export async function analyzeEmotions(text: string, emotions: any[], openAIApiKe
 }
 
 /**
- * Detects the languages present in the transcribed text
+ * Detects the languages present in the transcribed text using franc
  */
 export async function detectLanguages(text: string): Promise<string[]> {
   try {
     console.log('Detecting languages in text:', text.slice(0, 100) + '...');
     
-    // Use a lightweight GPT model to detect languages
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a language detection expert. Identify all languages used in the provided text. 
-            Return ONLY a JSON array of language codes (e.g., ["en", "es", "fr"]). 
-            If the text is entirely in one language, return only that language code. 
-            Use ISO 639-1 two-letter language codes.`
-          },
-          {
-            role: 'user',
-            content: text
-          }
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" }
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Error detecting languages:', error);
-      return ['en']; // Default to English if detection fails
+    // Split text into chunks to analyze, as franc works better with smaller segments
+    const chunks = text.split(/[.!?]+/).filter(chunk => chunk.trim().length > 10);
+    
+    const detectedLanguages = new Set<string>();
+    
+    // If text is too short, default to English
+    if (text.length < 10) {
+      console.log('Text too short for reliable language detection, defaulting to English');
+      return ['en'];
     }
-
-    const result = await response.json();
-    try {
-      const content = result.choices[0].message.content;
-      const langData = JSON.parse(content);
-      
-      if (Array.isArray(langData.languages)) {
-        console.log('Detected languages:', langData.languages);
-        return langData.languages;
-      } else if (Array.isArray(langData)) {
-        console.log('Detected languages:', langData);
-        return langData;
+    
+    // Process whole text first
+    const mainLang = franc(text, { minLength: 10 });
+    if (mainLang && mainLang !== 'und') {
+      try {
+        const langCode = langTag.language(mainLang).format();
+        if (langCode) detectedLanguages.add(langCode);
+      } catch (e) {
+        console.log(`Could not resolve language tag for ${mainLang}`);
       }
-      
-      return ['en']; // Default to English if format is unexpected
-    } catch (err) {
-      console.error('Error parsing language detection response:', err);
-      console.error('Raw response:', result.choices[0].message.content);
-      return ['en']; // Default to English on error
     }
+    
+    // Process each meaningful chunk to detect multiple languages
+    for (const chunk of chunks) {
+      if (chunk.trim().length < 20) continue; // Skip very short chunks
+      
+      const lang = franc(chunk, { minLength: 10 });
+      if (lang && lang !== 'und') {
+        try {
+          const langCode = langTag.language(lang).format();
+          if (langCode) detectedLanguages.add(langCode);
+        } catch (e) {
+          console.log(`Could not resolve language tag for ${lang}`);
+        }
+      }
+    }
+    
+    // Default to English if no languages detected
+    if (detectedLanguages.size === 0) {
+      console.log('No languages reliably detected, defaulting to English');
+      return ['en'];
+    }
+    
+    const result = Array.from(detectedLanguages);
+    console.log('Detected languages:', result);
+    return result;
   } catch (error) {
     console.error('Error in detectLanguages:', error);
     return ['en']; // Default to English on error
