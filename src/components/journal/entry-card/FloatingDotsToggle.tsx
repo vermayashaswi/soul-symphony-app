@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ChevronUp, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 interface FloatingDotsToggleProps {
   onClick: () => void;
@@ -20,12 +21,9 @@ export function FloatingDotsToggle({ onClick, isExpanded }: FloatingDotsTogglePr
       onClick={handleClick}
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.95 }}
+      aria-label={isExpanded ? "Collapse entry" : "Expand entry"}
     >
-      {isExpanded ? (
-        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-      ) : (
-        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-      )}
+      <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
       
       {[0, 1, 2].map((i) => {
         const colors = [

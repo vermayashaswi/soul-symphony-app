@@ -251,6 +251,7 @@ export function JournalEntryCard({
         className="journal-entry-card" 
         data-entry-id={safeEntry.id}
         data-processing={isProcessing ? "true" : "false"}
+        data-expanded={isExpanded ? "true" : "false"}
       >
         <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
           <div className="flex justify-between items-start p-3 md:p-4">
