@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
 import { motion } from 'framer-motion';
@@ -56,7 +56,7 @@ export function JournalEntryCard({
   };
 
   const [isExpanded, setIsExpanded] = useState(isNew);
-  const [showThemes, setShowThemes] = useState(isNew);
+  const [showThemes, setShowThemes] = useState(false);
   const [highlightNew, setHighlightNew] = useState(isNew);
   const [deletionCompleted, setDeletionCompleted] = useState(false);
   const [deletionInProgress, setDeletionInProgress] = useState(false);
