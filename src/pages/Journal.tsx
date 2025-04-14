@@ -696,29 +696,29 @@ const Journal = () => {
               
               <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
                 {!safeToSwitchTab && isSavingRecording ? (
-                  <div className="mt-8 flex flex-col items-center justify-center p-12 border border-dashed border-gray-300 rounded-lg">
+                  <div className="mt-8 flex flex-col items-center justify-center p-12 border border-dashed border-gray-300 rounded-lg mb-6">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
                     <p className="text-muted-foreground font-medium">Processing your recording...</p>
                     <p className="text-muted-foreground text-sm mt-2">Your journal entry will appear here in a moment</p>
                   </div>
                 ) : showLoadingFeedback ? (
-                  <div className="mt-8 flex flex-col items-center justify-center p-12 border border-dashed border-gray-300 rounded-lg">
+                  <div className="mt-8 flex flex-col items-center justify-center p-12 border border-dashed border-gray-300 rounded-lg mb-6">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
                     <p className="text-muted-foreground font-medium">Processing your entry with AI...</p>
                     <p className="text-muted-foreground text-sm mt-2">Analyzing your journal entry for themes and sentiment</p>
                   </div>
-                ) : (
-                  <ErrorBoundary>
-                    <JournalEntriesList
-                      entries={entries}
-                      loading={loading}
-                      processingEntries={processingEntries}
-                      processedEntryIds={processedEntryIds}
-                      onStartRecording={handleStartRecording}
-                      onDeleteEntry={handleDeleteEntry}
-                    />
-                  </ErrorBoundary>
-                )}
+                ) : null}
+                
+                <ErrorBoundary>
+                  <JournalEntriesList
+                    entries={entries}
+                    loading={loading}
+                    processingEntries={processingEntries}
+                    processedEntryIds={processedEntryIds}
+                    onStartRecording={handleStartRecording}
+                    onDeleteEntry={handleDeleteEntry}
+                  />
+                </ErrorBoundary>
               </TabsContent>
             </Tabs>
           </>

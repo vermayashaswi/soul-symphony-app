@@ -1,35 +1,17 @@
 
-// Simple debug logger utility for audio processing
+import { useState } from 'react';
+
+// Create a simple logger object that can be imported throughout the app
 export const debugLogger = {
-  log: (level: 'info' | 'error' | 'warn', ...args: any[]) => {
-    const timestamp = new Date().toISOString();
-    console.log(`${timestamp} ${level}:`, ...args);
+  log: (level: string, message: string, details?: any) => {
+    console.log(`[${level.toUpperCase()}] ${message}`, details || '');
   },
-  
-  logInfo: (...args: any[]) => {
-    debugLogger.log('info', ...args);
-  },
-  
-  logError: (...args: any[]) => {
-    debugLogger.log('error', ...args);
-  },
-  
-  logWarning: (...args: any[]) => {
-    debugLogger.log('warn', ...args);
-  },
-
-  // Adding a placeholder method to maintain backwards compatibility
-  setLastProfileError: (_: any) => {}
+  setLastProfileError: (_: any) => {
+    // Placeholder function for backward compatibility
+    console.log('Profile error:', _);
+  }
 };
 
-// Re-export for backward compatibility
-export const logInfo = debugLogger.logInfo;
-export const logError = debugLogger.logError;
-export const logWarning = debugLogger.logWarning;
-
-const DebugPanel = () => {
-  return null; // No UI for now
-};
-
+// Export the panel component for backward compatibility
+const DebugPanel = () => null;
 export default DebugPanel;
-

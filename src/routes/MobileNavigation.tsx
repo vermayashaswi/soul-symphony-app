@@ -45,9 +45,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }, []);
   
   useEffect(() => {
-    // Only show mobile navigation for app routes in mobile or native app and when authenticated
+    // Always show mobile navigation for app routes in mobile or native app
     const shouldShowNav = (isMobile || isNativeApp()) && 
-                          isAppRoute(location.pathname) &&
                           onboardingComplete !== false &&
                           !isKeyboardVisible; // Hide when keyboard is visible
     
@@ -55,7 +54,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       shouldShowNav, 
       isMobile, 
       isNativeApp: isNativeApp(),
-      isAppRoute: isAppRoute(location.pathname),
       path: location.pathname,
       onboardingComplete 
     });
@@ -83,8 +81,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
 
   // Improved active route detection for handling back navigation
   const getActiveStatus = (path: string) => {
-    // Strict exact path matching
-    return location.pathname === path;
+    // Match any path that starts with the given path
+    return location.pathname.startsWith(path);
   };
   
   return (
@@ -96,7 +94,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     >
       <div className="flex justify-around items-center">
         {navItems.map((item) => {
-          // Use the new active status function
           const isActive = getActiveStatus(item.path);
           
           return (

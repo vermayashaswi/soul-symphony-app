@@ -13,15 +13,15 @@ const MobileNavbar = () => {
   const [isChatInputActive, setIsChatInputActive] = useState(false);
   
   const navItems = [
-    { path: '/home', label: 'Home', icon: Home },
-    { path: '/journal', label: 'Journal', icon: Book },
-    { path: '/insights', label: 'Insights', icon: BarChart2 },
-    { path: '/smart-chat', label: 'Chat', icon: MessageSquare },
-    { path: '/settings', label: 'Settings', icon: Settings },
+    { path: '/app/home', label: 'Home', icon: Home },
+    { path: '/app/journal', label: 'Journal', icon: Book },
+    { path: '/app/insights', label: 'Insights', icon: BarChart2 },
+    { path: '/app/smart-chat', label: 'Chat', icon: MessageSquare },
+    { path: '/app/settings', label: 'Settings', icon: Settings },
   ];
 
-  // Only show the navbar if the user is logged in or on the home page
-  if (!user && location.pathname !== '/') {
+  // Only show the navbar if the user is logged in
+  if (!user) {
     return null;
   }
   
@@ -74,15 +74,15 @@ const MobileNavbar = () => {
   }, []);
 
   // Return null when keyboard is visible or chat input is active in chat page
-  const isChatPage = location.pathname === '/smart-chat';
+  const isChatPage = location.pathname === '/app/smart-chat';
   if (isKeyboardVisible || (isChatPage && isChatInputActive)) {
     return null;
   }
 
   // Improved active route detection to ensure only one tab is active
   const getActiveStatus = (path: string) => {
-    // Exact path matching to ensure only one active tab
-    return location.pathname === path;
+    // Match the path at the beginning of the current path
+    return location.pathname.startsWith(path);
   };
 
   return (
