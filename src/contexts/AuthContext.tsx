@@ -252,13 +252,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       await signOutService((path: string) => {
         console.log(`[AuthContext] Redirecting to ${path} after signout`);
-        window.location.href = '/onboarding';
+        window.location.href = '/app';
       });
     } catch (error: any) {
       console.error('[AuthContext] Error during sign out:', error);
       toast.error(`Error signing out: ${error.message}`);
       
-      window.location.href = '/onboarding';
+      window.location.href = '/app';
     }
   };
 

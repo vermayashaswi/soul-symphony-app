@@ -220,7 +220,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       // Clear any auth-related items from local storage
       localStorage.removeItem('authRedirectTo');
       
-      // Redirect to onboarding page if navigate function is provided
+      // Redirect to app page if navigate function is provided
       if (navigate) {
         navigate('/app');
       }
@@ -236,14 +236,14 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
     
-    // Always redirect to onboarding page if navigate function is provided
+    // Always redirect to app page if navigate function is provided
     if (navigate) {
       navigate('/app');
     }
   } catch (error: any) {
     console.error('Error signing out:', error.message);
     
-    // Still navigate to onboarding page even if there's an error
+    // Still navigate to app page even if there's an error
     if (navigate) {
       navigate('/app');
     }
