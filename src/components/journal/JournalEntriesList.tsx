@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -147,8 +146,9 @@ export default function JournalEntriesList({
     
     lastProcessingChangeTimestamp.current = now;
     
-    // CRITICAL FIX: More robust completion detection that won't dismiss loaders too early
     let hasNewCompletedEntries = false;
+    let hasEntriesWithContentButNoMetadata = false;
+    
     entries.forEach(entry => {
       if (!entry || !entry.id) return;
       
@@ -157,7 +157,6 @@ export default function JournalEntriesList({
       
       if (!isBeingProcessed) return;
       
-      // Check if we've already verified this entry as complete
       if (entriesCheckedForCompletionRef.current[entryIdStr]) return;
       
       const isContentComplete = entry.content && 
@@ -168,13 +167,15 @@ export default function JournalEntriesList({
                               (Array.isArray(entry.master_themes) && entry.master_themes.length > 0) ||
                               entry.sentiment;
       
-      // Only consider an entry fully complete when it has both content AND metadata
+      if (isContentComplete && !hasThemesOrSentiment) {
+        hasEntriesWithContentButNoMetadata = true;
+        console.log(`[JournalEntriesList] Entry ${entry.id} has content but metadata is still processing`);
+      }
+      
       if (isContentComplete && hasThemesOrSentiment) {
         console.log(`[JournalEntriesList] Entry ${entry.id} is fully complete with content and metadata`);
         entriesCheckedForCompletionRef.current[entryIdStr] = true;
         hasNewCompletedEntries = true;
-      } else if (isContentComplete) {
-        console.log(`[JournalEntriesList] Entry ${entry.id} has content but metadata is still processing`);
       }
     });
     
@@ -185,11 +186,9 @@ export default function JournalEntriesList({
         clearTimeout(processingEntryRemovalTimerRef.current);
       }
       
-      // CRITICAL FIX: Increased timeout to ensure UI transitions smoothly
       processingEntryRemovalTimerRef.current = setTimeout(() => {
         console.log("[JournalEntriesList] Executing delayed removal of processing indicators");
         
-        // First mark entries as complete
         const entriesToMarkComplete = entries.filter(entry => {
           const entryIdStr = String(entry.id);
           return allProcessingEntries.some(tempId => tempId.includes(entryIdStr)) &&
@@ -197,7 +196,6 @@ export default function JournalEntriesList({
         });
         
         if (entriesToMarkComplete.length > 0) {
-          // Only hide the processing indicators after we have entries to show
           setShowTemporaryProcessingEntries(false);
           
           const updatedProcessingEntries = allProcessingEntries.filter(tempId => {
@@ -212,7 +210,11 @@ export default function JournalEntriesList({
             }));
           }
         }
-      }, 5000); // Increased from 2500ms to 5000ms for better UX
+      }, 8000);
+    }
+    else if (hasEntriesWithContentButNoMetadata) {
+      console.log("[JournalEntriesList] Entries have content but waiting for metadata");
+      setShowTemporaryProcessingEntries(true);
     }
   }, [processingEntries, persistedProcessingEntries, entries]);
 

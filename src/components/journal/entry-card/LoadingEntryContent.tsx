@@ -4,7 +4,6 @@ import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 
 export function LoadingEntryContent() {
-  // Added motion effects for smoother appearance and increased visibility
   return (
     <motion.div 
       className="space-y-2"
@@ -23,7 +22,7 @@ export function LoadingEntryContent() {
       <ShimmerSkeleton className="h-4 w-5/6" />
       <ShimmerSkeleton className="h-4 w-1/2" />
       
-      <div className="flex items-center mt-2 justify-center">
+      <div className="flex items-center mt-4 justify-center">
         <div className="text-xs text-muted-foreground animate-pulse">
           Processing with AI...
         </div>

@@ -47,7 +47,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       clearTimeout(timeoutRef.current);
     }
     
-    // CRITICAL FIX: Ensure loading state persists longer for long recordings
+    // IMPROVED FIX: Better content loading state handling
     if (contentIsLoading) {
       setShowLoading(true);
       contentAvailableRef.current = false;
@@ -55,8 +55,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       // Only when transitioning from loading to content-available
       contentAvailableRef.current = true;
       
-      // Delay showing content for a smoother transition
-      // CRITICAL FIX: Use a longer timeout to ensure content is fully ready
+      // IMPORTANT: Ensure loading state persists longer for a better transition experience
       timeoutRef.current = setTimeout(() => {
         if (prevProcessingRef.current && !isProcessing) {
           // If transitioning from processing to done, delay a bit longer
@@ -64,13 +63,13 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
             console.log('[EntryContent] Transitioning from loading to content display after delay');
             setShowLoading(false);
             setStableContent(content);
-          }, 1200); // Increased from 800ms to 1200ms
+          }, 1800); // Increased from 1200ms to 1800ms for a smoother experience
         } else {
           console.log('[EntryContent] Setting content directly after processing check');
           setShowLoading(false);
           setStableContent(content);
         }
-      }, 1500); // Increased from 1000ms to 1500ms
+      }, 2000); // Increased from 1500ms to 2000ms to ensure loading state visibility
     }
     
     // Update refs
