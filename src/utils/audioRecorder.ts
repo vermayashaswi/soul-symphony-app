@@ -8,18 +8,24 @@ export const recordAudio = async () => {
     throw new Error('Audio recording not supported in this browser');
   }
   
-  // Request microphone access with more permissive settings
-  // Not using advanced constraints which might fail on some devices
+  // Request microphone access with optimized settings
   const stream = await navigator.mediaDevices.getUserMedia({ 
-    audio: true
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      sampleRate: 48000,
+      sampleSize: 24,
+      channelCount: 2
+    }
   });
   
   // Try multiple MIME types in order of preference
   const mimeTypes = [
+    'audio/webm;codecs=opus',
     'audio/webm',
     'audio/mp4',
-    'audio/ogg;codecs=opus', 
-    'audio/webm;codecs=opus'
+    'audio/ogg;codecs=opus'
   ];
   
   // Find the first supported MIME type
@@ -30,6 +36,8 @@ export const recordAudio = async () => {
       break;
     }
   }
+  
+  console.log(`[audioRecorder] Using MIME type: ${mimeType || 'default browser MIME type'}`);
   
   // Set up MediaRecorder with best supported options
   const options: MediaRecorderOptions = {
@@ -45,15 +53,15 @@ export const recordAudio = async () => {
   let mediaRecorder: MediaRecorder;
   try {
     mediaRecorder = new MediaRecorder(stream, options);
-    console.log(`Recording with MIME type: ${mediaRecorder.mimeType}`);
+    console.log(`[audioRecorder] Recording with MIME type: ${mediaRecorder.mimeType}`);
   } catch (e) {
-    console.warn('Failed to create MediaRecorder with specified options, using defaults', e);
+    console.warn('[audioRecorder] Failed to create MediaRecorder with specified options, using defaults', e);
     try {
       // Fallback to default options
       mediaRecorder = new MediaRecorder(stream);
-      console.log(`Fallback: Recording with MIME type: ${mediaRecorder.mimeType}`);
+      console.log(`[audioRecorder] Fallback: Recording with MIME type: ${mediaRecorder.mimeType}`);
     } catch (fallbackError) {
-      console.error('Complete failure to create MediaRecorder', fallbackError);
+      console.error('[audioRecorder] Complete failure to create MediaRecorder', fallbackError);
       // Stop all tracks to release the microphone before throwing
       stream.getTracks().forEach(track => track.stop());
       throw new Error('Could not create audio recorder with your browser');
@@ -66,26 +74,28 @@ export const recordAudio = async () => {
   mediaRecorder.addEventListener('dataavailable', (event) => {
     if (event.data && event.data.size > 0) {
       audioChunks.push(event.data);
-      console.log(`Audio chunk received: ${event.data.size} bytes`);
+      console.log(`[audioRecorder] Audio chunk received: ${event.data.size} bytes`);
+    } else {
+      console.warn('[audioRecorder] Received empty audio chunk, ignoring');
     }
   });
   
   // Start recording and immediately request first data chunk
   mediaRecorder.start(100); // Use 100ms timeslice to get frequent chunks
-  console.log('MediaRecorder started');
+  console.log('[audioRecorder] MediaRecorder started');
   
   // Define the stop method that will return a Promise with the audio URL
   const stop = () => {
     return new Promise<{ audioUrl: string, blob: Blob }>((resolve) => {
       mediaRecorder.addEventListener('stop', () => {
-        console.log(`Recording stopped, collected ${audioChunks.length} chunks`);
+        console.log(`[audioRecorder] Recording stopped, collected ${audioChunks.length} chunks`);
         
         // Handle empty recording with a minimal audio placeholder
         if (audioChunks.length === 0) {
-          console.warn('No audio data captured during recording');
+          console.warn('[audioRecorder] No audio data captured during recording');
           // Create a minimal audio blob (1kb of silence) for consistent behavior
           const silence = new Uint8Array(1024).fill(0);
-          const silenceBlob = new Blob([silence], { type: mediaRecorder.mimeType || 'audio/webm' });
+          const silenceBlob = new Blob([silence], { type: mediaRecorder.mimeType || 'audio/webm;codecs=opus' });
           const silenceUrl = URL.createObjectURL(silenceBlob);
           
           // Release microphone
@@ -96,10 +106,10 @@ export const recordAudio = async () => {
         }
         
         // Create audio blob and get its URL
-        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm;codecs=opus' });
         const audioUrl = URL.createObjectURL(audioBlob);
         
-        console.log(`Audio blob created: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
+        console.log(`[audioRecorder] Audio blob created: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
         
         // Release microphone
         stream.getTracks().forEach(track => track.stop());
@@ -115,11 +125,11 @@ export const recordAudio = async () => {
         setTimeout(() => {
           if (mediaRecorder.state === 'recording') {
             mediaRecorder.stop();
-            console.log('MediaRecorder explicitly stopped');
+            console.log('[audioRecorder] MediaRecorder explicitly stopped');
           }
         }, 200);
       } else {
-        console.warn(`Cannot stop recorder, current state: ${mediaRecorder.state}`);
+        console.warn(`[audioRecorder] Cannot stop recorder, current state: ${mediaRecorder.state}`);
         // If we're not recording, stop anyway
         mediaRecorder.stop();
       }
@@ -147,12 +157,24 @@ export const recordAudio = async () => {
     start: () => {
       if (mediaRecorder.state !== 'recording') {
         mediaRecorder.start(100);
-        console.log('MediaRecorder started');
+        console.log('[audioRecorder] MediaRecorder started');
       }
     },
     stop,
-    pause,
-    resume,
+    pause: () => {
+      if (mediaRecorder.state === 'recording') {
+        mediaRecorder.pause();
+        return true;
+      }
+      return false;
+    },
+    resume: () => {
+      if (mediaRecorder.state === 'paused') {
+        mediaRecorder.resume();
+        return true;
+      }
+      return false;
+    },
     stream,
     getState: () => mediaRecorder.state
   };

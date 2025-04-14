@@ -14,6 +14,7 @@ export async function processRecordingInBackground(
 ): Promise<void> {
   try {
     console.log('[BackgroundProcessor] Starting background processing for tempId:', tempId);
+    console.log('[BackgroundProcessor] Audio blob size:', audioBlob?.size, 'bytes, type:', audioBlob?.type);
     
     if (!audioBlob) {
       throw new Error('No audio blob provided');
@@ -28,7 +29,10 @@ export async function processRecordingInBackground(
     
     await new Promise<void>((resolve, reject) => {
       reader.onloadend = () => resolve();
-      reader.onerror = reject;
+      reader.onerror = (e) => {
+        console.error('[BackgroundProcessor] Error reading audio file:', e);
+        reject(new Error('Failed to read audio file'));
+      };
       reader.readAsDataURL(audioBlob);
     });
     
@@ -54,12 +58,18 @@ export async function processRecordingInBackground(
       : (audioBlob.size / 16000) * 1000 // Estimate based on size and 16kHz sample rate
       : 0;
     
+    console.log('[BackgroundProcessor] Estimated recording duration:', recordingTimeMs, 'ms');
+    
     // Invoke the Supabase function to process the audio
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64Audio,
         userId: userId,
-        recordingTime: recordingTimeMs
+        recordingTime: recordingTimeMs,
+        // Indicate this is a direct transcription without additional processing
+        directTranscription: false,
+        // Request high quality processing
+        highQuality: true
       }
     });
     

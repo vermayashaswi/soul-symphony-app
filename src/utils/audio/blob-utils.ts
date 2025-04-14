@@ -31,11 +31,12 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
     return { isValid: false, errorMessage: 'No recording to process.' };
   }
   
-  // Accept any blob with non-zero size - we'll fix it later if needed
+  // Accept even very small blobs - we'll pad them later if needed
   if (audioBlob.size <= 0) {
     return { isValid: false, errorMessage: 'Empty recording detected.' };
   }
   
+  console.log(`[blob-utils] Validated audio blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
   return { isValid: true };
 }
 
@@ -43,13 +44,14 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
  * Fixes common issues with audio blob MIME types and adds padding to small files
  */
 export function normalizeAudioBlob(audioBlob: Blob): Blob {
-  console.log(`Normalizing audio blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
+  console.log(`[blob-utils] Normalizing audio blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
   
   // If the blob is very small, add padding to prevent "too short" errors
-  if (audioBlob.size < 1000) {
-    console.log('Adding padding to small audio blob');
-    // Create a larger padding for very small files (4KB)
-    const padding = new Uint8Array(4096).fill(0);
+  // Lower the threshold from 1000 to 200 bytes to be more permissive
+  if (audioBlob.size < 200) {
+    console.log('[blob-utils] Adding padding to small audio blob');
+    // Create a larger padding for very small files (8KB instead of 4KB)
+    const padding = new Uint8Array(8192).fill(0);
     return new Blob([audioBlob, padding], { type: getProperMimeType(audioBlob) });
   }
   
@@ -96,10 +98,6 @@ function getProperMimeType(blob: Blob): string {
     }
   }
   
-  // Final fallback based on size heuristics
-  if (blob.size > 1000000) {
-    return 'audio/wav'; // Larger files are likely WAV
-  } else {
-    return 'audio/webm;codecs=opus'; // Smaller files are likely Opus in WebM container
-  }
+  // Final fallback to webm/opus which is widely supported
+  return 'audio/webm;codecs=opus';
 }
