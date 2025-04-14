@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
@@ -116,7 +115,7 @@ export const fetchJournalEntries = async (
     
     const typedEntries: JournalEntry[] = (data || []).map(item => ({
       id: item.id,
-      content: item["refined text"] || item["transcription text"] || "",
+      content: item["refined text"] || "", // Only use refined text, no fallback
       created_at: item.created_at,
       audio_url: item.audio_url,
       sentiment: item.sentiment,
