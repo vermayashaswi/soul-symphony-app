@@ -39,7 +39,8 @@ export default function JournalEntriesList({
   const hasNoValidEntries = useRef(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [processingEntriesLoaded, setProcessingEntriesLoaded] = useState(false);
-  const [showTemporaryProcessingEntries, setShowTemporaryProcessingEntries] = useState(false);
+  const [showTemporaryProcessingEntries, setShowTemporaryProcessingEntries] = useState(true);
+  const [visibleProcessingEntries, setVisibleProcessingEntries] = useState<string[]>([]);
 
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
@@ -61,10 +62,6 @@ export default function JournalEntriesList({
         if (event.detail.entries.length > 0) {
           setProcessingEntriesLoaded(true);
           setShowTemporaryProcessingEntries(true);
-        } else {
-          setTimeout(() => {
-            setShowTemporaryProcessingEntries(false);
-          }, 1000);
         }
       }
     };
@@ -86,15 +83,30 @@ export default function JournalEntriesList({
   }, []);
 
   useEffect(() => {
-    if (Array.isArray(processingEntries) && processingEntries.length > 0) {
-      setProcessingEntriesLoaded(true);
+    const allProcessingEntries = [...new Set([...processingEntries, ...persistedProcessingEntries])];
+    setVisibleProcessingEntries(allProcessingEntries);
+    
+    if (allProcessingEntries.length > 0) {
       setShowTemporaryProcessingEntries(true);
-    } else if (processingEntries.length === 0 && persistedProcessingEntries.length === 0) {
+      setProcessingEntriesLoaded(true);
+    }
+    
+    const hasCompletedEntries = entries.some(entry => {
+      const entryIdStr = String(entry.id);
+      return allProcessingEntries.some(tempId => tempId.includes(entryIdStr)) && 
+             entry.content && 
+             entry.content !== "Processing entry..." && 
+             entry.content.trim() !== "" &&
+             Array.isArray(entry.themes || entry.master_themes) && 
+             (entry.themes?.length > 0 || entry.master_themes?.length > 0);
+    });
+    
+    if (hasCompletedEntries && allProcessingEntries.length === 0) {
       setTimeout(() => {
         setShowTemporaryProcessingEntries(false);
-      }, 1000);
+      }, 2000);
     }
-  }, [processingEntries, persistedProcessingEntries.length]);
+  }, [processingEntries, persistedProcessingEntries, entries]);
 
   useEffect(() => {
     try {
@@ -262,13 +274,13 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4 mt-6">
-            {(hasProcessingEntries || (processingEntriesLoaded && showTemporaryProcessingEntries)) && (
+            {(showTemporaryProcessingEntries || visibleProcessingEntries.length > 0) && (
               <div className="mb-4">
                 <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Processing your new entry...</span>
                 </div>
-                <JournalEntryLoadingSkeleton count={allProcessingEntries.length || 1} />
+                <JournalEntryLoadingSkeleton count={visibleProcessingEntries.length || 1} />
               </div>
             )}
             

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -59,8 +60,19 @@ export function JournalEntryCard({
   const [deletionCompleted, setDeletionCompleted] = useState(false);
   const [deletionInProgress, setDeletionInProgress] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [contentLoaded, setContentLoaded] = useState(false);
   const mountedRef = useRef<boolean>(true);
   
+  // Check if content is ready to display
+  useEffect(() => {
+    const hasValidContent = safeEntry.content && 
+                         safeEntry.content !== "Processing entry..." && 
+                         safeEntry.content !== "Loading..." &&
+                         safeEntry.content.trim() !== "";
+    
+    setContentLoaded(hasValidContent);
+  }, [safeEntry.content]);
+
   const extractThemes = (): string[] => {
     try {
       const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
@@ -182,16 +194,16 @@ export function JournalEntryCard({
     try {
       const noThemes = (!safeEntry.themes || safeEntry.themes.length === 0) && 
                      (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
-      return noThemes && isNew;
+      return noThemes && (isNew || isProcessing);
     } catch (error) {
       console.error('[JournalEntryCard] Error checking if entry is being processed:', error);
       return false;
     }
   };
 
-  const isSentimentProcessing = !safeEntry.sentiment && isNew;
+  const isSentimentProcessing = !safeEntry.sentiment && (isNew || isProcessing);
   const isThemesProcessing = isProcessing || isEntryBeingProcessed();
-  const isContentProcessing = !safeEntry.content || safeEntry.content === "Processing entry..." || isProcessing;
+  const isContentProcessing = !contentLoaded || isProcessing;
 
   if (hasError) {
     return (
@@ -223,6 +235,7 @@ export function JournalEntryCard({
         transition={{ duration: 3 }}
         className="journal-entry-card" 
         data-entry-id={safeEntry.id}
+        data-processing={isProcessing ? "true" : "false"}
       >
         <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
           <div className="flex justify-between items-start p-3 md:p-4">
