@@ -1,3 +1,4 @@
+
 /**
  * AI processing utilities for transcription, translation, and analysis
  */
@@ -102,108 +103,173 @@ export async function analyzeEmotions(text: string, emotions: any[], openAIApiKe
 }
 
 /**
- * Transcribes audio and returns detected language info from Whisper
+ * Detects the languages present in the transcribed text
+ */
+export async function detectLanguages(text: string): Promise<string[]> {
+  try {
+    console.log('Detecting languages in text:', text.slice(0, 100) + '...');
+    
+    // Use a lightweight GPT model to detect languages
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a language detection expert. Identify all languages used in the provided text. 
+            Return ONLY a JSON array of language codes (e.g., ["en", "es", "fr"]). 
+            If the text is entirely in one language, return only that language code. 
+            Use ISO 639-1 two-letter language codes.`
+          },
+          {
+            role: 'user',
+            content: text
+          }
+        ],
+        temperature: 0.3,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error detecting languages:', error);
+      return ['en']; // Default to English if detection fails
+    }
+
+    const result = await response.json();
+    try {
+      const content = result.choices[0].message.content;
+      const langData = JSON.parse(content);
+      
+      if (Array.isArray(langData.languages)) {
+        console.log('Detected languages:', langData.languages);
+        return langData.languages;
+      } else if (Array.isArray(langData)) {
+        console.log('Detected languages:', langData);
+        return langData;
+      }
+      
+      return ['en']; // Default to English if format is unexpected
+    } catch (err) {
+      console.error('Error parsing language detection response:', err);
+      console.error('Raw response:', result.choices[0].message.content);
+      return ['en']; // Default to English on error
+    }
+  } catch (error) {
+    console.error('Error in detectLanguages:', error);
+    return ['en']; // Default to English on error
+  }
+}
+
+/**
+ * Transcribes audio and translates it if needed
  */
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob, 
   fileType: string, 
   openAIApiKey: string
 ): Promise<string> {
-  try {
-    const formData = new FormData();
-    formData.append('file', audioBlob, `audio.${fileType}`);
-    formData.append('model', 'whisper-1');
-    
-    // No language parameter - let Whisper auto-detect
-    console.log("Sending to Whisper API with auto language detection");
-    
-    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-      },
-      body: formData,
-    });
+  const formData = new FormData();
+  formData.append('file', audioBlob, `audio.${fileType}`);
+  formData.append('model', 'whisper-1');
+  formData.append('response_format', 'json');
+  
+  // No language parameter - let Whisper auto-detect
+  console.log("Sending to Whisper API with auto language detection");
+  
+  const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openAIApiKey}`,
+    },
+    body: formData,
+  });
 
-    if (!whisperResponse.ok) {
-      const errorText = await whisperResponse.text();
-      console.error("Whisper API error:", errorText);
-      throw new Error(`Whisper API error: ${errorText}`);
-    }
-
-    const whisperResult = await whisperResponse.json();
-    
-    // Log detected language from Whisper
-    console.log("Whisper detected language:", whisperResult.language || "Not specified");
-    
-    return whisperResult.text;
-  } catch (error) {
-    console.error('Error in transcribeAudioWithWhisper:', error);
-    throw error;
+  if (!whisperResponse.ok) {
+    const errorText = await whisperResponse.text();
+    console.error("Whisper API error:", errorText);
+    throw new Error(`Whisper API error: ${errorText}`);
   }
+
+  const whisperResult = await whisperResponse.json();
+  return whisperResult.text;
 }
 
 /**
  * Translates and refines the transcribed text
  */
 export async function translateAndRefineText(
-  text: string,
-  apiKey: string
-): Promise<{ refinedText: string, error?: string }> {
+  transcribedText: string,
+  openAIApiKey: string
+): Promise<{ refinedText: string }> {
   try {
-    console.log("Starting text refinement and translation...");
-    const systemMessage = `You are an expert in refining and translating speech-to-text content. Your job is to:
-1. Fix grammatical errors and improve readability
-2. Maintain the original meaning and voice of the speaker
-3. Translate any non-English content to English`;
-
-    const userMessage = `Please refine and translate this speech-to-text content if needed. Maintain the speaker's original voice and meaning while fixing grammar and improving readability:
+    console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
     
-${text}`;
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // First detect languages in the transcribed text
+    const detectedLanguages = await detectLanguages(transcribedText);
+    const languagesInfo = detectedLanguages.join(', ');
+    
+    console.log("Detected languages:", languagesInfo);
+    
+    const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemMessage },
-          { role: 'user', content: userMessage }
+          {
+            role: 'system',
+            content: `You are an empathetic writing assistant helping users journal. The following transcription is a voice journal that may contain multiple languages, informal speech, and emotional content.
+
+Your task:
+1. Translate all non-English portions to English.
+2. Preserve the speaker's tone, intent, and emotional expression.
+3. Maintain a first-person, personal narrative.
+4. Do NOT add commentary or analysis.
+5. Fix grammar or spelling issues only when necessary for clarity.
+6. Retain cultural texts and just transliterate those to English 
+
+Detected languages in the text: ${languagesInfo}
+
+Here is the transcription:`
+          },
+          {
+            role: 'user',
+            content: `${transcribedText}`
+          },
+          {
+            role: 'system',
+            content: 'Reply with only the translated and corrected text. Apart from the translation of the audio entry, don\'t explain or provide any information from your end!'
+          }
         ],
-        temperature: 0.3,
-        max_tokens: 2048
-      })
+        temperature: 0.3
+      }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("API response not OK:", response.status, errorText);
-      return { refinedText: text, error: `API error: ${response.status} - ${errorText}` };
+    if (!gptResponse.ok) {
+      const errorText = await gptResponse.text();
+      console.error("GPT API error:", errorText);
+      throw new Error(`GPT API error: ${errorText}`);
     }
 
-    const data = await response.json();
+    const gptResult = await gptResponse.json();
+    const refinedText = gptResult.choices[0].message.content;
     
-    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-      console.error("Unexpected API response format:", JSON.stringify(data));
-      return { refinedText: text, error: "Invalid API response format" };
-    }
+    console.log("GPT Response (first 100 chars):", refinedText.slice(0, 100) + "...");
     
-    const refinedText = data.choices[0].message.content.trim();
-    
-    // Verify we got a valid response
-    if (!refinedText || refinedText.length < 10) {
-      console.error("Refined text too short or empty:", refinedText);
-      return { refinedText: text, error: "Refined text too short or empty" };
-    }
-    
-    console.log("Text refinement successful!");
     return { refinedText };
   } catch (error) {
     console.error("Error in translateAndRefineText:", error);
-    // Return original text on error instead of empty string
-    return { refinedText: text, error: error.message };
+    // If translation fails, return original text as refined text
+    return { refinedText: transcribedText };
   }
 }

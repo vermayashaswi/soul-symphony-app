@@ -106,8 +106,7 @@ export const fetchJournalEntries = async (
     if (data && data.length > 0) {
       console.log('[JournalService] First entry sample:', {
         id: data[0].id,
-        refined_text: data[0]["refined text"],
-        transcribed_text: data[0]["transcription text"],
+        text: data[0]["refined text"],
         created: data[0].created_at,
         duration: data[0].duration
       });
@@ -117,7 +116,7 @@ export const fetchJournalEntries = async (
     
     const typedEntries: JournalEntry[] = (data || []).map(item => ({
       id: item.id,
-      content: item["refined text"] || "",  // Only use refined text
+      content: item["refined text"] || item["transcription text"] || "",
       created_at: item.created_at,
       audio_url: item.audio_url,
       sentiment: item.sentiment,

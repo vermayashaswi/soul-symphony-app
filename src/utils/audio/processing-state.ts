@@ -1,103 +1,147 @@
 
-export function setProcessingLock(isLocked: boolean): void {
-  console.log(`[ProcessingState] Setting processing lock to ${isLocked}`);
-  localStorage.setItem('isProcessingLocked', isLocked ? 'true' : 'false');
-}
+/**
+ * Audio processing state management
+ * Handles processing locks and operational state
+ */
 
-export function isProcessingLocked(): boolean {
-  return localStorage.getItem('isProcessingLocked') === 'true';
-}
+// Flag to track if an entry is being processed to prevent duplicate notifications
+let isEntryBeingProcessed = false;
+let processingLock = false;
+let processingTimeoutId: NodeJS.Timeout | null = null;
+let lastStateChangeTime = 0;
+const DEBOUNCE_THRESHOLD = 1000; // Increased from 500ms to 1000ms to prevent rapid state changes
 
-export function resetProcessingState(): void {
-  console.log('[ProcessingState] Resetting processing state');
-  localStorage.removeItem('isProcessingLocked');
-  localStorage.removeItem('isEntryBeingProcessed');
-  // Don't clear processingEntries here, they should be handled separately
-}
-
-export function setIsEntryBeingProcessed(isBeingProcessed: boolean): void {
-  localStorage.setItem('isEntryBeingProcessed', isBeingProcessed ? 'true' : 'false');
-}
-
-export function isEntryBeingProcessed(): boolean {
-  return localStorage.getItem('isEntryBeingProcessed') === 'true';
-}
-
-export function updateProcessingEntries(tempId: string, action: 'add' | 'remove'): void {
-  const entriesStr = localStorage.getItem('processingEntries') || '[]';
-  let entries: string[] = [];
-  
+// Store processing entries in localStorage to persist across navigations
+export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove') => {
   try {
-    entries = JSON.parse(entriesStr);
-    if (!Array.isArray(entries)) {
-      entries = [];
+    // Prevent rapid toggling by implementing a simple debounce
+    const now = Date.now();
+    if (now - lastStateChangeTime < DEBOUNCE_THRESHOLD) {
+      console.log('[Audio.ProcessingState] Debouncing rapid state change');
+      return getProcessingEntries(); // Return current state without changes
     }
-  } catch (e) {
-    console.error('Error parsing processing entries:', e);
-    entries = [];
-  }
-  
-  if (action === 'add' && !entries.includes(tempId)) {
-    entries.push(tempId);
-  } else if (action === 'remove') {
-    entries = entries.filter(id => id !== tempId);
-  }
-  
-  localStorage.setItem('processingEntries', JSON.stringify(entries));
-  
-  // Dispatch custom event for components to listen to
-  const event = new CustomEvent('processingEntriesChanged', {
-    detail: {
-      entries,
-      lastUpdate: Date.now()
-    }
-  });
-  
-  window.dispatchEvent(event);
-  console.log(`[ProcessingState] Updated entries (${action}): ${JSON.stringify(entries)}`);
-}
-
-export function getProcessingEntries(): string[] {
-  const entriesStr = localStorage.getItem('processingEntries') || '[]';
-  try {
-    const entries = JSON.parse(entriesStr);
-    return Array.isArray(entries) ? entries : [];
-  } catch (e) {
-    console.error('Error parsing processing entries:', e);
-    return [];
-  }
-}
-
-export function isProcessingEntry(entryId: number | string): boolean {
-  const entries = getProcessingEntries();
-  const idStr = String(entryId);
-  return entries.some(tempId => tempId.includes(idStr));
-}
-
-export function removeProcessingEntryById(entryId: number | string): void {
-  const entries = getProcessingEntries();
-  const idStr = String(entryId);
-  const filteredEntries = entries.filter(tempId => !tempId.includes(idStr));
-  
-  if (filteredEntries.length !== entries.length) {
-    localStorage.setItem('processingEntries', JSON.stringify(filteredEntries));
+    lastStateChangeTime = now;
     
+    const storedEntries = localStorage.getItem('processingEntries');
+    let entries: string[] = storedEntries ? JSON.parse(storedEntries) : [];
+    
+    if (action === 'add' && !entries.includes(tempId)) {
+      entries.push(tempId);
+    } else if (action === 'remove') {
+      entries = entries.filter(id => id !== tempId);
+    }
+    
+    localStorage.setItem('processingEntries', JSON.stringify(entries));
+    
+    // Dispatch an event so other components can react to the change
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-      detail: {
-        entries: filteredEntries,
-        lastUpdate: Date.now()
-      }
+      detail: { entries, lastUpdate: now }
     }));
     
-    console.log(`[ProcessingState] Removed entry ID ${idStr} from processing entries`);
+    return entries;
+  } catch (error) {
+    console.error('[Audio.ProcessingState] Error updating processing entries in storage:', error);
+    return [];
   }
+};
+
+// Get the current processing entries from localStorage
+export const getProcessingEntries = (): string[] => {
+  try {
+    const storedEntries = localStorage.getItem('processingEntries');
+    return storedEntries ? JSON.parse(storedEntries) : [];
+  } catch (error) {
+    console.error('[Audio.ProcessingState] Error retrieving processing entries from storage:', error);
+    return [];
+  }
+};
+
+// Remove processing entry by ID (useful when an entry is completed)
+export const removeProcessingEntryById = (entryId: number | string): void => {
+  try {
+    // Prevent rapid toggling with debounce
+    const now = Date.now();
+    if (now - lastStateChangeTime < DEBOUNCE_THRESHOLD) {
+      console.log('[Audio.ProcessingState] Debouncing rapid removal request');
+      return;
+    }
+    lastStateChangeTime = now;
+    
+    const idStr = String(entryId);
+    const storedEntries = localStorage.getItem('processingEntries');
+    let entries: string[] = storedEntries ? JSON.parse(storedEntries) : [];
+    
+    // Filter out any entry that contains this ID
+    const updatedEntries = entries.filter(tempId => !tempId.includes(idStr));
+    
+    if (updatedEntries.length !== entries.length) {
+      localStorage.setItem('processingEntries', JSON.stringify(updatedEntries));
+      
+      // Dispatch an event so other components can react to the change
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { entries: updatedEntries, lastUpdate: now, removedId: idStr }
+      }));
+      
+      console.log(`[Audio.ProcessingState] Removed processing entry with ID ${idStr}`);
+    }
+  } catch (error) {
+    console.error('[Audio.ProcessingState] Error removing processing entry from storage:', error);
+  }
+};
+
+// Check if a journal entry is currently being processed
+export function isProcessingEntry(): boolean {
+  return isEntryBeingProcessed;
 }
 
-// Add this function to handle previous entries flag
-export function setHasPreviousEntries(hasEntries: boolean): void {
-  localStorage.setItem('hasPreviousEntries', hasEntries ? 'true' : 'false');
+// Release all locks and reset processing state (useful for recovery)
+export function resetProcessingState(): void {
+  console.log('[Audio.ProcessingState] Manually resetting processing state');
+  isEntryBeingProcessed = false;
+  processingLock = false;
+  
+  // Clear all processing entries from localStorage
+  localStorage.setItem('processingEntries', JSON.stringify([]));
+  
+  if (processingTimeoutId) {
+    clearTimeout(processingTimeoutId);
+    processingTimeoutId = null;
+  }
+  
+  // Clear all toasts to ensure UI is clean
+  import('@/services/notificationService').then(({ clearAllToasts }) => {
+    clearAllToasts();
+  });
+  
+  // Dispatch a reset event
+  window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+    detail: { entries: [], reset: true, lastUpdate: Date.now() }
+  }));
 }
 
-export function getHasPreviousEntries(): boolean {
-  return localStorage.getItem('hasPreviousEntries') === 'true';
+// Internal setters used by the main processing module
+export function setProcessingLock(value: boolean): void {
+  processingLock = value;
+}
+
+export function getProcessingLock(): boolean {
+  return processingLock;
+}
+
+export function setProcessingTimeoutId(id: NodeJS.Timeout | null): void {
+  processingTimeoutId = id;
+}
+
+export function getProcessingTimeoutId(): NodeJS.Timeout | null {
+  return processingTimeoutId;
+}
+
+export function setIsEntryBeingProcessed(value: boolean): void {
+  isEntryBeingProcessed = value;
+}
+
+// Variable to check if user has previous entries
+export let hasPreviousEntries = false;
+export function setHasPreviousEntries(value: boolean): void {
+  hasPreviousEntries = value;
 }

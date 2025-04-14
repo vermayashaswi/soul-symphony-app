@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -130,7 +129,6 @@ export function JournalEntryCard({
   }, [isNew]);
 
   const toggleExpanded = () => {
-    console.log(`[JournalEntryCard] Toggling expanded state: ${!isExpanded}`);
     setIsExpanded(!isExpanded);
   };
 
@@ -270,7 +268,6 @@ export function JournalEntryCard({
                 content={safeEntry.content} 
                 isExpanded={isExpanded} 
                 isProcessing={isContentProcessing}
-                onToggleExpanded={toggleExpanded}
               />
             </ErrorBoundary>
             
