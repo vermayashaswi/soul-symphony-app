@@ -1,6 +1,6 @@
 
-import { useState, useRef, useEffect } from "react";
-import RecordRTC, { StereoAudioRecorder } from "recordrtc";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { recordAudio } from "../utils/audioRecorder";
 
 interface UseVoiceRecorderProps {
   onRecordingComplete: (audioBlob: Blob, tempId?: string) => void;
@@ -14,14 +14,14 @@ export function useVoiceRecorder({
   const [status, setStatus] = useState<
     "idle" | "acquiring_media" | "recording" | "stopping"
   >("idle");
-  const [recorder, setRecorder] = useState<RecordRTC | null>(null);
+  const [recorderInstance, setRecorderInstance] = useState<any>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const [startTime, setStartTime] = useState<number>(0);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
     try {
       // Dispatch operation start event for debugging
       const event = new CustomEvent('journalOperationStart', {
@@ -33,22 +33,18 @@ export function useVoiceRecorder({
       const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
       
       setStatus("acquiring_media");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setMediaStream(stream);
-
-      const recorder = new RecordRTC(stream, {
-        type: "audio",
-        mimeType: "audio/webm",
-        recorderType: StereoAudioRecorder,
-        numberOfAudioChannels: 1,
-        desiredSampRate: 16000,
-      });
-
-      recorder.startRecording();
-      setRecorder(recorder);
-      setStatus("recording");
+      console.log('Starting audio recording - acquiring media');
+      
+      // Use our custom recorder instead of RecordRTC
+      const recorder = await recordAudio();
+      setRecorderInstance(recorder);
+      setMediaStream(recorder.stream);
+      
+      // Start timer
       setStartTime(Date.now());
-
+      setStatus("recording");
+      console.log('Audio recording started successfully');
+      
       // Update timer at regular intervals
       timerInterval.current = setInterval(() => {
         setElapsedTime(Date.now() - startTime);
@@ -77,10 +73,13 @@ export function useVoiceRecorder({
         }
       }));
     }
-  };
+  }, []);
 
-  const stopRecording = () => {
-    if (!recorder) return;
+  const stopRecording = useCallback(() => {
+    if (!recorderInstance) {
+      console.error('No recorder instance to stop');
+      return;
+    }
     
     // Dispatch operation event for debugging
     const event = new CustomEvent('journalOperationStart', {
@@ -92,27 +91,30 @@ export function useVoiceRecorder({
     const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
 
     setStatus("stopping");
+    console.log('Stopping audio recording');
     
     try {
-      recorder.stopRecording(() => {
-        const blob = recorder.getBlob();
-        setRecordingBlob(blob);
-        
-        if (mediaStream) {
-          mediaStream.getTracks().forEach((track) => track.stop());
-          setMediaStream(null);
-        }
-        
-        if (timerInterval.current) {
-          clearInterval(timerInterval.current);
-          timerInterval.current = null;
-        }
-        
-        setStatus("idle");
-        
-        if (blob.size > 0) {
-          if (onRecordingComplete) {
+      recorderInstance.stop()
+        .then(({ blob }: { blob: Blob }) => {
+          console.log(`Recording stopped, blob size: ${blob.size}, type: ${blob.type}`);
+          setRecordingBlob(blob);
+          
+          if (mediaStream) {
+            mediaStream.getTracks().forEach((track) => track.stop());
+            setMediaStream(null);
+          }
+          
+          if (timerInterval.current) {
+            clearInterval(timerInterval.current);
+            timerInterval.current = null;
+          }
+          
+          setStatus("idle");
+          
+          // Even if blob is small, try to process it
+          if (blob) {
             const tempId = generateTempId();
+            console.log(`Processing audio blob: ${formatBytes(blob.size)}, duration: ${formatTime(elapsedTime)}`);
             onRecordingComplete(blob, tempId);
             
             if (opId) {
@@ -125,26 +127,42 @@ export function useVoiceRecorder({
                 }
               }));
             }
+          } else {
+            console.error("Recording failed: no blob");
+            
+            if (opId) {
+              window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+                detail: {
+                  id: opId,
+                  status: 'error',
+                  message: 'Recording failed',
+                  details: 'No audio blob received'
+                }
+              }));
+            }
+            
+            if (onError) onError(new Error("Recording failed: no blob"));
           }
-        } else {
-          console.error("Recording failed: empty blob");
+        })
+        .catch((err: any) => {
+          console.error("Error stopping recording:", err);
+          setStatus("idle");
           
           if (opId) {
             window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
               detail: {
                 id: opId,
                 status: 'error',
-                message: 'Recording failed',
-                details: 'Empty audio blob received'
+                message: 'Error stopping recording',
+                details: err instanceof Error ? err.message : String(err)
               }
             }));
           }
           
-          if (onError) onError(new Error("Recording failed: empty blob"));
-        }
-      });
+          if (onError) onError(err);
+        });
     } catch (err) {
-      console.error("Error stopping recording:", err);
+      console.error("Error in stop recording process:", err);
       setStatus("idle");
       
       if (opId) {
@@ -152,7 +170,7 @@ export function useVoiceRecorder({
           detail: {
             id: opId,
             status: 'error',
-            message: 'Error stopping recording',
+            message: 'Error in recording stop process',
             details: err instanceof Error ? err.message : String(err)
           }
         }));
@@ -160,7 +178,7 @@ export function useVoiceRecorder({
       
       if (onError) onError(err);
     }
-  };
+  }, [recorderInstance, mediaStream, elapsedTime, onRecordingComplete, onError]);
 
   const clearRecording = () => {
     setRecordingBlob(null);
@@ -174,8 +192,22 @@ export function useVoiceRecorder({
       if (timerInterval.current) {
         clearInterval(timerInterval.current);
       }
+      
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+      
+      if (recorderInstance) {
+        try {
+          if (recorderInstance.getState() === 'recording') {
+            recorderInstance.stop();
+          }
+        } catch (e) {
+          console.error('Error cleaning up recorder:', e);
+        }
+      }
     };
-  }, []);
+  }, [mediaStream, recorderInstance]);
 
   return {
     status,

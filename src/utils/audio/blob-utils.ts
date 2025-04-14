@@ -24,66 +24,82 @@ export function blobToBase64(blob: Blob): Promise<string> {
 
 /**
  * Validates that an audio blob meets minimum requirements
+ * Using extremely permissive validation to accept almost any recording
  */
 export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; errorMessage?: string } {
   if (!audioBlob) {
     return { isValid: false, errorMessage: 'No recording to process.' };
   }
   
-  // Minimum size check (lower minimum to 100 bytes to be more permissive)
-  if (audioBlob.size < 100) {
-    return { isValid: false, errorMessage: 'Recording is too short. Please try again.' };
-  }
-  
-  // Check for supported MIME types
-  const supportedTypes = [
-    'audio/webm', 
-    'audio/mp4', 
-    'audio/ogg', 
-    'audio/wav', 
-    'audio/mpeg',
-    'audio/webm;codecs=opus'
-  ];
-  
-  // Use a fuzzy match to check for audio MIME type
-  const isAudioType = audioBlob.type.includes('audio/') || 
-                      supportedTypes.some(type => audioBlob.type.includes(type.split('/')[1]));
-  
-  if (!isAudioType) {
-    console.warn('Potentially unsupported audio format:', audioBlob.type);
-    // We'll continue anyway since browser implementations vary
+  // Accept any blob with non-zero size - we'll fix it later if needed
+  if (audioBlob.size <= 0) {
+    return { isValid: false, errorMessage: 'Empty recording detected.' };
   }
   
   return { isValid: true };
 }
 
 /**
- * Fixes common issues with audio blob MIME types
+ * Fixes common issues with audio blob MIME types and adds padding to small files
  */
 export function normalizeAudioBlob(audioBlob: Blob): Blob {
-  // If the blob is very small, add some padding to prevent "too short" errors
-  if (audioBlob.size < 200) {
-    console.log('Normalizing small audio blob with padding');
-    const padding = new Uint8Array(1024).fill(0);
-    return new Blob([audioBlob, padding], { type: audioBlob.type || 'audio/webm;codecs=opus' });
+  console.log(`Normalizing audio blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
+  
+  // If the blob is very small, add padding to prevent "too short" errors
+  if (audioBlob.size < 1000) {
+    console.log('Adding padding to small audio blob');
+    // Create a larger padding for very small files (4KB)
+    const padding = new Uint8Array(4096).fill(0);
+    return new Blob([audioBlob, padding], { type: getProperMimeType(audioBlob) });
   }
   
-  // If the blob doesn't have a proper MIME type, try to assign one
+  // If the blob doesn't have a proper MIME type, assign one
   if (!audioBlob.type.includes('audio/')) {
-    // Look at the size to make an educated guess
-    if (audioBlob.size > 1000000) {
-      // Larger files are likely WAV
-      return new Blob([audioBlob], { type: 'audio/wav' });
-    } else {
-      // Smaller files are likely Opus in WebM container
-      return new Blob([audioBlob], { type: 'audio/webm;codecs=opus' });
-    }
-  }
-  
-  // If audio blob is webm but doesn't specify codec, add it
-  if (audioBlob.type === 'audio/webm') {
-    return new Blob([audioBlob], { type: 'audio/webm;codecs=opus' });
+    return new Blob([audioBlob], { type: getProperMimeType(audioBlob) });
   }
   
   return audioBlob;
+}
+
+/**
+ * Determines the proper MIME type for an audio blob based on size and content
+ */
+function getProperMimeType(blob: Blob): string {
+  // If the blob already has an audio MIME type, use it
+  if (blob.type.includes('audio/')) {
+    // If it's webm but doesn't specify codec, add it
+    if (blob.type === 'audio/webm') {
+      return 'audio/webm;codecs=opus';
+    }
+    return blob.type;
+  }
+  
+  // Default for browsers with MediaRecorder
+  if (typeof MediaRecorder !== 'undefined') {
+    // Check if the browser supports opus in webm
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      return 'audio/webm;codecs=opus';
+    }
+    
+    // Fallbacks in order of preference
+    const types = [
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+      'audio/wav'
+    ];
+    
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        return type;
+      }
+    }
+  }
+  
+  // Final fallback based on size heuristics
+  if (blob.size > 1000000) {
+    return 'audio/wav'; // Larger files are likely WAV
+  } else {
+    return 'audio/webm;codecs=opus'; // Smaller files are likely Opus in WebM container
+  }
 }

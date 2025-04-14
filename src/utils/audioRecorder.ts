@@ -8,105 +8,152 @@ export const recordAudio = async () => {
     throw new Error('Audio recording not supported in this browser');
   }
   
-  // Request microphone access
+  // Request microphone access with more permissive settings
+  // Not using advanced constraints which might fail on some devices
   const stream = await navigator.mediaDevices.getUserMedia({ 
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true
-    } 
+    audio: true
   });
   
-  // Set up the MediaRecorder with improved options to prevent short recordings
-  const options = {
-    mimeType: 'audio/webm;codecs=opus',
-    audioBitsPerSecond: 128000 // Higher quality audio
+  // Try multiple MIME types in order of preference
+  const mimeTypes = [
+    'audio/webm',
+    'audio/mp4',
+    'audio/ogg;codecs=opus', 
+    'audio/webm;codecs=opus'
+  ];
+  
+  // Find the first supported MIME type
+  let mimeType = '';
+  for (const type of mimeTypes) {
+    if (MediaRecorder.isTypeSupported(type)) {
+      mimeType = type;
+      break;
+    }
+  }
+  
+  // Set up MediaRecorder with best supported options
+  const options: MediaRecorderOptions = {
+    audioBitsPerSecond: 128000 // Set reasonable bitrate
   };
   
-  // Try to use the preferred MIME type, fall back to browser defaults if not supported
-  let mediaRecorder;
+  // Only add mime type if we found a supported one
+  if (mimeType) {
+    options.mimeType = mimeType;
+  }
+  
+  // Create the MediaRecorder with proper error handling
+  let mediaRecorder: MediaRecorder;
   try {
     mediaRecorder = new MediaRecorder(stream, options);
+    console.log(`Recording with MIME type: ${mediaRecorder.mimeType}`);
   } catch (e) {
-    console.warn('Preferred audio format not supported, using browser default', e);
-    mediaRecorder = new MediaRecorder(stream);
+    console.warn('Failed to create MediaRecorder with specified options, using defaults', e);
+    try {
+      // Fallback to default options
+      mediaRecorder = new MediaRecorder(stream);
+      console.log(`Fallback: Recording with MIME type: ${mediaRecorder.mimeType}`);
+    } catch (fallbackError) {
+      console.error('Complete failure to create MediaRecorder', fallbackError);
+      // Stop all tracks to release the microphone before throwing
+      stream.getTracks().forEach(track => track.stop());
+      throw new Error('Could not create audio recorder with your browser');
+    }
   }
   
   const audioChunks: BlobPart[] = [];
   
-  // Start recording
-  mediaRecorder.start();
-  
-  // Force an initial data chunk to ensure we have something
-  setTimeout(() => {
-    try {
-      if (mediaRecorder.state === 'recording') {
-        mediaRecorder.requestData();
-      }
-    } catch (e) {
-      console.warn('Could not request initial data chunk', e);
-    }
-  }, 100);
-  
   // Add data to chunks when available
   mediaRecorder.addEventListener('dataavailable', (event) => {
-    if (event.data.size > 0) {
+    if (event.data && event.data.size > 0) {
       audioChunks.push(event.data);
+      console.log(`Audio chunk received: ${event.data.size} bytes`);
     }
   });
+  
+  // Start recording and immediately request first data chunk
+  mediaRecorder.start(100); // Use 100ms timeslice to get frequent chunks
+  console.log('MediaRecorder started');
   
   // Define the stop method that will return a Promise with the audio URL
   const stop = () => {
     return new Promise<{ audioUrl: string, blob: Blob }>((resolve) => {
       mediaRecorder.addEventListener('stop', () => {
-        // Ensure we have enough data before creating blob
+        console.log(`Recording stopped, collected ${audioChunks.length} chunks`);
+        
+        // Handle empty recording with a minimal audio placeholder
         if (audioChunks.length === 0) {
-          console.warn('No audio chunks collected, creating minimal audio');
-          // Create a minimal audio blob to prevent errors
-          const silence = new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0]);
-          audioChunks.push(new Blob([silence], { type: 'audio/webm;codecs=opus' }));
+          console.warn('No audio data captured during recording');
+          // Create a minimal audio blob (1kb of silence) for consistent behavior
+          const silence = new Uint8Array(1024).fill(0);
+          const silenceBlob = new Blob([silence], { type: mediaRecorder.mimeType || 'audio/webm' });
+          const silenceUrl = URL.createObjectURL(silenceBlob);
+          
+          // Release microphone
+          stream.getTracks().forEach(track => track.stop());
+          
+          resolve({ audioUrl: silenceUrl, blob: silenceBlob });
+          return;
         }
         
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+        // Create audio blob and get its URL
+        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
         
-        // If the blob is too small, add padding to prevent "too short" errors
-        let finalBlob = audioBlob;
-        if (audioBlob.size < 200) {
-          console.log('Adding padding to small audio blob');
-          const padding = new Uint8Array(1024).fill(0);
-          finalBlob = new Blob([audioBlob, padding], { type: 'audio/webm;codecs=opus' });
-        }
+        console.log(`Audio blob created: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
         
-        // Stop all tracks to release the microphone
+        // Release microphone
         stream.getTracks().forEach(track => track.stop());
         
-        resolve({ audioUrl, blob: finalBlob });
+        resolve({ audioUrl, blob: audioBlob });
       });
       
-      // Request data before stopping to ensure we get something
+      // Ensure we finish getting data before stopping
       if (mediaRecorder.state === 'recording') {
-        try {
-          mediaRecorder.requestData();
-          setTimeout(() => mediaRecorder.stop(), 100);
-        } catch (e) {
-          console.warn('Error requesting data before stop', e);
-          mediaRecorder.stop();
-        }
+        mediaRecorder.requestData();
+        
+        // Small delay to make sure data is actually captured
+        setTimeout(() => {
+          if (mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            console.log('MediaRecorder explicitly stopped');
+          }
+        }, 200);
       } else {
+        console.warn(`Cannot stop recorder, current state: ${mediaRecorder.state}`);
+        // If we're not recording, stop anyway
         mediaRecorder.stop();
       }
     });
+  };
+  
+  const pause = () => {
+    if (mediaRecorder.state === 'recording') {
+      mediaRecorder.pause();
+      return true;
+    }
+    return false;
+  };
+  
+  const resume = () => {
+    if (mediaRecorder.state === 'paused') {
+      mediaRecorder.resume();
+      return true;
+    }
+    return false;
   };
   
   // Return an object with methods to control the recorder
   return {
     start: () => {
       if (mediaRecorder.state !== 'recording') {
-        mediaRecorder.start();
+        mediaRecorder.start(100);
+        console.log('MediaRecorder started');
       }
     },
     stop,
-    stream
+    pause,
+    resume,
+    stream,
+    getState: () => mediaRecorder.state
   };
 };
