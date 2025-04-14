@@ -12,12 +12,17 @@ export function LoadingEntryContent() {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <ShimmerSkeleton className="h-3 w-full" />
-      <ShimmerSkeleton className="h-3 w-3/4" />
-      <ShimmerSkeleton className="h-3 w-5/6" />
-      <ShimmerSkeleton className="h-3 w-1/2" />
+      <div className="flex items-center gap-2 mb-4">
+        <ShimmerSkeleton className="h-4 w-4 rounded-full" />
+        <ShimmerSkeleton className="h-4 w-32" />
+      </div>
       
-      <div className="flex items-center mt-3 justify-center">
+      <ShimmerSkeleton className="h-4 w-full" />
+      <ShimmerSkeleton className="h-4 w-3/4" />
+      <ShimmerSkeleton className="h-4 w-5/6" />
+      <ShimmerSkeleton className="h-4 w-1/2" />
+      
+      <div className="flex items-center mt-4 justify-center">
         <div className="text-xs text-muted-foreground animate-pulse">
           Processing with AI...
         </div>

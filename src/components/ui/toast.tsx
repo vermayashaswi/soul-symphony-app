@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import * as ToastPrimitives from "@radix-ui/react-toast"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -44,6 +45,7 @@ const Toast = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
     VariantProps<typeof toastVariants>
 >(({ className, variant, ...props }, ref) => {
+  // Create a ref that matches the expected element type of ToastPrimitives.Root
   const toastRef = React.useRef<React.ElementRef<typeof ToastPrimitives.Root>>(null);
   const { onOpenChange } = props;
   
