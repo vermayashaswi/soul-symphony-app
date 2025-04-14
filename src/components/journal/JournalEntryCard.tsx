@@ -12,6 +12,7 @@ import {
   EntryContent
 } from './entry-card';
 import ErrorBoundary from './ErrorBoundary';
+import { triggerThemeExtraction } from '@/utils/audio/theme-extractor';
 
 export interface JournalEntry {
   id: number;
@@ -168,6 +169,23 @@ export function JournalEntryCard({
       return 'Recently';
     }
   })();
+  
+  function extractThemes() {
+    try {
+      if (Array.isArray(safeEntry.master_themes) && safeEntry.master_themes.length > 0) {
+        return safeEntry.master_themes;
+      }
+      
+      if (Array.isArray(safeEntry.themes) && safeEntry.themes.length > 0) {
+        return safeEntry.themes;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('[JournalEntryCard] Error extracting themes:', error);
+      return [];
+    }
+  }
   
   const initialThemes = extractThemes();
   
