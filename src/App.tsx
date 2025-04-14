@@ -30,7 +30,7 @@ const queryClient = new QueryClient({
 
 const App = () => {
   useEffect(() => {
-    console.log('App mounted, path:', window.location.pathname);
+    console.log('App mounted, path:', window.location.pathname, 'hostname:', window.location.hostname);
     debugLogger.log('info', '🔍 Audio debugging initialized');
     debugLogger.log('info', `[${new Date().toISOString()}] App initialized`);
     
@@ -46,11 +46,24 @@ const App = () => {
     
     // Add domain-specific handling for app.soulo.online
     const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+    
+    // Handle app subdomain path corrections
     if (isAppSubdomain && window.location.pathname.startsWith('/app/')) {
       // If we're on app.soulo.online/app/*, redirect to app.soulo.online/*
       const newPath = window.location.pathname.replace('/app/', '/');
       console.log('Redirecting from app subdomain path with /app/ prefix to:', newPath);
       window.history.replaceState(null, '', newPath);
+    }
+    
+    // Handle main domain redirects to app subdomain if configured
+    const shouldRedirectToAppSubdomain = false; // Set to true if you want to redirect all traffic
+    if (!isAppSubdomain && shouldRedirectToAppSubdomain && window.location.pathname.startsWith('/app/')) {
+      // If we're on soulo.online/app/*, redirect to app.soulo.online/*
+      const newPath = window.location.pathname.replace('/app/', '/');
+      const newUrl = `https://app.soulo.online${newPath}${window.location.search}${window.location.hash}`;
+      console.log('Redirecting to app subdomain:', newUrl);
+      window.location.href = newUrl;
+      return;
     }
     
     // Add a global error listener to catch runtime errors

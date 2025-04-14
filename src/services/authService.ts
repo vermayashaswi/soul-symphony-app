@@ -17,9 +17,8 @@ export const getRedirectUrl = (): string => {
       return 'https://app.soulo.online/auth';
     }
     
-    // Check if we're on a specific path like /app/auth
-    const pathMatch = window.location.pathname.match(/\/app\/auth/);
-    return pathMatch ? 'https://soulo.online/app/auth' : 'https://soulo.online/auth';
+    // For main domain, redirect to the /app/auth path
+    return 'https://soulo.online/app/auth';
   }
   
   const origin = window.location.origin;
@@ -46,17 +45,27 @@ export const getRedirectUrl = (): string => {
   if (isInStandaloneMode() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     // Use a special auth flow that works better in PWA context
     const pathname = window.location.pathname;
-    // Check if we're on app auth page
-    const isAppAuth = pathname.includes('/app/auth');
-    return `${origin}${isAppAuth ? '/app/auth' : '/auth'}?pwa_mode=true`;
+    const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+    
+    // Check if we're on app auth page - adjust path based on domain
+    if (isAppSubdomain) {
+      return `${origin}/auth?pwa_mode=true`;
+    } else {
+      return `${origin}/app/auth?pwa_mode=true`;
+    }
   }
   
   // Otherwise use the current origin for local development
   // Use the current path to determine if we're in /auth or /app/auth
   const pathname = window.location.pathname;
-  // Check if we're on app auth page
-  const isAppAuth = pathname.includes('/app/auth');
-  return `${origin}${isAppAuth ? '/app/auth' : '/auth'}`;
+  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+  
+  // Check if we're on app auth page - adjust path based on domain
+  if (isAppSubdomain) {
+    return `${origin}/auth`;
+  } else {
+    return `${origin}/app/auth`;
+  }
 };
 
 /**

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Journal from '@/pages/Journal';
@@ -146,10 +145,7 @@ const AppRoutes = () => {
               path="/app" 
               element={user ? <Navigate to="/app/home" replace /> : <Navigate to="/app/onboarding" replace />} 
             />
-            <Route 
-              path="/" 
-              element={user ? <Navigate to="/app/home" replace /> : <Navigate to="/app/onboarding" replace />} 
-            />
+            <Route path="/" element={<Navigate to="/app" replace />} />
           </>
         )}
       </Routes>

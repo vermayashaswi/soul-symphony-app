@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,13 +19,25 @@ export const isAppRoute = (pathname: string): boolean => {
            !pathname.startsWith('/app-download');
   }
   
-  // Standard app path detection for main domain
+  // Legacy support for soulo.online/app/* paths
   return pathname === '/app' || pathname.startsWith('/app/');
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
-  // Website routes are anything that doesn't start with /app
-  return !isAppRoute(pathname);
+  // Website routes are anything that doesn't start with /app on main domain
+  // Or specific content routes on app subdomain
+  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+  
+  if (isAppSubdomain) {
+    // Only these specific routes are considered website routes on app subdomain
+    return pathname.startsWith('/blog') || 
+           pathname.startsWith('/faq') || 
+           pathname.startsWith('/privacy-policy') || 
+           pathname.startsWith('/app-download');
+  }
+  
+  // On main domain, everything not starting with /app is a website route
+  return !pathname.startsWith('/app');
 }
 
 export const WebsiteRouteWrapper = ({ element }: { element: React.ReactNode }) => {
