@@ -9,8 +9,9 @@ interface EntryContentProps {
 }
 
 export function EntryContent({ content, isExpanded, isProcessing = false }: EntryContentProps) {
-  // Always show loading state when processing or no content available
-  if (isProcessing || !content || content === "Processing entry...") {
+  // Show loading state when processing or no content available
+  // Added additional check to consider empty or placeholder content as "processing"
+  if (isProcessing || !content || content === "Processing entry..." || content.trim() === "") {
     return <LoadingEntryContent />;
   }
 
