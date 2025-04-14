@@ -4,9 +4,15 @@ import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 
 export function LoadingEntryContent() {
-  // Use shimmer skeletons for smoother loading appearance
+  // Added motion effects for smoother appearance
   return (
-    <div className="space-y-2">
+    <motion.div 
+      className="space-y-2"
+      initial={{ opacity: 0.6 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+    >
       <div className="flex items-center gap-2 mb-4">
         <ShimmerSkeleton className="h-4 w-4 rounded-full" />
         <ShimmerSkeleton className="h-4 w-32" />
@@ -16,6 +22,6 @@ export function LoadingEntryContent() {
       <ShimmerSkeleton className="h-4 w-3/4" />
       <ShimmerSkeleton className="h-4 w-5/6" />
       <ShimmerSkeleton className="h-4 w-1/2" />
-    </div>
+    </motion.div>
   );
 }

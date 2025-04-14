@@ -44,6 +44,8 @@ export default function JournalEntriesList({
   const [stableVisibleProcessingEntries, setStableVisibleProcessingEntries] = useState<string[]>([]);
   const lastProcessingChangeTimestamp = useRef(0);
   const processingEntriesTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const processingEntryRemovalTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const stateUpdateVersionRef = useRef(0);
 
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
@@ -92,23 +94,34 @@ export default function JournalEntriesList({
     const allProcessingEntries = [...new Set([...processingEntries, ...persistedProcessingEntries])];
     
     const now = Date.now();
-    if (now - lastProcessingChangeTimestamp.current < 500) {
-      if (processingEntriesTimerRef.current) {
-        clearTimeout(processingEntriesTimerRef.current);
-      }
+    const timeSinceLastChange = now - lastProcessingChangeTimestamp.current;
+    
+    if (processingEntriesTimerRef.current) {
+      clearTimeout(processingEntriesTimerRef.current);
     }
     
-    lastProcessingChangeTimestamp.current = now;
+    const currentVersion = ++stateUpdateVersionRef.current;
     
     processingEntriesTimerRef.current = setTimeout(() => {
-      setStableVisibleProcessingEntries(allProcessingEntries);
-      setVisibleProcessingEntries(allProcessingEntries);
-      
-      if (allProcessingEntries.length > 0) {
-        setShowTemporaryProcessingEntries(true);
-        setProcessingEntriesLoaded(true);
+      if (currentVersion === stateUpdateVersionRef.current) {
+        setStableVisibleProcessingEntries(prev => {
+          if (allProcessingEntries.length > prev.length) {
+            return allProcessingEntries;
+          }
+          else if (allProcessingEntries.length > 0) {
+            return prev;
+          }
+          return allProcessingEntries;
+        });
+        
+        if (allProcessingEntries.length > 0) {
+          setShowTemporaryProcessingEntries(true);
+          setProcessingEntriesLoaded(true);
+        }
       }
-    }, 300);
+    }, timeSinceLastChange < 2000 ? 2000 : 500);
+    
+    lastProcessingChangeTimestamp.current = now;
     
     const hasCompletedEntries = entries.some(entry => {
       const entryIdStr = String(entry.id);
@@ -129,8 +142,14 @@ export default function JournalEntriesList({
     });
     
     if (hasCompletedEntries) {
-      console.log("Completed entries detected, hiding processing entries soon");
-      setTimeout(() => {
+      console.log("Completed entries detected, scheduling processing indicators removal");
+      
+      if (processingEntryRemovalTimerRef.current) {
+        clearTimeout(processingEntryRemovalTimerRef.current);
+      }
+      
+      processingEntryRemovalTimerRef.current = setTimeout(() => {
+        console.log("Executing delayed removal of processing indicators");
         setShowTemporaryProcessingEntries(false);
         
         const updatedProcessingEntries = allProcessingEntries.filter(tempId => {
@@ -141,10 +160,10 @@ export default function JournalEntriesList({
           localStorage.setItem('processingEntries', JSON.stringify(updatedProcessingEntries));
           
           window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-            detail: { entries: updatedProcessingEntries }
+            detail: { entries: updatedProcessingEntries, lastUpdate: Date.now() }
           }));
         }
-      }, 1000);
+      }, 2500);
     }
   }, [processingEntries, persistedProcessingEntries, entries]);
 

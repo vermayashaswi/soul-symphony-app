@@ -9,7 +9,7 @@ let isEntryBeingProcessed = false;
 let processingLock = false;
 let processingTimeoutId: NodeJS.Timeout | null = null;
 let lastStateChangeTime = 0;
-const DEBOUNCE_THRESHOLD = 500; // ms to prevent rapid state changes
+const DEBOUNCE_THRESHOLD = 1000; // Increased from 500ms to 1000ms to prevent rapid state changes
 
 // Store processing entries in localStorage to persist across navigations
 export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove') => {
@@ -35,7 +35,7 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
     
     // Dispatch an event so other components can react to the change
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-      detail: { entries }
+      detail: { entries, lastUpdate: now }
     }));
     
     return entries;
@@ -79,7 +79,7 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
       
       // Dispatch an event so other components can react to the change
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { entries: updatedEntries }
+        detail: { entries: updatedEntries, lastUpdate: now, removedId: idStr }
       }));
       
       console.log(`[Audio.ProcessingState] Removed processing entry with ID ${idStr}`);
@@ -112,6 +112,11 @@ export function resetProcessingState(): void {
   import('@/services/notificationService').then(({ clearAllToasts }) => {
     clearAllToasts();
   });
+  
+  // Dispatch a reset event
+  window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+    detail: { entries: [], reset: true, lastUpdate: Date.now() }
+  }));
 }
 
 // Internal setters used by the main processing module
