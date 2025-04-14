@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,7 +7,18 @@ export const isNativeApp = (): boolean => {
 };
 
 export const isAppRoute = (pathname: string): boolean => {
-  // More strict checking for app routes
+  // Handle both app.soulo.online/* and soulo.online/app/*
+  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+  
+  if (isAppSubdomain) {
+    // On app subdomain, all paths are app routes except explicit website routes
+    return !pathname.startsWith('/blog') && 
+           !pathname.startsWith('/faq') && 
+           !pathname.startsWith('/privacy-policy') && 
+           !pathname.startsWith('/app-download');
+  }
+  
+  // Standard app path detection for main domain
   return pathname === '/app' || pathname.startsWith('/app/');
 };
 
@@ -38,21 +48,32 @@ export const AppRouteWrapper = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
   
   console.log('AppRouteWrapper rendering:', location.pathname, { 
     requiresAuth, 
-    userExists: !!user 
+    userExists: !!user,
+    isAppSubdomain
   });
   
   useEffect(() => {
     if (requiresAuth && !user) {
-      console.log('Protected route accessed without auth, redirecting to /app/auth');
-      navigate('/app/auth', { 
-        state: { from: location },
-        replace: true
-      });
+      console.log('Protected route accessed without auth, redirecting to auth');
+      
+      // Adjust redirect path based on subdomain
+      if (isAppSubdomain) {
+        navigate('/auth', { 
+          state: { from: location },
+          replace: true
+        });
+      } else {
+        navigate('/app/auth', { 
+          state: { from: location },
+          replace: true
+        });
+      }
     }
-  }, [user, navigate, requiresAuth, location]);
+  }, [user, navigate, requiresAuth, location, isAppSubdomain]);
 
   // If this is a protected route and user is not authenticated,
   // render nothing while the redirect happens

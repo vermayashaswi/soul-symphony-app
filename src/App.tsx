@@ -40,8 +40,18 @@ const App = () => {
       viewport: {
         width: window.innerWidth,
         height: window.innerHeight
-      }
+      },
+      hostname: window.location.hostname
     });
+    
+    // Add domain-specific handling for app.soulo.online
+    const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+    if (isAppSubdomain && window.location.pathname.startsWith('/app/')) {
+      // If we're on app.soulo.online/app/*, redirect to app.soulo.online/*
+      const newPath = window.location.pathname.replace('/app/', '/');
+      console.log('Redirecting from app subdomain path with /app/ prefix to:', newPath);
+      window.history.replaceState(null, '', newPath);
+    }
     
     // Add a global error listener to catch runtime errors
     const handleGlobalError = (event: ErrorEvent) => {

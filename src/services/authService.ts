@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -10,7 +9,14 @@ export const getRedirectUrl = (): string => {
   // This is a production environment fix specifically for soulo.online
   // Force the correct URL for production environment
   if (window.location.hostname === 'soulo.online' || 
+      window.location.hostname === 'app.soulo.online' ||
       window.location.hostname.endsWith('.soulo.online')) {
+    
+    // Special case for app subdomain
+    if (window.location.hostname === 'app.soulo.online') {
+      return 'https://app.soulo.online/auth';
+    }
+    
     // Check if we're on a specific path like /app/auth
     const pathMatch = window.location.pathname.match(/\/app\/auth/);
     return pathMatch ? 'https://soulo.online/app/auth' : 'https://soulo.online/auth';
