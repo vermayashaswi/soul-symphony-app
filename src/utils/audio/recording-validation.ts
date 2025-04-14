@@ -3,7 +3,6 @@
  * Audio recording validation utilities
  */
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
-import { verifyUserAuthentication } from './auth-utils';
 import { 
   setProcessingLock, 
   setIsEntryBeingProcessed, 
@@ -45,7 +44,13 @@ export async function validateInitialState(
     }
   }
   
-  // Validate the audio blob
+  // If the blob is very small but not null, we'll still try to process it
+  if (audioBlob && audioBlob.size < 200) {
+    console.warn('[AudioValidation] Audio blob is very small:', audioBlob.size, 'bytes');
+    // Still allow processing for small blobs; the server will handle validation
+  }
+  
+  // Validate the audio blob with more permissive settings
   const validation = validateAudioBlob(audioBlob);
   if (!validation.isValid) {
     console.error('Audio validation failed:', validation.errorMessage);

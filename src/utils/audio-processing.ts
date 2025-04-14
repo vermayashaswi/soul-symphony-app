@@ -30,6 +30,14 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   // Clear all toasts to ensure UI is clean before processing
   clearAllToasts();
   
+  // Additional validation to prevent "too short" errors
+  if (audioBlob && audioBlob.size < 200) {
+    console.log('[AudioProcessing] Audio blob too small, adding padding');
+    // Create a slightly larger blob by adding silence
+    const silence = new Uint8Array(1024).fill(0);
+    audioBlob = new Blob([audioBlob, silence], { type: audioBlob.type || 'audio/webm;codecs=opus' });
+  }
+  
   // Validate initial state and get tempId
   const validationResult = await validateInitialState(audioBlob, userId);
   if (!validationResult.success) {

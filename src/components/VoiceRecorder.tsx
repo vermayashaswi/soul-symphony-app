@@ -205,14 +205,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         console.log('[VoiceRecorder] Audio prepared with duration:', duration);
         setAudioPrepared(true);
         
-        if (duration < 0.5) {
+        if (duration < 0.2 && recordingTime < 0.5) {
           setRecordingError("Recording is too short. Please try again.");
           setIsProcessing(false);
           setHasSaved(false);
           savingInProgressRef.current = false;
           return;
         }
-      } else if (audioDuration < 0.5) {
+      } else if (audioDuration < 0.2 && recordingTime < 0.5) {
         setRecordingError("Recording is too short. Please try again.");
         setIsProcessing(false);
         setHasSaved(false);
