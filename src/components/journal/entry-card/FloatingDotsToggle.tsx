@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronUp, MoreHorizontal } from 'lucide-react';
 
 interface FloatingDotsToggleProps {
   onClick: () => void;
@@ -25,7 +25,7 @@ export function FloatingDotsToggle({ onClick, isExpanded }: FloatingDotsTogglePr
       {isExpanded ? (
         <ChevronUp className="h-4 w-4 text-muted-foreground" />
       ) : (
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
       )}
       
       {[0, 1, 2].map((i) => {
