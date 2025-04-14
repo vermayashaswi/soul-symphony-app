@@ -157,7 +157,7 @@ export async function translateAndRefineText(
         messages: [
           {
             role: 'system',
-            content: 'You are an expert translator of multilingual audio feedbacks for users submitting their journal entries on an app called "SOuLO". Translate the following multi-lingual text to English. A user might be using multiple languages within this entry. Also correct any transcription errors, add proper punctuation, and format the text into readable paragraphs:'
+            content: 'You are an expert translator of multilingual audio feedbacks for users submitting their journal entries on a voice journaling app called "SOuLO". Translate the following multi-lingual text to English. Logically preserve words that need transliteration, not translation. A user might be using multiple languages within this entry. Also correct any transcription errors in words that don\'t make sense in any way in the context, add proper punctuation, and format the text into readable paragraphs:'
           },
           {
             role: 'user',
