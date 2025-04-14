@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -6,7 +7,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   FloatingDotsToggle, 
-  SentimentMeter, 
   ThemeLoader, 
   DeleteEntryDialog,
   EntryContent
@@ -87,6 +87,34 @@ export function JournalEntryCard({
     } catch (error) {
       console.error("[JournalEntryCard] Error extracting themes:", error);
       return [];
+    }
+  };
+  
+  // Calculate sentiment-based border color
+  const getSentimentBorderClass = (): string => {
+    if (!safeEntry.sentiment || isProcessing) {
+      return '';
+    }
+
+    let score = 0;
+    try {
+      if (typeof safeEntry.sentiment === 'string') {
+        score = parseFloat(safeEntry.sentiment);
+      } else if (typeof safeEntry.sentiment === 'object' && safeEntry.sentiment !== null) {
+        score = (safeEntry.sentiment as any).score || 0;
+      }
+    } catch (error) {
+      console.error("[JournalEntryCard] Error parsing sentiment score:", error);
+      return '';
+    }
+
+    // Apply border based on sentiment score
+    if (score >= 0.3) {
+      return 'border-[#F2FCE2] border-2'; // Good - Green
+    } else if (score <= -0.3) {
+      return 'border-[#ea384c] border-2'; // Bad - Red
+    } else {
+      return 'border-[#FEF7CD] border-2'; // Neutral - Yellow
     }
   };
   
@@ -237,7 +265,6 @@ export function JournalEntryCard({
                                               safeEntry.content === "Processing entry..." ||
                                               safeEntry.content === "Loading...");
   
-  const isSentimentProcessing = isProcessing && !safeEntry.sentiment && !contentLoaded;
   const isThemesProcessing = isProcessing && !contentLoaded && 
                            (!safeEntry.themes || safeEntry.themes.length === 0) && 
                            (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
@@ -276,16 +303,10 @@ export function JournalEntryCard({
         data-expanded={isExpanded ? "true" : "false"}
         data-show-themes={showThemes ? "true" : "false"}
       >
-        <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''}`}>
+        <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''} ${getSentimentBorderClass()}`}>
           <div className="flex justify-between items-start p-3 md:p-4">
             <div className="flex items-center space-x-3">
               <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
-              <ErrorBoundary>
-                <SentimentMeter 
-                  sentiment={safeEntry.sentiment} 
-                  isProcessing={isSentimentProcessing}
-                />
-              </ErrorBoundary>
             </div>
 
             <div className="flex items-center space-x-2 md:space-x-3">

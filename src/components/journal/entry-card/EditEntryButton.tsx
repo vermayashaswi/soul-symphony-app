@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface EditEntryButtonProps {
   entryId: number;
@@ -17,6 +18,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isMobile = useIsMobile();
 
   const handleOpenDialog = () => {
     setEditedContent(content);
@@ -62,9 +64,9 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   return (
     <>
       <Button 
-        variant="outline" 
-        size="icon" 
-        className="h-8 w-8 text-primary border-primary"
+        variant="ghost" 
+        size={isMobile ? "sm" : "icon"} 
+        className={isMobile ? "h-8 w-8 p-0" : ""}
         onClick={handleOpenDialog}
         aria-label="Edit entry"
       >
