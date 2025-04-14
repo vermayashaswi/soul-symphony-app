@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,7 +12,7 @@ import AppRoutes from "./routes/AppRoutes";
 import "./styles/mobile.css";
 import { useEffect } from 'react';
 import { handleAuthCallback } from "./services/authService";
-import { debugLogger } from "@/components/debug/DebugPanel";
+import { debugLogger } from "@/components/debug/DebugPanel.tsx";
 
 const queryClient = new QueryClient({
   defaultOptions: {
