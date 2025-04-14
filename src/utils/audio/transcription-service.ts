@@ -32,7 +32,8 @@ export async function sendAudioForTranscription(
         audio: base64Audio,
         userId: userId || null,
         directTranscription: directTranscription,
-        highQuality: true // Add flag to indicate this is a high-quality recording
+        highQuality: true, // Add flag to indicate this is a high-quality recording
+        recordingTime: Date.now() // Add current time to help with debugging
       }
     });
 
@@ -66,6 +67,7 @@ export async function sendAudioForTranscription(
     console.log('Transcription successful:', {
       directMode: directTranscription,
       transcriptionLength: response.data?.transcription?.length || 0,
+      refinedTextLength: response.data?.refinedText?.length || 0,
       hasEntryId: !!response.data?.entryId
     });
 

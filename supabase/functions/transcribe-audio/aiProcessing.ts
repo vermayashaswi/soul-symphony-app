@@ -154,6 +154,14 @@ export async function translateAndRefineText(
   try {
     console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
     
+    // Add more logging to track exactly what we're sending to GPT
+    console.log("Transcribed text length:", transcribedText.length);
+    
+    if (!transcribedText || transcribedText.trim() === '') {
+      console.error("Empty transcribed text provided to translateAndRefineText");
+      return { refinedText: "No text was detected in this recording." };
+    }
+    
     const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -181,7 +189,8 @@ export async function translateAndRefineText(
             content: transcribedText
           }
         ],
-        temperature: 0.3
+        temperature: 0.3,
+        max_tokens: 4000
       }),
     });
 
@@ -194,9 +203,15 @@ export async function translateAndRefineText(
     const result = await gptResponse.json();
     const refinedText = result.choices[0].message.content.trim();
     
+    // Add more logging to verify we got back a different text
+    console.log("Refined text length:", refinedText.length);
+    console.log("Original text first 50 chars:", transcribedText.slice(0, 50));
+    console.log("Refined text first 50 chars:", refinedText.slice(0, 50));
+    console.log("Are texts identical?", refinedText === transcribedText);
+    
     // Make sure we got back actual refined text and it's different from the original
-    if (!refinedText || refinedText === transcribedText) {
-      console.warn('GPT returned same text or empty response, using original text');
+    if (!refinedText) {
+      console.warn('GPT returned empty response, using original text');
       return { refinedText: transcribedText };
     }
     

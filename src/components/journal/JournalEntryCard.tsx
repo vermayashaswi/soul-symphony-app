@@ -130,6 +130,7 @@ export function JournalEntryCard({
   }, [isNew]);
 
   const toggleExpanded = () => {
+    console.log(`[JournalEntryCard] Toggling expanded state: ${!isExpanded}`);
     setIsExpanded(!isExpanded);
   };
 
