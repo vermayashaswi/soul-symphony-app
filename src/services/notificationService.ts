@@ -63,22 +63,22 @@ export function showTrackedToast(
 ): string {
   const id = options.id || `toast-${Date.now()}`;
   
-  let toastFn = toast;
+  let toastFunction;
   switch (options.type) {
     case 'success':
-      toastFn = toast.success;
+      toastFunction = toast.success;
       break;
     case 'error':
-      toastFn = toast.error;
+      toastFunction = toast.error;
       break;
     case 'loading':
-      toastFn = toast.loading;
+      toastFunction = toast.loading;
       break;
     default:
-      toastFn = toast;
+      toastFunction = toast;
   }
   
-  toastFn(message, {
+  toastFunction(message, {
     id,
     duration: options.duration || 3000,
   });
@@ -86,4 +86,3 @@ export function showTrackedToast(
   activeToasts.add(id);
   return id;
 }
-

@@ -3,7 +3,6 @@
  * AI processing utilities for transcription, translation, and analysis
  */
 
-import { franc } from "https://deno.land/x/franc@v6.1.0/index.js";
 import langTag from "https://deno.land/x/language_tags@1.0.0/mod.ts";
 
 /**
@@ -106,66 +105,6 @@ export async function analyzeEmotions(text: string, emotions: any[], openAIApiKe
 }
 
 /**
- * Detects the languages present in the transcribed text using franc
- * Note: This is kept as a fallback in case Whisper doesn't detect languages properly
- */
-export async function detectLanguages(text: string): Promise<string[]> {
-  try {
-    console.log('Detecting languages in text:', text.slice(0, 100) + '...');
-    
-    // Split text into chunks to analyze, as franc works better with smaller segments
-    const chunks = text.split(/[.!?]+/).filter(chunk => chunk.trim().length > 10);
-    
-    const detectedLanguages = new Set<string>();
-    
-    // If text is too short, default to English
-    if (text.length < 10) {
-      console.log('Text too short for reliable language detection, defaulting to English');
-      return ['en'];
-    }
-    
-    // Process whole text first
-    const mainLang = franc(text, { minLength: 10 });
-    if (mainLang && mainLang !== 'und') {
-      try {
-        const langCode = langTag.language(mainLang).format();
-        if (langCode) detectedLanguages.add(langCode);
-      } catch (e) {
-        console.log(`Could not resolve language tag for ${mainLang}`);
-      }
-    }
-    
-    // Process each meaningful chunk to detect multiple languages
-    for (const chunk of chunks) {
-      if (chunk.trim().length < 20) continue; // Skip very short chunks
-      
-      const lang = franc(chunk, { minLength: 10 });
-      if (lang && lang !== 'und') {
-        try {
-          const langCode = langTag.language(lang).format();
-          if (langCode) detectedLanguages.add(langCode);
-        } catch (e) {
-          console.log(`Could not resolve language tag for ${lang}`);
-        }
-      }
-    }
-    
-    // Default to English if no languages detected
-    if (detectedLanguages.size === 0) {
-      console.log('No languages reliably detected, defaulting to English');
-      return ['en'];
-    }
-    
-    const result = Array.from(detectedLanguages);
-    console.log('Detected languages:', result);
-    return result;
-  } catch (error) {
-    console.error('Error in detectLanguages:', error);
-    return ['en']; // Default to English on error
-  }
-}
-
-/**
  * Transcribes audio and returns detected language info from Whisper
  */
 export async function transcribeAudioWithWhisper(
@@ -217,14 +156,8 @@ export async function translateAndRefineText(
   try {
     console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
     
-    // If we don't have detected language from Whisper, use our fallback detection
+    // Use detected language from Whisper if available, otherwise mark as unknown
     let languagesInfo = detectedLanguage || "unknown";
-    
-    if (!detectedLanguage) {
-      // Use franc as fallback if language not detected by Whisper
-      const detectedLanguages = await detectLanguages(transcribedText);
-      languagesInfo = detectedLanguages.join(', ');
-    }
     
     console.log("Language information for GPT:", languagesInfo);
     
