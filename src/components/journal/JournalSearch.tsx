@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -186,7 +187,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
             />
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-1 py-0.5"> {/* Reduced vertical padding */}
             <div className="text-sm text-muted-foreground">
               {filteredEntries.length} total {filteredEntries.length === 1 ? 'entry' : 'entries'}
             </div>
