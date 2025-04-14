@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { triggerThemeExtraction } from '@/utils/audio/theme-extractor';
 
 interface EditEntryButtonProps {
   entryId: number;
@@ -38,11 +39,11 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
-      // Update the journal entry content
+      // Update the journal entry content in the "refined text" column
       const { error } = await supabase
         .from('Journal Entries')
         .update({ 
-          content: editedContent,
+          "refined text": editedContent,
           themes: null, // Clear themes so they can be regenerated
           master_themes: null 
         })
@@ -50,8 +51,19 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         
       if (error) throw error;
       
-      toast.success('Journal entry updated');
+      // Trigger theme extraction after content update
+      const themeSuccess = await triggerThemeExtraction(entryId);
+      
+      if (themeSuccess) {
+        toast.success('Journal entry updated and themes extraction triggered');
+      } else {
+        toast.success('Journal entry updated');
+        console.warn('Theme extraction failed but entry was updated');
+      }
+      
       handleCloseDialog();
+      
+      // Notify parent that the entry was updated
       onEntryUpdated();
     } catch (error) {
       console.error('Error updating journal entry:', error);
