@@ -9,8 +9,6 @@ import { supabase } from '@/integrations/supabase/client';
  */
 export async function triggerThemeExtraction(entryId: number): Promise<boolean> {
   try {
-    console.log("Manually triggering theme extraction for entry:", entryId);
-    
     // Get the entry text
     const { data: entryData, error: fetchError } = await supabase
       .from('Journal Entries')
@@ -19,40 +17,36 @@ export async function triggerThemeExtraction(entryId: number): Promise<boolean> 
       .single();
       
     if (fetchError) {
-      console.error("Error fetching entry for theme extraction:", fetchError);
-      return false;
+      throw new Error(`Error fetching entry: ${fetchError.message}`);
     } 
     
     if (!entryData) {
-      console.error("No entry data found for theme extraction");
-      return false;
+      throw new Error("No entry data found");
     }
     
     const text = entryData["refined text"] || entryData["transcription text"] || "";
     
     if (!text) {
-      console.error("No text content found for theme extraction");
-      return false;
+      throw new Error("No text content found");
     }
     
-    // Call the generate-themes function directly
-    console.log("Calling generate-themes with text:", text.substring(0, 50) + "...");
+    // Call the generate-themes function
     const { error } = await supabase.functions.invoke('generate-themes', {
       body: {
         text: text,
-        entryId: entryId  // Ensure entryId is passed as a number
+        entryId: entryId
       }
     });
     
     if (error) {
-      console.error("Error calling generate-themes:", error);
-      return false;
+      throw new Error(`Error calling generate-themes: ${error.message}`);
     }
     
-    console.log("Successfully triggered theme extraction");
     return true;
-  } catch (themeErr) {
-    console.error("Error manually triggering theme extraction:", themeErr);
+  } catch (err) {
+    console.error("Error triggering theme extraction:", err);
+    // Even if theme extraction fails, we don't want to block the user
+    // The themes can be generated later
     return false;
   }
 }

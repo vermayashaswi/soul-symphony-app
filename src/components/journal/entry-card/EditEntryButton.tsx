@@ -39,10 +39,8 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
-      console.log("Updating entry:", entryId, "with content:", editedContent.substring(0, 50) + "...");
-      
       // Update the journal entry content in the "refined text" column
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
           "refined text": editedContent,
@@ -51,27 +49,30 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         })
         .eq('id', entryId);
         
-      if (error) {
-        console.error("Supabase update error:", error);
-        throw error;
+      if (updateError) {
+        console.error("Error updating entry:", updateError);
+        toast.error('Failed to update entry');
+        setIsSubmitting(false);
+        return;
       }
       
-      console.log("Update successful, triggering theme extraction");
-      
-      // Trigger theme extraction after content update
-      const themeSuccess = await triggerThemeExtraction(entryId);
-      
-      if (themeSuccess) {
-        toast.success('Journal entry updated and themes extraction triggered');
-      } else {
-        toast.success('Journal entry updated');
-        console.warn('Theme extraction failed but entry was updated');
-      }
-      
+      // Close dialog first to improve perceived performance
       handleCloseDialog();
       
-      // Notify parent that the entry was updated
+      // Notify parent that the entry was updated immediately after successful update
       onEntryUpdated();
+      
+      // Show a success toast for the update
+      toast.success('Journal entry updated');
+      
+      // Trigger theme extraction in the background
+      try {
+        await triggerThemeExtraction(entryId);
+        toast.success('Themes extraction completed');
+      } catch (extractionError) {
+        console.error('Theme extraction failed but entry was updated:', extractionError);
+      }
+      
     } catch (error) {
       console.error('Error updating journal entry:', error);
       toast.error('Failed to update entry');
