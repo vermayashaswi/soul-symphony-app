@@ -37,14 +37,17 @@ export function PlaybackControls({
   const [isTouchActive, setIsTouchActive] = useState(false);
   const { isMobile } = useIsMobile();
   
+  // Fix for zero duration audio - use a minimum valid duration
+  const effectiveDuration = audioDuration <= 0 ? 0.1 : audioDuration;
+  
   // Update slider and current time based on playback progress
   useEffect(() => {
     if (!isTouchActive && playbackProgress !== undefined) {
-      const timeInSeconds = (playbackProgress * audioDuration);
+      const timeInSeconds = (playbackProgress * effectiveDuration);
       setCurrentTime(timeInSeconds);
       setSliderValue(playbackProgress * 100);
     }
-  }, [playbackProgress, audioDuration, isTouchActive]);
+  }, [playbackProgress, effectiveDuration, isTouchActive]);
   
   // Force update the slider position during playback with requestAnimationFrame
   useEffect(() => {
@@ -60,7 +63,7 @@ export function PlaybackControls({
           }
           return prev;
         });
-        setCurrentTime(playbackProgress * audioDuration);
+        setCurrentTime(playbackProgress * effectiveDuration);
         animationFrameId = requestAnimationFrame(updateSlider);
       };
       
@@ -72,22 +75,23 @@ export function PlaybackControls({
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isPlaying, playbackProgress, audioDuration, isTouchActive]);
+  }, [isPlaying, playbackProgress, effectiveDuration, isTouchActive]);
   
   const formattedProgress = formatTime(currentTime);
-  const formattedDuration = formatTime(audioDuration);
+  const formattedDuration = formatTime(effectiveDuration);
   
   const handleSliderChange = (value: number[]) => {
     if (onSeek) {
       const position = value[0] / 100;
       setSliderValue(value[0]);
-      setCurrentTime(position * audioDuration);
+      setCurrentTime(position * effectiveDuration);
       onSeek(position);
     }
   };
 
   // Function to ensure all toasts are completely cleared
   const handleSaveClick = async () => {
+    // Always allow saving even if duration is 0
     setIsClearingToasts(true);
     
     // First force clear any existing toasts
@@ -215,6 +219,8 @@ export function PlaybackControls({
 }
 
 function formatTime(seconds: number): string {
+  // Ensure seconds is at least 0
+  seconds = Math.max(0, seconds);
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;

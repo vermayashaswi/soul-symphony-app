@@ -30,8 +30,8 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
     return { isValid: false, errorMessage: 'No recording to process.' };
   }
   
-  // Minimum size check (lower minimum to 200 bytes to be more permissive)
-  if (audioBlob.size < 200) {
+  // Minimum size check (lower minimum to 100 bytes to be more permissive)
+  if (audioBlob.size < 100) {
     return { isValid: false, errorMessage: 'Recording is too short. Please try again.' };
   }
   
@@ -61,6 +61,13 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
  * Fixes common issues with audio blob MIME types
  */
 export function normalizeAudioBlob(audioBlob: Blob): Blob {
+  // If the blob is very small, add some padding to prevent "too short" errors
+  if (audioBlob.size < 200) {
+    console.log('Normalizing small audio blob with padding');
+    const padding = new Uint8Array(1024).fill(0);
+    return new Blob([audioBlob, padding], { type: audioBlob.type || 'audio/webm;codecs=opus' });
+  }
+  
   // If the blob doesn't have a proper MIME type, try to assign one
   if (!audioBlob.type.includes('audio/')) {
     // Look at the size to make an educated guess

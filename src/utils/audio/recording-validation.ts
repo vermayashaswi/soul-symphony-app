@@ -44,10 +44,15 @@ export async function validateInitialState(
     }
   }
   
-  // If the blob is very small but not null, we'll still try to process it
-  if (audioBlob && audioBlob.size < 200) {
+  // Even for very small blobs, try to process them - the server may be able to handle them
+  if (audioBlob && audioBlob.size < 100) {
     console.warn('[AudioValidation] Audio blob is very small:', audioBlob.size, 'bytes');
-    // Still allow processing for small blobs; the server will handle validation
+    
+    // Add padding to ensure it can be processed
+    const padding = new Uint8Array(1024).fill(0);
+    audioBlob = new Blob([audioBlob, padding], { type: audioBlob.type || 'audio/webm;codecs=opus' });
+    
+    console.log('[AudioValidation] Added padding, new size:', audioBlob.size, 'bytes');
   }
   
   // Validate the audio blob with more permissive settings

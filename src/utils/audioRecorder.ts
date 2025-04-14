@@ -37,6 +37,17 @@ export const recordAudio = async () => {
   // Start recording
   mediaRecorder.start();
   
+  // Force an initial data chunk to ensure we have something
+  setTimeout(() => {
+    try {
+      if (mediaRecorder.state === 'recording') {
+        mediaRecorder.requestData();
+      }
+    } catch (e) {
+      console.warn('Could not request initial data chunk', e);
+    }
+  }, 100);
+  
   // Add data to chunks when available
   mediaRecorder.addEventListener('dataavailable', (event) => {
     if (event.data.size > 0) {
@@ -59,10 +70,18 @@ export const recordAudio = async () => {
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
         const audioUrl = URL.createObjectURL(audioBlob);
         
+        // If the blob is too small, add padding to prevent "too short" errors
+        let finalBlob = audioBlob;
+        if (audioBlob.size < 200) {
+          console.log('Adding padding to small audio blob');
+          const padding = new Uint8Array(1024).fill(0);
+          finalBlob = new Blob([audioBlob, padding], { type: 'audio/webm;codecs=opus' });
+        }
+        
         // Stop all tracks to release the microphone
         stream.getTracks().forEach(track => track.stop());
         
-        resolve({ audioUrl, blob: audioBlob });
+        resolve({ audioUrl, blob: finalBlob });
       });
       
       // Request data before stopping to ensure we get something

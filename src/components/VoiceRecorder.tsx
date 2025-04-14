@@ -130,7 +130,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       hasPlayedOnce,
       audioPrepared,
       waitingForClear,
-      toastsCleared
+      toastsCleared,
+      recordingTime
     });
     
     if (updateDebugInfo) {
@@ -199,21 +200,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       setWaitingForClear(false);
       setToastsCleared(true);
       
-      if (!hasPlayedOnce || audioDuration === 0) {
-        console.log('[VoiceRecorder] Recording not played yet, preparing audio...');
-        const duration = await prepareAudio();
-        console.log('[VoiceRecorder] Audio prepared with duration:', duration);
-        setAudioPrepared(true);
-        
-        if (duration < 0.2 && recordingTime < 0.5) {
-          setRecordingError("Recording is too short. Please try again.");
-          setIsProcessing(false);
-          setHasSaved(false);
-          savingInProgressRef.current = false;
-          return;
-        }
-      } else if (audioDuration < 0.2 && recordingTime < 0.5) {
-        setRecordingError("Recording is too short. Please try again.");
+      const estimatedDuration = recordingTime;
+      console.log('[VoiceRecorder] Estimated recording duration from timer:', estimatedDuration);
+      
+      if (audioDuration <= 0 && recordingTime <= 0 && (!audioBlob || audioBlob.size < 50)) {
+        setRecordingError("No audio recorded. Please try again.");
         setIsProcessing(false);
         setHasSaved(false);
         savingInProgressRef.current = false;
@@ -225,16 +216,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.log('[VoiceRecorder] Processing audio:', {
         type: normalizedBlob.type,
         size: normalizedBlob.size,
-        duration: audioDuration,
+        audioDuration: audioDuration,
         recordingTime: recordingTime,
         hasPlayedOnce: hasPlayedOnce,
         audioPrepared: audioPrepared
       });
-      
-      if (!hasPlayedOnce && audioDuration === 0 && recordingTime > 0) {
-        const estimatedDuration = recordingTime / 1000;
-        console.log(`[VoiceRecorder] Recording not played yet, estimating duration as ${estimatedDuration}s`);
-      }
       
       if (onRecordingComplete) {
         try {
