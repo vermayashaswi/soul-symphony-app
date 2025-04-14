@@ -16,7 +16,10 @@ export const debugLogger = {
   
   logWarning: (...args: any[]) => {
     debugLogger.log('warn', ...args);
-  }
+  },
+
+  // Adding a placeholder method to maintain backwards compatibility
+  setLastProfileError: (_: any) => {}
 };
 
 // Re-export for backward compatibility
@@ -29,3 +32,4 @@ const DebugPanel = () => {
 };
 
 export default DebugPanel;
+
