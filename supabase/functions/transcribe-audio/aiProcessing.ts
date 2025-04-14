@@ -1,4 +1,3 @@
-
 /**
  * AI processing utilities for transcription, translation, and analysis
  */
@@ -148,78 +147,63 @@ export async function transcribeAudioWithWhisper(
  * Translates and refines the transcribed text
  */
 export async function translateAndRefineText(
-  transcribedText: string,
-  openAIApiKey: string
-): Promise<{ refinedText: string }> {
+  text: string,
+  apiKey: string
+): Promise<{ refinedText: string, error?: string }> {
   try {
-    console.log("Sending text to GPT for translation and refinement:", transcribedText.slice(0, 100) + "...");
+    console.log("Starting text refinement and translation...");
+    const systemMessage = `You are an expert in refining and translating speech-to-text content. Your job is to:
+1. Fix grammatical errors and improve readability
+2. Maintain the original meaning and voice of the speaker
+3. Translate any non-English content to English`;
+
+    const userMessage = `Please refine and translate this speech-to-text content if needed. Maintain the speaker's original voice and meaning while fixing grammar and improving readability:
     
-    // Add more logging to track exactly what we're sending to GPT
-    console.log("Transcribed text length:", transcribedText.length);
-    
-    if (!transcribedText || transcribedText.trim() === '') {
-      console.error("Empty transcribed text provided to translateAndRefineText");
-      return { refinedText: "No text was detected in this recording." };
-    }
-    
-    const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+${text}`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          {
-            role: 'system',
-            content: `You are a helpful assistant that improves journal entries. Your goal is to:
-            1. Keep the original meaning intact
-            2. Fix any grammar or spelling errors
-            3. Improve clarity and readability
-            4. Structure the text into paragraphs if needed
-            5. If the text is in a language other than English, translate it to English while preserving the original meaning
-            
-            Do NOT add any new information, opinions, or comments not present in the original text.
-            Do NOT summarize - maintain all details from the original text.
-            Return ONLY the improved text without any explanations, comments, or extra text.`
-          },
-          {
-            role: 'user',
-            content: transcribedText
-          }
+          { role: 'system', content: systemMessage },
+          { role: 'user', content: userMessage }
         ],
         temperature: 0.3,
-        max_tokens: 4000
-      }),
+        max_tokens: 2048
+      })
     });
 
-    if (!gptResponse.ok) {
-      const error = await gptResponse.text();
-      console.error('Error refining text with GPT:', error);
-      throw new Error('Failed to refine text');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API response not OK:", response.status, errorText);
+      return { refinedText: text, error: `API error: ${response.status} - ${errorText}` };
     }
 
-    const result = await gptResponse.json();
-    const refinedText = result.choices[0].message.content.trim();
+    const data = await response.json();
     
-    // Add more logging to verify we got back a different text
-    console.log("Refined text length:", refinedText.length);
-    console.log("Original text first 50 chars:", transcribedText.slice(0, 50));
-    console.log("Refined text first 50 chars:", refinedText.slice(0, 50));
-    console.log("Are texts identical?", refinedText === transcribedText);
-    
-    // Make sure we got back actual refined text and it's different from the original
-    if (!refinedText) {
-      console.warn('GPT returned empty response, using original text');
-      return { refinedText: transcribedText };
+    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+      console.error("Unexpected API response format:", JSON.stringify(data));
+      return { refinedText: text, error: "Invalid API response format" };
     }
     
-    console.log('Successfully refined text:', refinedText.slice(0, 100) + '...');
+    const refinedText = data.choices[0].message.content.trim();
+    
+    // Verify we got a valid response
+    if (!refinedText || refinedText.length < 10) {
+      console.error("Refined text too short or empty:", refinedText);
+      return { refinedText: text, error: "Refined text too short or empty" };
+    }
+    
+    console.log("Text refinement successful!");
     return { refinedText };
   } catch (error) {
-    console.error('Error in translateAndRefineText:', error);
-    // If there's an error, use the original text
-    return { refinedText: transcribedText };
+    console.error("Error in translateAndRefineText:", error);
+    // Return original text on error instead of empty string
+    return { refinedText: text, error: error.message };
   }
 }

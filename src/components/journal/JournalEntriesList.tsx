@@ -1,3 +1,6 @@
+
+// Improving the journal entries list component to better handle processing state and displaying entries
+
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -30,7 +33,6 @@ export default function JournalEntriesList({
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
   const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
-  const [renderRetryCount, setRenderRetryCount] = useState(0);
   const [persistedProcessingEntries, setPersistedProcessingEntries] = useState<string[]>([]);
   const hasProcessingEntries = Array.isArray(processingEntries) && processingEntries.length > 0 || persistedProcessingEntries.length > 0;
   const componentMounted = useRef(true);
@@ -40,16 +42,15 @@ export default function JournalEntriesList({
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [processingEntriesLoaded, setProcessingEntriesLoaded] = useState(false);
   const [showTemporaryProcessingEntries, setShowTemporaryProcessingEntries] = useState(true);
-  const [visibleProcessingEntries, setVisibleProcessingEntries] = useState<string[]>([]);
   const [stableVisibleProcessingEntries, setStableVisibleProcessingEntries] = useState<string[]>([]);
   const lastProcessingChangeTimestamp = useRef(0);
   const processingEntriesTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const processingEntryRemovalTimerRef = useRef<NodeJS.Timeout | null>(null);
   const stateUpdateVersionRef = useRef(0);
 
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
       const persistedEntries = getProcessingEntries();
+      console.log('[JournalEntriesList] Loaded persisted processing entries:', persistedEntries);
       setPersistedProcessingEntries(persistedEntries);
       
       if (persistedEntries.length > 0) {
@@ -61,6 +62,7 @@ export default function JournalEntriesList({
     loadPersistedProcessingEntries();
     
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
+      console.log('[JournalEntriesList] Processing entries changed event:', event.detail);
       if (event.detail && Array.isArray(event.detail.entries)) {
         setPersistedProcessingEntries(event.detail.entries);
         
@@ -75,6 +77,7 @@ export default function JournalEntriesList({
     
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        console.log('[JournalEntriesList] Page became visible, reloading processing entries');
         loadPersistedProcessingEntries();
       }
     };
@@ -92,6 +95,7 @@ export default function JournalEntriesList({
 
   useEffect(() => {
     const allProcessingEntries = [...new Set([...processingEntries, ...persistedProcessingEntries])];
+    console.log('[JournalEntriesList] Processing entries combined:', allProcessingEntries);
     
     const now = Date.now();
     const timeSinceLastChange = now - lastProcessingChangeTimestamp.current;
@@ -144,11 +148,8 @@ export default function JournalEntriesList({
     if (hasCompletedEntries) {
       console.log("Completed entries detected, scheduling processing indicators removal");
       
-      if (processingEntryRemovalTimerRef.current) {
-        clearTimeout(processingEntryRemovalTimerRef.current);
-      }
-      
-      processingEntryRemovalTimerRef.current = setTimeout(() => {
+      // Schedule the removal with a delay to allow UI to update
+      setTimeout(() => {
         console.log("Executing delayed removal of processing indicators");
         setShowTemporaryProcessingEntries(false);
         
@@ -180,6 +181,7 @@ export default function JournalEntriesList({
         
         hasNoValidEntries.current = filteredEntries.length === 0 && entries.length > 0;
         
+        console.log('[JournalEntriesList] Filtered entries:', filteredEntries.length);
         setLocalEntries(filteredEntries);
         setFilteredEntries(filteredEntries);
       } else {
@@ -336,6 +338,7 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4 mt-6">
+            {/* Always show processing entries when they exist */}
             {(showTemporaryProcessingEntries && stableVisibleProcessingEntries.length > 0) && (
               <div className="mb-4">
                 <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">

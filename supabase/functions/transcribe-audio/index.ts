@@ -166,10 +166,17 @@ serve(async (req) => {
 
       // Process with GPT for translation and refinement
       console.log("Processing transcription with GPT for refinement...");
-      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey);
+      const { refinedText, error: refinementError } = await translateAndRefineText(transcribedText, openAIApiKey);
+      
+      if (refinementError) {
+        console.error("Error refining text:", refinementError);
+      }
       
       console.log("Original transcription:", transcribedText.slice(0, 100) + "...");
-      console.log("Refined text:", refinedText.slice(0, 100) + "...");
+      console.log("Refined text:", refinedText ? (refinedText.slice(0, 100) + "...") : "No refined text");
+      
+      // If refinement failed, use the original transcription
+      const finalRefinedText = refinedText || transcribedText;
 
       // Get emotions from the refined text - run inside try/catch to avoid failure
       let emotions = null;
@@ -182,7 +189,7 @@ serve(async (req) => {
         if (emotionsError) {
           console.error('Error fetching emotions from database:', emotionsError);
         } else {
-          emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
+          emotions = await analyzeEmotions(finalRefinedText, emotionsData, openAIApiKey);
         }
       } catch (emotionsErr) {
         console.error("Error analyzing emotions:", emotionsErr);
@@ -193,7 +200,7 @@ serve(async (req) => {
       let entities = [];
       try {
         if (GOOGLE_NL_API_KEY) {
-          const nlResults = await analyzeWithGoogleNL(refinedText, GOOGLE_NL_API_KEY);
+          const nlResults = await analyzeWithGoogleNL(finalRefinedText, GOOGLE_NL_API_KEY);
           sentimentScore = nlResults.sentiment;
           entities = nlResults.entities;
         } else {
@@ -227,7 +234,7 @@ serve(async (req) => {
         entryId = await storeJournalEntry(
           supabase,
           transcribedText,
-          refinedText,
+          finalRefinedText,
           audioUrl,
           userId,
           audioDuration,
@@ -247,7 +254,7 @@ serve(async (req) => {
         // Use waitUntil for background tasks
         try {
           // Extract themes in the background
-          const themeExtractionPromise = extractThemes(supabase, refinedText, entryId)
+          const themeExtractionPromise = extractThemes(supabase, finalRefinedText, entryId)
             .catch(err => {
               console.error("Background theme extraction failed:", err);
             });
@@ -255,8 +262,8 @@ serve(async (req) => {
           // Generate embedding in the background
           const embeddingPromise = (async () => {
             try {
-              const embedding = await generateEmbedding(refinedText, openAIApiKey);
-              await storeEmbedding(supabase, entryId, refinedText, embedding);
+              const embedding = await generateEmbedding(finalRefinedText, openAIApiKey);
+              await storeEmbedding(supabase, entryId, finalRefinedText, embedding);
             } catch (embErr) {
               console.error("Error generating embedding:", embErr);
             }
@@ -294,7 +301,7 @@ serve(async (req) => {
       // Return success response
       return createSuccessResponse({
         transcription: transcribedText,
-        refinedText: refinedText,
+        refinedText: finalRefinedText,
         audioUrl: audioUrl,
         entryId: entryId,
         emotions: emotions,

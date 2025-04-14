@@ -54,6 +54,7 @@ export function updateProcessingEntries(tempId: string, action: 'add' | 'remove'
   });
   
   window.dispatchEvent(event);
+  console.log(`[ProcessingState] Updated entries (${action}): ${JSON.stringify(entries)}`);
 }
 
 export function getProcessingEntries(): string[] {
@@ -87,6 +88,8 @@ export function removeProcessingEntryById(entryId: number | string): void {
         lastUpdate: Date.now()
       }
     }));
+    
+    console.log(`[ProcessingState] Removed entry ID ${idStr} from processing entries`);
   }
 }
 

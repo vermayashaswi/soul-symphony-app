@@ -25,7 +25,7 @@ export const FloatingDotsToggle: React.FC<FloatingDotsToggleProps> = ({ onClick 
           size="icon"
           onClick={handleClick}
           className="h-8 w-8 rounded-full"
-          aria-label="Expand or collapse entry"
+          aria-label="Toggle entry expansion"
         >
           <MoreHorizontal className="h-4 w-4" />
         </Button>

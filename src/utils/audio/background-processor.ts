@@ -55,10 +55,10 @@ export async function processRecordingInBackground(
       const newTempId = `${tempId}-entry${result.data.entryId}`;
       updateProcessingEntries(newTempId, 'add');
       
-      // After a reasonable time, remove the processing entry
+      // Remove the processing entry status after a longer time to ensure UI has updated
       setTimeout(() => {
         updateProcessingEntries(newTempId, 'remove');
-      }, 10000);
+      }, 30000); // Increased from 10 seconds to 30 seconds
     } else {
       // Remove tempId after processing
       updateProcessingEntries(tempId, 'remove');
@@ -72,4 +72,3 @@ export async function processRecordingInBackground(
     throw error;
   }
 }
-
