@@ -93,18 +93,39 @@ export default function JournalEntriesList({
     
     const hasCompletedEntries = entries.some(entry => {
       const entryIdStr = String(entry.id);
-      return allProcessingEntries.some(tempId => tempId.includes(entryIdStr)) && 
-             entry.content && 
-             entry.content !== "Processing entry..." && 
-             entry.content.trim() !== "" &&
-             Array.isArray(entry.themes || entry.master_themes) && 
-             (entry.themes?.length > 0 || entry.master_themes?.length > 0);
+      const isBeingProcessed = allProcessingEntries.some(tempId => tempId.includes(entryIdStr));
+      
+      const isComplete = entry.content && 
+                        entry.content !== "Processing entry..." && 
+                        entry.content.trim() !== "" &&
+                        ((Array.isArray(entry.themes) && entry.themes.length > 0) || 
+                         (Array.isArray(entry.master_themes) && entry.master_themes.length > 0));
+      
+      if (isBeingProcessed && isComplete) {
+        console.log(`Entry ${entry.id} is now complete. Removing from processing list.`);
+        return true;
+      }
+      
+      return false;
     });
     
-    if (hasCompletedEntries && allProcessingEntries.length === 0) {
+    if (hasCompletedEntries) {
+      console.log("Completed entries detected, hiding processing entries soon");
       setTimeout(() => {
         setShowTemporaryProcessingEntries(false);
-      }, 2000);
+        
+        const updatedProcessingEntries = allProcessingEntries.filter(tempId => {
+          return !entries.some(entry => tempId.includes(String(entry.id)));
+        });
+        
+        if (updatedProcessingEntries.length !== allProcessingEntries.length) {
+          localStorage.setItem('processingEntries', JSON.stringify(updatedProcessingEntries));
+          
+          window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+            detail: { entries: updatedProcessingEntries }
+          }));
+        }
+      }, 1000);
     }
   }, [processingEntries, persistedProcessingEntries, entries]);
 
@@ -156,7 +177,10 @@ export default function JournalEntriesList({
           }
             
           if (newEntryIds.length > 0) {
+            console.log('[JournalEntriesList] New entries detected:', newEntryIds);
             setAnimatedEntryIds(prev => [...prev, ...newEntryIds]);
+            
+            setShowTemporaryProcessingEntries(false);
             
             setTimeout(() => {
               if (componentMounted.current) {
@@ -274,7 +298,7 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4 mt-6">
-            {(showTemporaryProcessingEntries || visibleProcessingEntries.length > 0) && (
+            {(showTemporaryProcessingEntries && visibleProcessingEntries.length > 0) && (
               <div className="mb-4">
                 <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
                   <Loader2 className="h-4 w-4 animate-spin" />

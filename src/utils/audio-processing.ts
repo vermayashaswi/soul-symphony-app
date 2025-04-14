@@ -10,7 +10,8 @@ import {
   updateProcessingEntries,
   isProcessingEntry,
   resetProcessingState,
-  getProcessingEntries
+  getProcessingEntries,
+  removeProcessingEntryById
 } from './audio/processing-state';
 import { validateInitialState, setupProcessingTimeout } from './audio/recording-validation';
 import { processRecordingInBackground } from './audio/background-processor';
@@ -77,4 +78,9 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
 }
 
 // Re-export useful functions from child modules
-export { isProcessingEntry, resetProcessingState, getProcessingEntries } from './audio/processing-state';
+export { 
+  isProcessingEntry, 
+  resetProcessingState, 
+  getProcessingEntries,
+  removeProcessingEntryById 
+} from './audio/processing-state';

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -63,16 +62,7 @@ export function JournalEntryCard({
   const [contentLoaded, setContentLoaded] = useState(false);
   const mountedRef = useRef<boolean>(true);
   
-  // Check if content is ready to display
-  useEffect(() => {
-    const hasValidContent = safeEntry.content && 
-                         safeEntry.content !== "Processing entry..." && 
-                         safeEntry.content !== "Loading..." &&
-                         safeEntry.content.trim() !== "";
-    
-    setContentLoaded(hasValidContent);
-  }, [safeEntry.content]);
-
+  // Extract themes from the entry
   const extractThemes = (): string[] => {
     try {
       const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
@@ -97,6 +87,21 @@ export function JournalEntryCard({
       return [];
     }
   };
+  
+  // Check if content is ready to display
+  useEffect(() => {
+    const hasValidContent = safeEntry.content && 
+                         safeEntry.content !== "Processing entry..." && 
+                         safeEntry.content !== "Loading..." &&
+                         safeEntry.content.trim() !== "";
+    
+    setContentLoaded(hasValidContent);
+    
+    // Automatically expand new entries
+    if (isNew && hasValidContent && !isExpanded) {
+      setIsExpanded(true);
+    }
+  }, [safeEntry.content, isNew, isExpanded]);
   
   useEffect(() => {
     console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id}`);

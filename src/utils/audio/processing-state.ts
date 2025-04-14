@@ -46,6 +46,31 @@ export const getProcessingEntries = (): string[] => {
   }
 };
 
+// Remove processing entry by ID (useful when an entry is completed)
+export const removeProcessingEntryById = (entryId: number | string): void => {
+  try {
+    const idStr = String(entryId);
+    const storedEntries = localStorage.getItem('processingEntries');
+    let entries: string[] = storedEntries ? JSON.parse(storedEntries) : [];
+    
+    // Filter out any entry that contains this ID
+    const updatedEntries = entries.filter(tempId => !tempId.includes(idStr));
+    
+    if (updatedEntries.length !== entries.length) {
+      localStorage.setItem('processingEntries', JSON.stringify(updatedEntries));
+      
+      // Dispatch an event so other components can react to the change
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { entries: updatedEntries }
+      }));
+      
+      console.log(`[Audio.ProcessingState] Removed processing entry with ID ${idStr}`);
+    }
+  } catch (error) {
+    console.error('[Audio.ProcessingState] Error removing processing entry from storage:', error);
+  }
+};
+
 // Check if a journal entry is currently being processed
 export function isProcessingEntry(): boolean {
   return isEntryBeingProcessed;
