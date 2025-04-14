@@ -86,8 +86,8 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-          <div className="flex justify-between items-center">
-            <div className="flex space-x-2">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex space-x-2 mx-auto">
               <Button 
                 variant="outline" 
                 onClick={() => handleUserFeedback(1)}
@@ -106,7 +106,7 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
               </Button>
             </div>
           </div>
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 mt-2 w-full justify-center">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={isDeleting}>
               Cancel
             </Button>
