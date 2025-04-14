@@ -1,3 +1,4 @@
+
 /**
  * AI processing utilities for transcription, translation, and analysis
  */
@@ -161,6 +162,10 @@ export async function translateAndRefineText(
           {
             role: 'user',
             content: `${transcribedText}`
+          },
+          {
+            role: 'system',
+            content: 'Reply with only the translated and corrected text. Apart from the translation of the audio entry, don\'t explain or provide any information from your end!'
           }
         ],
         temperature: 0.3
