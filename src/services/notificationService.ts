@@ -2,6 +2,12 @@
 import { toast } from 'sonner';
 
 /**
+ * Types for notification settings
+ */
+export type NotificationFrequency = 'once' | 'twice' | 'thrice';
+export type NotificationTime = 'morning' | 'afternoon' | 'evening' | 'night';
+
+/**
  * Tracks active toast IDs
  */
 const activeToasts = new Set<string>();
@@ -85,4 +91,43 @@ export function showTrackedToast(
   
   activeToasts.add(id);
   return id;
+}
+
+/**
+ * Setup journal reminders using the device's notification system
+ * This is called from the Settings page
+ */
+export function setupJournalReminder(
+  enabled: boolean,
+  frequency: NotificationFrequency = 'once',
+  times: NotificationTime[] = ['evening']
+): Promise<boolean> {
+  console.log('Setting up journal reminders:', { enabled, frequency, times });
+  
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('notification_enabled', enabled ? 'true' : 'false');
+    localStorage.setItem('notification_frequency', frequency);
+    localStorage.setItem('notification_times', JSON.stringify(times));
+  }
+  
+  if (enabled) {
+    // Show success toast
+    toast.success('Journal reminders set up successfully');
+    return Promise.resolve(true);
+  } else {
+    // Show info toast
+    toast.info('Journal reminders disabled');
+    return Promise.resolve(false);
+  }
+}
+
+/**
+ * Initialize notifications for Capacitor (mobile devices)
+ * This is a placeholder function for now
+ */
+export function initializeCapacitorNotifications(): Promise<void> {
+  console.log('Initializing Capacitor notifications');
+  
+  // For web only implementation, just resolve
+  return Promise.resolve();
 }

@@ -1,3 +1,4 @@
+
 export function setProcessingLock(isLocked: boolean): void {
   console.log(`[ProcessingState] Setting processing lock to ${isLocked}`);
   localStorage.setItem('isProcessingLocked', isLocked ? 'true' : 'false');
@@ -87,4 +88,13 @@ export function removeProcessingEntryById(entryId: number | string): void {
       }
     }));
   }
+}
+
+// Add this function to handle previous entries flag
+export function setHasPreviousEntries(hasEntries: boolean): void {
+  localStorage.setItem('hasPreviousEntries', hasEntries ? 'true' : 'false');
+}
+
+export function getHasPreviousEntries(): boolean {
+  return localStorage.getItem('hasPreviousEntries') === 'true';
 }

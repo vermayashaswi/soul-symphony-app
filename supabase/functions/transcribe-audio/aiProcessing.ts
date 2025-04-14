@@ -3,8 +3,6 @@
  * AI processing utilities for transcription, translation, and analysis
  */
 
-import langTag from "https://deno.land/x/language_tags@1.0.0/mod.ts";
-
 /**
  * Generates an embedding for text using OpenAI
  */
