@@ -28,12 +28,17 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [steps, setSteps] = useState<RecordingDebugStep[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
+  const [prevStatus, setPrevStatus] = useState<string | undefined>(undefined);
   const { addEvent, isEnabled, toggleEnabled } = useDebugLog();
   
   useEffect(() => {
     if (!currentStatus) return;
     
+    // Only process if status actually changed
+    if (currentStatus === prevStatus) return;
+    
     const now = Date.now();
+    console.log('[RecordingDebugger] Status changed:', prevStatus, '->', currentStatus);
     
     if (currentStatus === 'Recording') {
       setSteps([
@@ -54,7 +59,7 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
       
       addEvent('recording', 'Recording started', 'info', { timestamp: now });
     } 
-    else if (currentStatus === 'Recorded' && steps.length > 0) {
+    else if (currentStatus === 'Recorded' || (audioBlob && prevStatus === 'Recording')) {
       const updatedSteps = [...steps];
       
       const recordingStepIndex = updatedSteps.findIndex(s => s.step === 'Recording Started');
@@ -96,7 +101,10 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
         blobType: audioBlob?.type || 'unknown'
       });
     }
-  }, [currentStatus, audioDuration, audioBlob, addEvent]);
+    
+    // Save the current status as previous for the next update
+    setPrevStatus(currentStatus);
+  }, [currentStatus, audioDuration, audioBlob, addEvent, steps, prevStatus]);
   
   const handleDebugButtonClick = () => {
     if (!isEnabled) {
