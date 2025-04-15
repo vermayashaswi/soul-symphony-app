@@ -110,9 +110,13 @@ export function PlaybackControls({
       setIsClearingToasts(false);
       console.log('[PlaybackControls] Calling onSaveEntry callback');
       
-      // Dispatch an event to ensure loading state is visible immediately
-      window.dispatchEvent(new CustomEvent('entrySaveInitiated', {
-        detail: { timestamp: Date.now() }
+      // Dispatch an event to immediately show processing state
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { 
+          entries: ['temp-' + Date.now()], 
+          lastUpdate: Date.now(),
+          forceUpdate: true 
+        }
       }));
       
       onSaveEntry();
