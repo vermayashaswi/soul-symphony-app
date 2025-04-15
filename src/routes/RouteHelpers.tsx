@@ -7,11 +7,15 @@ export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
 };
 
+export const isAppSubdomain = (): boolean => {
+  return window.location.hostname === 'app.soulo.online';
+};
+
 export const isAppRoute = (pathname: string): boolean => {
   // Handle both app.soulo.online/* and soulo.online/app/*
-  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+  const appSubdomain = isAppSubdomain();
   
-  if (isAppSubdomain) {
+  if (appSubdomain) {
     // On app subdomain, all paths are app routes except explicit website routes
     return !pathname.startsWith('/blog') && 
            !pathname.startsWith('/faq') && 
@@ -26,9 +30,9 @@ export const isAppRoute = (pathname: string): boolean => {
 export const isWebsiteRoute = (pathname: string): boolean => {
   // Website routes are anything that doesn't start with /app on main domain
   // Or specific content routes on app subdomain
-  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+  const appSubdomain = isAppSubdomain();
   
-  if (isAppSubdomain) {
+  if (appSubdomain) {
     // Only these specific routes are considered website routes on app subdomain
     return pathname.startsWith('/blog') || 
            pathname.startsWith('/faq') || 

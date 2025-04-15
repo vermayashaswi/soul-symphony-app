@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Journal from '@/pages/Journal';
@@ -11,17 +12,25 @@ import MobileNavigation from './MobileNavigation';
 import { useAuth } from '@/contexts/AuthContext';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import HomePage from '@/pages/website/HomePage';
+import LandingPage from '@/pages/landing/LandingPage';
+import { isAppSubdomain } from './RouteHelpers';
 
 const AppRoutes = () => {
   const { user } = useAuth();
   const onboardingComplete = user?.user_metadata?.onboarding_completed ?? null;
-  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+  const appSubdomain = window.location.hostname === 'app.soulo.online';
+
+  // Force render marketing site on main domain
+  if (!appSubdomain && window.location.pathname === '/') {
+    console.log('Main domain - showing landing page');
+    return <LandingPage />;
+  }
 
   return (
     <>
       <Routes>
         {/* Auth routes - adjust paths based on domain */}
-        {isAppSubdomain ? (
+        {appSubdomain ? (
           <Route path="/auth" element={<Auth />} />
         ) : (
           <>
@@ -31,15 +40,15 @@ const AppRoutes = () => {
         )}
         
         {/* Onboarding route - accessible without auth */}
-        {isAppSubdomain ? (
+        {appSubdomain ? (
           <Route path="/onboarding" element={<OnboardingScreen />} />
         ) : (
           <Route path="/app/onboarding" element={<OnboardingScreen />} />
         )}
         
-        {/* Website routes - use the modern HomePage */}
-        {!isAppSubdomain && (
-          <Route path="/" element={<HomePage />} />
+        {/* Website routes - use the modern landing page */}
+        {!appSubdomain && (
+          <Route path="/" element={<LandingPage />} />
         )}
         
         {/* App routes with domain-specific paths */}
@@ -140,7 +149,7 @@ const AppRoutes = () => {
         )}
         
         {/* Root app routes - conditionally redirect based on auth status */}
-        {isAppSubdomain ? (
+        {appSubdomain ? (
           <Route 
             path="/" 
             element={user ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />} 
