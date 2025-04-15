@@ -36,6 +36,15 @@ export async function processRecordingInBackground(
       duration: (audioBlob as any).duration || 'unknown'
     });
     
+    // Notify UI about processing status to ensure placeholder is visible
+    window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+      detail: { 
+        entries: [tempId], 
+        lastUpdate: Date.now(),
+        forceUpdate: true 
+      }
+    }));
+    
     // Convert blob to base64
     console.log('[BackgroundProcessor] Converting blob to base64');
     const base64Audio = await blobToBase64(audioBlob);

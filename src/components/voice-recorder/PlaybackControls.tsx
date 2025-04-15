@@ -98,12 +98,23 @@ export function PlaybackControls({
   const handleSaveEntry = async () => {
     console.log('[PlaybackControls] Save entry initiated');
     
+    if (!audioBlob || audioBlob.size < 100) {
+      console.error('[PlaybackControls] Invalid audio blob for saving:', audioBlob?.size);
+      return;
+    }
+    
     setIsClearingToasts(true);
     await clearAllToasts();
     
     setTimeout(() => {
       setIsClearingToasts(false);
       console.log('[PlaybackControls] Calling onSaveEntry callback');
+      
+      // Dispatch an event to ensure loading state is visible immediately
+      window.dispatchEvent(new CustomEvent('entrySaveInitiated', {
+        detail: { timestamp: Date.now() }
+      }));
+      
       onSaveEntry();
     }, 150);
   };
@@ -164,7 +175,7 @@ export function PlaybackControls({
             variant="default" 
             className="rounded-full bg-green-600 hover:bg-green-700"
             onClick={handleSaveEntry}
-            disabled={isProcessing || isClearingToasts}
+            disabled={isProcessing || isClearingToasts || !audioBlob || audioBlob.size < 100}
           >
             {isProcessing || isClearingToasts ? (
               <>

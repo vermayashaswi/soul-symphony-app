@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -30,6 +31,13 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   
   // Handle content and loading state transitions
   useEffect(() => {
+    // Immediately show loading state if isProcessing is true, regardless of current state
+    if (isProcessing && !showLoading) {
+      console.log('[EntryContent] Processing started, showing loading state immediately');
+      setShowLoading(true);
+      return;
+    }
+    
     const contentIsLoading = isProcessing || 
                           !content || 
                           content === "Processing entry..." || 
