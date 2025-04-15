@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Journal from '@/pages/Journal';
@@ -24,7 +23,10 @@ const AppRoutes = () => {
         {isAppSubdomain ? (
           <Route path="/auth" element={<Auth />} />
         ) : (
-          <Route path="/app/auth" element={<Auth />} />
+          <>
+            <Route path="/app/auth" element={<Auth />} />
+            <Route path="/auth" element={<Auth />} />
+          </>
         )}
         
         {/* Onboarding route - accessible without auth */}
@@ -138,10 +140,13 @@ const AppRoutes = () => {
             element={user ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />} 
           />
         ) : (
-          <Route 
-            path="/app" 
-            element={user ? <Navigate to="/app/home" replace /> : <Navigate to="/app/onboarding" replace />} 
-          />
+          <>
+            <Route 
+              path="/app" 
+              element={user ? <Navigate to="/app/home" replace /> : <Navigate to="/app/onboarding" replace />} 
+            />
+            <Route path="/" element={<Navigate to="/app" replace />} />
+          </>
         )}
       </Routes>
       {user && <MobileNavigation onboardingComplete={onboardingComplete} />}

@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,31 +9,27 @@ import { clearAllToasts } from '@/services/notificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PlaybackControlsProps {
+  audioBlob: Blob | null;
   isPlaying: boolean;
+  isProcessing: boolean;
   playbackProgress: number;
   audioDuration: number;
-  togglePlayback?: () => void; // Make this optional
-  onTogglePlayback: () => void; // Add this to match expected prop
+  onTogglePlayback: () => void;
   onSaveEntry: () => void;
   onRestart: () => void;
   onSeek?: (position: number) => void;
-  seekTo?: (position: number) => void; // Add this to match expected prop
-  audioBlob?: Blob | null; // Add this to match expected prop
-  isProcessing?: boolean; // Add this to match expected prop
 }
 
 export function PlaybackControls({
+  audioBlob,
   isPlaying,
+  isProcessing,
   playbackProgress,
   audioDuration,
-  togglePlayback, // Keep for backward compatibility
-  onTogglePlayback, // New prop expected by VoiceRecorder component
+  onTogglePlayback,
   onSaveEntry,
   onRestart,
-  onSeek,
-  seekTo, // Add this to match expected prop
-  audioBlob = null,
-  isProcessing = false
+  onSeek
 }: PlaybackControlsProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [isClearingToasts, setIsClearingToasts] = useState(false);
@@ -41,35 +37,16 @@ export function PlaybackControls({
   const [isTouchActive, setIsTouchActive] = useState(false);
   const { isMobile } = useIsMobile();
   
-  // Use togglePlayback or onTogglePlayback based on what's provided
-  const handleTogglePlayback = () => {
-    if (togglePlayback) {
-      togglePlayback();
-    } else {
-      onTogglePlayback();
-    }
-  };
-  
-  // Store the initial duration to prevent flickering
-  const stableDuration = useRef<number>(audioDuration > 0 ? audioDuration : 1);
-  
-  // Only update the stable duration ref if the new value is significantly different and stable
-  useEffect(() => {
-    if (audioDuration > 0 && Math.abs(audioDuration - stableDuration.current) > 0.5) {
-      stableDuration.current = audioDuration;
-    }
-  }, [audioDuration]);
-  
   // Update slider and current time based on playback progress
   useEffect(() => {
     if (!isTouchActive && playbackProgress !== undefined) {
-      const timeInSeconds = (playbackProgress * stableDuration.current);
+      const timeInSeconds = (playbackProgress * audioDuration);
       setCurrentTime(timeInSeconds);
       setSliderValue(playbackProgress * 100);
     }
-  }, [playbackProgress, isTouchActive]);
+  }, [playbackProgress, audioDuration, isTouchActive]);
   
-  // Force update the slider position during playback with requestAnimationFrame for smooth updates
+  // Force update the slider position during playback with requestAnimationFrame
   useEffect(() => {
     let animationFrameId: number;
     
@@ -78,12 +55,12 @@ export function PlaybackControls({
         setSliderValue(prev => {
           // Only update if there's a real change to prevent unnecessary renders
           const newValue = playbackProgress * 100;
-          if (Math.abs(prev - newValue) > 0.5) {
+          if (Math.abs(prev - newValue) > 0.1) {
             return newValue;
           }
           return prev;
         });
-        setCurrentTime(playbackProgress * stableDuration.current);
+        setCurrentTime(playbackProgress * audioDuration);
         animationFrameId = requestAnimationFrame(updateSlider);
       };
       
@@ -95,22 +72,16 @@ export function PlaybackControls({
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isPlaying, playbackProgress, isTouchActive]);
+  }, [isPlaying, playbackProgress, audioDuration, isTouchActive]);
   
   const formattedProgress = formatTime(currentTime);
-  const formattedDuration = formatTime(stableDuration.current);
+  const formattedDuration = formatTime(audioDuration);
   
   const handleSliderChange = (value: number[]) => {
-    const position = value[0] / 100;
-    setSliderValue(value[0]);
-    setCurrentTime(position * stableDuration.current);
-    
-    // Use seekTo if provided (from VoiceRecorder component)
-    if (seekTo) {
-      seekTo(position);
-    } 
-    // Fall back to onSeek if seekTo is not provided
-    else if (onSeek) {
+    if (onSeek) {
+      const position = value[0] / 100;
+      setSliderValue(value[0]);
+      setCurrentTime(position * audioDuration);
       onSeek(position);
     }
   };
@@ -174,7 +145,7 @@ export function PlaybackControls({
           value={[sliderValue]}
           max={100}
           step={0.1}
-          onValueChange={(values) => handleSliderChange(values)}
+          onValueChange={handleSliderChange}
           disabled={isProcessing || !audioBlob}
           className="mb-2"
           onTouchStart={() => setIsTouchActive(true)}
@@ -194,7 +165,7 @@ export function PlaybackControls({
       )}>
         {/* Play/Pause Button */}
         <Button 
-          onClick={handleTogglePlayback}
+          onClick={onTogglePlayback}
           variant="ghost" 
           size="icon"
           className={cn(
@@ -244,8 +215,6 @@ export function PlaybackControls({
 }
 
 function formatTime(seconds: number): string {
-  // Ensure seconds is at least 0
-  seconds = Math.max(0, seconds);
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;

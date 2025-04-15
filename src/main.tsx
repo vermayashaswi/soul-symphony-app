@@ -28,14 +28,6 @@ const fixViewportHeight = () => {
 // Call the fix on page load
 fixViewportHeight();
 
-// Log the current domain for debugging
-console.log('Application starting on:', {
-  hostname: window.location.hostname,
-  pathname: window.location.pathname,
-  isAppSubdomain: window.location.hostname === 'app.soulo.online',
-  fullUrl: window.location.href
-});
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
