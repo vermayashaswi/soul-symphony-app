@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCorsRequest, createErrorResponse, createSuccessResponse } from "../_shared/utils.ts";
@@ -78,7 +77,7 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload');
     }
 
-    const { audio, userId, directTranscription, highQuality } = payload;
+    const { audio, userId, directTranscription, highQuality, recordingTime } = payload;
     
     // Validate required fields
     if (!audio) {
@@ -103,6 +102,7 @@ serve(async (req) => {
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
     console.log("High quality mode:", highQuality ? "YES" : "NO");
     console.log("Audio data length:", audio.length);
+    console.log("Recording time provided:", recordingTime ? `${recordingTime}ms` : "Not provided");
     
     // Process audio data in a try-catch block to handle any processing errors
     let binaryAudio;
@@ -212,12 +212,16 @@ serve(async (req) => {
         console.error("Error in Google NL analysis:", nlErr);
       }
 
-      // Calculate audio duration more accurately based on file type and bytes
+      // Calculate audio duration more accurately based on provided recording time and file type
       let audioDuration = 0;
       
-      if (detectedFileType === 'webm') {
-        // For WebM, use the recordingTime from the client if available, or estimate
-        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : transcribedText.length / 15;
+      if (recordingTime && recordingTime > 100) {
+        // If recording time is provided and seems valid, use it (converting from ms to seconds)
+        audioDuration = Math.round(recordingTime / 1000);
+        console.log(`Using provided recording time: ${audioDuration} seconds`);
+      } else if (detectedFileType === 'webm') {
+        // For WebM, estimate based on file size if no recording time
+        audioDuration = Math.round(binaryAudio.length / 16000);
       } else if (detectedFileType === 'wav') {
         // For WAV (assuming 48kHz, 16-bit, stereo)
         audioDuration = Math.round(binaryAudio.length / 192000);
@@ -309,7 +313,8 @@ serve(async (req) => {
         emotions: emotions,
         sentiment: sentimentScore,
         entities: entities,
-        detectedLanguages: detectedLanguages
+        detectedLanguages: detectedLanguages,
+        audioDuration: audioDuration
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);

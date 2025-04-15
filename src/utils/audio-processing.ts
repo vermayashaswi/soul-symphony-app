@@ -1,4 +1,3 @@
-
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -26,6 +25,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   error?: string;
 }> {
   console.log('[AudioProcessing] Starting processing with blob:', audioBlob?.size, audioBlob?.type);
+  console.log('[AudioProcessing] Blob duration:', (audioBlob as any)?.duration || 'unknown');
   
   // Clear all toasts to ensure UI is clean before processing
   clearAllToasts();
@@ -96,10 +96,15 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       const updatedEntries = updateProcessingEntries(tempId, 'add');
       console.log('[AudioProcessing] Updated processing entries in localStorage:', updatedEntries);
       
-      // Log the audio details
+      // Extract duration from blob if available, or estimate it
+      const estimatedDuration = (audioBlob as any)?.duration || 
+                               (audioBlob && audioBlob.size > 0 ? audioBlob.size / 16000 : 0);
+      
+      // Log the audio details with duration
       console.log('[AudioProcessing] Processing audio:', {
         size: audioBlob?.size || 0,
         type: audioBlob?.type || 'unknown',
+        estimatedDuration: estimatedDuration,
         userId: userId || 'anonymous'
       });
       
@@ -121,7 +126,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       console.log('[AudioProcessing] Launching background processing');
       const startTime = Date.now(); // Store the start time here
       
-      processRecordingInBackground(audioBlob, userId, tempId)
+      processRecordingInBackground(audioBlob, userId, tempId, estimatedDuration)
         .then(result => {
           console.log('[AudioProcessing] Background processing completed:', result);
           

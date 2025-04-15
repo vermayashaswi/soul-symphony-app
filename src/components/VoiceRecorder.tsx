@@ -64,6 +64,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         console.log('[VoiceRecorder] Creating playable version of the blob');
         const normalizedBlob = normalizeAudioBlob(audioBlob);
         const playable = createPlayableAudioBlob(normalizedBlob);
+        
+        if (recordingTime && recordingTime > 0) {
+          (playable as any).duration = recordingTime / 1000;
+          console.log('[VoiceRecorder] Added duration to blob:', (playable as any).duration, 'seconds');
+        }
+        
         setPlayableBlob(playable);
         console.log('[VoiceRecorder] Created playable blob:', playable.size, playable.type);
       } catch (err) {
@@ -73,7 +79,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     } else {
       setPlayableBlob(null);
     }
-  }, [audioBlob]);
+  }, [audioBlob, recordingTime]);
   
   const {
     isPlaying,
@@ -136,11 +142,17 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       setTimeout(() => {
         prepareAudio(true).then(duration => {
           console.log('[VoiceRecorder] Audio prepared with duration:', duration);
+          
+          if ((duration === undefined || duration < 0.5) && recordingTime > 0) {
+            const recordingDuration = recordingTime / 1000;
+            console.log('[VoiceRecorder] Using recording time for duration:', recordingDuration);
+          }
+          
           setAudioPrepared(true);
         });
       }, 300);
     }
-  }, [playableBlob, audioPrepared, prepareAudio]);
+  }, [playableBlob, audioPrepared, prepareAudio, recordingTime]);
   
   useEffect(() => {
     console.log('[VoiceRecorder] State update:', {
@@ -159,7 +171,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       recordingTime
     });
     
-    const effectiveDuration = audioDuration && audioDuration > 0.1 
+    const effectiveDuration = audioDuration && audioDuration > 0.5 
       ? audioDuration 
       : recordingTime / 1000;
     
@@ -234,17 +246,24 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       setWaitingForClear(false);
       setToastsCleared(true);
 
+      const effectiveDuration = audioDuration && audioDuration > 0.5 
+        ? audioDuration 
+        : recordingTime / 1000;
+        
       console.log('[VoiceRecorder] Processing audio:', {
         originalType: audioBlob.type,
         originalSize: audioBlob.size,
         audioDuration: audioDuration,
         recordingTime: recordingTime,
+        effectiveDuration: effectiveDuration,
         hasPlayedOnce: hasPlayedOnce,
         audioPrepared: audioPrepared
       });
       
       const normalizedBlob = normalizeAudioBlob(audioBlob);
       console.log('[VoiceRecorder] Normalized blob:', normalizedBlob.size, normalizedBlob.type);
+      
+      (normalizedBlob as any).duration = effectiveDuration;
       
       if (onRecordingComplete) {
         try {

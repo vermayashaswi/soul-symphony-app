@@ -10,11 +10,13 @@ import { resetProcessingState, setProcessingLock, updateProcessingEntries } from
 export async function processRecordingInBackground(
   audioBlob: Blob | null, 
   userId: string | undefined, 
-  tempId: string
+  tempId: string,
+  estimatedDuration?: number
 ): Promise<void> {
   try {
     console.log('[BackgroundProcessor] Starting background processing for tempId:', tempId);
     console.log('[BackgroundProcessor] Audio blob size:', audioBlob?.size, 'bytes, type:', audioBlob?.type);
+    console.log('[BackgroundProcessor] Estimated duration:', estimatedDuration || 'unknown', 'seconds');
     
     if (!audioBlob) {
       throw new Error('No audio blob provided');
@@ -50,15 +52,23 @@ export async function processRecordingInBackground(
     console.log('[BackgroundProcessor] Audio converted to base64');
     console.log('[BackgroundProcessor] Sending audio to transcribe function');
     
-    // Calculate recording duration in seconds from blob
-    // Since Blob doesn't have a duration property, we need to estimate it differently
-    // We can calculate based on the audio blob size and sample rate as an approximation
-    const recordingTimeMs = audioBlob.size > 0 
-      ? (audioBlob as any).duration ? (audioBlob as any).duration * 1000 // Use custom duration if available
-      : (audioBlob.size / 16000) * 1000 // Estimate based on size and 16kHz sample rate
-      : 0;
+    // Use the most reliable duration source
+    // 1. Custom duration property if available
+    // 2. Provided estimated duration
+    // 3. Calculate based on blob size
+    const blobDuration = (audioBlob as any).duration;
     
-    console.log('[BackgroundProcessor] Estimated recording duration:', recordingTimeMs, 'ms');
+    const recordingTimeMs = blobDuration ? blobDuration * 1000 : 
+                            estimatedDuration ? estimatedDuration * 1000 :
+                            audioBlob.size > 0 ? (audioBlob.size / 16000) * 1000 : 0;
+    
+    console.log('[BackgroundProcessor] Audio duration sources:', {
+      blobDuration: blobDuration ? `${blobDuration}s` : 'not available',
+      estimatedDuration: estimatedDuration ? `${estimatedDuration}s` : 'not provided',
+      calculatedFromSize: audioBlob.size > 0 ? `${(audioBlob.size / 16000)}s` : 'not calculated'
+    });
+    
+    console.log('[BackgroundProcessor] Using recording duration:', recordingTimeMs, 'ms');
     
     // Invoke the Supabase function to process the audio
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
