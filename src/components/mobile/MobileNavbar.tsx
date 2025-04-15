@@ -5,23 +5,35 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
+import { isAppSubdomain } from '@/routes/RouteHelpers';
 
 const MobileNavbar = () => {
   const location = useLocation();
   const { user } = useAuth();
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [isChatInputActive, setIsChatInputActive] = useState(false);
+  const appSubdomain = isAppSubdomain();
   
-  const navItems = [
-    { path: '/app/home', label: 'Home', icon: Home },
-    { path: '/app/journal', label: 'Journal', icon: Book },
-    { path: '/app/insights', label: 'Insights', icon: BarChart2 },
-    { path: '/app/smart-chat', label: 'Chat', icon: MessageSquare },
-    { path: '/app/settings', label: 'Settings', icon: Settings },
-  ];
+  // Dynamically build navigation items based on subdomain
+  const navItems = appSubdomain ? 
+    [
+      { path: '/home', label: 'Home', icon: Home },
+      { path: '/journal', label: 'Journal', icon: Book },
+      { path: '/insights', label: 'Insights', icon: BarChart2 },
+      { path: '/smart-chat', label: 'Chat', icon: MessageSquare },
+      { path: '/settings', label: 'Settings', icon: Settings },
+    ] : 
+    [
+      { path: '/app/home', label: 'Home', icon: Home },
+      { path: '/app/journal', label: 'Journal', icon: Book },
+      { path: '/app/insights', label: 'Insights', icon: BarChart2 },
+      { path: '/app/smart-chat', label: 'Chat', icon: MessageSquare },
+      { path: '/app/settings', label: 'Settings', icon: Settings },
+    ];
 
   // Only show the navbar if the user is logged in and not on auth page
-  if (!user || location.pathname === '/app/auth') {
+  const authPath = appSubdomain ? '/auth' : '/app/auth';
+  if (!user || location.pathname === authPath) {
     return null;
   }
   
@@ -74,15 +86,22 @@ const MobileNavbar = () => {
   }, []);
 
   // Return null when keyboard is visible or chat input is active in chat page
-  const isChatPage = location.pathname === '/app/smart-chat';
+  const chatPath = appSubdomain ? '/smart-chat' : '/app/smart-chat';
+  const isChatPage = location.pathname === chatPath;
   if (isKeyboardVisible || (isChatPage && isChatInputActive)) {
     return null;
   }
 
   // Improved active route detection to ensure only one tab is active
   const getActiveStatus = (path: string) => {
-    // Match the path at the beginning of the current path
-    return location.pathname.startsWith(path);
+    // Check if current path matches the nav item path
+    return location.pathname === path || 
+           // Also check if current path is a sub-path
+           (path.endsWith('/home') && location.pathname.includes('/home/')) ||
+           (path.endsWith('/journal') && location.pathname.includes('/journal/')) ||
+           (path.endsWith('/insights') && location.pathname.includes('/insights/')) ||
+           (path.endsWith('/smart-chat') && location.pathname.includes('/smart-chat/')) ||
+           (path.endsWith('/settings') && location.pathname.includes('/settings/'));
   };
 
   return (

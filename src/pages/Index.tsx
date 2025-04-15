@@ -11,6 +11,7 @@ import Navbar from '@/components/Navbar';
 import HeroSection from '@/components/landing/HeroSection';
 import FeaturesGrid from '@/components/landing/FeaturesGrid';
 import EnergyAnimation from '@/components/EnergyAnimation';
+import HomePage from '@/pages/website/HomePage';
 import LandingPage from '@/pages/landing/LandingPage';
 
 const Index = () => {
@@ -26,10 +27,10 @@ const Index = () => {
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
   const isAppSubdomain = window.location.hostname === 'app.soulo.online';
 
-  // IMPORTANT: If this is the main domain (not app subdomain), render the modern landing page
+  // IMPORTANT: If this is the main domain (not app subdomain), render the modern homepage with features
   if (!isAppSubdomain) {
-    console.log('Rendering marketing website on main domain');
-    return <LandingPage />;
+    console.log('Rendering modern marketing homepage on main domain');
+    return <HomePage />;
   }
 
   // Continue with the regular Index rendering for app subdomain

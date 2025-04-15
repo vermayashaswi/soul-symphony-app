@@ -23,7 +23,7 @@ export const isAppRoute = (pathname: string): boolean => {
            !pathname.startsWith('/app-download');
   }
   
-  // Legacy support for soulo.online/app/* paths
+  // On main domain, /app/* paths are app routes
   return pathname === '/app' || pathname.startsWith('/app/');
 };
 

@@ -12,6 +12,7 @@ import MobileNavigation from './MobileNavigation';
 import { useAuth } from '@/contexts/AuthContext';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import LandingPage from '@/pages/landing/LandingPage';
+import HomePage from '@/pages/website/HomePage';
 import { isAppSubdomain } from './RouteHelpers';
 
 const AppRoutes = () => {
@@ -21,8 +22,8 @@ const AppRoutes = () => {
 
   // Force render marketing site on main domain
   if (!appSubdomain && window.location.pathname === '/') {
-    console.log('Main domain - showing landing page');
-    return <LandingPage />;
+    console.log('Main domain - showing modern landing page (HomePage)');
+    return <HomePage />;
   }
 
   return (
@@ -47,7 +48,7 @@ const AppRoutes = () => {
         
         {/* Website routes - use the modern landing page */}
         {!appSubdomain && (
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<HomePage />} />
         )}
         
         {/* App routes with domain-specific paths */}
