@@ -17,18 +17,12 @@ function Toaster({ ...props }: ToasterProps) {
       toastOptions={{
         classNames: {
           toast: isDarkMode
-            ? "group bg-theme text-white font-medium border border-white/10" 
+            ? "group bg-theme text-black font-medium border border-white/10" 
             : "group bg-theme text-black font-medium border border-black/10",
-          title: isDarkMode 
-            ? "text-white font-semibold" 
-            : "text-black font-semibold",
-          description: isDarkMode 
-            ? "text-white/90 font-normal" 
-            : "text-black/90 font-normal",
+          title: "text-black font-semibold",
+          description: "text-black/90 font-normal",
           actionButton: "bg-primary text-primary-foreground font-medium",
-          closeButton: isDarkMode
-            ? "text-white/50 hover:text-white" 
-            : "text-black/50 hover:text-black"
+          closeButton: "text-black/50 hover:text-black"
         }
       }}
       {...props}

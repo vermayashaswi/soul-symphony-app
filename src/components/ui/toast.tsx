@@ -77,8 +77,8 @@ const Toast = React.forwardRef<
         toastVariants({ variant }), 
         className, 
         "bg-theme border-theme/30",
-        // Apply light or dark text based on theme
-        isDarkMode ? "text-white" : "text-black"
+        // Apply black text regardless of theme
+        "text-black"
       )}
       {...props}
     />
@@ -105,16 +105,12 @@ const ToastClose = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Close>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Close>
 >(({ className, ...props }, ref) => {
-  const { theme, systemTheme } = useTheme();
-  // Determine if we're in dark mode
-  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
-  
   return (
     <ToastPrimitives.Close
       ref={ref}
       className={cn(
         "absolute right-2 top-2 rounded-md p-1 opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100",
-        isDarkMode ? "text-white/50 hover:text-white focus:ring-white" : "text-black/50 hover:text-black focus:ring-black",
+        "text-black/50 hover:text-black focus:ring-black",
         className
       )}
       toast-close=""
@@ -130,16 +126,11 @@ const ToastTitle = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Title>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Title>
 >(({ className, ...props }, ref) => {
-  const { theme, systemTheme } = useTheme();
-  // Determine if we're in dark mode
-  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
-  
   return (
     <ToastPrimitives.Title
       ref={ref}
       className={cn(
-        "text-sm font-semibold", 
-        isDarkMode ? "text-white" : "text-black",
+        "text-sm font-semibold text-black",
         className
       )}
       {...props}
@@ -152,16 +143,11 @@ const ToastDescription = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Description>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Description>
 >(({ className, ...props }, ref) => {
-  const { theme, systemTheme } = useTheme();
-  // Determine if we're in dark mode
-  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
-  
   return (
     <ToastPrimitives.Description
       ref={ref}
       className={cn(
-        "text-sm opacity-90 font-normal", 
-        isDarkMode ? "text-white/90" : "text-black/90",
+        "text-sm opacity-90 font-normal text-black/90",
         className
       )}
       {...props}

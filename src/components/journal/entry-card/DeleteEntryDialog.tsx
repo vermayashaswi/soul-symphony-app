@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { 
   Dialog, 
   DialogContent, 
@@ -12,7 +12,6 @@ import {
   DialogTrigger 
 } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface DeleteEntryDialogProps {
@@ -49,27 +48,6 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
     }
   };
 
-  const handleUserFeedback = async (feedback: number) => {
-    if (!entryId) return;
-
-    try {
-      const { error } = await supabase
-        .from('Journal Entries')
-        .update({ user_feedback: feedback })
-        .eq('id', entryId);
-    
-      if (error) {
-        console.error('Error saving user feedback:', error);
-        toast.error('Failed to save feedback');
-      } else {
-        toast.success('Thank you for your feedback!');
-      }
-    } catch (error) {
-      console.error('Unexpected error saving feedback:', error);
-      toast.error('An unexpected error occurred');
-    }
-  };
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -77,7 +55,7 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
           <Trash2 className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] max-w-[90vw]">
+      <DialogContent className="sm:max-w-[425px] w-[calc(100%-2rem)] max-w-[90vw]">
         <DialogHeader>
           <DialogTitle>Are you absolutely sure?</DialogTitle>
           <DialogDescription>
@@ -85,40 +63,18 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
             servers.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-          <div className="flex items-center justify-between w-full">
-            <div className="flex space-x-2 mx-auto">
-              <Button 
-                variant="outline" 
-                onClick={() => handleUserFeedback(1)}
-                className="flex items-center"
-              >
-                <ThumbsUp className="mr-2 h-4 w-4" /> 
-                Good Translation
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => handleUserFeedback(0)}
-                className="flex items-center"
-              >
-                <ThumbsDown className="mr-2 h-4 w-4" /> 
-                Needs Improvement
-              </Button>
-            </div>
-          </div>
-          <div className="flex space-x-2 mt-2 w-full justify-center">
-            <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={isDeleting}>
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              variant="destructive" 
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? 'Deleting...' : 'Delete'}
-            </Button>
-          </div>
+        <DialogFooter className="flex space-x-2">
+          <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            variant="destructive" 
+            onClick={handleDelete}
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

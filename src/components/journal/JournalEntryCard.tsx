@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -62,6 +63,8 @@ export function JournalEntryCard({
   const [deletionInProgress, setDeletionInProgress] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [contentLoaded, setContentLoaded] = useState(false);
+  const [thumbsUp, setThumbsUp] = useState(false);
+  const [thumbsDown, setThumbsDown] = useState(false);
   const mountedRef = useRef<boolean>(true);
   
   const extractThemes = (): string[] => {
@@ -223,6 +226,27 @@ export function JournalEntryCard({
 
   const handleUserFeedback = async (feedback: number) => {
     try {
+      // Toggle thumbs state
+      if (feedback === 1) {
+        if (!thumbsUp) {
+          setThumbsUp(true);
+          setThumbsDown(false);
+          toast.success('Glad you liked the translation');
+        } else {
+          setThumbsUp(false);
+          // No toast when deselecting
+        }
+      } else {
+        if (!thumbsDown) {
+          setThumbsDown(true);
+          setThumbsUp(false);
+          toast.error("We'll try and improve on the translation");
+        } else {
+          setThumbsDown(false);
+          // No toast when deselecting
+        }
+      }
+      
       const { error } = await supabase
         .from('Journal Entries')
         .update({ user_feedback: feedback })
@@ -231,8 +255,6 @@ export function JournalEntryCard({
       if (error) {
         console.error('Error saving user feedback:', error);
         toast.error('Failed to save feedback');
-      } else {
-        toast.success('Thank you for your feedback!');
       }
     } catch (error) {
       console.error('Unexpected error saving feedback:', error);
@@ -333,14 +355,14 @@ export function JournalEntryCard({
               <div className="flex space-x-2">
                 <button
                   onClick={() => handleUserFeedback(1)}
-                  className="text-green-500 hover:bg-green-100 p-1 rounded-full"
+                  className={`hover:bg-green-100 p-1 rounded-full ${thumbsUp ? 'text-green-600 bg-green-100' : 'text-green-500'}`}
                   aria-label="Thumbs up for translation"
                 >
                   <ThumbsUp size={16} />
                 </button>
                 <button
                   onClick={() => handleUserFeedback(0)}
-                  className="text-red-500 hover:bg-red-100 p-1 rounded-full"
+                  className={`hover:bg-red-100 p-1 rounded-full ${thumbsDown ? 'text-red-600 bg-red-100' : 'text-red-500'}`}
                   aria-label="Thumbs down for translation"
                 >
                   <ThumbsDown size={16} />
