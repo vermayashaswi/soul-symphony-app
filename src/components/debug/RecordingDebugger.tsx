@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Bug, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [steps, setSteps] = useState<RecordingDebugStep[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
-  const { addEvent, isEnabled } = useDebugLog();
+  const { addEvent, isEnabled, toggleEnabled } = useDebugLog();
   
   useEffect(() => {
     if (!currentStatus) return;
@@ -97,16 +98,22 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
     }
   }, [currentStatus, audioDuration, audioBlob, addEvent]);
   
+  const handleDebugButtonClick = () => {
+    if (!isEnabled) {
+      // Enable debug mode when clicked
+      toggleEnabled();
+    }
+    // Toggle panel state regardless of debug mode
+    setIsOpen(!isOpen);
+  };
+  
   return (
     <div className="fixed bottom-20 right-4 z-50 flex flex-col items-end">
       <Button
         size="sm"
-        variant="outline"
-        className={`flex items-center gap-2 mb-2 bg-white dark:bg-gray-800 shadow-md ${
-          isEnabled ? 'opacity-100' : 'opacity-50'
-        }`}
-        onClick={() => setIsOpen(!isOpen)}
-        disabled={!isEnabled}
+        variant={isEnabled ? "outline" : "secondary"}
+        className="flex items-center gap-2 mb-2 bg-white dark:bg-gray-800 shadow-md"
+        onClick={handleDebugButtonClick}
       >
         <Bug className="h-4 w-4" />
         <span>Debug Recording</span>
@@ -132,6 +139,22 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
                 <X className="h-4 w-4" />
               </Button>
             </div>
+            
+            {!isEnabled && (
+              <div className="mb-4 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+                <p className="text-xs text-amber-800 dark:text-amber-200">
+                  Debug mode is currently disabled. Debug information will be limited.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={toggleEnabled}
+                  className="w-full mt-2 text-xs h-7 border-amber-300"
+                >
+                  Enable Debug Mode
+                </Button>
+              </div>
+            )}
             
             <div className="space-y-3 max-h-[300px] overflow-y-auto">
               {steps.map((step, index) => (
