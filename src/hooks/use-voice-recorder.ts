@@ -10,10 +10,10 @@ export function useVoiceRecorder({
   onRecordingComplete,
   onError,
 }: UseVoiceRecorderProps) {
-  const [status, setStatus: any] = useState<
+  const [status, setStatus] = useState<
     "idle" | "acquiring_media" | "recording" | "stopping"
   >("idle");
-  const [recorderInstance, setRecorderInstance: any] = useState<any>(null);
+  const [recorderInstance, setRecorderInstance] = useState<any>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const [startTime, setStartTime] = useState<number>(0);
