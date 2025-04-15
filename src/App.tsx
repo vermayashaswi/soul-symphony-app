@@ -1,14 +1,17 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./hooks/use-theme";
 import { TouchAnimation } from "./components/ui/touch-animation";
 import { supabase } from "./integrations/supabase/client";
 import AppRoutes from "./routes/AppRoutes";
+import WebsiteRoutes from "./routes/WebsiteRoutes";
+import { isAppRoute } from "./routes/RouteHelpers";
 import "./styles/mobile.css";
 import { useEffect } from 'react';
 import { handleAuthCallback } from "./services/authService";
@@ -46,6 +49,8 @@ const App = () => {
     
     // Add domain-specific handling for app.soulo.online
     const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+    const isMainDomain = window.location.hostname === 'soulo.online' || 
+                         window.location.hostname.includes('lovableproject.com');
     
     // Handle app subdomain path corrections
     if (isAppSubdomain && window.location.pathname.startsWith('/app/')) {
@@ -161,6 +166,10 @@ const App = () => {
     };
   }, []);
   
+  // Determine if the current path is an app route
+  const isApp = isAppRoute(window.location.pathname);
+  console.log('Current path is app route:', isApp, window.location.pathname);
+  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -170,7 +179,7 @@ const App = () => {
               <div className="relative min-h-screen">
                 <div className="relative z-10">
                   <AnimatePresence mode="wait">
-                    <AppRoutes />
+                    {isApp ? <AppRoutes /> : <WebsiteRoutes />}
                   </AnimatePresence>
                 </div>
                 <TouchAnimation />
