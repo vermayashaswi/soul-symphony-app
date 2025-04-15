@@ -104,9 +104,9 @@ export default function JournalEntriesList({
                     prev.filter(id => id !== event.detail.tempId)
                   );
                 }
-              }, 1000);
+              }, 100);
             }
-          }, 2000);
+          }, 100);
         } else {
           console.log(`[JournalEntriesList] No matching entry found yet for ${event.detail.entryId}`);
           
@@ -575,7 +575,7 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4 mt-6">
-            {processedTransitionalEntries.map(tempId => (
+            {processedTransitionalEntries.length > 0 && processedTransitionalEntries.map(tempId => (
               <ErrorBoundary key={`transitional-boundary-${tempId}`}>
                 {renderTransitionalEntry(tempId)}
               </ErrorBoundary>
@@ -629,7 +629,7 @@ export default function JournalEntriesList({
                 </Button>
               </motion.div>
             ) : (
-              finalLocalEntries.map((entry, index) => (
+              finalDisplayEntries.map((entry, index) => (
                 <ErrorBoundary key={`entry-boundary-${entry.id}`}>
                   <motion.div
                     key={`entry-${entry.id}`}
