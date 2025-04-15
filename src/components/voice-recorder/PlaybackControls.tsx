@@ -17,6 +17,7 @@ interface PlaybackControlsProps {
   onSaveEntry: () => void;
   onRestart: () => void;
   onSeek?: (position: number) => void;
+  seekTo?: (position: number) => void; // Add this to match expected prop
   audioBlob?: Blob | null; // Add this to match expected prop
   isProcessing?: boolean; // Add this to match expected prop
 }
@@ -30,6 +31,7 @@ export function PlaybackControls({
   onSaveEntry,
   onRestart,
   onSeek,
+  seekTo, // Add this to match expected prop
   audioBlob = null,
   isProcessing = false
 }: PlaybackControlsProps) {
@@ -99,10 +101,16 @@ export function PlaybackControls({
   const formattedDuration = formatTime(stableDuration.current);
   
   const handleSliderChange = (value: number[]) => {
-    if (onSeek) {
-      const position = value[0] / 100;
-      setSliderValue(value[0]);
-      setCurrentTime(position * stableDuration.current);
+    const position = value[0] / 100;
+    setSliderValue(value[0]);
+    setCurrentTime(position * stableDuration.current);
+    
+    // Use seekTo if provided (from VoiceRecorder component)
+    if (seekTo) {
+      seekTo(position);
+    } 
+    // Fall back to onSeek if seekTo is not provided
+    else if (onSeek) {
       onSeek(position);
     }
   };
