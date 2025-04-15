@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useAudioRecorder } from '@/hooks/use-audio-recorder';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
+import { blobToBase64 } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -235,9 +236,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       }
       
       // Important: Normalize the blob and await the result
+      console.log('[VoiceRecorder] Normalizing audio blob before processing...');
       let normalizedBlob: Blob;
       try {
         normalizedBlob = await normalizeAudioBlob(audioBlob);
+        console.log('[VoiceRecorder] Blob normalized successfully:', {
+          type: normalizedBlob.type,
+          size: normalizedBlob.size,
+          hasDuration: 'duration' in normalizedBlob,
+          duration: (normalizedBlob as any).duration || 'unknown'
+        });
       } catch (error) {
         console.error('[VoiceRecorder] Error normalizing audio blob:', error);
         setRecordingError("Error processing audio. Please try again.");
@@ -266,6 +274,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         try {
           console.log('[VoiceRecorder] Calling recording completion callback');
           saveCompleteRef.current = false;
+          
+          // Test the blob conversion before passing to callback
+          const base64Test = await blobToBase64(normalizedBlob).catch(err => {
+            console.error('[VoiceRecorder] Base64 conversion test failed:', err);
+            throw new Error('Error preparing audio for processing');
+          });
+          
+          console.log('[VoiceRecorder] Base64 test conversion successful, length:', base64Test.length);
           
           await onRecordingComplete(normalizedBlob);
           

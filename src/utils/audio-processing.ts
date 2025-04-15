@@ -15,6 +15,7 @@ import {
 } from './audio/processing-state';
 import { validateInitialState, setupProcessingTimeout } from './audio/recording-validation';
 import { processRecordingInBackground } from './audio/background-processor';
+import { blobToBase64 } from './audio/blob-utils';
 
 /**
  * Processes an audio recording for transcription and analysis
@@ -29,6 +30,41 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   
   // Clear all toasts to ensure UI is clean before processing
   clearAllToasts();
+  
+  // Validate the audio blob
+  if (!audioBlob) {
+    return { 
+      success: false, 
+      error: 'No audio data to process' 
+    };
+  }
+  
+  // Check if the audio blob has duration
+  if (!('duration' in audioBlob) || (audioBlob as any).duration <= 0) {
+    console.warn('[AudioProcessing] Audio blob has no duration property or duration is 0');
+  } else {
+    console.log('[AudioProcessing] Audio duration:', (audioBlob as any).duration);
+  }
+  
+  // Test base64 conversion before proceeding
+  try {
+    const base64Test = await blobToBase64(audioBlob);
+    console.log('[AudioProcessing] Base64 test conversion successful, length:', base64Test.length);
+    
+    // Make sure we have reasonable data
+    if (base64Test.length < 50) {
+      return {
+        success: false,
+        error: 'Audio data appears too short or invalid'
+      };
+    }
+  } catch (error) {
+    console.error('[AudioProcessing] Base64 test conversion failed:', error);
+    return {
+      success: false,
+      error: 'Error preparing audio data for processing'
+    };
+  }
   
   // Validate initial state and get tempId
   const validationResult = await validateInitialState(audioBlob, userId);
@@ -58,7 +94,8 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     console.log('[AudioProcessing] Processing audio:', {
       size: audioBlob?.size || 0,
       type: audioBlob?.type || 'unknown',
-      userId: userId || 'anonymous'
+      userId: userId || 'anonymous',
+      audioDuration: (audioBlob as any).duration || 'unknown'
     });
     
     // Launch the processing without awaiting it

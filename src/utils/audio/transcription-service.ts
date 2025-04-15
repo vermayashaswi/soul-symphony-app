@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { blobToBase64 } from '@/utils/audio/blob-utils';
 
 interface TranscriptionResult {
   success: boolean;
@@ -84,6 +85,42 @@ export async function sendAudioForTranscription(
     return {
       success: false,
       error: error.message || 'Unknown error occurred'
+    };
+  }
+}
+
+/**
+ * Convert an audio blob to base64 and send for transcription
+ * @param audioBlob - The audio blob to transcribe
+ * @param userId - User ID for association with the transcription
+ * @param directTranscription - If true, just returns the transcription without processing
+ */
+export async function transcribeAudioBlob(
+  audioBlob: Blob,
+  userId: string | undefined,
+  directTranscription: boolean = false
+): Promise<TranscriptionResult> {
+  try {
+    console.log('[TranscriptionService] Converting audio blob to base64...');
+    console.log('[TranscriptionService] Audio blob details:', {
+      size: audioBlob.size,
+      type: audioBlob.type,
+      hasDuration: 'duration' in audioBlob,
+      duration: (audioBlob as any).duration || 'unknown'
+    });
+    
+    // Convert blob to base64
+    const base64Audio = await blobToBase64(audioBlob);
+    
+    console.log(`[TranscriptionService] Base64 conversion successful, length: ${base64Audio.length}`);
+    
+    // Send for transcription
+    return await sendAudioForTranscription(base64Audio, userId, directTranscription);
+  } catch (error: any) {
+    console.error('[TranscriptionService] Error in transcribeAudioBlob:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to prepare audio for transcription'
     };
   }
 }

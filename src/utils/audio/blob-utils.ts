@@ -110,7 +110,7 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
   
   // Use a fuzzy match to check for audio MIME type
   const isAudioType = audioBlob.type.includes('audio/') || 
-                      supportedTypes.some(type => audioBlob.type.includes(type.split('/')[1]));
+                     supportedTypes.some(type => audioBlob.type.includes(type.split('/')[1]));
   
   if (!isAudioType) {
     console.warn('[validateAudioBlob] Potentially unsupported audio format:', audioBlob.type);
@@ -125,13 +125,13 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
  * @returns A new blob with duration property, or the original if it already has duration
  */
 export function safelyAddDurationProperty(blob: Blob, duration: number): Blob {
-  // If the blob already has a duration property, return it as is
-  if ('duration' in blob) {
+  // If the blob already has a duration property with a valid value, return it
+  if ('duration' in blob && typeof (blob as any).duration === 'number' && (blob as any).duration > 0) {
     console.log('[safelyAddDurationProperty] Blob already has duration property:', (blob as any).duration);
     return blob;
   }
   
-  // Create a new blob with the same content but same type
+  // Create a new blob with the same content and same type
   const newBlob = new Blob([blob], { type: blob.type });
   
   try {
@@ -140,7 +140,7 @@ export function safelyAddDurationProperty(blob: Blob, duration: number): Blob {
       value: duration,
       writable: false,
       enumerable: true,
-      configurable: false // Ensure property cannot be redefined
+      configurable: true // Allow property to be redefined if needed
     });
     console.log(`[safelyAddDurationProperty] Added duration ${duration}s to blob`);
   } catch (error) {
@@ -159,10 +159,17 @@ export async function normalizeAudioBlob(audioBlob: Blob): Promise<Blob> {
     let resultBlob = audioBlob;
     let duration = 0;
     
-    // If blob doesn't have duration property, try to get it
-    if (!('duration' in audioBlob)) {
+    // If blob doesn't have duration property or it's zero, try to get it
+    if (!('duration' in audioBlob) || (audioBlob as any).duration === 0) {
       console.log('[normalizeAudioBlob] Getting duration for blob');
       duration = await getAudioBlobDuration(audioBlob);
+      
+      // If we still couldn't get a duration, estimate from size
+      if (duration === 0 && audioBlob.size > 0) {
+        duration = audioBlob.size / 16000; // Rough estimate based on 128kbps audio
+        console.log(`[normalizeAudioBlob] Estimated duration from size: ${duration}s`);
+      }
+      
       if (duration > 0) {
         resultBlob = safelyAddDurationProperty(resultBlob, duration);
       }

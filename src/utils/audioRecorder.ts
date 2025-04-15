@@ -21,7 +21,7 @@ export const recordAudio = async () => {
   
   // Set up the MediaRecorder with specific options for better compatibility
   const options = {
-    mimeType: 'audio/wav',
+    mimeType: 'audio/webm;codecs=opus',
     audioBitsPerSecond: 128000
   };
   
@@ -68,8 +68,8 @@ export const recordAudio = async () => {
               return;
             }
             
-            // Create blob with explicit MIME type
-            const mimeType = mediaRecorder.mimeType || 'audio/wav';
+            // Create blob with correct MIME type
+            const mimeType = mediaRecorder.mimeType || 'audio/webm;codecs=opus';
             const audioBlob = new Blob(audioChunks, { type: mimeType });
             
             if (audioBlob.size < 100) {
@@ -83,11 +83,11 @@ export const recordAudio = async () => {
             // Stop all tracks to release the microphone
             stream.getTracks().forEach(track => track.stop());
             
-            // Create a new blob with duration property
-            let finalBlob = audioBlob;
+            // Create a new blob with duration property using Blob constructor
+            const finalBlob = new Blob([audioBlob], { type: mimeType });
             
             try {
-              // Set duration on the blob object using the recordingDuration we calculated
+              // Set duration on the blob object using explicit property definition
               Object.defineProperty(finalBlob, 'duration', {
                 value: recordingDuration,
                 writable: false,
@@ -96,20 +96,7 @@ export const recordAudio = async () => {
               });
               console.log(`[audioRecorder] Successfully added duration property: ${recordingDuration}s`);
             } catch (err) {
-              console.warn('[audioRecorder] Could not add duration property directly, creating new blob');
-              // If we can't add property directly (e.g., due to browser restrictions), create a new blob
-              const newBlob = new Blob([audioBlob], { type: mimeType });
-              try {
-                Object.defineProperty(newBlob, 'duration', {
-                  value: recordingDuration,
-                  writable: false,
-                  enumerable: true,
-                  configurable: false
-                });
-                finalBlob = newBlob;
-              } catch (e) {
-                console.error('[audioRecorder] Failed to add duration to new blob as well:', e);
-              }
+              console.warn('[audioRecorder] Could not add duration property:', err);
             }
             
             console.log(`[audioRecorder] Stopped recording. Duration: ${recordingDuration}s, Size: ${finalBlob.size} bytes, Type: ${finalBlob.type}`);
