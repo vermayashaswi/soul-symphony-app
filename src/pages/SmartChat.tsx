@@ -15,7 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import { generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useToast } from "@/hooks/use-toast";
-import { DebugLogProvider } from "@/utils/debug/DebugContext";
+import { DebugProvider } from "@/utils/debug/DebugContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -416,8 +416,8 @@ export default function SmartChat() {
   const content = shouldRenderMobile ? mobileContent : desktopContent;
   
   return (
-    <DebugLogProvider>
+    <DebugProvider>
       {mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content}
-    </DebugLogProvider>
+    </DebugProvider>
   );
 }
