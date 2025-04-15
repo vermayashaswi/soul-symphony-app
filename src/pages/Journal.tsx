@@ -49,6 +49,18 @@ const Journal = () => {
   const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const processingToEntryMapRef = useRef<Map<string, number>>(new Map());
 
+  const { 
+    entries, 
+    loading, 
+    fetchEntries, 
+    error: entriesError, 
+    profileExists 
+  } = useJournalEntries(
+    user?.id,
+    refreshKey,
+    isProfileChecked
+  );
+
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       console.error('[Journal] Caught render error:', event);
@@ -111,18 +123,6 @@ const Journal = () => {
       clearAllToasts();
     };
   }, [processingEntries, toastIds, fetchEntries]);
-
-  const { 
-    entries, 
-    loading, 
-    fetchEntries, 
-    error: entriesError, 
-    profileExists 
-  } = useJournalEntries(
-    user?.id,
-    refreshKey,
-    isProfileChecked
-  );
 
   useEffect(() => {
     clearAllToasts();

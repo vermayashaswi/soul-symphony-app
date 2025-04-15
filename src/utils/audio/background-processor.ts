@@ -68,6 +68,16 @@ export async function processRecordingInBackground(
     if (functionData.entryId) {
       console.log(`[BackgroundProcessor] Setting mapping: tempId ${tempId} -> entryId ${functionData.entryId}`);
       setEntryIdForProcessingId(tempId, functionData.entryId);
+      
+      // Dispatch an event to immediately update UI components
+      window.dispatchEvent(new CustomEvent('processingEntryMapped', {
+        detail: { 
+          tempId, 
+          entryId: functionData.entryId, 
+          timestamp: Date.now(),
+          isComplete: true 
+        }
+      }));
     }
     
     // Release the processing locks

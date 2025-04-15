@@ -33,39 +33,14 @@ export default function JournalEntriesList({
   const [renderRetryCount, setRenderRetryCount] = useState(0);
   const [persistedProcessingEntries, setPersistedProcessingEntries] = useState<string[]>([]);
   const [isSearchActive, setIsSearchActive] = useState(false);
-  const [processingStep, setProcessingStep] = useState<string>('recording');
   const [processingToEntryMap, setProcessingToEntryMap] = useState<Map<string, number>>(new Map());
-  const hasProcessingEntries = Array.isArray(processingEntries) && processingEntries.length > 0 || persistedProcessingEntries.length > 0;
+  const [visibleProcessingEntries, setVisibleProcessingEntries] = useState<string[]>([]);
+  const hasProcessingEntries = visibleProcessingEntries.length > 0;
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
   const [renderError, setRenderError] = useState<Error | null>(null);
   const hasNoValidEntries = useRef(false);
   const processingStepTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Processing steps animation
-  useEffect(() => {
-    if (hasProcessingEntries) {
-      const steps = ['transcribing', 'processing', 'extracting_themes', 'analyzing_sentiment', 'finalizing'];
-      let currentStepIndex = 0;
-      
-      const advanceStep = () => {
-        if (!componentMounted.current) return;
-        
-        setProcessingStep(steps[currentStepIndex]);
-        currentStepIndex = (currentStepIndex + 1) % steps.length;
-        
-        processingStepTimeoutRef.current = setTimeout(advanceStep, 3000);
-      };
-      
-      advanceStep();
-      
-      return () => {
-        if (processingStepTimeoutRef.current) {
-          clearTimeout(processingStepTimeoutRef.current);
-        }
-      };
-    }
-  }, [hasProcessingEntries]);
 
   // Listen for mapping events between processing IDs and entry IDs
   useEffect(() => {
@@ -78,6 +53,11 @@ export default function JournalEntriesList({
           newMap.set(event.detail.tempId, event.detail.entryId);
           return newMap;
         });
+        
+        // When we have a mapping, remove this entry from visible processing entries
+        setVisibleProcessingEntries(prev => 
+          prev.filter(id => id !== event.detail.tempId)
+        );
         
         // Check if this entry is in our current entries list and highlight it
         const newEntryId = event.detail.entryId;
@@ -106,6 +86,9 @@ export default function JournalEntriesList({
     const loadPersistedProcessingEntries = () => {
       const persistedEntries = getProcessingEntries();
       setPersistedProcessingEntries(persistedEntries);
+      
+      // Initialize visible processing entries with persisted ones
+      setVisibleProcessingEntries(persistedEntries);
     };
     
     loadPersistedProcessingEntries();
@@ -113,6 +96,17 @@ export default function JournalEntriesList({
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
       if (event.detail && Array.isArray(event.detail.entries)) {
         setPersistedProcessingEntries(event.detail.entries);
+        
+        // Update visible processing entries as well
+        const newEntries = event.detail.entries;
+        setVisibleProcessingEntries(prev => {
+          // Only add entries that aren't already mapped to an entryId
+          const entriesWithoutMapping = newEntries.filter(tempId => 
+            !Array.from(processingToEntryMap.keys()).includes(tempId)
+          );
+          
+          return entriesWithoutMapping;
+        });
       }
     };
     
@@ -130,7 +124,7 @@ export default function JournalEntriesList({
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [processingToEntryMap]);
 
   // Process and filter entries
   useEffect(() => {
@@ -148,6 +142,17 @@ export default function JournalEntriesList({
         
         setLocalEntries(filteredEntries);
         setFilteredEntries(filteredEntries);
+        
+        // Check if any new entries correspond to processing entries and update visibility
+        const entryIds = filteredEntries.map(entry => entry.id);
+        
+        setVisibleProcessingEntries(prev => {
+          return prev.filter(tempId => {
+            const mappedEntryId = getEntryIdForProcessingId(tempId);
+            // Keep only processing entries that don't have a corresponding entry in the list
+            return !mappedEntryId || !entryIds.includes(mappedEntryId);
+          });
+        });
       } else {
         console.warn('[JournalEntriesList] Entries is not an array:', entries);
         setLocalEntries([]);
@@ -182,6 +187,11 @@ export default function JournalEntriesList({
               if (mappedEntryId && !animatedEntryIds.includes(mappedEntryId)) {
                 console.log(`[JournalEntriesList] Found mapped entry ID for processing ${tempId}: ${mappedEntryId}`);
                 newEntryIds.push(mappedEntryId);
+                
+                // Once we've found the entry, remove it from visible processing entries
+                setVisibleProcessingEntries(prev => 
+                  prev.filter(id => id !== tempId)
+                );
               }
             });
           }
@@ -268,57 +278,9 @@ export default function JournalEntriesList({
     setIsSearchActive(results.length !== localEntries.length);
   };
   
-  const allProcessingEntries = [...new Set([...processingEntries, ...persistedProcessingEntries])];
   const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !hasProcessingEntries;
   
-  const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !allProcessingEntries.length;
-
-  const renderProcessingStepContent = () => {
-    switch (processingStep) {
-      case 'transcribing':
-        return (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span>Transcribing your audio...</span>
-          </div>
-        );
-      case 'processing':
-        return (
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-primary" />
-            <span>Processing with AI...</span>
-          </div>
-        );
-      case 'extracting_themes':
-        return (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span>Extracting themes from your entry...</span>
-          </div>
-        );
-      case 'analyzing_sentiment':
-        return (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span>Analyzing sentiment and emotions...</span>
-          </div>
-        );
-      case 'finalizing':
-        return (
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-primary" />
-            <span>Finalizing your journal entry...</span>
-          </div>
-        );
-      default:
-        return (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span>Processing your entry...</span>
-          </div>
-        );
-    }
-  };
+  const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !visibleProcessingEntries.length;
 
   if (hasNoValidEntries.current) {
     return (
@@ -382,28 +344,8 @@ export default function JournalEntriesList({
                     </div>
                   </div>
                   
-                  <div className="h-1 w-full bg-muted-foreground/20 rounded-full overflow-hidden">
-                    <motion.div 
-                      className="h-full bg-primary rounded-full"
-                      initial={{ width: "10%" }}
-                      animate={{ 
-                        width: ["10%", "30%", "50%", "70%", "90%"],
-                        transition: { 
-                          times: [0, 0.2, 0.4, 0.6, 0.8],
-                          duration: 15, 
-                          repeat: Infinity,
-                          repeatType: "reverse" 
-                        }
-                      }}
-                    />
-                  </div>
-                  
-                  <div className="text-sm text-muted-foreground">
-                    {renderProcessingStepContent()}
-                  </div>
-                  
-                  <div className="pt-2 text-xs text-muted-foreground">
-                    Your entry will appear here once processing is complete
+                  <div className="pt-2 text-sm">
+                    <LoadingEntryContent />
                   </div>
                 </div>
               </motion.div>
@@ -476,5 +418,14 @@ export default function JournalEntriesList({
         )}
       </div>
     </ErrorBoundary>
+  );
+}
+
+const LoadingEntryContent = () => {
+  return (
+    <div className="flex items-center gap-2">
+      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+      <span>Processing your entry...</span>
+    </div>
   );
 }
