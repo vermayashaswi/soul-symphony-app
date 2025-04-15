@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
@@ -7,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { clearAllToasts } from '@/services/notificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDebugLog } from '@/hooks/use-debug-log';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -36,6 +36,7 @@ export function PlaybackControls({
   const [sliderValue, setSliderValue] = useState(0);
   const [isTouchActive, setIsTouchActive] = useState(false);
   const { isMobile } = useIsMobile();
+  const { addEvent } = useDebugLog ? useDebugLog() : { addEvent: console.log };
   
   useEffect(() => {
     if (!isTouchActive && playbackProgress !== undefined) {
@@ -43,14 +44,14 @@ export function PlaybackControls({
       setCurrentTime(timeInSeconds);
       setSliderValue(playbackProgress * 100);
       
-      console.log('[PlaybackControls] Progress update:', {
+      addEvent('PlaybackControls', 'Progress update', 'info', {
         progress: playbackProgress,
         timeInSeconds,
         audioDuration,
         sliderValue: playbackProgress * 100
       });
     }
-  }, [playbackProgress, audioDuration, isTouchActive]);
+  }, [playbackProgress, audioDuration, isTouchActive, addEvent]);
   
   const formatTime = (seconds: number): string => {
     if (isNaN(seconds) || seconds < 0) return '00:00';
@@ -64,7 +65,7 @@ export function PlaybackControls({
     setSliderValue(value[0]);
     setCurrentTime(newPosition * audioDuration);
     
-    console.log('[PlaybackControls] Slider changed:', {
+    addEvent('PlaybackControls', 'Slider changed', 'info', {
       value: value[0],
       newPosition,
       newTimeInSeconds: newPosition * audioDuration
@@ -90,10 +91,10 @@ export function PlaybackControls({
   };
   
   const handleSaveEntry = async () => {
-    console.log('[PlaybackControls] Save entry initiated');
+    addEvent('ProcessingFlow', 'Save entry initiated', 'info');
     
     if (!audioBlob || audioBlob.size < 100) {
-      console.error('[PlaybackControls] Invalid audio blob for saving:', audioBlob?.size);
+      addEvent('ProcessingFlow', 'Invalid audio blob for saving', 'error', { size: audioBlob?.size });
       return;
     }
     
@@ -101,7 +102,7 @@ export function PlaybackControls({
     await clearAllToasts();
     
     const tempId = 'temp-' + Date.now();
-    console.log('[PlaybackControls] Dispatching immediate processing event with tempId:', tempId);
+    addEvent('ProcessingFlow', 'Dispatching immediate processing event', 'info', { tempId });
     
     // Create a processing entry state first
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
@@ -118,13 +119,18 @@ export function PlaybackControls({
       if (!existingEntries.includes(tempId)) {
         existingEntries.push(tempId);
         localStorage.setItem('processingEntries', JSON.stringify(existingEntries));
+        addEvent('ProcessingFlow', 'Updated localStorage with tempId', 'success', { 
+          tempId, 
+          existingEntries 
+        });
       }
     } catch (e) {
-      console.error('[PlaybackControls] Error updating localStorage:', e);
+      addEvent('ProcessingFlow', 'Error updating localStorage', 'error', e);
     }
     
     // Send another event after a short delay to ensure the UI catches it
     setTimeout(() => {
+      addEvent('ProcessingFlow', 'Sending followup processing event', 'info', { tempId });
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { 
           entries: [tempId], 
@@ -136,6 +142,7 @@ export function PlaybackControls({
     
     // And a third time just to be sure
     setTimeout(() => {
+      addEvent('ProcessingFlow', 'Sending third processing event', 'info', { tempId });
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { 
           entries: [tempId], 
@@ -147,7 +154,7 @@ export function PlaybackControls({
     
     setTimeout(() => {
       setIsClearingToasts(false);
-      console.log('[PlaybackControls] Calling onSaveEntry callback');
+      addEvent('ProcessingFlow', 'Calling onSaveEntry callback', 'info');
       onSaveEntry();
     }, 150);
   };

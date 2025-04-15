@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { createLogEntry } from './debugUtils';
 import { DebugLogContextType, DebugLogEntry, LogLevel } from './debugLogTypes';
 
@@ -16,18 +16,18 @@ const DebugLogContext = createContext<DebugLogContextType>({
 // Debug provider component
 export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [logs, setLogs] = useState<DebugLogEntry[]>([]);
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const [isEnabled, setIsEnabled] = useState<boolean>(true); // Default to enabled for debugging
   
   // Local storage key for saving debug preferences
   const STORAGE_KEY = 'debug_preferences';
   
   // Initialize from local storage
-  React.useEffect(() => {
+  useEffect(() => {
     const savedPreferences = localStorage.getItem(STORAGE_KEY);
     if (savedPreferences) {
       try {
         const { enabled } = JSON.parse(savedPreferences);
-        setIsEnabled(enabled || false);
+        setIsEnabled(enabled || true); // Default to true for our debugging
       } catch (e) {
         console.error("Error parsing debug preferences:", e);
       }
@@ -56,6 +56,11 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
       const newEntry = createLogEntry(category, message, level, details);
       return [...prev, newEntry];
     });
+    
+    // Also log to console for easier debugging during development
+    const logLevel = level === 'error' ? 'error' : 
+                    level === 'warning' ? 'warn' : 'log';
+    console[logLevel](`[${category}] ${message}`, details);
   }, [isEnabled]);
   
   // Add for backward compatibility

@@ -12,9 +12,12 @@ import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
 import { debugLogger, logInfo, logError } from '@/components/debug/DebugPanel';
+import DebugLogPanel from '@/components/debug/DebugLogPanel';
+import { useDebugLog } from '@/utils/debug/DebugContext';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
+  const { addEvent } = useDebugLog();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
@@ -46,11 +49,11 @@ const Journal = () => {
   const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    logInfo('Journal page mounted', 'Journal');
+    addEvent('Journal', 'Journal page mounted', 'info');
     
     const handleError = (event: ErrorEvent) => {
       console.error('[Journal] Caught render error:', event);
-      logError(`Render error: ${event.message}`, 'Journal', {
+      addEvent('Journal', `Render error: ${event.message}`, 'error', {
         filename: event.filename,
         lineno: event.lineno,
         stack: event.error?.stack
@@ -60,16 +63,23 @@ const Journal = () => {
     
     window.addEventListener('error', handleError);
     
+    const handleProcessingEntriesChanged = (event: CustomEvent) => {
+      addEvent('ProcessingEntries', 'Processing entries changed event', 'info', event.detail);
+    };
+    
+    window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
+    
     return () => {
-      logInfo('Journal page unmounted', 'Journal');
+      addEvent('Journal', 'Journal page unmounted', 'info');
       window.removeEventListener('error', handleError);
+      window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
       if (autoRetryTimeoutRef.current) {
         clearTimeout(autoRetryTimeoutRef.current);
       }
       
       clearAllToasts();
     };
-  }, []);
+  }, [addEvent]);
 
   const { 
     entries, 
@@ -350,6 +360,11 @@ const Journal = () => {
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
     if (!audioBlob || !user?.id) {
+      addEvent('ProcessingFlow', 'Cannot process recording: missing data', 'error', {
+        hasBlob: !!audioBlob,
+        hasUserId: !!user?.id,
+        blobSize: audioBlob?.size
+      });
       console.error('[Journal] Cannot process recording: missing audio blob or user ID');
       setProcessingError('Cannot process recording: missing required information');
       setIsRecordingComplete(false);
@@ -365,6 +380,11 @@ const Journal = () => {
           clearAllToasts();
           setTimeout(() => resolve(), 150);
         }, 50);
+      });
+      
+      addEvent('ProcessingFlow', 'Recording complete - starting processing', 'info', {
+        audioSize: audioBlob.size,
+        userId: user.id
       });
       
       setIsRecordingComplete(true);
@@ -404,11 +424,9 @@ const Journal = () => {
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
         
-        // Force a refresh of the entries list
         fetchEntries();
         setRefreshKey(prev => prev + 1);
         
-        // Make sure the placeholder entry is visible
         window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
           detail: { 
             entries: [...processingEntries, tempId], 
@@ -605,6 +623,7 @@ const Journal = () => {
     <ErrorBoundary onReset={resetError}>
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
         <JournalHeader />
+        <DebugLogPanel />
         
         {isCheckingProfile ? (
           <div className="min-h-screen flex items-center justify-center">

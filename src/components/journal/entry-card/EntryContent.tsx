@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useDebugLog } from '@/utils/debug/DebugContext';
 
 interface EntryContentProps {
   content: string;
@@ -10,6 +11,7 @@ interface EntryContentProps {
 }
 
 export function EntryContent({ content, isExpanded, isProcessing = false }: EntryContentProps) {
+  const { addEvent } = useDebugLog();
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
   const prevProcessingRef = useRef(isProcessing);
@@ -19,7 +21,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   
   // Debug logging
   useEffect(() => {
-    console.log('[EntryContent] State update:', {
+    addEvent('EntryContent', 'State update', 'info', {
       contentLength: content?.length || 0,
       isProcessing,
       isExpanded,
@@ -27,13 +29,13 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       contentEmpty: !content || content === "Processing entry..." || content.trim() === "" || content === "Loading...",
       stableContentSet: stableContent === content
     });
-  }, [content, isProcessing, isExpanded, showLoading, stableContent]);
+  }, [content, isProcessing, isExpanded, showLoading, stableContent, addEvent]);
   
   // Handle content and loading state transitions
   useEffect(() => {
     // Immediately show loading state if isProcessing is true, regardless of current state
     if (isProcessing && !showLoading) {
-      console.log('[EntryContent] Processing started, showing loading state immediately');
+      addEvent('EntryContent', 'Processing started, showing loading state immediately', 'info');
       setShowLoading(true);
       return;
     }
@@ -44,7 +46,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
                           content.trim() === "" ||
                           content === "Loading...";
     
-    console.log('[EntryContent] Content status check:', {
+    addEvent('EntryContent', 'Content status check', 'info', {
       contentIsLoading,
       isProcessing,
       contentSample: content?.substring(0, 20) + (content?.length > 20 ? '...' : ''),
@@ -67,16 +69,16 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       // Keep loading state visible for a moment for better UX
       const delayTime = prevProcessingRef.current && !isProcessing ? 2000 : 1000;
       
-      console.log(`[EntryContent] Content available, will show after ${delayTime}ms delay`);
+      addEvent('EntryContent', `Content available, will show after ${delayTime}ms delay`, 'info');
       
       timeoutRef.current = setTimeout(() => {
-        console.log('[EntryContent] Transitioning from loading to content display');
+        addEvent('EntryContent', 'Transitioning from loading to content display', 'info');
         setShowLoading(false);
         setStableContent(content);
       }, delayTime);
     } else if (content !== stableContent && !showLoading) {
       // Content has changed while already displaying content (not during loading)
-      console.log('[EntryContent] Content updated while already showing content');
+      addEvent('EntryContent', 'Content updated while already showing content', 'info');
       setStableContent(content);
     }
     
@@ -89,7 +91,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [content, isProcessing, showLoading, stableContent]);
+  }, [content, isProcessing, showLoading, stableContent, addEvent]);
 
   return (
     <AnimatePresence mode="wait">
@@ -102,6 +104,8 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
+          onAnimationStart={() => addEvent('EntryContent', 'Expanded content animation started', 'info')}
+          onAnimationComplete={() => addEvent('EntryContent', 'Expanded content animation completed', 'info')}
         >
           <p className="text-xs md:text-sm text-foreground">{stableContent}</p>
         </motion.div>
@@ -113,6 +117,8 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
+          onAnimationStart={() => addEvent('EntryContent', 'Collapsed content animation started', 'info')}
+          onAnimationComplete={() => addEvent('EntryContent', 'Collapsed content animation completed', 'info')}
         >
           {stableContent}
         </motion.p>

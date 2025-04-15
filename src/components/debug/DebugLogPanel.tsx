@@ -47,7 +47,7 @@ const DebugLogPanel: React.FC = () => {
   if (!isEnabled) {
     return (
       <Button
-        className="fixed bottom-4 right-4 z-50 shadow-lg"
+        className="fixed top-4 right-4 z-50 shadow-lg"
         size="sm"
         onClick={toggleEnabled}
       >
@@ -57,10 +57,10 @@ const DebugLogPanel: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-0 right-0 z-50 w-full md:w-auto max-w-full md:max-w-md border shadow-lg bg-white dark:bg-gray-900 rounded-t-lg overflow-hidden transition-all duration-300 ease-in-out"
+    <div className="fixed top-0 right-0 z-50 w-full md:w-auto max-w-full md:max-w-md border shadow-lg bg-white dark:bg-gray-900 rounded-b-lg overflow-hidden transition-all duration-300 ease-in-out"
       style={{ 
         height: isOpen ? 'min(80vh, 500px)' : '40px',
-        transform: isEnabled ? 'translateY(0)' : 'translateY(100%)'
+        transform: isEnabled ? 'translateY(0)' : 'translateY(-100%)'
       }}
     >
       {/* Header */}
@@ -70,7 +70,7 @@ const DebugLogPanel: React.FC = () => {
       >
         <div className="flex items-center">
           <Bug className="mr-2 h-4 w-4" />
-          <span className="font-medium">Debug Logs</span>
+          <span className="font-medium">Processing Debug</span>
           <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
             {filteredLogs.length} logs
           </span>

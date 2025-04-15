@@ -8,6 +8,7 @@ import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import JournalSearch from './JournalSearch';
 import { getProcessingEntries } from '@/utils/audio-processing';
+import { useDebugLog } from '@/utils/debug/DebugContext';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -47,20 +48,21 @@ export default function JournalEntriesList({
   const processingEntryRemovalTimerRef = useRef<NodeJS.Timeout | null>(null);
   const stateUpdateVersionRef = useRef(0);
   const entriesCheckedForCompletionRef = useRef<Record<string, boolean>>({});
+  const { addEvent } = useDebugLog();
 
   useEffect(() => {
-    console.log('[JournalEntriesList] Processing entries state:', {
+    addEvent('JournalEntries', 'Processing entries state', 'info', {
       processingEntries,
       persistedProcessingEntries,
       showTemporaryProcessingEntries,
       stableVisibleProcessingEntries: stableVisibleProcessingEntries.length
     });
-  }, [processingEntries, persistedProcessingEntries, showTemporaryProcessingEntries, stableVisibleProcessingEntries]);
+  }, [processingEntries, persistedProcessingEntries, showTemporaryProcessingEntries, stableVisibleProcessingEntries, addEvent]);
 
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
       const persistedEntries = getProcessingEntries();
-      console.log('[JournalEntriesList] Loaded persisted entries:', persistedEntries);
+      addEvent('JournalEntries', 'Loaded persisted entries', 'info', persistedEntries);
       setPersistedProcessingEntries(persistedEntries);
       
       if (persistedEntries.length > 0) {
@@ -73,7 +75,7 @@ export default function JournalEntriesList({
     loadPersistedProcessingEntries();
     
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
-      console.log('[JournalEntriesList] Processing entries changed event:', event.detail);
+      addEvent('JournalEntries', 'Processing entries changed event received', 'info', event.detail);
       if (event.detail && Array.isArray(event.detail.entries)) {
         setPersistedProcessingEntries(event.detail.entries);
         
@@ -82,6 +84,7 @@ export default function JournalEntriesList({
           setShowTemporaryProcessingEntries(true);
           if (event.detail.forceUpdate) {
             setStableVisibleProcessingEntries(event.detail.entries);
+            addEvent('JournalEntries', 'Force updated visible processing entries', 'success', event.detail.entries);
           }
         }
       }
@@ -97,14 +100,17 @@ export default function JournalEntriesList({
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
+    addEvent('JournalEntries', 'JournalEntriesList mounted', 'info');
+    
     return () => {
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (processingEntriesTimerRef.current) {
         clearTimeout(processingEntriesTimerRef.current);
       }
+      addEvent('JournalEntries', 'JournalEntriesList unmounted', 'info');
     };
-  }, []);
+  }, [addEvent]);
 
   useEffect(() => {
     const allProcessingEntries = [...new Set([...processingEntries, ...persistedProcessingEntries])];
@@ -367,6 +373,8 @@ export default function JournalEntriesList({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="mb-4"
+                onAnimationStart={() => addEvent('JournalEntries', 'Processing loader animation started', 'info')}
+                onAnimationComplete={() => addEvent('JournalEntries', 'Processing loader animation completed', 'info')}
               >
                 <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
                   <Loader2 className="h-4 w-4 animate-spin" />
