@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { checkUserProfile, createUserProfile, fetchJournalEntries } from '@/services/journalService';
@@ -54,6 +55,7 @@ export function useJournalEntries(
   const lastSuccessfulFetchRef = useRef<JournalEntry[]>([]);
   const cacheInitializedRef = useRef(false);
   const cacheValidityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastProcessingEntriesRef = useRef<string[]>([]);
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -76,6 +78,29 @@ export function useJournalEntries(
       }, 120000); // 2 minutes cache validity
     }
   }, [entries, userId, refreshKey]);
+
+  // Listen for processing entry events to trigger proactive fetches
+  useEffect(() => {
+    const handleProcessingEntryMapped = (event: CustomEvent) => {
+      if (!event.detail || !event.detail.entryId) return;
+      
+      console.log(`[useJournalEntries] Detected entry mapping, will fetch new data:`, event.detail.entryId);
+      
+      // Immediately try to fetch fresh data when an entry is mapped
+      if (userId && !isFetchingRef.current) {
+        // Short delay to allow the database to settle
+        setTimeout(() => {
+          fetchEntries();
+        }, 300);
+      }
+    };
+    
+    window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
+    
+    return () => {
+      window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
+    };
+  }, [userId]);
 
   const verifyUserProfile = useCallback(async (userId: string) => {
     try {
@@ -111,15 +136,15 @@ export function useJournalEntries(
                 'cached entries:', globalEntriesCache.entries.length,
                 'refreshKey:', refreshKey);
     
-    // Don't prevent fetching if we're trying to get fresh data after processing
-    // This specifically fixes the race condition where a processed entry might be missed
+    // Don't prevent fetching if refreshKey has changed - this ensures we get fresh data after processing
     const shouldSkipFetch = isFetchingRef.current && 
                            globalEntriesCache.userId === userId && 
                            globalEntriesCache.entries.length > 0 &&
+                           globalEntriesCache.lastRefreshKey === refreshKey &&
                            Date.now() - (globalEntriesCache.lastFetchTime?.getTime() || 0) < 500;
     
     if (shouldSkipFetch) {
-      console.log('[useJournalEntries] Skipping fetch as we just fetched recently');
+      console.log('[useJournalEntries] Skipping fetch as we just fetched recently with same refresh key');
       return;
     }
     
@@ -232,7 +257,37 @@ export function useJournalEntries(
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [userId, fetchCount, profileExists, verifyUserProfile, isProfileChecked]);
+  }, [userId, fetchCount, profileExists, verifyUserProfile, isProfileChecked, refreshKey]);
+
+  // Listen for processing entries changes to trigger fetches
+  useEffect(() => {
+    const handleProcessingEntriesChanged = (event: CustomEvent) => {
+      if (!event.detail || !Array.isArray(event.detail.entries)) return;
+      
+      const newProcessingEntries = event.detail.entries;
+      const prevProcessingEntries = lastProcessingEntriesRef.current;
+      
+      // If processing entries have changed and we have new entries, fetch data
+      if (newProcessingEntries.length !== prevProcessingEntries.length) {
+        console.log('[useJournalEntries] Processing entries changed, scheduling fetch');
+        
+        lastProcessingEntriesRef.current = newProcessingEntries;
+        
+        // If we have a new processing entry, fetch after short delay
+        if (newProcessingEntries.length > prevProcessingEntries.length) {
+          setTimeout(() => {
+            fetchEntries();
+          }, 1000);
+        }
+      }
+    };
+    
+    window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
+    
+    return () => {
+      window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
+    };
+  }, [fetchEntries]);
 
   useEffect(() => {
     if (userId) {

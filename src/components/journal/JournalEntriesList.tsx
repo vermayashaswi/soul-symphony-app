@@ -37,6 +37,9 @@ export default function JournalEntriesList({
   const [processingToEntryMap, setProcessingToEntryMap] = useState<Map<string, number>>(new Map());
   const [visibleProcessingEntries, setVisibleProcessingEntries] = useState<string[]>([]);
   const [recentlyCompletedEntries, setRecentlyCompletedEntries] = useState<number[]>([]);
+  const [processingToActualEntry, setProcessingToActualEntry] = useState<Map<string, JournalEntry>>(new Map());
+  const [transitionalLoadingEntries, setTransitionalLoadingEntries] = useState<string[]>([]);
+  
   const hasProcessingEntries = visibleProcessingEntries.length > 0 && processingEntries.length > 0;
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
@@ -50,15 +53,54 @@ export default function JournalEntriesList({
       if (event.detail && event.detail.tempId && event.detail.entryId) {
         console.log(`[JournalEntriesList] Processing entry mapped: ${event.detail.tempId} -> ${event.detail.entryId}`);
         
-        setProcessingToEntryMap(prev => {
-          const newMap = new Map(prev);
-          newMap.set(event.detail.tempId, event.detail.entryId);
-          return newMap;
-        });
+        // Find the actual entry that matches the mapped entryId
+        const matchedEntry = entries.find(entry => entry.id === event.detail.entryId);
         
-        setVisibleProcessingEntries(prev => 
-          prev.filter(id => id !== event.detail.tempId)
-        );
+        if (matchedEntry) {
+          console.log(`[JournalEntriesList] Found matching entry for ${event.detail.tempId}:`, matchedEntry.id);
+          
+          // Store the mapping between processing ID and actual entry data
+          setProcessingToActualEntry(prev => {
+            const newMap = new Map(prev);
+            newMap.set(event.detail.tempId, matchedEntry);
+            return newMap;
+          });
+          
+          // Add to transitional loading entries to trigger the transition effect
+          setTransitionalLoadingEntries(prev => [...prev, event.detail.tempId]);
+          
+          // After a delay, remove from visible processing entries
+          setTimeout(() => {
+            if (componentMounted.current) {
+              setVisibleProcessingEntries(prev => 
+                prev.filter(id => id !== event.detail.tempId)
+              );
+              
+              // And then after another delay, clean up the transitional state
+              setTimeout(() => {
+                if (componentMounted.current) {
+                  setTransitionalLoadingEntries(prev => 
+                    prev.filter(id => id !== event.detail.tempId)
+                  );
+                }
+              }, 1000);
+            }
+          }, 2000); // Wait 2 seconds before removing to allow for smooth transition
+        } else {
+          console.log(`[JournalEntriesList] No matching entry found yet for ${event.detail.entryId}`);
+          
+          // If we don't have the entry data yet, just store the mapping
+          setProcessingToEntryMap(prev => {
+            const newMap = new Map(prev);
+            newMap.set(event.detail.tempId, event.detail.entryId);
+            return newMap;
+          });
+          
+          // And remove from visible processing to avoid showing empty card
+          setVisibleProcessingEntries(prev => 
+            prev.filter(id => id !== event.detail.tempId)
+          );
+        }
         
         const newEntryId = event.detail.entryId;
         if (newEntryId) {
@@ -86,7 +128,35 @@ export default function JournalEntriesList({
     return () => {
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     };
-  }, []);
+  }, [entries]);
+
+  // Update processing entries whenever entries change
+  useEffect(() => {
+    // Check if we have any processing entries with mapped IDs
+    if (entries.length > 0 && processingToEntryMap.size > 0) {
+      // For each processing ID that has a mapped entry ID
+      processingToEntryMap.forEach((entryId, tempId) => {
+        // Find the actual entry that matches
+        const matchedEntry = entries.find(entry => entry.id === entryId);
+        
+        if (matchedEntry) {
+          console.log(`[JournalEntriesList] Found actual entry data for ${tempId}:`, matchedEntry.id);
+          
+          // Store the mapping between processing ID and actual entry
+          setProcessingToActualEntry(prev => {
+            const newMap = new Map(prev);
+            newMap.set(tempId, matchedEntry);
+            return newMap;
+          });
+          
+          // Add to transitional loading entries
+          if (!transitionalLoadingEntries.includes(tempId)) {
+            setTransitionalLoadingEntries(prev => [...prev, tempId]);
+          }
+        }
+      });
+    }
+  }, [entries, processingToEntryMap]);
 
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
@@ -173,8 +243,11 @@ export default function JournalEntriesList({
         
         const entryIds = sortedEntries.map(entry => entry.id);
         
+        // Only remove from visible processing if not in transitional state
         setVisibleProcessingEntries(prev => {
           return prev.filter(tempId => {
+            if (transitionalLoadingEntries.includes(tempId)) return true;
+            
             const mappedEntryId = getEntryIdForProcessingId(tempId);
             return !mappedEntryId || !entryIds.includes(mappedEntryId);
           });
@@ -194,7 +267,7 @@ export default function JournalEntriesList({
     return () => {
       componentMounted.current = false;
     };
-  }, [entries, recentlyCompletedEntries]);
+  }, [entries, recentlyCompletedEntries, transitionalLoadingEntries]);
 
   useEffect(() => {
     if (!componentMounted.current) return;
@@ -339,6 +412,58 @@ export default function JournalEntriesList({
     return !processingLinkedEntries.some(linkedEntry => linkedEntry.id === entry.id);
   });
 
+  // Render function for transitional loading entries (those that have actual entry data but are still showing as loading)
+  const renderTransitionalEntry = (tempId: string) => {
+    const actualEntry = processingToActualEntry.get(tempId);
+    
+    if (!actualEntry) {
+      return (
+        <div className="mb-4 bg-muted/40 border rounded-lg p-4 shadow-sm">
+          <div className="flex flex-col space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">Processing New Entry</h3>
+              <div className="bg-primary/10 text-primary text-xs rounded-full px-2 py-0.5">
+                In Progress
+              </div>
+            </div>
+            
+            <div className="pt-2 text-sm">
+              <LoadingEntryContent />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Render a special transitional version of the entry card
+    return (
+      <motion.div
+        key={`transitional-${tempId}`}
+        initial={{ opacity: 0.8 }}
+        animate={{ 
+          opacity: 1,
+          transition: { duration: 0.5 }
+        }}
+        className="relative rounded-lg shadow-md overflow-hidden ring-2 ring-primary ring-opacity-50"
+      >
+        <JournalEntryCard 
+          entry={actualEntry}
+          onDelete={handleEntryDelete}
+          isNew={true}
+          isProcessing={false}
+        />
+        <motion.div
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 1.5, delay: 0.5 }}
+          className="absolute inset-0 bg-white dark:bg-black pointer-events-none flex items-center justify-center"
+        >
+          <CheckCircle2 className="h-12 w-12 text-green-500 animate-pulse" />
+        </motion.div>
+      </motion.div>
+    );
+  };
+
   return (
     <ErrorBoundary>
       <div>
@@ -360,7 +485,15 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4 mt-6">
-            {hasProcessingEntries && (
+            {/* First render transitional entries (loading cards that have data) */}
+            {transitionalLoadingEntries.map(tempId => (
+              <ErrorBoundary key={`transitional-boundary-${tempId}`}>
+                {renderTransitionalEntry(tempId)}
+              </ErrorBoundary>
+            ))}
+            
+            {/* Then render regular processing entries */}
+            {hasProcessingEntries && !transitionalLoadingEntries.some(id => visibleProcessingEntries.includes(id)) && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}

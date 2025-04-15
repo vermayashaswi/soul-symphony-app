@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
-import { processRecording, getEntryIdForProcessingId } from '@/utils/audio-processing';
+import { processRecording, getEntryIdForProcessingId, setEntryIdForProcessingId } from '@/utils/audio-processing';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import JournalHeader from '@/components/journal/JournalHeader';
@@ -87,25 +87,26 @@ const Journal = () => {
           
           console.log('[Journal] Fetching new data immediately after entry mapped');
           fetchEntries();
-          setRefreshKey(prev => prev + 1);
+          
+          setTimeout(() => {
+            setProcessingEntries(prev => prev.filter(id => id !== event.detail.tempId));
+            
+            if (toastIds[event.detail.tempId]) {
+              toast.dismiss(toastIds[event.detail.tempId]);
+              
+              setToastIds(prev => {
+                const newToastIds = { ...prev };
+                delete newToastIds[event.detail.tempId];
+                return newToastIds;
+              });
+            }
+          }, 3000);
           
           toast.success('Journal entry analyzed and saved', {
             duration: 3000,
             id: 'journal-success-toast',
             closeButton: false
           });
-          
-          setProcessingEntries(prev => prev.filter(id => id !== event.detail.tempId));
-          
-          if (toastIds[event.detail.tempId]) {
-            toast.dismiss(toastIds[event.detail.tempId]);
-            
-            setToastIds(prev => {
-              const newToastIds = { ...prev };
-              delete newToastIds[event.detail.tempId];
-              return newToastIds;
-            });
-          }
           
           const fetchIntervals = [500, 1500, 3000];
           fetchIntervals.forEach(interval => {
