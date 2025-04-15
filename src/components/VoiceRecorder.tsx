@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -220,6 +221,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         return;
       }
       
+      // Important: This normalizes the blob and awaits the result
       const normalizedBlob = await normalizeAudioBlob(audioBlob);
       
       console.log('[VoiceRecorder] Processing audio:', {
@@ -228,7 +230,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         duration: audioDuration,
         recordingTime: recordingTime,
         hasPlayedOnce: hasPlayedOnce,
-        audioPrepared: audioPrepared
+        audioPrepared: audioPrepared,
+        blobHasDuration: 'duration' in normalizedBlob
       });
       
       if (!hasPlayedOnce && audioDuration === 0 && recordingTime > 0) {

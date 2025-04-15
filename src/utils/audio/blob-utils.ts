@@ -110,67 +110,82 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
 }
 
 /**
+ * Safely adds a duration property to a blob
+ * @returns A new blob with duration property, or the original if it already has duration
+ */
+function safelyAddDurationProperty(blob: Blob, duration: number): Blob {
+  // If the blob already has a duration property, return it as is
+  if ('duration' in blob) {
+    console.log('[safelyAddDurationProperty] Blob already has duration property:', (blob as any).duration);
+    return blob;
+  }
+  
+  // Create a new blob with the same content but new type
+  const newBlob = new Blob([blob], { type: blob.type });
+  
+  try {
+    // Attempt to define the duration property
+    Object.defineProperty(newBlob, 'duration', {
+      value: duration,
+      writable: false,
+      enumerable: true
+    });
+    console.log(`[safelyAddDurationProperty] Added duration ${duration}s to blob`);
+  } catch (error) {
+    console.warn('[safelyAddDurationProperty] Could not add duration to blob:', error);
+  }
+  
+  return newBlob;
+}
+
+/**
  * Fixes common issues with audio blob MIME types and adds duration if missing
  * @returns Promise<Blob> A promise that resolves to the normalized audio blob
  */
 export function normalizeAudioBlob(audioBlob: Blob): Promise<Blob> {
   return new Promise(async (resolve) => {
     try {
-      // If blob doesn't have duration property, try to get it and add it
+      let resultBlob = audioBlob;
+      let duration = 0;
+      
+      // If blob doesn't have duration property, try to get it
       if (!('duration' in audioBlob)) {
-        const duration = await getAudioBlobDuration(audioBlob);
+        duration = await getAudioBlobDuration(audioBlob);
         if (duration > 0) {
-          Object.defineProperty(audioBlob, 'duration', {
-            value: duration,
-            writable: false
-          });
-          console.log(`[normalizeAudioBlob] Added duration ${duration}s to blob`);
+          resultBlob = safelyAddDurationProperty(resultBlob, duration);
         }
+      } else {
+        duration = (audioBlob as any).duration;
+        console.log(`[normalizeAudioBlob] Blob already has duration ${duration}s`);
       }
       
       // If the blob doesn't have a proper MIME type, try to assign one
-      if (!audioBlob.type.includes('audio/')) {
+      if (!resultBlob.type.includes('audio/')) {
         // Look at the size to make an educated guess
-        if (audioBlob.size > 1000000) {
-          // Larger files are likely WAV
-          const newBlob = new Blob([audioBlob], { type: 'audio/wav' });
-          if ('duration' in audioBlob) {
-            Object.defineProperty(newBlob, 'duration', {
-              value: (audioBlob as any).duration,
-              writable: false
-            });
-          }
-          resolve(newBlob);
-          return;
+        const newBlobType = resultBlob.size > 1000000 ? 'audio/wav' : 'audio/webm;codecs=opus';
+        const newBlob = new Blob([resultBlob], { type: newBlobType });
+        
+        // Transfer the duration if it exists
+        if (duration > 0) {
+          resultBlob = safelyAddDurationProperty(newBlob, duration);
         } else {
-          // Smaller files are likely Opus in WebM container
-          const newBlob = new Blob([audioBlob], { type: 'audio/webm;codecs=opus' });
-          if ('duration' in audioBlob) {
-            Object.defineProperty(newBlob, 'duration', {
-              value: (audioBlob as any).duration,
-              writable: false
-            });
-          }
-          resolve(newBlob);
-          return;
+          resultBlob = newBlob;
         }
-      }
-      
+      } 
       // If audio blob is webm but doesn't specify codec, add it
-      if (audioBlob.type === 'audio/webm') {
-        const newBlob = new Blob([audioBlob], { type: 'audio/webm;codecs=opus' });
-        if ('duration' in audioBlob) {
-          Object.defineProperty(newBlob, 'duration', {
-            value: (audioBlob as any).duration,
-            writable: false
-          });
+      else if (resultBlob.type === 'audio/webm') {
+        const newBlob = new Blob([resultBlob], { type: 'audio/webm;codecs=opus' });
+        
+        // Transfer the duration if it exists
+        if (duration > 0) {
+          resultBlob = safelyAddDurationProperty(newBlob, duration);
+        } else {
+          resultBlob = newBlob;
         }
-        resolve(newBlob);
-        return;
       }
       
-      // Return the original blob if no changes were needed
-      resolve(audioBlob);
+      // Return the fully normalized blob
+      resolve(resultBlob);
     } catch (error) {
       console.error('[normalizeAudioBlob] Error:', error);
       // Return the original blob in case of error
