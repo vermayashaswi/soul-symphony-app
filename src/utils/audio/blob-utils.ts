@@ -22,6 +22,58 @@ export const blobToBase64 = (blob: Blob): Promise<string> => {
 };
 
 /**
+ * Validates an audio blob to ensure it's usable for processing
+ * @param blob - The audio blob to validate
+ * @returns Validation result with status and error message if any
+ */
+export const validateAudioBlob = (blob: Blob | null): {
+  isValid: boolean;
+  errorMessage?: string;
+} => {
+  if (!blob) {
+    return {
+      isValid: false,
+      errorMessage: 'No audio data available'
+    };
+  }
+
+  if (blob.size === 0) {
+    return {
+      isValid: false,
+      errorMessage: 'Audio recording is empty'
+    };
+  }
+
+  // Check if the blob has a valid MIME type
+  const validAudioTypes = [
+    'audio/webm',
+    'audio/mp4',
+    'audio/wav',
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/ogg'
+  ];
+
+  if (!blob.type || !validAudioTypes.includes(blob.type)) {
+    console.warn(`[BlobUtils] Audio has an unrecognized type: ${blob.type || 'unknown'}`);
+    // We'll still accept it, but log a warning
+  }
+
+  // If the blob has a duration property, ensure it's reasonable
+  if ('duration' in blob) {
+    const duration = (blob as any).duration;
+    if (typeof duration === 'number' && duration < 0.5) {
+      return {
+        isValid: false,
+        errorMessage: 'Recording is too short (less than 0.5 seconds)'
+      };
+    }
+  }
+
+  return { isValid: true };
+};
+
+/**
  * Normalizes an audio blob to ensure it has the correct type and format
  * @param blob - The original audio blob
  * @returns Promise resolving to a normalized blob
