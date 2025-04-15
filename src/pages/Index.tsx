@@ -11,7 +11,6 @@ import Navbar from '@/components/Navbar';
 import HeroSection from '@/components/landing/HeroSection';
 import FeaturesGrid from '@/components/landing/FeaturesGrid';
 import EnergyAnimation from '@/components/EnergyAnimation';
-import HomePage from '@/pages/website/HomePage';
 import LandingPage from '@/pages/landing/LandingPage';
 
 const Index = () => {

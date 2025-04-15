@@ -11,7 +11,6 @@ import ProtectedRoute from './ProtectedRoute';
 import MobileNavigation from './MobileNavigation';
 import { useAuth } from '@/contexts/AuthContext';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import HomePage from '@/pages/website/HomePage';
 import LandingPage from '@/pages/landing/LandingPage';
 import { isAppSubdomain } from './RouteHelpers';
 
@@ -52,7 +51,7 @@ const AppRoutes = () => {
         )}
         
         {/* App routes with domain-specific paths */}
-        {isAppSubdomain ? (
+        {isAppSubdomain() ? (
           <>
             <Route 
               path="/home" 
