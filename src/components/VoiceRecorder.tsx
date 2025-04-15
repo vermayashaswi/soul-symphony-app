@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
-import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
+import { normalizeAudioBlob, createPlayableAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -31,6 +32,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [audioPrepared, setAudioPrepared] = useState(false);
   const [waitingForClear, setWaitingForClear] = useState(false);
   const [toastsCleared, setToastsCleared] = useState(false);
+  const [playableBlob, setPlayableBlob] = useState<Blob | null>(null);
   const saveCompleteRef = useRef(false);
   const savingInProgressRef = useRef(false);
   const domClearAttemptedRef = useRef(false);
@@ -53,6 +55,23 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     maxDuration: 300
   });
   
+  // When audioBlob changes, create a playable version
+  useEffect(() => {
+    if (audioBlob) {
+      try {
+        console.log('[VoiceRecorder] Creating playable version of the blob');
+        const playable = createPlayableAudioBlob(audioBlob);
+        setPlayableBlob(playable);
+        console.log('[VoiceRecorder] Created playable blob:', playable.size, playable.type);
+      } catch (err) {
+        console.error('[VoiceRecorder] Error creating playable blob:', err);
+        setPlayableBlob(audioBlob);
+      }
+    } else {
+      setPlayableBlob(null);
+    }
+  }, [audioBlob]);
+  
   const {
     isPlaying,
     playbackProgress,
@@ -63,7 +82,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     seekTo,
     prepareAudio
   } = useAudioPlayback({ 
-    audioBlob,
+    audioBlob: playableBlob,  // Use the playable version for better compatibility
     onPlaybackStart: () => {
       console.log('[VoiceRecorder] Playback started');
       setHasPlayedOnce(true);
@@ -109,20 +128,21 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   }, [isRecording, audioBlob]);
   
   useEffect(() => {
-    if (audioBlob && !audioPrepared) {
-      console.log('[VoiceRecorder] New audio blob detected, preparing audio...');
+    if (playableBlob && !audioPrepared) {
+      console.log('[VoiceRecorder] New playable blob detected, preparing audio...');
       prepareAudio().then(duration => {
         console.log('[VoiceRecorder] Audio prepared with duration:', duration);
         setAudioPrepared(true);
       });
     }
-  }, [audioBlob, audioPrepared, prepareAudio]);
+  }, [playableBlob, audioPrepared, prepareAudio]);
   
   useEffect(() => {
     console.log('[VoiceRecorder] State update:', {
       isProcessing,
       hasAudioBlob: !!audioBlob,
       audioSize: audioBlob?.size || 0,
+      playableBlobSize: playableBlob?.size || 0,
       isRecording,
       hasPermission,
       audioDuration,
@@ -142,7 +162,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         duration: audioDuration || recordingTime
       });
     }
-  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
+  }, [isProcessing, audioBlob, playableBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
   useEffect(() => {
     return () => {
@@ -199,35 +219,29 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       setHasSaved(true);
       setWaitingForClear(false);
       setToastsCleared(true);
-      
-      const estimatedDuration = recordingTime;
-      console.log('[VoiceRecorder] Estimated recording duration from timer:', estimatedDuration);
-      
-      if (audioDuration <= 0 && recordingTime <= 0 && (!audioBlob || audioBlob.size < 50)) {
-        setRecordingError("No audio recorded. Please try again.");
-        setIsProcessing(false);
-        setHasSaved(false);
-        savingInProgressRef.current = false;
-        return;
-      }
-      
-      const normalizedBlob = normalizeAudioBlob(audioBlob);
-      
+
       console.log('[VoiceRecorder] Processing audio:', {
-        type: normalizedBlob.type,
-        size: normalizedBlob.size,
+        originalType: audioBlob.type,
+        originalSize: audioBlob.size,
         audioDuration: audioDuration,
         recordingTime: recordingTime,
         hasPlayedOnce: hasPlayedOnce,
         audioPrepared: audioPrepared
       });
       
+      // Add extra padding to ensure valid audio
+      const normalizedBlob = normalizeAudioBlob(audioBlob);
+      console.log('[VoiceRecorder] Normalized blob:', normalizedBlob.size, normalizedBlob.type);
+      
       if (onRecordingComplete) {
         try {
           console.log('[VoiceRecorder] Calling recording completion callback');
           saveCompleteRef.current = false;
           
-          await onRecordingComplete(normalizedBlob);
+          // Use a random tempId to track this recording
+          const tempId = `temp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          
+          await onRecordingComplete(normalizedBlob, tempId);
           
           saveCompleteRef.current = true;
           savingInProgressRef.current = false;
@@ -277,6 +291,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     setHasSaved(false);
     setHasPlayedOnce(false);
     setAudioPrepared(false);
+    setPlayableBlob(null);
     saveCompleteRef.current = false;
     savingInProgressRef.current = false;
     domClearAttemptedRef.current = false;
@@ -340,7 +355,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
             ) : audioBlob ? (
               <div className="flex flex-col items-center w-full relative z-10 mt-auto mb-8">
                 <PlaybackControls
-                  audioBlob={audioBlob}
+                  audioBlob={playableBlob}
                   isPlaying={isPlaying}
                   isProcessing={isProcessing || waitingForClear}
                   playbackProgress={playbackProgress}

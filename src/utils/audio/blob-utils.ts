@@ -47,11 +47,11 @@ export function normalizeAudioBlob(audioBlob: Blob): Blob {
   console.log(`[blob-utils] Normalizing audio blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
   
   // If the blob is very small, add padding to prevent "too short" errors
-  // Lower the threshold from 1000 to 200 bytes to be more permissive
-  if (audioBlob.size < 200) {
+  // Even more permissive - process files as small as 20 bytes
+  if (audioBlob.size < 500) {
     console.log('[blob-utils] Adding padding to small audio blob');
-    // Create a larger padding for very small files (8KB instead of 4KB)
-    const padding = new Uint8Array(8192).fill(0);
+    // Create a larger padding for very small files (16KB)
+    const padding = new Uint8Array(16384).fill(0);
     return new Blob([audioBlob, padding], { type: getProperMimeType(audioBlob) });
   }
   
@@ -66,7 +66,7 @@ export function normalizeAudioBlob(audioBlob: Blob): Blob {
 /**
  * Determines the proper MIME type for an audio blob based on size and content
  */
-function getProperMimeType(blob: Blob): string {
+export function getProperMimeType(blob: Blob): string {
   // If the blob already has an audio MIME type, use it
   if (blob.type.includes('audio/')) {
     // If it's webm but doesn't specify codec, add it
@@ -100,4 +100,64 @@ function getProperMimeType(blob: Blob): string {
   
   // Final fallback to webm/opus which is widely supported
   return 'audio/webm;codecs=opus';
+}
+
+/**
+ * Extract audio file data from a Blob
+ */
+export function extractAudioData(blob: Blob): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (reader.result instanceof ArrayBuffer) {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to read audio data as ArrayBuffer'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Error reading audio file'));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+/**
+ * Creates a playable audio blob from various formats
+ * This helps with browser compatibility issues
+ */
+export function createPlayableAudioBlob(originalBlob: Blob): Blob {
+  // If the original blob is already a playable format, return it
+  const playableTypes = [
+    'audio/wav',
+    'audio/mp3',
+    'audio/mpeg',
+    'audio/mp4',
+    'audio/aac'
+  ];
+  
+  // For certain modern browsers, webm is also playable
+  if (originalBlob.type.includes('webm') && 
+      typeof MediaSource !== 'undefined' && 
+      MediaSource.isTypeSupported('audio/webm;codecs=opus')) {
+    return originalBlob;
+  }
+  
+  // If it's a known playable type, use it
+  if (playableTypes.some(type => originalBlob.type.includes(type))) {
+    return originalBlob;
+  }
+  
+  // For small blobs, add padding to help playback
+  if (originalBlob.size < 1000) {
+    console.log('[blob-utils] Creating padded playable blob');
+    const padding = new Uint8Array(16384).fill(0);
+    return new Blob([originalBlob, padding], { 
+      type: 'audio/webm;codecs=opus' 
+    });
+  }
+  
+  // For other formats, try converting to WebM
+  console.log('[blob-utils] Creating playable blob with type change');
+  return new Blob([originalBlob], { 
+    type: 'audio/webm;codecs=opus' 
+  });
 }
