@@ -20,7 +20,7 @@ function Toaster({ ...props }: ToasterProps) {
             ? "group bg-theme text-black font-medium border border-white/10" 
             : "group bg-theme text-black font-medium border border-black/10",
           title: "text-black font-semibold",
-          description: "text-black/90 font-normal",
+          description: "text-black font-normal",
           actionButton: "bg-primary text-primary-foreground font-medium",
           closeButton: "text-black/50 hover:text-black"
         }

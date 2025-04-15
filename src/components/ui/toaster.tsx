@@ -36,7 +36,7 @@ export function Toaster() {
                 </ToastTitle>
               )}
               {description && (
-                <ToastDescription className="text-black/90">
+                <ToastDescription className="text-black">
                   {description}
                 </ToastDescription>
               )}

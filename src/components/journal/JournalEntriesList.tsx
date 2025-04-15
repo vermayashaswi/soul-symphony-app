@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -42,6 +41,7 @@ export default function JournalEntriesList({
   const [transitionalLoadingEntries, setTransitionalLoadingEntries] = useState<string[]>([]);
   const [seenEntryIds, setSeenEntryIds] = useState<Set<number>>(new Set());
   const [processedProcessingIds, setProcessedProcessingIds] = useState<Set<string>>(new Set());
+  const [fullyProcessedEntries, setFullyProcessedEntries] = useState<Set<number>>(new Set());
   
   const mainProcessingEntryId = visibleProcessingEntries.length > 0 ? visibleProcessingEntries[0] : null;
   const hasProcessingEntries = mainProcessingEntryId !== null && processingEntries.length > 0;
@@ -67,6 +67,12 @@ export default function JournalEntriesList({
         setProcessedProcessingIds(prev => {
           const newSet = new Set(prev);
           newSet.add(event.detail.tempId);
+          return newSet;
+        });
+        
+        setFullyProcessedEntries(prev => {
+          const newSet = new Set(prev);
+          newSet.add(event.detail.entryId);
           return newSet;
         });
         
@@ -156,6 +162,12 @@ export default function JournalEntriesList({
         if (matchedEntry) {
           console.log(`[JournalEntriesList] Found actual entry data for ${tempId}:`, matchedEntry.id);
           
+          setFullyProcessedEntries(prev => {
+            const newSet = new Set(prev);
+            newSet.add(matchedEntry.id);
+            return newSet;
+          });
+          
           setProcessingToActualEntry(prev => {
             const newMap = new Map(prev);
             newMap.set(tempId, matchedEntry);
@@ -240,22 +252,22 @@ export default function JournalEntriesList({
     try {
       if (Array.isArray(entries)) {
         const currentEntryIds = new Set<number>();
+        const entryIdToKeep = new Map<number, JournalEntry>();
         
-        const filteredEntries = entries.filter(
-          entry => {
-            if (!entry || 
-                typeof entry !== 'object' || 
-                !entry.id || 
-                pendingDeletions.current.has(entry.id) || 
-                (!entry.content && !entry.created_at) ||
-                currentEntryIds.has(entry.id)) {
-              return false;
-            }
-            
-            currentEntryIds.add(entry.id);
-            return true;
+        for (const entry of entries) {
+          if (!entry || 
+              typeof entry !== 'object' || 
+              !entry.id || 
+              pendingDeletions.current.has(entry.id) || 
+              (!entry.content && !entry.created_at)) {
+            continue;
           }
-        );
+          
+          entryIdToKeep.set(entry.id, entry);
+          currentEntryIds.add(entry.id);
+        }
+        
+        const filteredEntries = Array.from(entryIdToKeep.values());
         
         hasNoValidEntries.current = filteredEntries.length === 0 && entries.length > 0;
         
@@ -316,6 +328,12 @@ export default function JournalEntriesList({
                 console.log(`[JournalEntriesList] Found mapped entry ID for processing ${tempId}: ${mappedEntryId}`);
                 newEntryIds.push(mappedEntryId);
                 
+                setFullyProcessedEntries(prev => {
+                  const newSet = new Set(prev);
+                  newSet.add(mappedEntryId);
+                  return newSet;
+                });
+                
                 setVisibleProcessingEntries(prev => 
                   prev.filter(id => id !== tempId)
                 );
@@ -335,6 +353,12 @@ export default function JournalEntriesList({
                   !animatedEntryIds.includes(entry.id) && 
                   !seenEntryIds.has(entry.id)) {
                 newEntryIds.push(entry.id);
+                
+                setFullyProcessedEntries(prev => {
+                  const newSet = new Set(prev);
+                  newSet.add(entry.id);
+                  return newSet;
+                });
               }
             }
           }
@@ -367,7 +391,6 @@ export default function JournalEntriesList({
       
       pendingDeletions.current.add(entryId);
       
-      // Update the visible processing entries
       setVisibleProcessingEntries(prev => prev.filter(tempId => {
         const mappedId = getEntryIdForProcessingId(tempId);
         return mappedId !== entryId;
@@ -456,16 +479,29 @@ export default function JournalEntriesList({
   }
 
   const displayEntries = isSearchActive ? filteredEntries : localEntries;
+  
+  const uniqueEntriesMap = new Map<number, JournalEntry>();
   const safeLocalEntries = Array.isArray(displayEntries) ? displayEntries : [];
-
-  const processingLinkedEntries = safeLocalEntries.filter(entry => {
-    return Array.from(processingToEntryMap.entries()).some(([tempId, entryId]) => {
-      return entryId === entry.id && transitionalLoadingEntries.includes(tempId);
-    });
+  
+  for (const entry of safeLocalEntries) {
+    if (!pendingDeletions.current.has(entry.id)) {
+      uniqueEntriesMap.set(entry.id, entry);
+    }
+  }
+  
+  const finalDisplayEntries = Array.from(uniqueEntriesMap.values());
+  
+  const processedTransitionalEntries = transitionalLoadingEntries.filter(tempId => {
+    const actualEntry = processingToActualEntry.get(tempId);
+    return actualEntry && fullyProcessedEntries.has(actualEntry.id);
   });
-
-  const filteredLocalEntries = safeLocalEntries.filter(entry => {
-    return !processingLinkedEntries.some(linkedEntry => linkedEntry.id === entry.id);
+  
+  const finalLocalEntries = finalDisplayEntries.filter(entry => {
+    const hasMatchingTransitional = processedTransitionalEntries.some(tempId => {
+      const transitionalEntry = processingToActualEntry.get(tempId);
+      return transitionalEntry && transitionalEntry.id === entry.id;
+    });
+    return !hasMatchingTransitional;
   });
 
   const renderTransitionalEntry = (tempId: string) => {
@@ -539,13 +575,13 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4 mt-6">
-            {transitionalLoadingEntries.map(tempId => (
+            {processedTransitionalEntries.map(tempId => (
               <ErrorBoundary key={`transitional-boundary-${tempId}`}>
                 {renderTransitionalEntry(tempId)}
               </ErrorBoundary>
             ))}
             
-            {hasProcessingEntries && !transitionalLoadingEntries.some(id => id === mainProcessingEntryId) && (
+            {hasProcessingEntries && !processedTransitionalEntries.some(id => id === mainProcessingEntryId) && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -568,7 +604,7 @@ export default function JournalEntriesList({
               </motion.div>
             )}
             
-            {safeLocalEntries.length === 0 && !hasProcessingEntries && !loading ? (
+            {finalDisplayEntries.length === 0 && !hasProcessingEntries && !loading ? (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -593,7 +629,7 @@ export default function JournalEntriesList({
                 </Button>
               </motion.div>
             ) : (
-              filteredLocalEntries.map((entry, index) => (
+              finalLocalEntries.map((entry, index) => (
                 <ErrorBoundary key={`entry-boundary-${entry.id}`}>
                   <motion.div
                     key={`entry-${entry.id}`}
