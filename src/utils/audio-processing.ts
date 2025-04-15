@@ -15,7 +15,6 @@ import {
 } from './audio/processing-state';
 import { validateInitialState, setupProcessingTimeout } from './audio/recording-validation';
 import { processRecordingInBackground } from './audio/background-processor';
-import { useDebugLog } from '@/utils/debug/DebugContext';
 
 /**
  * Processes an audio recording for transcription and analysis
@@ -44,10 +43,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     // Log the start of the process for debugging
     if (typeof window !== 'undefined') {
       try {
-        const DebugContext = require('@/utils/debug/DebugContext');
-        const { useDebugLog } = DebugContext;
-        
-        // Access the add event directly without the hook since we're outside a React component
+        // Access the debug methods directly from the window object
         if (window.__debugLog && window.__debugLog.addEvent) {
           window.__debugLog.addEvent(
             'audioProcessing', 
@@ -123,6 +119,8 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       
       // Launch the processing without awaiting it
       console.log('[AudioProcessing] Launching background processing');
+      const startTime = Date.now(); // Store the start time here
+      
       processRecordingInBackground(audioBlob, userId, tempId)
         .then(result => {
           console.log('[AudioProcessing] Background processing completed:', result);
@@ -137,7 +135,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
                 tempId,
                 result,
                 timestamp: Date.now(),
-                duration: Date.now() - (result.startTime || Date.now())
+                duration: Date.now() - startTime // Use the locally stored startTime instead
               }
             );
           }
@@ -218,24 +216,12 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
 if (typeof window !== 'undefined') {
   window.__debugLog = window.__debugLog || {};
   
-  try {
-    // Initialize debug context for global access
-    const initDebugContext = () => {
-      const { useDebugLog } = require('@/utils/debug/DebugContext');
-      
-      // Initialize debug methods if not already available
-      if (!window.__debugLog.addEvent) {
-        window.__debugLog.addEvent = (category, message, level, details) => {
-          // This is a fallback implementation that logs to console
-          // The real implementation will be set by React components using the hook
-          console.log(`[${level}] [${category}] ${message}`, details);
-        };
-      }
+  // Access window object directly without require
+  if (!window.__debugLog.addEvent) {
+    window.__debugLog.addEvent = (category: string, message: string, level: string, details?: any) => {
+      // This is a fallback implementation that logs to console
+      console.log(`[${level}] [${category}] ${message}`, details);
     };
-    
-    initDebugContext();
-  } catch (e) {
-    console.error('Error initializing debug context:', e);
   }
 }
 
