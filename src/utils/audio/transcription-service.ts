@@ -31,7 +31,7 @@ export async function sendAudioForTranscription(
     // Add more diagnostic info about the audio data being sent
     console.log('[TranscriptionService] Audio data sample (first 100 chars):', base64Audio.substring(0, 100));
     
-    // Call the Supabase edge function with a longer timeout
+    // Call the Supabase edge function with a longer timeout - Fix: Remove options property
     console.log('[TranscriptionService] Invoking transcribe-audio edge function');
     const response = await supabase.functions.invoke('transcribe-audio', {
       body: {
@@ -39,10 +39,8 @@ export async function sendAudioForTranscription(
         userId: userId || null,
         directTranscription: directTranscription,
         highQuality: true,
-        recordingTime: (base64Audio.length > 1000) ? Math.floor(base64Audio.length / 700) : null // Rough estimate of recording time
-      },
-      options: {
-        timeout: 60000 // Increase timeout to 60 seconds for longer recordings
+        recordingTime: (base64Audio.length > 1000) ? Math.floor(base64Audio.length / 700) : null, // Rough estimate of recording time
+        timeout: 60000 // Move timeout into the body object instead
       }
     });
 
