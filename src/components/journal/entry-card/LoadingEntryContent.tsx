@@ -10,9 +10,11 @@ export function LoadingEntryContent() {
   
   useEffect(() => {
     addEvent('LoadingUI', 'LoadingEntryContent component mounted', 'info');
+    console.log('[LoadingEntryContent] Component mounted');
     
     return () => {
       addEvent('LoadingUI', 'LoadingEntryContent component unmounted', 'info');
+      console.log('[LoadingEntryContent] Component unmounted');
     };
   }, [addEvent]);
   
@@ -23,8 +25,14 @@ export function LoadingEntryContent() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
-      onAnimationStart={() => addEvent('LoadingUI', 'LoadingEntryContent animation started', 'info')}
-      onAnimationComplete={() => addEvent('LoadingUI', 'LoadingEntryContent animation completed', 'info')}
+      onAnimationStart={() => {
+        addEvent('LoadingUI', 'LoadingEntryContent animation started', 'info');
+        console.log('[LoadingEntryContent] Animation started');
+      }}
+      onAnimationComplete={() => {
+        addEvent('LoadingUI', 'LoadingEntryContent animation completed', 'info');
+        console.log('[LoadingEntryContent] Animation completed');
+      }}
     >
       <div className="flex items-center gap-2 mb-4">
         <ShimmerSkeleton className="h-4 w-4 rounded-full" />

@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 
 const DebugLogPanel: React.FC = () => {
   const { logs, clearLogs, isEnabled, toggleEnabled } = useDebugLog();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true); // Start open by default
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [filterLevel, setFilterLevel] = useState<LogLevel | null>(null);
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
@@ -57,7 +57,7 @@ const DebugLogPanel: React.FC = () => {
   }
 
   return (
-    <div className="fixed top-0 right-0 z-50 w-full md:w-auto max-w-full md:max-w-md border shadow-lg bg-white dark:bg-gray-900 rounded-b-lg overflow-hidden transition-all duration-300 ease-in-out"
+    <div className="fixed top-0 right-0 z-[100] w-full md:w-auto max-w-full md:max-w-md border shadow-lg bg-white dark:bg-gray-900 rounded-b-lg overflow-hidden transition-all duration-300 ease-in-out"
       style={{ 
         height: isOpen ? 'min(80vh, 500px)' : '40px',
         transform: isEnabled ? 'translateY(0)' : 'translateY(-100%)'
@@ -114,7 +114,7 @@ const DebugLogPanel: React.FC = () => {
       </div>
 
       {/* Content */}
-      <CollapsibleContent forceMount className={`${isOpen ? 'block' : 'hidden'} overflow-hidden h-[calc(100%-40px)]`}>
+      <div className={`${isOpen ? 'block' : 'hidden'} overflow-hidden h-[calc(100%-40px)]`}>
         <div className="flex flex-col h-full">
           {/* Filters */}
           <div className="p-2 border-b flex flex-wrap gap-2">
@@ -200,7 +200,7 @@ const DebugLogPanel: React.FC = () => {
             )}
           </div>
         </div>
-      </CollapsibleContent>
+      </div>
     </div>
   );
 };

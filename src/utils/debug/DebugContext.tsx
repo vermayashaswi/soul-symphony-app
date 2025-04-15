@@ -9,7 +9,7 @@ const DebugLogContext = createContext<DebugLogContextType>({
   addEvent: () => {},
   addLog: () => {}, // Added for backwards compatibility 
   clearLogs: () => {},
-  isEnabled: false,
+  isEnabled: true, // Default to true
   toggleEnabled: () => {}
 });
 
@@ -23,14 +23,18 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Initialize from local storage
   useEffect(() => {
-    const savedPreferences = localStorage.getItem(STORAGE_KEY);
-    if (savedPreferences) {
-      try {
+    console.log('[DebugContext] Initializing debug context');
+    try {
+      const savedPreferences = localStorage.getItem(STORAGE_KEY);
+      if (savedPreferences) {
         const { enabled } = JSON.parse(savedPreferences);
-        setIsEnabled(enabled || true); // Default to true for our debugging
-      } catch (e) {
-        console.error("Error parsing debug preferences:", e);
+        setIsEnabled(enabled !== false); // Default to true if not explicitly false
+        console.log('[DebugContext] Loaded preferences:', { enabled });
+      } else {
+        console.log('[DebugContext] No saved preferences, using default (enabled)');
       }
+    } catch (e) {
+      console.error("[DebugContext] Error parsing debug preferences:", e);
     }
   }, []);
 
@@ -38,8 +42,9 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
   const savePreferences = useCallback(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled: isEnabled }));
+      console.log('[DebugContext] Saved preferences:', { enabled: isEnabled });
     } catch (e) {
-      console.error("Error saving debug preferences:", e);
+      console.error("[DebugContext] Error saving debug preferences:", e);
     }
   }, [isEnabled]);
 
@@ -76,12 +81,14 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Clear all logs
   const clearLogs = useCallback(() => {
     setLogs([]);
+    console.log('[DebugContext] Cleared all logs');
   }, []);
   
   // Toggle debug mode
   const toggleEnabled = useCallback(() => {
     setIsEnabled(prev => {
       const newState = !prev;
+      console.log('[DebugContext] Debug mode toggled:', { newState });
       // Schedule saving the new state
       setTimeout(() => savePreferences(), 0);
       return newState;
@@ -97,6 +104,11 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
     isEnabled,
     toggleEnabled
   };
+  
+  useEffect(() => {
+    console.log('[DebugContext] Debug context initialized, enabled:', isEnabled);
+    addEvent('DebugContext', 'Debug context initialized', 'info', { enabled: isEnabled });
+  }, []);
   
   return (
     <DebugLogContext.Provider value={value}>

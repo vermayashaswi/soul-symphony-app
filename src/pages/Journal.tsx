@@ -51,6 +51,15 @@ const Journal = () => {
   useEffect(() => {
     addEvent('Journal', 'Journal page mounted', 'info');
     
+    addEvent('DebugInfo', 'Journal page initialization', 'info', {
+      userPresent: !!user?.id,
+      isProfileChecked,
+      activeTab,
+      processingEntries: processingEntries.length,
+      entriesLoaded: entries.length,
+      timeStamp: new Date().toISOString()
+    });
+    
     const handleError = (event: ErrorEvent) => {
       console.error('[Journal] Caught render error:', event);
       addEvent('Journal', `Render error: ${event.message}`, 'error', {
