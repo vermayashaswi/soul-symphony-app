@@ -28,6 +28,9 @@ export async function sendAudioForTranscription(
     console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
     
+    // Add more diagnostic info about the audio data being sent
+    console.log('[TranscriptionService] Audio data sample (first 100 chars):', base64Audio.substring(0, 100));
+    
     // Call the Supabase edge function with a longer timeout
     console.log('[TranscriptionService] Invoking transcribe-audio edge function');
     const response = await supabase.functions.invoke('transcribe-audio', {
@@ -35,7 +38,11 @@ export async function sendAudioForTranscription(
         audio: base64Audio,
         userId: userId || null,
         directTranscription: directTranscription,
-        highQuality: true // Add flag to indicate this is a high-quality recording
+        highQuality: true,
+        recordingTime: (base64Audio.length > 1000) ? Math.floor(base64Audio.length / 700) : null // Rough estimate of recording time
+      },
+      options: {
+        timeout: 60000 // Increase timeout to 60 seconds for longer recordings
       }
     });
 
@@ -73,7 +80,8 @@ export async function sendAudioForTranscription(
       refinedTextLength: response.data?.refinedText?.length || 0,
       hasEntryId: !!response.data?.entryId,
       entryId: response.data?.entryId || 'none',
-      audioUrl: response.data?.audioUrl ? 'exists' : 'none'
+      audioUrl: response.data?.audioUrl ? 'exists' : 'none',
+      responseData: JSON.stringify(response.data).substring(0, 200) + '...' // Log a sample of the response
     });
 
     return {

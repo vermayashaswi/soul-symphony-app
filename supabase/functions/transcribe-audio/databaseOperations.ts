@@ -1,3 +1,4 @@
+
 /**
  * Database operations for the transcribe-audio function
  */
@@ -30,9 +31,35 @@ export async function createProfileIfNeeded(supabase: any, userId: string) {
       console.log("Profile not found, creating one");
       
       // Get user data from auth
-      const { data: userData, error: userError } = await supabase.auth.getUser(userId);
+      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
       if (userError) {
         console.error("Error getting user data:", userError);
+        
+        // Fallback method if admin API fails
+        const { data: fallbackUserData, error: fallbackError } = await supabase.auth.getUser(userId);
+        if (fallbackError) {
+          console.error("Fallback method also failed:", fallbackError);
+          return;
+        }
+        
+        if (fallbackUserData?.user) {
+          // Create profile
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert([{ 
+              id: userId,
+              email: fallbackUserData.user.email,
+              full_name: fallbackUserData.user?.user_metadata?.full_name || '',
+              avatar_url: fallbackUserData.user?.user_metadata?.avatar_url || ''
+            }]);
+            
+          if (insertError) {
+            console.error('Error creating user profile:', insertError);
+          } else {
+            console.log("Profile created successfully for user:", userId);
+          }
+        }
+        
         return;
       }
       
@@ -99,8 +126,8 @@ export async function storeJournalEntry(
   entities: any[]
 ) {
   try {
-    // Convert userId to text format explicitly to match column type in DB table
-    const userIdForDb = userId ? userId : null;
+    // Ensure userId is in the correct format
+    const userIdForDb = userId || null;
     
     console.log("Inserting entry with data:", {
       transcribed_text_length: transcribedText?.length || 0,
@@ -113,30 +140,74 @@ export async function storeJournalEntry(
       duration: audioDuration
     });
     
-    const { data: entryData, error: insertError } = await supabase
-      .from('Journal Entries')
-      .insert([{ 
-        "transcription text": transcribedText,
-        "refined text": refinedText,
-        "audio_url": audioUrl,
-        "user_id": userIdForDb,
-        "duration": audioDuration,
-        "emotions": emotions,
-        "sentiment": sentimentScore,
-        "entities": entities
-      }])
-      .select();
+    // Perform insert with detailed error handling
+    try {
+      const { data: entryData, error: insertError } = await supabase
+        .from('Journal Entries')
+        .insert([{ 
+          "transcription text": transcribedText,
+          "refined text": refinedText,
+          "audio_url": audioUrl,
+          "user_id": userIdForDb,
+          "duration": audioDuration,
+          "emotions": emotions,
+          "sentiment": sentimentScore,
+          "entities": entities
+        }])
+        .select();
+      
+      if (insertError) {
+        console.error('Error creating entry in database:', insertError);
+        console.error('Error details:', JSON.stringify(insertError));
         
-    if (insertError) {
-      console.error('Error creating entry in database:', insertError);
-      console.error('Error details:', JSON.stringify(insertError));
-      throw new Error(`Database insert error: ${insertError.message}`);
-    } else if (entryData && entryData.length > 0) {
-      console.log("Journal entry saved to database:", entryData[0].id);
-      return entryData[0].id;
-    } else {
-      console.error("No data returned from insert operation");
-      throw new Error("Failed to create journal entry in database");
+        // Check for common issues like missing columns
+        if (insertError.message.includes('column') && insertError.message.includes('does not exist')) {
+          console.error('Database schema issue: Column does not exist');
+        }
+        
+        // Check for RLS issues
+        if (insertError.message.includes('new row violates row-level security')) {
+          console.error('RLS policy violation - check that user_id is correctly set and RLS policies allow insert');
+        }
+        
+        throw new Error(`Database insert error: ${insertError.message}`);
+      } else if (entryData && entryData.length > 0) {
+        console.log("Journal entry saved to database successfully:", entryData[0].id);
+        return entryData[0].id;
+      } else {
+        console.error("No data returned from insert operation");
+        throw new Error("Failed to create journal entry in database");
+      }
+    } catch (dbInsertErr) {
+      console.error("Database insert operation error:", dbInsertErr);
+      
+      // Try a fallback approach with basic insert
+      try {
+        console.log("Attempting fallback insert with minimal data");
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('Journal Entries')
+          .insert([{ 
+            "transcription text": transcribedText,
+            "refined text": refinedText,
+            "user_id": userIdForDb
+          }])
+          .select();
+          
+        if (fallbackError) {
+          console.error('Fallback insert also failed:', fallbackError);
+          throw fallbackError;
+        }
+        
+        if (fallbackData && fallbackData.length > 0) {
+          console.log("Fallback journal entry saved with basic data:", fallbackData[0].id);
+          return fallbackData[0].id;
+        }
+        
+        throw new Error("Fallback insert returned no data");
+      } catch (fallbackErr) {
+        console.error("Fallback insert also failed:", fallbackErr);
+        throw fallbackErr;
+      }
     }
   } catch (dbErr) {
     console.error("Database error:", dbErr);

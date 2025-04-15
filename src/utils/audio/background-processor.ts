@@ -23,6 +23,17 @@ export async function processRecordingInBackground(
       throw new Error('No audio data to process');
     }
     
+    // Additional validation of audio blob
+    console.log('[BackgroundProcessor] Validating audio blob:', {
+      size: audioBlob.size,
+      type: audioBlob.type,
+      isDefined: !!audioBlob
+    });
+    
+    if (audioBlob.size < 100) {
+      throw new Error('Audio data is too small to process (size < 100 bytes)');
+    }
+    
     // Ensure the audioBlob has a duration property
     if (!('duration' in audioBlob) || (audioBlob as any).duration <= 0) {
       console.warn('[BackgroundProcessor] Audio blob missing duration property, using default');
@@ -51,7 +62,15 @@ export async function processRecordingInBackground(
     console.log(`[BackgroundProcessor] Converted to base64 successfully, length: ${base64Audio.length}`);
     
     if (base64Audio.length < 50) {
-      throw new Error('Audio data is too small to process');
+      throw new Error('Audio data is too small to process (base64 length < 50)');
+    }
+    
+    // Log a sample of the base64 data to verify it looks right
+    console.log('[BackgroundProcessor] Base64 audio sample (first 50 chars):', base64Audio.substring(0, 50));
+    
+    // Check if the user ID is present for proper storage
+    if (!userId) {
+      console.warn('[BackgroundProcessor] No user ID provided - entry may not be properly associated');
     }
     
     // Send to transcription service
@@ -61,10 +80,27 @@ export async function processRecordingInBackground(
     if (!result.success) {
       console.error('[BackgroundProcessor] Transcription failed:', result.error);
       
+      // Log more details about the error
+      console.error('[BackgroundProcessor] Transcription error details:', {
+        errorMessage: result.error,
+        userId: userId || 'not provided',
+        audioSize: base64Audio.length,
+        tempId
+      });
+      
       // Clean up processing state
       setIsEntryBeingProcessed(false);
       setProcessingLock(false);
       updateProcessingEntries(tempId, 'remove');
+      
+      // Notify UI about failed processing
+      window.dispatchEvent(new CustomEvent('processingEntryFailed', {
+        detail: { 
+          tempId, 
+          error: result.error,
+          timestamp: Date.now()
+        }
+      }));
       
       return {
         success: false,
@@ -77,11 +113,21 @@ export async function processRecordingInBackground(
     
     if (!entryId) {
       console.error('[BackgroundProcessor] No entry ID returned from transcription service');
+      console.error('[BackgroundProcessor] Response data:', result.data);
       
       // Clean up processing state
       setIsEntryBeingProcessed(false);
       setProcessingLock(false);
       updateProcessingEntries(tempId, 'remove');
+      
+      // Notify UI about failed processing
+      window.dispatchEvent(new CustomEvent('processingEntryFailed', {
+        detail: { 
+          tempId, 
+          error: 'No entry ID returned from transcription',
+          timestamp: Date.now() 
+        }
+      }));
       
       return {
         success: false,
@@ -103,6 +149,15 @@ export async function processRecordingInBackground(
     setIsEntryBeingProcessed(false);
     setProcessingLock(false);
     
+    // Notify UI about successful processing
+    window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+      detail: { 
+        tempId, 
+        entryId,
+        timestamp: Date.now() 
+      }
+    }));
+    
     return {
       success: true,
       entryId: entryId
@@ -110,10 +165,27 @@ export async function processRecordingInBackground(
   } catch (error: any) {
     console.error('[BackgroundProcessor] Error in background processing:', error);
     
+    // Log more details about the error
+    console.error('[BackgroundProcessor] Processing error details:', {
+      errorMessage: error.message,
+      errorStack: error.stack,
+      userId: userId || 'not provided',
+      tempId
+    });
+    
     // Clean up processing state
     setIsEntryBeingProcessed(false);
     setProcessingLock(false);
     updateProcessingEntries(tempId, 'remove');
+    
+    // Notify UI about failed processing
+    window.dispatchEvent(new CustomEvent('processingEntryFailed', {
+      detail: { 
+        tempId, 
+        error: error.message || 'Unknown error in background processing',
+        timestamp: Date.now() 
+      }
+    }));
     
     return {
       success: false,

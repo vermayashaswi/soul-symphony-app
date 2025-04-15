@@ -103,6 +103,12 @@ export async function transcribeAudioWithWhisper(
       formData.append('language', language);
     }
     
+    console.log("Sending audio to Whisper API with params:", {
+      fileType,
+      blobSize: audioBlob.size,
+      language: language || 'auto-detect'
+    });
+    
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
@@ -118,10 +124,90 @@ export async function transcribeAudioWithWhisper(
     }
 
     const data = await response.json();
+    console.log("Whisper transcription successful, text length:", data.text?.length || 0);
     return data.text;
   } catch (error) {
     console.error('Error in Whisper transcription:', error);
     throw error;
+  }
+}
+
+/**
+ * Translate and refine the transcribed text
+ * This ensures the text is in proper English and well-formatted
+ */
+export async function translateAndRefineText(
+  transcribedText: string, 
+  openAIApiKey: string,
+  detectedLanguages: string[] = ['en']
+): Promise<{ refinedText: string }> {
+  try {
+    if (!transcribedText || transcribedText.trim().length === 0) {
+      console.error('No text to translate/refine');
+      return { refinedText: '' };
+    }
+    
+    // Check if the text needs translation
+    const needsTranslation = !detectedLanguages.includes('en') || detectedLanguages.length > 1;
+    
+    console.log("Translating and refining text:", {
+      textLength: transcribedText.length,
+      detectedLanguages,
+      needsTranslation
+    });
+    
+    // Build the system prompt based on detected languages
+    let systemPrompt = 'You are an expert transcription editor.';
+    
+    if (needsTranslation) {
+      const languageList = detectedLanguages.join(', ');
+      systemPrompt += ` The text may contain content in ${languageList}. Translate everything to English while preserving the original meaning.`;
+    }
+    
+    systemPrompt += ' Polish the transcription by fixing grammar, punctuation, and capitalization. Preserve all factual content. Format paragraphs naturally.';
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: transcribedText
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1000,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Error translating/refining text:', errorData);
+      
+      // If translation fails, fall back to original text
+      return { refinedText: transcribedText };
+    }
+
+    const data = await response.json();
+    const refinedText = data.choices[0]?.message?.content || transcribedText;
+    
+    console.log("Text refinement complete, original length:", transcribedText.length, 
+                "refined length:", refinedText.length);
+    
+    return { refinedText };
+  } catch (error) {
+    console.error('Error translating/refining text:', error);
+    // On error, return the original text
+    return { refinedText: transcribedText };
   }
 }
 
