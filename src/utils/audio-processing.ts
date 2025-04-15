@@ -1,3 +1,4 @@
+
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -89,15 +90,6 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     const updatedEntries = updateProcessingEntries(tempId, 'add');
     console.log('[AudioProcessing] Updated processing entries in localStorage:', updatedEntries);
     
-    // Immediately dispatch an event to update the UI
-    window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-      detail: { 
-        entries: updatedEntries, 
-        lastUpdate: Date.now(), 
-        forceUpdate: true 
-      }
-    }));
-    
     // Log the audio details
     console.log('[AudioProcessing] Processing audio:', {
       size: audioBlob?.size || 0,
@@ -111,16 +103,6 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     processRecordingInBackground(audioBlob, userId, tempId)
       .then(result => {
         console.log('[AudioProcessing] Background processing completed:', result);
-        
-        // Dispatch another event when processing completes
-        window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-          detail: { 
-            entries: getProcessingEntries().filter(id => id !== tempId), 
-            lastUpdate: Date.now(),
-            processingComplete: true,
-            completedTempId: tempId
-          }
-        }));
       })
       .catch(err => {
         console.error('[AudioProcessing] Background processing error:', err);
@@ -128,21 +110,15 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
         setProcessingLock(false);
         
         updateProcessingEntries(tempId, 'remove');
-        
-        // Notify UI about processing failure
-        window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-          detail: { 
-            entries: getProcessingEntries().filter(id => id !== tempId), 
-            lastUpdate: Date.now(),
-            processingFailed: true,
-            failedTempId: tempId,
-            error: err.message || 'Unknown error'
-          }
-        }));
       });
     
     // Return immediately with the temp ID
     console.log('[AudioProcessing] Returning success with tempId:', tempId);
+    
+    // Force a custom event dispatch to ensure UI updates
+    window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+      detail: { entries: updatedEntries, lastUpdate: Date.now(), forceUpdate: true }
+    }));
     
     return { success: true, tempId };
   } catch (error: any) {

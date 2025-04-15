@@ -136,12 +136,19 @@ const Journal = () => {
         });
         
         setTimeout(() => {
-          setProcessingEntries([]);
-          setToastIds({});
-        }, 1500);
+          console.log('[Journal] Doing additional fetch for complete entry data');
+          fetchEntries();
+          setRefreshKey(prev => prev + 1);
+        }, 1000);
         
+        setProcessingEntries([]);
+        setToastIds({});
         setIsSavingRecording(false);
         setSafeToSwitchTab(true);
+        
+        if (activeTab === 'record') {
+          setActiveTab('entries');
+        }
         
         setEntriesReady(true);
       }
@@ -152,7 +159,7 @@ const Journal = () => {
         setEntriesReady(true);
       }
     }
-  }, [entries, processingEntries, toastIds, entriesReady]);
+  }, [entries, processingEntries, toastIds, entriesReady, activeTab, fetchEntries]);
 
   useEffect(() => {
     return () => {
@@ -397,9 +404,11 @@ const Journal = () => {
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
         
+        // Force a refresh of the entries list
         fetchEntries();
         setRefreshKey(prev => prev + 1);
         
+        // Make sure the placeholder entry is visible
         window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
           detail: { 
             entries: [...processingEntries, tempId], 
