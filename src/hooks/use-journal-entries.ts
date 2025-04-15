@@ -111,8 +111,15 @@ export function useJournalEntries(
                 'cached entries:', globalEntriesCache.entries.length,
                 'refreshKey:', refreshKey);
     
-    if (isFetchingRef.current) {
-      console.log('[useJournalEntries] Already fetching, skipping this request');
+    // Don't prevent fetching if we're trying to get fresh data after processing
+    // This specifically fixes the race condition where a processed entry might be missed
+    const shouldSkipFetch = isFetchingRef.current && 
+                           globalEntriesCache.userId === userId && 
+                           globalEntriesCache.entries.length > 0 &&
+                           Date.now() - (globalEntriesCache.lastFetchTime?.getTime() || 0) < 500;
+    
+    if (shouldSkipFetch) {
+      console.log('[useJournalEntries] Skipping fetch as we just fetched recently');
       return;
     }
     
@@ -192,8 +199,17 @@ export function useJournalEntries(
       if (journalEntries.length > 0 || entriesRef.current.length === 0) {
         console.log('[useJournalEntries] Setting entries:', journalEntries.length);
         setEntries(journalEntries);
-      } else {
-        console.log('[useJournalEntries] Fetch returned empty but keeping existing entries');
+      } else if (journalEntries.length === 0 && entriesRef.current.length > 0) {
+        // If we got an empty response but have existing entries, check if it's likely a race condition
+        const timeSinceLastFetch = globalEntriesCache.lastFetchTime ? 
+                                  Date.now() - globalEntriesCache.lastFetchTime.getTime() : 0;
+                                  
+        if (timeSinceLastFetch < 5000) { // If less than 5 seconds since last fetch
+          console.log('[useJournalEntries] Fetch returned empty during likely race condition, keeping existing entries');
+          // Keep existing entries as they're likely more up-to-date during active processing
+        } else {
+          console.log('[useJournalEntries] Fetch returned empty but keeping existing entries');
+        }
       }
       
       setLastFetchTime(new Date());

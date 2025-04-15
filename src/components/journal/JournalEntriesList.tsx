@@ -36,12 +36,14 @@ export default function JournalEntriesList({
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [processingToEntryMap, setProcessingToEntryMap] = useState<Map<string, number>>(new Map());
   const [visibleProcessingEntries, setVisibleProcessingEntries] = useState<string[]>([]);
+  const [recentlyCompletedEntries, setRecentlyCompletedEntries] = useState<number[]>([]);
   const hasProcessingEntries = visibleProcessingEntries.length > 0 && processingEntries.length > 0;
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
   const [renderError, setRenderError] = useState<Error | null>(null);
   const hasNoValidEntries = useRef(false);
   const processingStepTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const entryTransitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const handleProcessingEntryMapped = (event: CustomEvent) => {
@@ -59,12 +61,20 @@ export default function JournalEntriesList({
         );
         
         const newEntryId = event.detail.entryId;
-        if (newEntryId && !animatedEntryIds.includes(newEntryId)) {
+        if (newEntryId) {
+          setRecentlyCompletedEntries(prev => [...prev, newEntryId]);
+          
           setAnimatedEntryIds(prev => [...prev, newEntryId]);
           
           setTimeout(() => {
             if (componentMounted.current) {
               setAnimatedEntryIds(prev => prev.filter(id => id !== newEntryId));
+              
+              setTimeout(() => {
+                if (componentMounted.current) {
+                  setRecentlyCompletedEntries(prev => prev.filter(id => id !== newEntryId));
+                }
+              }, 5000);
             }
           }, 5000);
         }
@@ -76,7 +86,7 @@ export default function JournalEntriesList({
     return () => {
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     };
-  }, [animatedEntryIds]);
+  }, []);
 
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
@@ -148,10 +158,20 @@ export default function JournalEntriesList({
         
         hasNoValidEntries.current = filteredEntries.length === 0 && entries.length > 0;
         
-        setLocalEntries(filteredEntries);
-        setFilteredEntries(filteredEntries);
+        const recentlyProcessedEntries = filteredEntries.filter(
+          entry => recentlyCompletedEntries.includes(entry.id)
+        );
         
-        const entryIds = filteredEntries.map(entry => entry.id);
+        const regularEntries = filteredEntries.filter(
+          entry => !recentlyCompletedEntries.includes(entry.id)
+        );
+        
+        const sortedEntries = [...recentlyProcessedEntries, ...regularEntries];
+        
+        setLocalEntries(sortedEntries);
+        setFilteredEntries(sortedEntries);
+        
+        const entryIds = sortedEntries.map(entry => entry.id);
         
         setVisibleProcessingEntries(prev => {
           return prev.filter(tempId => {
@@ -174,7 +194,7 @@ export default function JournalEntriesList({
     return () => {
       componentMounted.current = false;
     };
-  }, [entries]);
+  }, [entries, recentlyCompletedEntries]);
 
   useEffect(() => {
     if (!componentMounted.current) return;
@@ -266,6 +286,9 @@ export default function JournalEntriesList({
       pendingDeletions.current.clear();
       if (processingStepTimeoutRef.current) {
         clearTimeout(processingStepTimeoutRef.current);
+      }
+      if (entryTransitionTimeoutRef.current) {
+        clearTimeout(entryTransitionTimeoutRef.current);
       }
     };
   }, []);
@@ -410,7 +433,7 @@ export default function JournalEntriesList({
                     <JournalEntryCard 
                       entry={entry} 
                       onDelete={handleEntryDelete} 
-                      isNew={animatedEntryIds.includes(entry.id)}
+                      isNew={animatedEntryIds.includes(entry.id) || recentlyCompletedEntries.includes(entry.id)}
                       isProcessing={false}
                     />
                   </motion.div>

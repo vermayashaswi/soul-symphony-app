@@ -70,7 +70,10 @@ const Journal = () => {
     window.addEventListener('error', handleError);
     
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
-      // Handle processing entries changed event
+      if (event.detail && Array.isArray(event.detail.entries)) {
+        console.log(`[Journal] Processing entries changed: ${event.detail.entries.length} entries`);
+        setProcessingEntries(event.detail.entries);
+      }
     };
     
     const handleProcessingEntryMapped = (event: CustomEvent) => {
@@ -81,6 +84,10 @@ const Journal = () => {
         
         if (processingEntries.includes(event.detail.tempId)) {
           setProcessedEntryIds(prev => [...prev, event.detail.entryId]);
+          
+          console.log('[Journal] Fetching new data immediately after entry mapped');
+          fetchEntries();
+          setRefreshKey(prev => prev + 1);
           
           toast.success('Journal entry analyzed and saved', {
             duration: 3000,
@@ -100,19 +107,27 @@ const Journal = () => {
             });
           }
           
-          setTimeout(() => {
-            console.log('[Journal] Doing additional fetch for complete entry data after mapping');
-            fetchEntries();
-            setRefreshKey(prev => prev + 1);
-          }, 500);
+          const fetchIntervals = [500, 1500, 3000];
+          fetchIntervals.forEach(interval => {
+            setTimeout(() => {
+              if (componentMounted.current) {
+                console.log(`[Journal] Scheduled fetch at ${interval}ms after mapping`);
+                fetchEntries();
+                setRefreshKey(prev => prev + 1);
+              }
+            }, interval);
+          });
         }
       }
     };
+    
+    const componentMounted = { current: true };
     
     window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
     window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     
     return () => {
+      componentMounted.current = false;
       window.removeEventListener('error', handleError);
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
@@ -213,11 +228,14 @@ const Journal = () => {
             });
           }
           
-          setTimeout(() => {
-            console.log('[Journal] Doing additional fetch for complete entry data');
-            fetchEntries();
-            setRefreshKey(prev => prev + 1);
-          }, 1000);
+          const fetchIntervals = [1000, 2000];
+          fetchIntervals.forEach(interval => {
+            setTimeout(() => {
+              console.log(`[Journal] Additional fetch at ${interval}ms after new entries detected`);
+              fetchEntries();
+              setRefreshKey(prev => prev + 1);
+            }, interval);
+          });
           
           setIsSavingRecording(false);
           setSafeToSwitchTab(true);
@@ -499,13 +517,13 @@ const Journal = () => {
         
         const pollIntervals = [1000, 2000, 3000, 5000, 8000, 10000, 15000];
         
-        for (const interval of pollIntervals) {
+        pollIntervals.forEach(interval => {
           setTimeout(() => {
             console.log(`[Journal] Polling for entry data at ${interval}ms interval`);
             fetchEntries();
             setRefreshKey(prev => prev + 1);
           }, interval);
-        }
+        });
         
         setTimeout(() => {
           console.log('[Journal] Maximum processing time check for tempId:', tempId);
