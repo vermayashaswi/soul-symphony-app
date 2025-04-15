@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { createLogEntry } from './debugUtils';
 import { DebugLogContextType, DebugLogEntry, LogLevel } from './debugLogTypes';
 
@@ -9,45 +9,15 @@ const DebugLogContext = createContext<DebugLogContextType>({
   addEvent: () => {},
   addLog: () => {}, // Added for backwards compatibility 
   clearLogs: () => {},
-  isEnabled: true, // Default to true
+  isEnabled: true,
   toggleEnabled: () => {}
 });
 
 // Debug provider component
 export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [logs, setLogs] = useState<DebugLogEntry[]>([]);
-  const [isEnabled, setIsEnabled] = useState<boolean>(true); // Default to enabled for debugging
+  const [isEnabled, setIsEnabled] = useState<boolean>(true);
   
-  // Local storage key for saving debug preferences
-  const STORAGE_KEY = 'debug_preferences';
-  
-  // Initialize from local storage
-  useEffect(() => {
-    console.log('[DebugContext] Initializing debug context');
-    try {
-      const savedPreferences = localStorage.getItem(STORAGE_KEY);
-      if (savedPreferences) {
-        const { enabled } = JSON.parse(savedPreferences);
-        setIsEnabled(enabled !== false); // Default to true if not explicitly false
-        console.log('[DebugContext] Loaded preferences:', { enabled });
-      } else {
-        console.log('[DebugContext] No saved preferences, using default (enabled)');
-      }
-    } catch (e) {
-      console.error("[DebugContext] Error parsing debug preferences:", e);
-    }
-  }, []);
-
-  // Save preferences to local storage
-  const savePreferences = useCallback(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled: isEnabled }));
-      console.log('[DebugContext] Saved preferences:', { enabled: isEnabled });
-    } catch (e) {
-      console.error("[DebugContext] Error saving debug preferences:", e);
-    }
-  }, [isEnabled]);
-
   // Add a new event log (primary method name)
   const addEvent = useCallback((
     category: string, 
@@ -86,14 +56,8 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Toggle debug mode
   const toggleEnabled = useCallback(() => {
-    setIsEnabled(prev => {
-      const newState = !prev;
-      console.log('[DebugContext] Debug mode toggled:', { newState });
-      // Schedule saving the new state
-      setTimeout(() => savePreferences(), 0);
-      return newState;
-    });
-  }, [savePreferences]);
+    setIsEnabled(prev => !prev);
+  }, []);
   
   // The context value
   const value = {
@@ -104,11 +68,6 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
     isEnabled,
     toggleEnabled
   };
-  
-  useEffect(() => {
-    console.log('[DebugContext] Debug context initialized, enabled:', isEnabled);
-    addEvent('DebugContext', 'Debug context initialized', 'info', { enabled: isEnabled });
-  }, []);
   
   return (
     <DebugLogContext.Provider value={value}>

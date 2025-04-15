@@ -1,14 +1,14 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Mic } from 'lucide-react';
+import { Plus, Loader2, Mic, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
 import EmptyJournalState from './EmptyJournalState';
 import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import JournalSearch from './JournalSearch';
 import { getProcessingEntries } from '@/utils/audio-processing';
-import { useDebugLog } from '@/utils/debug/DebugContext';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -33,60 +33,52 @@ export default function JournalEntriesList({
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [renderRetryCount, setRenderRetryCount] = useState(0);
   const [persistedProcessingEntries, setPersistedProcessingEntries] = useState<string[]>([]);
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [processingStep, setProcessingStep] = useState<string>('recording');
   const hasProcessingEntries = Array.isArray(processingEntries) && processingEntries.length > 0 || persistedProcessingEntries.length > 0;
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
   const [renderError, setRenderError] = useState<Error | null>(null);
   const hasNoValidEntries = useRef(false);
-  const [isSearchActive, setIsSearchActive] = useState(false);
-  const [processingEntriesLoaded, setProcessingEntriesLoaded] = useState(false);
-  const [showTemporaryProcessingEntries, setShowTemporaryProcessingEntries] = useState(true);
-  const [visibleProcessingEntries, setVisibleProcessingEntries] = useState<string[]>([]);
-  const [stableVisibleProcessingEntries, setStableVisibleProcessingEntries] = useState<string[]>([]);
-  const lastProcessingChangeTimestamp = useRef(0);
-  const processingEntriesTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const processingEntryRemovalTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const stateUpdateVersionRef = useRef(0);
-  const entriesCheckedForCompletionRef = useRef<Record<string, boolean>>({});
-  const { addEvent } = useDebugLog();
+  const processingStepTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Processing steps animation
   useEffect(() => {
-    addEvent('JournalEntries', 'Processing entries state', 'info', {
-      processingEntries,
-      persistedProcessingEntries,
-      showTemporaryProcessingEntries,
-      stableVisibleProcessingEntries: stableVisibleProcessingEntries.length
-    });
-  }, [processingEntries, persistedProcessingEntries, showTemporaryProcessingEntries, stableVisibleProcessingEntries, addEvent]);
+    if (hasProcessingEntries) {
+      const steps = ['transcribing', 'processing', 'extracting_themes', 'analyzing_sentiment', 'finalizing'];
+      let currentStepIndex = 0;
+      
+      const advanceStep = () => {
+        if (!componentMounted.current) return;
+        
+        setProcessingStep(steps[currentStepIndex]);
+        currentStepIndex = (currentStepIndex + 1) % steps.length;
+        
+        processingStepTimeoutRef.current = setTimeout(advanceStep, 3000);
+      };
+      
+      advanceStep();
+      
+      return () => {
+        if (processingStepTimeoutRef.current) {
+          clearTimeout(processingStepTimeoutRef.current);
+        }
+      };
+    }
+  }, [hasProcessingEntries]);
 
+  // Load persisted processing entries from localStorage
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
       const persistedEntries = getProcessingEntries();
-      addEvent('JournalEntries', 'Loaded persisted entries', 'info', persistedEntries);
       setPersistedProcessingEntries(persistedEntries);
-      
-      if (persistedEntries.length > 0) {
-        setProcessingEntriesLoaded(true);
-        setShowTemporaryProcessingEntries(true);
-        setStableVisibleProcessingEntries(persistedEntries);
-      }
     };
     
     loadPersistedProcessingEntries();
     
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
-      addEvent('JournalEntries', 'Processing entries changed event received', 'info', event.detail);
       if (event.detail && Array.isArray(event.detail.entries)) {
         setPersistedProcessingEntries(event.detail.entries);
-        
-        if (event.detail.entries.length > 0) {
-          setProcessingEntriesLoaded(true);
-          setShowTemporaryProcessingEntries(true);
-          if (event.detail.forceUpdate) {
-            setStableVisibleProcessingEntries(event.detail.entries);
-            addEvent('JournalEntries', 'Force updated visible processing entries', 'success', event.detail.entries);
-          }
-        }
       }
     };
     
@@ -100,105 +92,13 @@ export default function JournalEntriesList({
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    addEvent('JournalEntries', 'JournalEntriesList mounted', 'info');
-    
     return () => {
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (processingEntriesTimerRef.current) {
-        clearTimeout(processingEntriesTimerRef.current);
-      }
-      addEvent('JournalEntries', 'JournalEntriesList unmounted', 'info');
     };
-  }, [addEvent]);
+  }, []);
 
-  useEffect(() => {
-    const allProcessingEntries = [...new Set([...processingEntries, ...persistedProcessingEntries])];
-    console.log('[JournalEntriesList] Combined processing entries:', allProcessingEntries);
-    
-    const now = Date.now();
-    const timeSinceLastChange = now - lastProcessingChangeTimestamp.current;
-    
-    if (processingEntriesTimerRef.current) {
-      clearTimeout(processingEntriesTimerRef.current);
-    }
-    
-    const currentVersion = ++stateUpdateVersionRef.current;
-    
-    const entriesIds = entries.map(entry => String(entry.id));
-    const uniqueProcessingEntries = allProcessingEntries.filter(tempId => {
-      const possibleId = tempId.split('-').pop();
-      return !entriesIds.some(id => id === possibleId || tempId.includes(id));
-    });
-    
-    if (uniqueProcessingEntries.length > 0) {
-      setStableVisibleProcessingEntries(uniqueProcessingEntries);
-      setShowTemporaryProcessingEntries(true);
-      setProcessingEntriesLoaded(true);
-    } else if (allProcessingEntries.length === 0) {
-      setShowTemporaryProcessingEntries(false);
-      setStableVisibleProcessingEntries([]);
-    }
-
-    let hasNewCompletedEntries = false;
-    let hasEntriesWithContentButNoMetadata = false;
-    
-    entries.forEach(entry => {
-      if (!entry || !entry.id) return;
-      
-      const entryIdStr = String(entry.id);
-      const isBeingProcessed = allProcessingEntries.some(tempId => tempId.includes(entryIdStr));
-      
-      if (!isBeingProcessed) return;
-      
-      if (entriesCheckedForCompletionRef.current[entryIdStr]) return;
-      
-      const isContentComplete = entry.content && 
-                            entry.content !== "Processing entry..." && 
-                            entry.content.trim() !== "";
-                       
-      const hasThemesOrSentiment = (Array.isArray(entry.themes) && entry.themes.length > 0) || 
-                              (Array.isArray(entry.master_themes) && entry.master_themes.length > 0) ||
-                              entry.sentiment;
-      
-      if (isContentComplete && !hasThemesOrSentiment) {
-        hasEntriesWithContentButNoMetadata = true;
-        console.log(`[JournalEntriesList] Entry ${entry.id} has content but metadata is still processing`);
-      }
-      
-      if (isContentComplete && hasThemesOrSentiment) {
-        console.log(`[JournalEntriesList] Entry ${entry.id} is fully complete with content and metadata`);
-        entriesCheckedForCompletionRef.current[entryIdStr] = true;
-        hasNewCompletedEntries = true;
-      }
-    });
-    
-    if (hasNewCompletedEntries) {
-      console.log("[JournalEntriesList] New completed entries detected, scheduling processing indicators removal");
-      
-      if (processingEntryRemovalTimerRef.current) {
-        clearTimeout(processingEntryRemovalTimerRef.current);
-      }
-      
-      processingEntryRemovalTimerRef.current = setTimeout(() => {
-        console.log("[JournalEntriesList] Executing delayed removal of processing indicators");
-        setShowTemporaryProcessingEntries(false);
-        
-        const updatedProcessingEntries = allProcessingEntries.filter(tempId => {
-          return !entries.some(entry => tempId.includes(String(entry.id)));
-        });
-        
-        if (updatedProcessingEntries.length !== allProcessingEntries.length) {
-          localStorage.setItem('processingEntries', JSON.stringify(updatedProcessingEntries));
-          
-          window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-            detail: { entries: updatedProcessingEntries, lastUpdate: Date.now() }
-          }));
-        }
-      }, 500);
-    }
-  }, [processingEntries, persistedProcessingEntries, entries]);
-
+  // Process and filter entries
   useEffect(() => {
     try {
       if (Array.isArray(entries)) {
@@ -231,6 +131,7 @@ export default function JournalEntriesList({
     };
   }, [entries]);
 
+  // Track new entries for animation
   useEffect(() => {
     if (!componentMounted.current) return;
     
@@ -249,8 +150,6 @@ export default function JournalEntriesList({
           if (newEntryIds.length > 0) {
             console.log('[JournalEntriesList] New entries detected:', newEntryIds);
             setAnimatedEntryIds(prev => [...prev, ...newEntryIds]);
-            
-            setShowTemporaryProcessingEntries(false);
             
             setTimeout(() => {
               if (componentMounted.current) {
@@ -305,6 +204,9 @@ export default function JournalEntriesList({
       console.log("[JournalEntriesList] Component unmounting");
       componentMounted.current = false;
       pendingDeletions.current.clear();
+      if (processingStepTimeoutRef.current) {
+        clearTimeout(processingStepTimeoutRef.current);
+      }
     };
   }, []);
   
@@ -321,6 +223,53 @@ export default function JournalEntriesList({
   const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !hasProcessingEntries;
   
   const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !allProcessingEntries.length;
+
+  const renderProcessingStepContent = () => {
+    switch (processingStep) {
+      case 'transcribing':
+        return (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span>Transcribing your audio...</span>
+          </div>
+        );
+      case 'processing':
+        return (
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-primary" />
+            <span>Processing with AI...</span>
+          </div>
+        );
+      case 'extracting_themes':
+        return (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span>Extracting themes from your entry...</span>
+          </div>
+        );
+      case 'analyzing_sentiment':
+        return (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span>Analyzing sentiment and emotions...</span>
+          </div>
+        );
+      case 'finalizing':
+        return (
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+            <span>Finalizing your journal entry...</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span>Processing your entry...</span>
+          </div>
+        );
+    }
+  };
 
   if (hasNoValidEntries.current) {
     return (
@@ -368,23 +317,50 @@ export default function JournalEntriesList({
 
         <AnimatePresence>
           <div className="space-y-4 mt-6">
-            {(showTemporaryProcessingEntries && stableVisibleProcessingEntries.length > 0) && (
+            {hasProcessingEntries && (
               <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="mb-4"
-                onAnimationStart={() => addEvent('JournalEntries', 'Processing loader animation started', 'info')}
-                onAnimationComplete={() => addEvent('JournalEntries', 'Processing loader animation completed', 'info')}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="mb-4 bg-muted/40 border rounded-lg p-4 shadow-sm"
               >
-                <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Processing your new entry...</span>
+                <div className="flex flex-col space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium">Processing New Entry</h3>
+                    <div className="bg-primary/10 text-primary text-xs rounded-full px-2 py-0.5">
+                      In Progress
+                    </div>
+                  </div>
+                  
+                  <div className="h-1 w-full bg-muted-foreground/20 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-primary rounded-full"
+                      initial={{ width: "10%" }}
+                      animate={{ 
+                        width: ["10%", "30%", "50%", "70%", "90%"],
+                        transition: { 
+                          times: [0, 0.2, 0.4, 0.6, 0.8],
+                          duration: 15, 
+                          repeat: Infinity,
+                          repeatType: "reverse" 
+                        }
+                      }}
+                    />
+                  </div>
+                  
+                  <div className="text-sm text-muted-foreground">
+                    {renderProcessingStepContent()}
+                  </div>
+                  
+                  <div className="pt-2 text-xs text-muted-foreground">
+                    Your entry will appear here once processing is complete
+                  </div>
                 </div>
-                <JournalEntryLoadingSkeleton count={stableVisibleProcessingEntries.length || 1} />
               </motion.div>
             )}
             
-            {safeLocalEntries.length === 0 && !hasProcessingEntries && !loading && !processingEntriesLoaded ? (
+            {safeLocalEntries.length === 0 && !hasProcessingEntries && !loading ? (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

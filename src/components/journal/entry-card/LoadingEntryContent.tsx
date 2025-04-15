@@ -1,23 +1,10 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { Loader } from 'lucide-react';
-import { useDebugLog } from '@/utils/debug/DebugContext';
 
 export function LoadingEntryContent() {
-  const { addEvent } = useDebugLog();
-  
-  useEffect(() => {
-    addEvent('LoadingUI', 'LoadingEntryContent component mounted', 'info');
-    console.log('[LoadingEntryContent] Component mounted');
-    
-    return () => {
-      addEvent('LoadingUI', 'LoadingEntryContent component unmounted', 'info');
-      console.log('[LoadingEntryContent] Component unmounted');
-    };
-  }, [addEvent]);
-  
   return (
     <motion.div 
       className="space-y-2"
@@ -25,14 +12,6 @@ export function LoadingEntryContent() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
-      onAnimationStart={() => {
-        addEvent('LoadingUI', 'LoadingEntryContent animation started', 'info');
-        console.log('[LoadingEntryContent] Animation started');
-      }}
-      onAnimationComplete={() => {
-        addEvent('LoadingUI', 'LoadingEntryContent animation completed', 'info');
-        console.log('[LoadingEntryContent] Animation completed');
-      }}
     >
       <div className="flex items-center gap-2 mb-4">
         <ShimmerSkeleton className="h-4 w-4 rounded-full" />

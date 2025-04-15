@@ -1,7 +1,6 @@
 
 import React from "react";
 import { useDebugLog } from "@/utils/debug/DebugContext";
-import DebugLogPanel from "@/components/debug/DebugLogPanel";
 
 // Create a provider for backward compatibility
 export const ChatDebugProvider = ({ children }: { children: React.ReactNode }) => {
@@ -28,7 +27,7 @@ export const useChatDebug = () => {
 
 // Export the panel component for backward compatibility
 const ChatDebugPanel = () => {
-  return <DebugLogPanel />;
+  return null;
 };
 
 export default ChatDebugPanel;
