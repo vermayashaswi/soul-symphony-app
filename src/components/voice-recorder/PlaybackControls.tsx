@@ -106,19 +106,33 @@ export function PlaybackControls({
     setIsClearingToasts(true);
     await clearAllToasts();
     
+    // Dispatch an event to immediately show processing state BEFORE calling onSaveEntry
+    const tempId = 'temp-' + Date.now();
+    console.log('[PlaybackControls] Dispatching immediate processing event with tempId:', tempId);
+    
+    // Create a fake processing entry immediately for better UX
+    window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+      detail: { 
+        entries: [tempId], 
+        lastUpdate: Date.now(),
+        forceUpdate: true 
+      }
+    }));
+    
+    // Store in localStorage immediately for persistence
+    try {
+      const existingEntries = JSON.parse(localStorage.getItem('processingEntries') || '[]');
+      if (!existingEntries.includes(tempId)) {
+        existingEntries.push(tempId);
+        localStorage.setItem('processingEntries', JSON.stringify(existingEntries));
+      }
+    } catch (e) {
+      console.error('[PlaybackControls] Error updating localStorage:', e);
+    }
+    
     setTimeout(() => {
       setIsClearingToasts(false);
       console.log('[PlaybackControls] Calling onSaveEntry callback');
-      
-      // Dispatch an event to immediately show processing state
-      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { 
-          entries: ['temp-' + Date.now()], 
-          lastUpdate: Date.now(),
-          forceUpdate: true 
-        }
-      }));
-      
       onSaveEntry();
     }, 150);
   };

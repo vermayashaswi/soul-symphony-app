@@ -36,8 +36,9 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
     localStorage.setItem('processingEntries', JSON.stringify(entries));
     
     // Dispatch an event so other components can react to the change
+    // Ensure we set forceUpdate flag to true to guarantee the UI updates
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-      detail: { entries, lastUpdate: now }
+      detail: { entries, lastUpdate: now, forceUpdate: true }
     }));
     
     return entries;
@@ -83,7 +84,7 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
       
       // Dispatch an event so other components can react to the change
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { entries: updatedEntries, lastUpdate: now, removedId: idStr }
+        detail: { entries: updatedEntries, lastUpdate: now, removedId: idStr, forceUpdate: true }
       }));
       
       console.log(`[Audio.ProcessingState] Removed processing entry with ID ${idStr}`);
