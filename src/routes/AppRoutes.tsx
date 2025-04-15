@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Journal from '@/pages/Journal';
@@ -10,6 +11,7 @@ import ProtectedRoute from './ProtectedRoute';
 import MobileNavigation from './MobileNavigation';
 import { useAuth } from '@/contexts/AuthContext';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import LandingPage from '@/pages/landing/LandingPage';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -34,6 +36,11 @@ const AppRoutes = () => {
           <Route path="/onboarding" element={<OnboardingScreen />} />
         ) : (
           <Route path="/app/onboarding" element={<OnboardingScreen />} />
+        )}
+        
+        {/* Website routes */}
+        {!isAppSubdomain && (
+          <Route path="/" element={<LandingPage />} />
         )}
         
         {/* App routes with domain-specific paths */}
@@ -140,13 +147,10 @@ const AppRoutes = () => {
             element={user ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />} 
           />
         ) : (
-          <>
-            <Route 
-              path="/app" 
-              element={user ? <Navigate to="/app/home" replace /> : <Navigate to="/app/onboarding" replace />} 
-            />
-            <Route path="/" element={<Navigate to="/app" replace />} />
-          </>
+          <Route 
+            path="/app" 
+            element={user ? <Navigate to="/app/home" replace /> : <Navigate to="/app/onboarding" replace />} 
+          />
         )}
       </Routes>
       {user && <MobileNavigation onboardingComplete={onboardingComplete} />}

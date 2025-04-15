@@ -32,7 +32,7 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   }
   
   const isAuthRoute = location.pathname === '/app/auth' || location.pathname === '/auth';
-  const isOnboardingRoute = location.pathname === '/app/onboarding';
+  const isOnboardingRoute = location.pathname === '/app/onboarding' || location.pathname === '/onboarding';
   const isRootAppRoute = location.pathname === '/app';
   
   // Do not run checks on special routes
