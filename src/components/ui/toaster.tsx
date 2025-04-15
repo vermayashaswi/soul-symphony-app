@@ -25,18 +25,18 @@ export function Toaster() {
             {...props} 
             className={
               isDarkMode
-                ? "bg-slate-800 border border-slate-700 text-black shadow-lg"
-                : "bg-white border border-slate-200 text-black shadow-lg"
+                ? "bg-theme border-white/10 text-white shadow-lg"
+                : "bg-theme border-black/10 text-black shadow-lg"
             }
           >
             <div className="grid gap-1">
               {title && (
-                <ToastTitle className="text-black font-semibold">
+                <ToastTitle className={isDarkMode ? "text-white" : "text-black"}>
                   {title}
                 </ToastTitle>
               )}
               {description && (
-                <ToastDescription className="text-black/90 font-normal">
+                <ToastDescription className={isDarkMode ? "text-white/90" : "text-black/90"}>
                   {description}
                 </ToastDescription>
               )}

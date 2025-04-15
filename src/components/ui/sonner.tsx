@@ -5,7 +5,7 @@ import { Toaster as Sonner } from "sonner"
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 function Toaster({ ...props }: ToasterProps) {
-  const { theme, systemTheme } = useTheme()
+  const { theme, systemTheme, colorTheme } = useTheme()
   
   // Determine if we're in dark mode
   const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
@@ -17,8 +17,8 @@ function Toaster({ ...props }: ToasterProps) {
       toastOptions={{
         classNames: {
           toast: isDarkMode
-            ? "group bg-slate-800 border-slate-700 text-white font-medium" // Changed text color to white
-            : "group bg-white border-slate-200 text-black font-medium",
+            ? "group bg-theme text-white font-medium border border-white/10" 
+            : "group bg-theme text-black font-medium border border-black/10",
           title: isDarkMode 
             ? "text-white font-semibold" 
             : "text-black font-semibold",

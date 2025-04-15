@@ -6,6 +6,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture"
 import { X } from "lucide-react"
+import { useTheme } from "@/hooks/use-theme"
 
 const ToastProvider = ToastPrimitives.Provider
 
@@ -29,9 +30,9 @@ const toastVariants = cva(
   {
     variants: {
       variant: {
-        default: "border dark:bg-slate-800 dark:text-white dark:border-slate-700 bg-white text-black border-slate-200 font-medium",
+        default: "border font-medium",
         destructive:
-          "destructive group border-destructive bg-destructive text-destructive-foreground dark:border-destructive dark:bg-destructive dark:text-white font-medium",
+          "destructive group border-destructive bg-destructive font-medium",
       },
     },
     defaultVariants: {
@@ -48,6 +49,10 @@ const Toast = React.forwardRef<
   // Create a ref that matches the expected element type of ToastPrimitives.Root
   const toastRef = React.useRef<React.ElementRef<typeof ToastPrimitives.Root>>(null);
   const { onOpenChange } = props;
+  const { colorTheme, theme, systemTheme } = useTheme();
+  
+  // Determine if we're in dark mode
+  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
   
   useSwipeGesture(toastRef as React.RefObject<HTMLElement>, {
     onSwipeLeft: () => onOpenChange?.(false),
@@ -68,7 +73,13 @@ const Toast = React.forwardRef<
           toastRef.current = node;
         }
       }}
-      className={cn(toastVariants({ variant }), className)}
+      className={cn(
+        toastVariants({ variant }), 
+        className, 
+        "bg-theme border-theme/30",
+        // Apply light or dark text based on theme
+        isDarkMode ? "text-white" : "text-black"
+      )}
       {...props}
     />
   )
@@ -82,7 +93,7 @@ const ToastAction = React.forwardRef<
   <ToastPrimitives.Action
     ref={ref}
     className={cn(
-      "inline-flex h-8 shrink-0 items-center justify-center rounded-md border bg-transparent px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-[.destructive]:border-muted/40 group-[.destructive]:hover:border-destructive/30 group-[.destructive]:hover:bg-destructive group-[.destructive]:hover:text-black group-[.destructive]:focus:ring-destructive dark:text-black",
+      "inline-flex h-8 shrink-0 items-center justify-center rounded-md border bg-transparent px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-[.destructive]:border-muted/40 group-[.destructive]:hover:border-destructive/30 group-[.destructive]:hover:bg-destructive group-[.destructive]:hover:text-black group-[.destructive]:focus:ring-destructive",
       className
     )}
     {...props}
@@ -93,43 +104,70 @@ ToastAction.displayName = ToastPrimitives.Action.displayName
 const ToastClose = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Close>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Close>
->(({ className, ...props }, ref) => (
-  <ToastPrimitives.Close
-    ref={ref}
-    className={cn(
-      "absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100 group-[.destructive]:text-red-300 group-[.destructive]:hover:text-red-50 group-[.destructive]:focus:ring-red-400 group-[.destructive]:focus:ring-offset-red-600 dark:text-black/50 dark:hover:text-black",
-      className
-    )}
-    toast-close=""
-    {...props}
-  >
-    <X className="h-4 w-4" />
-  </ToastPrimitives.Close>
-))
+>(({ className, ...props }, ref) => {
+  const { theme, systemTheme } = useTheme();
+  // Determine if we're in dark mode
+  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
+  
+  return (
+    <ToastPrimitives.Close
+      ref={ref}
+      className={cn(
+        "absolute right-2 top-2 rounded-md p-1 opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100",
+        isDarkMode ? "text-white/50 hover:text-white focus:ring-white" : "text-black/50 hover:text-black focus:ring-black",
+        className
+      )}
+      toast-close=""
+      {...props}
+    >
+      <X className="h-4 w-4" />
+    </ToastPrimitives.Close>
+  );
+})
 ToastClose.displayName = ToastPrimitives.Close.displayName
 
 const ToastTitle = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Title>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Title>
->(({ className, ...props }, ref) => (
-  <ToastPrimitives.Title
-    ref={ref}
-    className={cn("text-sm font-semibold dark:text-white text-black group-[.destructive]:text-destructive-foreground", className)}
-    {...props}
-  />
-))
+>(({ className, ...props }, ref) => {
+  const { theme, systemTheme } = useTheme();
+  // Determine if we're in dark mode
+  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
+  
+  return (
+    <ToastPrimitives.Title
+      ref={ref}
+      className={cn(
+        "text-sm font-semibold", 
+        isDarkMode ? "text-white" : "text-black",
+        className
+      )}
+      {...props}
+    />
+  );
+})
 ToastTitle.displayName = ToastPrimitives.Title.displayName
 
 const ToastDescription = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Description>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Description>
->(({ className, ...props }, ref) => (
-  <ToastPrimitives.Description
-    ref={ref}
-    className={cn("text-sm opacity-90 dark:text-white/90 text-black/90 font-normal group-[.destructive]:text-destructive-foreground/90", className)}
-    {...props}
-  />
-))
+>(({ className, ...props }, ref) => {
+  const { theme, systemTheme } = useTheme();
+  // Determine if we're in dark mode
+  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
+  
+  return (
+    <ToastPrimitives.Description
+      ref={ref}
+      className={cn(
+        "text-sm opacity-90 font-normal", 
+        isDarkMode ? "text-white/90" : "text-black/90",
+        className
+      )}
+      {...props}
+    />
+  );
+})
 ToastDescription.displayName = ToastPrimitives.Description.displayName
 
 type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
