@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
@@ -37,7 +36,6 @@ export function PlaybackControls({
   const [isTouchActive, setIsTouchActive] = useState(false);
   const { isMobile } = useIsMobile();
   
-  // Update slider and current time based on playback progress
   useEffect(() => {
     if (!isTouchActive && playbackProgress !== undefined) {
       const timeInSeconds = (playbackProgress * audioDuration);
@@ -53,7 +51,6 @@ export function PlaybackControls({
     }
   }, [playbackProgress, audioDuration, isTouchActive]);
   
-  // Format time as MM:SS
   const formatTime = (seconds: number): string => {
     if (isNaN(seconds) || seconds < 0) return '00:00';
     const mins = Math.floor(seconds / 60);
@@ -61,7 +58,6 @@ export function PlaybackControls({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Handle slider change
   const handleSliderChange = (value: number[]) => {
     const newPosition = value[0] / 100;
     setSliderValue(value[0]);
@@ -78,12 +74,10 @@ export function PlaybackControls({
     }
   };
   
-  // Start of touch interaction
   const handleTouchStart = () => {
     setIsTouchActive(true);
   };
   
-  // End of touch interaction
   const handleTouchEnd = () => {
     if (onSeek && sliderValue !== undefined) {
       onSeek(sliderValue / 100);
@@ -94,7 +88,6 @@ export function PlaybackControls({
     }, 100);
   };
   
-  // Handle save entry with better toast cleaning
   const handleSaveEntry = async () => {
     console.log('[PlaybackControls] Save entry initiated');
     
@@ -110,7 +103,6 @@ export function PlaybackControls({
       setIsClearingToasts(false);
       console.log('[PlaybackControls] Calling onSaveEntry callback');
       
-      // Dispatch an event to immediately show processing state
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { 
           entries: ['temp-' + Date.now()], 

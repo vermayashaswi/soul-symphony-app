@@ -8,6 +8,7 @@ import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import JournalSearch from './JournalSearch';
 import { getProcessingEntries } from '@/utils/audio-processing';
+import { ProcessingEntryCard } from './entry-card/ProcessingEntryCard';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -363,12 +364,19 @@ export default function JournalEntriesList({
         <AnimatePresence>
           <div className="space-y-4 mt-6">
             {(showTemporaryProcessingEntries && stableVisibleProcessingEntries.length > 0) && (
-              <div className="mb-4">
-                <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Processing your new entry...</span>
-                </div>
-                <JournalEntryLoadingSkeleton count={stableVisibleProcessingEntries.length || 1} />
+              <div className="mb-2">
+                {stableVisibleProcessingEntries.map(tempId => (
+                  <motion.div
+                    key={`processing-${tempId}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="mb-4"
+                  >
+                    <ProcessingEntryCard tempId={tempId} />
+                  </motion.div>
+                ))}
               </div>
             )}
             
