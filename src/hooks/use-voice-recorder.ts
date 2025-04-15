@@ -73,7 +73,9 @@ export function useVoiceRecorder({
       
       // Update timer at regular intervals
       timerInterval.current = setInterval(() => {
-        setElapsedTime(Date.now() - startTime);
+        const current = Date.now();
+        const elapsed = current - startTime;
+        setElapsedTime(elapsed);
       }, 100);
       
       // Set maximum duration timeout
@@ -94,6 +96,8 @@ export function useVoiceRecorder({
           }
         }));
       }
+      
+      console.log('[useVoiceRecorder] Recording started successfully');
     } catch (err) {
       console.error("[useVoiceRecorder] Error starting recording:", err);
       setStatus("idle");
@@ -135,6 +139,7 @@ export function useVoiceRecorder({
       // Get the actual recording duration
       const finalElapsedTime = Date.now() - startTime;
       setElapsedTime(finalElapsedTime);
+      console.log(`[useVoiceRecorder] Final elapsed time: ${finalElapsedTime/1000}s`);
       
       // Stop the recorder and get the audio blob
       const { blob, duration } = await recorderRef.current.stop();
@@ -147,22 +152,48 @@ export function useVoiceRecorder({
       // Validate the blob
       const validation = validateAudioBlob(blob);
       if (!validation.isValid) {
+        console.error('[useVoiceRecorder] Blob validation failed:', validation.errorMessage);
         throw new Error(validation.errorMessage || "Recording validation failed");
       }
       
-      // Add duration property to blob
-      Object.defineProperty(blob, 'duration', {
-        value: actualDuration,
-        writable: false
-      });
+      // Ensure the blob has the duration property
+      let finalBlob = blob;
+      if (!('duration' in blob) || (blob as any).duration === 0) {
+        console.log('[useVoiceRecorder] Adding missing duration to blob:', actualDuration);
+        try {
+          // Create a new blob with the duration property
+          Object.defineProperty(finalBlob, 'duration', {
+            value: actualDuration,
+            writable: false,
+            enumerable: true,
+            configurable: false
+          });
+        } catch (error) {
+          console.warn('[useVoiceRecorder] Could not add duration property directly:', error);
+          // If we can't add directly, create a new blob
+          const newBlob = new Blob([blob], { type: blob.type });
+          try {
+            Object.defineProperty(newBlob, 'duration', {
+              value: actualDuration,
+              writable: false,
+              enumerable: true,
+              configurable: false
+            });
+            finalBlob = newBlob;
+          } catch (e) {
+            console.error('[useVoiceRecorder] Failed to add duration to new blob as well:', e);
+          }
+        }
+      }
       
-      setRecordingBlob(blob);
+      setRecordingBlob(finalBlob);
       setStatus("idle");
       
-      if (blob.size > 0) {
+      if (finalBlob.size > 0) {
         if (onRecordingComplete) {
           const tempId = generateTempId();
-          onRecordingComplete(blob, tempId);
+          console.log(`[useVoiceRecorder] Calling onRecordingComplete with blob size: ${finalBlob.size}, duration: ${actualDuration}`);
+          onRecordingComplete(finalBlob, tempId);
           
           if (opId) {
             window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
@@ -170,7 +201,7 @@ export function useVoiceRecorder({
                 id: opId,
                 status: 'success',
                 message: 'Recording completed',
-                details: `Audio size: ${formatBytes(blob.size)}, Duration: ${actualDuration}s, TempID: ${tempId}`
+                details: `Audio size: ${formatBytes(finalBlob.size)}, Duration: ${actualDuration}s, TempID: ${tempId}`
               }
             }));
           }

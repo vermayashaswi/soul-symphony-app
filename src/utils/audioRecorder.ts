@@ -37,11 +37,13 @@ export const recordAudio = async () => {
   // Start recording and capture start time
   mediaRecorder.start();
   startTime = Date.now();
+  console.log('[audioRecorder] Recording started');
   
   // Add data to chunks when available
   mediaRecorder.addEventListener('dataavailable', (event) => {
     if (event.data.size > 0) {
       audioChunks.push(event.data);
+      console.log(`[audioRecorder] Received chunk: ${event.data.size} bytes`);
     }
   });
   
@@ -49,15 +51,19 @@ export const recordAudio = async () => {
   const stop = () => {
     return new Promise<{ audioUrl: string, blob: Blob, duration: number }>((resolve, reject) => {
       try {
+        console.log('[audioRecorder] Stopping recording...');
+        
         // Calculate duration before stopping
         if (startTime) {
           recordingDuration = (Date.now() - startTime) / 1000; // in seconds
+          console.log(`[audioRecorder] Recording duration: ${recordingDuration}s`);
         }
         
         // Handle stop event
         mediaRecorder.addEventListener('stop', () => {
           try {
             if (audioChunks.length === 0) {
+              console.error('[audioRecorder] No audio data recorded');
               reject(new Error('No audio data recorded'));
               return;
             }
@@ -67,6 +73,7 @@ export const recordAudio = async () => {
             const audioBlob = new Blob(audioChunks, { type: mimeType });
             
             if (audioBlob.size < 100) {
+              console.error('[audioRecorder] Recording too short');
               reject(new Error('Recording too short'));
               return;
             }
@@ -76,15 +83,42 @@ export const recordAudio = async () => {
             // Stop all tracks to release the microphone
             stream.getTracks().forEach(track => track.stop());
             
-            // Set duration on the blob object using the recordingDuration we calculated
-            Object.defineProperty(audioBlob, 'duration', {
-              value: recordingDuration,
-              writable: false
+            // Create a new blob with duration property
+            let finalBlob = audioBlob;
+            
+            try {
+              // Set duration on the blob object using the recordingDuration we calculated
+              Object.defineProperty(finalBlob, 'duration', {
+                value: recordingDuration,
+                writable: false,
+                enumerable: true,
+                configurable: false
+              });
+              console.log(`[audioRecorder] Successfully added duration property: ${recordingDuration}s`);
+            } catch (err) {
+              console.warn('[audioRecorder] Could not add duration property directly, creating new blob');
+              // If we can't add property directly (e.g., due to browser restrictions), create a new blob
+              const newBlob = new Blob([audioBlob], { type: mimeType });
+              try {
+                Object.defineProperty(newBlob, 'duration', {
+                  value: recordingDuration,
+                  writable: false,
+                  enumerable: true,
+                  configurable: false
+                });
+                finalBlob = newBlob;
+              } catch (e) {
+                console.error('[audioRecorder] Failed to add duration to new blob as well:', e);
+              }
+            }
+            
+            console.log(`[audioRecorder] Stopped recording. Duration: ${recordingDuration}s, Size: ${finalBlob.size} bytes, Type: ${finalBlob.type}`);
+            
+            resolve({ 
+              audioUrl, 
+              blob: finalBlob, 
+              duration: recordingDuration 
             });
-            
-            console.log(`[audioRecorder] Stopped recording. Duration: ${recordingDuration}s, Size: ${audioBlob.size} bytes, Type: ${audioBlob.type}`);
-            
-            resolve({ audioUrl, blob: audioBlob, duration: recordingDuration });
           } catch (error) {
             console.error('[audioRecorder] Error in stop handler:', error);
             reject(error);
@@ -117,6 +151,7 @@ export const recordAudio = async () => {
       if (mediaRecorder.state === 'inactive') {
         mediaRecorder.start();
         startTime = Date.now();
+        console.log('[audioRecorder] Recording restarted');
       }
     },
     stop,
