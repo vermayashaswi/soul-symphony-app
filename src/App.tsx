@@ -163,10 +163,10 @@ const App = () => {
   
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <ThemeProvider>
-            <AuthProvider>
+      <BrowserRouter>
+        <ThemeProvider>
+          <AuthProvider>
+            <TooltipProvider>
               <div className="relative min-h-screen">
                 <div className="relative z-10">
                   <AnimatePresence mode="wait">
@@ -177,10 +177,10 @@ const App = () => {
               </div>
               <Sonner richColors closeButton position="top-center" />
               <Toaster />
-            </AuthProvider>
-          </ThemeProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+            </TooltipProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 };
