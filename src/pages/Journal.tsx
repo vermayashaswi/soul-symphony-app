@@ -11,13 +11,9 @@ import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
-import { debugLogger, logInfo, logError } from '@/components/debug/DebugPanel';
-import DebugLogPanel from '@/components/debug/DebugLogPanel';
-import { useDebugLog } from '@/utils/debug/DebugContext';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
-  const { addEvent } = useDebugLog();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
@@ -49,37 +45,20 @@ const Journal = () => {
   const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    addEvent('Journal', 'Journal page mounted', 'info');
-    
-    addEvent('DebugInfo', 'Journal page initialization', 'info', {
-      userPresent: !!user?.id,
-      isProfileChecked,
-      activeTab,
-      processingEntries: processingEntries.length,
-      entriesLoaded: entries.length,
-      timeStamp: new Date().toISOString()
-    });
-    
     const handleError = (event: ErrorEvent) => {
       console.error('[Journal] Caught render error:', event);
-      addEvent('Journal', `Render error: ${event.message}`, 'error', {
-        filename: event.filename,
-        lineno: event.lineno,
-        stack: event.error?.stack
-      });
       setHasRenderError(true);
     };
     
     window.addEventListener('error', handleError);
     
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
-      addEvent('ProcessingEntries', 'Processing entries changed event', 'info', event.detail);
+      // Handle processing entries changed event
     };
     
     window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
     
     return () => {
-      addEvent('Journal', 'Journal page unmounted', 'info');
       window.removeEventListener('error', handleError);
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
       if (autoRetryTimeoutRef.current) {
@@ -88,7 +67,7 @@ const Journal = () => {
       
       clearAllToasts();
     };
-  }, [addEvent]);
+  }, []);
 
   const { 
     entries, 
@@ -237,18 +216,15 @@ const Journal = () => {
       setLastAction('Checking Profile');
       
       console.log('[Journal] Checking user profile for ID:', userId);
-      logInfo(`Checking user profile for ID: ${userId}`, 'Journal');
       
       const profileCreated = await ensureProfileExists();
       profileCheckedOnceRef.current = true;
       
       console.log('[Journal] Profile check result:', profileCreated);
-      logInfo(`Profile check result: ${profileCreated}`, 'Journal');
       
       if (!profileCreated) {
         if (profileCreationAttempts < maxProfileAttempts) {
           setProfileCreationAttempts(prev => prev + 1);
-          logInfo(`Scheduling automatic profile creation retry ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
           
           const retryDelay = 1000 * Math.pow(1.5, profileCreationAttempts);
           
@@ -257,7 +233,6 @@ const Journal = () => {
           }
           
           autoRetryTimeoutRef.current = setTimeout(() => {
-            logInfo(`Executing automatic profile creation retry ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
             setLastAction(`Auto Retry Profile ${profileCreationAttempts + 1}`);
             
             if (profileCreationAttempts >= maxProfileAttempts - 1) {
@@ -278,7 +253,6 @@ const Journal = () => {
       setIsProfileChecked(true);
     } catch (error: any) {
       console.error('[Journal] Error checking/creating user profile:', error);
-      logError(`Error checking/creating user profile: ${error.message}`, 'Journal', error);
       
       const now = Date.now();
       if (now - lastProfileErrorTime > 60000) {
@@ -287,7 +261,6 @@ const Journal = () => {
       
       if (profileCreationAttempts < maxProfileAttempts) {
         setProfileCreationAttempts(prev => prev + 1);
-        logInfo(`Scheduling automatic profile creation retry after error ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
         
         const retryDelay = 1000 * Math.pow(1.5, profileCreationAttempts);
         
@@ -296,7 +269,6 @@ const Journal = () => {
         }
         
         autoRetryTimeoutRef.current = setTimeout(() => {
-          logInfo(`Executing automatic profile creation retry after error ${profileCreationAttempts + 1}/${maxProfileAttempts}`, 'Journal');
           setLastAction(`Auto Retry Profile After Error ${profileCreationAttempts + 1}`);
           
           if (profileCreationAttempts >= maxProfileAttempts - 1) {
@@ -369,11 +341,6 @@ const Journal = () => {
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
     if (!audioBlob || !user?.id) {
-      addEvent('ProcessingFlow', 'Cannot process recording: missing data', 'error', {
-        hasBlob: !!audioBlob,
-        hasUserId: !!user?.id,
-        blobSize: audioBlob?.size
-      });
       console.error('[Journal] Cannot process recording: missing audio blob or user ID');
       setProcessingError('Cannot process recording: missing required information');
       setIsRecordingComplete(false);
@@ -389,11 +356,6 @@ const Journal = () => {
           clearAllToasts();
           setTimeout(() => resolve(), 150);
         }, 50);
-      });
-      
-      addEvent('ProcessingFlow', 'Recording complete - starting processing', 'info', {
-        audioSize: audioBlob.size,
-        userId: user.id
       });
       
       setIsRecordingComplete(true);
@@ -632,7 +594,6 @@ const Journal = () => {
     <ErrorBoundary onReset={resetError}>
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
         <JournalHeader />
-        <DebugLogPanel />
         
         {isCheckingProfile ? (
           <div className="min-h-screen flex items-center justify-center">
@@ -733,7 +694,6 @@ const Journal = () => {
               </TabsContent>
               
               <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
-                
                 <ErrorBoundary>
                   <JournalEntriesList
                     entries={entries}

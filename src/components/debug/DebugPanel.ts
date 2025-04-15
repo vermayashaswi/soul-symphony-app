@@ -1,31 +1,19 @@
 
-// This file provides stub implementations for debugging functionality
-
+// Stub implementation with no-op functions
 export const debugLogger = {
-  log: (level: 'info' | 'error' | 'warn', ...args: any[]) => {
-    // Stub implementation - does nothing but prevents runtime errors
-    console.log(`[Stub Debug] ${level}:`, ...args);
-  },
-  
-  logInfo: (...args: any[]) => {
-    console.log('[Stub Debug Info]:', ...args);
-  },
-  
-  logError: (...args: any[]) => {
-    console.error('[Stub Debug Error]:', ...args);
-  },
-  
-  logWarning: (...args: any[]) => {},
-  
-  setLastProfileError: (_: any) => {}
+  log: () => {},
+  logInfo: () => {},
+  logError: () => {},
+  logWarning: () => {},
+  setLastProfileError: () => {}
 };
 
-export const logInfo = debugLogger.logInfo;
-export const logError = debugLogger.logError;
-export const logAuthError = (..._: any[]) => {};
-export const logProfile = (..._: any[]) => {};
-export const logAuth = (..._: any[]) => {};
+export const logInfo = () => {};
+export const logError = () => {};
+export const logAuthError = () => {};
+export const logProfile = () => {};
+export const logAuth = () => {};
 
-// Create a null component for backward compatibility
+// Empty component
 const DebugPanel = () => null;
 export default DebugPanel;
