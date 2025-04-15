@@ -120,7 +120,7 @@ export function resetProcessingState(): void {
   
   // Dispatch a reset event
   window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-    detail: { entries: [], reset: true, lastUpdate: Date.now() }
+    detail: { entries: [], reset: true, lastUpdate: Date.now(), forceUpdate: true }
   }));
 }
 

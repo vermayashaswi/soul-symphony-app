@@ -363,13 +363,17 @@ export default function JournalEntriesList({
         <AnimatePresence>
           <div className="space-y-4 mt-6">
             {(showTemporaryProcessingEntries && stableVisibleProcessingEntries.length > 0) && (
-              <div className="mb-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mb-4"
+              >
                 <div className="flex items-center gap-2 text-sm text-primary font-medium mb-3">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Processing your new entry...</span>
                 </div>
                 <JournalEntryLoadingSkeleton count={stableVisibleProcessingEntries.length || 1} />
-              </div>
+              </motion.div>
             )}
             
             {safeLocalEntries.length === 0 && !hasProcessingEntries && !loading && !processingEntriesLoaded ? (

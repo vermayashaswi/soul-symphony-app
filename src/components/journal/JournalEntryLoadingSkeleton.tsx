@@ -20,7 +20,7 @@ export default function JournalEntryLoadingSkeleton({ count = 1 }: JournalEntryL
           transition={{ duration: 0.3, delay: index * 0.1 }}
           className="overflow-hidden"
         >
-          <Card className="p-4 bg-card shadow-sm">
+          <Card className="p-4 bg-card border border-primary/10 shadow-sm">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <ShimmerSkeleton className="h-5 w-32 mb-2" />
