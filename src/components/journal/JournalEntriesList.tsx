@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import JournalSearch from './JournalSearch';
-import { getProcessingEntries, getEntryIdForProcessingId } from '@/utils/audio-processing';
+import { getProcessingEntries, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
 import { LoadingEntryContent } from './entry-card/LoadingEntryContent';
 
 interface JournalEntriesListProps {
@@ -365,6 +365,20 @@ export default function JournalEntriesList({
       console.log(`[JournalEntriesList] Handling deletion of entry ${entryId}`);
       
       pendingDeletions.current.add(entryId);
+      
+      setProcessingEntries(prev => prev.filter(tempId => {
+        const mappedId = getEntryIdForProcessingId(tempId);
+        return mappedId !== entryId;
+      }));
+      
+      setTransitionalLoadingEntries(prev => {
+        return prev.filter(tempId => {
+          const mappedEntry = processingToActualEntry.get(tempId);
+          return !mappedEntry || mappedEntry.id !== entryId;
+        });
+      });
+      
+      removeProcessingEntryById(entryId);
       
       setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
       

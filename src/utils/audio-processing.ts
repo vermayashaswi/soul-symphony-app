@@ -1,4 +1,3 @@
-
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -176,3 +175,63 @@ export {
   getProcessingEntries,
   removeProcessingEntryById 
 } from './audio/processing-state';
+
+// Update getEntryIdForProcessingId to be more resilient
+export const getEntryIdForProcessingId = (tempId: string): number | null => {
+  try {
+    const processingToEntryMap = localStorage.getItem('processingToEntryMap');
+    if (!processingToEntryMap) return null;
+    
+    const map = JSON.parse(processingToEntryMap);
+    return map[tempId] || null;
+  } catch (error) {
+    console.error('[Audio Processing] Error getting entry ID for processing ID:', error);
+    return null;
+  }
+};
+
+// Update the removeProcessingEntryById function to properly clean up all traces
+export const removeProcessingEntryById = (entryId: number | string): void => {
+  // First, remove from the processing state
+  removeProcessingFromState(entryId);
+  
+  // Then, clean up the map storage
+  try {
+    const processingToEntryMap = localStorage.getItem('processingToEntryMap');
+    if (processingToEntryMap) {
+      const map = JSON.parse(processingToEntryMap);
+      const idStr = String(entryId);
+      
+      // Find and remove any entry with this ID
+      let hasChanges = false;
+      Object.keys(map).forEach(tempId => {
+        if (String(map[tempId]) === idStr) {
+          delete map[tempId];
+          hasChanges = true;
+        }
+      });
+      
+      // Update storage if changes were made
+      if (hasChanges) {
+        localStorage.setItem('processingToEntryMap', JSON.stringify(map));
+        
+        // Dispatch an event to notify other components
+        window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+          detail: { 
+            entries: getProcessingEntries(),
+            lastUpdate: Date.now(),
+            removedId: idStr,
+            forceUpdate: true 
+          }
+        }));
+      }
+    }
+  } catch (error) {
+    console.error('[Audio Processing] Error removing entry from processing map:', error);
+  }
+  
+  // Also, ensure we update the UI by dispatching an additional event
+  window.dispatchEvent(new CustomEvent('entryDeleted', {
+    detail: { entryId }
+  }));
+};

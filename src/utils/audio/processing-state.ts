@@ -1,3 +1,4 @@
+
 /**
  * Audio processing state management
  * Handles processing locks and operational state
@@ -96,8 +97,25 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
     const storedEntries = localStorage.getItem('processingEntries');
     let entries: string[] = storedEntries ? JSON.parse(storedEntries) : [];
     
-    // Filter out any entry that contains this ID
-    const updatedEntries = entries.filter(tempId => !tempId.includes(idStr));
+    // Enhanced filtering to catch more variations of tempId
+    const updatedEntries = entries.filter(tempId => {
+      // Check if this tempId contains the entryId we want to remove
+      const hasId = tempId.includes(idStr);
+      
+      // Also check if this tempId is mapped to the entryId in processingToEntryMap
+      let isMapped = false;
+      try {
+        const mapStr = localStorage.getItem('processingToEntryMap');
+        if (mapStr) {
+          const map = JSON.parse(mapStr);
+          isMapped = String(map[tempId]) === idStr;
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+      
+      return !hasId && !isMapped;
+    });
     
     if (updatedEntries.length !== entries.length) {
       localStorage.setItem('processingEntries', JSON.stringify(updatedEntries));

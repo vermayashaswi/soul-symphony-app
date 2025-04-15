@@ -613,14 +613,21 @@ const Journal = () => {
       
       clearAllToasts();
       
+      // First, remove any processing entries related to this entry
       processingEntries.forEach(tempId => {
-        if (toastIds[tempId]) {
-          toast.dismiss(toastIds[tempId]);
+        const mappedId = getEntryIdForProcessingId(tempId);
+        if (mappedId === entryId) {
+          if (toastIds[tempId]) {
+            toast.dismiss(toastIds[tempId]);
+          }
+          // Clean up this processing entry
+          removeProcessingEntryById(entryId);
         }
       });
       
+      // Update our UI states
       const updatedProcessingEntries = processingEntries.filter(
-        tempId => !tempId.includes(String(entryId))
+        tempId => getEntryIdForProcessingId(tempId) !== entryId
       );
       setProcessingEntries(updatedProcessingEntries);
       
@@ -638,6 +645,17 @@ const Journal = () => {
         return updated;
       });
       
+      // Now delete the entry from the database
+      const { error } = await supabase
+        .from('Journal Entries')
+        .delete()
+        .eq('id', entryId);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Refresh the entries list
       setTimeout(() => {
         setRefreshKey(Date.now());
         fetchEntries();
