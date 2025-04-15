@@ -1,4 +1,3 @@
-
 /**
  * Audio processing state management
  * Handles processing locks and operational state
@@ -26,10 +25,12 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
     let entries: string[] = storedEntries ? JSON.parse(storedEntries) : [];
     
     if (action === 'add' && !entries.includes(tempId)) {
-      entries.push(tempId);
-      console.log(`[Audio.ProcessingState] Added entry ${tempId} to processing list. Now tracking ${entries.length} entries.`);
+      // Add timestamp to tempId to track staleness
+      const tempIdWithTimestamp = `${tempId}-${Date.now()}`;
+      entries.push(tempIdWithTimestamp);
+      console.log(`[Audio.ProcessingState] Added entry ${tempIdWithTimestamp} to processing list. Now tracking ${entries.length} entries.`);
     } else if (action === 'remove') {
-      entries = entries.filter(id => id !== tempId);
+      entries = entries.filter(id => !id.startsWith(tempId));
       console.log(`[Audio.ProcessingState] Removed entry ${tempId} from processing list. Now tracking ${entries.length} entries.`);
     }
     
@@ -52,7 +53,26 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
 export const getProcessingEntries = (): string[] => {
   try {
     const storedEntries = localStorage.getItem('processingEntries');
-    const entries = storedEntries ? JSON.parse(storedEntries) : [];
+    let entries = storedEntries ? JSON.parse(storedEntries) : [];
+    
+    // Filter out stale entries (older than 10 minutes)
+    if (entries.length > 0) {
+      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+      entries = entries.filter((entry: string) => {
+        // Check if entry has timestamp (entries added after this update)
+        const parts = entry.split('-');
+        if (parts.length > 1) {
+          const timestamp = parseInt(parts[parts.length - 1]);
+          return !isNaN(timestamp) && timestamp > tenMinutesAgo;
+        }
+        // For legacy entries without timestamps, keep them
+        return true;
+      });
+      
+      // Update storage with filtered entries
+      localStorage.setItem('processingEntries', JSON.stringify(entries));
+    }
+    
     console.log(`[Audio.ProcessingState] Retrieved ${entries.length} processing entries from storage.`);
     return entries;
   } catch (error) {

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import JournalSearch from './JournalSearch';
 import { getProcessingEntries, getEntryIdForProcessingId } from '@/utils/audio-processing';
+import { LoadingEntryContent } from './entry-card/LoadingEntryContent';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -81,32 +83,51 @@ export default function JournalEntriesList({
     };
   }, [animatedEntryIds]);
 
-  // Load persisted processing entries from localStorage
+  // Load persisted processing entries from localStorage - but only if they're actually being processed
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
       const persistedEntries = getProcessingEntries();
-      setPersistedProcessingEntries(persistedEntries);
       
-      // Initialize visible processing entries with persisted ones
-      setVisibleProcessingEntries(persistedEntries);
+      // Verify these entries are really being processed
+      if (persistedEntries.length > 0) {
+        // Filter out any entries that might be stale (older than 10 minutes)
+        const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+        const validEntries = persistedEntries.filter(id => {
+          const timestamp = parseInt(id.split('-').pop() || '0');
+          return !isNaN(timestamp) && timestamp > tenMinutesAgo;
+        });
+        
+        setPersistedProcessingEntries(validEntries);
+        setVisibleProcessingEntries(validEntries);
+      } else {
+        setPersistedProcessingEntries([]);
+        setVisibleProcessingEntries([]);
+      }
     };
     
     loadPersistedProcessingEntries();
     
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
       if (event.detail && Array.isArray(event.detail.entries)) {
-        setPersistedProcessingEntries(event.detail.entries);
-        
-        // Update visible processing entries as well
-        const newEntries = event.detail.entries;
-        setVisibleProcessingEntries(prev => {
-          // Only add entries that aren't already mapped to an entryId
-          const entriesWithoutMapping = newEntries.filter(tempId => 
-            !Array.from(processingToEntryMap.keys()).includes(tempId)
-          );
+        // Only update if we actually have entries to process
+        if (event.detail.entries.length > 0) {
+          setPersistedProcessingEntries(event.detail.entries);
           
-          return entriesWithoutMapping;
-        });
+          // Update visible processing entries as well
+          const newEntries = event.detail.entries;
+          setVisibleProcessingEntries(prev => {
+            // Only add entries that aren't already mapped to an entryId
+            const entriesWithoutMapping = newEntries.filter(tempId => 
+              !Array.from(processingToEntryMap.keys()).includes(tempId)
+            );
+            
+            return entriesWithoutMapping;
+          });
+        } else {
+          // If we have no entries, clear both states
+          setPersistedProcessingEntries([]);
+          setVisibleProcessingEntries([]);
+        }
       }
     };
     
@@ -307,6 +328,16 @@ export default function JournalEntriesList({
   const displayEntries = isSearchActive ? filteredEntries : localEntries;
   const safeLocalEntries = Array.isArray(displayEntries) ? displayEntries : [];
 
+  // Find any entries that are linked to currently processing entries
+  const processingLinkedEntries = safeLocalEntries.filter(entry => {
+    return Array.from(processingToEntryMap.entries()).some(([tempId, entryId]) => entryId === entry.id);
+  });
+
+  // Remove these entries from the main list as they'll be displayed separately
+  const filteredLocalEntries = safeLocalEntries.filter(entry => {
+    return !processingLinkedEntries.some(linkedEntry => linkedEntry.id === entry.id);
+  });
+
   return (
     <ErrorBoundary>
       <div>
@@ -376,7 +407,7 @@ export default function JournalEntriesList({
                 </Button>
               </motion.div>
             ) : (
-              safeLocalEntries.map((entry, index) => (
+              filteredLocalEntries.map((entry, index) => (
                 <ErrorBoundary key={`entry-boundary-${entry.id}`}>
                   <motion.div
                     key={`entry-${entry.id}`}
@@ -418,14 +449,5 @@ export default function JournalEntriesList({
         )}
       </div>
     </ErrorBoundary>
-  );
-}
-
-const LoadingEntryContent = () => {
-  return (
-    <div className="flex items-center gap-2">
-      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-      <span>Processing your entry...</span>
-    </div>
   );
 }
