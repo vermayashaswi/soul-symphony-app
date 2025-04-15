@@ -29,7 +29,16 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
   const [steps, setSteps] = useState<RecordingDebugStep[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [prevStatus, setPrevStatus] = useState<string | undefined>(undefined);
+  const [actualAudioDuration, setActualAudioDuration] = useState<number | undefined>(undefined);
   const { addEvent, isEnabled, toggleEnabled } = useDebugLog();
+  
+  // Update actual audio duration when audioDuration changes and is valid
+  useEffect(() => {
+    if (audioDuration && audioDuration > 0.1) {
+      console.log('[RecordingDebugger] Setting actual audio duration:', audioDuration);
+      setActualAudioDuration(audioDuration);
+    }
+  }, [audioDuration]);
   
   useEffect(() => {
     if (!currentStatus) return;
@@ -38,7 +47,10 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
     if (currentStatus === prevStatus) return;
     
     const now = Date.now();
-    console.log('[RecordingDebugger] Status changed:', prevStatus, '->', currentStatus);
+    console.log('[RecordingDebugger] Status changed:', prevStatus, '->', currentStatus, 
+                'audioDuration:', audioDuration, 
+                'actualAudioDuration:', actualAudioDuration,
+                'blob size:', audioBlob?.size);
     
     if (currentStatus === 'Recording') {
       setSteps([
@@ -64,12 +76,24 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
       
       const recordingStepIndex = updatedSteps.findIndex(s => s.step === 'Recording Started');
       if (recordingStepIndex >= 0) {
+        const recordingDuration = now - updatedSteps[recordingStepIndex].timestamp;
         updatedSteps[recordingStepIndex] = {
           ...updatedSteps[recordingStepIndex],
           status: 'completed',
-          duration: now - updatedSteps[recordingStepIndex].timestamp
+          duration: recordingDuration
         };
       }
+      
+      // Calculate the most reliable duration to use
+      const durationToUse = actualAudioDuration || audioDuration || 
+                           (recordingStepIndex >= 0 ? 
+                            (now - updatedSteps[recordingStepIndex].timestamp) / 1000 : 0);
+      
+      console.log('[RecordingDebugger] Using duration:', durationToUse, 
+                 'actual:', actualAudioDuration, 
+                 'prop:', audioDuration, 
+                 'calculated:', recordingStepIndex >= 0 ? 
+                               (now - updatedSteps[recordingStepIndex].timestamp) / 1000 : 0);
       
       updatedSteps.push(
         {
@@ -83,7 +107,7 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
           step: 'Playback Ready',
           status: 'completed',
           timestamp: now + 100,
-          details: `Audio duration: ${formatTime(audioDuration || 0)}`,
+          details: `Audio duration: ${formatTime(durationToUse)}`,
           duration: 200
         },
         {
@@ -96,7 +120,7 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
       
       setSteps(updatedSteps);
       addEvent('recording', 'Recording completed', 'success', { 
-        duration: audioDuration || 0,
+        duration: durationToUse,
         blobSize: audioBlob?.size || 0,
         blobType: audioBlob?.type || 'unknown'
       });
@@ -104,7 +128,7 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
     
     // Save the current status as previous for the next update
     setPrevStatus(currentStatus);
-  }, [currentStatus, audioDuration, audioBlob, addEvent, steps, prevStatus]);
+  }, [currentStatus, audioDuration, audioBlob, addEvent, steps, prevStatus, actualAudioDuration]);
   
   const handleDebugButtonClick = () => {
     if (!isEnabled) {
@@ -204,6 +228,12 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
                 <span>Elapsed:</span>
                 <span className="font-medium">{formatDuration(Date.now() - startTime)}</span>
               </div>
+              {actualAudioDuration && (
+                <div className="flex justify-between mt-1">
+                  <span>Audio Duration:</span>
+                  <span className="font-medium">{formatTime(actualAudioDuration)}</span>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

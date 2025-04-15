@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -59,12 +58,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     maxDuration: 300
   });
   
-  // When audioBlob changes, create a playable version with extra padding
   useEffect(() => {
     if (audioBlob) {
       try {
         console.log('[VoiceRecorder] Creating playable version of the blob');
-        // Add extra padding for more reliable playback
         const normalizedBlob = normalizeAudioBlob(audioBlob);
         const playable = createPlayableAudioBlob(normalizedBlob);
         setPlayableBlob(playable);
@@ -88,7 +85,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     seekTo,
     prepareAudio
   } = useAudioPlayback({ 
-    audioBlob: playableBlob,  // Use the playable version for better compatibility
+    audioBlob: playableBlob,
     onPlaybackStart: () => {
       console.log('[VoiceRecorder] Playback started');
       setHasPlayedOnce(true);
@@ -136,7 +133,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   useEffect(() => {
     if (playableBlob && !audioPrepared) {
       console.log('[VoiceRecorder] New playable blob detected, preparing audio...');
-      // Force a timeout before preparing audio to allow browser to process
       setTimeout(() => {
         prepareAudio(true).then(duration => {
           console.log('[VoiceRecorder] Audio prepared with duration:', duration);
@@ -163,14 +159,18 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       recordingTime
     });
     
-    // Update debug info state for the debugger component
+    const effectiveDuration = audioDuration && audioDuration > 0.1 
+      ? audioDuration 
+      : recordingTime / 1000;
+    
     const newDebugInfo = {
       status: isRecording 
         ? 'Recording' 
         : (audioBlob ? 'Recorded' : 'No Recording'),
-      duration: audioDuration || recordingTime
+      duration: effectiveDuration
     };
     
+    console.log('[VoiceRecorder] Setting debug info:', newDebugInfo);
     setDebugInfo(newDebugInfo);
     
     if (updateDebugInfo) {
@@ -243,7 +243,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         audioPrepared: audioPrepared
       });
       
-      // Add extra padding to ensure valid audio
       const normalizedBlob = normalizeAudioBlob(audioBlob);
       console.log('[VoiceRecorder] Normalized blob:', normalizedBlob.size, normalizedBlob.type);
       
@@ -252,7 +251,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           console.log('[VoiceRecorder] Calling recording completion callback');
           saveCompleteRef.current = false;
           
-          // Use a random tempId to track this recording
           const tempId = `temp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
           
           await onRecordingComplete(normalizedBlob, tempId);
@@ -419,7 +417,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         </div>
       </div>
       
-      {/* Add the Recording Debugger component */}
       <RecordingDebugger 
         currentStatus={debugInfo.status} 
         audioDuration={debugInfo.duration}
