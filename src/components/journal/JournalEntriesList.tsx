@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -37,14 +36,13 @@ export default function JournalEntriesList({
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [processingToEntryMap, setProcessingToEntryMap] = useState<Map<string, number>>(new Map());
   const [visibleProcessingEntries, setVisibleProcessingEntries] = useState<string[]>([]);
-  const hasProcessingEntries = visibleProcessingEntries.length > 0;
+  const hasProcessingEntries = visibleProcessingEntries.length > 0 && processingEntries.length > 0;
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
   const [renderError, setRenderError] = useState<Error | null>(null);
   const hasNoValidEntries = useRef(false);
   const processingStepTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Listen for mapping events between processing IDs and entry IDs
   useEffect(() => {
     const handleProcessingEntryMapped = (event: CustomEvent) => {
       if (event.detail && event.detail.tempId && event.detail.entryId) {
@@ -56,17 +54,14 @@ export default function JournalEntriesList({
           return newMap;
         });
         
-        // When we have a mapping, remove this entry from visible processing entries
         setVisibleProcessingEntries(prev => 
           prev.filter(id => id !== event.detail.tempId)
         );
         
-        // Check if this entry is in our current entries list and highlight it
         const newEntryId = event.detail.entryId;
         if (newEntryId && !animatedEntryIds.includes(newEntryId)) {
           setAnimatedEntryIds(prev => [...prev, newEntryId]);
           
-          // Remove highlight after 5 seconds
           setTimeout(() => {
             if (componentMounted.current) {
               setAnimatedEntryIds(prev => prev.filter(id => id !== newEntryId));
@@ -83,14 +78,11 @@ export default function JournalEntriesList({
     };
   }, [animatedEntryIds]);
 
-  // Load persisted processing entries from localStorage - but only if they're actually being processed
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
       const persistedEntries = getProcessingEntries();
       
-      // Verify these entries are really being processed
       if (persistedEntries.length > 0) {
-        // Filter out any entries that might be stale (older than 10 minutes)
         const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
         const validEntries = persistedEntries.filter(id => {
           const timestamp = parseInt(id.split('-').pop() || '0');
@@ -109,14 +101,11 @@ export default function JournalEntriesList({
     
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
       if (event.detail && Array.isArray(event.detail.entries)) {
-        // Only update if we actually have entries to process
         if (event.detail.entries.length > 0) {
           setPersistedProcessingEntries(event.detail.entries);
           
-          // Update visible processing entries as well
           const newEntries = event.detail.entries;
           setVisibleProcessingEntries(prev => {
-            // Only add entries that aren't already mapped to an entryId
             const entriesWithoutMapping = newEntries.filter(tempId => 
               !Array.from(processingToEntryMap.keys()).includes(tempId)
             );
@@ -124,7 +113,6 @@ export default function JournalEntriesList({
             return entriesWithoutMapping;
           });
         } else {
-          // If we have no entries, clear both states
           setPersistedProcessingEntries([]);
           setVisibleProcessingEntries([]);
         }
@@ -147,7 +135,6 @@ export default function JournalEntriesList({
     };
   }, [processingToEntryMap]);
 
-  // Process and filter entries
   useEffect(() => {
     try {
       if (Array.isArray(entries)) {
@@ -164,13 +151,11 @@ export default function JournalEntriesList({
         setLocalEntries(filteredEntries);
         setFilteredEntries(filteredEntries);
         
-        // Check if any new entries correspond to processing entries and update visibility
         const entryIds = filteredEntries.map(entry => entry.id);
         
         setVisibleProcessingEntries(prev => {
           return prev.filter(tempId => {
             const mappedEntryId = getEntryIdForProcessingId(tempId);
-            // Keep only processing entries that don't have a corresponding entry in the list
             return !mappedEntryId || !entryIds.includes(mappedEntryId);
           });
         });
@@ -191,17 +176,14 @@ export default function JournalEntriesList({
     };
   }, [entries]);
 
-  // Track new entries for animation
   useEffect(() => {
     if (!componentMounted.current) return;
     
     try {
       if (Array.isArray(entries) && entries.length > 0) {
         if (entries.length > prevEntriesLength) {
-          // Find newly added entries
           const newEntryIds: number[] = [];
           
-          // Check processing entries first - these have priority for animation
           if (persistedProcessingEntries.length > 0) {
             persistedProcessingEntries.forEach(tempId => {
               const mappedEntryId = getEntryIdForProcessingId(tempId);
@@ -209,7 +191,6 @@ export default function JournalEntriesList({
                 console.log(`[JournalEntriesList] Found mapped entry ID for processing ${tempId}: ${mappedEntryId}`);
                 newEntryIds.push(mappedEntryId);
                 
-                // Once we've found the entry, remove it from visible processing entries
                 setVisibleProcessingEntries(prev => 
                   prev.filter(id => id !== tempId)
                 );
@@ -217,7 +198,6 @@ export default function JournalEntriesList({
             });
           }
           
-          // If no mapped entries were found, use the traditional approach
           if (newEntryIds.length === 0) {
             for (let i = 0; i < Math.min(entries.length - prevEntriesLength, entries.length); i++) {
               const entry = entries[i];
@@ -328,12 +308,10 @@ export default function JournalEntriesList({
   const displayEntries = isSearchActive ? filteredEntries : localEntries;
   const safeLocalEntries = Array.isArray(displayEntries) ? displayEntries : [];
 
-  // Find any entries that are linked to currently processing entries
   const processingLinkedEntries = safeLocalEntries.filter(entry => {
     return Array.from(processingToEntryMap.entries()).some(([tempId, entryId]) => entryId === entry.id);
   });
 
-  // Remove these entries from the main list as they'll be displayed separately
   const filteredLocalEntries = safeLocalEntries.filter(entry => {
     return !processingLinkedEntries.some(linkedEntry => linkedEntry.id === entry.id);
   });

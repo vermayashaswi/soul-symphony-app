@@ -288,6 +288,18 @@ const Journal = () => {
     }
   }, [processingEntries.length, fetchEntries, isSavingRecording]);
 
+  useEffect(() => {
+    if (activeTab === 'entries') {
+      const currentlyProcessing = processingEntries.filter(tempId => {
+        return !getEntryIdForProcessingId(tempId);
+      });
+      
+      if (currentlyProcessing.length !== processingEntries.length) {
+        setProcessingEntries(currentlyProcessing);
+      }
+    }
+  }, [activeTab, processingEntries]);
+
   const checkUserProfile = async (userId: string) => {
     try {
       setIsCheckingProfile(true);
