@@ -14,6 +14,7 @@ interface RecordingButtonProps {
   audioLevel?: number;
   showAnimation?: boolean;
   audioBlob?: Blob | null; // Add this to track if we have a recording
+  ripples?: number[]; // Add support for ripples prop
 }
 
 export function RecordingButton({
@@ -25,7 +26,8 @@ export function RecordingButton({
   onPermissionRequest,
   audioLevel = 0,
   showAnimation = true,
-  audioBlob = null
+  audioBlob = null,
+  ripples = []
 }: RecordingButtonProps) {
   if (hasPermission === false) {
     return (

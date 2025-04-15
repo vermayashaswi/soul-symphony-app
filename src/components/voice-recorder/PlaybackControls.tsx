@@ -9,33 +9,44 @@ import { clearAllToasts } from '@/services/notificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PlaybackControlsProps {
-  audioBlob: Blob | null;
   isPlaying: boolean;
-  isProcessing: boolean;
   playbackProgress: number;
   audioDuration: number;
-  onTogglePlayback: () => void;
+  togglePlayback?: () => void; // Make this optional
+  onTogglePlayback: () => void; // Add this to match expected prop
   onSaveEntry: () => void;
   onRestart: () => void;
   onSeek?: (position: number) => void;
+  audioBlob?: Blob | null; // Add this to match expected prop
+  isProcessing?: boolean; // Add this to match expected prop
 }
 
 export function PlaybackControls({
-  audioBlob,
   isPlaying,
-  isProcessing,
   playbackProgress,
   audioDuration,
-  onTogglePlayback,
+  togglePlayback, // Keep for backward compatibility
+  onTogglePlayback, // New prop expected by VoiceRecorder component
   onSaveEntry,
   onRestart,
-  onSeek
+  onSeek,
+  audioBlob = null,
+  isProcessing = false
 }: PlaybackControlsProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [isClearingToasts, setIsClearingToasts] = useState(false);
   const [sliderValue, setSliderValue] = useState(0);
   const [isTouchActive, setIsTouchActive] = useState(false);
   const { isMobile } = useIsMobile();
+  
+  // Use togglePlayback or onTogglePlayback based on what's provided
+  const handleTogglePlayback = () => {
+    if (togglePlayback) {
+      togglePlayback();
+    } else {
+      onTogglePlayback();
+    }
+  };
   
   // Store the initial duration to prevent flickering
   const stableDuration = useRef<number>(audioDuration > 0 ? audioDuration : 1);
@@ -175,7 +186,7 @@ export function PlaybackControls({
       )}>
         {/* Play/Pause Button */}
         <Button 
-          onClick={onTogglePlayback}
+          onClick={handleTogglePlayback}
           variant="ghost" 
           size="icon"
           className={cn(

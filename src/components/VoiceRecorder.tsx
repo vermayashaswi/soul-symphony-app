@@ -439,6 +439,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               }}
               audioLevel={audioLevel}
               showAnimation={false}
+              audioBlob={audioBlob}
               ripples={ripples}
             />
           </div>
@@ -464,43 +465,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                   isPlaying={isPlaying}
                   playbackProgress={playbackProgress}
                   audioDuration={audioDuration || recordingTime / 1000}
-                  togglePlayback={togglePlayback}
+                  onTogglePlayback={togglePlayback}
                   seekTo={seekTo}
+                  onSaveEntry={handleSaveEntry}
+                  onRestart={handleRestart}
+                  audioBlob={audioBlob}
+                  isProcessing={isProcessing}
                 />
-                
-                <div className="flex justify-between mt-16 space-x-4 px-4">
-                  <button
-                    onClick={handleRestart}
-                    disabled={isProcessing}
-                    className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-1"
-                  >
-                    {isProcessing ? (
-                      <span className="flex items-center justify-center">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Processing...
-                      </span>
-                    ) : (
-                      "Discard & Restart"
-                    )}
-                  </button>
-                  
-                  <button
-                    onClick={handleSaveEntry}
-                    disabled={isProcessing || hasSaved}
-                    className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium transition-colors flex-1 disabled:opacity-50 disabled:pointer-events-none"
-                  >
-                    {isProcessing ? (
-                      <span className="flex items-center justify-center">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Processing...
-                      </span>
-                    ) : hasSaved ? (
-                      "Saved!"
-                    ) : (
-                      "Save Recording"
-                    )}
-                  </button>
-                </div>
                 
                 {recordingError && (
                   <div className="mt-4 px-4">
