@@ -11,6 +11,7 @@ import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
+import { logInfo } from '@/components/debug/DebugPanel';
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();

@@ -11,11 +11,11 @@ export const ChatDebugProvider = ({ children }: { children: React.ReactNode }) =
 export const useChatDebug = () => {
   return {
     logs: [],
-    addLog: () => {},
-    addEvent: () => {},
-    clearLogs: () => {},
+    addLog: (...args: any[]) => {},
+    addEvent: (...args: any[]) => {},
+    clearLogs: (...args: any[]) => {},
     isEnabled: false,
-    toggleEnabled: () => {}
+    toggleEnabled: (...args: any[]) => {}
   };
 };
 

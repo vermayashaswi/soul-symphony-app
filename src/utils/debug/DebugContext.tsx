@@ -1,21 +1,43 @@
 
-import React, { createContext, useContext, ReactNode } from 'react';
-import { DebugLogContextType } from './debugLogTypes';
+import React, { createContext, useContext, useState } from 'react';
+
+// Define the context type
+interface DebugContextType {
+  logs: any[];
+  addLog: (...args: any[]) => void;
+  addEvent: (...args: any[]) => void;
+  clearLogs: () => void;
+  isEnabled: boolean;
+  toggleEnabled: () => void;
+}
 
 // Create a stub context with no-op functions
-const DebugLogContext = createContext<DebugLogContextType>({
+const DebugContext = createContext<DebugContextType>({
   logs: [],
-  addEvent: () => {},
-  addLog: () => {},
+  addLog: (...args: any[]) => {},
+  addEvent: (...args: any[]) => {},
   clearLogs: () => {},
   isEnabled: false,
-  toggleEnabled: () => {}
+  toggleEnabled: () => {},
 });
 
-// Stub provider that doesn't actually do anything
-export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  return <>{children}</>;
+// Stub provider component
+export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <DebugContext.Provider
+      value={{
+        logs: [],
+        addLog: (...args: any[]) => {},
+        addEvent: (...args: any[]) => {},
+        clearLogs: () => {},
+        isEnabled: false,
+        toggleEnabled: () => {},
+      }}
+    >
+      {children}
+    </DebugContext.Provider>
+  );
 };
 
-// Hook that returns the stub implementation
-export const useDebugLog = () => useContext(DebugLogContext);
+// Stub hook
+export const useDebugLog = () => useContext(DebugContext);
