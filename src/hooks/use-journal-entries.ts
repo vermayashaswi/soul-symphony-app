@@ -19,9 +19,11 @@ const globalEntriesCache: {
   lastFetchTime: Date | null;
   userId?: string;
   lastRefreshKey?: number;
+  entryIds: Set<number>;
 } = {
   entries: [],
-  lastFetchTime: null
+  lastFetchTime: null,
+  entryIds: new Set()
 };
 
 export function useJournalEntries(
@@ -56,16 +58,30 @@ export function useJournalEntries(
   const cacheInitializedRef = useRef(false);
   const cacheValidityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastProcessingEntriesRef = useRef<string[]>([]);
+  const previousFetchParamsRef = useRef<{ userId?: string, refreshKey: number }>({ refreshKey });
+  const entryIdsSet = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     entriesRef.current = entries;
     
     // Update global cache when entries change with improved cache management
     if (entries.length > 0 && userId) {
-      globalEntriesCache.entries = entries;
+      // Track unique entry IDs to prevent duplicates in the cache
+      const uniqueEntries: JournalEntry[] = [];
+      const seenIds = new Set<number>();
+      
+      for (const entry of entries) {
+        if (!seenIds.has(entry.id)) {
+          seenIds.add(entry.id);
+          uniqueEntries.push(entry);
+        }
+      }
+      
+      globalEntriesCache.entries = uniqueEntries;
       globalEntriesCache.userId = userId;
       globalEntriesCache.lastRefreshKey = refreshKey;
       globalEntriesCache.lastFetchTime = new Date();
+      globalEntriesCache.entryIds = seenIds;
       
       // Set cache validity timer - invalidate after 2 minutes to ensure fresh data eventually
       if (cacheValidityTimerRef.current) {
@@ -136,17 +152,23 @@ export function useJournalEntries(
                 'cached entries:', globalEntriesCache.entries.length,
                 'refreshKey:', refreshKey);
     
-    // Don't prevent fetching if refreshKey has changed - this ensures we get fresh data after processing
-    const shouldSkipFetch = isFetchingRef.current && 
-                           globalEntriesCache.userId === userId && 
-                           globalEntriesCache.entries.length > 0 &&
-                           globalEntriesCache.lastRefreshKey === refreshKey &&
-                           Date.now() - (globalEntriesCache.lastFetchTime?.getTime() || 0) < 500;
+    // Check if this is a duplicate fetch with the same parameters
+    const isDuplicateFetch = 
+      isFetchingRef.current && 
+      previousFetchParamsRef.current.userId === userId && 
+      previousFetchParamsRef.current.refreshKey === refreshKey &&
+      globalEntriesCache.userId === userId && 
+      globalEntriesCache.entries.length > 0 &&
+      globalEntriesCache.lastRefreshKey === refreshKey &&
+      Date.now() - (globalEntriesCache.lastFetchTime?.getTime() || 0) < 500;
     
-    if (shouldSkipFetch) {
-      console.log('[useJournalEntries] Skipping fetch as we just fetched recently with same refresh key');
+    if (isDuplicateFetch) {
+      console.log('[useJournalEntries] Skipping duplicate fetch with same parameters');
       return;
     }
+    
+    // Update previous fetch params
+    previousFetchParamsRef.current = { userId, refreshKey };
     
     // CRITICAL IMPROVEMENT: Immediately show cached data while fetching fresh data
     if (globalEntriesCache.userId === userId && globalEntriesCache.entries.length > 0) {
@@ -210,21 +232,34 @@ export function useJournalEntries(
         consecutiveEmptyFetchesRef.current = 0;
       }
       
+      // Deduplicate entries
+      const uniqueEntries: JournalEntry[] = [];
+      const uniqueIds = new Set<number>();
+      
+      for (const entry of journalEntries) {
+        if (!uniqueIds.has(entry.id)) {
+          uniqueIds.add(entry.id);
+          uniqueEntries.push(entry);
+        }
+      }
+      
       // Save successful fetch for recovery
-      lastSuccessfulFetchRef.current = journalEntries;
+      lastSuccessfulFetchRef.current = uniqueEntries;
       
       // Update global cache with fresh entries - with improved settings
-      globalEntriesCache.entries = journalEntries;
+      globalEntriesCache.entries = uniqueEntries;
       globalEntriesCache.userId = userId;
       globalEntriesCache.lastFetchTime = new Date();
       globalEntriesCache.lastRefreshKey = refreshKey;
+      globalEntriesCache.entryIds = uniqueIds;
       
       // IMPROVED FIX: Don't replace entries with empty array if we already have entries
       // and this fetch returned empty (could be a temporary connectivity issue)
-      if (journalEntries.length > 0 || entriesRef.current.length === 0) {
-        console.log('[useJournalEntries] Setting entries:', journalEntries.length);
-        setEntries(journalEntries);
-      } else if (journalEntries.length === 0 && entriesRef.current.length > 0) {
+      if (uniqueEntries.length > 0 || entriesRef.current.length === 0) {
+        console.log('[useJournalEntries] Setting entries:', uniqueEntries.length);
+        setEntries(uniqueEntries);
+        entryIdsSet.current = uniqueIds;
+      } else if (uniqueEntries.length === 0 && entriesRef.current.length > 0) {
         // If we got an empty response but have existing entries, check if it's likely a race condition
         const timeSinceLastFetch = globalEntriesCache.lastFetchTime ? 
                                   Date.now() - globalEntriesCache.lastFetchTime.getTime() : 0;
