@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Bug, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Bug, ChevronDown, ChevronUp, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDebugLog } from '@/utils/debug/DebugContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,6 +30,13 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [prevStatus, setPrevStatus] = useState<string | undefined>(undefined);
   const [actualAudioDuration, setActualAudioDuration] = useState<number | undefined>(undefined);
+  const [blobDetails, setBlobDetails] = useState<{
+    size: number;
+    type: string;
+    blobDuration: number | null;
+    isValid: boolean;
+    isEmpty: boolean;
+  } | null>(null);
   const { addEvent, isEnabled, toggleEnabled } = useDebugLog();
   
   // Update actual audio duration when audioDuration changes and is valid
@@ -39,6 +46,23 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
       setActualAudioDuration(audioDuration);
     }
   }, [audioDuration]);
+  
+  // Update blob details when audioBlob changes
+  useEffect(() => {
+    if (audioBlob) {
+      const details = {
+        size: audioBlob.size,
+        type: audioBlob.type || 'unknown',
+        blobDuration: (audioBlob as any).duration || null,
+        isValid: audioBlob.size > 100,
+        isEmpty: audioBlob.size <= 100
+      };
+      setBlobDetails(details);
+      console.log('[RecordingDebugger] Blob details:', details);
+    } else {
+      setBlobDetails(null);
+    }
+  }, [audioBlob]);
   
   useEffect(() => {
     if (!currentStatus) return;
@@ -50,7 +74,7 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
     console.log('[RecordingDebugger] Status changed:', prevStatus, '->', currentStatus, 
                 'audioDuration:', audioDuration, 
                 'actualAudioDuration:', actualAudioDuration,
-                'blob size:', audioBlob?.size);
+                'blob:', blobDetails);
     
     if (currentStatus === 'Recording') {
       setSteps([
@@ -95,40 +119,59 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
                  'calculated:', recordingStepIndex >= 0 ? 
                                (now - updatedSteps[recordingStepIndex].timestamp) / 1000 : 0);
       
+      const hasValidBlob = audioBlob && audioBlob.size > 100;
+      
       updatedSteps.push(
         {
           step: 'Audio Processing',
-          status: 'completed',
+          status: hasValidBlob ? 'completed' : 'error',
           timestamp: now,
-          details: `Created audio blob: ${audioBlob ? formatBytes(audioBlob.size) : 'N/A'}, type: ${audioBlob?.type || 'N/A'}`,
+          details: audioBlob 
+            ? `Created audio blob: ${formatBytes(audioBlob.size)}, type: ${audioBlob.type || 'N/A'}, valid: ${hasValidBlob}`
+            : 'No audio blob created',
           duration: 100
-        },
-        {
-          step: 'Playback Ready',
-          status: 'completed',
-          timestamp: now + 100,
-          details: `Audio duration: ${formatTime(durationToUse)}`,
-          duration: 200
-        },
-        {
-          step: 'Waiting for Save',
-          status: 'in-progress',
-          timestamp: now + 300,
-          details: 'Ready to process and save recording'
         }
       );
+      
+      if (hasValidBlob) {
+        updatedSteps.push(
+          {
+            step: 'Playback Ready',
+            status: durationToUse > 0.1 ? 'completed' : 'error',
+            timestamp: now + 100,
+            details: `Audio duration: ${formatTime(durationToUse)}${durationToUse < 0.1 ? ' (ERROR: Too short)' : ''}`,
+            duration: 200
+          },
+          {
+            step: 'Ready for Save',
+            status: 'in-progress',
+            timestamp: now + 300,
+            details: 'Audio can be saved when duration > 0.1s and blob size > 100 bytes'
+          }
+        );
+      } else {
+        updatedSteps.push(
+          {
+            step: 'Error',
+            status: 'error',
+            timestamp: now + 100,
+            details: `Invalid audio recording: ${audioBlob ? 'Size too small' : 'No audio data'}`
+          }
+        );
+      }
       
       setSteps(updatedSteps);
       addEvent('recording', 'Recording completed', 'success', { 
         duration: durationToUse,
         blobSize: audioBlob?.size || 0,
-        blobType: audioBlob?.type || 'unknown'
+        blobType: audioBlob?.type || 'unknown',
+        isValid: hasValidBlob
       });
     }
     
     // Save the current status as previous for the next update
     setPrevStatus(currentStatus);
-  }, [currentStatus, audioDuration, audioBlob, addEvent, steps, prevStatus, actualAudioDuration]);
+  }, [currentStatus, audioDuration, audioBlob, addEvent, steps, prevStatus, actualAudioDuration, blobDetails]);
   
   const handleDebugButtonClick = () => {
     if (!isEnabled) {
@@ -217,6 +260,36 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
               )}
             </div>
             
+            {blobDetails && (
+              <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-md">
+                <h4 className="text-xs font-medium mb-1">Audio Blob Details:</h4>
+                <ul className="text-xs space-y-1 text-gray-500">
+                  <li className="flex justify-between">
+                    <span>Size:</span> 
+                    <span className={blobDetails.size < 100 ? 'text-red-500 font-medium' : ''}>{formatBytes(blobDetails.size)}</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span>Type:</span> 
+                    <span>{blobDetails.type}</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span>Blob Duration:</span> 
+                    <span>{blobDetails.blobDuration !== null ? `${blobDetails.blobDuration.toFixed(2)}s` : 'Not set'}</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span>Valid for Processing:</span> 
+                    <span className={!blobDetails.isValid ? 'text-red-500 font-medium' : 'text-green-500'}>{blobDetails.isValid ? 'Yes' : 'No'}</span>
+                  </li>
+                </ul>
+                {!blobDetails.isValid && (
+                  <div className="mt-1 text-xs flex items-center gap-1 text-red-500">
+                    <AlertCircle className="h-3 w-3" />
+                    <span>{blobDetails.isEmpty ? 'Audio blob too small or empty' : 'Audio blob invalid'}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            
             <div className="mt-3 text-xs text-gray-500 border-t pt-2">
               {currentStatus && (
                 <div className="flex justify-between">
@@ -231,9 +304,22 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
               {actualAudioDuration && (
                 <div className="flex justify-between mt-1">
                   <span>Audio Duration:</span>
-                  <span className="font-medium">{formatTime(actualAudioDuration)}</span>
+                  <span className={`font-medium ${actualAudioDuration < 0.1 ? 'text-red-500' : ''}`}>
+                    {formatTime(actualAudioDuration)}
+                    {actualAudioDuration < 0.1 && ' (Too short)'}
+                  </span>
                 </div>
               )}
+              <div className="flex justify-between mt-1">
+                <span>Save Requirements:</span>
+                <span className="font-medium">
+                  {audioBlob && actualAudioDuration 
+                    ? (audioBlob.size > 100 && actualAudioDuration > 0.1 
+                        ? '✅ All met' 
+                        : '❌ Not met') 
+                    : 'N/A'}
+                </span>
+              </div>
             </div>
           </motion.div>
         )}

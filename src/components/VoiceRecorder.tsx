@@ -63,15 +63,28 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       try {
         console.log('[VoiceRecorder] Creating playable version of the blob');
         const normalizedBlob = normalizeAudioBlob(audioBlob);
+        
+        if (recordingTime && recordingTime > 0) {
+          const durationInSeconds = recordingTime / 1000;
+          Object.defineProperty(normalizedBlob, 'duration', {
+            value: durationInSeconds,
+            writable: false
+          });
+          console.log('[VoiceRecorder] Added duration to blob:', durationInSeconds, 'seconds');
+        }
+        
         const playable = createPlayableAudioBlob(normalizedBlob);
         
         if (recordingTime && recordingTime > 0) {
-          (playable as any).duration = recordingTime / 1000;
-          console.log('[VoiceRecorder] Added duration to blob:', (playable as any).duration, 'seconds');
+          const durationInSeconds = recordingTime / 1000;
+          Object.defineProperty(playable, 'duration', {
+            value: durationInSeconds,
+            writable: false
+          });
         }
         
         setPlayableBlob(playable);
-        console.log('[VoiceRecorder] Created playable blob:', playable.size, playable.type);
+        console.log('[VoiceRecorder] Created playable blob:', playable.size, playable.type, 'duration:', (playable as any).duration);
       } catch (err) {
         console.error('[VoiceRecorder] Error creating playable blob:', err);
         setPlayableBlob(audioBlob);
@@ -208,6 +221,18 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       return;
     }
     
+    if (audioBlob.size < 100) {
+      setRecordingError("Audio recording is too short or empty");
+      return;
+    }
+    
+    const hasDuration = (audioBlob as any).duration > 0.1 || recordingTime > 100;
+    if (!hasDuration) {
+      console.error('[VoiceRecorder] Recording has invalid duration:', (audioBlob as any).duration, 'recordingTime:', recordingTime);
+      setRecordingError("Recording duration is too short");
+      return;
+    }
+    
     if (hasSaved || savingInProgressRef.current) {
       console.log('[VoiceRecorder] Already saved this recording or save in progress, ignoring duplicate save request');
       return;
@@ -253,6 +278,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.log('[VoiceRecorder] Processing audio:', {
         originalType: audioBlob.type,
         originalSize: audioBlob.size,
+        originalDuration: (audioBlob as any).duration,
         audioDuration: audioDuration,
         recordingTime: recordingTime,
         effectiveDuration: effectiveDuration,
@@ -263,7 +289,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       const normalizedBlob = normalizeAudioBlob(audioBlob);
       console.log('[VoiceRecorder] Normalized blob:', normalizedBlob.size, normalizedBlob.type);
       
-      (normalizedBlob as any).duration = effectiveDuration;
+      Object.defineProperty(normalizedBlob, 'duration', {
+        value: effectiveDuration,
+        writable: false
+      });
+      
+      console.log('[VoiceRecorder] Final blob for processing:', {
+        size: normalizedBlob.size,
+        type: normalizedBlob.type,
+        duration: (normalizedBlob as any).duration
+      });
       
       if (onRecordingComplete) {
         try {

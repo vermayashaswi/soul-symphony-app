@@ -1,3 +1,4 @@
+
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -24,22 +25,25 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   tempId?: string;
   error?: string;
 }> {
-  console.log('[AudioProcessing] Starting processing with blob:', audioBlob?.size, audioBlob?.type);
-  console.log('[AudioProcessing] Blob duration:', (audioBlob as any)?.duration || 'unknown');
+  console.log('[AudioProcessing] Starting processing with blob:', 
+             audioBlob ? `${audioBlob.size} bytes, ${audioBlob.type}` : 'null');
+  console.log('[AudioProcessing] Blob duration property:', (audioBlob as any)?.duration || 'unknown');
+  
+  // Validate the audio blob fundamentally
+  if (!audioBlob) {
+    console.error('[AudioProcessing] No audio blob provided');
+    return { success: false, error: 'No audio recording provided' };
+  }
+  
+  if (audioBlob.size < 100) {
+    console.error('[AudioProcessing] Audio blob too small:', audioBlob.size, 'bytes');
+    return { success: false, error: 'Recording too short or empty' };
+  }
   
   // Clear all toasts to ensure UI is clean before processing
-  clearAllToasts();
+  await clearAllToasts();
   
   try {
-    // For small recordings, add padding to make them viable
-    if (audioBlob && audioBlob.size < 200) {
-      console.log('[AudioProcessing] Audio blob too small, adding padding');
-      // Create a slightly larger blob by adding silence
-      const silence = new Uint8Array(2048).fill(0);
-      audioBlob = new Blob([audioBlob, silence], { type: audioBlob.type || 'audio/webm;codecs=opus' });
-      console.log('[AudioProcessing] New blob size after padding:', audioBlob.size);
-    }
-    
     // Log the start of the process for debugging
     if (typeof window !== 'undefined') {
       try {
@@ -50,8 +54,9 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
             'Started audio processing', 
             'info', 
             { 
-              blobSize: audioBlob?.size || 0, 
-              blobType: audioBlob?.type || 'unknown',
+              blobSize: audioBlob.size || 0, 
+              blobType: audioBlob.type || 'unknown',
+              blobDuration: (audioBlob as any)?.duration,
               timestamp: Date.now(),
               userId: userId || 'anonymous' 
             }
@@ -97,13 +102,21 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       console.log('[AudioProcessing] Updated processing entries in localStorage:', updatedEntries);
       
       // Extract duration from blob if available, or estimate it
-      const estimatedDuration = (audioBlob as any)?.duration || 
-                               (audioBlob && audioBlob.size > 0 ? audioBlob.size / 16000 : 0);
+      const blobDuration = typeof (audioBlob as any)?.duration === 'number' ? (audioBlob as any).duration : null;
+      const estimatedDuration = blobDuration !== null ? blobDuration : 
+                               (audioBlob.size > 0 ? audioBlob.size / 16000 : 0);
+      
+      // Ensure we have a valid duration
+      if (estimatedDuration < 0.1) {
+        console.error('[AudioProcessing] Duration too short:', estimatedDuration, 'seconds');
+        throw new Error('Recording duration too short');
+      }
       
       // Log the audio details with duration
       console.log('[AudioProcessing] Processing audio:', {
-        size: audioBlob?.size || 0,
-        type: audioBlob?.type || 'unknown',
+        size: audioBlob.size,
+        type: audioBlob.type,
+        blobDuration: blobDuration,
         estimatedDuration: estimatedDuration,
         userId: userId || 'anonymous'
       });
@@ -116,7 +129,9 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
           'info', 
           { 
             tempId,
-            blobSize: audioBlob?.size || 0,
+            blobSize: audioBlob.size,
+            blobDuration: blobDuration,
+            estimatedDuration: estimatedDuration,
             timestamp: Date.now()
           }
         );
@@ -124,7 +139,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       
       // Launch the processing without awaiting it
       console.log('[AudioProcessing] Launching background processing');
-      const startTime = Date.now(); // Store the start time here
+      const startTime = Date.now();
       
       processRecordingInBackground(audioBlob, userId, tempId, estimatedDuration)
         .then(result => {
@@ -140,7 +155,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
                 tempId,
                 result,
                 timestamp: Date.now(),
-                duration: Date.now() - startTime // Use the locally stored startTime instead
+                duration: Date.now() - startTime
               }
             );
           }

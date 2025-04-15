@@ -86,8 +86,8 @@ serve(async (req) => {
     }
     
     // Additional validation for audio data
-    if (typeof audio !== 'string' || audio.length < 50) {
-      console.error('Audio data appears too short or invalid');
+    if (typeof audio !== 'string' || audio.length < 100) {
+      console.error('Audio data appears too short or invalid:', audio.length);
       throw new Error('Audio data appears too short or invalid');
     }
 
@@ -98,11 +98,16 @@ serve(async (req) => {
 
     // Log request details
     console.log("Received audio data, processing...");
-    console.log("User ID:", userId);
+    console.log("User ID:", userId || "anonymous");
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
     console.log("High quality mode:", highQuality ? "YES" : "NO");
     console.log("Audio data length:", audio.length);
     console.log("Recording time provided:", recordingTime ? `${recordingTime}ms` : "Not provided");
+    
+    // Validate recording time is reasonable
+    if (recordingTime && (recordingTime < 100 || recordingTime > 600000)) {
+      console.warn(`Suspicious recording time: ${recordingTime}ms. Will calculate based on data.`);
+    }
     
     // Process audio data in a try-catch block to handle any processing errors
     let binaryAudio;
@@ -215,23 +220,32 @@ serve(async (req) => {
       // Calculate audio duration more accurately based on provided recording time and file type
       let audioDuration = 0;
       
-      if (recordingTime && recordingTime > 100) {
-        // If recording time is provided and seems valid, use it (converting from ms to seconds)
+      if (recordingTime && recordingTime > 500 && recordingTime < 300000) {
+        // If recording time is provided and seems valid (between 0.5s and 5 minutes), use it (converting from ms to seconds)
         audioDuration = Math.round(recordingTime / 1000);
-        console.log(`Using provided recording time: ${audioDuration} seconds`);
+        console.log(`Using provided recording time: ${audioDuration} seconds (from ${recordingTime}ms)`);
       } else if (detectedFileType === 'webm') {
         // For WebM, estimate based on file size if no recording time
         audioDuration = Math.round(binaryAudio.length / 16000);
+        console.log(`Calculated duration based on WebM size: ${audioDuration} seconds`);
       } else if (detectedFileType === 'wav') {
         // For WAV (assuming 48kHz, 16-bit, stereo)
         audioDuration = Math.round(binaryAudio.length / 192000);
+        console.log(`Calculated duration based on WAV size: ${audioDuration} seconds`);
+      } else if (detectedFileType === 'mp4' || detectedFileType === 'm4a') {
+        // For MP4/M4A (rough estimation)
+        audioDuration = Math.round(binaryAudio.length / 32000);
+        console.log(`Calculated duration based on MP4/M4A size: ${audioDuration} seconds`);
       } else {
         // Fallback estimation based on transcription length
         const wordCount = transcribedText.split(/\s+/).length;
         audioDuration = Math.max(1, Math.round(wordCount / 2.5)); 
+        console.log(`Calculated duration based on word count (${wordCount} words): ${audioDuration} seconds`);
       }
       
-      console.log(`Calculated audio duration: ${audioDuration} seconds`);
+      // Sanity check - ensure duration is at least 1 second
+      audioDuration = Math.max(1, audioDuration);
+      console.log(`Final audio duration: ${audioDuration} seconds`);
 
       // Store journal entry in database
       console.log("Storing journal entry...");
@@ -318,10 +332,12 @@ serve(async (req) => {
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);
+      console.error("Error stack:", error.stack);
       return createErrorResponse(error);
     }
   } catch (error) {
     console.error("Error in transcribe-audio function:", error);
+    console.error("Error stack:", error.stack);
     return createErrorResponse(error);
   }
 });
