@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { createLogEntry } from './debugUtils';
 import { DebugLogContextType, DebugLogEntry, LogLevel } from './debugLogTypes';
 
@@ -12,6 +12,11 @@ const DebugLogContext = createContext<DebugLogContextType>({
   isEnabled: false,
   toggleEnabled: () => {}
 });
+
+// Make debug methods available globally for non-React code
+if (typeof window !== 'undefined') {
+  window.__debugLog = window.__debugLog || {};
+}
 
 // Debug provider component
 export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -93,6 +98,27 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
     toggleEnabled
   };
   
+  // Make methods available globally so non-React code can access them
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__debugLog = {
+        ...window.__debugLog,
+        addEvent,
+        addLog,
+        clearLogs,
+        isEnabled,
+        toggleEnabled
+      };
+    }
+    
+    return () => {
+      // Cleanup on unmount
+      if (typeof window !== 'undefined') {
+        window.__debugLog = window.__debugLog || {};
+      }
+    };
+  }, [addEvent, addLog, clearLogs, isEnabled, toggleEnabled]);
+  
   return (
     <DebugLogContext.Provider value={value}>
       {children}
@@ -102,3 +128,16 @@ export const DebugLogProvider: React.FC<{ children: ReactNode }> = ({ children }
 
 // Hook to use the debug log context
 export const useDebugLog = () => useContext(DebugLogContext);
+
+// Add a TypeScript declaration for the window object to include our debug methods
+declare global {
+  interface Window {
+    __debugLog?: {
+      addEvent?: (category: string, message: string, level?: LogLevel, details?: any) => void;
+      addLog?: (category: string, message: string, level?: LogLevel, details?: any) => void;
+      clearLogs?: () => void;
+      isEnabled?: boolean;
+      toggleEnabled?: () => void;
+    };
+  }
+}

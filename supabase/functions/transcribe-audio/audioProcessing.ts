@@ -26,6 +26,10 @@ export function processBase64Chunks(base64String: string, chunkSize = 32768): Ui
     const chunks: Uint8Array[] = [];
     let position = 0;
     
+    // Process in chunks to avoid memory overflow
+    console.log('Starting chunk processing, chunk size:', chunkSize);
+    let chunksProcessed = 0;
+    
     while (position < cleanBase64.length) {
       const chunk = cleanBase64.slice(position, position + chunkSize);
       try {
@@ -37,6 +41,7 @@ export function processBase64Chunks(base64String: string, chunkSize = 32768): Ui
         }
         
         chunks.push(bytes);
+        chunksProcessed++;
       } catch (error) {
         console.error('Error processing base64 chunk:', error);
         // Skip bad chunk and continue
@@ -45,7 +50,11 @@ export function processBase64Chunks(base64String: string, chunkSize = 32768): Ui
       position += chunkSize;
     }
 
+    console.log(`Processed ${chunksProcessed} chunks successfully`);
+    
     const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    console.log(`Total binary data size: ${totalLength} bytes`);
+    
     const result = new Uint8Array(totalLength);
     let offset = 0;
 
@@ -64,6 +73,7 @@ export function processBase64Chunks(base64String: string, chunkSize = 32768): Ui
       for (let i = result.length; i < paddedResult.length; i++) {
         paddedResult[i] = 0;
       }
+      console.log(`After padding, total size: ${paddedResult.length} bytes`);
       return paddedResult;
     }
 
@@ -80,8 +90,11 @@ export function processBase64Chunks(base64String: string, chunkSize = 32768): Ui
  * Detects the file type from the audio data
  */
 export function detectFileType(data: Uint8Array): string {
+  console.log('Running file type detection on binary data');
+  
   // Check for WebM signature
   if (data.length > 4 && data[0] === 0x1A && data[1] === 0x45 && data[2] === 0xDF && data[3] === 0xA3) {
+    console.log('Detected WebM signature');
     return 'webm';
   }
   
@@ -91,6 +104,7 @@ export function detectFileType(data: Uint8Array): string {
     try {
       const ftypString = String.fromCharCode(...possibleMP4);
       if (ftypString === 'ftyp') {
+        console.log('Detected MP4 signature');
         return 'mp4';
       }
     } catch (e) {
@@ -104,6 +118,7 @@ export function detectFileType(data: Uint8Array): string {
       const possibleRIFF = String.fromCharCode(...new Uint8Array(data.buffer, 0, 4));
       const possibleWAVE = String.fromCharCode(...new Uint8Array(data.buffer, 8, 4));
       if (possibleRIFF === 'RIFF' && possibleWAVE === 'WAVE') {
+        console.log('Detected WAV signature');
         return 'wav';
       }
     } catch (e) {
@@ -113,11 +128,13 @@ export function detectFileType(data: Uint8Array): string {
   
   // Check for MP3 signature (ID3)
   if (data.length > 3 && data[0] === 0x49 && data[1] === 0x44 && data[2] === 0x33) {
+    console.log('Detected MP3 signature (ID3)');
     return 'mp3';
   }
   
   // Check for OGG signature
   if (data.length > 4 && data[0] === 0x4F && data[1] === 0x67 && data[2] === 0x67 && data[3] === 0x53) {
+    console.log('Detected OGG signature');
     return 'ogg';
   }
   
@@ -160,6 +177,7 @@ export function ensureValidAudioData(data: Uint8Array, fileType: string): Uint8A
       result.set(header);
       result.set(silence, header.length);
       
+      console.log(`Created valid WAV file with silence, total size: ${result.length} bytes`);
       return result;
     } else if (fileType === 'mp3') {
       // Create a minimal MP3 frame (silent)
@@ -174,9 +192,11 @@ export function ensureValidAudioData(data: Uint8Array, fileType: string): Uint8A
       result.set(header);
       result.set(silence, header.length);
       
+      console.log(`Created valid MP3 file with silence, total size: ${result.length} bytes`);
       return result;
     } else {
       // For WebM or other formats, return a larger padding
+      console.log(`Created generic padded file for ${fileType}, total size: 256KB`);
       return new Uint8Array(262144).fill(0); // 256KB of silence
     }
   }

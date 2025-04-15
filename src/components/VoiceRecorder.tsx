@@ -15,6 +15,7 @@ import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { AnimatedPrompt } from '@/components/voice-recorder/AnimatedPrompt';
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
+import { RecordingDebugger } from '@/components/debug/RecordingDebugger';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -33,6 +34,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [waitingForClear, setWaitingForClear] = useState(false);
   const [toastsCleared, setToastsCleared] = useState(false);
   const [playableBlob, setPlayableBlob] = useState<Blob | null>(null);
+  const [debugInfo, setDebugInfo] = useState<{status: string, duration?: number}>({
+    status: 'No Recording'
+  });
   const saveCompleteRef = useRef(false);
   const savingInProgressRef = useRef(false);
   const domClearAttemptedRef = useRef(false);
@@ -159,13 +163,18 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       recordingTime
     });
     
+    // Update debug info state for the debugger component
+    const newDebugInfo = {
+      status: isRecording 
+        ? 'Recording' 
+        : (audioBlob ? 'Recorded' : 'No Recording'),
+      duration: audioDuration || recordingTime
+    };
+    
+    setDebugInfo(newDebugInfo);
+    
     if (updateDebugInfo) {
-      updateDebugInfo({
-        status: isRecording 
-          ? 'Recording' 
-          : (audioBlob ? 'Recorded' : 'No Recording'),
-        duration: audioDuration || recordingTime
-      });
+      updateDebugInfo(newDebugInfo);
     }
   }, [isProcessing, audioBlob, playableBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
@@ -409,6 +418,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           )}
         </div>
       </div>
+      
+      {/* Add the Recording Debugger component */}
+      <RecordingDebugger 
+        currentStatus={debugInfo.status} 
+        audioDuration={debugInfo.duration}
+        audioBlob={audioBlob}
+      />
     </div>
   );
 }
